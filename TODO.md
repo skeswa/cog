@@ -14,3 +14,5 @@
 - [ ] comprehensive `Subject` compat tests
 - [ ] disposable `CogState`
 - [ ] comprehensive disposable `CogState` tests
+- [ ] doc comment all the things
+- [ ] g3doc all the things
