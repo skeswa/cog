@@ -80,6 +80,80 @@ void main() {
       });
     });
 
+    group('Simple sync watching', () {
+      setUp(() {
+        cogtext = Cogtext(
+          cogValueRuntime: Cogtime(
+            logging: logging,
+            scheduler: SyncTestingCogValueRuntimeScheduler(),
+          ),
+        );
+      });
+
+      test('watching from a spun automatic Cog without specifying spin throws',
+          () {
+        final numberCog = Cog((c) {
+          return 4;
+        }, init: null.of<int>(), spin: Spin<bool>());
+
+        expect(() => numberCog.watch(cogtext), throwsArgumentError);
+      });
+
+      test('watching from a spun manual Cog without specifying spin throws',
+          () {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        expect(() => numberCog.watch(cogtext), throwsArgumentError);
+      });
+
+      test(
+          'watching from an unspun automatic Cog '
+          'without specifying spin throws', () {
+        final numberCog = Cog((c) {
+          return 4;
+        }, init: null.of<int>());
+
+        expect(
+            () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
+      });
+
+      test('watching from an unspun manual Cog without specifying spin throws',
+          () {
+        final numberCog = Cog.man(() => 4);
+
+        expect(
+            () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
+      });
+
+      test('you can watch from a spun manual Cog', () {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
+      });
+
+      test('you can watch from a spun automatic Cog', () {
+        final numberCog = Cog((c) {
+          return 4;
+        }, init: null.of<int>(), spin: Spin<bool>());
+
+        expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
+      });
+
+      test('you can watch from an unspun manual Cog', () {
+        final numberCog = Cog.man(() => 4);
+
+        expect(numberCog.watch(cogtext).isBroadcast, isTrue);
+      });
+
+      test('you can watch from an unspun automatic Cog', () {
+        final numberCog = Cog((c) {
+          return 4;
+        }, init: null.of<int>());
+
+        expect(numberCog.watch(cogtext).isBroadcast, isTrue);
+      });
+    });
+
     group('Simple sync reading and writing', () {
       setUp(() {
         cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
