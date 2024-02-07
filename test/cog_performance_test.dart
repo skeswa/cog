@@ -6,19 +6,16 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog Performance', () {
     late Cogtext cogtext;
-    late SyncTestingCogStateRuntimeScheduler scheduler;
     late TestingCogStateRuntimeTelemetry telemetry;
 
     setUpLogging();
 
     setUp(() {
-      scheduler = SyncTestingCogStateRuntimeScheduler();
       telemetry = TestingCogStateRuntimeTelemetry();
 
       cogtext = Cogtext(
         cogStateRuntime: StandardCogStateRuntime(
           logging: TestingCogStateRuntimeLogger(),
-          scheduler: scheduler,
           telemetry: telemetry,
         ),
       );

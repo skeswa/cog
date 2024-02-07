@@ -84,12 +84,8 @@ void main() {
 
     group('Simple sync watching', () {
       setUp(() {
-        cogtext = Cogtext(
-          cogStateRuntime: StandardCogStateRuntime(
-            logging: logging,
-            scheduler: SyncTestingCogStateRuntimeScheduler(),
-          ),
-        );
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
       test('watching from a spun automatic Cog without specifying spin throws',
