@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:cog/src/notification_urgency.dart';
-
 import 'common.dart';
 import 'cog_registry.dart';
-import 'cog_value_runtime.dart';
-import 'cogtime.dart';
+import 'cog_state_runtime.dart';
+import 'notification_urgency.dart';
+import 'standard_cog_state_runtime.dart';
 import 'spin.dart';
 
 part 'automatic_cog.dart';
@@ -15,9 +14,9 @@ part 'manual_cog.dart';
 sealed class Cog<ValueType, SpinType> {
   String? debugLabel;
 
-  final CogValueComparator<ValueType> eq;
+  final CogStateComparator<ValueType> eq;
 
-  final CogValueInitializer<ValueType> init;
+  final CogStateInitializer<ValueType> init;
 
   late final CogOrdinal ordinal;
 
@@ -26,8 +25,8 @@ sealed class Cog<ValueType, SpinType> {
   factory Cog(
     AutomaticCogDefinition<ValueType, SpinType> def, {
     String? debugLabel,
-    CogValueComparator<ValueType>? eq,
-    required CogValueInitializer<ValueType> init,
+    CogStateComparator<ValueType>? eq,
+    required CogStateInitializer<ValueType> init,
     CogRegistry? registry,
     Spin<SpinType>? spin,
     Duration? ttl,
@@ -43,9 +42,9 @@ sealed class Cog<ValueType, SpinType> {
       );
 
   static ManualCog<ValueType, SpinType> man<ValueType, SpinType>(
-    CogValueInitializer<ValueType> init, {
+    CogStateInitializer<ValueType> init, {
     String? debugLabel,
-    CogValueComparator<ValueType>? eq,
+    CogStateComparator<ValueType>? eq,
     CogRegistry? registry,
     Spin<SpinType>? spin,
   }) =>
@@ -72,9 +71,9 @@ sealed class Cog<ValueType, SpinType> {
   }) {
     _assertThatSpinMatches(spin);
 
-    final cogValue = cogtext._cogValueRuntime.acquire(cog: this, cogSpin: spin);
+    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
 
-    return cogValue.value;
+    return cogState.value;
   }
 
   Stream<ValueType> watch(
@@ -84,7 +83,7 @@ sealed class Cog<ValueType, SpinType> {
   }) {
     _assertThatSpinMatches(spin);
 
-    return cogtext._cogValueRuntime.acquireValueChangeStream(
+    return cogtext._cogStateRuntime.acquireValueChangeStream(
       cog: this,
       cogSpin: spin,
       urgency: urgency,
@@ -95,15 +94,15 @@ sealed class Cog<ValueType, SpinType> {
     assert(() {
       if (this.spin == null && spin != null) {
         throw ArgumentError(
-          'Cannot read with spin from a Cog that '
+          'Cannot read or watch a Cog with spin that '
           'does not specify a spin in its definition',
         );
       }
 
       if (this.spin != null && spin == null) {
         throw ArgumentError(
-          'Cannot read without spin from a Cog that '
-          'does specifies a spin in its definition',
+          'Cannot read or watch a Cog without spin that '
+          'specifies a spin in its definition',
         );
       }
 

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'cog_value_runtime_logging.dart';
+import 'cog_state_runtime_logging.dart';
 
-abstract interface class CogValueRuntimeScheduler {
+abstract interface class CogStateRuntimeScheduler {
   void scheduleBackgroundTask(
     void Function() backgroundTask, {
     bool isHighPriority = false,
@@ -15,23 +15,25 @@ abstract interface class CogValueRuntimeScheduler {
   );
 }
 
-final class NaiveCogValueRuntimeScheduler implements CogValueRuntimeScheduler {
+final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
   final _BackgroundTaskScheduler _highPriorityBackgroundTaskScheduler;
   final _BackgroundTaskScheduler _lowPriorityBackgroundTaskScheduler;
 
-  NaiveCogValueRuntimeScheduler({
+  NaiveCogStateRuntimeScheduler({
     Duration highPriorityBackgroundTaskDelay =
         _naiveHighPriorityBackgroundTaskDelay,
     Duration lowPriorityBackgroundTaskDelay =
         _naiveLowPriorityBackgroundTaskDelay,
-    required CogValueRuntimeLogging logging,
+    required CogStateRuntimeLogging logging,
   })  : _highPriorityBackgroundTaskScheduler = _BackgroundTaskScheduler(
           backgroundTaskDelay: highPriorityBackgroundTaskDelay,
           logging: logging,
+          logMessage: 'executing high priority background tasks',
         ),
         _lowPriorityBackgroundTaskScheduler = _BackgroundTaskScheduler(
           backgroundTaskDelay: lowPriorityBackgroundTaskDelay,
           logging: logging,
+          logMessage: 'executing low priority background tasks',
         );
 
   @override
@@ -61,13 +63,16 @@ final class _BackgroundTaskScheduler {
   final Duration _backgroundTaskDelay;
   final _backgroundTasks = Queue<void Function()>();
   Timer? _backgroundTaskTimer;
-  final CogValueRuntimeLogging _logging;
+  final String _logMessage;
+  final CogStateRuntimeLogging _logging;
 
   _BackgroundTaskScheduler({
     required Duration backgroundTaskDelay,
-    required CogValueRuntimeLogging logging,
+    required CogStateRuntimeLogging logging,
+    required String logMessage,
   })  : _backgroundTaskDelay = backgroundTaskDelay,
-        _logging = logging;
+        _logging = logging,
+        _logMessage = logMessage;
 
   void schedule(void Function() backgroundTask) {
     if (!_backgroundTasks.contains(backgroundTask)) {
@@ -80,7 +85,7 @@ final class _BackgroundTaskScheduler {
   void _onTimerElapsed() {
     _backgroundTaskTimer = null;
 
-    _logging.debug(null, 'Executing background tasks');
+    _logging.debug(null, _logMessage);
 
     while (_backgroundTasks.isNotEmpty) {
       final backgroundTask = _backgroundTasks.removeFirst();

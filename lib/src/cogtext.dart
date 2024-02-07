@@ -1,8 +1,8 @@
 part of 'cog.dart';
 
 final class Cogtext {
-  final CogValueRuntime _cogValueRuntime;
+  final CogStateRuntime _cogStateRuntime;
 
-  Cogtext({CogValueRuntime? cogValueRuntime})
-      : _cogValueRuntime = cogValueRuntime ?? Cogtime();
+  Cogtext({CogStateRuntime? cogStateRuntime})
+      : _cogStateRuntime = cogStateRuntime ?? StandardCogStateRuntime();
 }

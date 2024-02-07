@@ -1,4 +1,5 @@
 import 'package:cog/cog.dart';
+import 'package:cog/src/notification_urgency.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
@@ -6,17 +7,18 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog API', () {
     late Cogtext cogtext;
-    late TestingCogValueRuntimeLogger logging;
+    late TestingCogStateRuntimeLogger logging;
 
     setUpLogging();
 
     setUp(() {
-      logging = TestingCogValueRuntimeLogger();
+      logging = TestingCogStateRuntimeLogger();
     });
 
     group('Simple sync reading', () {
       setUp(() {
-        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
       test('reading from a spun automatic Cog without specifying spin throws',
@@ -83,9 +85,9 @@ void main() {
     group('Simple sync watching', () {
       setUp(() {
         cogtext = Cogtext(
-          cogValueRuntime: Cogtime(
+          cogStateRuntime: StandardCogStateRuntime(
             logging: logging,
-            scheduler: SyncTestingCogValueRuntimeScheduler(),
+            scheduler: SyncTestingCogStateRuntimeScheduler(),
           ),
         );
       });
@@ -156,7 +158,8 @@ void main() {
 
     group('Simple sync reading and writing', () {
       setUp(() {
-        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
       test('writing to a spun manual Cog without specifying spin throws', () {
@@ -206,9 +209,184 @@ void main() {
       });
     });
 
+    group('Simple async watching and writing', () {
+      setUp(() {
+        cogtext = Cogtext(
+          cogStateRuntime: StandardCogStateRuntime(
+            logging: logging,
+            scheduler: NaiveCogStateRuntimeScheduler(
+              logging: logging,
+              highPriorityBackgroundTaskDelay: Duration.zero,
+              lowPriorityBackgroundTaskDelay: Duration.zero,
+            ),
+          ),
+        );
+      });
+
+      test('you can watch and write to spun manual Cogs', () async {
+        final boolCog =
+            Cog.man(() => true, debugLabel: 'boolCog', spin: Spin<bool>());
+        final numberCog =
+            Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
+        final textCog =
+            Cog.man(() => 'hello', debugLabel: 'textCog', spin: Spin<bool>());
+
+        final emissions = [];
+        final subscriptions = [
+          boolCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.notUrgent,
+                spin: false,
+              )
+              .listen(emissions.add),
+          numberCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.urgent,
+                spin: false,
+              )
+              .listen(emissions.add),
+          numberCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.urgent,
+                spin: true,
+              )
+              .listen(emissions.add),
+          textCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.mostUrgent,
+                spin: false,
+              )
+              .listen(emissions.add),
+        ];
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        boolCog.write(cogtext, false, spin: false);
+        boolCog.write(cogtext, true, spin: false);
+        numberCog.write(cogtext, 5, spin: false);
+        numberCog.write(cogtext, 6, spin: false);
+        numberCog.write(cogtext, 66, spin: true);
+        numberCog.write(cogtext, 7, spin: false);
+        numberCog.write(cogtext, 7, spin: false);
+        numberCog.write(cogtext, 77, spin: true);
+        numberCog.write(cogtext, 77, spin: true);
+        textCog.write(cogtext, 'world', spin: false);
+        textCog.write(cogtext, 'mars', spin: false);
+        textCog.write(cogtext, 'jupiter', spin: false);
+        textCog.write(cogtext, 'saturn', spin: false);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['saturn', 77, 7, true]));
+
+        numberCog.write(cogtext, 8, spin: false);
+        numberCog.write(cogtext, 8, spin: false);
+        numberCog.write(cogtext, 8, spin: false);
+        textCog.write(cogtext, 'saturn', spin: false);
+        textCog.write(cogtext, 'neptune', spin: false);
+        boolCog.write(cogtext, false, spin: false);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['saturn', 77, 7, true, 'neptune', 8, false]));
+
+        for (final subscription in subscriptions) {
+          subscription.cancel();
+        }
+
+        numberCog.write(cogtext, 9, spin: false);
+
+        expect(emissions, equals(['saturn', 77, 7, true, 'neptune', 8, false]));
+
+        await Future.delayed(Duration.zero);
+      });
+
+      test('you can watch and write to unspun manual Cogs', () async {
+        final boolCog = Cog.man(() => true, debugLabel: 'boolCog');
+        final numberCog = Cog.man(() => 4, debugLabel: 'numberCog');
+        final textCog = Cog.man(() => 'hello', debugLabel: 'textCog');
+
+        final emissions = [];
+        final subscriptions = [
+          boolCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.notUrgent,
+              )
+              .listen(emissions.add),
+          numberCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.urgent,
+              )
+              .listen(emissions.add),
+          textCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.mostUrgent,
+              )
+              .listen(emissions.add),
+        ];
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        boolCog.write(cogtext, false);
+        boolCog.write(cogtext, true);
+        numberCog.write(cogtext, 5);
+        numberCog.write(cogtext, 6);
+        numberCog.write(cogtext, 66);
+        numberCog.write(cogtext, 7);
+        numberCog.write(cogtext, 7);
+        numberCog.write(cogtext, 77);
+        numberCog.write(cogtext, 77);
+        textCog.write(cogtext, 'world');
+        textCog.write(cogtext, 'mars');
+        textCog.write(cogtext, 'jupiter');
+        textCog.write(cogtext, 'saturn');
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['saturn', 77, true]));
+
+        numberCog.write(cogtext, 8);
+        numberCog.write(cogtext, 8);
+        numberCog.write(cogtext, 8);
+        textCog.write(cogtext, 'saturn');
+        textCog.write(cogtext, 'neptune');
+        boolCog.write(cogtext, false);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['saturn', 77, true, 'neptune', 8, false]));
+
+        for (final subscription in subscriptions) {
+          subscription.cancel();
+        }
+
+        numberCog.write(cogtext, 9);
+
+        expect(emissions, equals(['saturn', 77, true, 'neptune', 8, false]));
+
+        await Future.delayed(Duration.zero);
+      });
+    });
+
     group('Complex sync reading', () {
       setUp(() {
-        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
       test('you can read from a chain of unspun automatic Cogs', () {
@@ -352,7 +530,8 @@ void main() {
 
     group('Complex sync reading and writing', () {
       setUp(() {
-        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
       test(

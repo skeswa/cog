@@ -1,52 +1,58 @@
 import 'package:cog/cog.dart';
 import 'package:logging/logging.dart';
 
-final class TestingCogValueRuntimeLogger implements CogValueRuntimeLogging {
-  final _logger = Logger('TestingCogValueRuntimeLogger');
+final class TestingCogStateRuntimeLogger implements CogStateRuntimeLogging {
+  final _logger = Logger('TestingCogStateRuntimeLogger');
 
   @override
-  void debug(CogValue? cogValue, String message, [Object? details]) {
-    if (isEnabled) {
+  void debug(
+    Object? cogStateOrCogStateOrdinal,
+    String message, [
+    Object? details,
+  ]) =>
       _log(
-        cogValue: cogValue,
+        cogStateOrCogStateOrdinal: cogStateOrCogStateOrdinal,
         error: details,
         level: Level.FINEST,
         message: message,
         stackTrace: null,
       );
-    }
-  }
 
   @override
   void error(
-    CogValue? cogValue,
+    Object? cogStateOrCogStateOrdinal,
     String message, [
     Object? error,
     StackTrace? stackTrace,
-  ]) {
-    if (isEnabled) {
+  ]) =>
       _log(
-        cogValue: cogValue,
+        cogStateOrCogStateOrdinal: cogStateOrCogStateOrdinal,
         error: error,
         level: Level.SEVERE,
         message: message,
         stackTrace: stackTrace,
       );
-    }
-  }
 
   void _log({
-    required CogValue? cogValue,
+    required Object? cogStateOrCogStateOrdinal,
     required Object? error,
     required Level level,
     required String message,
     required StackTrace? stackTrace,
   }) {
+    if (Logger.root.level > level) {
+      return;
+    }
+
     final stringBuffer = StringBuffer();
 
-    if (cogValue != null) {
+    if (cogStateOrCogStateOrdinal is CogState) {
       stringBuffer
-        ..writeCogValueDebugTagOf(cogValue)
+        ..writeCogStateDebugTagOf(cogStateOrCogStateOrdinal)
+        ..write(' ');
+    } else if (cogStateOrCogStateOrdinal is CogStateOrdinal) {
+      stringBuffer
+        ..writeCogStateOrdinalDebugTagOf(cogStateOrCogStateOrdinal)
         ..write(' ');
     }
 
@@ -59,16 +65,13 @@ final class TestingCogValueRuntimeLogger implements CogValueRuntimeLogging {
       stackTrace,
     );
   }
-
-  @override
-  bool get isEnabled => Logger.root.level <= Level.FINEST;
 }
 
 extension on StringBuffer {
-  void writeCogValueDebugTagOf(CogValue cogValue) {
+  void writeCogStateDebugTagOf(CogState cogState) {
     write('[');
 
-    final cog = cogValue.cog;
+    final cog = cogState.cog;
 
     if (cog.debugLabel != null) {
       write(cog.debugLabel);
@@ -81,17 +84,23 @@ extension on StringBuffer {
 
     write('::');
 
-    final spin = cogValue.spinOrNull;
+    final spin = cogState.spinOrNull;
 
     if (spin != null) {
       write(spin);
       write('<');
-      write(cogValue.ordinal);
+      write(cogState.ordinal);
       write('>');
     } else {
-      write(cogValue.ordinal);
+      write(cogState.ordinal);
     }
 
+    write(']');
+  }
+
+  void writeCogStateOrdinalDebugTagOf(CogStateOrdinal cogStateOrdinal) {
+    write('[?::');
+    write(cogStateOrdinal);
     write(']');
   }
 }

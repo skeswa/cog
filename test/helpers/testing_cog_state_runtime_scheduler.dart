@@ -1,7 +1,7 @@
 import 'package:cog/cog.dart';
 
-final class SyncTestingCogValueRuntimeScheduler
-    implements CogValueRuntimeScheduler {
+final class SyncTestingCogStateRuntimeScheduler
+    implements CogStateRuntimeScheduler {
   @override
   void scheduleBackgroundTask(
     void Function() backgroundTask, {

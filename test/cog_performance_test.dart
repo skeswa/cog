@@ -6,17 +6,18 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog Performance', () {
     late Cogtext cogtext;
-    late SyncTestingCogValueRuntimeScheduler scheduler;
-    late TestingCogValueRuntimeTelemetry telemetry;
+    late SyncTestingCogStateRuntimeScheduler scheduler;
+    late TestingCogStateRuntimeTelemetry telemetry;
 
     setUpLogging();
 
     setUp(() {
-      scheduler = SyncTestingCogValueRuntimeScheduler();
-      telemetry = TestingCogValueRuntimeTelemetry();
+      scheduler = SyncTestingCogStateRuntimeScheduler();
+      telemetry = TestingCogStateRuntimeTelemetry();
 
       cogtext = Cogtext(
-        cogValueRuntime: Cogtime(
+        cogStateRuntime: StandardCogStateRuntime(
+          logging: TestingCogStateRuntimeLogger(),
           scheduler: scheduler,
           telemetry: telemetry,
         ),
@@ -49,11 +50,10 @@ void main() {
         final dayOfTheWeekCog = Cog.man(
           () => Day.wednesday,
           debugLabel: 'dayOfTheWeekCog',
-          spin: Spin<City>(),
         );
 
         final isWeekendCog = Cog((c) {
-          final dayOfTheWeek = c.link(dayOfTheWeekCog, spin: c.spin);
+          final dayOfTheWeek = c.link(dayOfTheWeekCog);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
         }, debugLabel: 'isWeekendCog', init: () => false, spin: Spin<City>());
@@ -70,85 +70,84 @@ void main() {
           spin: Spin<City>(),
         );
 
-        final meterReads = [telemetry.meter];
+        var lastMeterRead = telemetry.meter;
+        final meterReads = [lastMeterRead];
 
         shouldGoToTheBeachCog.read(cogtext, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         shouldGoToTheBeachCog.read(cogtext, spin: City.brooklyn);
         shouldGoToTheBeachCog.read(cogtext, spin: City.cambridge);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         temperatureCog.write(cogtext, 24.0, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         temperatureCog
           ..write(cogtext, 18.0, spin: City.brooklyn)
           ..write(cogtext, 12.0, spin: City.cambridge);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         isNiceOutsideCog.read(cogtext, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         isNiceOutsideCog.read(cogtext, spin: City.brooklyn);
         isNiceOutsideCog.read(cogtext, spin: City.cambridge);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
-        dayOfTheWeekCog.write(cogtext, Day.saturday, spin: City.austin);
+        dayOfTheWeekCog.write(cogtext, Day.saturday);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         isNiceOutsideCog.read(cogtext, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         isNiceOutsideCog.read(cogtext, spin: City.brooklyn);
         isNiceOutsideCog.read(cogtext, spin: City.cambridge);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         shouldGoToTheBeachCog.read(cogtext, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         isWindyCog.write(cogtext, true, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         shouldGoToTheBeachCog.read(cogtext, spin: City.austin);
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         for (var i = 0; i < 100; i++) {
           shouldGoToTheBeachCog.read(cogtext, spin: City.austin);
         }
 
-        meterReads.add(telemetry.meter);
+        meterReads.add(telemetry.meter - lastMeterRead);
+        lastMeterRead = telemetry.meter;
 
         expect(
           meterReads,
-          equals([
-            0,
-            68,
-            204,
-            206,
-            208,
-            226,
-            243,
-            244,
-            244,
-            244,
-            278,
-            280,
-            316,
-            316,
-          ]),
+          equals([0, 71, 138, 3, 4, 19, 18, 6, 0, 0, 38, 3, 38, 0]),
         );
       });
     });

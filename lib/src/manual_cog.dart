@@ -3,11 +3,11 @@ part of 'cog.dart';
 final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   ManualCog._({
     super.debugLabel,
-    required CogValueComparator<ValueType>? eq,
+    required CogStateComparator<ValueType>? eq,
     required super.init,
     required CogRegistry? registry,
     required super.spin,
-  }) : super._(eq: eq ?? areCogValuesIdentical, registry: registry);
+  }) : super._(eq: eq ?? areCogStatesIdentical, registry: registry);
 
   @override
   String toString() => 'AutomaticCog<$ValueType'
@@ -38,8 +38,8 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
       return true;
     }());
 
-    final cogValue = cogtext._cogValueRuntime.acquire(cog: this, cogSpin: spin);
+    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
 
-    cogValue.maybeRevise(value);
+    cogState.maybeRevise(value);
   }
 }
