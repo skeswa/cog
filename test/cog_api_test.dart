@@ -6,18 +6,19 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog API', () {
     late Cogtext cogtext;
+    late TestingCogValueRuntimeLogger logging;
 
     setUpLogging();
 
     setUp(() {
-      cogtext = Cogtext(
-        cogValueRuntime: Cogtime(
-          logging: TestingCogValueRuntimeLogger(),
-        ),
-      );
+      logging = TestingCogValueRuntimeLogger();
     });
 
     group('Simple sync reading', () {
+      setUp(() {
+        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+      });
+
       test('reading from a spun automatic Cog without specifying spin throws',
           () {
         final numberCog = Cog((c) {
@@ -80,6 +81,10 @@ void main() {
     });
 
     group('Simple sync reading and writing', () {
+      setUp(() {
+        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+      });
+
       test('writing to a spun manual Cog without specifying spin throws', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
@@ -128,6 +133,10 @@ void main() {
     });
 
     group('Complex sync reading', () {
+      setUp(() {
+        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+      });
+
       test('you can read from a chain of unspun automatic Cogs', () {
         final isWindyCog =
             Cog((c) => false, debugLabel: 'isWindyCog', init: () => false);
@@ -268,6 +277,10 @@ void main() {
     });
 
     group('Complex sync reading and writing', () {
+      setUp(() {
+        cogtext = Cogtext(cogValueRuntime: Cogtime(logging: logging));
+      });
+
       test(
           'you can read from and write to a chain of Cogs where some are '
           'manual, some are spun, and some are both', () {
