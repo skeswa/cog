@@ -79,7 +79,7 @@ sealed class Cog<ValueType, SpinType> {
   Stream<ValueType> watch(
     Cogtext cogtext, {
     SpinType? spin,
-    NotificationUrgency urgency = NotificationUrgency.notUrgent,
+    NotificationUrgency urgency = NotificationUrgency.lessUrgent,
   }) {
     _assertThatSpinMatches(spin);
 

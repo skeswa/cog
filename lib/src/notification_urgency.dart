@@ -1,6 +1,6 @@
 final class NotificationUrgency {
-  static const mostUrgent = NotificationUrgency._('mostUrgent', 3);
-  static const notUrgent = NotificationUrgency._('notUrgent', 1);
+  static const lessUrgent = NotificationUrgency._('lessUrgent', 1);
+  static const moreUrgent = NotificationUrgency._('moreUrgent', 3);
   static const urgent = NotificationUrgency._('urgent', 2);
 
   final String _label;

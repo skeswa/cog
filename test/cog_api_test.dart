@@ -232,7 +232,7 @@ void main() {
           boolCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.notUrgent,
+                urgency: NotificationUrgency.lessUrgent,
                 spin: false,
               )
               .listen(emissions.add),
@@ -253,7 +253,7 @@ void main() {
           textCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.mostUrgent,
+                urgency: NotificationUrgency.moreUrgent,
                 spin: false,
               )
               .listen(emissions.add),
@@ -315,7 +315,7 @@ void main() {
           boolCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.notUrgent,
+                urgency: NotificationUrgency.lessUrgent,
               )
               .listen(emissions.add),
           numberCog
@@ -327,7 +327,7 @@ void main() {
           textCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.mostUrgent,
+                urgency: NotificationUrgency.moreUrgent,
               )
               .listen(emissions.add),
         ];
