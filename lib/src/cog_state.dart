@@ -34,9 +34,35 @@ sealed class CogState<ValueType, SpinType,
   })  : _spin = spin,
         _value = cog.init();
 
+  ValueType evaluate() => _value;
+
+  void init() {}
+
   bool get isActuallyStale => false;
 
-  void maybeRevise(ValueType value) {
+  void markStale({
+    Staleness staleness = Staleness.stale,
+  }) {
+    assert(() {
+      if (staleness == Staleness.fresh) {
+        throw ArgumentError('Staleness cannot be set to fresh externally');
+      }
+
+      return true;
+    }());
+
+    final didUpdateStaleness = _updateStaleness(staleness);
+
+    if (didUpdateStaleness && staleness != Staleness.fresh) {
+      runtime.maybeNotifyListenersOf(ordinal);
+
+      for (final followerOrdinal in runtime.followerOrdinalsOf(ordinal)) {
+        runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
+      }
+    }
+  }
+
+  void maybeRevise(ValueType value, {bool quietly = false}) {
     final shouldRevise = !cog.eq(_value, value);
 
     if (shouldRevise) {
@@ -50,10 +76,15 @@ sealed class CogState<ValueType, SpinType,
       _value = value;
 
       for (final followerOrdinal in runtime.followerOrdinalsOf(ordinal)) {
-        runtime[followerOrdinal].staleness = Staleness.stale;
+        runtime[followerOrdinal].markStale();
       }
 
-      runtime.maybeNotifyListenersOf(ordinal);
+      if (!quietly) {
+        runtime.maybeNotifyListenersOf(ordinal);
+      } else {
+        runtime.logging
+            .debug(this, 'skipping listener notification - quietly = true');
+      }
     } else {
       runtime.logging
           .debug(this, 'no revision - new value was equal to old value');
@@ -98,28 +129,6 @@ sealed class CogState<ValueType, SpinType,
 
     return _staleness;
   }
-
-  set staleness(Staleness staleness) {
-    assert(() {
-      if (staleness == Staleness.fresh) {
-        throw ArgumentError('Staleness cannot be set to fresh externally');
-      }
-
-      return true;
-    }());
-
-    final didUpdateStaleness = _updateStaleness(staleness);
-
-    if (didUpdateStaleness && staleness != Staleness.fresh) {
-      runtime.maybeNotifyListenersOf(ordinal);
-
-      for (final followerOrdinal in runtime.followerOrdinalsOf(ordinal)) {
-        runtime[followerOrdinal].staleness = Staleness.maybeStale;
-      }
-    }
-  }
-
-  ValueType get value => _value;
 
   bool _updateStaleness(Staleness staleness) {
     if (staleness == _staleness) {

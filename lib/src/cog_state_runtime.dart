@@ -14,8 +14,8 @@ abstract interface class CogStateRuntime {
   });
 
   Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
-    required CogSpinType? cogSpin,
+    required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
+        cogState,
     required NotificationUrgency urgency,
   });
 

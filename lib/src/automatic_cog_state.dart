@@ -3,7 +3,7 @@ part of 'cog_state.dart';
 final class AutomaticCogState<ValueType, SpinType>
     extends CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
     implements AutomaticCogController<ValueType, SpinType> {
-  CogStateRevision _leaderRevisionHash = initialCogStateRevision;
+  CogStateRevision? _leaderRevisionHash;
 
   late var _linkedLeaderOrdinals = <CogStateOrdinal>[];
 
@@ -17,7 +17,19 @@ final class AutomaticCogState<ValueType, SpinType>
   });
 
   @override
-  ValueType get curr => super.value;
+  ValueType get curr => _value;
+
+  @override
+  ValueType evaluate() {
+    _maybeRecalculateValue();
+
+    return _value;
+  }
+
+  @override
+  void init() {
+    maybeRevise(_recalculateValue(), quietly: true);
+  }
 
   @override
   bool get isActuallyStale {
@@ -31,22 +43,13 @@ final class AutomaticCogState<ValueType, SpinType>
     Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
     LinkedCogSpinType? spin,
   }) {
-    assert(() {
-      if (cog.spin == null && spin != null) {
-        throw ArgumentError(
-          'When linking to a cog that does not specify a spin type, '
-          'a spin value cannot be specified',
-        );
-      }
-
-      return true;
-    }());
+    assert(thatSpinsMatch(cog, spin));
 
     final cogState = runtime.acquire(cog: cog, cogSpin: spin);
 
     _linkedLeaderOrdinals.add(cogState.ordinal);
 
-    return cogState.value;
+    return cogState.evaluate();
   }
 
   @override
@@ -54,13 +57,6 @@ final class AutomaticCogState<ValueType, SpinType>
     _maybeRecalculateValue();
 
     return _revision;
-  }
-
-  @override
-  ValueType get value {
-    _maybeRecalculateValue();
-
-    return _value;
   }
 
   CogStateRevisionHash _calculateLeaderRevisionHash() {
@@ -115,8 +111,8 @@ final class AutomaticCogState<ValueType, SpinType>
       if (_previouslyLinkedLeaderOrdinals[i] < _linkedLeaderOrdinals[j]) {
         // Looks like this previously linked leader ordinal is no longer linked.
         runtime.terminateCogStateDependency(
-          leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
           followerCogStateOrdinal: ordinal,
+          leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
         );
 
         i++;
@@ -124,8 +120,8 @@ final class AutomaticCogState<ValueType, SpinType>
           _linkedLeaderOrdinals[j]) {
         // Looks like we have a newly linked leader ordinal.
         runtime.renewCogStateDependency(
-          leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
           followerCogStateOrdinal: ordinal,
+          leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
         );
 
         j++;
@@ -140,16 +136,16 @@ final class AutomaticCogState<ValueType, SpinType>
     // We need to account for one of the lists being longer than the other.
     while (i < _previouslyLinkedLeaderOrdinals.length) {
       runtime.terminateCogStateDependency(
-        leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
         followerCogStateOrdinal: ordinal,
+        leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
       );
 
       i++;
     }
     while (j < _linkedLeaderOrdinals.length) {
       runtime.renewCogStateDependency(
-        leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
         followerCogStateOrdinal: ordinal,
+        leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
       );
 
       j++;

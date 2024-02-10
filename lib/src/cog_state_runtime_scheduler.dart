@@ -63,6 +63,7 @@ final class _BackgroundTaskScheduler {
   final Duration _backgroundTaskDelay;
   final _backgroundTasks = Queue<void Function()>();
   Timer? _backgroundTaskTimer;
+  void Function()? _inProgressBackgroundTask;
   final String _logMessage;
   final CogStateRuntimeLogging _logging;
 
@@ -75,8 +76,15 @@ final class _BackgroundTaskScheduler {
         _logMessage = logMessage;
 
   void schedule(void Function() backgroundTask) {
-    if (!_backgroundTasks.contains(backgroundTask)) {
+    if (backgroundTask != _inProgressBackgroundTask &&
+        !_backgroundTasks.contains(backgroundTask)) {
       _backgroundTasks.add(backgroundTask);
+    } else {
+      _logging.debug(
+        null,
+        'skipping background task because it is '
+        'already in progress or will be soon',
+      );
     }
 
     _backgroundTaskTimer ??= Timer(_backgroundTaskDelay, _onTimerElapsed);
@@ -90,11 +98,15 @@ final class _BackgroundTaskScheduler {
     while (_backgroundTasks.isNotEmpty) {
       final backgroundTask = _backgroundTasks.removeFirst();
 
+      _inProgressBackgroundTask = backgroundTask;
+
       try {
         backgroundTask();
       } catch (e, stackTrace) {
         _logging.error(
             null, 'Failed to execute background task', e, stackTrace);
+      } finally {
+        _inProgressBackgroundTask = null;
       }
     }
   }

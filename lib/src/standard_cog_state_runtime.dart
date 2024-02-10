@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 import 'cog.dart';
 import 'cog_state.dart';
 import 'cog_state_runtime.dart';
@@ -20,7 +22,9 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   final _cogStateListeningPosts = <CogStateListeningPost?>[];
   final _cogStates = <CogState>[];
   final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
-  final _cogStateListeningPostsToMaybeNotify = <CogStateListeningPost>[];
+  final _cogStateListeningPostsToMaybeNotify =
+      PriorityQueue<CogStateListeningPost>(
+          _compareCogStateListeningPostsToMaybeNotify);
 
   StandardCogStateRuntime({
     this.logging = const NoOpCogStateRuntimeLogging(),
@@ -70,12 +74,10 @@ final class StandardCogStateRuntime implements CogStateRuntime {
 
   @override
   Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
-    required CogSpinType? cogSpin,
+    required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
+        cogState,
     required NotificationUrgency urgency,
   }) {
-    final cogState = acquire(cog: cog, cogSpin: cogSpin);
-
     final existingCogStateListeningPost =
         _cogStateListeningPosts[cogState.ordinal];
 
@@ -206,6 +208,8 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     _cogStates.add(cogState);
     _cogStateOrdinalByHash[cogStateHash] = ordinal;
 
+    cogState.init();
+
     logging.debug(cogState, 'created new cog value');
 
     return cogState;
@@ -268,23 +272,33 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   void _onCogStateListeningPostsReadyForNotification() {
     logging.debug(null, 'executing pending potential listener notifications');
 
-    _cogStateListeningPostsToMaybeNotify
-        .sort(_compareCogStateListeningPostsToMaybeNotify);
-
+    var iterationCount = 0;
     CogStateListeningPost? previousCogStateListeningPost;
 
-    for (final cogStateListeningPost in _cogStateListeningPostsToMaybeNotify) {
+    while (iterationCount < _listeningPostNotificationLimit &&
+        _cogStateListeningPostsToMaybeNotify.isNotEmpty) {
+      final cogStateListeningPost =
+          _cogStateListeningPostsToMaybeNotify.removeFirst();
+
       if (cogStateListeningPost == previousCogStateListeningPost) {
         continue;
       }
 
       cogStateListeningPost.maybeNotify();
       previousCogStateListeningPost = cogStateListeningPost;
+      iterationCount++;
     }
 
     _cogStateListeningPostsToMaybeNotify.clear();
+
+    if (iterationCount >= _listeningPostNotificationLimit) {
+      logging.error(null, 'reached listening post notification limit');
+    }
   }
 }
+
+/// Maximum number of consecutive listening post notifications.
+const _listeningPostNotificationLimit = 1000;
 
 /// Comparator that sorts a collection of [CogStateListeningPost] instances from
 /// most urgent to least urgent, then from high [CogStateOrdinal] to low

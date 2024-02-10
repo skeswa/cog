@@ -69,11 +69,11 @@ sealed class Cog<ValueType, SpinType> {
     Cogtext cogtext, {
     SpinType? spin,
   }) {
-    _assertThatSpinMatches(spin);
+    assert(thatSpinsMatch(this, spin));
 
     final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
 
-    return cogState.value;
+    return cogState.evaluate();
   }
 
   Stream<ValueType> watch(
@@ -81,32 +81,13 @@ sealed class Cog<ValueType, SpinType> {
     SpinType? spin,
     NotificationUrgency urgency = NotificationUrgency.lessUrgent,
   }) {
-    _assertThatSpinMatches(spin);
+    assert(thatSpinsMatch(this, spin));
+
+    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
 
     return cogtext._cogStateRuntime.acquireValueChangeStream(
-      cog: this,
-      cogSpin: spin,
+      cogState: cogState,
       urgency: urgency,
     );
-  }
-
-  void _assertThatSpinMatches(SpinType? spin) {
-    assert(() {
-      if (this.spin == null && spin != null) {
-        throw ArgumentError(
-          'Cannot read or watch a Cog with spin that '
-          'does not specify a spin in its definition',
-        );
-      }
-
-      if (this.spin != null && spin == null) {
-        throw ArgumentError(
-          'Cannot read or watch a Cog without spin that '
-          'specifies a spin in its definition',
-        );
-      }
-
-      return true;
-    }());
   }
 }

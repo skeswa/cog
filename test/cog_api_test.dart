@@ -1,5 +1,4 @@
 import 'package:cog/cog.dart';
-import 'package:cog/src/notification_urgency.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
@@ -219,7 +218,154 @@ void main() {
         );
       });
 
-      test('you can watch and write to spun manual Cogs', () async {
+      test(
+          'watching a spun manual Cog to which a value is '
+          'written triggers a notification', () async {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        final emissions = [];
+        final subscription =
+            numberCog.watch(cogtext, spin: false).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await Future.delayed(Duration.zero);
+      });
+
+      test(
+          'watching an unspun manual Cog to which a value is '
+          'written triggers a notification', () async {
+        final numberCog = Cog.man(() => 4);
+
+        final emissions = [];
+        final subscription = numberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+      });
+
+      test(
+          'watching a spun automatic Cog to which a value is '
+          'written triggers a notification', () async {
+        final numberCog =
+            Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
+
+        final squaredNumberCog = Cog((c) {
+          final number = c.link(numberCog, spin: c.spin);
+
+          return number * number;
+        }, debugLabel: 'squaredNumberCog', init: () => -1, spin: Spin<bool>());
+
+        final emissions = [];
+        final subscription =
+            squaredNumberCog.watch(cogtext, spin: false).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([25]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([25]));
+
+        await Future.delayed(Duration.zero);
+      });
+
+      test(
+          'watching an unspun automatic Cog to which a value is '
+          'written triggers a notification', () async {
+        final numberCog =
+            Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
+
+        final squaredNumberCog = Cog((c) {
+          final number = c.link(numberCog, spin: false);
+
+          return number * number;
+        }, debugLabel: 'squaredNumberCog', init: () => -1);
+
+        final emissions = [];
+        final subscription =
+            squaredNumberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([25]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([25]));
+
+        await Future.delayed(Duration.zero);
+      });
+
+      test('you can watch and write multiple spun manual Cogs', () async {
         final boolCog =
             Cog.man(() => true, debugLabel: 'boolCog', spin: Spin<bool>());
         final numberCog =
@@ -305,7 +451,7 @@ void main() {
         await Future.delayed(Duration.zero);
       });
 
-      test('you can watch and write to unspun manual Cogs', () async {
+      test('you can watch and write to multiple unspun manual Cogs', () async {
         final boolCog = Cog.man(() => true, debugLabel: 'boolCog');
         final numberCog = Cog.man(() => 4, debugLabel: 'numberCog');
         final textCog = Cog.man(() => 'hello', debugLabel: 'textCog');
