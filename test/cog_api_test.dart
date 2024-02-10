@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cog/cog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,7 +16,7 @@ void main() {
       logging = TestingCogStateRuntimeLogger();
     });
 
-    group('Simple sync reading', () {
+    group('Simple reading', () {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
@@ -81,7 +83,7 @@ void main() {
       });
     });
 
-    group('Simple sync watching', () {
+    group('Simple watching', () {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
@@ -151,7 +153,7 @@ void main() {
       });
     });
 
-    group('Simple sync reading and writing', () {
+    group('Simple reading and writing', () {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
@@ -204,7 +206,7 @@ void main() {
       });
     });
 
-    group('Simple async watching and writing', () {
+    group('Simple watching and writing', () {
       setUp(() {
         cogtext = Cogtext(
           cogStateRuntime: StandardCogStateRuntime(
@@ -523,9 +525,288 @@ void main() {
 
         await Future.delayed(Duration.zero);
       });
+
+      test('you can watch and write multiple spun automatic Cogs', () async {
+        final aCog = Cog.man(() => 1, debugLabel: 'aCog', spin: Spin<bool>());
+        final bCog = Cog.man(() => 2, debugLabel: 'bCog', spin: Spin<bool>());
+        final cCog = Cog.man(() => 3, debugLabel: 'cCog', spin: Spin<bool>());
+
+        final negativeBCog = Cog((c) {
+          final b = c.link(bCog, spin: c.spin);
+
+          return -b;
+        }, debugLabel: 'negativeBCog', init: () => 0, spin: Spin<bool>());
+        final twoACog = Cog((c) {
+          final a = c.link(aCog, spin: c.spin);
+
+          return 2 * a;
+        }, debugLabel: 'twoACog', init: () => 0, spin: Spin<bool>());
+
+        final discriminantCog = Cog((c) {
+          final a = c.link(aCog, spin: c.spin);
+          final b = c.link(bCog, spin: c.spin);
+          final cVal = c.link(cCog, spin: c.spin);
+
+          return b * b - 4 * a * cVal;
+        }, debugLabel: 'discriminantCog', init: () => 0, spin: Spin<bool>());
+
+        final sqrtDiscriminantCog = Cog(
+          (c) {
+            final discriminant = c.link(discriminantCog, spin: c.spin);
+
+            return sqrt(discriminant);
+          },
+          debugLabel: 'sqrtDiscriminantCog',
+          init: () => 0.0,
+          spin: Spin<bool>(),
+        );
+
+        final answerCog = Cog(
+          (c) {
+            final negativeB = c.link(negativeBCog, spin: c.spin);
+            final sqrtDiscriminant = c.link(sqrtDiscriminantCog, spin: c.spin);
+            final twoA = c.link(twoACog, spin: c.spin);
+
+            return (
+              (negativeB + sqrtDiscriminant) / twoA,
+              (negativeB - sqrtDiscriminant) / twoA
+            );
+          },
+          debugLabel: 'sqrtDiscriminantCog',
+          init: () => (0.0, 0.0),
+          spin: Spin<bool>(),
+        );
+
+        final emissions = [];
+        final subscriptions = [
+          answerCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.lessUrgent,
+                spin: false,
+              )
+              .listen(emissions.add),
+          discriminantCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.moreUrgent,
+                spin: false,
+              )
+              .listen(emissions.add),
+        ];
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        aCog.write(cogtext, 6, spin: false);
+        bCog.write(cogtext, 11, spin: false);
+        cCog.write(cogtext, -35, spin: false);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([961, (5.0 / 3.0, -3.5)]));
+
+        cCog.write(cogtext, 0, spin: false);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            emissions,
+            equals([
+              961,
+              (5.0 / 3.0, -3.5),
+              121,
+              (0.0, -11 / 6),
+            ]));
+
+        aCog.write(cogtext, -4, spin: false);
+        bCog.write(cogtext, 7, spin: false);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            emissions,
+            equals([
+              961,
+              (5.0 / 3.0, -3.5),
+              121,
+              (0.0, -11 / 6),
+              49,
+              (0.0, 1.75),
+            ]));
+
+        aCog.write(cogtext, -4, spin: true);
+        bCog.write(cogtext, 7, spin: true);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            961,
+            (5.0 / 3.0, -3.5),
+            121,
+            (0.0, -11 / 6),
+            49,
+            (0.0, 1.75),
+          ]),
+        );
+
+        for (final subscription in subscriptions) {
+          subscription.cancel();
+        }
+
+        aCog.write(cogtext, 11, spin: false);
+
+        expect(
+          emissions,
+          equals([
+            961,
+            (5.0 / 3.0, -3.5),
+            121,
+            (0.0, -11 / 6),
+            49,
+            (0.0, 1.75),
+          ]),
+        );
+
+        await Future.delayed(Duration.zero);
+      });
+
+      test('you can watch and write multiple unspun automatic Cogs', () async {
+        final aCog = Cog.man(() => 1, debugLabel: 'aCog');
+        final bCog = Cog.man(() => 2, debugLabel: 'bCog');
+        final cCog = Cog.man(() => 3, debugLabel: 'cCog');
+
+        final negativeBCog = Cog((c) {
+          final b = c.link(bCog);
+
+          return -b;
+        }, debugLabel: 'negativeBCog', init: () => 0);
+        final twoACog = Cog((c) {
+          final a = c.link(aCog);
+
+          return 2 * a;
+        }, debugLabel: 'twoACog', init: () => 0);
+
+        final discriminantCog = Cog((c) {
+          final a = c.link(aCog);
+          final b = c.link(bCog);
+          final cVal = c.link(cCog);
+
+          return b * b - 4 * a * cVal;
+        }, debugLabel: 'discriminantCog', init: () => 0);
+
+        final sqrtDiscriminantCog = Cog(
+          (c) {
+            final discriminant = c.link(discriminantCog);
+
+            return sqrt(discriminant);
+          },
+          debugLabel: 'sqrtDiscriminantCog',
+          init: () => 0.0,
+        );
+
+        final answerCog = Cog(
+          (c) {
+            final negativeB = c.link(negativeBCog);
+            final sqrtDiscriminant = c.link(sqrtDiscriminantCog);
+            final twoA = c.link(twoACog);
+
+            return (
+              (negativeB + sqrtDiscriminant) / twoA,
+              (negativeB - sqrtDiscriminant) / twoA
+            );
+          },
+          debugLabel: 'sqrtDiscriminantCog',
+          init: () => (0.0, 0.0),
+        );
+
+        final emissions = [];
+        final subscriptions = [
+          answerCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.lessUrgent,
+              )
+              .listen(emissions.add),
+          discriminantCog
+              .watch(
+                cogtext,
+                urgency: NotificationUrgency.moreUrgent,
+              )
+              .listen(emissions.add),
+        ];
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        aCog.write(cogtext, 6);
+        bCog.write(cogtext, 11);
+        cCog.write(cogtext, -35);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([961, (5.0 / 3.0, -3.5)]));
+
+        cCog.write(cogtext, 0);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            emissions,
+            equals([
+              961,
+              (5.0 / 3.0, -3.5),
+              121,
+              (0.0, -11 / 6),
+            ]));
+
+        aCog.write(cogtext, -4);
+        bCog.write(cogtext, 7);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            emissions,
+            equals([
+              961,
+              (5.0 / 3.0, -3.5),
+              121,
+              (0.0, -11 / 6),
+              49,
+              (0.0, 1.75),
+            ]));
+
+        for (final subscription in subscriptions) {
+          subscription.cancel();
+        }
+
+        aCog.write(cogtext, 11);
+
+        expect(
+          emissions,
+          equals([
+            961,
+            (5.0 / 3.0, -3.5),
+            121,
+            (0.0, -11 / 6),
+            49,
+            (0.0, 1.75),
+          ]),
+        );
+
+        await Future.delayed(Duration.zero);
+      });
     });
 
-    group('Complex sync reading', () {
+    group('Complex reading', () {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
@@ -670,7 +951,7 @@ void main() {
       });
     });
 
-    group('Complex sync reading and writing', () {
+    group('Complex reading and writing', () {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
