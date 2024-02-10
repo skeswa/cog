@@ -25,14 +25,15 @@ final class CogStateListeningPost<ValueType, SpinType> {
         .recordCogStateListeningPostCreation(cogState.ordinal);
   }
 
-  void dispose() {
+  Future<void> dispose() {
     cogState.runtime.logging.debug(
       cogState,
       'disposing listening post',
     );
 
     _isActive = false;
-    _streamController.close();
+
+    return _streamController.close();
   }
 
   bool get isActive => _isActive;

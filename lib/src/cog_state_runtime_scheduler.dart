@@ -4,6 +4,8 @@ import 'dart:collection';
 import 'cog_state_runtime_logging.dart';
 
 abstract interface class CogStateRuntimeScheduler {
+  Future<void> dispose();
+
   void scheduleBackgroundTask(
     void Function() backgroundTask, {
     bool isHighPriority = false,
@@ -16,8 +18,9 @@ abstract interface class CogStateRuntimeScheduler {
 }
 
 final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
-  final _BackgroundTaskScheduler _highPriorityBackgroundTaskScheduler;
-  final _BackgroundTaskScheduler _lowPriorityBackgroundTaskScheduler;
+  final _NaiveBackgroundTaskScheduler _highPriorityBackgroundTaskScheduler;
+  final _NaiveBackgroundTaskScheduler _lowPriorityBackgroundTaskScheduler;
+  final _scheduledDelayedTaskTimers = <Timer>[];
 
   NaiveCogStateRuntimeScheduler({
     Duration highPriorityBackgroundTaskDelay =
@@ -25,16 +28,28 @@ final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
     Duration lowPriorityBackgroundTaskDelay =
         _naiveLowPriorityBackgroundTaskDelay,
     required CogStateRuntimeLogging logging,
-  })  : _highPriorityBackgroundTaskScheduler = _BackgroundTaskScheduler(
+  })  : _highPriorityBackgroundTaskScheduler = _NaiveBackgroundTaskScheduler(
           backgroundTaskDelay: highPriorityBackgroundTaskDelay,
           logging: logging,
           logMessage: 'executing high priority background tasks',
         ),
-        _lowPriorityBackgroundTaskScheduler = _BackgroundTaskScheduler(
+        _lowPriorityBackgroundTaskScheduler = _NaiveBackgroundTaskScheduler(
           backgroundTaskDelay: lowPriorityBackgroundTaskDelay,
           logging: logging,
           logMessage: 'executing low priority background tasks',
         );
+
+  @override
+  Future<void> dispose() async {
+    _highPriorityBackgroundTaskScheduler.dispose();
+    _lowPriorityBackgroundTaskScheduler.dispose();
+
+    for (final scheduledDelayedTaskTimer in _scheduledDelayedTaskTimers) {
+      scheduledDelayedTaskTimer.cancel();
+    }
+
+    _scheduledDelayedTaskTimers.clear();
+  }
 
   @override
   void scheduleBackgroundTask(
@@ -52,14 +67,24 @@ final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
   void scheduleDelayedTask(void Function() dalayedTask, Duration delay) {
     // TODO(skeswa): should we cluster these to make cog value updates more
     // bursty?
-    Timer(delay, dalayedTask);
+    _scheduledDelayedTaskTimers.add(Timer(delay, () {
+      dalayedTask();
+
+      _cullElapsedScheduledDelayedTaskTimers();
+    }));
+  }
+
+  void _cullElapsedScheduledDelayedTaskTimers() {
+    _scheduledDelayedTaskTimers.removeWhere(
+      (scheduledDelayedTaskTimer) => scheduledDelayedTaskTimer.isActive,
+    );
   }
 }
 
 const _naiveHighPriorityBackgroundTaskDelay = Duration.zero;
 const _naiveLowPriorityBackgroundTaskDelay = Duration(seconds: 3);
 
-final class _BackgroundTaskScheduler {
+final class _NaiveBackgroundTaskScheduler {
   final Duration _backgroundTaskDelay;
   final _backgroundTasks = Queue<void Function()>();
   Timer? _backgroundTaskTimer;
@@ -67,13 +92,19 @@ final class _BackgroundTaskScheduler {
   final String _logMessage;
   final CogStateRuntimeLogging _logging;
 
-  _BackgroundTaskScheduler({
+  _NaiveBackgroundTaskScheduler({
     required Duration backgroundTaskDelay,
     required CogStateRuntimeLogging logging,
     required String logMessage,
   })  : _backgroundTaskDelay = backgroundTaskDelay,
         _logging = logging,
         _logMessage = logMessage;
+
+  void dispose() {
+    _backgroundTaskTimer?.cancel();
+    _backgroundTaskTimer = null;
+    _inProgressBackgroundTask = null;
+  }
 
   void schedule(void Function() backgroundTask) {
     if (backgroundTask != _inProgressBackgroundTask &&

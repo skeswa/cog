@@ -20,11 +20,12 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   final _cogStateFollowers = <List<CogStateOrdinal>?>[];
   final _cogStateLeaders = <List<CogStateOrdinal>?>[];
   final _cogStateListeningPosts = <CogStateListeningPost?>[];
-  final _cogStates = <CogState>[];
-  final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
   final _cogStateListeningPostsToMaybeNotify =
       PriorityQueue<CogStateListeningPost>(
-          _compareCogStateListeningPostsToMaybeNotify);
+    _compareCogStateListeningPostsToMaybeNotify,
+  );
+  final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
+  final _cogStates = <CogState>[];
 
   StandardCogStateRuntime({
     this.logging = const NoOpCogStateRuntimeLogging(),
@@ -101,6 +102,24 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }
 
     return cogStateListeningPost.valueChanges;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await scheduler.dispose();
+
+    _cogStateFollowers.clear();
+    _cogStateLeaders.clear();
+    _cogStateListeningPostsToMaybeNotify.clear();
+    _cogStateOrdinalByHash.clear();
+    _cogStates.clear();
+
+    await Future.wait([
+      for (final cogStateListeningPost in _cogStateListeningPosts)
+        if (cogStateListeningPost != null) cogStateListeningPost.dispose(),
+    ]);
+
+    _cogStateListeningPosts.clear();
   }
 
   @override

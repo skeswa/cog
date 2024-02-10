@@ -21,6 +21,10 @@ void main() {
       );
     });
 
+    tearDown(() async {
+      await cogtext.dispose();
+    });
+
     group('Complex sync reading and writing', () {
       test('should do as little work as possible', () {
         final isWindyCog =

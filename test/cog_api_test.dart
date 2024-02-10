@@ -22,6 +22,10 @@ void main() {
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
       test('reading from a spun automatic Cog without specifying spin throws',
           () {
         final numberCog = Cog((c) {
@@ -87,6 +91,10 @@ void main() {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
       });
 
       test('watching from a spun automatic Cog without specifying spin throws',
@@ -159,6 +167,10 @@ void main() {
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
       });
 
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
       test('writing to a spun manual Cog without specifying spin throws', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
@@ -220,6 +232,10 @@ void main() {
         );
       });
 
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
       test(
           'watching a spun manual Cog to which a value is '
           'written triggers a notification', () async {
@@ -252,8 +268,6 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([5]));
-
-        await Future.delayed(Duration.zero);
       });
 
       test(
@@ -320,8 +334,6 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([25]));
-
-        await Future.delayed(Duration.zero);
       });
 
       test(
@@ -363,8 +375,6 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([25]));
-
-        await Future.delayed(Duration.zero);
       });
 
       test('you can watch and write multiple spun manual Cogs', () async {
@@ -522,8 +532,6 @@ void main() {
         numberCog.write(cogtext, 9);
 
         expect(emissions, equals(['saturn', 77, true, 'neptune', 8, false]));
-
-        await Future.delayed(Duration.zero);
       });
 
       test('you can watch and write multiple spun automatic Cogs', () async {
@@ -672,8 +680,6 @@ void main() {
             (0.0, 1.75),
           ]),
         );
-
-        await Future.delayed(Duration.zero);
       });
 
       test('you can watch and write multiple unspun automatic Cogs', () async {
@@ -801,8 +807,6 @@ void main() {
             (0.0, 1.75),
           ]),
         );
-
-        await Future.delayed(Duration.zero);
       });
     });
 
@@ -810,6 +814,10 @@ void main() {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
       });
 
       test('you can read from a chain of unspun automatic Cogs', () {
@@ -955,6 +963,10 @@ void main() {
       setUp(() {
         cogtext =
             Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
       });
 
       test(

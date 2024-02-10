@@ -5,4 +5,6 @@ final class Cogtext {
 
   Cogtext({CogStateRuntime? cogStateRuntime})
       : _cogStateRuntime = cogStateRuntime ?? StandardCogStateRuntime();
+
+  Future<void> dispose() => _cogStateRuntime.dispose();
 }

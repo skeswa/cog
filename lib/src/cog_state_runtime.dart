@@ -19,6 +19,8 @@ abstract interface class CogStateRuntime {
     required NotificationUrgency urgency,
   });
 
+  Future<void> dispose();
+
   Iterable<CogStateOrdinal> followerOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
   );
