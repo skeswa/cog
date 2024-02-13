@@ -16,6 +16,52 @@ void main() {
       logging = TestingCogStateRuntimeLogger();
     });
 
+    group('Basics', () {
+      test('automatic Cogs should be stringifiable', () {
+        final fourCog = Cog((c) => 4, init: null.of<int>(), spin: Spin<bool>());
+        final falseCog = Cog(
+          (c) => false,
+          debugLabel: 'falseCog',
+          init: () => false,
+          ttl: const Duration(seconds: 1),
+        );
+        final helloCog = Cog(
+          (c) => 'hello',
+          eq: (a, b) => a.length == b.length,
+          init: () => '',
+        );
+
+        expect('$fourCog', 'AutomaticCog<int?, bool>()');
+        expect(
+          '$falseCog',
+          'AutomaticCog<bool>(debugLabel: "falseCog", ttl: 0:00:01.000000)',
+        );
+        expect('$helloCog', 'AutomaticCog<String>(eq: overridden)');
+      });
+
+      test('manual Cogs should be stringifiable', () {
+        final fourCog = Cog.man(null.of<int>(), spin: Spin<bool>());
+        final falseCog = Cog.man(() => false, debugLabel: 'falseCog');
+        final helloCog = Cog.man(
+          () => '',
+          eq: (a, b) => a.length == b.length,
+        );
+
+        expect('$fourCog', 'ManualCog<int?, bool>()');
+        expect(
+          '$falseCog',
+          'ManualCog<bool>(debugLabel: "falseCog")',
+        );
+        expect('$helloCog', 'ManualCog<String>(eq: overridden)');
+      });
+
+      test('NotificationUrgency should be stringifiable', () {
+        expect('${NotificationUrgency.lessUrgent}', 'lessUrgent');
+        expect('${NotificationUrgency.moreUrgent}', 'moreUrgent');
+        expect('${NotificationUrgency.urgent}', 'urgent');
+      });
+    });
+
     group('Simple reading', () {
       setUp(() {
         cogtext =

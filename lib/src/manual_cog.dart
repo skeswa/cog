@@ -7,13 +7,45 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
     required super.init,
     required CogRegistry? registry,
     required super.spin,
-  }) : super._(eq: eq ?? areCogStatesIdentical, registry: registry);
+  }) : super._(eq: eq ?? identical, registry: registry);
 
   @override
-  String toString() => 'AutomaticCog<$ValueType'
-      '${spin != null ? ', $SpinType' : ''}'
-      '>('
-      ')';
+  String toString() {
+    final stringBuffer = StringBuffer('ManualCog<')..write(ValueType);
+
+    if (spin != null) {
+      stringBuffer
+        ..write(', ')
+        ..write(SpinType);
+    }
+
+    stringBuffer.write('>(');
+
+    var hasParams = false;
+
+    if (debugLabel != null) {
+      stringBuffer
+        ..write('debugLabel: "')
+        ..write(debugLabel)
+        ..write('"');
+
+      hasParams = true;
+    }
+
+    if (eq != identical) {
+      if (hasParams) {
+        stringBuffer.write(', ');
+      }
+
+      stringBuffer.write('eq: overridden');
+
+      hasParams = true;
+    }
+
+    stringBuffer.write(')');
+
+    return stringBuffer.toString();
+  }
 
   void write(
     Cogtext cogtext,
