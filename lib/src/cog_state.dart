@@ -18,23 +18,37 @@ sealed class CogState<ValueType, SpinType,
 
   final CogStateRuntime runtime;
 
-  CogStateRevision _revision = initialCogStateRevision;
+  CogStateRevision _revision = initialCogStateRevision - 1;
 
   final SpinType? _spin;
 
   var _staleness = Staleness.stale;
 
-  ValueType _value;
+  late ValueType _value;
 
   CogState({
     required this.cog,
     required this.ordinal,
     required SpinType? spin,
     required this.runtime,
-  })  : _spin = spin,
-        _value = cog.init();
+  }) : _spin = spin;
 
-  ValueType evaluate() => _value;
+  bool assertHasValue() {
+    if (!_hasValue) {
+      throw StateError(
+        'Cog state has not yet been initialized. Typically, this happens '
+        'if the initial invocation of the Cog definition threw.',
+      );
+    }
+
+    return true;
+  }
+
+  ValueType evaluate() {
+    assertHasValue();
+
+    return _value;
+  }
 
   void init() {}
 
@@ -63,7 +77,7 @@ sealed class CogState<ValueType, SpinType,
   }
 
   void maybeRevise(ValueType value, {bool quietly = false}) {
-    final shouldRevise = !cog.eq(_value, value);
+    final shouldRevise = !_hasValue || !cog.eq(_value, value);
 
     if (shouldRevise) {
       runtime.logging.debug(
@@ -129,6 +143,8 @@ sealed class CogState<ValueType, SpinType,
 
     return _staleness;
   }
+
+  bool get _hasValue => _revision >= initialCogStateRevision;
 
   bool _updateStaleness(Staleness staleness) {
     if (staleness == _staleness) {

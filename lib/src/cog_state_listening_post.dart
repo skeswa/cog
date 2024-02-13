@@ -65,7 +65,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
       'notifying listeners of value changes',
     );
 
-    _streamController.add(cogState._value);
+    _streamController.add(cogState.evaluate());
 
     _revisionOfLastNotification = revision;
 

@@ -1,10 +1,12 @@
 part of 'cog.dart';
 
 final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
+  final CogValueInitializer<ValueType> init;
+
   ManualCog._({
     super.debugLabel,
-    required CogStateComparator<ValueType>? eq,
-    required super.init,
+    required CogValueComparator<ValueType>? eq,
+    required this.init,
     required CogRegistry? registry,
     required super.spin,
   }) : super._(eq: eq ?? identical, registry: registry);

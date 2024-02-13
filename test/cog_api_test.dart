@@ -18,21 +18,19 @@ void main() {
 
     group('Basics', () {
       test('automatic Cogs should be stringifiable', () {
-        final fourCog = Cog((c) => 4, init: null.of<int>(), spin: Spin<bool>());
+        final fourCog = Cog((c) => 4, spin: Spin<bool>());
         final falseCog = Cog(
           (c) => false,
           debugLabel: 'falseCog',
-          init: () => false,
           ttl: const Duration(seconds: 1),
         );
         final helloCog = Cog(
           (c) => 'hello',
           debugLabel: 'helloCog',
           eq: (a, b) => a.length == b.length,
-          init: () => '',
         );
 
-        expect('$fourCog', 'AutomaticCog<int?, bool>()');
+        expect('$fourCog', 'AutomaticCog<int, bool>()');
         expect(
           '$falseCog',
           'AutomaticCog<bool>(debugLabel: "falseCog", ttl: 0:00:01.000000)',
@@ -85,7 +83,7 @@ void main() {
           () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>(), spin: Spin<bool>());
+        }, spin: Spin<bool>());
 
         expect(() => numberCog.read(cogtext), throwsArgumentError);
       });
@@ -101,7 +99,7 @@ void main() {
           () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>());
+        });
 
         expect(() => numberCog.read(cogtext, spin: false), throwsArgumentError);
       });
@@ -122,7 +120,7 @@ void main() {
       test('reading from a spun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>(), spin: Spin<bool>());
+        }, spin: Spin<bool>());
 
         expect(numberCog.read(cogtext, spin: false), equals(4));
       });
@@ -136,9 +134,22 @@ void main() {
       test('reading from an unspun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>());
+        });
 
         expect(numberCog.read(cogtext), equals(4));
+      });
+
+      test(
+          'reading from an automatic Cog that did not initialize '
+          'correctly throws', () {
+        final numberCog = Cog((c) {
+          throw Error();
+        }, spin: Spin<bool>());
+
+        expect(
+          () => numberCog.read(cogtext, spin: false),
+          throwsA(isA<Error>()),
+        );
       });
     });
 
@@ -155,7 +166,7 @@ void main() {
       test('watching a spun automatic Cog without specifying spin throws', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>(), spin: Spin<bool>());
+        }, spin: Spin<bool>());
 
         expect(() => numberCog.watch(cogtext), throwsArgumentError);
       });
@@ -171,7 +182,7 @@ void main() {
           'without specifying spin throws', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>());
+        });
 
         expect(
             () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
@@ -193,7 +204,7 @@ void main() {
       test('watching a spun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>(), spin: Spin<bool>());
+        }, spin: Spin<bool>());
 
         expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
       });
@@ -207,7 +218,7 @@ void main() {
       test('watching an unspun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
-        }, init: null.of<int>());
+        });
 
         expect(numberCog.watch(cogtext).isBroadcast, isTrue);
       });
@@ -354,7 +365,7 @@ void main() {
           final number = c.link(numberCog, spin: c.spin);
 
           return number * number;
-        }, debugLabel: 'squaredNumberCog', init: () => -1, spin: Spin<bool>());
+        }, debugLabel: 'squaredNumberCog', spin: Spin<bool>());
 
         final emissions = [];
         final subscription =
@@ -394,7 +405,7 @@ void main() {
           final number = c.link(numberCog, spin: false);
 
           return number * number;
-        }, debugLabel: 'squaredNumberCog', init: () => -1);
+        }, debugLabel: 'squaredNumberCog');
 
         final emissions = [];
         final subscription =
@@ -636,12 +647,12 @@ void main() {
           final b = c.link(bCog, spin: c.spin);
 
           return -b;
-        }, debugLabel: 'negativeBCog', init: () => 0, spin: Spin<bool>());
+        }, debugLabel: 'negativeBCog', spin: Spin<bool>());
         final twoACog = Cog((c) {
           final a = c.link(aCog, spin: c.spin);
 
           return 2 * a;
-        }, debugLabel: 'twoACog', init: () => 0, spin: Spin<bool>());
+        }, debugLabel: 'twoACog', spin: Spin<bool>());
 
         final discriminantCog = Cog((c) {
           final a = c.link(aCog, spin: c.spin);
@@ -649,7 +660,7 @@ void main() {
           final cVal = c.link(cCog, spin: c.spin);
 
           return b * b - 4 * a * cVal;
-        }, debugLabel: 'discriminantCog', init: () => 0, spin: Spin<bool>());
+        }, debugLabel: 'discriminantCog', spin: Spin<bool>());
 
         final sqrtDiscriminantCog = Cog(
           (c) {
@@ -658,7 +669,6 @@ void main() {
             return sqrt(discriminant);
           },
           debugLabel: 'sqrtDiscriminantCog',
-          init: () => 0.0,
           spin: Spin<bool>(),
         );
 
@@ -674,7 +684,6 @@ void main() {
             );
           },
           debugLabel: 'sqrtDiscriminantCog',
-          init: () => (0.0, 0.0),
           spin: Spin<bool>(),
         );
 
@@ -786,12 +795,12 @@ void main() {
           final b = c.link(bCog);
 
           return -b;
-        }, debugLabel: 'negativeBCog', init: () => 0);
+        }, debugLabel: 'negativeBCog');
         final twoACog = Cog((c) {
           final a = c.link(aCog);
 
           return 2 * a;
-        }, debugLabel: 'twoACog', init: () => 0);
+        }, debugLabel: 'twoACog');
 
         final discriminantCog = Cog((c) {
           final a = c.link(aCog);
@@ -799,7 +808,7 @@ void main() {
           final cVal = c.link(cCog);
 
           return b * b - 4 * a * cVal;
-        }, debugLabel: 'discriminantCog', init: () => 0);
+        }, debugLabel: 'discriminantCog');
 
         final sqrtDiscriminantCog = Cog(
           (c) {
@@ -808,7 +817,6 @@ void main() {
             return sqrt(discriminant);
           },
           debugLabel: 'sqrtDiscriminantCog',
-          init: () => 0.0,
         );
 
         final answerCog = Cog(
@@ -823,7 +831,6 @@ void main() {
             );
           },
           debugLabel: 'sqrtDiscriminantCog',
-          init: () => (0.0, 0.0),
         );
 
         final emissions = [];
@@ -931,19 +938,16 @@ void main() {
         final secondCog = Cog(
           (c) => 2 * c.link(firstCog),
           debugLabel: 'secondCog',
-          init: () => 0,
         );
 
         final thirdCog = Cog(
           (c) => 3 * c.link(secondCog),
           debugLabel: 'thirdCog',
-          init: () => 0,
         );
 
         final fourthCog = Cog(
           (c) => 5 * c.link(thirdCog),
           debugLabel: 'fourthCog',
-          init: () => 0,
         );
 
         final emissions = [];
@@ -1040,7 +1044,6 @@ void main() {
 
         final numberPlusOneCog = Cog(
           (c) => c.link(numberCog, spin: c.spin) + 1,
-          init: () => 0,
           spin: Spin<bool>(),
         );
 
@@ -1109,7 +1112,6 @@ void main() {
 
         final numberPlusOneCog = Cog(
           (c) => c.link(numberCog) + 1,
-          init: () => 0,
         );
 
         final emissions = [];
@@ -1147,44 +1149,42 @@ void main() {
       });
 
       test('you can read from a chain of unspun automatic Cogs', () {
-        final isWindyCog =
-            Cog((c) => false, debugLabel: 'isWindyCog', init: () => false);
+        final isWindyCog = Cog((c) => false, debugLabel: 'isWindyCog');
 
-        final temperatureCog =
-            Cog((c) => 12.0, debugLabel: 'temperatureCog', init: () => 12.0);
+        final temperatureCog = Cog((c) => 12.0, debugLabel: 'temperatureCog');
 
         final isNiceOutsideCog = Cog((c) {
           final isWindy = c.link(isWindyCog);
           final temperature = c.link(temperatureCog);
 
           return !isWindy && temperature > 22.0;
-        }, debugLabel: 'isNiceOutsideCog', init: () => false);
+        }, debugLabel: 'isNiceOutsideCog');
 
-        final dayOfTheWeekCog = Cog((c) => Day.sunday,
-            debugLabel: 'dayOfTheWeekCog', init: () => Day.sunday);
+        final dayOfTheWeekCog =
+            Cog((c) => Day.sunday, debugLabel: 'dayOfTheWeekCog');
 
         final isWeekendCog = Cog((c) {
           final dayOfTheWeek = c.link(dayOfTheWeekCog);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
-        }, debugLabel: 'isWeekendCog', init: () => false);
+        }, debugLabel: 'isWeekendCog');
 
         final shouldGoToTheBeachCog = Cog((c) {
           final isNiceOutside = c.link(isNiceOutsideCog);
           final isWeekend = c.link(isWeekendCog);
 
           return isNiceOutside && isWeekend;
-        }, debugLabel: 'shouldGoToTheBeachCog', init: () => false);
+        }, debugLabel: 'shouldGoToTheBeachCog');
 
         expect(shouldGoToTheBeachCog.read(cogtext), isFalse);
       });
 
       test('you can read from a chain of spun automatic Cogs', () {
-        final isWindyCog = Cog((c) => false,
-            init: () => false, debugLabel: 'isWindyCog', spin: Spin<City>());
+        final isWindyCog =
+            Cog((c) => false, debugLabel: 'isWindyCog', spin: Spin<City>());
 
-        final temperatureCog = Cog((c) => 12.0,
-            debugLabel: 'temperatureCog', init: () => 12.0, spin: Spin<City>());
+        final temperatureCog =
+            Cog((c) => 12.0, debugLabel: 'temperatureCog', spin: Spin<City>());
 
         final isNiceOutsideCog = Cog(
           (c) {
@@ -1194,14 +1194,12 @@ void main() {
             return !isWindy && temperature > 22.0;
           },
           debugLabel: 'isNiceOutsideCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
         final dayOfTheWeekCog = Cog(
           (c) => Day.sunday,
           debugLabel: 'dayOfTheWeekCog',
-          init: () => Day.sunday,
           spin: Spin<City>(),
         );
 
@@ -1209,7 +1207,7 @@ void main() {
           final dayOfTheWeek = c.link(dayOfTheWeekCog, spin: c.spin);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
-        }, debugLabel: 'isWeekendCog', init: () => false, spin: Spin<City>());
+        }, debugLabel: 'isWeekendCog', spin: Spin<City>());
 
         final shouldGoToTheBeachCog = Cog(
           (c) {
@@ -1219,7 +1217,6 @@ void main() {
             return isNiceOutside && isWeekend;
           },
           debugLabel: 'shouldGoToTheBeachCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
@@ -1250,20 +1247,17 @@ void main() {
             return !isWindy && temperature > 22.0;
           },
           debugLabel: 'isNiceOutsideCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
         final dayOfTheWeekCog = Cog((c) => Day.sunday,
-            debugLabel: 'dayOfTheWeekCog',
-            init: () => Day.sunday,
-            spin: Spin<City>());
+            debugLabel: 'dayOfTheWeekCog', spin: Spin<City>());
 
         final isWeekendCog = Cog((c) {
           final dayOfTheWeek = c.link(dayOfTheWeekCog, spin: c.spin);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
-        }, debugLabel: 'isWeekendCog', init: () => false, spin: Spin<City>());
+        }, debugLabel: 'isWeekendCog', spin: Spin<City>());
 
         final shouldGoToTheBeachCog = Cog(
           (c) {
@@ -1273,7 +1267,6 @@ void main() {
             return isNiceOutside && isWeekend;
           },
           debugLabel: 'shouldGoToTheBeachCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
@@ -1315,7 +1308,6 @@ void main() {
             return !isWindy && temperature > 22.0;
           },
           debugLabel: 'isNiceOutsideCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
@@ -1329,7 +1321,7 @@ void main() {
           final dayOfTheWeek = c.link(dayOfTheWeekCog, spin: c.spin);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
-        }, debugLabel: 'isWeekendCog', init: () => false, spin: Spin<City>());
+        }, debugLabel: 'isWeekendCog', spin: Spin<City>());
 
         final shouldGoToTheBeachCog = Cog(
           (c) {
@@ -1339,7 +1331,6 @@ void main() {
             return isNiceOutside && isWeekend;
           },
           debugLabel: 'shouldGoToTheBeachCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 

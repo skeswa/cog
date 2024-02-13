@@ -17,7 +17,7 @@ final class AutomaticCogState<ValueType, SpinType>
   });
 
   @override
-  ValueType get curr => _value;
+  ValueType curr({required ValueType orElse}) => _hasValue ? _value : orElse;
 
   @override
   ValueType evaluate() {

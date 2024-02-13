@@ -8,8 +8,7 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   AutomaticCog._(
     this.def, {
     super.debugLabel,
-    CogStateComparator<ValueType>? eq,
-    required super.init,
+    CogValueComparator<ValueType>? eq,
     CogRegistry? registry,
     super.spin,
     this.ttl,
@@ -67,7 +66,7 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
 }
 
 abstract interface class AutomaticCogController<ValueType, SpinType> {
-  ValueType get curr;
+  ValueType curr({required ValueType orElse});
   SpinType get spin;
 
   LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(

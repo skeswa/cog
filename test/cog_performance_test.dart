@@ -44,7 +44,6 @@ void main() {
             return !isWindy && temperature > 22.0;
           },
           debugLabel: 'isNiceOutsideCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
@@ -57,7 +56,7 @@ void main() {
           final dayOfTheWeek = c.link(dayOfTheWeekCog);
 
           return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
-        }, debugLabel: 'isWeekendCog', init: () => false, spin: Spin<City>());
+        }, debugLabel: 'isWeekendCog', spin: Spin<City>());
 
         final shouldGoToTheBeachCog = Cog(
           (c) {
@@ -67,7 +66,6 @@ void main() {
             return isNiceOutside && isWeekend;
           },
           debugLabel: 'shouldGoToTheBeachCog',
-          init: () => false,
           spin: Spin<City>(),
         );
 
@@ -148,7 +146,7 @@ void main() {
 
         expect(
           meterReads,
-          equals([0, 71, 138, 3, 4, 19, 18, 6, 0, 0, 38, 3, 38, 0]),
+          equals([0, 74, 142, 2, 2, 19, 18, 5, 0, 0, 38, 2, 38, 0]),
         );
       });
     });

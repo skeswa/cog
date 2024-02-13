@@ -8,4 +8,9 @@ final class ManualCogState<ValueType, SpinType>
     required super.runtime,
     required super.spin,
   });
+
+  @override
+  void init() {
+    maybeRevise(cog.init(), quietly: true);
+  }
 }
