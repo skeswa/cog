@@ -27,6 +27,7 @@ void main() {
         );
         final helloCog = Cog(
           (c) => 'hello',
+          debugLabel: 'helloCog',
           eq: (a, b) => a.length == b.length,
           init: () => '',
         );
@@ -36,7 +37,10 @@ void main() {
           '$falseCog',
           'AutomaticCog<bool>(debugLabel: "falseCog", ttl: 0:00:01.000000)',
         );
-        expect('$helloCog', 'AutomaticCog<String>(eq: overridden)');
+        expect(
+          '$helloCog',
+          'AutomaticCog<String>(debugLabel: "helloCog", eq: overridden)',
+        );
       });
 
       test('manual Cogs should be stringifiable', () {
@@ -44,6 +48,7 @@ void main() {
         final falseCog = Cog.man(() => false, debugLabel: 'falseCog');
         final helloCog = Cog.man(
           () => '',
+          debugLabel: 'helloCog',
           eq: (a, b) => a.length == b.length,
         );
 
@@ -52,10 +57,14 @@ void main() {
           '$falseCog',
           'ManualCog<bool>(debugLabel: "falseCog")',
         );
-        expect('$helloCog', 'ManualCog<String>(eq: overridden)');
+        expect(
+          '$helloCog',
+          'ManualCog<String>(debugLabel: "helloCog", eq: overridden)',
+        );
       });
 
       test('NotificationUrgency should be stringifiable', () {
+        expect('${NotificationUrgency.immediate}', 'immediate');
         expect('${NotificationUrgency.lessUrgent}', 'lessUrgent');
         expect('${NotificationUrgency.moreUrgent}', 'moreUrgent');
         expect('${NotificationUrgency.urgent}', 'urgent');
@@ -414,6 +423,45 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([25]));
+      });
+
+      test(
+          'writing to a watched manual Cog with immediate urgency '
+          'triggers a notification synchronously', () async {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        final emissions = [];
+        final subscription = numberCog
+            .watch(
+              cogtext,
+              spin: false,
+              urgency: NotificationUrgency.immediate,
+            )
+            .listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(emissions, equals([5]));
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
       });
 
       test(

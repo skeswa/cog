@@ -5,6 +5,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
   var _isActive = false;
   final CogStateListeningPostDeactivationCallback _onDeactivation;
   late final _streamController = StreamController<ValueType>.broadcast(
+    sync: true,
     onCancel: _onLastListenerDisconnected,
     onListen: _onFirstListenerConnected,
   );

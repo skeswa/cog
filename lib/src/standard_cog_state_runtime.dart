@@ -151,6 +151,12 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       return;
     }
 
+    if (listeningPost.urgency == NotificationUrgency.immediate) {
+      listeningPost.maybeNotify();
+
+      return;
+    }
+
     _cogStateListeningPostsToMaybeNotify.add(listeningPost);
 
     scheduler.scheduleBackgroundTask(
