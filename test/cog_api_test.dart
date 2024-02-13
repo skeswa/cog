@@ -58,13 +58,13 @@ void main() {
         expect(() => numberCog.read(cogtext, spin: false), throwsArgumentError);
       });
 
-      test('you can read from a spun manual Cog', () {
+      test('reading from a spun manual Cog returns its current value', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         expect(numberCog.read(cogtext, spin: false), equals(4));
       });
 
-      test('you can read from a spun automatic Cog', () {
+      test('reading from a spun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
         }, init: null.of<int>(), spin: Spin<bool>());
@@ -72,13 +72,13 @@ void main() {
         expect(numberCog.read(cogtext, spin: false), equals(4));
       });
 
-      test('you can read from an unspun manual Cog', () {
+      test('reading from an unspun manual Cog returns its value', () {
         final numberCog = Cog.man(() => 4);
 
         expect(numberCog.read(cogtext), equals(4));
       });
 
-      test('you can read from an unspun automatic Cog', () {
+      test('reading from an unspun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
         }, init: null.of<int>());
@@ -97,8 +97,7 @@ void main() {
         await cogtext.dispose();
       });
 
-      test('watching from a spun automatic Cog without specifying spin throws',
-          () {
+      test('watching a spun automatic Cog without specifying spin throws', () {
         final numberCog = Cog((c) {
           return 4;
         }, init: null.of<int>(), spin: Spin<bool>());
@@ -106,15 +105,14 @@ void main() {
         expect(() => numberCog.watch(cogtext), throwsArgumentError);
       });
 
-      test('watching from a spun manual Cog without specifying spin throws',
-          () {
+      test('watching a spun manual Cog without specifying spin throws', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         expect(() => numberCog.watch(cogtext), throwsArgumentError);
       });
 
       test(
-          'watching from an unspun automatic Cog '
+          'watching an unspun automatic Cog '
           'without specifying spin throws', () {
         final numberCog = Cog((c) {
           return 4;
@@ -124,21 +122,20 @@ void main() {
             () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
       });
 
-      test('watching from an unspun manual Cog without specifying spin throws',
-          () {
+      test('watching an unspun manual Cog without specifying spin throws', () {
         final numberCog = Cog.man(() => 4);
 
         expect(
             () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
       });
 
-      test('you can watch from a spun manual Cog', () {
+      test('watching from a spun manual Cog returns its value', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
       });
 
-      test('you can watch from a spun automatic Cog', () {
+      test('watching a spun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
         }, init: null.of<int>(), spin: Spin<bool>());
@@ -146,13 +143,13 @@ void main() {
         expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
       });
 
-      test('you can watch from an unspun manual Cog', () {
+      test('watching an unspun manual Cog returns its value', () {
         final numberCog = Cog.man(() => 4);
 
         expect(numberCog.watch(cogtext).isBroadcast, isTrue);
       });
 
-      test('you can watch from an unspun automatic Cog', () {
+      test('watching an unspun automatic Cog returns its value', () {
         final numberCog = Cog((c) {
           return 4;
         }, init: null.of<int>());
@@ -186,7 +183,7 @@ void main() {
         );
       });
 
-      test('you can read from and write to a spun manual Cog', () {
+      test('writing to a spun manual Cog changes its value', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         expect(numberCog.read(cogtext, spin: false), equals(4));
@@ -203,7 +200,7 @@ void main() {
         expect(numberCog.read(cogtext, spin: true), equals(6));
       });
 
-      test('you can read from and write to an unspun manual Cog', () {
+      test('writing to an unspun manual Cog changes its value', () {
         final numberCog = Cog.man(() => 4);
 
         expect(numberCog.read(cogtext), equals(4));
@@ -236,9 +233,8 @@ void main() {
         await cogtext.dispose();
       });
 
-      test(
-          'watching a spun manual Cog to which a value is '
-          'written triggers a notification', () async {
+      test('writing to a watched, spun manual Cog triggers a notification',
+          () async {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         final emissions = [];
@@ -270,9 +266,8 @@ void main() {
         expect(emissions, equals([5]));
       });
 
-      test(
-          'watching an unspun manual Cog to which a value is '
-          'written triggers a notification', () async {
+      test('writing to a watched, unspun manual Cog triggers a notification',
+          () async {
         final numberCog = Cog.man(() => 4);
 
         final emissions = [];
@@ -295,9 +290,8 @@ void main() {
         expect(emissions, equals([5]));
       });
 
-      test(
-          'watching a spun automatic Cog to which a value is '
-          'written triggers a notification', () async {
+      test('writing to a watched, spun automatic Cog triggers a notification',
+          () async {
         final numberCog =
             Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
 
@@ -336,9 +330,8 @@ void main() {
         expect(emissions, equals([25]));
       });
 
-      test(
-          'watching an unspun automatic Cog to which a value is '
-          'written triggers a notification', () async {
+      test('writing to a watched, unspun automatic Cog triggers a notification',
+          () async {
         final numberCog =
             Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
 
@@ -377,7 +370,9 @@ void main() {
         expect(emissions, equals([25]));
       });
 
-      test('you can watch and write multiple spun manual Cogs', () async {
+      test(
+          'writing to multiple unrelated watched, spun manual Cogs triggers '
+          'the right notifications in the right order', () async {
         final boolCog =
             Cog.man(() => true, debugLabel: 'boolCog', spin: Spin<bool>());
         final numberCog =
@@ -463,7 +458,9 @@ void main() {
         await Future.delayed(Duration.zero);
       });
 
-      test('you can watch and write to multiple unspun manual Cogs', () async {
+      test(
+          'writing to multiple unrelated watched, unspun manual Cogs triggers '
+          'the right notifications in the right order', () async {
         final boolCog = Cog.man(() => true, debugLabel: 'boolCog');
         final numberCog = Cog.man(() => 4, debugLabel: 'numberCog');
         final textCog = Cog.man(() => 'hello', debugLabel: 'textCog');
@@ -534,7 +531,9 @@ void main() {
         expect(emissions, equals(['saturn', 77, true, 'neptune', 8, false]));
       });
 
-      test('you can watch and write multiple spun automatic Cogs', () async {
+      test(
+          'writing to multiple unrelated watched, spun automatic Cogs '
+          'triggers the right notifications in the right order', () async {
         final aCog = Cog.man(() => 1, debugLabel: 'aCog', spin: Spin<bool>());
         final bCog = Cog.man(() => 2, debugLabel: 'bCog', spin: Spin<bool>());
         final cCog = Cog.man(() => 3, debugLabel: 'cCog', spin: Spin<bool>());
@@ -682,7 +681,9 @@ void main() {
         );
       });
 
-      test('you can watch and write multiple unspun automatic Cogs', () async {
+      test(
+          'writing to multiple unrelated watched, unspun automatic Cogs '
+          'triggers the right notifications in the right order', () async {
         final aCog = Cog.man(() => 1, debugLabel: 'aCog');
         final bCog = Cog.man(() => 2, debugLabel: 'bCog');
         final cCog = Cog.man(() => 3, debugLabel: 'cCog');
@@ -807,6 +808,237 @@ void main() {
             (0.0, 1.75),
           ]),
         );
+      });
+    });
+
+    group('Simple reading, watching and writing', () {
+      setUp(() {
+        cogtext = Cogtext(
+          cogStateRuntime: StandardCogStateRuntime(
+            logging: logging,
+            scheduler: NaiveCogStateRuntimeScheduler(
+              logging: logging,
+              highPriorityBackgroundTaskDelay: Duration.zero,
+              lowPriorityBackgroundTaskDelay: Duration.zero,
+            ),
+          ),
+        );
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
+      test(
+          'reading from the end of a chain of watched automatic '
+          'Cogs triggers notifications all the way up the chain', () async {
+        final firstCog = Cog.man(() => 1, debugLabel: 'firstCog');
+
+        final secondCog = Cog(
+          (c) => 2 * c.link(firstCog),
+          debugLabel: 'secondCog',
+          init: () => 0,
+        );
+
+        final thirdCog = Cog(
+          (c) => 3 * c.link(secondCog),
+          debugLabel: 'thirdCog',
+          init: () => 0,
+        );
+
+        final fourthCog = Cog(
+          (c) => 5 * c.link(thirdCog),
+          debugLabel: 'fourthCog',
+          init: () => 0,
+        );
+
+        final emissions = [];
+
+        expect(emissions, isEmpty);
+
+        firstCog.read(cogtext);
+        secondCog.read(cogtext);
+        thirdCog.read(cogtext);
+        fourthCog.read(cogtext);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        firstCog.write(cogtext, 2);
+
+        firstCog
+            .watch(
+              cogtext,
+              urgency: NotificationUrgency.lessUrgent,
+            )
+            .listen(emissions.add);
+        secondCog
+            .watch(
+              cogtext,
+              urgency: NotificationUrgency.moreUrgent,
+            )
+            .listen(emissions.add);
+        thirdCog
+            .watch(
+              cogtext,
+              urgency: NotificationUrgency.urgent,
+            )
+            .listen(emissions.add);
+        fourthCog
+            .watch(
+              cogtext,
+              urgency: NotificationUrgency.lessUrgent,
+            )
+            .listen(emissions.add);
+
+        fourthCog.read(cogtext);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, [4, 12, 60]);
+      });
+
+      test(
+          'writing to a watched and spun manual Cog triggers a notification, '
+          'even while intermittently reading', () async {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        final emissions = [];
+        final subscription =
+            numberCog.watch(cogtext, spin: false).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(numberCog.read(cogtext, spin: false), 5);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+      });
+
+      test(
+          'writing to a watched and spun automatic Cog triggers a '
+          'notification, even while intermittently reading', () async {
+        final numberCog = Cog.man(() => 4, spin: Spin<bool>());
+
+        final numberPlusOneCog = Cog(
+          (c) => c.link(numberCog, spin: c.spin) + 1,
+          init: () => 0,
+          spin: Spin<bool>(),
+        );
+
+        final emissions = [];
+        final subscription =
+            numberPlusOneCog.watch(cogtext, spin: false).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: true);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5, spin: false);
+
+        expect(numberPlusOneCog.read(cogtext, spin: false), 6);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([6]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([6]));
+      });
+
+      test(
+          'writing to a watched and unspun manual Cog triggers a notification, '
+          'even while intermittently reading', () async {
+        final numberCog = Cog.man(() => 4);
+
+        final emissions = [];
+        final subscription = numberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5);
+
+        expect(numberCog.read(cogtext), 5);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([5]));
+      });
+
+      test(
+          'writing to a watched and unspun automatic Cog triggers a '
+          'notification, even while intermittently reading', () async {
+        final numberCog = Cog.man(() => 4);
+
+        final numberPlusOneCog = Cog(
+          (c) => c.link(numberCog) + 1,
+          init: () => 0,
+        );
+
+        final emissions = [];
+        final subscription =
+            numberPlusOneCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 5);
+
+        expect(numberPlusOneCog.read(cogtext), 6);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([6]));
+
+        await subscription.cancel();
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([6]));
       });
     });
 
