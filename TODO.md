@@ -1,8 +1,7 @@
-- [ ] comprehensive `.read` and `.write` tests (90% coverage)
+- [ ] comprehensive `.read`, `.watch`, `.write` tests (90% coverage)
   - [ ] big smoke test
   - [x] `flatMap` test
   - [x] `switchMap` test
-- [ ] comprehensive `.watch` tests
 - [ ] ttl
 - [ ] comprehensive `ttl` tests
 - [ ] `async`
@@ -11,7 +10,7 @@
 - [ ] comprehensive `Mechanism` tests
 - [ ] Flutter
   - [ ] `useCog`
-  - [ ] `useNewCog`
+  - [ ] `useCogs`
   - [ ] `FlutterCogtext`
   - [ ] comprehensive Flutter tests
 - [ ] `Subject` compat

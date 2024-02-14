@@ -67,6 +67,10 @@ void main() {
         expect('${NotificationUrgency.moreUrgent}', 'moreUrgent');
         expect('${NotificationUrgency.urgent}', 'urgent');
       });
+
+      test('Spin<T> requires T', () {
+        expect(() => Spin(), throwsArgumentError);
+      });
     });
 
     group('Simple reading', () {
@@ -1059,6 +1063,21 @@ void main() {
             [1, -2, 3, -4, 5],
             [5, 6, 7, 8, 9],
             [5, 6, 7, 8, 9, 10, 11, -12, 13, 14],
+          ]),
+        );
+
+        numberedListOffsetCog.write(cogtext, 17);
+        numberedListLengthCog.write(cogtext, 1);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+            [5, 6, 7, 8, 9],
+            [5, 6, 7, 8, 9, 10, 11, -12, 13, 14],
+            [18],
           ]),
         );
       });
