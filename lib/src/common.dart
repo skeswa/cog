@@ -15,8 +15,6 @@ const CogStateRevisionHash leaderRevisionHashSeed = 7;
 const CogStateRevisionHash leaderRevisionHashScalingFactor = 31;
 const CogStateRevision initialCogStateRevision = 0;
 
-bool areCogStatesIdentical<CogState>(CogState a, CogState b) => identical(a, b);
-
 bool thatSpinsMatch<ValueType, SpinType>(
   Cog<ValueType, SpinType> cog,
   SpinType? spin,

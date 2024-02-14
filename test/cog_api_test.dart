@@ -16,7 +16,7 @@ void main() {
       logging = TestingCogStateRuntimeLogger();
     });
 
-    group('Basics', () {
+    group('Auxilliary details', () {
       test('automatic Cogs should be stringifiable', () {
         final fourCog = Cog((c) => 4, spin: Spin<bool>());
         final falseCog = Cog(
@@ -69,7 +69,18 @@ void main() {
       });
 
       test('Spin<T> requires T', () {
+        expect(() => Spin<dynamic>(), throwsArgumentError);
         expect(() => Spin(), throwsArgumentError);
+      });
+
+      test('null.of<T>() returns a function that returns null', () {
+        expect(null.of<int>(), isA<int? Function()>());
+        expect(null.of<int>()(), isNull);
+      });
+
+      test('null.of<T>() requires T', () {
+        expect(() => null.of<dynamic>(), throwsArgumentError);
+        expect(() => null.of(), throwsArgumentError);
       });
     });
 
