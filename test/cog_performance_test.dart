@@ -25,7 +25,7 @@ void main() {
       await cogtext.dispose();
     });
 
-    group('Complex sync reading and writing', () {
+    group('Complex reading and writing', () {
       test('should do as little work as possible', () {
         final isWindyCog =
             Cog.man(() => false, debugLabel: 'isWindyCog', spin: Spin<City>());

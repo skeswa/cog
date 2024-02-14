@@ -1604,5 +1604,154 @@ void main() {
         expect(shouldGoToTheBeachCog.read(cogtext, spin: City.austin), isFalse);
       });
     });
+
+    group('Complex watching and writing', () {
+      setUp(() {
+        cogtext =
+            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
+      test(
+          'you can read from and write to a chain of Cogs where some are '
+          'manual, some are spun, and some are both', () async {
+        final isWindyCog =
+            Cog.man(() => false, debugLabel: 'isWindyCog', spin: Spin<City>());
+
+        final temperatureCog = Cog.man(
+          () => 12.0,
+          debugLabel: 'temperatureCog',
+          spin: Spin<City>(),
+        );
+
+        final isNiceOutsideCog = Cog(
+          (c) {
+            final isWindy = c.link(isWindyCog, spin: c.spin);
+            final temperature = c.link(temperatureCog, spin: c.spin);
+
+            return !isWindy && temperature > 22.0;
+          },
+          debugLabel: 'isNiceOutsideCog',
+          spin: Spin<City>(),
+        );
+
+        final dayOfTheWeekCog = Cog.man(
+          () => Day.wednesday,
+          debugLabel: 'dayOfTheWeekCog',
+        );
+
+        final isWeekendCog = Cog((c) {
+          final dayOfTheWeek = c.link(dayOfTheWeekCog);
+
+          return dayOfTheWeek == Day.saturday || dayOfTheWeek == Day.sunday;
+        }, debugLabel: 'isWeekendCog');
+
+        final shouldGoToTheBeachCog = Cog(
+          (c) {
+            final isNiceOutside = c.link(isNiceOutsideCog, spin: c.spin);
+            final isWeekend = c.link(isWeekendCog);
+
+            return isNiceOutside && isWeekend;
+          },
+          debugLabel: 'shouldGoToTheBeachCog',
+          spin: Spin<City>(),
+        );
+
+        final emissions = [];
+        final subscriptions = [
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.austin)
+              .map((shouldGoToTheBeach) =>
+                  'shouldGoToTheBeach austin $shouldGoToTheBeach')
+              .listen(emissions.add),
+          shouldGoToTheBeachCog
+              .watch(
+                cogtext,
+                spin: City.brooklyn,
+                urgency: NotificationUrgency.lessUrgent,
+              )
+              .map((shouldGoToTheBeach) =>
+                  'shouldGoToTheBeach brooklyn $shouldGoToTheBeach')
+              .listen(emissions.add),
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.cambridge)
+              .map((shouldGoToTheBeach) =>
+                  'shouldGoToTheBeach cambridge $shouldGoToTheBeach')
+              .listen(emissions.add),
+          isNiceOutsideCog
+              .watch(cogtext, spin: City.brooklyn)
+              .map((isNiceOutside) => 'isNiceOutside brooklyn $isNiceOutside')
+              .listen(emissions.add),
+          isNiceOutsideCog
+              .watch(
+                cogtext,
+                spin: City.austin,
+                urgency: NotificationUrgency.moreUrgent,
+              )
+              .map((isNiceOutside) => 'isNiceOutside austin $isNiceOutside')
+              .listen(emissions.add),
+        ];
+
+        temperatureCog
+          ..write(cogtext, 24.0, spin: City.austin)
+          ..write(cogtext, 18.0, spin: City.brooklyn)
+          ..write(cogtext, 12.0, spin: City.cambridge);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'isNiceOutside austin true',
+            'isNiceOutside brooklyn false',
+            'shouldGoToTheBeach brooklyn false',
+            'shouldGoToTheBeach austin false',
+          ]),
+        );
+
+        subscriptions.addAll([
+          isWeekendCog
+              .watch(cogtext, urgency: NotificationUrgency.immediate)
+              .map((isWeekend) => 'isWeekendCog $isWeekend')
+              .listen(emissions.add),
+          temperatureCog
+              .watch(cogtext, spin: City.austin)
+              .map((temperature) => 'temperature austin $temperature')
+              .listen(emissions.add),
+        ]);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'isNiceOutside austin true',
+            'isNiceOutside brooklyn false',
+            'shouldGoToTheBeach brooklyn false',
+            'shouldGoToTheBeach austin false',
+          ]),
+        );
+
+        dayOfTheWeekCog.write(cogtext, Day.saturday);
+        isWindyCog.write(cogtext, true, spin: City.austin);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            emissions,
+            equals([
+              'isNiceOutside austin true',
+              'isNiceOutside brooklyn false',
+              'shouldGoToTheBeach brooklyn false',
+              'shouldGoToTheBeach austin false',
+              'isWeekendCog true',
+              'isNiceOutside austin false',
+              'shouldGoToTheBeach cambridge false',
+            ]));
+      });
+    });
   });
 }
