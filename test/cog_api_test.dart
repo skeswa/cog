@@ -910,6 +910,206 @@ void main() {
           ]),
         );
       });
+
+      test(
+          'writing to a watched manual Cogs triggers notifications in '
+          'the correct order, even after urgency is changed', () async {
+        final boolCog = Cog.man(() => false);
+        final numberCog = Cog.man(() => 4);
+        final stringCog = Cog.man(() => '');
+
+        final emissions = [];
+
+        boolCog
+            .watch(cogtext, urgency: NotificationUrgency.moreUrgent)
+            .listen(emissions.add);
+        numberCog
+            .watch(cogtext, urgency: NotificationUrgency.urgent)
+            .listen(emissions.add);
+        stringCog
+            .watch(cogtext, urgency: NotificationUrgency.lessUrgent)
+            .listen(emissions.add);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        boolCog.write(cogtext, true);
+        numberCog.write(cogtext, 5);
+        stringCog.write(cogtext, '123');
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            true,
+            5,
+            '123',
+          ]),
+        );
+
+        stringCog.watch(cogtext, urgency: NotificationUrgency.moreUrgent);
+
+        boolCog.write(cogtext, false);
+        numberCog.write(cogtext, 6);
+        stringCog.write(cogtext, '456');
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            true,
+            5,
+            '123',
+            '456',
+            false,
+            6,
+          ]),
+        );
+      });
+
+      test('automatic Cogs can mimick a "flatMap"-like behavior', () async {
+        final numberedCogs = [
+          for (var i = 1; i <= 20; i++)
+            Cog.man(() => i, debugLabel: 'numberedCog$i'),
+        ];
+
+        final numberedListLengthCog =
+            Cog.man(() => 5, debugLabel: 'numberedListLengthCog');
+        final numberedListOffsetCog =
+            Cog.man(() => 0, debugLabel: 'numberedListOffsetCog');
+
+        final numberedListCog = Cog((c) {
+          final numberedListLength = c.link(numberedListLengthCog);
+          final numberedListOffset = c.link(numberedListOffsetCog);
+
+          return [
+            for (var i = numberedListOffset;
+                i < numberedListOffset + numberedListLength;
+                i++)
+              c.link(numberedCogs[i]),
+          ];
+        }, debugLabel: 'numberedListCog');
+
+        final emissions = [];
+
+        numberedListCog.watch(cogtext).listen(emissions.add);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberedCogs[1].write(cogtext, -2);
+        numberedCogs[3].write(cogtext, -4);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+          ]),
+        );
+
+        numberedCogs[11].write(cogtext, -12);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+          ]),
+        );
+
+        numberedListOffsetCog.write(cogtext, 4);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+            [5, 6, 7, 8, 9],
+          ]),
+        );
+
+        numberedListLengthCog.write(cogtext, 10);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+            [5, 6, 7, 8, 9],
+            [5, 6, 7, 8, 9, 10, 11, -12, 13, 14],
+          ]),
+        );
+
+        numberedCogs[2].write(cogtext, -3);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            [1, -2, 3, -4, 5],
+            [5, 6, 7, 8, 9],
+            [5, 6, 7, 8, 9, 10, 11, -12, 13, 14],
+          ]),
+        );
+      });
+
+      test('automatic Cogs can mimick a "switchMap"-like behavior', () async {
+        final evenCog = Cog.man(() => 2);
+        final oddCog = Cog.man(() => 3);
+        final isEvenCog = Cog.man(() => true);
+
+        final numberCog = Cog((c) {
+          final isEven = c.link(isEvenCog);
+
+          final number = isEven ? c.link(evenCog) : c.link(oddCog);
+
+          return number;
+        });
+
+        final emissions = [];
+
+        numberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        evenCog.write(cogtext, 4);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4]));
+
+        isEvenCog.write(cogtext, false);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4, 3]));
+
+        await Future.delayed(Duration.zero);
+
+        oddCog.write(cogtext, 5);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4, 3, 5]));
+
+        evenCog.write(cogtext, 6);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4, 3, 5]));
+      });
     });
 
     group('Simple reading, watching and writing', () {

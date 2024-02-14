@@ -1,3 +1,7 @@
+- [ ] comprehensive `.read` and `.write` tests (90% coverage)
+  - [ ] big smoke test
+  - [x] `flatMap` test
+  - [x] `switchMap` test
 - [ ] comprehensive `.watch` tests
 - [ ] ttl
 - [ ] comprehensive `ttl` tests
