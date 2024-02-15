@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cog/cog.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
@@ -22,7 +23,7 @@ void main() {
         final falseCog = Cog(
           (c) => false,
           debugLabel: 'falseCog',
-          ttl: const Duration(seconds: 1),
+          ttl: 1.seconds,
         );
         final helloCog = Cog(
           (c) => 'hello',
@@ -82,12 +83,31 @@ void main() {
         expect(() => null.of<dynamic>(), throwsArgumentError);
         expect(() => null.of(), throwsArgumentError);
       });
+
+      test('int.duration should work as expected', () {
+        expect(3.days, equals(const Duration(days: 3)));
+        expect(3.hours, equals(const Duration(hours: 3)));
+        expect(3.microseconds, equals(const Duration(microseconds: 3)));
+        expect(3.milliseconds, equals(const Duration(milliseconds: 3)));
+        expect(3.minutes, equals(const Duration(minutes: 3)));
+        expect(3.seconds, equals(const Duration(seconds: 3)));
+      });
+
+      test('Cogtext cog state runtime should be optionally replaceable', () {
+        expect(
+          () => Cogtext(),
+          isNot(throwsA(anything)),
+        );
+        expect(
+          () => Cogtext(cogStateRuntime: const NoOpCogStateRuntime()),
+          isNot(throwsA(anything)),
+        );
+      });
     });
 
     group('Simple reading', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext();
       });
 
       tearDown(() async {
@@ -236,6 +256,47 @@ void main() {
         });
 
         expect(numberCog.watch(cogtext).isBroadcast, isTrue);
+      });
+
+      test(
+          'a watched automatic Cog with a TTL re-evaluates and '
+          'emits on a fixed interval', () {
+        fakeAsync((async) {
+          cogtext = Cogtext(
+            cogStateRuntime: StandardCogStateRuntime(logging: logging),
+          );
+
+          final numberCog = Cog(
+            (c) => c.curr(0) < 4 ? c.curr(0) + 1 : c.curr(0),
+            ttl: 5.seconds,
+          );
+
+          expect(numberCog.read(cogtext), 1);
+
+          final emissions = [];
+
+          numberCog.watch(cogtext).listen(emissions.add);
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([2]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([2, 3]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([2, 3, 4]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([2, 3, 4]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([2, 3, 4]));
+        });
       });
     });
 

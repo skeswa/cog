@@ -66,7 +66,7 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
 }
 
 abstract interface class AutomaticCogController<ValueType, SpinType> {
-  ValueType curr({required ValueType orElse});
+  CurrValueType curr<CurrValueType extends ValueType>(CurrValueType orElse);
   SpinType get spin;
 
   LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(

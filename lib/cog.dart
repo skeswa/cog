@@ -7,5 +7,6 @@ export 'src/cog_state_runtime_telemetry.dart';
 export 'src/common.dart';
 export 'src/priority.dart';
 export 'src/null_type_extension.dart';
+export 'src/int_duration_extension.dart';
 export 'src/spin.dart';
 export 'src/standard_cog_state_runtime.dart';

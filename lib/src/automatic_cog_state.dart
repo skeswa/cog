@@ -17,7 +17,8 @@ final class AutomaticCogState<ValueType, SpinType>
   });
 
   @override
-  ValueType curr({required ValueType orElse}) => _hasValue ? _value : orElse;
+  CurrValueType curr<CurrValueType extends ValueType>(CurrValueType orElse) =>
+      _hasValue ? _value as CurrValueType : orElse;
 
   @override
   ValueType evaluate() {
@@ -102,7 +103,7 @@ final class AutomaticCogState<ValueType, SpinType>
   void _onTtlExpiration() {
     runtime.logging.debug(this, 'TTL expired - re-calculating value...');
 
-    _maybeRecalculateValue();
+    maybeRevise(_recalculateValue());
     _maybeScheduleTtl();
   }
 
