@@ -4,20 +4,20 @@ final class CogStateListeningPost<ValueType, SpinType> {
   final CogState<ValueType, SpinType, Cog<ValueType, SpinType>> cogState;
   var _isActive = false;
   final CogStateListeningPostDeactivationCallback _onDeactivation;
+  Priority _priority;
+  CogStateRevision? _revisionOfLastNotification;
   late final _streamController = StreamController<ValueType>.broadcast(
     sync: true,
     onCancel: _onLastListenerDisconnected,
     onListen: _onFirstListenerConnected,
   );
-  CogStateRevision? _revisionOfLastNotification;
-  NotificationUrgency _urgency;
 
   CogStateListeningPost({
     required this.cogState,
     required CogStateListeningPostDeactivationCallback onDeactivation,
-    required NotificationUrgency urgency,
-  })  : _onDeactivation = onDeactivation,
-        _urgency = urgency {
+    required Priority priority,
+  })  : _priority = priority,
+        _onDeactivation = onDeactivation {
     cogState.runtime.logging.debug(
       cogState,
       'created new listening post',
@@ -73,20 +73,20 @@ final class CogStateListeningPost<ValueType, SpinType> {
         .recordCogStateChangeNotification(cogState.ordinal);
   }
 
-  NotificationUrgency get urgency => _urgency;
+  Priority get priority => _priority;
 
-  set urgency(NotificationUrgency value) {
-    if (value == _urgency) {
+  set priority(Priority value) {
+    if (value == _priority) {
       return;
     }
 
     cogState.runtime.logging.debug(
       cogState,
-      'changing notification urgency to',
+      'changing notification priority to',
       value,
     );
 
-    _urgency = value;
+    _priority = value;
   }
 
   Stream<ValueType> get valueChanges => _streamController.stream;

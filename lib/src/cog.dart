@@ -3,7 +3,7 @@ import 'dart:async';
 import 'common.dart';
 import 'cog_registry.dart';
 import 'cog_state_runtime.dart';
-import 'notification_urgency.dart';
+import 'priority.dart';
 import 'standard_cog_state_runtime.dart';
 import 'spin.dart';
 
@@ -73,8 +73,8 @@ sealed class Cog<ValueType, SpinType> {
 
   Stream<ValueType> watch(
     Cogtext cogtext, {
+    Priority priority = Priority.low,
     SpinType? spin,
-    NotificationUrgency urgency = NotificationUrgency.lessUrgent,
   }) {
     assert(thatSpinsMatch(this, spin));
 
@@ -82,7 +82,7 @@ sealed class Cog<ValueType, SpinType> {
 
     return cogtext._cogStateRuntime.acquireValueChangeStream(
       cogState: cogState,
-      urgency: urgency,
+      priority: priority,
     );
   }
 }

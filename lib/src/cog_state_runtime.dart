@@ -4,7 +4,7 @@ import 'cog_state_runtime_logging.dart';
 import 'cog_state_runtime_scheduler.dart';
 import 'cog_state_runtime_telemetry.dart';
 import 'common.dart';
-import 'notification_urgency.dart';
+import 'priority.dart';
 
 abstract interface class CogStateRuntime {
   CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
@@ -16,7 +16,7 @@ abstract interface class CogStateRuntime {
   Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
     required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
         cogState,
-    required NotificationUrgency urgency,
+    required Priority priority,
   });
 
   Future<void> dispose();

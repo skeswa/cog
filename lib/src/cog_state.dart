@@ -3,7 +3,7 @@ import 'dart:async';
 import 'cog.dart';
 import 'cog_state_runtime.dart';
 import 'common.dart';
-import 'notification_urgency.dart';
+import 'priority.dart';
 import 'staleness.dart';
 
 part 'automatic_cog_state.dart';

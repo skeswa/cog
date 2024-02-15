@@ -61,11 +61,11 @@ void main() {
         );
       });
 
-      test('NotificationUrgency should be stringifiable', () {
-        expect('${NotificationUrgency.immediate}', 'immediate');
-        expect('${NotificationUrgency.lessUrgent}', 'lessUrgent');
-        expect('${NotificationUrgency.moreUrgent}', 'moreUrgent');
-        expect('${NotificationUrgency.urgent}', 'urgent');
+      test('Priority should be stringifiable', () {
+        expect('${Priority.asap}', 'asap');
+        expect('${Priority.low}', 'low');
+        expect('${Priority.high}', 'high');
+        expect('${Priority.normal}', 'normal');
       });
 
       test('Spin<T> requires T', () {
@@ -452,7 +452,7 @@ void main() {
       });
 
       test(
-          'writing to a watched manual Cog with immediate urgency '
+          'writing to a watched manual Cog with asap priority '
           'triggers a notification synchronously', () async {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
@@ -461,7 +461,7 @@ void main() {
             .watch(
               cogtext,
               spin: false,
-              urgency: NotificationUrgency.immediate,
+              priority: Priority.asap,
             )
             .listen(emissions.add);
 
@@ -505,28 +505,28 @@ void main() {
           boolCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.lessUrgent,
+                priority: Priority.low,
                 spin: false,
               )
               .listen(emissions.add),
           numberCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.urgent,
+                priority: Priority.normal,
                 spin: false,
               )
               .listen(emissions.add),
           numberCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.urgent,
+                priority: Priority.normal,
                 spin: true,
               )
               .listen(emissions.add),
           textCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.moreUrgent,
+                priority: Priority.high,
                 spin: false,
               )
               .listen(emissions.add),
@@ -590,19 +590,19 @@ void main() {
           boolCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.lessUrgent,
+                priority: Priority.low,
               )
               .listen(emissions.add),
           numberCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.urgent,
+                priority: Priority.normal,
               )
               .listen(emissions.add),
           textCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.moreUrgent,
+                priority: Priority.high,
               )
               .listen(emissions.add),
         ];
@@ -707,14 +707,14 @@ void main() {
           answerCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.lessUrgent,
+                priority: Priority.low,
                 spin: false,
               )
               .listen(emissions.add),
           discriminantCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.moreUrgent,
+                priority: Priority.high,
                 spin: false,
               )
               .listen(emissions.add),
@@ -853,13 +853,13 @@ void main() {
           answerCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.lessUrgent,
+                priority: Priority.low,
               )
               .listen(emissions.add),
           discriminantCog
               .watch(
                 cogtext,
-                urgency: NotificationUrgency.moreUrgent,
+                priority: Priority.high,
               )
               .listen(emissions.add),
         ];
@@ -928,22 +928,18 @@ void main() {
 
       test(
           'writing to a watched manual Cogs triggers notifications in '
-          'the correct order, even after urgency is changed', () async {
+          'the correct order, even after priority is changed', () async {
         final boolCog = Cog.man(() => false);
         final numberCog = Cog.man(() => 4);
         final stringCog = Cog.man(() => '');
 
         final emissions = [];
 
-        boolCog
-            .watch(cogtext, urgency: NotificationUrgency.moreUrgent)
-            .listen(emissions.add);
+        boolCog.watch(cogtext, priority: Priority.high).listen(emissions.add);
         numberCog
-            .watch(cogtext, urgency: NotificationUrgency.urgent)
+            .watch(cogtext, priority: Priority.normal)
             .listen(emissions.add);
-        stringCog
-            .watch(cogtext, urgency: NotificationUrgency.lessUrgent)
-            .listen(emissions.add);
+        stringCog.watch(cogtext, priority: Priority.low).listen(emissions.add);
 
         await Future.delayed(Duration.zero);
 
@@ -964,7 +960,7 @@ void main() {
           ]),
         );
 
-        stringCog.watch(cogtext, urgency: NotificationUrgency.moreUrgent);
+        stringCog.watch(cogtext, priority: Priority.high);
 
         boolCog.write(cogtext, false);
         numberCog.write(cogtext, 6);
@@ -1200,25 +1196,25 @@ void main() {
         firstCog
             .watch(
               cogtext,
-              urgency: NotificationUrgency.lessUrgent,
+              priority: Priority.low,
             )
             .listen(emissions.add);
         secondCog
             .watch(
               cogtext,
-              urgency: NotificationUrgency.moreUrgent,
+              priority: Priority.high,
             )
             .listen(emissions.add);
         thirdCog
             .watch(
               cogtext,
-              urgency: NotificationUrgency.urgent,
+              priority: Priority.normal,
             )
             .listen(emissions.add);
         fourthCog
             .watch(
               cogtext,
-              urgency: NotificationUrgency.lessUrgent,
+              priority: Priority.low,
             )
             .listen(emissions.add);
 
@@ -1671,7 +1667,7 @@ void main() {
               .watch(
                 cogtext,
                 spin: City.brooklyn,
-                urgency: NotificationUrgency.lessUrgent,
+                priority: Priority.low,
               )
               .map((shouldGoToTheBeach) =>
                   'shouldGoToTheBeach brooklyn $shouldGoToTheBeach')
@@ -1689,7 +1685,7 @@ void main() {
               .watch(
                 cogtext,
                 spin: City.austin,
-                urgency: NotificationUrgency.moreUrgent,
+                priority: Priority.high,
               )
               .map((isNiceOutside) => 'isNiceOutside austin $isNiceOutside')
               .listen(emissions.add),
@@ -1714,7 +1710,7 @@ void main() {
 
         subscriptions.addAll([
           isWeekendCog
-              .watch(cogtext, urgency: NotificationUrgency.immediate)
+              .watch(cogtext, priority: Priority.asap)
               .map((isWeekend) => 'isWeekendCog $isWeekend')
               .listen(emissions.add),
           temperatureCog

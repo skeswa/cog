@@ -7,7 +7,7 @@ import 'cog_state_runtime_logging.dart';
 import 'cog_state_runtime_scheduler.dart';
 import 'cog_state_runtime_telemetry.dart';
 import 'common.dart';
-import 'notification_urgency.dart';
+import 'priority.dart';
 
 final class StandardCogStateRuntime implements CogStateRuntime {
   @override
@@ -77,7 +77,7 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
     required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
         cogState,
-    required NotificationUrgency urgency,
+    required Priority priority,
   }) {
     final existingCogStateListeningPost =
         _cogStateListeningPosts[cogState.ordinal];
@@ -91,14 +91,14 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       cogStateListeningPost = CogStateListeningPost(
         cogState: cogState,
         onDeactivation: _onCogStateListeningPostDeactivation,
-        urgency: urgency,
+        priority: priority,
       );
 
       _cogStateListeningPosts[cogState.ordinal] = cogStateListeningPost;
     }
 
-    if (cogStateListeningPost.urgency < urgency) {
-      cogStateListeningPost.urgency = urgency;
+    if (cogStateListeningPost.priority < priority) {
+      cogStateListeningPost.priority = priority;
     }
 
     return cogStateListeningPost.valueChanges;
@@ -151,7 +151,7 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       return;
     }
 
-    if (listeningPost.urgency == NotificationUrgency.immediate) {
+    if (listeningPost.priority == Priority.asap) {
       listeningPost.maybeNotify();
 
       return;
@@ -326,16 +326,16 @@ final class StandardCogStateRuntime implements CogStateRuntime {
 const _listeningPostNotificationLimit = 1000;
 
 /// Comparator that sorts a collection of [CogStateListeningPost] instances from
-/// most urgent to least urgent, then from high [CogStateOrdinal] to low
+/// most normal to least normal, then from high [CogStateOrdinal] to low
 /// [CogStateOrdinal].
 int _compareCogStateListeningPostsToMaybeNotify(
   CogStateListeningPost a,
   CogStateListeningPost b,
 ) {
-  final urgencyComparison = b.urgency.compareTo(a.urgency);
+  final priorityComparison = b.priority.compareTo(a.priority);
 
-  if (urgencyComparison != 0) {
-    return urgencyComparison;
+  if (priorityComparison != 0) {
+    return priorityComparison;
   }
 
   return b.cogState.ordinal.compareTo(a.cogState.ordinal);
