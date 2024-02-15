@@ -20,7 +20,7 @@ abstract interface class CogStateRuntimeScheduler {
 final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
   final _NaiveBackgroundTaskScheduler _highPriorityBackgroundTaskScheduler;
   final _NaiveBackgroundTaskScheduler _lowPriorityBackgroundTaskScheduler;
-  final _scheduledDelayedTaskTimers = <Timer>[];
+  final _scheduledDelayedTasks = <void Function(), Timer>{};
 
   NaiveCogStateRuntimeScheduler({
     Duration highPriorityBackgroundTaskDelay =
@@ -44,11 +44,11 @@ final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
     _highPriorityBackgroundTaskScheduler.dispose();
     _lowPriorityBackgroundTaskScheduler.dispose();
 
-    for (final scheduledDelayedTaskTimer in _scheduledDelayedTaskTimers) {
+    for (final scheduledDelayedTaskTimer in _scheduledDelayedTasks.values) {
       scheduledDelayedTaskTimer.cancel();
     }
 
-    _scheduledDelayedTaskTimers.clear();
+    _scheduledDelayedTasks.clear();
   }
 
   @override
@@ -65,19 +65,16 @@ final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
 
   @override
   void scheduleDelayedTask(void Function() dalayedTask, Duration delay) {
-    // TODO(skeswa): should we cluster these to make cog value updates more
-    // bursty?
-    _scheduledDelayedTaskTimers.add(Timer(delay, () {
+    _scheduledDelayedTasks[dalayedTask]?.cancel();
+    _scheduledDelayedTasks[dalayedTask] = Timer(delay, () {
       dalayedTask();
 
       _cullElapsedScheduledDelayedTaskTimers();
-    }));
+    });
   }
 
   void _cullElapsedScheduledDelayedTaskTimers() {
-    _scheduledDelayedTaskTimers.removeWhere(
-      (scheduledDelayedTaskTimer) => scheduledDelayedTaskTimer.isActive,
-    );
+    _scheduledDelayedTasks.removeWhere((_, timer) => !timer.isActive);
   }
 }
 

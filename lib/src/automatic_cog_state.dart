@@ -29,6 +29,8 @@ final class AutomaticCogState<ValueType, SpinType>
   @override
   void init() {
     maybeRevise(_recalculateValue(), quietly: true);
+
+    _maybeScheduleTtl();
   }
 
   @override
@@ -83,6 +85,25 @@ final class AutomaticCogState<ValueType, SpinType>
     final recalculatedValue = _recalculateValue();
 
     maybeRevise(recalculatedValue);
+  }
+
+  void _maybeScheduleTtl() {
+    final ttl = cog.ttl;
+
+    if (ttl == null) {
+      return;
+    }
+
+    runtime.logging.debug(this, 'scheduling TTL');
+
+    runtime.scheduler.scheduleDelayedTask(_onTtlExpiration, ttl);
+  }
+
+  void _onTtlExpiration() {
+    runtime.logging.debug(this, 'TTL expired - re-calculating value...');
+
+    _maybeRecalculateValue();
+    _maybeScheduleTtl();
   }
 
   ValueType _recalculateValue() {
