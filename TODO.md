@@ -1,5 +1,3 @@
-- [ ] ttl
-- [ ] comprehensive `ttl` tests
 - [ ] `async`
 - [ ] comprehensive `async` tests
 - [ ] `Mechanism`, `MechanismRegistry`

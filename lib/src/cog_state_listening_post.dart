@@ -18,16 +18,16 @@ final class CogStateListeningPost<ValueType, SpinType> {
     required Priority priority,
   })  : _priority = priority,
         _onDeactivation = onDeactivation {
-    cogState.runtime.logging.debug(
+    cogState._runtime.logging.debug(
       cogState,
       'created new listening post',
     );
-    cogState.runtime.telemetry
+    cogState._runtime.telemetry
         .recordCogStateListeningPostCreation(cogState.ordinal);
   }
 
   Future<void> dispose() {
-    cogState.runtime.logging.debug(
+    cogState._runtime.logging.debug(
       cogState,
       'disposing listening post',
     );
@@ -41,7 +41,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
 
   void maybeNotify() {
     if (!_isActive) {
-      cogState.runtime.logging.debug(
+      cogState._runtime.logging.debug(
         cogState,
         'skipping notification due to inactivity',
       );
@@ -52,7 +52,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
     final revision = cogState.revision;
 
     if (revision == _revisionOfLastNotification) {
-      cogState.runtime.logging.debug(
+      cogState._runtime.logging.debug(
         cogState,
         'skipping notification due to no revision change',
       );
@@ -60,7 +60,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
       return;
     }
 
-    cogState.runtime.logging.debug(
+    cogState._runtime.logging.debug(
       cogState,
       'notifying listeners of value changes',
     );
@@ -69,7 +69,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
 
     _revisionOfLastNotification = revision;
 
-    cogState.runtime.telemetry
+    cogState._runtime.telemetry
         .recordCogStateChangeNotification(cogState.ordinal);
   }
 
@@ -80,7 +80,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
       return;
     }
 
-    cogState.runtime.logging.debug(
+    cogState._runtime.logging.debug(
       cogState,
       'changing notification priority to',
       value,

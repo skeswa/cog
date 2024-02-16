@@ -7,6 +7,7 @@ import 'priority.dart';
 import 'staleness.dart';
 
 part 'automatic_cog_state.dart';
+part 'automatic_cog_state_conveyor.dart';
 part 'cog_state_listening_post.dart';
 part 'manual_cog_state.dart';
 
@@ -16,9 +17,9 @@ sealed class CogState<ValueType, SpinType,
 
   final CogStateOrdinal ordinal;
 
-  final CogStateRuntime runtime;
-
   CogStateRevision _revision = initialCogStateRevision - 1;
+
+  final CogStateRuntime _runtime;
 
   final SpinType? _spin;
 
@@ -30,8 +31,9 @@ sealed class CogState<ValueType, SpinType,
     required this.cog,
     required this.ordinal,
     required SpinType? spin,
-    required this.runtime,
-  }) : _spin = spin;
+    required CogStateRuntime runtime,
+  })  : _runtime = runtime,
+        _spin = spin;
 
   bool assertHasValue() {
     if (!_hasValue) {
@@ -68,10 +70,10 @@ sealed class CogState<ValueType, SpinType,
     final didUpdateStaleness = _updateStaleness(staleness);
 
     if (didUpdateStaleness && staleness != Staleness.fresh) {
-      runtime.maybeNotifyListenersOf(ordinal);
+      _runtime.maybeNotifyListenersOf(ordinal);
 
-      for (final followerOrdinal in runtime.followerOrdinalsOf(ordinal)) {
-        runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
+      for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
+        _runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
       }
     }
   }
@@ -80,7 +82,7 @@ sealed class CogState<ValueType, SpinType,
     final shouldRevise = !_hasValue || !cog.eq(_value, value);
 
     if (shouldRevise) {
-      runtime.logging.debug(
+      _runtime.logging.debug(
         this,
         'new revision - marking followers as stale and setting value to',
         value,
@@ -89,18 +91,18 @@ sealed class CogState<ValueType, SpinType,
       _revision++;
       _value = value;
 
-      for (final followerOrdinal in runtime.followerOrdinalsOf(ordinal)) {
-        runtime[followerOrdinal].markStale();
+      for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
+        _runtime[followerOrdinal].markStale();
       }
 
       if (!quietly) {
-        runtime.maybeNotifyListenersOf(ordinal);
+        _runtime.maybeNotifyListenersOf(ordinal);
       } else {
-        runtime.logging
+        _runtime.logging
             .debug(this, 'skipping listener notification - quietly = true');
       }
     } else {
-      runtime.logging
+      _runtime.logging
           .debug(this, 'no revision - new value was equal to old value');
     }
 
@@ -109,21 +111,6 @@ sealed class CogState<ValueType, SpinType,
 
   CogStateRevision get revision => _revision;
 
-  SpinType get spin {
-    assert(() {
-      if (cog.spin == null) {
-        throw StateError(
-          'Cannot read cog spin - '
-          'this cog definition does not specify a spin type',
-        );
-      }
-
-      return true;
-    }());
-
-    return _spin as SpinType;
-  }
-
   SpinType? get spinOrNull => _spin;
 
   Staleness get staleness {
@@ -131,12 +118,12 @@ sealed class CogState<ValueType, SpinType,
       final actualStaleness =
           isActuallyStale ? Staleness.stale : Staleness.fresh;
 
-      runtime.logging.debug(
+      _runtime.logging.debug(
         this,
         'updating staleness form maybeStale to',
         actualStaleness,
       );
-      runtime.telemetry.recordCogStateStalenessChange(ordinal);
+      _runtime.telemetry.recordCogStateStalenessChange(ordinal);
 
       _staleness = actualStaleness;
     }
@@ -151,8 +138,8 @@ sealed class CogState<ValueType, SpinType,
       return false;
     }
 
-    runtime.logging.debug(this, 'staleness is becoming', staleness);
-    runtime.telemetry.recordCogStateStalenessChange(ordinal);
+    _runtime.logging.debug(this, 'staleness is becoming', staleness);
+    _runtime.telemetry.recordCogStateStalenessChange(ordinal);
 
     _staleness = staleness;
 

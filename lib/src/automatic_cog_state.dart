@@ -1,13 +1,9 @@
 part of 'cog_state.dart';
 
 final class AutomaticCogState<ValueType, SpinType>
-    extends CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
-    implements AutomaticCogController<ValueType, SpinType> {
+    extends CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>> {
+  late final AutomaticCogStateConveyor<ValueType, SpinType> _conveyor;
   CogStateRevision? _leaderRevisionHash;
-
-  late var _linkedLeaderOrdinals = <CogStateOrdinal>[];
-
-  late var _previouslyLinkedLeaderOrdinals = <CogStateOrdinal>[];
 
   AutomaticCogState({
     required super.cog,
@@ -17,19 +13,18 @@ final class AutomaticCogState<ValueType, SpinType>
   });
 
   @override
-  CurrValueType curr<CurrValueType extends ValueType>(CurrValueType orElse) =>
-      _hasValue ? _value as CurrValueType : orElse;
-
-  @override
   ValueType evaluate() {
-    _maybeRecalculateValue();
+    _maybeReconvey();
 
     return _value;
   }
 
   @override
   void init() {
-    maybeRevise(_recalculateValue(), quietly: true);
+    _conveyor = SyncAutomaticCogStateConveyor(
+      cogState: this,
+      onNextValue: _onNextValue,
+    )..convey(quietly: true);
 
     _maybeScheduleTtl();
   }
@@ -42,22 +37,8 @@ final class AutomaticCogState<ValueType, SpinType>
   }
 
   @override
-  LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(
-    Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
-    LinkedCogSpinType? spin,
-  }) {
-    assert(thatSpinsMatch(cog, spin));
-
-    final cogState = runtime.acquire(cog: cog, cogSpin: spin);
-
-    _linkedLeaderOrdinals.add(cogState.ordinal);
-
-    return cogState.evaluate();
-  }
-
-  @override
   CogStateRevision get revision {
-    _maybeRecalculateValue();
+    _maybeReconvey();
 
     return _revision;
   }
@@ -65,17 +46,17 @@ final class AutomaticCogState<ValueType, SpinType>
   CogStateRevisionHash _calculateLeaderRevisionHash() {
     var hash = leaderRevisionHashSeed;
 
-    for (final leaderOrdinal in runtime.leaderOrdinalsOf(ordinal)) {
+    for (final leaderOrdinal in _runtime.leaderOrdinalsOf(ordinal)) {
       hash += leaderRevisionHashScalingFactor * hash +
-          runtime[leaderOrdinal].revision;
+          _runtime[leaderOrdinal].revision;
     }
 
     return hash;
   }
 
-  void _maybeRecalculateValue() {
+  void _maybeReconvey() {
     if (staleness != Staleness.stale) {
-      runtime.logging.debug(
+      _runtime.logging.debug(
         this,
         'skipping value re-calculation due to lack of staleness',
       );
@@ -83,9 +64,7 @@ final class AutomaticCogState<ValueType, SpinType>
       return;
     }
 
-    final recalculatedValue = _recalculateValue();
-
-    maybeRevise(recalculatedValue);
+    _conveyor.convey();
   }
 
   void _maybeScheduleTtl() {
@@ -95,100 +74,30 @@ final class AutomaticCogState<ValueType, SpinType>
       return;
     }
 
-    runtime.logging.debug(this, 'scheduling TTL');
+    _runtime.logging.debug(this, 'scheduling TTL');
 
-    runtime.scheduler.scheduleDelayedTask(_onTtlExpiration, ttl);
+    _runtime.scheduler.scheduleDelayedTask(_onTtlExpiration, ttl);
   }
 
-  void _onTtlExpiration() {
-    runtime.logging.debug(this, 'TTL expired - re-calculating value...');
-
-    maybeRevise(_recalculateValue());
-    _maybeScheduleTtl();
-  }
-
-  ValueType _recalculateValue() {
-    // Swap the cog value leader tracking lists so that we can use them
-    // for a new def invocation.
-    _swapLeaderOrdinals();
-
-    runtime.logging.debug(this, 'invoking cog definition');
-    runtime.telemetry.recordCogStateRecalculation(ordinal);
-
-    final defResult = cog.def(this);
-
-    // TODO(skeswa): asyncify all of the logic below
-    if (defResult is Future) {
-      throw UnsupportedError('No async yet buckaroo');
-    }
-
-    // Ensure that the linked ordinals are in order so we can compare to
-    // previously linked leader ordinals.
-    _linkedLeaderOrdinals.sort();
-
-    // Look for differences in the two sorted lists of leader ordinals.
-    int i = 0, j = 0;
-    while (i < _previouslyLinkedLeaderOrdinals.length &&
-        j < _linkedLeaderOrdinals.length) {
-      if (_previouslyLinkedLeaderOrdinals[i] < _linkedLeaderOrdinals[j]) {
-        // Looks like this previously linked leader ordinal is no longer linked.
-        runtime.terminateCogStateDependency(
-          followerCogStateOrdinal: ordinal,
-          leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
-        );
-
-        i++;
-      } else if (_previouslyLinkedLeaderOrdinals[i] >
-          _linkedLeaderOrdinals[j]) {
-        // Looks like we have a newly linked leader ordinal.
-        runtime.renewCogStateDependency(
-          followerCogStateOrdinal: ordinal,
-          leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
-        );
-
-        j++;
-      } else {
-        // This leader ordinal has stayed linked.
-
-        i++;
-        j++;
-      }
-    }
-
-    // We need to account for one of the lists being longer than the other.
-    while (i < _previouslyLinkedLeaderOrdinals.length) {
-      runtime.terminateCogStateDependency(
-        followerCogStateOrdinal: ordinal,
-        leaderCogStateOrdinal: _previouslyLinkedLeaderOrdinals[i],
-      );
-
-      i++;
-    }
-    while (j < _linkedLeaderOrdinals.length) {
-      runtime.renewCogStateDependency(
-        followerCogStateOrdinal: ordinal,
-        leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
-      );
-
-      j++;
-    }
-
-    runtime.logging.debug(
+  void _onNextValue(
+    ValueType nextValue,
+    bool shouldNotify,
+  ) {
+    _runtime.logging.debug(
       this,
       'updating leader revision hash and resetting staleness to fresh',
     );
-    runtime.telemetry.recordCogStateStalenessChange(ordinal);
+    _runtime.telemetry.recordCogStateStalenessChange(ordinal);
 
     _leaderRevisionHash = _calculateLeaderRevisionHash();
 
-    return defResult;
+    maybeRevise(nextValue);
   }
 
-  void _swapLeaderOrdinals() {
-    final previouslyLinkedLeaderOrdinals = _previouslyLinkedLeaderOrdinals;
+  void _onTtlExpiration() {
+    _runtime.logging.debug(this, 'TTL expired - re-calculating value...');
 
-    _previouslyLinkedLeaderOrdinals = _linkedLeaderOrdinals;
-
-    _linkedLeaderOrdinals = previouslyLinkedLeaderOrdinals..clear();
+    _conveyor.convey();
+    _maybeScheduleTtl();
   }
 }
