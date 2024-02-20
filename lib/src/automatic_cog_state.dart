@@ -99,7 +99,7 @@ final class AutomaticCogState<ValueType, SpinType>
 
     _leaderRevisionHash = _calculateLeaderRevisionHash();
 
-    maybeRevise(nextValue);
+    maybeRevise(nextValue, shouldNotify: shouldNotify);
   }
 
   void _onTtlExpiration() {

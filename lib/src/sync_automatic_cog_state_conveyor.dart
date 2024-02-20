@@ -17,6 +17,12 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
   })  : _invocationFrame = invocationFrame,
         _onError = onError,
         super._(cogState: cogState, onNextValue: onNextValue) {
+    _updateCogStateDependencies(
+      cogState: _cogState,
+      linkedLeaderOrdinals: _invocationFrame.linkedLeaderOrdinals,
+      previouslyLinkedLeaderOrdinals: _previouslyLinkedLeaderOrdinals,
+    );
+
     _onNextValue(
       nextValue: invocationResult,
       shouldNotify: false,
@@ -24,7 +30,7 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
   }
 
   @override
-  void convey({bool quietly = false}) {
+  void convey({bool isForced = false}) {
     _resetInvocationFrame();
 
     try {
@@ -38,7 +44,7 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
 
       _onNextValue(
         nextValue: invocationResult,
-        shouldNotify: !quietly,
+        shouldNotify: true,
       );
     } catch (e, stackTrace) {
       _onError(
@@ -55,7 +61,8 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
 
     _previouslyLinkedLeaderOrdinals = _invocationFrame.linkedLeaderOrdinals;
 
-    _invocationFrame.linkedLeaderOrdinals = previouslyLinkedLeaderOrdinals
-      ..clear();
+    _invocationFrame.reset(
+      linkedLeaderOrdinals: previouslyLinkedLeaderOrdinals..clear(),
+    );
   }
 }

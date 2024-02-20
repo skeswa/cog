@@ -82,7 +82,10 @@ sealed class CogState<ValueType, SpinType,
     }
   }
 
-  void maybeRevise(ValueType value, {bool shouldNotify = true}) {
+  void maybeRevise(
+    ValueType value, {
+    required bool shouldNotify,
+  }) {
     final shouldRevise = !_hasValue || !cog.eq(_value, value);
 
     if (shouldRevise) {

@@ -75,32 +75,28 @@ extension on StringBuffer {
 
     if (cog.debugLabel != null) {
       write(cog.debugLabel);
-      write('<');
-      write(cog.ordinal);
-      write('>');
-    } else {
-      write(cog.ordinal);
     }
 
-    write('::');
+    write('<');
+    write(cog.ordinal);
+    write('>');
+    write(' | ');
 
     final spin = cogState.spinOrNull;
 
     if (spin != null) {
       write(spin);
-      write('<');
-      write(cogState.ordinal);
-      write('>');
-    } else {
-      write(cogState.ordinal);
     }
 
+    write('<');
+    write(cogState.ordinal);
+    write('>');
     write(']');
   }
 
   void writeCogStateOrdinalDebugTagOf(CogStateOrdinal cogStateOrdinal) {
-    write('[?::');
+    write('[<?> | <');
     write(cogStateOrdinal);
-    write(']');
+    write('>]');
   }
 }

@@ -3,20 +3,21 @@ part of 'cog_state.dart';
 final class AutomaticCogInvocationFrame<ValueType, SpinType>
     implements AutomaticCogController<ValueType, SpinType> {
   final AutomaticCogState<ValueType, SpinType> cogState;
-  final bool hasValue;
-  var linkedLeaderOrdinals = <CogStateOrdinal>[];
   final int ordinal;
-  late ValueType value;
+
+  bool _hasValue;
+  var _linkedLeaderOrdinals = <CogStateOrdinal>[];
+  late ValueType _value;
 
   AutomaticCogInvocationFrame._({
     required this.cogState,
     required CogValueInitializer<ValueType>? init,
     required this.ordinal,
-  }) : hasValue = cogState._hasValue {
-    if (hasValue) {
-      value = cogState._value;
+  }) : _hasValue = cogState._hasValue {
+    if (_hasValue) {
+      _value = cogState._value;
     } else if (init != null) {
-      value = init();
+      _value = init();
     }
   }
 
@@ -31,6 +32,8 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     return cogState.cog.def(this);
   }
 
+  bool get hasValue => _hasValue;
+
   @override
   LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(
     Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
@@ -40,11 +43,28 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
 
     final acquiredCogState = cogState._runtime.acquire(cog: cog, cogSpin: spin);
 
-    linkedLeaderOrdinals.add(acquiredCogState.ordinal);
+    _linkedLeaderOrdinals.add(acquiredCogState.ordinal);
 
     return acquiredCogState.evaluate();
   }
 
+  List<CogStateOrdinal> get linkedLeaderOrdinals => _linkedLeaderOrdinals;
+
+  void reset({
+    List<CogStateOrdinal>? linkedLeaderOrdinals,
+  }) {
+    if (linkedLeaderOrdinals != null) {
+      _linkedLeaderOrdinals = linkedLeaderOrdinals;
+    }
+
+    _hasValue = cogState._hasValue;
+    if (_hasValue) {
+      _value = cogState._value;
+    }
+  }
+
   @override
   SpinType get spin => cogState.spinOrThrow;
+
+  ValueType get value => _value;
 }

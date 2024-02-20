@@ -52,6 +52,7 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   void write(
     Cogtext cogtext,
     ValueType value, {
+    bool quietly = false,
     SpinType? spin,
   }) {
     assert(() {
@@ -74,6 +75,6 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
 
     final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
 
-    cogState.maybeRevise(value);
+    cogState.maybeRevise(value, shouldNotify: !quietly);
   }
 }

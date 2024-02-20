@@ -7,7 +7,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
   final CogValueInitializer<ValueType> _init;
   AutomaticCogInvocationFrame<ValueType, SpinType>? _lastFrame;
   final AutomaticCogStateConveyorErrorCallback<ValueType, SpinType> _onError;
-  var _reconveyStatus = _ReconveyStatus.unnecessary;
+  _ReconveyStatus _reconveyStatus = _ReconveyStatus.unnecessary;
 
   AsyncAutomaticCogStateConveyor._({
     required AutomaticCogState<ValueType, SpinType> cogState,
@@ -21,27 +21,34 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
         _init = init,
         _onError = onError,
         super._(cogState: cogState, onNextValue: onNextValue) {
-    _maybeConvey(invocation: invocation, shouldNotify: false);
+    _maybeConvey(
+      invocation: invocation,
+      invocationFrame: invocationFrame,
+      shouldNotify: false,
+    );
   }
 
   @override
-  void convey() => _maybeConvey(invocation: null, shouldNotify: true);
+  void convey() => _maybeConvey();
 
   Future<void> _maybeConvey({
-    required Future<ValueType>? invocation,
-    required bool shouldNotify,
+    Future<ValueType>? invocation,
+    AutomaticCogInvocationFrame<ValueType, SpinType>? invocationFrame,
+    bool shouldNotify = true,
   }) async {
     // When scheduling sequentially, all we need to track is whether there
     // should be a re-convey. We schedule re-convey when an active frame is
     // already in progress - that we follow it up once complete.
     if (_cogState.cog.async == Async.sequentially && _activeFrameCount > 0) {
-      if (_reconveyStatus == _ReconveyStatus.scheduled) {
-        _cogState._runtime.logging.debug(
-          _cogState,
-          're-convey is already scheduled',
-        );
-      } else {
-        _reconveyStatus = _ReconveyStatus.necessary;
+      switch (_reconveyStatus) {
+        case _ReconveyStatus.scheduled:
+          _cogState._runtime.logging.debug(
+            _cogState,
+            're-convey is already scheduled',
+          );
+
+        default:
+          _reconveyStatus = _ReconveyStatus.necessary;
       }
 
       return;
@@ -50,49 +57,47 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     _activeFrameCount++;
 
     try {
-      final invocationFrame = AutomaticCogInvocationFrame._(
+      invocationFrame ??= AutomaticCogInvocationFrame._(
         cogState: _cogState,
         init: _init,
         ordinal: ++_currentFrameOrdinal,
       );
 
-      final invocation = invocationFrame.invoke() as Future<ValueType>;
+      invocation ??= invocationFrame.invoke() as Future<ValueType>;
 
-      try {
-        final invocationResult = await invocation;
+      final invocationResult = await invocation;
 
-        if (_cogState.cog.async == Async.singularly &&
-            invocationFrame.ordinal == _currentFrameOrdinal) {
-          _cogState._runtime.logging.debug(
-            _cogState,
-            'invocation frame was usurped - ignoring result',
-            invocationResult,
-          );
-
-          return;
-        }
-
-        _onNextValue(
-          nextValue: invocationResult,
-          shouldNotify: shouldNotify,
+      if (_cogState.cog.async == Async.singularly &&
+          invocationFrame.ordinal == _currentFrameOrdinal) {
+        _cogState._runtime.logging.debug(
+          _cogState,
+          'invocation frame was usurped - ignoring result',
+          invocationResult,
         );
 
-        _updateCogStateDependencies(
-          cogState: _cogState,
-          linkedLeaderOrdinals: invocationFrame.linkedLeaderOrdinals,
-          previouslyLinkedLeaderOrdinals:
-              _lastFrame?.linkedLeaderOrdinals ?? const [],
-        );
-
-        _lastFrame = invocationFrame;
-      } catch (e, stackTrace) {
-        _onError(
-          cog: _cogState.cog,
-          error: e,
-          spin: _cogState._spin,
-          stackTrace: stackTrace,
-        );
+        return;
       }
+
+      _onNextValue(
+        nextValue: invocationResult,
+        shouldNotify: shouldNotify,
+      );
+
+      _updateCogStateDependencies(
+        cogState: _cogState,
+        linkedLeaderOrdinals: invocationFrame.linkedLeaderOrdinals,
+        previouslyLinkedLeaderOrdinals:
+            _lastFrame?.linkedLeaderOrdinals ?? const [],
+      );
+
+      _lastFrame = invocationFrame;
+    } catch (e, stackTrace) {
+      _onError(
+        cog: _cogState.cog,
+        error: e,
+        spin: _cogState._spin,
+        stackTrace: stackTrace,
+      );
     } finally {
       _activeFrameCount--;
     }
@@ -110,11 +115,20 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
   }
 
   void _onReconvey() {
-    _reconveyStatus = _ReconveyStatus.unnecessary;
+    switch (_reconveyStatus) {
+      case _ReconveyStatus.scheduled:
+        _reconveyStatus = _ReconveyStatus.unnecessary;
 
-    _cogState._runtime.logging.debug(_cogState, 're-conveying...');
+        _cogState._runtime.logging.debug(_cogState, 're-conveying...');
 
-    _maybeConvey(invocation: null, shouldNotify: true);
+        _maybeConvey(invocation: null);
+
+      default:
+        _cogState._runtime.logging.debug(
+          _cogState,
+          'skipping scheduled re-convey due to status',
+        );
+    }
   }
 }
 
