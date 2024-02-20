@@ -11,6 +11,6 @@ final class ManualCogState<ValueType, SpinType>
 
   @override
   void init() {
-    maybeRevise(cog.init(), quietly: true);
+    maybeRevise(cog.init(), shouldNotify: false);
   }
 }

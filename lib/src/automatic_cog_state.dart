@@ -21,10 +21,11 @@ final class AutomaticCogState<ValueType, SpinType>
 
   @override
   void init() {
-    _conveyor = SyncAutomaticCogStateConveyor(
+    _conveyor = AutomaticCogStateConveyor(
       cogState: this,
+      onError: _onError,
       onNextValue: _onNextValue,
-    )..convey(quietly: true);
+    );
 
     _maybeScheduleTtl();
   }
@@ -79,10 +80,17 @@ final class AutomaticCogState<ValueType, SpinType>
     _runtime.scheduler.scheduleDelayedTask(_onTtlExpiration, ttl);
   }
 
-  void _onNextValue(
-    ValueType nextValue,
-    bool shouldNotify,
-  ) {
+  void _onError({
+    required Cog<ValueType, SpinType> cog,
+    required Object error,
+    required StackTrace stackTrace,
+    required SpinType? spin,
+  }) {}
+
+  void _onNextValue({
+    required ValueType nextValue,
+    required bool shouldNotify,
+  }) {
     _runtime.logging.debug(
       this,
       'updating leader revision hash and resetting staleness to fresh',

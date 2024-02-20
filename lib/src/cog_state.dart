@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'async.dart';
 import 'cog.dart';
 import 'cog_state_runtime.dart';
 import 'common.dart';
 import 'priority.dart';
 import 'staleness.dart';
 
+part 'async_automatic_cog_state_conveyor.dart';
+part 'automatic_cog_invocation_frame.dart';
 part 'automatic_cog_state.dart';
 part 'automatic_cog_state_conveyor.dart';
 part 'cog_state_listening_post.dart';
 part 'manual_cog_state.dart';
+part 'sync_automatic_cog_state_conveyor.dart';
 
 sealed class CogState<ValueType, SpinType,
     CogType extends Cog<ValueType, SpinType>> {
@@ -78,7 +82,7 @@ sealed class CogState<ValueType, SpinType,
     }
   }
 
-  void maybeRevise(ValueType value, {bool quietly = false}) {
+  void maybeRevise(ValueType value, {bool shouldNotify = true}) {
     final shouldRevise = !_hasValue || !cog.eq(_value, value);
 
     if (shouldRevise) {
@@ -95,11 +99,13 @@ sealed class CogState<ValueType, SpinType,
         _runtime[followerOrdinal].markStale();
       }
 
-      if (!quietly) {
+      if (shouldNotify) {
         _runtime.maybeNotifyListenersOf(ordinal);
       } else {
-        _runtime.logging
-            .debug(this, 'skipping listener notification - quietly = true');
+        _runtime.logging.debug(
+          this,
+          'skipping listener notification - shouldNotify = false',
+        );
       }
     } else {
       _runtime.logging
@@ -112,6 +118,21 @@ sealed class CogState<ValueType, SpinType,
   CogStateRevision get revision => _revision;
 
   SpinType? get spinOrNull => _spin;
+
+  SpinType get spinOrThrow {
+    assert(() {
+      if (cog.spin == null) {
+        throw StateError(
+          'Cannot read cog spin - '
+          'this cog definition does not specify a spin type',
+        );
+      }
+
+      return true;
+    }());
+
+    return _spin as SpinType;
+  }
 
   Staleness get staleness {
     if (_staleness == Staleness.maybeStale) {

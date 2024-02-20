@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'async.dart';
 import 'common.dart';
 import 'cog_registry.dart';
 import 'cog_state_runtime.dart';
@@ -22,16 +23,20 @@ sealed class Cog<ValueType, SpinType> {
 
   factory Cog(
     AutomaticCogDefinition<ValueType, SpinType> def, {
+    Async? async,
     String? debugLabel,
     CogValueComparator<ValueType>? eq,
+    CogValueInitializer<ValueType>? init,
     CogRegistry? registry,
     Spin<SpinType>? spin,
     Duration? ttl,
   }) =>
       AutomaticCog._(
         def,
+        async: async,
         debugLabel: debugLabel,
         eq: eq,
+        init: init,
         registry: registry,
         spin: spin,
         ttl: ttl,

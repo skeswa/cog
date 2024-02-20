@@ -1,18 +1,25 @@
 part of 'cog.dart';
 
 final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
+  final Async async;
+
   final AutomaticCogDefinition<ValueType, SpinType> def;
+
+  final CogValueInitializer<ValueType>? init;
 
   final Duration? ttl;
 
   AutomaticCog._(
     this.def, {
     super.debugLabel,
+    Async? async,
     CogValueComparator<ValueType>? eq,
+    this.init,
     CogRegistry? registry,
     super.spin,
     this.ttl,
-  }) : super._(eq: eq ?? identical, registry: registry);
+  })  : async = async ?? Async.inParallel,
+        super._(eq: eq ?? identical, registry: registry);
 
   @override
   String toString() {
