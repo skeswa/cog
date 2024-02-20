@@ -60,10 +60,10 @@ sealed class AutomaticCogStateConveyor<ValueType, SpinType> {
 
 typedef AutomaticCogStateConveyorErrorCallback<ValueType, SpinType> = void
     Function({
-  required Cog<ValueType, SpinType> cog,
+  required CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
+      cogState,
   required Object error,
   required StackTrace stackTrace,
-  required SpinType? spin,
 });
 
 typedef AutomaticCogStateConveyorNextValueCallback<ValueType> = void Function({

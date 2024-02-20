@@ -81,11 +81,18 @@ final class AutomaticCogState<ValueType, SpinType>
   }
 
   void _onError({
-    required Cog<ValueType, SpinType> cog,
+    required CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
+        cogState,
     required Object error,
     required StackTrace stackTrace,
-    required SpinType? spin,
-  }) {}
+  }) {
+    _runtime.logging.error(
+      cogState,
+      'encountered an error while conveying',
+      error,
+      stackTrace,
+    );
+  }
 
   void _onNextValue({
     required ValueType nextValue,

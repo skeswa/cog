@@ -93,9 +93,8 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
       _lastFrame = invocationFrame;
     } catch (e, stackTrace) {
       _onError(
-        cog: _cogState.cog,
+        cogState: _cogState,
         error: e,
-        spin: _cogState._spin,
         stackTrace: stackTrace,
       );
     } finally {

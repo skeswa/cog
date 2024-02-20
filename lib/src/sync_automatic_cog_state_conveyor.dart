@@ -48,9 +48,8 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
       );
     } catch (e, stackTrace) {
       _onError(
-        cog: _cogState.cog,
+        cogState: _cogState,
         error: e,
-        spin: _cogState._spin,
         stackTrace: stackTrace,
       );
     }
