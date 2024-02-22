@@ -1665,10 +1665,8 @@ void main() {
 
         expect(emissions, isEmpty);
 
-        print('DEBUG: firstCog.write(cogtext, 2);');
         firstCog.write(cogtext, 2);
 
-        print('DEBUG: watches');
         firstCog
             .watch(
               cogtext,
@@ -1694,7 +1692,6 @@ void main() {
             )
             .listen(emissions.add);
 
-        print('DEBUG: fourthCog.read(cogtext);');
         fourthCog.read(cogtext);
 
         expect(emissions, isEmpty);
