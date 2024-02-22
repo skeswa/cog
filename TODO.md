@@ -1,5 +1,7 @@
-- [ ] `async`
+- [x] `async`
 - [ ] comprehensive `async` tests
+- [ ] disposable `CogState`
+- [ ] `CogState` culling
 - [ ] `Mechanism`, `MechanismRegistry`
 - [ ] comprehensive `Mechanism` tests
 - [ ] Flutter
@@ -9,7 +11,6 @@
   - [ ] comprehensive Flutter tests
 - [ ] `Subject` compat
 - [ ] comprehensive `Subject` compat tests
-- [ ] disposable `CogState`
 - [ ] comprehensive disposable `CogState` tests
 - [ ] doc comment all the things
 - [ ] g3doc all the things

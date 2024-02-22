@@ -23,18 +23,43 @@ final class AutomaticCogState<ValueType, SpinType>
   void init() {
     _conveyor = AutomaticCogStateConveyor(
       cogState: this,
-      onError: _onError,
       onNextValue: _onNextValue,
     );
-
-    _maybeScheduleTtl();
   }
 
   @override
   bool get isActuallyStale {
     final latestLeaderRevisionHash = _calculateLeaderRevisionHash();
 
-    return _leaderRevisionHash != latestLeaderRevisionHash;
+    return latestLeaderRevisionHash != _leaderRevisionHash;
+  }
+
+  @override
+  void markStale({
+    Staleness staleness = Staleness.stale,
+  }) {
+    super.markStale(staleness: staleness);
+
+    if (_conveyor.isEager) {
+      _runtime.logging.debug(
+        this,
+        'this cog state conveys eagerly - '
+        'might need to re-convey based on change in staleness',
+      );
+
+      _maybeReconvey();
+    }
+  }
+
+  @override
+  bool maybeRevise(ValueType value, {required bool shouldNotify}) {
+    final didRevise = super.maybeRevise(value, shouldNotify: shouldNotify);
+
+    if (didRevise) {
+      _maybeScheduleTtl();
+    }
+
+    return didRevise;
   }
 
   @override
@@ -55,17 +80,23 @@ final class AutomaticCogState<ValueType, SpinType>
     return hash;
   }
 
-  void _maybeReconvey() {
-    if (staleness != Staleness.stale) {
-      _runtime.logging.debug(
-        this,
-        'skipping value re-calculation due to lack of staleness',
-      );
+  void _maybeReconvey({bool shouldForce = false}) {
+    if (!shouldForce) {
+      final recalculatedStaleness = recalculateStaleness();
 
-      return;
+      if (recalculatedStaleness != Staleness.stale) {
+        _runtime.logging.debug(
+          this,
+          'skipping convey due to lack of staleness',
+        );
+
+        return;
+      }
     }
 
-    _conveyor.convey();
+    _runtime.logging.debug(this, 're-conveying');
+
+    _conveyor.convey(shouldForce: shouldForce);
   }
 
   void _maybeScheduleTtl() {
@@ -75,23 +106,9 @@ final class AutomaticCogState<ValueType, SpinType>
       return;
     }
 
-    _runtime.logging.debug(this, 'scheduling TTL');
+    _runtime.logging.debug(this, '(re-)scheduling TTL');
 
     _runtime.scheduler.scheduleDelayedTask(_onTtlExpiration, ttl);
-  }
-
-  void _onError({
-    required CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
-        cogState,
-    required Object error,
-    required StackTrace stackTrace,
-  }) {
-    _runtime.logging.error(
-      cogState,
-      'encountered an error while conveying',
-      error,
-      stackTrace,
-    );
   }
 
   void _onNextValue({
@@ -100,9 +117,8 @@ final class AutomaticCogState<ValueType, SpinType>
   }) {
     _runtime.logging.debug(
       this,
-      'updating leader revision hash and resetting staleness to fresh',
+      'next value has conveyed - updating leader revision hash',
     );
-    _runtime.telemetry.recordCogStateStalenessChange(ordinal);
 
     _leaderRevisionHash = _calculateLeaderRevisionHash();
 
@@ -112,7 +128,7 @@ final class AutomaticCogState<ValueType, SpinType>
   void _onTtlExpiration() {
     _runtime.logging.debug(this, 'TTL expired - re-calculating value...');
 
-    _conveyor.convey();
+    _maybeReconvey(shouldForce: true);
     _maybeScheduleTtl();
   }
 }

@@ -7,46 +7,28 @@ sealed class AutomaticCogStateConveyor<ValueType, SpinType> {
 
   factory AutomaticCogStateConveyor({
     required AutomaticCogState<ValueType, SpinType> cogState,
-    required AutomaticCogStateConveyorErrorCallback<ValueType, SpinType>
-        onError,
     required AutomaticCogStateConveyorNextValueCallback<ValueType> onNextValue,
   }) {
-    final init = cogState.cog.init;
-
     final invocationFrame = AutomaticCogInvocationFrame._(
       cogState: cogState,
-      init: init,
       ordinal: _initialInvocationFrameOrdinal,
     );
 
     final invocation = invocationFrame.invoke();
 
-    if (invocation is Future<ValueType>) {
-      if (init == null) {
-        throw ArgumentError(
-          'Failed to initialize asynchronous automatic Cog ${cogState.cog} '
-          'with spin `${cogState._spin}`: '
-          'asynchronous automatic Cogs require an accompanying `init` function',
-        );
-      }
-
-      return AsyncAutomaticCogStateConveyor._(
-        cogState: cogState,
-        init: init,
-        invocation: invocation,
-        invocationFrame: invocationFrame,
-        onError: onError,
-        onNextValue: onNextValue,
-      );
-    } else {
-      return SyncAutomaticCogStateConveyor._(
-        cogState: cogState,
-        invocationFrame: invocationFrame,
-        invocationResult: invocation,
-        onError: onError,
-        onNextValue: onNextValue,
-      );
-    }
+    return invocation is Future<ValueType>
+        ? AsyncAutomaticCogStateConveyor._(
+            cogState: cogState,
+            invocation: invocation,
+            invocationFrame: invocationFrame,
+            onNextValue: onNextValue,
+          )
+        : SyncAutomaticCogStateConveyor._(
+            cogState: cogState,
+            invocationFrame: invocationFrame,
+            invocationResult: invocation,
+            onNextValue: onNextValue,
+          );
   }
 
   AutomaticCogStateConveyor._({
@@ -55,16 +37,10 @@ sealed class AutomaticCogStateConveyor<ValueType, SpinType> {
   })  : _cogState = cogState,
         _onNextValue = onNextValue;
 
-  void convey();
-}
+  void convey({bool shouldForce = false});
 
-typedef AutomaticCogStateConveyorErrorCallback<ValueType, SpinType> = void
-    Function({
-  required CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>>
-      cogState,
-  required Object error,
-  required StackTrace stackTrace,
-});
+  bool get isEager;
+}
 
 typedef AutomaticCogStateConveyorNextValueCallback<ValueType> = void Function({
   required ValueType nextValue,

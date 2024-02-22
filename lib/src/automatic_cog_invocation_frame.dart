@@ -11,19 +11,44 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
 
   AutomaticCogInvocationFrame._({
     required this.cogState,
-    required CogValueInitializer<ValueType>? init,
     required this.ordinal,
   }) : _hasValue = cogState._hasValue {
     if (_hasValue) {
       _value = cogState._value;
-    } else if (init != null) {
-      _value = init();
+    } else {
+      final init = cogState.cog.init;
+
+      if (init != null) {
+        _value = init();
+      }
     }
   }
 
   @override
-  CurrValueType curr<CurrValueType extends ValueType>(CurrValueType orElse) =>
-      hasValue ? value as CurrValueType : orElse;
+  ValueType get curr {
+    if (hasValue) {
+      return _value;
+    }
+
+    final init = cogState.cog.init;
+    if (init != null) {
+      return init();
+    }
+
+    throw StateError(
+      'Failed to get current value of automatic Cog '
+      '${cogState.cog} with spin `${cogState._spin}`: '
+      'Cog does not yet have a value, and does not have an accompanying '
+      '`init` function',
+    );
+  }
+
+  @override
+  CurrValueType currOr<CurrValueType extends ValueType>(
+    CurrValueType fallback,
+  ) {
+    return hasValue ? _value as CurrValueType : fallback;
+  }
 
   FutureOr<ValueType> invoke() {
     cogState._runtime.logging.debug(cogState, 'invoking cog definition');

@@ -4,38 +4,65 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     extends AutomaticCogStateConveyor<ValueType, SpinType> {
   var _activeFrameCount = 0;
   int _currentFrameOrdinal;
-  final CogValueInitializer<ValueType> _init;
   AutomaticCogInvocationFrame<ValueType, SpinType>? _lastFrame;
-  final AutomaticCogStateConveyorErrorCallback<ValueType, SpinType> _onError;
+  CogStateRevision? _leaderRevisionHash;
   _ReconveyStatus _reconveyStatus = _ReconveyStatus.unnecessary;
 
   AsyncAutomaticCogStateConveyor._({
     required AutomaticCogState<ValueType, SpinType> cogState,
-    required CogValueInitializer<ValueType> init,
     required Future<ValueType> invocation,
     required AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
-    required AutomaticCogStateConveyorErrorCallback<ValueType, SpinType>
-        onError,
     required AutomaticCogStateConveyorNextValueCallback<ValueType> onNextValue,
   })  : _currentFrameOrdinal = invocationFrame.ordinal,
-        _init = init,
-        _onError = onError,
         super._(cogState: cogState, onNextValue: onNextValue) {
+    final init = cogState.cog.init;
+
+    if (init == null) {
+      throw ArgumentError(
+        'Failed to initialize asynchronous automatic Cog ${cogState.cog} '
+        'with spin `${cogState._spin}`: '
+        'asynchronous automatic Cogs require an accompanying `init` function',
+      );
+    }
+
+    _onNextValue(
+      nextValue: init(),
+      shouldNotify: false,
+    );
+
     _maybeConvey(
       invocation: invocation,
       invocationFrame: invocationFrame,
-      shouldNotify: false,
+      shouldNotify: true,
     );
   }
 
   @override
-  void convey() => _maybeConvey();
+  void convey({bool shouldForce = false}) =>
+      _maybeConvey(shouldForce: shouldForce);
+
+  @override
+  bool get isEager => true;
 
   Future<void> _maybeConvey({
     Future<ValueType>? invocation,
     AutomaticCogInvocationFrame<ValueType, SpinType>? invocationFrame,
+    bool shouldForce = false,
     bool shouldNotify = true,
   }) async {
+    final latestLeaderRevisionHash = _cogState._calculateLeaderRevisionHash();
+
+    if (!shouldForce && latestLeaderRevisionHash == _leaderRevisionHash) {
+      _cogState._runtime.logging.debug(
+        _cogState,
+        're-convey has already happened for the current revision',
+      );
+
+      return;
+    }
+
+    _leaderRevisionHash = latestLeaderRevisionHash;
+
     // When scheduling sequentially, all we need to track is whether there
     // should be a re-convey. We schedule re-convey when an active frame is
     // already in progress - that we follow it up once complete.
@@ -59,7 +86,6 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     try {
       invocationFrame ??= AutomaticCogInvocationFrame._(
         cogState: _cogState,
-        init: _init,
         ordinal: ++_currentFrameOrdinal,
       );
 
@@ -92,7 +118,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
       _lastFrame = invocationFrame;
     } catch (e, stackTrace) {
-      _onError(
+      _cogState._runtime.handleError(
         cogState: _cogState,
         error: e,
         stackTrace: stackTrace,

@@ -1,3 +1,4 @@
+export 'src/async.dart';
 export 'src/cog.dart';
 export 'src/cog_state.dart';
 export 'src/cog_state_runtime.dart';

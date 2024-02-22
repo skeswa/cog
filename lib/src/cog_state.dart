@@ -71,18 +71,25 @@ sealed class CogState<ValueType, SpinType,
       return true;
     }());
 
-    final didUpdateStaleness = _updateStaleness(staleness);
+    final didUpdateStaleness = _maybeUpdateStaleness(staleness);
 
-    if (didUpdateStaleness && staleness != Staleness.fresh) {
-      _runtime.maybeNotifyListenersOf(ordinal);
+    if (!didUpdateStaleness) {
+      _runtime.logging.debug(
+        this,
+        'marked stale but staleness did not change',
+      );
 
-      for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
-        _runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
-      }
+      return;
+    }
+
+    _runtime.maybeNotifyListenersOf(ordinal);
+
+    for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
+      _runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
     }
   }
 
-  void maybeRevise(
+  bool maybeRevise(
     ValueType value, {
     required bool shouldNotify,
   }) {
@@ -115,7 +122,27 @@ sealed class CogState<ValueType, SpinType,
           .debug(this, 'no revision - new value was equal to old value');
     }
 
-    _updateStaleness(Staleness.fresh);
+    _maybeUpdateStaleness(Staleness.fresh);
+
+    return shouldRevise;
+  }
+
+  Staleness recalculateStaleness() {
+    if (_staleness == Staleness.maybeStale) {
+      final actualStaleness =
+          isActuallyStale ? Staleness.stale : Staleness.fresh;
+
+      _runtime.logging.debug(
+        this,
+        'updating staleness from maybeStale to',
+        actualStaleness,
+      );
+      _runtime.telemetry.recordCogStateStalenessChange(ordinal);
+
+      _staleness = actualStaleness;
+    }
+
+    return _staleness;
   }
 
   CogStateRevision get revision => _revision;
@@ -137,27 +164,9 @@ sealed class CogState<ValueType, SpinType,
     return _spin as SpinType;
   }
 
-  Staleness get staleness {
-    if (_staleness == Staleness.maybeStale) {
-      final actualStaleness =
-          isActuallyStale ? Staleness.stale : Staleness.fresh;
-
-      _runtime.logging.debug(
-        this,
-        'updating staleness form maybeStale to',
-        actualStaleness,
-      );
-      _runtime.telemetry.recordCogStateStalenessChange(ordinal);
-
-      _staleness = actualStaleness;
-    }
-
-    return _staleness;
-  }
-
   bool get _hasValue => _revision >= initialCogStateRevision;
 
-  bool _updateStaleness(Staleness staleness) {
+  bool _maybeUpdateStaleness(Staleness staleness) {
     if (staleness == _staleness) {
       return false;
     }

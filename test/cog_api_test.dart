@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cog/cog.dart';
@@ -186,6 +187,62 @@ void main() {
           throwsA(isA<Error>()),
         );
       });
+
+      test(
+          'reading from an async spun automatic Cog without '
+          'specifying init throws', () {
+        final numberCog = Cog((c) async {
+          return 4;
+        }, spin: Spin<bool>());
+
+        expect(() => numberCog.read(cogtext), throwsArgumentError);
+      });
+
+      test(
+          'reading from an async unspun automatic Cog without '
+          'specifying init throws', () {
+        final numberCog = Cog((c) async {
+          return 4;
+        });
+
+        expect(() => numberCog.read(cogtext), throwsArgumentError);
+      });
+
+      test(
+          'reading from an async spun automatic Cog that has not resolved yet '
+          'returns the init value', () {
+        final completer = Completer<void>.sync();
+
+        final numberCog = Cog((c) async {
+          await completer.future;
+
+          return 4;
+        }, init: () => 3, spin: Spin<bool>());
+
+        expect(numberCog.read(cogtext, spin: false), 3);
+
+        completer.complete();
+
+        expect(numberCog.read(cogtext, spin: false), 4);
+      });
+
+      test(
+          'reading from an async unspun automatic Cog that has not resolved '
+          'yet returns the init value', () {
+        final completer = Completer<void>.sync();
+
+        final numberCog = Cog((c) async {
+          await completer.future;
+
+          return 4;
+        }, init: () => 3);
+
+        expect(numberCog.read(cogtext), 3);
+
+        completer.complete();
+
+        expect(numberCog.read(cogtext), 4);
+      });
     });
 
     group('Simple watching', () {
@@ -230,13 +287,13 @@ void main() {
             () => numberCog.watch(cogtext, spin: false), throwsArgumentError);
       });
 
-      test('watching from a spun manual Cog returns its value', () {
+      test('watching from a spun manual Cog does not throw', () {
         final numberCog = Cog.man(() => 4, spin: Spin<bool>());
 
         expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
       });
 
-      test('watching a spun automatic Cog returns its value', () {
+      test('watching a spun automatic Cog does not throw', () {
         final numberCog = Cog((c) {
           return 4;
         }, spin: Spin<bool>());
@@ -244,13 +301,13 @@ void main() {
         expect(numberCog.watch(cogtext, spin: false).isBroadcast, isTrue);
       });
 
-      test('watching an unspun manual Cog returns its value', () {
+      test('watching an unspun manual Cog does not throw', () {
         final numberCog = Cog.man(() => 4);
 
         expect(numberCog.watch(cogtext).isBroadcast, isTrue);
       });
 
-      test('watching an unspun automatic Cog returns its value', () {
+      test('watching an unspun automatic Cog does not throw', () {
         final numberCog = Cog((c) {
           return 4;
         });
@@ -259,7 +316,7 @@ void main() {
       });
 
       test(
-          'a watched automatic Cog with a TTL re-evaluates and '
+          'watched automatic Cog with a TTL re-evaluates and '
           'emits on a fixed interval', () {
         fakeAsync((async) {
           cogtext = Cogtext(
@@ -267,7 +324,7 @@ void main() {
           );
 
           final numberCog = Cog(
-            (c) => c.curr(0) < 4 ? c.curr(0) + 1 : c.curr(0),
+            (c) => c.currOr(0) < 4 ? c.currOr(0) + 1 : c.currOr(0),
             ttl: 5.seconds,
           );
 
@@ -296,6 +353,152 @@ void main() {
           async.elapse(5.seconds);
 
           expect(emissions, equals([2, 3, 4]));
+        });
+      });
+
+      test(
+          'watching an async spun automatic Cog without '
+          'specifying init throws', () {
+        final numberCog = Cog((c) async {
+          return 4;
+        }, spin: Spin<bool>());
+
+        expect(() => numberCog.watch(cogtext), throwsArgumentError);
+      });
+
+      test(
+          'watching an async unspun automatic Cog without '
+          'specifying init throws', () {
+        final numberCog = Cog((c) async {
+          return 4;
+        });
+
+        expect(() => numberCog.watch(cogtext), throwsArgumentError);
+      });
+
+      test(
+          'watched async spun automatic Cog notifies listeners '
+          'when its future resolves', () async {
+        final completer = Completer<void>.sync();
+
+        final numberCog = Cog((c) async {
+          await completer.future;
+
+          return 4;
+        }, init: () => 3, spin: Spin<bool>());
+
+        final emissions = [];
+
+        numberCog.watch(cogtext, spin: false).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        completer.complete();
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4]));
+      });
+
+      test(
+          'watched async unspun automatic Cog notifies listeners '
+          'when its future resolves', () async {
+        final completer = Completer<void>.sync();
+
+        final numberCog = Cog((c) async {
+          await completer.future;
+
+          return 4;
+        }, init: () => 3);
+
+        final emissions = [];
+
+        numberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        completer.complete();
+
+        expect(emissions, isEmpty);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([4]));
+      });
+
+      test(
+          'watched async automatic Cog with a TTL re-evaluates and '
+          'emits on a fixed interval', () {
+        fakeAsync((async) {
+          cogtext = Cogtext(
+            cogStateRuntime: StandardCogStateRuntime(logging: logging),
+          );
+
+          final numberCog = Cog(
+            (c) async {
+              await Future.delayed(const Duration(seconds: 1));
+
+              return c.curr < 4 ? c.curr + 1 : c.curr;
+            },
+            init: () => 0,
+            ttl: 5.seconds,
+          );
+
+          expect(numberCog.read(cogtext), 0);
+
+          final emissions = [];
+
+          numberCog.watch(cogtext).listen(emissions.add);
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals([1]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([1]));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals([1, 2]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([1, 2]));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals([1, 2, 3]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([1, 2, 3]));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals([1, 2, 3, 4]));
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals([1, 2, 3, 4]));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals([1, 2, 3, 4]));
+
+          async.elapse(30.seconds);
+
+          expect(emissions, equals([1, 2, 3, 4]));
         });
       });
     });
@@ -354,6 +557,48 @@ void main() {
         numberCog.write(cogtext, 6);
 
         expect(numberCog.read(cogtext), equals(6));
+      });
+
+      test(
+          'writing to a manual Cog with a dependent automatic spun Cog '
+          'changes the automatic Cog\'s value', () {
+        final numberCog = Cog.man(() => 4);
+
+        final smallerNumberCog = Cog(
+          (c) => c.link(numberCog) - (c.spin ? 1 : 2),
+          spin: Spin<bool>(),
+        );
+
+        expect(smallerNumberCog.read(cogtext, spin: false), equals(2));
+        expect(smallerNumberCog.read(cogtext, spin: true), equals(3));
+
+        numberCog.write(cogtext, 5);
+
+        expect(smallerNumberCog.read(cogtext, spin: false), equals(3));
+        expect(smallerNumberCog.read(cogtext, spin: true), equals(4));
+
+        numberCog.write(cogtext, 6);
+
+        expect(smallerNumberCog.read(cogtext, spin: false), equals(4));
+        expect(smallerNumberCog.read(cogtext, spin: true), equals(5));
+      });
+
+      test(
+          'writing to a manual Cog with a dependent automatic unspun Cog '
+          'changes the automatic Cog\'s value', () {
+        final numberCog = Cog.man(() => 4);
+
+        final smallerNumberCog = Cog((c) => c.link(numberCog) - 1);
+
+        expect(smallerNumberCog.read(cogtext), equals(3));
+
+        numberCog.write(cogtext, 5);
+
+        expect(smallerNumberCog.read(cogtext), equals(4));
+
+        numberCog.write(cogtext, 6);
+
+        expect(smallerNumberCog.read(cogtext), equals(5));
       });
     });
 
@@ -432,8 +677,9 @@ void main() {
         expect(emissions, equals([5]));
       });
 
-      test('writing to a watched, spun automatic Cog triggers a notification',
-          () async {
+      test(
+          'writing to a manual Cog depended on by a watched, spun '
+          'automatic Cog triggers a notification', () async {
         final numberCog =
             Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
 
@@ -472,8 +718,9 @@ void main() {
         expect(emissions, equals([25]));
       });
 
-      test('writing to a watched, unspun automatic Cog triggers a notification',
-          () async {
+      test(
+          'writing to a manual Cog depended on by a watched, unspun '
+          'automatic Cog triggers a notification', () async {
         final numberCog =
             Cog.man(() => 4, debugLabel: 'numberCog', spin: Spin<bool>());
 
@@ -521,8 +768,8 @@ void main() {
         final subscription = numberCog
             .watch(
               cogtext,
-              spin: false,
               priority: Priority.asap,
+              spin: false,
             )
             .listen(emissions.add);
 
@@ -1197,6 +1444,172 @@ void main() {
 
         expect(emissions, equals([4, 3, 5]));
       });
+
+      test(
+          'watched async automatic Cogs with parallel scheduling '
+          'emit correctly when their dependecies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return 'waited $duration';
+            },
+            async: Async.inParallel,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(const Duration(seconds: 7));
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          durationCog.write(cogtext, 2);
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
+
+          durationCog.write(cogtext, 1);
+          durationCog.write(cogtext, 5);
+          durationCog.write(cogtext, 7);
+
+          async.elapse(const Duration(seconds: 5));
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+            ]),
+          );
+
+          async.elapse(const Duration(minutes: 1));
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+              'waited 7',
+            ]),
+          );
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with parallel scheduling and asap '
+          'priority emit correctly when their dependecies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return 'waited $duration';
+            },
+            async: Async.inParallel,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(const Duration(seconds: 7));
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          durationCog.write(cogtext, 2);
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 1));
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
+
+          durationCog.write(cogtext, 1);
+          durationCog.write(cogtext, 5);
+          durationCog.write(cogtext, 7);
+
+          async.elapse(const Duration(seconds: 5));
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+            ]),
+          );
+
+          async.elapse(const Duration(minutes: 1));
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+              'waited 7',
+            ]),
+          );
+        });
+      });
     });
 
     group('Simple reading, watching and writing', () {
@@ -1252,8 +1665,10 @@ void main() {
 
         expect(emissions, isEmpty);
 
+        print('DEBUG: firstCog.write(cogtext, 2);');
         firstCog.write(cogtext, 2);
 
+        print('DEBUG: watches');
         firstCog
             .watch(
               cogtext,
@@ -1279,6 +1694,7 @@ void main() {
             )
             .listen(emissions.add);
 
+        print('DEBUG: fourthCog.read(cogtext);');
         fourthCog.read(cogtext);
 
         expect(emissions, isEmpty);

@@ -34,9 +34,9 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   }) : scheduler = scheduler ?? NaiveCogStateRuntimeScheduler(logging: logging);
 
   @override
-  CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
-      acquire<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
+  CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+      acquire<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   }) {
     final cogSpinHash = _hashCogSpin(cogSpin);
@@ -54,7 +54,7 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }
 
     final cogState = _cogStates[cogStateOrdinal]
-        as CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>;
+        as CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>;
 
     assert(() {
       if (cogState.cog != cog) {
@@ -70,23 +70,23 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }());
 
     return _cogStates[cogStateOrdinal]
-        as CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>;
+        as CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>;
   }
 
   @override
-  Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
-    required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
+  Stream<CogValueType> acquireValueChangeStream<CogValueType, CogSpinType>({
+    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
         cogState,
     required Priority priority,
   }) {
     final existingCogStateListeningPost =
         _cogStateListeningPosts[cogState.ordinal];
 
-    CogStateListeningPost<CogStateType, CogSpinType> cogStateListeningPost;
+    CogStateListeningPost<CogValueType, CogSpinType> cogStateListeningPost;
 
     if (existingCogStateListeningPost != null) {
       cogStateListeningPost = existingCogStateListeningPost
-          as CogStateListeningPost<CogStateType, CogSpinType>;
+          as CogStateListeningPost<CogValueType, CogSpinType>;
     } else {
       cogStateListeningPost = CogStateListeningPost(
         cogState: cogState,
@@ -152,10 +152,20 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }
 
     if (listeningPost.priority == Priority.asap) {
+      logging.debug(
+        cogStateOrdinal,
+        'doing sync notification due to asap priority',
+      );
+
       listeningPost.maybeNotify();
 
       return;
     }
+
+    logging.debug(
+      cogStateOrdinal,
+      'scheduling notification background task',
+    );
 
     _cogStateListeningPostsToMaybeNotify.add(listeningPost);
 
@@ -213,9 +223,9 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     _cogStateFollowers[leaderCogStateOrdinal]?.remove(followerCogStateOrdinal);
   }
 
-  CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
-      _createCogState<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
+  CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+      _createCogState<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
     required CogStateHash cogStateHash,
   }) {
@@ -252,15 +262,15 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }
   }
 
-  CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
-      _instantiateCogState<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
+  CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+      _instantiateCogState<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
     required CogStateOrdinal cogStateOrdinal,
   }) {
     telemetry.recordCogStateCreation(cogStateOrdinal);
 
-    if (cog is AutomaticCog<CogStateType, CogSpinType>) {
+    if (cog is AutomaticCog<CogValueType, CogSpinType>) {
       return AutomaticCogState(
         cog: cog,
         ordinal: cogStateOrdinal,
@@ -269,7 +279,7 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       );
     }
 
-    if (cog is ManualCog<CogStateType, CogSpinType>) {
+    if (cog is ManualCog<CogValueType, CogSpinType>) {
       return ManualCogState(
         cog: cog,
         ordinal: cogStateOrdinal,
@@ -284,8 +294,8 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   CogSpinHash _hashCogSpin<CogSpinType>(CogSpinType? cogSpin) =>
       cogSpin.hashCode;
 
-  CogStateHash _hashCogState<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
+  CogStateHash _hashCogState<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
     required CogSpinHash cogSpinHash,
   }) =>
       Object.hash(cog.ordinal, cogSpinHash);
@@ -319,6 +329,22 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     if (iterationCount >= _listeningPostNotificationLimit) {
       logging.error(null, 'reached listening post notification limit');
     }
+  }
+
+  @override
+  void handleError<CogValueType, CogSpinType>({
+    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+        cogState,
+    required Object error,
+    required StackTrace stackTrace,
+  }) {
+    // TODO(skeswa): this should have a custom handler defined by the Cogtext
+    logging.error(
+      cogState,
+      'encountered an error while conveying',
+      error,
+      stackTrace,
+    );
   }
 }
 

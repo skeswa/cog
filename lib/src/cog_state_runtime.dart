@@ -7,14 +7,14 @@ import 'common.dart';
 import 'priority.dart';
 
 abstract interface class CogStateRuntime {
-  CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
-      acquire<CogStateType, CogSpinType>({
-    required Cog<CogStateType, CogSpinType> cog,
+  CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+      acquire<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   });
 
-  Stream<CogStateType> acquireValueChangeStream<CogStateType, CogSpinType>({
-    required CogState<CogStateType, CogSpinType, Cog<CogStateType, CogSpinType>>
+  Stream<CogValueType> acquireValueChangeStream<CogValueType, CogSpinType>({
+    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
         cogState,
     required Priority priority,
   });
@@ -24,6 +24,13 @@ abstract interface class CogStateRuntime {
   Iterable<CogStateOrdinal> followerOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
   );
+
+  void handleError<CogValueType, CogSpinType>({
+    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+        cogState,
+    required Object error,
+    required StackTrace stackTrace,
+  });
 
   Iterable<CogStateOrdinal> leaderOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,

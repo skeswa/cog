@@ -9,6 +9,7 @@ import 'standard_cog_state_runtime.dart';
 import 'spin.dart';
 
 part 'automatic_cog.dart';
+part 'automatic_cog_controller.dart';
 part 'cogtext.dart';
 part 'manual_cog.dart';
 

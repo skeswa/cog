@@ -3,7 +3,6 @@ part of 'cog_state.dart';
 final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
     extends AutomaticCogStateConveyor<ValueType, SpinType> {
   final AutomaticCogInvocationFrame<ValueType, SpinType> _invocationFrame;
-  final AutomaticCogStateConveyorErrorCallback<ValueType, SpinType> _onError;
 
   var _previouslyLinkedLeaderOrdinals = <CogStateOrdinal>[];
 
@@ -11,11 +10,8 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
     required AutomaticCogState<ValueType, SpinType> cogState,
     required AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
     required ValueType invocationResult,
-    required AutomaticCogStateConveyorErrorCallback<ValueType, SpinType>
-        onError,
     required AutomaticCogStateConveyorNextValueCallback<ValueType> onNextValue,
   })  : _invocationFrame = invocationFrame,
-        _onError = onError,
         super._(cogState: cogState, onNextValue: onNextValue) {
     _updateCogStateDependencies(
       cogState: _cogState,
@@ -30,7 +26,7 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
   }
 
   @override
-  void convey({bool isForced = false}) {
+  void convey({bool shouldForce = false}) {
     _resetInvocationFrame();
 
     try {
@@ -47,13 +43,16 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
         shouldNotify: true,
       );
     } catch (e, stackTrace) {
-      _onError(
+      _cogState._runtime.handleError(
         cogState: _cogState,
         error: e,
         stackTrace: stackTrace,
       );
     }
   }
+
+  @override
+  bool get isEager => false;
 
   void _resetInvocationFrame() {
     final previouslyLinkedLeaderOrdinals = _previouslyLinkedLeaderOrdinals;

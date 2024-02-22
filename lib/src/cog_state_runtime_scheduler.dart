@@ -69,7 +69,7 @@ final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
     _scheduledDelayedTasks[dalayedTask] = Timer(delay, () {
       dalayedTask();
 
-      _cullElapsedScheduledDelayedTaskTimers();
+      scheduleBackgroundTask(_cullElapsedScheduledDelayedTaskTimers);
     });
   }
 

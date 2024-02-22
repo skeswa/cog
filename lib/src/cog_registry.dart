@@ -2,8 +2,8 @@ import 'cog.dart';
 import 'common.dart';
 
 abstract interface class CogRegistry {
-  CogOrdinal register<CogStateType, CogSpinType>(
-    Cog<CogStateType, CogSpinType> cog,
+  CogOrdinal register<CogValueType, CogSpinType>(
+    Cog<CogValueType, CogSpinType> cog,
   );
 }
 
@@ -13,8 +13,8 @@ final class GlobalCogRegistry implements CogRegistry {
   final _cogs = <Cog>[];
 
   @override
-  CogOrdinal register<CogStateType, CogSpinType>(
-    Cog<CogStateType, CogSpinType> cog,
+  CogOrdinal register<CogValueType, CogSpinType>(
+    Cog<CogValueType, CogSpinType> cog,
   ) {
     final ordinal = _cogs.length;
 

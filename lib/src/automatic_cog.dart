@@ -72,15 +72,5 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   }
 }
 
-abstract interface class AutomaticCogController<ValueType, SpinType> {
-  CurrValueType curr<CurrValueType extends ValueType>(CurrValueType orElse);
-  SpinType get spin;
-
-  LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(
-    Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
-    LinkedCogSpinType? spin,
-  });
-}
-
 typedef AutomaticCogDefinition<ValueType, SpinType> = FutureOr<ValueType>
     Function(AutomaticCogController<ValueType, SpinType>);
