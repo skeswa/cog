@@ -9,7 +9,7 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
     required this.init,
     required CogRegistry? registry,
     required super.spin,
-  }) : super._(eq: eq ?? identical, registry: registry);
+  }) : super._(eq: eq, registry: registry);
 
   @override
   String toString() {
@@ -34,7 +34,7 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
       hasParams = true;
     }
 
-    if (eq != identical) {
+    if (eq != null) {
       if (hasParams) {
         stringBuffer.write(', ');
       }

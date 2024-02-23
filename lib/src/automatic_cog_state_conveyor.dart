@@ -39,7 +39,11 @@ sealed class AutomaticCogStateConveyor<ValueType, SpinType> {
 
   void convey({bool shouldForce = false});
 
+  void init();
+
   bool get isEager;
+
+  bool get propagatesPotentialStaleness;
 }
 
 typedef AutomaticCogStateConveyorNextValueCallback<ValueType> = void Function({

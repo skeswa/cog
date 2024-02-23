@@ -60,6 +60,14 @@ sealed class CogState<ValueType, SpinType,
 
   bool get isActuallyStale => false;
 
+  void markFollowersStale({
+    Staleness staleness = Staleness.stale,
+  }) {
+    for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
+      _runtime[followerOrdinal].markStale(staleness: staleness);
+    }
+  }
+
   void markStale({
     Staleness staleness = Staleness.stale,
   }) {
@@ -83,17 +91,14 @@ sealed class CogState<ValueType, SpinType,
     }
 
     _runtime.maybeNotifyListenersOf(ordinal);
-
-    for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
-      _runtime[followerOrdinal].markStale(staleness: Staleness.maybeStale);
-    }
+    markFollowersStale(staleness: Staleness.maybeStale);
   }
 
   bool maybeRevise(
     ValueType value, {
     required bool shouldNotify,
   }) {
-    final shouldRevise = !_hasValue || !cog.eq(_value, value);
+    final shouldRevise = !_hasValue || !_eq(_value, value);
 
     if (shouldRevise) {
       _runtime.logging.debug(
@@ -105,9 +110,7 @@ sealed class CogState<ValueType, SpinType,
       _revision++;
       _value = value;
 
-      for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
-        _runtime[followerOrdinal].markStale();
-      }
+      markFollowersStale();
 
       if (shouldNotify) {
         _runtime.maybeNotifyListenersOf(ordinal);
@@ -163,6 +166,8 @@ sealed class CogState<ValueType, SpinType,
 
     return _spin as SpinType;
   }
+
+  bool _eq(ValueType a, ValueType b) => cog.eq?.call(a, b) ?? a == b;
 
   bool get _hasValue => _revision >= initialCogStateRevision;
 

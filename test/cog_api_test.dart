@@ -7,6 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
 
+// TODO: eq test
+// TODO: Async.singular
+// TODO: to string Async test
+
 void main() {
   group('Cog API', () {
     late Cogtext cogtext;
@@ -29,6 +33,7 @@ void main() {
         final helloCog = Cog(
           (c) => 'hello',
           debugLabel: 'helloCog',
+          async: Async.singularly,
           eq: (a, b) => a.length == b.length,
         );
 
@@ -39,7 +44,9 @@ void main() {
         );
         expect(
           '$helloCog',
-          'AutomaticCog<String>(debugLabel: "helloCog", eq: overridden)',
+          'AutomaticCog<String>('
+              'async: Async.singularly, debugLabel: "helloCog", eq: overridden'
+              ')',
         );
       });
 
@@ -319,10 +326,6 @@ void main() {
           'watched automatic Cog with a TTL re-evaluates and '
           'emits on a fixed interval', () {
         fakeAsync((async) {
-          cogtext = Cogtext(
-            cogStateRuntime: StandardCogStateRuntime(logging: logging),
-          );
-
           final numberCog = Cog(
             (c) => c.currOr(0) < 4 ? c.currOr(0) + 1 : c.currOr(0),
             ttl: 5.seconds,
@@ -440,10 +443,6 @@ void main() {
           'watched async automatic Cog with a TTL re-evaluates and '
           'emits on a fixed interval', () {
         fakeAsync((async) {
-          cogtext = Cogtext(
-            cogStateRuntime: StandardCogStateRuntime(logging: logging),
-          );
-
           final numberCog = Cog(
             (c) async {
               await Future.delayed(const Duration(seconds: 1));
@@ -499,6 +498,70 @@ void main() {
           async.elapse(30.seconds);
 
           expect(emissions, equals([1, 2, 3, 4]));
+        });
+      });
+
+      test(
+          'watched async automatic Cog with sequential scheduling and a TTL '
+          're-evaluates and emits on a fixed interval', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          var times = 0;
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return 'waited $duration seconds ${times++} times';
+            },
+            async: Async.sequentially,
+            debugLabel: 'waitingCog',
+            init: () => '',
+            ttl: 5.seconds,
+          );
+
+          expect(waitingCog.read(cogtext), '');
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0 seconds 0 times']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(5.seconds);
+
+          expect(emissions, equals(['waited 0 seconds 0 times']));
+
+          async.elapse(3.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0 seconds 0 times',
+              'waited 8 seconds 1 times',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0 seconds 0 times',
+              'waited 8 seconds 1 times',
+              'waited 8 seconds 2 times',
+              'waited 8 seconds 3 times',
+              'waited 8 seconds 4 times',
+              'waited 8 seconds 5 times'
+            ]),
+          );
         });
       });
     });
@@ -1447,7 +1510,7 @@ void main() {
 
       test(
           'watched async automatic Cogs with parallel scheduling '
-          'emit correctly when their dependecies change', () {
+          'emit correctly when their dependencies change', () {
         fakeAsync((async) {
           final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
 
@@ -1529,7 +1592,7 @@ void main() {
 
       test(
           'watched async automatic Cogs with parallel scheduling and asap '
-          'priority emit correctly when their dependecies change', () {
+          'priority emit correctly when their dependencies change', () {
         fakeAsync((async) {
           final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
 
@@ -1608,6 +1671,116 @@ void main() {
               'waited 7',
             ]),
           );
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with sequential scheduling '
+          'emit correctly when their dependencies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return 'waited $duration';
+            },
+            async: Async.sequentially,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(const Duration(seconds: 4));
+
+          durationCog.write(cogtext, 2);
+          durationCog.write(cogtext, 4);
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with sequential scheduling and asap'
+          'priority emit correctly when their dependencies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return 'waited $duration';
+            },
+            async: Async.sequentially,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(const Duration(seconds: 4));
+
+          durationCog.write(cogtext, 2);
+          durationCog.write(cogtext, 4);
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(const Duration(seconds: 2));
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
         });
       });
     });

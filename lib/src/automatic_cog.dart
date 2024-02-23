@@ -1,7 +1,7 @@
 part of 'cog.dart';
 
 final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
-  final Async async;
+  final Async? async;
 
   final AutomaticCogDefinition<ValueType, SpinType> def;
 
@@ -12,14 +12,13 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   AutomaticCog._(
     this.def, {
     super.debugLabel,
-    Async? async,
+    this.async,
     CogValueComparator<ValueType>? eq,
     this.init,
     CogRegistry? registry,
     super.spin,
     this.ttl,
-  })  : async = async ?? Async.inParallel,
-        super._(eq: eq ?? identical, registry: registry);
+  }) : super._(eq: eq, registry: registry);
 
   @override
   String toString() {
@@ -35,7 +34,19 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
 
     var hasParams = false;
 
+    if (async != null) {
+      stringBuffer
+        ..write('async: ')
+        ..write(async);
+
+      hasParams = true;
+    }
+
     if (debugLabel != null) {
+      if (hasParams) {
+        stringBuffer.write(', ');
+      }
+
       stringBuffer
         ..write('debugLabel: "')
         ..write(debugLabel)
@@ -44,7 +55,7 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
       hasParams = true;
     }
 
-    if (eq != identical) {
+    if (eq != null) {
       if (hasParams) {
         stringBuffer.write(', ');
       }

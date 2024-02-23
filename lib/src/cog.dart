@@ -16,7 +16,7 @@ part 'manual_cog.dart';
 sealed class Cog<ValueType, SpinType> {
   String? debugLabel;
 
-  final CogValueComparator<ValueType> eq;
+  final CogValueComparator<ValueType>? eq;
 
   late final CogOrdinal ordinal;
 
@@ -51,11 +51,12 @@ sealed class Cog<ValueType, SpinType> {
     Spin<SpinType>? spin,
   }) =>
       ManualCog._(
-          debugLabel: debugLabel,
-          eq: eq,
-          init: init,
-          registry: registry,
-          spin: spin);
+        debugLabel: debugLabel,
+        eq: eq,
+        init: init,
+        registry: registry,
+        spin: spin,
+      );
 
   Cog._({
     required this.debugLabel,

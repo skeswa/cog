@@ -25,6 +25,8 @@ final class AutomaticCogState<ValueType, SpinType>
       cogState: this,
       onNextValue: _onNextValue,
     );
+
+    _conveyor.init();
   }
 
   @override
@@ -32,6 +34,22 @@ final class AutomaticCogState<ValueType, SpinType>
     final latestLeaderRevisionHash = _calculateLeaderRevisionHash();
 
     return latestLeaderRevisionHash != _leaderRevisionHash;
+  }
+
+  @override
+  void markFollowersStale({Staleness staleness = Staleness.stale}) {
+    if (!_conveyor.propagatesPotentialStaleness &&
+        staleness == Staleness.maybeStale) {
+      _runtime.logging.debug(
+        this,
+        'not marking followers as maybe stale - '
+        'this cog does not propagate potential staleness',
+      );
+
+      return;
+    }
+
+    super.markFollowersStale(staleness: staleness);
   }
 
   @override
