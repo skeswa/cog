@@ -1,5 +1,6 @@
 enum Async {
-  inParallel,
-  sequentially,
-  singularly,
+  latestOnly,
+  oneAtATime,
+  parallel,
+  queued,
 }

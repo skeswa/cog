@@ -31,7 +31,7 @@ void main() {
         final helloCog = Cog(
           (c) => 'hello',
           debugLabel: 'helloCog',
-          async: Async.singularly,
+          async: Async.latestOnly,
           eq: (a, b) => a.length == b.length,
         );
 
@@ -43,7 +43,7 @@ void main() {
         expect(
           '$helloCog',
           'AutomaticCog<String>('
-              'async: Async.singularly, debugLabel: "helloCog", eq: overridden'
+              'async: Async.latestOnly, debugLabel: "helloCog", eq: overridden'
               ')',
         );
       });
@@ -541,7 +541,7 @@ void main() {
       });
 
       test(
-          'watched async automatic Cog with sequential scheduling and a TTL '
+          'watched async automatic Cog with queued scheduling and a TTL '
           're-evaluates and emits on a fixed interval', () {
         fakeAsync((async) {
           final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
@@ -556,7 +556,7 @@ void main() {
 
               return 'waited $duration seconds ${times++} times';
             },
-            async: Async.sequentially,
+            async: Async.queued,
             debugLabel: 'waitingCog',
             init: () => '',
             ttl: 5.seconds,
@@ -1594,7 +1594,7 @@ void main() {
 
               return 'waited $duration';
             },
-            async: Async.inParallel,
+            async: Async.parallel,
             debugLabel: 'waitingCog',
             init: () => '',
           );
@@ -1676,7 +1676,7 @@ void main() {
 
               return 'waited $duration';
             },
-            async: Async.inParallel,
+            async: Async.parallel,
             debugLabel: 'waitingCog',
             init: () => '',
           );
@@ -1747,7 +1747,7 @@ void main() {
       });
 
       test(
-          'watched async automatic Cogs with sequential scheduling '
+          'watched async automatic Cogs with queued scheduling '
           'emit correctly when their dependencies change', () {
         fakeAsync((async) {
           final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
@@ -1760,7 +1760,7 @@ void main() {
 
               return 'waited $duration';
             },
-            async: Async.sequentially,
+            async: Async.queued,
             debugLabel: 'waitingCog',
             init: () => '',
           );
@@ -1801,7 +1801,7 @@ void main() {
       });
 
       test(
-          'watched async automatic Cogs with sequential scheduling and asap'
+          'watched async automatic Cogs with queued scheduling and asap'
           'priority emit correctly when their dependencies change', () {
         fakeAsync((async) {
           final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
@@ -1814,7 +1814,7 @@ void main() {
 
               return 'waited $duration';
             },
-            async: Async.sequentially,
+            async: Async.queued,
             debugLabel: 'waitingCog',
             init: () => '',
           );

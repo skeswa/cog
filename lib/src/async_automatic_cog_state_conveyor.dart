@@ -62,22 +62,37 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     bool shouldForce = false,
     bool shouldNotify = true,
   }) async {
-    // When scheduling sequentially, all we need to track is whether there
-    // should be a re-convey. We schedule re-convey when an active frame is
-    // already in progress - that we follow it up once complete.
-    if (_cogState.cog.async == Async.sequentially && _activeFrameCount > 0) {
-      if (_reconveyStatus != _ReconveyStatus.scheduled) {
-        _reconveyStatus = _ReconveyStatus.necessary;
+    if (_activeFrameCount > 0) {
+      switch (_cogState.cog.async) {
+        // When scheduling queued, all we need to track is whether there should
+        // be a re-convey. We schedule re-convey when an active frame is
+        // already in progress - that we follow it up once complete.
+        case Async.queued:
+          if (_reconveyStatus != _ReconveyStatus.scheduled) {
+            _reconveyStatus = _ReconveyStatus.necessary;
+          }
+          _shouldReconveyBeForced = _shouldReconveyBeForced || shouldForce;
+
+          _cogState._runtime.logging.debug(
+            _cogState,
+            're-convey is necessary and might be scheduled already - isForced',
+            _shouldReconveyBeForced,
+          );
+
+          return;
+
+        case Async.oneAtATime:
+          _cogState._runtime.logging.debug(
+            _cogState,
+            'skipping convey because one is already in progress',
+            _shouldReconveyBeForced,
+          );
+
+          return;
+
+        default:
+          break;
       }
-      _shouldReconveyBeForced = _shouldReconveyBeForced || shouldForce;
-
-      _cogState._runtime.logging.debug(
-        _cogState,
-        're-convey is necessary and might be scheduled already - isForced',
-        _shouldReconveyBeForced,
-      );
-
-      return;
     }
 
     final latestLeaderRevisionHash = _cogState._calculateLeaderRevisionHash();
@@ -105,7 +120,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
       final invocationResult = await invocation;
 
-      if (_cogState.cog.async == Async.singularly &&
+      if (_cogState.cog.async == Async.latestOnly &&
           invocationFrame.ordinal == _currentFrameOrdinal) {
         _cogState._runtime.logging.debug(
           _cogState,
