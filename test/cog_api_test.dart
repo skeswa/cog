@@ -287,6 +287,55 @@ void main() {
 
         expect(numberCog.read(cogtext), 4);
       });
+
+      test(
+          'reading from an automatic Cog that oscillates between sync '
+          'and async emits an error', () async {
+        final errors = [];
+
+        cogtext = Cogtext(cogStateRuntime: StandardCogStateRuntime(
+          onError: ({
+            required Cog cog,
+            required Object error,
+            required Object? spin,
+            required StackTrace stackTrace,
+          }) {
+            errors.add(error);
+          },
+        ));
+
+        final isAsyncCog = Cog.man(() => false);
+
+        final numberCog = Cog((c) {
+          final isAsync = c.link(isAsyncCog);
+
+          if (isAsync) {
+            return Future.value(4);
+          }
+
+          return 5;
+        }, init: () => 3);
+
+        expect(numberCog.read(cogtext), 5);
+
+        isAsyncCog.write(cogtext, true);
+
+        await Future.delayed(Duration.zero);
+
+        expect(numberCog.read(cogtext), 5);
+
+        expect(errors, isNotEmpty);
+      });
+
+      test(
+          'reading from an automatic Cog and referencing c.curr without '
+          'providing an init throws', () {
+        final numberCog = Cog<int, dynamic>((c) {
+          return c.curr + 1;
+        });
+
+        expect(() => numberCog.read(cogtext), throwsStateError);
+      });
     });
 
     group('Simple watching', () {
@@ -1526,6 +1575,80 @@ void main() {
             [5, 6, 7, 8, 9],
             [5, 6, 7, 8, 9, 10, 11, -12, 13, 14],
             [18],
+          ]),
+        );
+      });
+
+      test('automatic Cogs can drop dependencies over time', () async {
+        final numberCog = Cog.man(() => 1);
+
+        final aCog = Cog((c) => 'a${c.link(numberCog)}');
+        final bCog = Cog((c) => 'b${c.link(numberCog)}');
+        final cCog = Cog((c) => 'c${c.link(numberCog)}');
+
+        final subscriptionCountCog = Cog.man(() => 3);
+
+        final subscribingCog = Cog((c) {
+          final subscriptionCount = c.link(subscriptionCountCog);
+
+          return [
+            if (subscriptionCount > 0) c.link(aCog),
+            if (subscriptionCount > 1) c.link(bCog),
+            if (subscriptionCount > 2) c.link(cCog),
+          ].join(', ');
+        });
+
+        final emissions = [];
+
+        subscribingCog.watch(cogtext).listen(emissions.add);
+
+        numberCog.write(cogtext, 2);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'a2, b2, c2',
+          ]),
+        );
+
+        subscriptionCountCog.write(cogtext, 1);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'a2, b2, c2',
+            'a2',
+          ]),
+        );
+
+        numberCog.write(cogtext, 17);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'a2, b2, c2',
+            'a2',
+            'a17',
+          ]),
+        );
+
+        subscriptionCountCog.write(cogtext, 0);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'a2, b2, c2',
+            'a2',
+            'a17',
+            '',
           ]),
         );
       });

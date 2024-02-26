@@ -30,13 +30,6 @@ final class AutomaticCogState<ValueType, SpinType>
   }
 
   @override
-  bool get isActuallyStale {
-    final latestLeaderRevisionHash = _calculateLeaderRevisionHash();
-
-    return latestLeaderRevisionHash != _leaderRevisionHash;
-  }
-
-  @override
   void markFollowersStale({Staleness staleness = Staleness.stale}) {
     if (!_conveyor.propagatesPotentialStaleness &&
         staleness == Staleness.maybeStale) {
@@ -98,9 +91,15 @@ final class AutomaticCogState<ValueType, SpinType>
     return hash;
   }
 
+  bool get _isActuallyStale {
+    final latestLeaderRevisionHash = _calculateLeaderRevisionHash();
+
+    return latestLeaderRevisionHash != _leaderRevisionHash;
+  }
+
   void _maybeReconvey({bool shouldForce = false}) {
     if (!shouldForce) {
-      final recalculatedStaleness = recalculateStaleness();
+      final recalculatedStaleness = _recalculateStaleness();
 
       if (recalculatedStaleness != Staleness.stale) {
         _runtime.logging.debug(
@@ -148,5 +147,23 @@ final class AutomaticCogState<ValueType, SpinType>
 
     _maybeReconvey(shouldForce: true);
     _maybeScheduleTtl();
+  }
+
+  Staleness _recalculateStaleness() {
+    if (_staleness == Staleness.maybeStale) {
+      final actualStaleness =
+          _isActuallyStale ? Staleness.stale : Staleness.fresh;
+
+      _runtime.logging.debug(
+        this,
+        'updating staleness from maybeStale to',
+        actualStaleness,
+      );
+      _runtime.telemetry.recordCogStateStalenessChange(ordinal);
+
+      _staleness = actualStaleness;
+    }
+
+    return _staleness;
   }
 }

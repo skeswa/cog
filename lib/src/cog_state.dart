@@ -56,9 +56,7 @@ sealed class CogState<ValueType, SpinType,
     return _value;
   }
 
-  void init() {}
-
-  bool get isActuallyStale => false;
+  void init();
 
   void markFollowersStale({
     Staleness staleness = Staleness.stale,
@@ -128,24 +126,6 @@ sealed class CogState<ValueType, SpinType,
     _maybeUpdateStaleness(Staleness.fresh);
 
     return shouldRevise;
-  }
-
-  Staleness recalculateStaleness() {
-    if (_staleness == Staleness.maybeStale) {
-      final actualStaleness =
-          isActuallyStale ? Staleness.stale : Staleness.fresh;
-
-      _runtime.logging.debug(
-        this,
-        'updating staleness from maybeStale to',
-        actualStaleness,
-      );
-      _runtime.telemetry.recordCogStateStalenessChange(ordinal);
-
-      _staleness = actualStaleness;
-    }
-
-    return _staleness;
   }
 
   CogStateRevision get revision => _revision;

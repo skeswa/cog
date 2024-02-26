@@ -90,6 +90,4 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
 
   @override
   SpinType get spin => cogState.spinOrThrow;
-
-  ValueType get value => _value;
 }
