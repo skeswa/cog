@@ -7,9 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
 
-// TODO: eq test
 // TODO: Async.singular
-// TODO: to string Async test
 
 void main() {
   group('Cog API', () {
@@ -247,6 +245,47 @@ void main() {
         expect(numberCog.read(cogtext), 3);
 
         completer.complete();
+
+        expect(numberCog.read(cogtext), 4);
+      });
+
+      test(
+          'reading from an automatic Cog that oscillates between async '
+          'and sync emits an error', () async {
+        final errors = [];
+
+        cogtext = Cogtext(cogStateRuntime: StandardCogStateRuntime(
+          onError: ({
+            required Cog cog,
+            required Object error,
+            required Object? spin,
+            required StackTrace stackTrace,
+          }) {
+            errors.add(error);
+          },
+        ));
+
+        final isAsyncCog = Cog.man(() => true);
+
+        final numberCog = Cog((c) {
+          final isAsync = c.link(isAsyncCog);
+
+          if (isAsync) {
+            return Future.value(4);
+          }
+
+          return 5;
+        }, init: () => 3);
+
+        expect(numberCog.read(cogtext), 3);
+
+        await Future.delayed(Duration.zero);
+
+        expect(numberCog.read(cogtext), 4);
+
+        isAsyncCog.write(cogtext, false);
+
+        expect(errors, isNotEmpty);
 
         expect(numberCog.read(cogtext), 4);
       });
@@ -738,6 +777,39 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([5]));
+      });
+
+      test(
+          'watched manual Cog with a custom eq only emits '
+          'when the custom eq allows', () async {
+        final numberCog = Cog.man(
+          () => 4,
+          eq: (a, b) => b - a <= 5,
+        );
+
+        final emissions = [];
+
+        numberCog.watch(cogtext).listen(emissions.add);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 8);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, isEmpty);
+
+        numberCog.write(cogtext, 20);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([20]));
+
+        numberCog.write(cogtext, 30);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([20, 30]));
       });
 
       test(

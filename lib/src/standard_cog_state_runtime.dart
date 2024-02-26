@@ -26,12 +26,16 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   );
   final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
   final _cogStates = <CogState>[];
+  final StandardCogStateRuntimeErrorCallback? _onError;
 
   StandardCogStateRuntime({
     this.logging = const NoOpCogStateRuntimeLogging(),
+    StandardCogStateRuntimeErrorCallback? onError,
     CogStateRuntimeScheduler? scheduler,
     this.telemetry = const NoOpCogStateRuntimeTelemetry(),
-  }) : scheduler = scheduler ?? NaiveCogStateRuntimeScheduler(logging: logging);
+  })  : _onError = onError,
+        scheduler =
+            scheduler ?? NaiveCogStateRuntimeScheduler(logging: logging);
 
   @override
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
@@ -338,7 +342,19 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     required Object error,
     required StackTrace stackTrace,
   }) {
-    // TODO(skeswa): this should have a custom handler defined by the Cogtext
+    final onError = _onError;
+
+    if (onError != null) {
+      onError(
+        cog: cogState.cog,
+        error: error,
+        spin: cogState.spinOrNull,
+        stackTrace: stackTrace,
+      );
+
+      return;
+    }
+
     logging.error(
       cogState,
       'encountered an error while conveying',
@@ -347,6 +363,13 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     );
   }
 }
+
+typedef StandardCogStateRuntimeErrorCallback = void Function({
+  required Cog cog,
+  required Object error,
+  required Object? spin,
+  required StackTrace stackTrace,
+});
 
 /// Maximum number of consecutive listening post notifications.
 const _listeningPostNotificationLimit = 1000;
