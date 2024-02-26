@@ -7,9 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
 
-// TODO: Async.latestOnly
-// TODO: Async.oneAtATime
-
 void main() {
   group('Cog API', () {
     late Cogtext cogtext;
@@ -1579,6 +1576,168 @@ void main() {
         await Future.delayed(Duration.zero);
 
         expect(emissions, equals([4, 3, 5]));
+      });
+
+      test(
+          'watched async automatic Cogs with latest only scheduling emit '
+          'correctly when their dependencies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.latestOnly,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(7.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 1);
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          durationCog.write(cogtext, 2);
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
+
+          durationCog.write(cogtext, 1);
+          durationCog.write(cogtext, 5);
+          durationCog.write(cogtext, 7);
+
+          async.elapse(5.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+              'waited 7',
+            ]),
+          );
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with latest only scheduling and asap '
+          'priority correctly when their dependencies change', () {
+        fakeAsync((async) {
+          final durationCog = Cog.man(() => 0, debugLabel: 'durationCog');
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.link(durationCog);
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.latestOnly,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 8);
+
+          async.elapse(7.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationCog.write(cogtext, 1);
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          durationCog.write(cogtext, 2);
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
+
+          durationCog.write(cogtext, 1);
+          durationCog.write(cogtext, 5);
+          durationCog.write(cogtext, 7);
+
+          async.elapse(5.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+              'waited 7',
+            ]),
+          );
+        });
       });
 
       test(

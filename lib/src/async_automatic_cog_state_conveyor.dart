@@ -121,7 +121,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
       final invocationResult = await invocation;
 
       if (_cogState.cog.async == Async.latestOnly &&
-          invocationFrame.ordinal == _currentFrameOrdinal) {
+          invocationFrame.ordinal < _currentFrameOrdinal) {
         _cogState._runtime.logging.debug(
           _cogState,
           'invocation frame was usurped - ignoring result',
