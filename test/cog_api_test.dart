@@ -47,7 +47,7 @@ void main() {
       });
 
       test('manual Cogs should be stringifiable', () {
-        final fourCog = Cog.man(null.of<int>(), spin: Spin<bool>());
+        final fourCog = Cog.man(null.init<int>(), spin: Spin<bool>());
         final falseCog = Cog.man(() => false, debugLabel: 'falseCog');
         final helloCog = Cog.man(
           () => '',
@@ -79,13 +79,13 @@ void main() {
       });
 
       test('null.of<T>() returns a function that returns null', () {
-        expect(null.of<int>(), isA<int? Function()>());
-        expect(null.of<int>()(), isNull);
+        expect(null.init<int>(), isA<int? Function()>());
+        expect(null.init<int>()(), isNull);
       });
 
       test('null.of<T>() requires T', () {
-        expect(() => null.of<dynamic>(), throwsArgumentError);
-        expect(() => null.of(), throwsArgumentError);
+        expect(() => null.init<dynamic>(), throwsArgumentError);
+        expect(() => null.init(), throwsArgumentError);
       });
 
       test('int.duration should work as expected', () {
@@ -2913,6 +2913,213 @@ void main() {
               'isNiceOutside austin false',
               'shouldGoToTheBeach cambridge false',
             ]));
+      });
+
+      test(
+          'you can watch from a deep chain of automatic Cogs where some are '
+          'async and some are sync', () {
+        fakeAsync((async) {
+          final timeOfDayCog = Cog(
+            (c) => DateTime(
+              2024,
+              2,
+              26,
+              7 + async.elapsed.inHours,
+              async.elapsed.inMinutes,
+            ),
+            ttl: 1.hours + 30.minutes,
+            debugLabel: 'timeOfDayCog',
+          );
+
+          final zipCodeCog = Cog(
+            (c) => switch (c.spin) {
+              City.austin => 78737,
+              City.brooklyn => 11201,
+              City.cambridge => 02138,
+            },
+            debugLabel: 'zipCodeCog',
+            spin: Spin<City>(),
+          );
+
+          final weatherDataCog = Cog(
+            (c) async {
+              final timeOfDay = c.link(timeOfDayCog);
+              final zipCode = c.link(zipCodeCog, spin: c.spin);
+
+              final weatherData = await fetchWeatherData(
+                timeOfDay: timeOfDay,
+                zipCode: zipCode,
+              );
+
+              return weatherData;
+            },
+            async: Async.latestOnly,
+            debugLabel: 'weatherDataCog',
+            init: null.init<WeatherData>(),
+            spin: Spin<City>(),
+            ttl: 30.minutes,
+          );
+
+          final isSunnyCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return false;
+              }
+
+              return weatherData.cloudCoverPercentage < .3;
+            },
+            debugLabel: 'isSunnyCog',
+            spin: Spin<City>(),
+          );
+
+          final willRainLaterCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return false;
+              }
+
+              return weatherData.percentChanceOfRain > .5;
+            },
+            debugLabel: 'willRainLaterCog',
+            spin: Spin<City>(),
+          );
+
+          final tempInFahrenheitCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return null;
+              }
+
+              return (weatherData.tempInCelsius * 9 / 5) + 32;
+            },
+            debugLabel: 'tempInFahrenheitCog',
+            spin: Spin<City>(),
+          );
+
+          final isNiceOutsideCog = Cog(
+            (c) {
+              final isSunny = c.link(isSunnyCog, spin: c.spin);
+              final tempInFahrenheit =
+                  c.link(tempInFahrenheitCog, spin: c.spin);
+
+              if (tempInFahrenheit == null) {
+                return false;
+              }
+
+              return isSunny && tempInFahrenheit > 70.0;
+            },
+            debugLabel: 'isNiceOutsideCog',
+            spin: Spin<City>(),
+          );
+
+          final shouldGoToTheBeachCog = Cog(
+            (c) {
+              final isNiceOutside = c.link(isNiceOutsideCog, spin: c.spin);
+              final willRainLater = c.link(willRainLaterCog, spin: c.spin);
+
+              return isNiceOutside && !willRainLater;
+            },
+            debugLabel: 'shouldGoToTheBeachCog',
+            spin: Spin<City>(),
+          );
+
+          final emissions = [];
+
+          isNiceOutsideCog
+              .watch(cogtext, spin: City.austin)
+              .listen((isNiceOutsideCog) {
+            emissions.add(
+              'isNiceOutsideCog in austin: $isNiceOutsideCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.austin)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in austin: $shouldGoToTheBeachCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.brooklyn)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in brooklyn: $shouldGoToTheBeachCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.cambridge)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in cambridge: $shouldGoToTheBeachCog',
+            );
+          });
+
+          async.elapse(2.hours);
+
+          expect(
+            emissions,
+            equals([
+              'shouldGoToTheBeachCog in austin: true',
+              'isNiceOutsideCog in austin: true',
+              'shouldGoToTheBeachCog in brooklyn: false',
+              'shouldGoToTheBeachCog in cambridge: false',
+            ]),
+          );
+
+          async.elapse(2.hours);
+
+          expect(
+            emissions,
+            equals([
+              'shouldGoToTheBeachCog in austin: true',
+              'isNiceOutsideCog in austin: true',
+              'shouldGoToTheBeachCog in brooklyn: false',
+              'shouldGoToTheBeachCog in cambridge: false',
+              'shouldGoToTheBeachCog in austin: false',
+              'isNiceOutsideCog in austin: false',
+              'shouldGoToTheBeachCog in cambridge: true',
+            ]),
+          );
+
+          async.elapse(2.hours);
+
+          expect(
+            emissions,
+            equals([
+              'shouldGoToTheBeachCog in austin: true',
+              'isNiceOutsideCog in austin: true',
+              'shouldGoToTheBeachCog in brooklyn: false',
+              'shouldGoToTheBeachCog in cambridge: false',
+              'shouldGoToTheBeachCog in austin: false',
+              'isNiceOutsideCog in austin: false',
+              'shouldGoToTheBeachCog in cambridge: true',
+            ]),
+          );
+
+          async.elapse(2.hours);
+
+          expect(
+            emissions,
+            equals([
+              'shouldGoToTheBeachCog in austin: true',
+              'isNiceOutsideCog in austin: true',
+              'shouldGoToTheBeachCog in brooklyn: false',
+              'shouldGoToTheBeachCog in cambridge: false',
+              'shouldGoToTheBeachCog in austin: false',
+              'isNiceOutsideCog in austin: false',
+              'shouldGoToTheBeachCog in cambridge: true',
+              'shouldGoToTheBeachCog in cambridge: false',
+              'shouldGoToTheBeachCog in austin: true',
+              'isNiceOutsideCog in austin: true'
+            ]),
+          );
+        });
       });
     });
   });

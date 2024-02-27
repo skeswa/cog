@@ -1,5 +1,3 @@
-- [x] `async`
-- [ ] comprehensive `async` tests
 - [ ] disposable `CogState`
 - [ ] `CogState` culling
 - [ ] `Mechanism`, `MechanismRegistry`

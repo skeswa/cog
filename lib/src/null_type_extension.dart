@@ -1,5 +1,5 @@
 extension NullTypeExtension on Null {
-  T? Function() of<T>() {
+  T? Function() init<T>() {
     assert(() {
       if (T == dynamic) {
         throw ArgumentError(

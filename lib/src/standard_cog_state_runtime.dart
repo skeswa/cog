@@ -355,6 +355,14 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       return;
     }
 
+    assert(() {
+      throw StateError(
+        'Encountered a Cog runtime error with Cog '
+        '${cogState.cog} that has spin `${cogState.spinOrNull}`: '
+        '$error',
+      );
+    }());
+
     logging.error(
       cogState,
       'encountered an error while conveying',
