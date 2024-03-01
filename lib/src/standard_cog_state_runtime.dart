@@ -383,8 +383,7 @@ typedef StandardCogStateRuntimeErrorCallback = void Function({
 const _listeningPostNotificationLimit = 1000;
 
 /// Comparator that sorts a collection of [CogStateListeningPost] instances from
-/// most normal to least normal, then from high [CogStateOrdinal] to low
-/// [CogStateOrdinal].
+/// most normal to least normal, then from high [ordinal] to low [ordinal].
 int _compareCogStateListeningPostsToMaybeNotify(
   CogStateListeningPost a,
   CogStateListeningPost b,
@@ -395,5 +394,5 @@ int _compareCogStateListeningPostsToMaybeNotify(
     return priorityComparison;
   }
 
-  return b.cogState.ordinal.compareTo(a.cogState.ordinal);
+  return b.ordinal.compareTo(a.ordinal);
 }

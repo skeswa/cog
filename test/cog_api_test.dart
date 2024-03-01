@@ -336,6 +336,28 @@ void main() {
 
         expect(() => numberCog.read(cogtext), throwsStateError);
       });
+
+      test(
+          'reading from an automatic Cog that links to a non-cog correctly '
+          'reads its current value', () {
+        final numberFakeObservable = FakeObservable(1);
+
+        final numberPlusOneCog = Cog<int, dynamic>((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          return number + 1;
+        });
+
+        expect(numberPlusOneCog.read(cogtext), 2);
+        expect(numberFakeObservable.hasListeners, isTrue);
+      });
     });
 
     group('Simple watching', () {

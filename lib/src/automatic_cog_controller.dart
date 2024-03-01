@@ -37,8 +37,8 @@ typedef LinkNonCogSubscribe<NonCogType, SubscriptionType, ValueType>
   void Function(ValueType) onNextValue,
 );
 
-typedef LinkNonCogUnsubscribe<NonCogType, SubscriptionType, ValueType>
-    = SubscriptionType Function(
+typedef LinkNonCogUnsubscribe<NonCogType, SubscriptionType, ValueType> = void
+    Function(
   NonCogType nonCog,
   void Function(ValueType) onNextValue,
   SubscriptionType subscription,
