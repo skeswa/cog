@@ -2,9 +2,9 @@ import 'cog.dart';
 
 typedef CogOrdinal = int;
 typedef CogSpinHash = int;
-typedef CogValueComparator<ValueType> = bool Function(ValueType a, ValueType b);
 typedef CogStateDepedencyHash = int;
 typedef CogStateHash = int;
+typedef CogValueComparator<ValueType> = bool Function(ValueType a, ValueType b);
 typedef CogValueInitializer<ValueType> = ValueType Function();
 typedef CogStateListeningPostDeactivationCallback = void Function();
 typedef CogStateOrdinal = int;
@@ -26,7 +26,7 @@ bool thatSpinsMatch<ValueType, SpinType>(
     );
   }
 
-  if (cog.spin != null && spin == null) {
+  if (cog.spin != null && spin is! SpinType) {
     throw ArgumentError(
       'Must specify a spin when linking, reading, or watching a Cog '
       'that specifies a spin type in its definition',
