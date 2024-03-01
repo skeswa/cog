@@ -339,7 +339,7 @@ void main() {
 
       test(
           'reading from an automatic Cog that links to a non-cog correctly '
-          'reads its current value', () {
+          'reads the non-cog\'s initial value', () {
         final numberFakeObservable = FakeObservable(1);
 
         final numberPlusOneCog = Cog<int, dynamic>((c) {
@@ -356,6 +356,74 @@ void main() {
         });
 
         expect(numberPlusOneCog.read(cogtext), 2);
+        expect(numberFakeObservable.hasListeners, isTrue);
+      });
+
+      test(
+          'reading from an automatic Cog that links to a non-cog correctly '
+          'reads the non-cog\'s current value if that value is emitted '
+          'synchronosuly upon subscription', () {
+        final numberFakeObservable = FakeObservable(1);
+
+        final numberPlusOneCog = Cog<int, dynamic>((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => -100,
+            subscribe: (nonCog, onNextValue) {
+              final subscription = nonCog.stream.listen(onNextValue);
+
+              onNextValue(100);
+
+              return subscription;
+            },
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          return number + 1;
+        });
+
+        expect(numberPlusOneCog.read(cogtext), 101);
+        expect(numberFakeObservable.hasListeners, isTrue);
+      });
+
+      test(
+          'reading from an automatic Cog that links to a non-cog correctly '
+          'reads the non-cog\'s latest value', () async {
+        cogtext = Cogtext(
+          cogStateRuntime: StandardCogStateRuntime(
+            logging: logging,
+            scheduler: NaiveCogStateRuntimeScheduler(
+              logging: logging,
+              highPriorityBackgroundTaskDelay: Duration.zero,
+              lowPriorityBackgroundTaskDelay: Duration.zero,
+            ),
+          ),
+        );
+
+        final numberFakeObservable = FakeObservable(1, isSync: true);
+
+        final numberPlusOneCog = Cog<int, dynamic>((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          return number + 1;
+        });
+
+        expect(numberPlusOneCog.read(cogtext), 2);
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 2;
+
+        await Future.delayed(Duration.zero);
+
+        expect(numberPlusOneCog.read(cogtext), 3);
         expect(numberFakeObservable.hasListeners, isTrue);
       });
     });

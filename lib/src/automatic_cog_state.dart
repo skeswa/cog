@@ -145,7 +145,19 @@ final class AutomaticCogState<ValueType, SpinType>
       'non-cog dependency has changed - scheduling re-convey',
     );
 
-    _runtime.scheduler.scheduleBackgroundTask(_maybeReconvey);
+    _runtime.scheduler.scheduleBackgroundTask(
+      _onReconveyDueToNonCogDependencyChange,
+      isHighPriority: true,
+    );
+  }
+
+  void _onReconveyDueToNonCogDependencyChange() {
+    _runtime.logging.debug(
+      this,
+      're-conveying due to non-cog dependency change',
+    );
+
+    _maybeReconvey(shouldForce: true);
   }
 
   void _onTtlExpiration() {
