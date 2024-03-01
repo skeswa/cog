@@ -167,7 +167,16 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     }
 
     _linkedLeaderOrdinals.clear();
-    _nonCogExtension?.open(base: _base?._nonCogExtension);
+
+    final baseNonCogExtension = _base?._nonCogExtension;
+    var nonCogExtension = _nonCogExtension;
+
+    if (baseNonCogExtension != null || nonCogExtension != null) {
+      _nonCogExtension = nonCogExtension =
+          AutomaticCogInvocationFrameNonCogExtension(cogState: _cogState);
+
+      nonCogExtension.open(base: baseNonCogExtension);
+    }
 
     _cogState._runtime.logging.debug(_cogState, 'invoking cog definition');
     _cogState._runtime.telemetry.recordCogStateRecalculation(_cogState.ordinal);

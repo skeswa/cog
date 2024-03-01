@@ -338,11 +338,11 @@ void main() {
       });
 
       test(
-          'reading from an automatic Cog that links to a non-cog correctly '
-          'reads the non-cog\'s initial value', () {
+          'reading from an automatic Cog that links to a non-Cog correctly '
+          'reads the non-Cog\'s initial value', () {
         final numberFakeObservable = FakeObservable(1);
 
-        final numberPlusOneCog = Cog<int, dynamic>((c) {
+        final numberPlusOneCog = Cog((c) {
           final number = c.linkNonCog(
             numberFakeObservable,
             init: (nonCog) => nonCog.value,
@@ -360,12 +360,12 @@ void main() {
       });
 
       test(
-          'reading from an automatic Cog that links to a non-cog correctly '
-          'reads the non-cog\'s current value if that value is emitted '
+          'reading from an automatic Cog that links to a non-Cog correctly '
+          'reads the non-Cog\'s current value if that value is emitted '
           'synchronosuly upon subscription', () {
         final numberFakeObservable = FakeObservable(1);
 
-        final numberPlusOneCog = Cog<int, dynamic>((c) {
+        final numberPlusOneCog = Cog((c) {
           final number = c.linkNonCog(
             numberFakeObservable,
             init: (nonCog) => -100,
@@ -388,8 +388,8 @@ void main() {
       });
 
       test(
-          'reading from an automatic Cog that links to a non-cog correctly '
-          'reads the non-cog\'s latest value', () async {
+          'reading from an automatic Cog that links to a non-Cog correctly '
+          'reads the non-Cog\'s latest value', () async {
         cogtext = Cogtext(
           cogStateRuntime: StandardCogStateRuntime(
             logging: logging,
@@ -403,7 +403,7 @@ void main() {
 
         final numberFakeObservable = FakeObservable(1, isSync: true);
 
-        final numberPlusOneCog = Cog<int, dynamic>((c) {
+        final numberPlusOneCog = Cog((c) {
           final number = c.linkNonCog(
             numberFakeObservable,
             init: (nonCog) => nonCog.value,
@@ -739,6 +739,136 @@ void main() {
             ]),
           );
         });
+      });
+
+      test(
+          'watched automatic Cog that links to a non-Cog correctly '
+          'subscribes to changes in the non-Cog\'s value', () async {
+        final numberFakeObservable = FakeObservable(1, isSync: true);
+
+        final numberPlusOneCog = Cog((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          return number + 1;
+        });
+
+        final emissions = [];
+
+        numberPlusOneCog.watch(cogtext).listen(emissions.add);
+
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 2;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([3]));
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 3;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([3, 4]));
+        expect(numberFakeObservable.hasListeners, isTrue);
+      });
+
+      test(
+          'watched automatic Cog that unlinks from a non-Cog correctly '
+          'unsubscribes from changes in the non-Cog\'s value', () async {
+        final negativeFakeObservable = FakeObservable(-1, isSync: true);
+        final positiveFakeObservable = FakeObservable(1, isSync: true);
+        final isPositiveFakeObservable = FakeObservable(true, isSync: true);
+
+        final alternatingNumberCog = Cog((c) {
+          final isPositive = c.linkNonCog(
+            isPositiveFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          final value = c.linkNonCog(
+            isPositive ? positiveFakeObservable : negativeFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          return 'value is $value';
+        });
+
+        final emissions = [];
+
+        alternatingNumberCog.watch(cogtext).listen(emissions.add);
+
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isFalse);
+        expect(positiveFakeObservable.hasListeners, isTrue);
+
+        isPositiveFakeObservable.value = false;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['value is -1']));
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isTrue);
+        expect(positiveFakeObservable.hasListeners, isFalse);
+
+        negativeFakeObservable.value = -2;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['value is -1', 'value is -2']));
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isTrue);
+        expect(positiveFakeObservable.hasListeners, isFalse);
+
+        isPositiveFakeObservable.value = true;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['value is -1', 'value is -2', 'value is 1']));
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isFalse);
+        expect(positiveFakeObservable.hasListeners, isTrue);
+
+        negativeFakeObservable.value = -3;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals(['value is -1', 'value is -2', 'value is 1']));
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isFalse);
+        expect(positiveFakeObservable.hasListeners, isTrue);
+
+        positiveFakeObservable.value = 2;
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+          emissions,
+          equals([
+            'value is -1',
+            'value is -2',
+            'value is 1',
+            'value is 2',
+          ]),
+        );
+        expect(isPositiveFakeObservable.hasListeners, isTrue);
+        expect(negativeFakeObservable.hasListeners, isFalse);
+        expect(positiveFakeObservable.hasListeners, isTrue);
       });
     });
 
@@ -2391,6 +2521,66 @@ void main() {
 
           expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
         });
+      });
+
+      test(
+          'watched automatic Cog that links to both a Cog and non-Cog '
+          'correctly subscribes to changes in both', () async {
+        final numberFakeObservable = FakeObservable(17, isSync: true);
+        final otherNumberCog = Cog.man(() => 4, debugLabel: 'otherNumberCog');
+
+        final sumCog = Cog((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+          final otherNumber = c.link(otherNumberCog);
+
+          return number + otherNumber;
+        }, debugLabel: 'sumCog');
+
+        final emissions = [];
+
+        sumCog.watch(cogtext).listen(emissions.add);
+
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 18;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([22]));
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        otherNumberCog.write(cogtext, 5);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([22, 23]));
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        otherNumberCog.write(cogtext, 6);
+        numberFakeObservable.value = 17;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([22, 23]));
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        otherNumberCog.write(cogtext, 6);
+        otherNumberCog.write(cogtext, 7);
+        otherNumberCog.write(cogtext, 8);
+        otherNumberCog.write(cogtext, 9);
+        otherNumberCog.write(cogtext, 10);
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([22, 23, 27]));
+        expect(numberFakeObservable.hasListeners, isTrue);
       });
     });
 
