@@ -7,10 +7,39 @@ abstract interface class AutomaticCogController<ValueType, SpinType> {
     CurrValueType fallback,
   );
 
-  SpinType get spin;
-
-  LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(
-    Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
+  LinkedCogValueType link<LinkedCogValueType, LinkedCogSpinType>(
+    Cog<LinkedCogValueType, LinkedCogSpinType> cog, {
     LinkedCogSpinType? spin,
   });
+
+  NonCogValueType
+      linkNonCog<NonCogType, NonCogSubscriptionType, NonCogValueType>(
+    NonCogType nonCog, {
+    required LinkNonCogInit<NonCogType, NonCogValueType> init,
+    required LinkNonCogSubscribe<NonCogType, NonCogSubscriptionType,
+            NonCogValueType>
+        subscribe,
+    required LinkNonCogUnsubscribe<NonCogType, NonCogSubscriptionType,
+            NonCogValueType>
+        unsubscribe,
+  });
+
+  SpinType get spin;
 }
+
+typedef LinkNonCogInit<NonCogType, ValueType> = ValueType Function(
+  NonCogType nonCog,
+);
+
+typedef LinkNonCogSubscribe<NonCogType, SubscriptionType, ValueType>
+    = SubscriptionType Function(
+  NonCogType nonCog,
+  void Function(ValueType) onNextValue,
+);
+
+typedef LinkNonCogUnsubscribe<NonCogType, SubscriptionType, ValueType>
+    = SubscriptionType Function(
+  NonCogType nonCog,
+  void Function(ValueType) onNextValue,
+  SubscriptionType subscription,
+);

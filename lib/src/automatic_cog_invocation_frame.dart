@@ -2,21 +2,24 @@ part of 'cog_state.dart';
 
 final class AutomaticCogInvocationFrame<ValueType, SpinType>
     implements AutomaticCogController<ValueType, SpinType> {
-  final AutomaticCogState<ValueType, SpinType> cogState;
   final int ordinal;
 
+  AutomaticCogInvocationFrame? _base;
+  final AutomaticCogState<ValueType, SpinType> _cogState;
   bool _hasValue;
-  var _linkedLeaderOrdinals = <CogStateOrdinal>[];
+  final _linkedLeaderOrdinals = <CogStateOrdinal>[];
+  AutomaticCogInvocationFrameNonCogExtension? _nonCogExtension;
   late ValueType _value;
 
-  AutomaticCogInvocationFrame._({
-    required this.cogState,
+  AutomaticCogInvocationFrame({
+    required AutomaticCogState<ValueType, SpinType> cogState,
     required this.ordinal,
-  }) : _hasValue = cogState._hasValue {
+  })  : _cogState = cogState,
+        _hasValue = cogState._hasValue {
     if (_hasValue) {
-      _value = cogState._value;
+      _value = _cogState._value;
     } else {
-      final init = cogState.cog.init;
+      final init = _cogState.cog.init;
 
       if (init != null) {
         _value = init();
@@ -24,20 +27,84 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     }
   }
 
+  void abandon() {
+    _nonCogExtension?.abandon();
+  }
+
+  void close() {
+    final previouslyLinkedLeaderOrdinals =
+        _base?._linkedLeaderOrdinals ?? const [];
+
+    // Ensure that the linked ordinals are in order so we can compare to
+    // previously linked leader ordinals.
+    //
+    // Crucially, the logic below assumes that [previouslyLinkedLeaderOrdinals]
+    // was sorted too before.
+    _linkedLeaderOrdinals.sort();
+
+    // Look for differences in the two sorted lists of leader ordinals.
+    int i = 0, j = 0;
+    while (i < previouslyLinkedLeaderOrdinals.length &&
+        j < _linkedLeaderOrdinals.length) {
+      if (previouslyLinkedLeaderOrdinals[i] < _linkedLeaderOrdinals[j]) {
+        // Looks like this previously linked leader ordinal is no longer linked.
+        _cogState._runtime.terminateCogStateDependency(
+          followerCogStateOrdinal: _cogState.ordinal,
+          leaderCogStateOrdinal: previouslyLinkedLeaderOrdinals[i],
+        );
+
+        i++;
+      } else if (previouslyLinkedLeaderOrdinals[i] > _linkedLeaderOrdinals[j]) {
+        // Looks like we have a newly linked leader ordinal.
+        _cogState._runtime.renewCogStateDependency(
+          followerCogStateOrdinal: _cogState.ordinal,
+          leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
+        );
+
+        j++;
+      } else {
+        // This leader ordinal has stayed linked.
+
+        i++;
+        j++;
+      }
+    }
+
+    // We need to account for one of the lists being longer than the other.
+    while (i < previouslyLinkedLeaderOrdinals.length) {
+      _cogState._runtime.terminateCogStateDependency(
+        followerCogStateOrdinal: _cogState.ordinal,
+        leaderCogStateOrdinal: previouslyLinkedLeaderOrdinals[i],
+      );
+
+      i++;
+    }
+    while (j < _linkedLeaderOrdinals.length) {
+      _cogState._runtime.renewCogStateDependency(
+        followerCogStateOrdinal: _cogState.ordinal,
+        leaderCogStateOrdinal: _linkedLeaderOrdinals[j],
+      );
+
+      j++;
+    }
+
+    _nonCogExtension?.close();
+  }
+
   @override
   ValueType get curr {
-    if (hasValue) {
+    if (_hasValue) {
       return _value;
     }
 
-    final init = cogState.cog.init;
+    final init = _cogState.cog.init;
     if (init != null) {
       return init();
     }
 
     throw StateError(
       'Failed to get current value of automatic Cog '
-      '${cogState.cog} with spin `${cogState._spin}`: '
+      '${_cogState.cog} with spin `${_cogState._spin}`: '
       'Cog does not yet have a value, and does not have an accompanying '
       '`init` function',
     );
@@ -47,47 +114,67 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
   CurrValueType currOr<CurrValueType extends ValueType>(
     CurrValueType fallback,
   ) {
-    return hasValue ? _value as CurrValueType : fallback;
-  }
-
-  FutureOr<ValueType> invoke() {
-    cogState._runtime.logging.debug(cogState, 'invoking cog definition');
-    cogState._runtime.telemetry.recordCogStateRecalculation(cogState.ordinal);
-
-    return cogState.cog.def(this);
+    return _hasValue ? _value as CurrValueType : fallback;
   }
 
   bool get hasValue => _hasValue;
 
   @override
-  LinkedCogStateType link<LinkedCogStateType, LinkedCogSpinType>(
-    Cog<LinkedCogStateType, LinkedCogSpinType> cog, {
+  LinkedCogValueType link<LinkedCogValueType, LinkedCogSpinType>(
+    Cog<LinkedCogValueType, LinkedCogSpinType> cog, {
     LinkedCogSpinType? spin,
   }) {
     assert(thatSpinsMatch(cog, spin));
 
-    final acquiredCogState = cogState._runtime.acquire(cog: cog, cogSpin: spin);
+    final acquiredCogState =
+        _cogState._runtime.acquire(cog: cog, cogSpin: spin);
 
     _linkedLeaderOrdinals.add(acquiredCogState.ordinal);
 
     return acquiredCogState.evaluate();
   }
 
-  List<CogStateOrdinal> get linkedLeaderOrdinals => _linkedLeaderOrdinals;
-
-  void reset({
-    List<CogStateOrdinal>? linkedLeaderOrdinals,
+  @override
+  NonCogValueType
+      linkNonCog<NonCogType, NonCogSubscriptionType, NonCogValueType>(
+    NonCogType nonCog, {
+    required LinkNonCogInit<NonCogType, NonCogValueType> init,
+    required LinkNonCogSubscribe<NonCogType, NonCogSubscriptionType,
+            NonCogValueType>
+        subscribe,
+    required LinkNonCogUnsubscribe<NonCogType, NonCogSubscriptionType,
+            NonCogValueType>
+        unsubscribe,
   }) {
-    if (linkedLeaderOrdinals != null) {
-      _linkedLeaderOrdinals = linkedLeaderOrdinals;
+    final linkedNonCogs = _nonCogExtension ??=
+        AutomaticCogInvocationFrameNonCogExtension(cogState: _cogState);
+
+    return linkedNonCogs.linkNonCog(
+      init: init,
+      nonCog: nonCog,
+      subscribe: subscribe,
+      unsubscribe: unsubscribe,
+    );
+  }
+
+  FutureOr<ValueType> open({AutomaticCogInvocationFrame? base}) {
+    _base = base;
+
+    _hasValue = _cogState._hasValue;
+
+    if (_hasValue) {
+      _value = _cogState._value;
     }
 
-    _hasValue = cogState._hasValue;
-    if (_hasValue) {
-      _value = cogState._value;
-    }
+    _linkedLeaderOrdinals.clear();
+    _nonCogExtension?.open(base: _base?._nonCogExtension);
+
+    _cogState._runtime.logging.debug(_cogState, 'invoking cog definition');
+    _cogState._runtime.telemetry.recordCogStateRecalculation(_cogState.ordinal);
+
+    return _cogState.cog.def(this);
   }
 
   @override
-  SpinType get spin => cogState.spinOrThrow;
+  SpinType get spin => _cogState.spinOrThrow;
 }

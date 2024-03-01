@@ -9,6 +9,7 @@ import 'staleness.dart';
 
 part 'async_automatic_cog_state_conveyor.dart';
 part 'automatic_cog_invocation_frame.dart';
+part 'automatic_cog_invocation_frame_non_cog_extension.dart';
 part 'automatic_cog_state.dart';
 part 'automatic_cog_state_conveyor.dart';
 part 'cog_state_listening_post.dart';

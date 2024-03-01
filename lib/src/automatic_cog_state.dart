@@ -21,10 +21,7 @@ final class AutomaticCogState<ValueType, SpinType>
 
   @override
   void init() {
-    _conveyor = AutomaticCogStateConveyor(
-      cogState: this,
-      onNextValue: _onNextValue,
-    );
+    _conveyor = AutomaticCogStateConveyor(cogState: this);
 
     _conveyor.init();
   }
@@ -140,6 +137,15 @@ final class AutomaticCogState<ValueType, SpinType>
     _leaderRevisionHash = _calculateLeaderRevisionHash();
 
     maybeRevise(nextValue, shouldNotify: shouldNotify);
+  }
+
+  void _onNonCogDependencyChange() {
+    _runtime.logging.debug(
+      this,
+      'non-cog dependency has changed - scheduling re-convey',
+    );
+
+    _runtime.scheduler.scheduleBackgroundTask(_maybeReconvey);
   }
 
   void _onTtlExpiration() {

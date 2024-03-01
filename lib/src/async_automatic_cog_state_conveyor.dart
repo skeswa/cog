@@ -16,11 +16,10 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     required AutomaticCogState<ValueType, SpinType> cogState,
     required Future<ValueType> invocation,
     required AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
-    required AutomaticCogStateConveyorNextValueCallback<ValueType> onNextValue,
   })  : _currentFrameOrdinal = invocationFrame.ordinal,
         _initialInvocation = invocation,
         _initialInvocationFrame = invocationFrame,
-        super._(cogState: cogState, onNextValue: onNextValue) {}
+        super._(cogState: cogState);
 
   @override
   void convey({bool shouldForce = false}) =>
@@ -38,7 +37,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
       );
     }
 
-    _onNextValue(
+    _cogState._onNextValue(
       nextValue: init(),
       shouldNotify: false,
     );
@@ -110,13 +109,26 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
     _activeFrameCount++;
 
+    var didInvocationFrameClose = false;
+
     try {
-      invocationFrame ??= AutomaticCogInvocationFrame._(
+      invocationFrame ??= AutomaticCogInvocationFrame(
         cogState: _cogState,
         ordinal: ++_currentFrameOrdinal,
       );
 
-      invocation ??= invocationFrame.invoke() as Future<ValueType>;
+      if (invocation == null) {
+        final maybeFuture = invocationFrame.open(base: _lastFrame);
+
+        if (maybeFuture is! Future<ValueType>) {
+          throw StateError(
+            'Expected a Future<$ValueType> to be returned, '
+            'but got a ${maybeFuture.runtimeType} instead',
+          );
+        }
+
+        invocation = maybeFuture;
+      }
 
       final invocationResult = await invocation;
 
@@ -138,17 +150,14 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
         );
       }
 
-      _onNextValue(
+      _cogState._onNextValue(
         nextValue: invocationResult,
         shouldNotify: shouldNotify,
       );
 
-      _updateCogStateDependencies(
-        cogState: _cogState,
-        linkedLeaderOrdinals: invocationFrame.linkedLeaderOrdinals,
-        previouslyLinkedLeaderOrdinals:
-            _lastFrame?.linkedLeaderOrdinals ?? const [],
-      );
+      invocationFrame.close();
+
+      didInvocationFrameClose = true;
 
       _lastFrame = invocationFrame;
     } catch (e, stackTrace) {
@@ -159,6 +168,10 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
       );
     } finally {
       _activeFrameCount--;
+
+      if (!didInvocationFrameClose) {
+        invocationFrame?.abandon();
+      }
     }
 
     if (_reconveyStatus == _ReconveyStatus.necessary) {
