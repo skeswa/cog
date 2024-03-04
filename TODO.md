@@ -1,13 +1,14 @@
 - [x] non-Cog support
 - [x] comprehensive non-Cog tests
 - [ ] disposable `CogState`
-- [ ] `CogState` culling
 - [ ] `Mechanism`, `MechanismRegistry`
+- [ ] `CogState` culling
 - [ ] comprehensive `Mechanism` tests
 - [ ] Flutter
   - [ ] `useCog`
   - [ ] `useCogs`
   - [ ] `FlutterCogtext`
+  - [ ] `.linkValueListenable(...)`
   - [ ] comprehensive Flutter tests
 - [ ] `Subject` compat
 - [ ] comprehensive `Subject` compat tests
