@@ -781,6 +781,67 @@ void main() {
       });
 
       test(
+          'watched automatic Cog that links to a non-Cog more than once '
+          'correctly subscribes to changes in the non-Cog\'s value', () async {
+        final numberFakeObservable = FakeObservable(1, isSync: true);
+
+        var invocationCount = 0;
+
+        final numberPlusOneCog = Cog((c) {
+          final number = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+          final sameNumber = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+          final hereWeGoAgain = c.linkNonCog(
+            numberFakeObservable,
+            init: (nonCog) => nonCog.value,
+            subscribe: (nonCog, onNextValue) =>
+                nonCog.stream.listen(onNextValue),
+            unsubscribe: (nonCog, onNextValue, subscription) =>
+                subscription.cancel(),
+          );
+
+          invocationCount++;
+
+          return number + sameNumber + hereWeGoAgain + 1;
+        });
+
+        final emissions = [];
+
+        numberPlusOneCog.watch(cogtext).listen(emissions.add);
+
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 2;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([7]));
+        expect(invocationCount, 2);
+        expect(numberFakeObservable.hasListeners, isTrue);
+
+        numberFakeObservable.value = 3;
+
+        await Future.delayed(Duration.zero);
+
+        expect(emissions, equals([7, 10]));
+        expect(invocationCount, 3);
+        expect(numberFakeObservable.hasListeners, isTrue);
+      });
+
+      test(
           'watched automatic Cog that unlinks from a non-Cog correctly '
           'unsubscribes from changes in the non-Cog\'s value', () async {
         final isPositiveFakeObservable = FakeObservable(true,
