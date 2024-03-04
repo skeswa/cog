@@ -17,7 +17,7 @@ final class AutomaticCogState<ValueType, SpinType>
 
   @override
   ValueType evaluate() {
-    _maybeReconvey();
+    _maybeConvey();
 
     return _value;
   }
@@ -55,10 +55,10 @@ final class AutomaticCogState<ValueType, SpinType>
       _runtime.logging.debug(
         this,
         'this cog state conveys eagerly - '
-        'might need to re-convey based on change in staleness',
+        'might need to convey based on change in staleness',
       );
 
-      _maybeReconvey();
+      _maybeConvey();
     }
   }
 
@@ -78,13 +78,19 @@ final class AutomaticCogState<ValueType, SpinType>
 
   @override
   CogStateRevision get revision {
-    _maybeReconvey();
+    _maybeConvey();
 
     return _revision;
   }
 
   CogStateRevisionHash _calculateLeaderRevisionHash() {
-    var hash = leaderRevisionHashSeed;
+    var hash = revisionHashSeed;
+
+    final nonCogTracker = _nonCogTracker;
+
+    if (nonCogTracker != null) {
+      hash += revisionHashScalingFactor * hash + nonCogTracker.revisionHash;
+    }
 
     final leaderOrdinals = _runtime.leaderOrdinalsOf(ordinal);
 
@@ -93,8 +99,8 @@ final class AutomaticCogState<ValueType, SpinType>
     for (var i = 0; i < leaderOrdinalCount; i++) {
       final leaderOrdinal = leaderOrdinals[i];
 
-      hash += leaderRevisionHashScalingFactor * hash +
-          _runtime[leaderOrdinal].revision;
+      hash +=
+          revisionHashScalingFactor * hash + _runtime[leaderOrdinal].revision;
     }
 
     return hash;
@@ -106,7 +112,7 @@ final class AutomaticCogState<ValueType, SpinType>
     return latestLeaderRevisionHash != _leaderRevisionHash;
   }
 
-  void _maybeReconvey({bool shouldForce = false}) {
+  void _maybeConvey({bool shouldForce = false}) {
     if (!shouldForce) {
       final recalculatedStaleness = _recalculateStaleness();
 
@@ -156,28 +162,16 @@ final class AutomaticCogState<ValueType, SpinType>
   void _onNonCogDependencyChange() {
     _runtime.logging.debug(
       this,
-      'non-cog dependency has changed - scheduling re-convey',
+      'non-cog dependency has changed - marking stale',
     );
 
-    _runtime.scheduler.scheduleBackgroundTask(
-      _onReconveyDueToNonCogDependencyChange,
-      isHighPriority: true,
-    );
-  }
-
-  void _onReconveyDueToNonCogDependencyChange() {
-    _runtime.logging.debug(
-      this,
-      're-conveying due to non-cog dependency change',
-    );
-
-    _maybeReconvey(shouldForce: true);
+    markStale();
   }
 
   void _onTtlExpiration() {
     _runtime.logging.debug(this, 'TTL expired - re-calculating value...');
 
-    _maybeReconvey(shouldForce: true);
+    _maybeConvey(shouldForce: true);
     _maybeScheduleTtl();
   }
 

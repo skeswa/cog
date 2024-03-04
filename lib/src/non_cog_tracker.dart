@@ -8,6 +8,23 @@ final class NonCogTracker {
     required AutomaticCogState cogState,
   }) : _cogState = cogState;
 
+  TrackedNonCogRevisionHash get revisionHash {
+    var hash = revisionHashSeed;
+
+    final currentInvocationFrameOrdinal =
+        _cogState._currentInvocationFrameOrdinal;
+
+    for (final trackedNonCog in _trackedNonCogByNonCog.values) {
+      if (trackedNonCog.isTracking &&
+          trackedNonCog._trackingInvocationFrameOrdinals
+              .contains(currentInvocationFrameOrdinal)) {
+        hash += revisionHashScalingFactor * hash + trackedNonCog._revision;
+      }
+    }
+
+    return hash;
+  }
+
   ValueType track<NonCogType extends Object, SubscriptionType, ValueType>({
     required LinkNonCogInit<NonCogType, ValueType> init,
     required AutomaticCogInvocationFrameOrdinal invocationFrameOrdinal,
@@ -66,6 +83,7 @@ final class _TrackedNonCog<NonCogType, SubscriptionType, ValueType> {
       <AutomaticCogInvocationFrameOrdinal>[];
   final LinkNonCogUnsubscribe<NonCogType, SubscriptionType, ValueType>
       _unsubscribe;
+  var _revision = initialTrackedNonCogRevision;
   ValueType _value;
 
   _TrackedNonCog({
@@ -139,6 +157,7 @@ final class _TrackedNonCog<NonCogType, SubscriptionType, ValueType> {
 
   void _onNextValue(ValueType value) {
     _value = value;
+    _revision++;
 
     final currentInvocationFrameOrdinal =
         _nonCogTracker._cogState._currentInvocationFrameOrdinal;

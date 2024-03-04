@@ -10,11 +10,14 @@ typedef CogValueInitializer<ValueType> = ValueType Function();
 typedef CogStateListeningPostDeactivationCallback = void Function();
 typedef CogStateOrdinal = int;
 typedef CogStateRevision = int;
+typedef TrackedNonCogRevision = int;
+typedef TrackedNonCogRevisionHash = int;
 typedef CogStateRevisionHash = int;
 
-const CogStateRevisionHash leaderRevisionHashSeed = 7;
-const CogStateRevisionHash leaderRevisionHashScalingFactor = 31;
 const CogStateRevision initialCogStateRevision = 0;
+const TrackedNonCogRevision initialTrackedNonCogRevision = 0;
+const revisionHashSeed = 7;
+const revisionHashScalingFactor = 31;
 
 bool thatSpinsMatch<ValueType, SpinType>(
   Cog<ValueType, SpinType> cog,

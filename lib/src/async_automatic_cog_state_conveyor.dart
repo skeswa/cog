@@ -113,7 +113,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     if (!shouldForce && latestLeaderRevisionHash == _leaderRevisionHash) {
       _cogState._runtime.logging.debug(
         _cogState,
-        're-convey has already happened for the current revision',
+        're-convey has already happened for the current set of leaders revision',
       );
 
       return;

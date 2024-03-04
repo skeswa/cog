@@ -2148,6 +2148,99 @@ void main() {
       });
 
       test(
+          'watched async automatic Cogs with latest only scheduling and a '
+          'non-cog dependency emit correctly when their dependencies change',
+          () {
+        fakeAsync((async) {
+          final durationFakeObservable = FakeObservable(
+            0,
+            debugLabel: 'durationFakeObservable',
+          );
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.linkNonCog(
+                durationFakeObservable,
+                init: (nonCog) => nonCog.value,
+                subscribe: (nonCog, onNextValue) =>
+                    nonCog.stream.listen(onNextValue),
+                unsubscribe: (nonCog, onNextValue, subscription) =>
+                    subscription.cancel(),
+              );
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.latestOnly,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 8;
+
+          async.elapse(7.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 1;
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          durationFakeObservable.value = 2;
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
+
+          durationFakeObservable.value = 1;
+          durationFakeObservable.value = 5;
+          durationFakeObservable.value = 7;
+
+          async.elapse(5.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 1',
+              'waited 2',
+              'waited 7',
+            ]),
+          );
+        });
+      });
+
+      test(
           'watched async automatic Cogs with one-at-a-time scheduling '
           'emit correctly when their dependencies change', () {
         fakeAsync((async) {
@@ -2284,6 +2377,100 @@ void main() {
           durationCog.write(cogtext, 1);
           durationCog.write(cogtext, 5);
           durationCog.write(cogtext, 7);
+
+          async.elapse(5.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+            ]),
+          );
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with one-at-a-time scheduling and a '
+          'non-cog dependency emit correctly when their dependencies change',
+          () {
+        fakeAsync((async) {
+          final durationFakeObservable = FakeObservable(
+            0,
+            debugLabel: 'durationFakeObservable',
+          );
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.linkNonCog(
+                durationFakeObservable,
+                init: (nonCog) => nonCog.value,
+                subscribe: (nonCog, onNextValue) =>
+                    nonCog.stream.listen(onNextValue),
+                unsubscribe: (nonCog, onNextValue, subscription) =>
+                    subscription.cancel(),
+              );
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.oneAtATime,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 8;
+
+          async.elapse(7.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 1;
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          durationFakeObservable.value = 2;
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
+
+          durationFakeObservable.value = 1;
+          durationFakeObservable.value = 5;
+          durationFakeObservable.value = 7;
 
           async.elapse(5.seconds);
 
@@ -2478,6 +2665,101 @@ void main() {
       });
 
       test(
+          'watched async automatic Cogs with parallel scheduling and a '
+          'non-cog dependency emit correctly when their dependencies change',
+          () {
+        fakeAsync((async) {
+          final durationFakeObservable = FakeObservable(
+            0,
+            debugLabel: 'durationFakeObservable',
+          );
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.linkNonCog(
+                durationFakeObservable,
+                init: (nonCog) => nonCog.value,
+                subscribe: (nonCog, onNextValue) =>
+                    nonCog.stream.listen(onNextValue),
+                unsubscribe: (nonCog, onNextValue, subscription) =>
+                    subscription.cancel(),
+              );
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.parallel,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog
+              .watch(cogtext, priority: Priority.asap)
+              .listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 8;
+
+          async.elapse(7.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          durationFakeObservable.value = 2;
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(1.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
+
+          durationFakeObservable.value = 1;
+          durationFakeObservable.value = 5;
+          durationFakeObservable.value = 7;
+
+          async.elapse(5.seconds);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+            ]),
+          );
+
+          async.elapse(1.minutes);
+
+          expect(
+            emissions,
+            equals([
+              'waited 0',
+              'waited 8',
+              'waited 2',
+              'waited 1',
+              'waited 5',
+              'waited 7',
+            ]),
+          );
+        });
+      });
+
+      test(
           'watched async automatic Cogs with queued scheduling '
           'emit correctly when their dependencies change', () {
         fakeAsync((async) {
@@ -2568,6 +2850,71 @@ void main() {
 
           durationCog.write(cogtext, 2);
           durationCog.write(cogtext, 4);
+
+          async.elapse(2.seconds);
+
+          expect(emissions, equals(['waited 0']));
+
+          async.elapse(2.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(2.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8']));
+
+          async.elapse(2.seconds);
+
+          expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
+        });
+      });
+
+      test(
+          'watched async automatic Cogs with queued scheduling and a '
+          'non-cog dependency emit correctly when their dependencies change',
+          () {
+        fakeAsync((async) {
+          final durationFakeObservable = FakeObservable(
+            0,
+            debugLabel: 'durationFakeObservable',
+          );
+
+          final waitingCog = Cog(
+            (c) async {
+              final duration = c.linkNonCog(
+                durationFakeObservable,
+                init: (nonCog) => nonCog.value,
+                subscribe: (nonCog, onNextValue) =>
+                    nonCog.stream.listen(onNextValue),
+                unsubscribe: (nonCog, onNextValue, subscription) =>
+                    subscription.cancel(),
+              );
+
+              await Future.delayed(duration.seconds);
+
+              return 'waited $duration';
+            },
+            async: Async.queued,
+            debugLabel: 'waitingCog',
+            init: () => '',
+          );
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          expect(emissions, isEmpty);
+
+          async.elapse(Duration.zero);
+
+          expect(emissions, equals(['waited 0']));
+
+          durationFakeObservable.value = 8;
+
+          async.elapse(4.seconds);
+
+          durationFakeObservable.value = 2;
+          durationFakeObservable.value = 4;
 
           async.elapse(2.seconds);
 
