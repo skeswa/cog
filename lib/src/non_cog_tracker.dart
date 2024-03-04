@@ -153,8 +153,6 @@ final class _TrackedNonCog<NonCogType, SubscriptionType, ValueType> {
     return _value;
   }
 
-  ValueType get value => _value;
-
   void _onNextValue(ValueType value) {
     _value = value;
     _revision++;

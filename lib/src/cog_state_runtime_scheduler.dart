@@ -132,7 +132,11 @@ final class _NaiveBackgroundTaskScheduler {
         backgroundTask();
       } catch (e, stackTrace) {
         _logging.error(
-            null, 'Failed to execute background task', e, stackTrace);
+          null,
+          'Failed to execute background task',
+          e,
+          stackTrace,
+        );
       } finally {
         _inProgressBackgroundTask = null;
       }

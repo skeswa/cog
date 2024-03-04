@@ -107,6 +107,28 @@ void main() {
           isNot(throwsA(anything)),
         );
       });
+
+      test('Standard runtime scheduler can survive errors', () {
+        fakeAsync((async) {
+          var didThrow = false;
+
+          try {
+            final cogStateRuntime = StandardCogStateRuntime();
+
+            cogtext = Cogtext(cogStateRuntime: cogStateRuntime);
+
+            cogStateRuntime.scheduler.scheduleBackgroundTask(() {
+              throw StateError('oh no!');
+            });
+
+            async.elapse(1.days);
+          } catch (e) {
+            didThrow = true;
+          }
+
+          expect(didThrow, isFalse);
+        });
+      });
     });
 
     group('Simple reading', () {
