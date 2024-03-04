@@ -1,3 +1,5 @@
+- [x] non-Cog support
+- [x] comprehensive non-Cog tests
 - [ ] disposable `CogState`
 - [ ] `CogState` culling
 - [ ] `Mechanism`, `MechanismRegistry`
