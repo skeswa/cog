@@ -1986,6 +1986,142 @@ void main() {
       });
 
       test(
+          'async automatic Cogs with non-Cog dependencies only maintain '
+          'subscriptions when necessary', () {
+        fakeAsync((async) {
+          final scalarFakeObservable = FakeObservable(
+            10,
+            debugLabel: 'scalarFakeObservable',
+          );
+          final durationFakeObservables = [
+            for (var i = 1; i <= 100; i++)
+              FakeObservable(
+                i,
+                debugLabel: 'durationFakeObservable$i',
+              ),
+          ];
+
+          var waitingCogInvocation = 0;
+
+          final waitingCog = Cog((c) async {
+            final invocationNumber = waitingCogInvocation++;
+
+            final scalar = c.linkNonCog(
+              scalarFakeObservable,
+              init: (nonCog) => nonCog.value,
+              subscribe: (nonCog, onNextValue) =>
+                  nonCog.stream.listen(onNextValue),
+              unsubscribe: (nonCog, onNextValue, subscription) =>
+                  subscription.cancel(),
+            );
+
+            if (invocationNumber > 0) {
+              final duration = c.linkNonCog(
+                durationFakeObservables[invocationNumber - 1],
+                init: (nonCog) => nonCog.value,
+                subscribe: (nonCog, onNextValue) =>
+                    nonCog.stream.listen(onNextValue),
+                unsubscribe: (nonCog, onNextValue, subscription) =>
+                    subscription.cancel(),
+              );
+
+              await Future.delayed(Duration(seconds: duration));
+
+              return scalar * duration;
+            }
+
+            return -scalar;
+          }, async: Async.parallel, debugLabel: 'waitingCog', init: () => 0);
+
+          final emissions = [];
+
+          waitingCog.watch(cogtext).listen(emissions.add);
+
+          scalarFakeObservable.value = 11;
+          scalarFakeObservable.value = 12;
+          scalarFakeObservable.value = 13;
+
+          async.elapse(Duration.zero);
+
+          expect(waitingCogInvocation, 4);
+          expect(emissions, equals([-10]));
+
+          async.elapse(1.seconds);
+
+          expect(waitingCogInvocation, 4);
+          expect(emissions, equals([-10, 11]));
+          expect(scalarFakeObservable.hasListeners, isTrue);
+          expect(
+            durationFakeObservables
+                .where((durationFakeObservable) =>
+                    durationFakeObservable.hasListeners)
+                .toList(),
+            equals([
+              durationFakeObservables[0],
+              durationFakeObservables[1],
+              durationFakeObservables[2],
+            ]),
+          );
+
+          async.elapse(5.seconds);
+
+          expect(waitingCogInvocation, 4);
+          expect(emissions, equals([-10, 11, 24, 39]));
+          expect(scalarFakeObservable.hasListeners, isTrue);
+          expect(
+            durationFakeObservables
+                .where((durationFakeObservable) =>
+                    durationFakeObservable.hasListeners)
+                .toList(),
+            equals([durationFakeObservables[2]]),
+          );
+
+          scalarFakeObservable.value = 13;
+          scalarFakeObservable.value = 14;
+          scalarFakeObservable.value = 15;
+          scalarFakeObservable.value = 16;
+          scalarFakeObservable.value = 17;
+
+          async.elapse(5.seconds);
+
+          expect(waitingCogInvocation, 9);
+          expect(emissions, equals([-10, 11, 24, 39, 52, 70]));
+          expect(scalarFakeObservable.hasListeners, isTrue);
+          expect(
+            durationFakeObservables
+                .where((durationFakeObservable) =>
+                    durationFakeObservable.hasListeners)
+                .toList(),
+            equals([
+              durationFakeObservables[4],
+              durationFakeObservables[5],
+              durationFakeObservables[6],
+              durationFakeObservables[7],
+            ]),
+          );
+
+          durationFakeObservables[7].value++;
+          durationFakeObservables[7].value++;
+          durationFakeObservables[7].value++;
+
+          async.elapse(1.minutes);
+
+          expect(waitingCogInvocation, 9);
+          expect(emissions, equals([-10, 11, 24, 39, 52, 70, 90, 112, 136]));
+          expect(scalarFakeObservable.hasListeners, isTrue);
+          expect(
+            durationFakeObservables
+                .where((durationFakeObservable) =>
+                    durationFakeObservable.hasListeners)
+                .toList(),
+            equals([
+              durationFakeObservables[7],
+            ]),
+          );
+        });
+      });
+
+      test(
           'watched async automatic Cogs with latest only scheduling emit '
           'correctly when their dependencies change', () {
         fakeAsync((async) {
