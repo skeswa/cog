@@ -12,8 +12,8 @@ abstract interface class AutomaticCogController<ValueType, SpinType> {
     LinkedCogSpinType? spin,
   });
 
-  NonCogValueType
-      linkNonCog<NonCogType, NonCogSubscriptionType, NonCogValueType>(
+  NonCogValueType linkNonCog<NonCogType extends Object, NonCogSubscriptionType,
+      NonCogValueType>(
     NonCogType nonCog, {
     required LinkNonCogInit<NonCogType, NonCogValueType> init,
     required LinkNonCogSubscribe<NonCogType, NonCogSubscriptionType,

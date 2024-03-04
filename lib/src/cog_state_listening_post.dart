@@ -74,7 +74,7 @@ final class CogStateListeningPost<ValueType, SpinType> {
         .recordCogStateChangeNotification(_cogState.ordinal);
   }
 
-  int get ordinal => _cogState.ordinal;
+  CogStateOrdinal get ordinal => _cogState.ordinal;
 
   Priority get priority => _priority;
 

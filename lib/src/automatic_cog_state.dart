@@ -3,7 +3,10 @@ part of 'cog_state.dart';
 final class AutomaticCogState<ValueType, SpinType>
     extends CogState<ValueType, SpinType, AutomaticCog<ValueType, SpinType>> {
   late final AutomaticCogStateConveyor<ValueType, SpinType> _conveyor;
+  AutomaticCogInvocationFrameOrdinal _currentInvocationFrameOrdinal =
+      _initialInvocationFrameOrdinal - 1;
   CogStateRevision? _leaderRevisionHash;
+  NonCogTracker? _nonCogTracker;
 
   AutomaticCogState({
     required super.cog,
@@ -70,6 +73,9 @@ final class AutomaticCogState<ValueType, SpinType>
     return didRevise;
   }
 
+  NonCogTracker get nonCogTracker =>
+      _nonCogTracker ??= NonCogTracker(cogState: this);
+
   @override
   CogStateRevision get revision {
     _maybeReconvey();
@@ -80,7 +86,13 @@ final class AutomaticCogState<ValueType, SpinType>
   CogStateRevisionHash _calculateLeaderRevisionHash() {
     var hash = leaderRevisionHashSeed;
 
-    for (final leaderOrdinal in _runtime.leaderOrdinalsOf(ordinal)) {
+    final leaderOrdinals = _runtime.leaderOrdinalsOf(ordinal);
+
+    final leaderOrdinalCount = leaderOrdinals.length;
+
+    for (var i = 0; i < leaderOrdinalCount; i++) {
+      final leaderOrdinal = leaderOrdinals[i];
+
       hash += leaderRevisionHashScalingFactor * hash +
           _runtime[leaderOrdinal].revision;
     }
@@ -108,7 +120,7 @@ final class AutomaticCogState<ValueType, SpinType>
       }
     }
 
-    _runtime.logging.debug(this, 're-conveying');
+    _runtime.logging.debug(this, 'not skipping convey');
 
     _conveyor.convey(shouldForce: shouldForce);
   }
@@ -126,6 +138,7 @@ final class AutomaticCogState<ValueType, SpinType>
   }
 
   void _onNextValue({
+    required AutomaticCogInvocationFrameOrdinal nextInvocationFrameOrdinal,
     required ValueType nextValue,
     required bool shouldNotify,
   }) {
@@ -134,6 +147,7 @@ final class AutomaticCogState<ValueType, SpinType>
       'next value has conveyed - updating leader revision hash',
     );
 
+    _currentInvocationFrameOrdinal = nextInvocationFrameOrdinal;
     _leaderRevisionHash = _calculateLeaderRevisionHash();
 
     maybeRevise(nextValue, shouldNotify: shouldNotify);

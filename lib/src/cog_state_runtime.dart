@@ -21,7 +21,7 @@ abstract interface class CogStateRuntime {
 
   Future<void> dispose();
 
-  Iterable<CogStateOrdinal> followerOrdinalsOf(
+  List<CogStateOrdinal> followerOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
   );
 
@@ -32,7 +32,7 @@ abstract interface class CogStateRuntime {
     required StackTrace stackTrace,
   });
 
-  Iterable<CogStateOrdinal> leaderOrdinalsOf(
+  List<CogStateOrdinal> leaderOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
   );
 

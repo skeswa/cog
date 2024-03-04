@@ -783,9 +783,12 @@ void main() {
       test(
           'watched automatic Cog that unlinks from a non-Cog correctly '
           'unsubscribes from changes in the non-Cog\'s value', () async {
-        final negativeFakeObservable = FakeObservable(-1, isSync: true);
-        final positiveFakeObservable = FakeObservable(1, isSync: true);
-        final isPositiveFakeObservable = FakeObservable(true, isSync: true);
+        final isPositiveFakeObservable = FakeObservable(true,
+            debugLabel: 'isPositiveFakeObservable', isSync: true);
+        final negativeFakeObservable = FakeObservable(-1,
+            debugLabel: 'negativeFakeObservable', isSync: true);
+        final positiveFakeObservable = FakeObservable(1,
+            debugLabel: 'positiveFakeObservable', isSync: true);
 
         final alternatingNumberCog = Cog((c) {
           final isPositive = c.linkNonCog(
@@ -807,7 +810,7 @@ void main() {
           );
 
           return 'value is $value';
-        });
+        }, debugLabel: 'alternatingNumberCog');
 
         final emissions = [];
 

@@ -12,6 +12,12 @@ abstract interface class CogStateRuntimeTelemetry {
   void recordCogStateChangeNotification(CogStateOrdinal cogStateOrdinal);
   void recordCogStateCreation(CogStateOrdinal cogStateOrdinal);
   void recordCogStateListeningPostCreation(CogStateOrdinal cogStateOrdinal);
+  void recordCogStateNonCogDependencyRenewal({
+    required CogStateOrdinal followerCogStateOrdinal,
+  });
+  void recordCogStateNonCogDependencyTermination({
+    required CogStateOrdinal followerCogStateOrdinal,
+  });
   void recordCogStateRecalculation(CogStateOrdinal cogStateOrdinal);
   void recordCogStateStalenessChange(CogStateOrdinal cogStateOrdinal);
 }
@@ -39,6 +45,16 @@ final class NoOpCogStateRuntimeTelemetry implements CogStateRuntimeTelemetry {
 
   @override
   void recordCogStateListeningPostCreation(CogStateOrdinal cogStateOrdinal) {}
+
+  @override
+  void recordCogStateNonCogDependencyRenewal({
+    required CogStateOrdinal followerCogStateOrdinal,
+  }) {}
+
+  @override
+  void recordCogStateNonCogDependencyTermination({
+    required CogStateOrdinal followerCogStateOrdinal,
+  }) {}
 
   @override
   void recordCogStateRecalculation(CogStateOrdinal cogStateOrdinal) {}

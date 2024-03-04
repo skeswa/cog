@@ -1,6 +1,7 @@
 import 'dart:async';
 
 final class FakeObservable<T> {
+  final String? debugLabel;
   final bool isSync;
 
   var _hasListeners = false;
@@ -11,7 +12,7 @@ final class FakeObservable<T> {
   );
   T _value;
 
-  FakeObservable(this._value, {this.isSync = false});
+  FakeObservable(this._value, {this.debugLabel, this.isSync = false});
 
   bool get hasListeners => _hasListeners;
 
@@ -24,4 +25,9 @@ final class FakeObservable<T> {
 
     _streamController.add(value);
   }
+
+  @override
+  String toString() => 'FakeObservable<$T>('
+      '${debugLabel != null ? 'debugLabel: "$debugLabel", ' : ''}'
+      'value: $_value)';
 }

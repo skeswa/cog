@@ -2,13 +2,13 @@ part of 'cog_state.dart';
 
 final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     extends AutomaticCogStateConveyor<ValueType, SpinType> {
-  var _activeFrameCount = 0;
-  int _currentFrameOrdinal;
+  AutomaticCogInvocationFrame<ValueType, SpinType>? _currentInvocationFrame;
   final Future<ValueType> _initialInvocation;
   final AutomaticCogInvocationFrame<ValueType, SpinType>
       _initialInvocationFrame;
-  AutomaticCogInvocationFrame<ValueType, SpinType>? _lastFrame;
   CogStateRevision? _leaderRevisionHash;
+  AutomaticCogInvocationFrameOrdinal _nextInvocationFrameOrdinal;
+  var _pendingInvocationFrameCount = 0;
   _ReconveyStatus _reconveyStatus = _ReconveyStatus.unnecessary;
   var _shouldReconveyBeForced = false;
 
@@ -16,9 +16,9 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     required AutomaticCogState<ValueType, SpinType> cogState,
     required Future<ValueType> invocation,
     required AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
-  })  : _currentFrameOrdinal = invocationFrame.ordinal,
-        _initialInvocation = invocation,
+  })  : _initialInvocation = invocation,
         _initialInvocationFrame = invocationFrame,
+        _nextInvocationFrameOrdinal = invocationFrame.ordinal + 1,
         super._(cogState: cogState);
 
   @override
@@ -38,13 +38,14 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     }
 
     _cogState._onNextValue(
+      nextInvocationFrameOrdinal: _initialInvocationFrame.ordinal - 1,
       nextValue: init(),
       shouldNotify: false,
     );
 
     _maybeConvey(
-      invocation: _initialInvocation,
-      invocationFrame: _initialInvocationFrame,
+      pendingInvocation: _initialInvocation,
+      pendingInvocationFrame: _initialInvocationFrame,
       shouldNotify: true,
     );
   }
@@ -55,17 +56,39 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
   @override
   bool get propagatesPotentialStaleness => false;
 
-  Future<void> _maybeConvey({
-    Future<ValueType>? invocation,
+  void _abandonInvocationFrame(
     AutomaticCogInvocationFrame<ValueType, SpinType>? invocationFrame,
+  ) {
+    _cogState._nonCogTracker?.untrackAll(
+      invocationFrameOrdinal: invocationFrame?.ordinal,
+    );
+  }
+
+  bool _isLatestInvocationFrame(
+    AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
+  ) =>
+      _nextInvocationFrameOrdinal - invocationFrame.ordinal <= 1;
+
+  Future<void> _maybeConvey({
+    Future<ValueType>? pendingInvocation,
+    AutomaticCogInvocationFrame<ValueType, SpinType>? pendingInvocationFrame,
     bool shouldForce = false,
     bool shouldNotify = true,
   }) async {
-    if (_activeFrameCount > 0) {
+    if (_pendingInvocationFrameCount > 0) {
       switch (_cogState.cog.async) {
+        case Async.oneAtATime:
+          _cogState._runtime.logging.debug(
+            _cogState,
+            'skipping convey because one is already in progress',
+            _shouldReconveyBeForced,
+          );
+
+          return;
+
         // When scheduling queued, all we need to track is whether there should
-        // be a re-convey. We schedule re-convey when an active frame is
-        // already in progress - that we follow it up once complete.
+        // be a re-convey. We schedule re-convey when an active frame is already
+        // in progress so that we can follow it up once complete.
         case Async.queued:
           if (_reconveyStatus != _ReconveyStatus.scheduled) {
             _reconveyStatus = _ReconveyStatus.necessary;
@@ -75,15 +98,6 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
           _cogState._runtime.logging.debug(
             _cogState,
             're-convey is necessary and might be scheduled already - isForced',
-            _shouldReconveyBeForced,
-          );
-
-          return;
-
-        case Async.oneAtATime:
-          _cogState._runtime.logging.debug(
-            _cogState,
-            'skipping convey because one is already in progress',
             _shouldReconveyBeForced,
           );
 
@@ -106,19 +120,16 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
     }
 
     _leaderRevisionHash = latestLeaderRevisionHash;
-
-    _activeFrameCount++;
-
-    var didInvocationFrameClose = false;
+    _pendingInvocationFrameCount++;
 
     try {
-      invocationFrame ??= AutomaticCogInvocationFrame(
+      pendingInvocationFrame ??= AutomaticCogInvocationFrame(
         cogState: _cogState,
-        ordinal: ++_currentFrameOrdinal,
+        ordinal: _nextInvocationFrameOrdinal++,
       );
 
-      if (invocation == null) {
-        final maybeFuture = invocationFrame.open(base: _lastFrame);
+      if (pendingInvocation == null) {
+        final maybeFuture = pendingInvocationFrame.open();
 
         if (maybeFuture is! Future<ValueType>) {
           throw StateError(
@@ -127,17 +138,17 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
           );
         }
 
-        invocation = maybeFuture;
+        pendingInvocation = maybeFuture;
       }
 
-      final invocationResult = await invocation;
+      final pendingInvocationResult = await pendingInvocation;
 
       if (_cogState.cog.async == Async.latestOnly) {
-        if (invocationFrame.ordinal < _currentFrameOrdinal) {
+        if (!_isLatestInvocationFrame(pendingInvocationFrame)) {
           _cogState._runtime.logging.debug(
             _cogState,
-            'invocation frame was usurped - ignoring result',
-            invocationResult,
+            'pending invocation frame was usurped - ignoring result',
+            pendingInvocationResult,
           );
 
           return;
@@ -145,21 +156,18 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
         _cogState._runtime.logging.debug(
           _cogState,
-          'invocation frame not usurped - conveying result',
-          invocationResult,
+          'pending invocation frame not usurped - conveying result',
+          pendingInvocationResult,
         );
       }
 
       _cogState._onNextValue(
-        nextValue: invocationResult,
+        nextInvocationFrameOrdinal: pendingInvocationFrame.ordinal,
+        nextValue: pendingInvocationResult,
         shouldNotify: shouldNotify,
       );
 
-      invocationFrame.close();
-
-      didInvocationFrameClose = true;
-
-      _lastFrame = invocationFrame;
+      _promoteInvocationFrame(pendingInvocationFrame);
     } catch (e, stackTrace) {
       _cogState._runtime.handleError(
         cogState: _cogState,
@@ -167,10 +175,10 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
         stackTrace: stackTrace,
       );
     } finally {
-      _activeFrameCount--;
+      _pendingInvocationFrameCount--;
 
-      if (!didInvocationFrameClose) {
-        invocationFrame?.abandon();
+      if (!_wasInvocationFramePromoted(pendingInvocationFrame)) {
+        _abandonInvocationFrame(pendingInvocationFrame);
       }
     }
 
@@ -194,7 +202,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
         _cogState._runtime.logging.debug(_cogState, 're-conveying...');
 
-        _maybeConvey(invocation: null, shouldForce: _shouldReconveyBeForced);
+        _maybeConvey(shouldForce: _shouldReconveyBeForced);
 
       default:
         _cogState._runtime.logging.debug(
@@ -203,6 +211,24 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
         );
     }
   }
+
+  void _promoteInvocationFrame(
+    AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
+  ) {
+    invocationFrame.close(
+      currentInvocationFrame: _currentInvocationFrame,
+    );
+
+    final previousInvocationFrame = _currentInvocationFrame;
+    _currentInvocationFrame = invocationFrame;
+
+    _abandonInvocationFrame(previousInvocationFrame);
+  }
+
+  bool _wasInvocationFramePromoted(
+    AutomaticCogInvocationFrame<ValueType, SpinType>? invocationFrame,
+  ) =>
+      invocationFrame == _currentInvocationFrame;
 }
 
 enum _ReconveyStatus {

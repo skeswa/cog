@@ -38,6 +38,20 @@ final class TestingCogStateRuntimeTelemetry
   }
 
   @override
+  void recordCogStateNonCogDependencyRenewal({
+    required CogStateOrdinal followerCogStateOrdinal,
+  }) {
+    _meter += 1;
+  }
+
+  @override
+  void recordCogStateNonCogDependencyTermination({
+    required CogStateOrdinal followerCogStateOrdinal,
+  }) {
+    _meter += 1;
+  }
+
+  @override
   void recordCogStateRecalculation(CogStateOrdinal cogStateOrdinal) {
     _meter += 16;
   }

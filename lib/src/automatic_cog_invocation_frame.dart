@@ -2,13 +2,11 @@ part of 'cog_state.dart';
 
 final class AutomaticCogInvocationFrame<ValueType, SpinType>
     implements AutomaticCogController<ValueType, SpinType> {
-  final int ordinal;
+  final AutomaticCogInvocationFrameOrdinal ordinal;
 
-  AutomaticCogInvocationFrame? _base;
   final AutomaticCogState<ValueType, SpinType> _cogState;
   bool _hasValue;
   final _linkedLeaderOrdinals = <CogStateOrdinal>[];
-  AutomaticCogInvocationFrameNonCogExtension? _nonCogExtension;
   late ValueType _value;
 
   AutomaticCogInvocationFrame({
@@ -27,13 +25,9 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     }
   }
 
-  void abandon() {
-    _nonCogExtension?.abandon();
-  }
-
-  void close() {
+  void close({required AutomaticCogInvocationFrame? currentInvocationFrame}) {
     final previouslyLinkedLeaderOrdinals =
-        _base?._linkedLeaderOrdinals ?? const [];
+        currentInvocationFrame?._linkedLeaderOrdinals ?? const [];
 
     // Ensure that the linked ordinals are in order so we can compare to
     // previously linked leader ordinals.
@@ -87,8 +81,6 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
 
       j++;
     }
-
-    _nonCogExtension?.close();
   }
 
   @override
@@ -135,8 +127,8 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
   }
 
   @override
-  NonCogValueType
-      linkNonCog<NonCogType, NonCogSubscriptionType, NonCogValueType>(
+  NonCogValueType linkNonCog<NonCogType extends Object, NonCogSubscriptionType,
+      NonCogValueType>(
     NonCogType nonCog, {
     required LinkNonCogInit<NonCogType, NonCogValueType> init,
     required LinkNonCogSubscribe<NonCogType, NonCogSubscriptionType,
@@ -146,20 +138,16 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
             NonCogValueType>
         unsubscribe,
   }) {
-    final linkedNonCogs = _nonCogExtension ??=
-        AutomaticCogInvocationFrameNonCogExtension(cogState: _cogState);
-
-    return linkedNonCogs.linkNonCog(
+    return _cogState.nonCogTracker.track(
       init: init,
+      invocationFrameOrdinal: ordinal,
       nonCog: nonCog,
       subscribe: subscribe,
       unsubscribe: unsubscribe,
     );
   }
 
-  FutureOr<ValueType> open({AutomaticCogInvocationFrame? base}) {
-    _base = base;
-
+  FutureOr<ValueType> open() {
     _hasValue = _cogState._hasValue;
 
     if (_hasValue) {
@@ -167,16 +155,6 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     }
 
     _linkedLeaderOrdinals.clear();
-
-    final baseNonCogExtension = _base?._nonCogExtension;
-    var nonCogExtension = _nonCogExtension;
-
-    if (baseNonCogExtension != null || nonCogExtension != null) {
-      _nonCogExtension = nonCogExtension =
-          AutomaticCogInvocationFrameNonCogExtension(cogState: _cogState);
-
-      nonCogExtension.open(base: baseNonCogExtension);
-    }
 
     _cogState._runtime.logging.debug(_cogState, 'invoking cog definition');
     _cogState._runtime.telemetry.recordCogStateRecalculation(_cogState.ordinal);

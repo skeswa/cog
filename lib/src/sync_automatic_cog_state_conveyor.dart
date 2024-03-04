@@ -2,43 +2,43 @@ part of 'cog_state.dart';
 
 final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
     extends AutomaticCogStateConveyor<ValueType, SpinType> {
+  AutomaticCogInvocationFrame<ValueType, SpinType> _currentInvocationFrame;
   final ValueType _initialInvocationResult;
-  AutomaticCogInvocationFrame<ValueType, SpinType> _invocationFrame;
-  AutomaticCogInvocationFrame<ValueType, SpinType>? _previousInvocationFrame;
+  AutomaticCogInvocationFrame<ValueType, SpinType> _pendingInvocationFrame;
 
   SyncAutomaticCogStateConveyor._({
     required super.cogState,
     required AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
     required ValueType invocationResult,
-  })  : _initialInvocationResult = invocationResult,
-        _invocationFrame = invocationFrame,
+  })  : _currentInvocationFrame = AutomaticCogInvocationFrame(
+          cogState: cogState,
+          ordinal: invocationFrame.ordinal + 1,
+        ),
+        _initialInvocationResult = invocationResult,
+        _pendingInvocationFrame = invocationFrame,
         super._();
 
   @override
   void convey({bool shouldForce = false}) {
-    _swapInvocationFrames();
-
-    var didInvocationFrameClose = false;
+    final pendingInvocationFrame = _pendingInvocationFrame;
 
     try {
-      final invocationResult =
-          _invocationFrame.open(base: _previousInvocationFrame);
+      final pendingInvocationResult = pendingInvocationFrame.open();
 
-      if (invocationResult is! ValueType) {
+      if (pendingInvocationResult is! ValueType) {
         throw StateError(
           'Expected a $ValueType to be returned, '
-          'but got a ${invocationResult.runtimeType} instead',
+          'but got a ${pendingInvocationResult.runtimeType} instead',
         );
       }
 
       _cogState._onNextValue(
-        nextValue: invocationResult,
+        nextValue: pendingInvocationResult,
+        nextInvocationFrameOrdinal: pendingInvocationFrame.ordinal,
         shouldNotify: true,
       );
 
-      _invocationFrame.close();
-
-      didInvocationFrameClose = true;
+      _promoteInvocationFrame(pendingInvocationFrame);
     } catch (e, stackTrace) {
       _cogState._runtime.handleError(
         cogState: _cogState,
@@ -46,8 +46,8 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
         stackTrace: stackTrace,
       );
     } finally {
-      if (!didInvocationFrameClose) {
-        _invocationFrame.abandon();
+      if (!_wasInvocationFramePromoted(pendingInvocationFrame)) {
+        _abandonInvocationFrame(pendingInvocationFrame);
       }
     }
   }
@@ -56,12 +56,11 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
   void init() {
     _cogState._onNextValue(
       nextValue: _initialInvocationResult,
+      nextInvocationFrameOrdinal: _pendingInvocationFrame.ordinal,
       shouldNotify: false,
     );
 
-    // The initial invocation frame arrived "pre-opened", so we need to close it
-    // once an initial value has been reported to Cog state.
-    _invocationFrame.close();
+    _promoteInvocationFrame(_pendingInvocationFrame);
   }
 
   @override
@@ -70,14 +69,32 @@ final class SyncAutomaticCogStateConveyor<ValueType, SpinType>
   @override
   bool get propagatesPotentialStaleness => true;
 
-  void _swapInvocationFrames() {
-    final nextInvocationFrame = _previousInvocationFrame ??
-        AutomaticCogInvocationFrame(
-          cogState: _cogState,
-          ordinal: _invocationFrame.ordinal + 1,
-        );
+  void _abandonInvocationFrame(
+    AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
+  ) {
+    _cogState._nonCogTracker?.untrackAll(
+      invocationFrameOrdinal: invocationFrame.ordinal,
+    );
 
-    _previousInvocationFrame = _invocationFrame;
-    _invocationFrame = nextInvocationFrame;
+    invocationFrame._linkedLeaderOrdinals.clear();
   }
+
+  void _promoteInvocationFrame(
+    AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
+  ) {
+    _pendingInvocationFrame.close(
+      currentInvocationFrame: _currentInvocationFrame,
+    );
+
+    final previousInvocationFrame = _currentInvocationFrame;
+    _currentInvocationFrame = invocationFrame;
+    _pendingInvocationFrame = previousInvocationFrame;
+
+    _abandonInvocationFrame(previousInvocationFrame);
+  }
+
+  bool _wasInvocationFramePromoted(
+    AutomaticCogInvocationFrame<ValueType, SpinType> invocationFrame,
+  ) =>
+      invocationFrame == _currentInvocationFrame;
 }

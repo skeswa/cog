@@ -1,5 +1,6 @@
 import 'cog.dart';
 
+typedef AutomaticCogInvocationFrameOrdinal = int;
 typedef CogOrdinal = int;
 typedef CogSpinHash = int;
 typedef CogStateDepedencyHash = int;

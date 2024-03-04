@@ -9,11 +9,11 @@ import 'staleness.dart';
 
 part 'async_automatic_cog_state_conveyor.dart';
 part 'automatic_cog_invocation_frame.dart';
-part 'automatic_cog_invocation_frame_non_cog_extension.dart';
 part 'automatic_cog_state.dart';
 part 'automatic_cog_state_conveyor.dart';
 part 'cog_state_listening_post.dart';
 part 'manual_cog_state.dart';
+part 'non_cog_tracker.dart';
 part 'sync_automatic_cog_state_conveyor.dart';
 
 sealed class CogState<ValueType, SpinType,
@@ -62,7 +62,13 @@ sealed class CogState<ValueType, SpinType,
   void markFollowersStale({
     Staleness staleness = Staleness.stale,
   }) {
-    for (final followerOrdinal in _runtime.followerOrdinalsOf(ordinal)) {
+    final followerOrdinals = _runtime.followerOrdinalsOf(ordinal);
+
+    final followerOrdinalCount = followerOrdinals.length;
+
+    for (var i = 0; i < followerOrdinalCount; i++) {
+      final followerOrdinal = followerOrdinals[i];
+
       _runtime[followerOrdinal].markStale(staleness: staleness);
     }
   }
@@ -109,6 +115,8 @@ sealed class CogState<ValueType, SpinType,
       _revision++;
       _value = value;
 
+      _maybeUpdateStaleness(Staleness.fresh);
+
       markFollowersStale();
 
       if (shouldNotify) {
@@ -122,9 +130,9 @@ sealed class CogState<ValueType, SpinType,
     } else {
       _runtime.logging
           .debug(this, 'no revision - new value was equal to old value');
-    }
 
-    _maybeUpdateStaleness(Staleness.fresh);
+      _maybeUpdateStaleness(Staleness.fresh);
+    }
 
     return shouldRevise;
   }

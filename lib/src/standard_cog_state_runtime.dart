@@ -127,13 +127,14 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   }
 
   @override
-  Iterable<CogStateOrdinal> followerOrdinalsOf(
+  List<CogStateOrdinal> followerOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
-  ) =>
-      _cogStateFollowers[cogStateOrdinal] ?? const [];
+  ) {
+    return _cogStateFollowers[cogStateOrdinal] ?? const [];
+  }
 
   @override
-  Iterable<CogStateOrdinal> leaderOrdinalsOf(
+  List<CogStateOrdinal> leaderOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
   ) =>
       _cogStateLeaders[cogStateOrdinal] ?? const [];
@@ -359,7 +360,7 @@ final class StandardCogStateRuntime implements CogStateRuntime {
       throw StateError(
         'Encountered a Cog runtime error with Cog '
         '${cogState.cog} that has spin `${cogState.spinOrNull}`: '
-        '$error',
+        '$error:\n$stackTrace',
       );
     }());
 
