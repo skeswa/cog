@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'cog_state_runtime_logging.dart';
+import 'cog_runtime_logging.dart';
 
-abstract interface class CogStateRuntimeScheduler {
+abstract interface class CogRuntimeScheduler {
   Future<void> dispose();
 
   void scheduleBackgroundTask(
@@ -17,17 +17,17 @@ abstract interface class CogStateRuntimeScheduler {
   );
 }
 
-final class NaiveCogStateRuntimeScheduler implements CogStateRuntimeScheduler {
+final class NaiveCogRuntimeScheduler implements CogRuntimeScheduler {
   final _NaiveBackgroundTaskScheduler _highPriorityBackgroundTaskScheduler;
   final _NaiveBackgroundTaskScheduler _lowPriorityBackgroundTaskScheduler;
   final _scheduledDelayedTasks = <void Function(), Timer>{};
 
-  NaiveCogStateRuntimeScheduler({
+  NaiveCogRuntimeScheduler({
     Duration highPriorityBackgroundTaskDelay =
         _naiveHighPriorityBackgroundTaskDelay,
     Duration lowPriorityBackgroundTaskDelay =
         _naiveLowPriorityBackgroundTaskDelay,
-    required CogStateRuntimeLogging logging,
+    required CogRuntimeLogging logging,
   })  : _highPriorityBackgroundTaskScheduler = _NaiveBackgroundTaskScheduler(
           backgroundTaskDelay: highPriorityBackgroundTaskDelay,
           logging: logging,
@@ -87,11 +87,11 @@ final class _NaiveBackgroundTaskScheduler {
   Timer? _backgroundTaskTimer;
   void Function()? _inProgressBackgroundTask;
   final String _logMessage;
-  final CogStateRuntimeLogging _logging;
+  final CogRuntimeLogging _logging;
 
   _NaiveBackgroundTaskScheduler({
     required Duration backgroundTaskDelay,
-    required CogStateRuntimeLogging logging,
+    required CogRuntimeLogging logging,
     required String logMessage,
   })  : _backgroundTaskDelay = backgroundTaskDelay,
         _logging = logging,

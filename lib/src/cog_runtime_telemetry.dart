@@ -1,6 +1,6 @@
 import 'common.dart';
 
-abstract interface class CogStateRuntimeTelemetry {
+abstract interface class CogRuntimeTelemetry {
   void recordCogStateDependencyRenewal({
     required CogStateOrdinal followerCogStateOrdinal,
     required CogStateOrdinal leaderCogStateOrdinal,
@@ -22,8 +22,8 @@ abstract interface class CogStateRuntimeTelemetry {
   void recordCogStateStalenessChange(CogStateOrdinal cogStateOrdinal);
 }
 
-final class NoOpCogStateRuntimeTelemetry implements CogStateRuntimeTelemetry {
-  const NoOpCogStateRuntimeTelemetry();
+final class NoOpCogRuntimeTelemetry implements CogRuntimeTelemetry {
+  const NoOpCogRuntimeTelemetry();
 
   @override
   void recordCogStateDependencyRenewal({

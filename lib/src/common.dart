@@ -10,9 +10,10 @@ typedef CogValueInitializer<ValueType> = ValueType Function();
 typedef CogStateListeningPostDeactivationCallback = void Function();
 typedef CogStateOrdinal = int;
 typedef CogStateRevision = int;
+typedef CogStateRevisionHash = int;
+typedef MechanismOrdinal = int;
 typedef TrackedNonCogRevision = int;
 typedef TrackedNonCogRevisionHash = int;
-typedef CogStateRevisionHash = int;
 
 const CogStateRevision initialCogStateRevision = 0;
 const TrackedNonCogRevision initialTrackedNonCogRevision = 0;

@@ -1,8 +1,8 @@
 import 'package:cog/cog.dart';
 import 'package:logging/logging.dart';
 
-final class TestingCogStateRuntimeLogger implements CogStateRuntimeLogging {
-  final _logger = Logger('TestingCogStateRuntimeLogger');
+final class TestingCogRuntimeLogger implements CogRuntimeLogging {
+  final _logger = Logger('TestingCogRuntimeLogger');
 
   @override
   void debug(

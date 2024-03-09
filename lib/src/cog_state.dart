@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'async.dart';
 import 'cog.dart';
-import 'cog_state_runtime.dart';
+import 'cog_runtime.dart';
 import 'common.dart';
 import 'priority.dart';
 import 'staleness.dart';
@@ -24,7 +24,7 @@ sealed class CogState<ValueType, SpinType,
 
   CogStateRevision _revision = initialCogStateRevision - 1;
 
-  final CogStateRuntime _runtime;
+  final CogRuntime _runtime;
 
   final SpinType? _spin;
 
@@ -36,7 +36,7 @@ sealed class CogState<ValueType, SpinType,
     required this.cog,
     required this.ordinal,
     required SpinType? spin,
-    required CogStateRuntime runtime,
+    required CogRuntime runtime,
   })  : _runtime = runtime,
         _spin = spin;
 

@@ -1,7 +1,6 @@
 import 'package:cog/cog.dart';
 
-final class TestingCogStateRuntimeTelemetry
-    implements CogStateRuntimeTelemetry {
+final class TestingCogRuntimeTelemetry implements CogRuntimeTelemetry {
   var _meter = 0;
 
   int get meter => _meter;

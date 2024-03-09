@@ -1,4 +1,4 @@
-abstract interface class CogStateRuntimeLogging {
+abstract interface class CogRuntimeLogging {
   void debug(
     Object? cogStateOrCogStateOrdinal,
     String message, [
@@ -13,8 +13,8 @@ abstract interface class CogStateRuntimeLogging {
   ]);
 }
 
-final class NoOpCogStateRuntimeLogging implements CogStateRuntimeLogging {
-  const NoOpCogStateRuntimeLogging();
+final class NoOpCogRuntimeLogging implements CogRuntimeLogging {
+  const NoOpCogRuntimeLogging();
 
   @override
   void debug(

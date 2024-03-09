@@ -3,9 +3,9 @@ import 'dart:async';
 import 'async.dart';
 import 'common.dart';
 import 'cog_registry.dart';
-import 'cog_state_runtime.dart';
+import 'cog_runtime.dart';
 import 'priority.dart';
-import 'standard_cog_state_runtime.dart';
+import 'standard_cog_runtime.dart';
 import 'spin.dart';
 
 part 'automatic_cog.dart';
@@ -73,21 +73,21 @@ sealed class Cog<ValueType, SpinType> {
   }) {
     assert(thatSpinsMatch(this, spin));
 
-    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
+    final cogState = cogtext.runtime.acquire(cog: this, cogSpin: spin);
 
     return cogState.evaluate();
   }
 
   Stream<ValueType> watch(
     Cogtext cogtext, {
-    Priority priority = Priority.low,
+    Priority priority = Priority.normal,
     SpinType? spin,
   }) {
     assert(thatSpinsMatch(this, spin));
 
-    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
+    final cogState = cogtext.runtime.acquire(cog: this, cogSpin: spin);
 
-    return cogtext._cogStateRuntime.acquireValueChangeStream(
+    return cogtext.runtime.acquireValueChangeStream(
       cogState: cogState,
       priority: priority,
     );

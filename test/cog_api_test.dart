@@ -10,12 +10,12 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog API', () {
     late Cogtext cogtext;
-    late TestingCogStateRuntimeLogger logging;
+    late TestingCogRuntimeLogger logging;
 
     setUpLogging();
 
     setUp(() {
-      logging = TestingCogStateRuntimeLogger();
+      logging = TestingCogRuntimeLogger();
     });
 
     group('Auxilliary details', () {
@@ -103,7 +103,7 @@ void main() {
           isNot(throwsA(anything)),
         );
         expect(
-          () => Cogtext(cogStateRuntime: const NoOpCogStateRuntime()),
+          () => Cogtext(cogRuntime: const NoOpCogRuntime()),
           isNot(throwsA(anything)),
         );
       });
@@ -113,11 +113,11 @@ void main() {
           var didThrow = false;
 
           try {
-            final cogStateRuntime = StandardCogStateRuntime();
+            final cogRuntime = StandardCogRuntime();
 
-            cogtext = Cogtext(cogStateRuntime: cogStateRuntime);
+            cogtext = Cogtext(cogRuntime: cogRuntime);
 
-            cogStateRuntime.scheduler.scheduleBackgroundTask(() {
+            cogRuntime.scheduler.scheduleBackgroundTask(() {
               throw StateError('oh no!');
             });
 
@@ -274,9 +274,10 @@ void main() {
           'and sync emits an error', () async {
         final errors = [];
 
-        cogtext = Cogtext(cogStateRuntime: StandardCogStateRuntime(
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(
           onError: ({
-            required Cog cog,
+            Cog? cog,
+            Mechanism? mechanism,
             required Object error,
             required Object? spin,
             required StackTrace stackTrace,
@@ -315,9 +316,10 @@ void main() {
           'and async emits an error', () async {
         final errors = [];
 
-        cogtext = Cogtext(cogStateRuntime: StandardCogStateRuntime(
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(
           onError: ({
-            required Cog cog,
+            Cog? cog,
+            Mechanism? mechanism,
             required Object error,
             required Object? spin,
             required StackTrace stackTrace,
@@ -413,9 +415,9 @@ void main() {
           'reading from an automatic Cog that links to a non-Cog correctly '
           'reads the non-Cog\'s latest value', () async {
         cogtext = Cogtext(
-          cogStateRuntime: StandardCogStateRuntime(
+          cogRuntime: StandardCogRuntime(
             logging: logging,
-            scheduler: NaiveCogStateRuntimeScheduler(
+            scheduler: NaiveCogRuntimeScheduler(
               logging: logging,
               highPriorityBackgroundTaskDelay: Duration.zero,
               lowPriorityBackgroundTaskDelay: Duration.zero,
@@ -452,8 +454,7 @@ void main() {
 
     group('Simple watching', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(logging: logging));
       });
 
       tearDown(() async {
@@ -960,8 +961,7 @@ void main() {
 
     group('Simple reading and writing', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(logging: logging));
       });
 
       tearDown(() async {
@@ -1060,9 +1060,9 @@ void main() {
     group('Simple watching and writing', () {
       setUp(() {
         cogtext = Cogtext(
-          cogStateRuntime: StandardCogStateRuntime(
+          cogRuntime: StandardCogRuntime(
             logging: logging,
-            scheduler: NaiveCogStateRuntimeScheduler(
+            scheduler: NaiveCogRuntimeScheduler(
               logging: logging,
               highPriorityBackgroundTaskDelay: Duration.zero,
               lowPriorityBackgroundTaskDelay: Duration.zero,
@@ -3156,9 +3156,9 @@ void main() {
     group('Simple reading, watching and writing', () {
       setUp(() {
         cogtext = Cogtext(
-          cogStateRuntime: StandardCogStateRuntime(
+          cogRuntime: StandardCogRuntime(
             logging: logging,
-            scheduler: NaiveCogStateRuntimeScheduler(
+            scheduler: NaiveCogRuntimeScheduler(
               highPriorityBackgroundTaskDelay: Duration.zero,
               logging: logging,
               lowPriorityBackgroundTaskDelay: Duration.zero,
@@ -3381,8 +3381,7 @@ void main() {
 
     group('Complex reading', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(logging: logging));
       });
 
       tearDown(() async {
@@ -3521,8 +3520,7 @@ void main() {
 
     group('Complex reading and writing', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(logging: logging));
       });
 
       tearDown(() async {
@@ -3618,8 +3616,7 @@ void main() {
 
     group('Complex watching and writing', () {
       setUp(() {
-        cogtext =
-            Cogtext(cogStateRuntime: StandardCogStateRuntime(logging: logging));
+        cogtext = Cogtext(cogRuntime: StandardCogRuntime(logging: logging));
       });
 
       tearDown(() async {
@@ -3718,8 +3715,8 @@ void main() {
           equals([
             'isNiceOutside austin true',
             'isNiceOutside brooklyn false',
-            'shouldGoToTheBeach brooklyn false',
             'shouldGoToTheBeach austin false',
+            'shouldGoToTheBeach brooklyn false',
           ]),
         );
 
@@ -3741,8 +3738,8 @@ void main() {
           equals([
             'isNiceOutside austin true',
             'isNiceOutside brooklyn false',
-            'shouldGoToTheBeach brooklyn false',
             'shouldGoToTheBeach austin false',
+            'shouldGoToTheBeach brooklyn false',
           ]),
         );
 
@@ -3756,8 +3753,8 @@ void main() {
             equals([
               'isNiceOutside austin true',
               'isNiceOutside brooklyn false',
-              'shouldGoToTheBeach brooklyn false',
               'shouldGoToTheBeach austin false',
+              'shouldGoToTheBeach brooklyn false',
               'isWeekendCog true',
               'isNiceOutside austin false',
               'shouldGoToTheBeach cambridge false',

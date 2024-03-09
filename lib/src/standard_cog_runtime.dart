@@ -1,21 +1,26 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 
 import 'cog.dart';
 import 'cog_state.dart';
-import 'cog_state_runtime.dart';
-import 'cog_state_runtime_logging.dart';
-import 'cog_state_runtime_scheduler.dart';
-import 'cog_state_runtime_telemetry.dart';
+import 'cog_runtime.dart';
+import 'cog_runtime_logging.dart';
+import 'cog_runtime_scheduler.dart';
+import 'cog_runtime_telemetry.dart';
 import 'common.dart';
+import 'mechanism.dart';
+import 'mechanism_state.dart';
+import 'mechanism_registry.dart';
 import 'priority.dart';
 
-final class StandardCogStateRuntime implements CogStateRuntime {
+final class StandardCogRuntime implements CogRuntime {
   @override
-  final CogStateRuntimeLogging logging;
+  final CogRuntimeLogging logging;
   @override
-  final CogStateRuntimeScheduler scheduler;
+  final CogRuntimeScheduler scheduler;
   @override
-  final CogStateRuntimeTelemetry telemetry;
+  final CogRuntimeTelemetry telemetry;
 
   final _cogStateFollowers = <List<CogStateOrdinal>?>[];
   final _cogStateLeaders = <List<CogStateOrdinal>?>[];
@@ -26,16 +31,30 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   );
   final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
   final _cogStates = <CogState>[];
-  final StandardCogStateRuntimeErrorCallback? _onError;
+  final MechanismRegistry _mechanismRegistry;
+  StreamSubscription<MechanismOrdinal>? _mechanismRegisteredSubscription;
+  final _mechanismStates = <MechanismState?>[];
+  final StandardCogRuntimeErrorCallback? _onError;
 
-  StandardCogStateRuntime({
-    this.logging = const NoOpCogStateRuntimeLogging(),
-    StandardCogStateRuntimeErrorCallback? onError,
-    CogStateRuntimeScheduler? scheduler,
-    this.telemetry = const NoOpCogStateRuntimeTelemetry(),
-  })  : _onError = onError,
-        scheduler =
-            scheduler ?? NaiveCogStateRuntimeScheduler(logging: logging);
+  StandardCogRuntime({
+    this.logging = const NoOpCogRuntimeLogging(),
+    MechanismRegistry? mechanismRegistry,
+    StandardCogRuntimeErrorCallback? onError,
+    CogRuntimeScheduler? scheduler,
+    this.telemetry = const NoOpCogRuntimeTelemetry(),
+  })  : _mechanismRegistry =
+            mechanismRegistry ?? GlobalMechanismRegistry.instance,
+        _onError = onError,
+        scheduler = scheduler ?? NaiveCogRuntimeScheduler(logging: logging) {
+    _mechanismRegisteredSubscription =
+        _mechanismRegistry.mechanismRegistered.listen(_onMechanismRegistered);
+
+    _mechanismStates.length = _mechanismRegistry.registeredMechanisms.length;
+
+    for (final mechanism in _mechanismRegistry.registeredMechanisms) {
+      _onMechanismRegistered(mechanism.ordinal);
+    }
+  }
 
   @override
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
@@ -112,11 +131,17 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   Future<void> dispose() async {
     await scheduler.dispose();
 
+    for (final mechanismState in _mechanismStates) {
+      mechanismState?.dispose();
+    }
+
     _cogStateFollowers.clear();
     _cogStateLeaders.clear();
     _cogStateListeningPostsToMaybeNotify.clear();
     _cogStateOrdinalByHash.clear();
     _cogStates.clear();
+    _mechanismRegisteredSubscription?.cancel();
+    _mechanismStates.clear();
 
     await Future.wait([
       for (final cogStateListeningPost in _cogStateListeningPosts)
@@ -131,6 +156,51 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     CogStateOrdinal cogStateOrdinal,
   ) {
     return _cogStateFollowers[cogStateOrdinal] ?? const [];
+  }
+
+  @override
+  void handleError<CogValueType, CogSpinType>({
+    CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>?
+        cogState,
+    required Object error,
+    Mechanism? mechanism,
+    required StackTrace stackTrace,
+  }) {
+    final onError = _onError;
+
+    if (onError != null) {
+      onError(
+        cog: cogState?.cog,
+        error: error,
+        mechanism: mechanism,
+        spin: cogState?.spinOrNull,
+        stackTrace: stackTrace,
+      );
+
+      return;
+    }
+
+    assert(() {
+      var errorContext = '';
+      if (cogState != null) {
+        errorContext =
+            ' with Cog ${cogState.cog} that has spin `${cogState.spinOrNull}`';
+      }
+      if (mechanism != null) {
+        errorContext = ' with Mechanism $mechanism';
+      }
+
+      throw StateError(
+        'Encountered a Cog runtime error$errorContext: $error:\n$stackTrace',
+      );
+    }());
+
+    logging.error(
+      cogState,
+      'encountered an error while conveying',
+      error,
+      stackTrace,
+    );
   }
 
   @override
@@ -181,6 +251,25 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   }
 
   @override
+  void pauseMechanism(MechanismOrdinal mechanismOrdinal) {
+    final mechanismState = _mechanismStates[mechanismOrdinal];
+
+    if (mechanismState == null) {
+      return;
+    }
+
+    logging.debug(
+      null,
+      'pausing Mechanism',
+      mechanismState.mechanism,
+    );
+
+    mechanismState.dispose();
+
+    _mechanismStates[mechanismOrdinal] = null;
+  }
+
+  @override
   void renewCogStateDependency({
     required CogStateOrdinal followerCogStateOrdinal,
     required CogStateOrdinal leaderCogStateOrdinal,
@@ -209,6 +298,17 @@ final class StandardCogStateRuntime implements CogStateRuntime {
   }
 
   @override
+  void resumeMechanism(MechanismOrdinal mechanismOrdinal) {
+    final mechanismState = _acquireMechanismState(mechanismOrdinal);
+
+    logging.debug(
+      null,
+      'resumed Mechanism',
+      mechanismState.mechanism,
+    );
+  }
+
+  @override
   void terminateCogStateDependency({
     required CogStateOrdinal followerCogStateOrdinal,
     required CogStateOrdinal leaderCogStateOrdinal,
@@ -226,6 +326,29 @@ final class StandardCogStateRuntime implements CogStateRuntime {
 
     _cogStateLeaders[followerCogStateOrdinal]?.remove(leaderCogStateOrdinal);
     _cogStateFollowers[leaderCogStateOrdinal]?.remove(followerCogStateOrdinal);
+  }
+
+  MechanismState _acquireMechanismState(MechanismOrdinal mechanismOrdinal) {
+    final mechanism = _mechanismRegistry[mechanismOrdinal];
+
+    var mechanismState = mechanismOrdinal < _mechanismStates.length
+        ? _mechanismStates[mechanismOrdinal]
+        : null;
+
+    if (mechanismState == null) {
+      if (mechanismOrdinal < _mechanismStates.length) {
+        _mechanismStates.length = mechanismOrdinal + 1;
+      }
+
+      logging.debug(null, 'initializing Mechanism', mechanism);
+
+      _mechanismStates[mechanismOrdinal] = mechanismState =
+          MechanismState(cogRuntime: this, mechanism: mechanism);
+
+      mechanismState.init();
+    }
+
+    return mechanismState;
   }
 
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
@@ -336,45 +459,14 @@ final class StandardCogStateRuntime implements CogStateRuntime {
     }
   }
 
-  @override
-  void handleError<CogValueType, CogSpinType>({
-    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
-        cogState,
-    required Object error,
-    required StackTrace stackTrace,
-  }) {
-    final onError = _onError;
-
-    if (onError != null) {
-      onError(
-        cog: cogState.cog,
-        error: error,
-        spin: cogState.spinOrNull,
-        stackTrace: stackTrace,
-      );
-
-      return;
-    }
-
-    assert(() {
-      throw StateError(
-        'Encountered a Cog runtime error with Cog '
-        '${cogState.cog} that has spin `${cogState.spinOrNull}`: '
-        '$error:\n$stackTrace',
-      );
-    }());
-
-    logging.error(
-      cogState,
-      'encountered an error while conveying',
-      error,
-      stackTrace,
-    );
+  void _onMechanismRegistered(MechanismOrdinal mechanismOrdinal) {
+    _acquireMechanismState(mechanismOrdinal);
   }
 }
 
-typedef StandardCogStateRuntimeErrorCallback = void Function({
-  required Cog cog,
+typedef StandardCogRuntimeErrorCallback = void Function({
+  Cog? cog,
+  Mechanism? mechanism,
   required Object error,
   required Object? spin,
   required StackTrace stackTrace,

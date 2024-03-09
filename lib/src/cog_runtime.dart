@@ -1,12 +1,13 @@
 import 'cog.dart';
 import 'cog_state.dart';
-import 'cog_state_runtime_logging.dart';
-import 'cog_state_runtime_scheduler.dart';
-import 'cog_state_runtime_telemetry.dart';
+import 'cog_runtime_logging.dart';
+import 'cog_runtime_scheduler.dart';
+import 'cog_runtime_telemetry.dart';
 import 'common.dart';
+import 'mechanism.dart';
 import 'priority.dart';
 
-abstract interface class CogStateRuntime {
+abstract interface class CogRuntime {
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
       acquire<CogValueType, CogSpinType>({
     required Cog<CogValueType, CogSpinType> cog,
@@ -26,9 +27,10 @@ abstract interface class CogStateRuntime {
   );
 
   void handleError<CogValueType, CogSpinType>({
-    required CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
+    CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>?
         cogState,
     required Object error,
+    Mechanism? mechanism,
     required StackTrace stackTrace,
   });
 
@@ -36,20 +38,24 @@ abstract interface class CogStateRuntime {
     CogStateOrdinal cogStateOrdinal,
   );
 
-  CogStateRuntimeLogging get logging;
+  CogRuntimeLogging get logging;
 
   void maybeNotifyListenersOf(CogStateOrdinal cogStateOrdinal);
 
   CogState operator [](CogStateOrdinal cogStateOrdinal);
+
+  void pauseMechanism(MechanismOrdinal mechanismOrdinal);
 
   void renewCogStateDependency({
     required CogStateOrdinal followerCogStateOrdinal,
     required CogStateOrdinal leaderCogStateOrdinal,
   });
 
-  CogStateRuntimeScheduler get scheduler;
+  void resumeMechanism(MechanismOrdinal mechanismOrdinal);
 
-  CogStateRuntimeTelemetry get telemetry;
+  CogRuntimeScheduler get scheduler;
+
+  CogRuntimeTelemetry get telemetry;
 
   void terminateCogStateDependency({
     required CogStateOrdinal followerCogStateOrdinal,

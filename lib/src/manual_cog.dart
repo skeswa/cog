@@ -55,25 +55,9 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
     bool quietly = false,
     SpinType? spin,
   }) {
-    assert(() {
-      if (this.spin == null && spin != null) {
-        throw ArgumentError(
-          'Cannot write with spin to a Cog that '
-          'does not specify a spin in its definition',
-        );
-      }
+    assert(thatSpinsMatch(this, spin));
 
-      if (this.spin != null && spin == null) {
-        throw ArgumentError(
-          'Cannot write without spin to a Cog that '
-          'does specifies a spin in its definition',
-        );
-      }
-
-      return true;
-    }());
-
-    final cogState = cogtext._cogStateRuntime.acquire(cog: this, cogSpin: spin);
+    final cogState = cogtext.runtime.acquire(cog: this, cogSpin: spin);
 
     cogState.maybeRevise(value, shouldNotify: !quietly);
   }
