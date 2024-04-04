@@ -1,10 +1,10 @@
 part of 'cog.dart';
 
-final class Cogtext {
+class Cogtext {
   final CogRuntime runtime;
 
   Cogtext({CogRuntime? cogRuntime})
       : runtime = cogRuntime ?? StandardCogRuntime();
 
-  Future<void> dispose() => runtime.dispose();
+  FutureOr<void> dispose() => runtime.dispose();
 }

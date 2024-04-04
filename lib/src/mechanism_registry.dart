@@ -9,7 +9,7 @@ final class GlobalMechanismRegistry implements MechanismRegistry {
   final _mechanisms = <Mechanism>[];
 
   final _mechanismRegisteredController =
-      StreamController<MechanismOrdinal>.broadcast(sync: true);
+      StreamController<MechanismOrdinal>.broadcast();
 
   @override
   Stream<MechanismOrdinal> get mechanismRegistered =>

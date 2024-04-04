@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'cog.dart';
 import 'cog_runtime.dart';
-import 'common.dart';
 import 'mechanism.dart';
 import 'priority.dart';
 
@@ -17,7 +16,8 @@ final class MechanismState implements MechanismController {
     required this.mechanism,
   }) : _cogRuntime = cogRuntime;
 
-  void dispose() {
+  @override
+  FutureOr<void> dispose() {
     for (final disposer in _disposers) {
       try {
         disposer();
@@ -50,6 +50,22 @@ final class MechanismState implements MechanismController {
   }
 
   @override
+  StreamSubscription<ValueType> onChange<ValueType, SpinType>(
+    Cog<ValueType, SpinType> cog,
+    void Function(ValueType) onCogValueChange, {
+    Priority priority = Priority.low,
+    SpinType? spin,
+  }) {
+    final valueChangeSubscription = cog
+        .watch(this, priority: priority, spin: spin)
+        .listen(onCogValueChange);
+
+    onDispose(valueChangeSubscription.cancel);
+
+    return valueChangeSubscription;
+  }
+
+  @override
   void onDispose(void Function() disposer) {
     if (_disposers.contains(disposer)) {
       return;
@@ -59,51 +75,5 @@ final class MechanismState implements MechanismController {
   }
 
   @override
-  ValueType read<ValueType, SpinType>(
-    Cog<ValueType, SpinType> cog, {
-    SpinType? spin,
-  }) {
-    assert(thatSpinsMatch(cog, spin));
-
-    final cogState = _cogRuntime.acquire(cog: cog, cogSpin: spin);
-
-    return cogState.evaluate();
-  }
-
-  @override
-  StreamSubscription<ValueType> watch<ValueType, SpinType>(
-    Cog<ValueType, SpinType> cog,
-    void Function(ValueType) onCogValueChange, {
-    Priority priority = Priority.low,
-    SpinType? spin,
-  }) {
-    assert(thatSpinsMatch(cog, spin));
-
-    final cogState = _cogRuntime.acquire(cog: cog, cogSpin: spin);
-
-    final valueChangeStream = _cogRuntime.acquireValueChangeStream(
-      cogState: cogState,
-      priority: priority,
-    );
-
-    final valueChangeSubscription = valueChangeStream.listen(onCogValueChange);
-
-    onDispose(valueChangeSubscription.cancel);
-
-    return valueChangeSubscription;
-  }
-
-  @override
-  void write<ValueType, SpinType>(
-    ManualCog<ValueType, SpinType> cog,
-    ValueType value, {
-    bool quietly = false,
-    SpinType? spin,
-  }) {
-    assert(thatSpinsMatch(cog, spin));
-
-    final cogState = _cogRuntime.acquire(cog: cog, cogSpin: spin);
-
-    cogState.maybeRevise(value, shouldNotify: !quietly);
-  }
+  CogRuntime get runtime => _cogRuntime;
 }

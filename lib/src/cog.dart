@@ -4,6 +4,7 @@ import 'async.dart';
 import 'common.dart';
 import 'cog_registry.dart';
 import 'cog_runtime.dart';
+import 'cog_state.dart';
 import 'priority.dart';
 import 'standard_cog_runtime.dart';
 import 'spin.dart';
@@ -66,6 +67,12 @@ sealed class Cog<ValueType, SpinType> {
   }) {
     ordinal = (registry ?? GlobalCogRegistry.instance).register(this);
   }
+
+  CogState<ValueType, SpinType, Cog<ValueType, SpinType>> createState({
+    required CogStateOrdinal ordinal,
+    required CogRuntime runtime,
+    required SpinType? spin,
+  });
 
   ValueType read(
     Cogtext cogtext, {

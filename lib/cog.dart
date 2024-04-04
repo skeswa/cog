@@ -10,5 +10,6 @@ export 'src/priority.dart';
 export 'src/null_type_extension.dart';
 export 'src/int_duration_extension.dart';
 export 'src/mechanism.dart';
+export 'src/mechanism_registry.dart';
 export 'src/spin.dart';
 export 'src/standard_cog_runtime.dart';

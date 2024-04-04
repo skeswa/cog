@@ -12,6 +12,19 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   }) : super._(eq: eq, registry: registry);
 
   @override
+  CogState<ValueType, SpinType, Cog<ValueType, SpinType>> createState({
+    required CogStateOrdinal ordinal,
+    required CogRuntime runtime,
+    required SpinType? spin,
+  }) =>
+      ManualCogState(
+        cog: this,
+        ordinal: ordinal,
+        runtime: runtime,
+        spin: spin,
+      );
+
+  @override
   String toString() {
     final stringBuffer = StringBuffer('ManualCog<')..write(ValueType);
 

@@ -129,7 +129,7 @@ final class StandardCogRuntime implements CogRuntime {
 
   @override
   Future<void> dispose() async {
-    await scheduler.dispose();
+    final schedulerDisposal = scheduler.dispose();
 
     for (final mechanismState in _mechanismStates) {
       mechanismState?.dispose();
@@ -143,12 +143,15 @@ final class StandardCogRuntime implements CogRuntime {
     _mechanismRegisteredSubscription?.cancel();
     _mechanismStates.clear();
 
-    await Future.wait([
+    final listeningDisposal = Future.wait([
       for (final cogStateListeningPost in _cogStateListeningPosts)
         if (cogStateListeningPost != null) cogStateListeningPost.dispose(),
     ]);
 
     _cogStateListeningPosts.clear();
+
+    await schedulerDisposal;
+    await listeningDisposal;
   }
 
   @override
@@ -336,7 +339,7 @@ final class StandardCogRuntime implements CogRuntime {
         : null;
 
     if (mechanismState == null) {
-      if (mechanismOrdinal < _mechanismStates.length) {
+      if (mechanismOrdinal <= _mechanismStates.length) {
         _mechanismStates.length = mechanismOrdinal + 1;
       }
 
@@ -359,11 +362,13 @@ final class StandardCogRuntime implements CogRuntime {
   }) {
     final ordinal = _cogStates.length;
 
-    final cogState = _instantiateCogState(
-      cog: cog,
-      cogSpin: cogSpin,
-      cogStateOrdinal: ordinal,
+    final cogState = cog.createState(
+      ordinal: ordinal,
+      runtime: this,
+      spin: cogSpin,
     );
+
+    telemetry.recordCogStateCreation(ordinal);
 
     _cogStateFollowers.add(null);
     _cogStateLeaders.add(null);
@@ -388,35 +393,6 @@ final class StandardCogRuntime implements CogRuntime {
         _cogStateListeningPosts[i] = null;
       }
     }
-  }
-
-  CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
-      _instantiateCogState<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
-    required CogSpinType? cogSpin,
-    required CogStateOrdinal cogStateOrdinal,
-  }) {
-    telemetry.recordCogStateCreation(cogStateOrdinal);
-
-    if (cog is AutomaticCog<CogValueType, CogSpinType>) {
-      return AutomaticCogState(
-        cog: cog,
-        ordinal: cogStateOrdinal,
-        runtime: this,
-        spin: cogSpin,
-      );
-    }
-
-    if (cog is ManualCog<CogValueType, CogSpinType>) {
-      return ManualCogState(
-        cog: cog,
-        ordinal: cogStateOrdinal,
-        runtime: this,
-        spin: cogSpin,
-      );
-    }
-
-    throw UnsupportedError('Unknown cog type ${cog.runtimeType}');
   }
 
   CogSpinHash _hashCogSpin<CogSpinType>(CogSpinType? cogSpin) =>

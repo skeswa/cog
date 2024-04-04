@@ -19,7 +19,9 @@ final class Mechanism {
     this.debugLabel,
     MechanismRegistry? registry,
   }) {
-    ordinal = (registry ?? GlobalMechanismRegistry.instance).register(this);
+    registry ??= GlobalMechanismRegistry.instance;
+
+    ordinal = registry.register(this);
   }
 
   void pause(Cogtext cogtext) {
