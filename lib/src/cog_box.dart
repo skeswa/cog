@@ -51,7 +51,7 @@ final class CogBox {
     }
 
     for (final boxedCog in _boxedCogs) {
-      _cogtext.runtime.disposeCog(boxedCog._cog);
+      _cogtext.runtime.disposeCog(boxedCog._cog.ordinal);
     }
 
     _boxedCogs.clear();

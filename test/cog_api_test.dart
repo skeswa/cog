@@ -4121,7 +4121,7 @@ void main() {
         var mechanismInvocations = 0;
         var onDisposeInvocations = 0;
 
-        Mechanism(
+        final mechanism = Mechanism(
           (m) {
             m.onDispose(() {
               onDisposeInvocations++;
@@ -4142,7 +4142,7 @@ void main() {
 
         await Future.delayed(Duration.zero);
 
-        cogtext.dispose();
+        cogtext.runtime.disposeMechanism(mechanism.ordinal);
 
         expect(mechanismInvocations, 1);
         expect(onDisposeInvocations, 1);

@@ -27,7 +27,7 @@ abstract interface class CogRuntime {
 
   Future<void> dispose();
 
-  void disposeCog(Cog cog);
+  void disposeCog(CogOrdinal cogOrdinal);
 
   void disposeCogState(CogStateOrdinal cogStateOrdinal);
 

@@ -163,15 +163,15 @@ final class StandardCogRuntime implements CogRuntime {
   }
 
   @override
-  void disposeCog(Cog cog) {
+  void disposeCog(CogOrdinal cogOrdinal) {
     logging.debug(
       null,
-      'disposing all states of Cog',
-      cog,
+      'disposing all states of Cog with ordinal',
+      cogOrdinal,
     );
 
     for (final cogState in _cogStates) {
-      if (cogState != null && cogState.cog == cog) {
+      if (cogState != null && cogState.cog.ordinal == cogOrdinal) {
         disposeCogState(cogState.ordinal);
       }
     }
