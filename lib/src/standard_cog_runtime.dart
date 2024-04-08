@@ -30,7 +30,7 @@ final class StandardCogRuntime implements CogRuntime {
     _compareCogStateListeningPostsToMaybeNotify,
   );
   final _cogStateOrdinalByHash = <CogStateHash, CogStateOrdinal>{};
-  final _cogStates = <CogState>[];
+  final _cogStates = <CogState?>[];
   final MechanismRegistry _mechanismRegistry;
   StreamSubscription<MechanismOrdinal>? _mechanismRegisteredSubscription;
   final _mechanismStates = <MechanismState?>[];
@@ -73,27 +73,23 @@ final class StandardCogRuntime implements CogRuntime {
         cog: cog,
         cogSpin: cogSpin,
         cogStateHash: cogStateHash,
+        cogStateOrdinal: cogStateOrdinal,
       );
     }
 
     final cogState = _cogStates[cogStateOrdinal]
-        as CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>;
+        as CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>?;
 
-    assert(() {
-      if (cogState.cog != cog) {
-        throw StateError(
-          'Cog value collision detected! It appears as though the cog value '
-          'associated with this cog actually belongs to a different one. '
-          'Unfortunately, this state is unrecoverable as a cog value has '
-          'collision is exceedingly rare.',
-        );
-      }
+    if (cogState == null) {
+      return _createCogState(
+        cog: cog,
+        cogSpin: cogSpin,
+        cogStateHash: cogStateHash,
+        cogStateOrdinal: cogStateOrdinal,
+      );
+    }
 
-      return true;
-    }());
-
-    return _cogStates[cogStateOrdinal]
-        as CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>;
+    return cogState;
   }
 
   @override
@@ -128,6 +124,18 @@ final class StandardCogRuntime implements CogRuntime {
   }
 
   @override
+  CogStateOrdinal? cogStateOrdinalOf<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
+    required CogSpinType? cogSpin,
+  }) {
+    final cogSpinHash = _hashCogSpin(cogSpin);
+
+    final cogStateHash = _hashCogState(cog: cog, cogSpinHash: cogSpinHash);
+
+    return _cogStateOrdinalByHash[cogStateHash];
+  }
+
+  @override
   Future<void> dispose() async {
     final schedulerDisposal = scheduler.dispose();
 
@@ -152,6 +160,82 @@ final class StandardCogRuntime implements CogRuntime {
 
     await schedulerDisposal;
     await listeningDisposal;
+  }
+
+  @override
+  void disposeCog(Cog cog) {
+    logging.debug(
+      null,
+      'disposing all states of Cog',
+      cog,
+    );
+
+    for (final cogState in _cogStates) {
+      if (cogState != null && cogState.cog == cog) {
+        disposeCogState(cogState.ordinal);
+      }
+    }
+  }
+
+  @override
+  void disposeCogState(CogStateOrdinal cogStateOrdinal) {
+    logging.debug(
+      null,
+      'disposing Cog state',
+      cogStateOrdinal,
+    );
+
+    final cogStateFollowers = _cogStateFollowers[cogStateOrdinal];
+
+    if (cogStateFollowers != null) {
+      for (final cogStateFollower in cogStateFollowers) {
+        _cogStateLeaders[cogStateFollower]?.remove(cogStateOrdinal);
+      }
+
+      _cogStateLeaders.removeAt(cogStateOrdinal);
+    }
+
+    _cogStateFollowers.removeAt(cogStateOrdinal);
+
+    final cogStateLeaders = _cogStateLeaders[cogStateOrdinal];
+
+    if (cogStateLeaders != null) {
+      for (final cogStateLeader in cogStateLeaders) {
+        _cogStateFollowers[cogStateLeader]?.remove(cogStateOrdinal);
+      }
+
+      _cogStateLeaders.removeAt(cogStateOrdinal);
+    }
+
+    final cogStateListeningPost = _cogStateListeningPosts[cogStateOrdinal];
+
+    if (cogStateListeningPost != null) {
+      _cogStateListeningPosts.removeAt(cogStateOrdinal);
+      _cogStateListeningPostsToMaybeNotify.remove(cogStateListeningPost);
+
+      cogStateListeningPost.dispose();
+    }
+
+    _cogStates.removeAt(cogStateOrdinal);
+  }
+
+  @override
+  void disposeMechanism(MechanismOrdinal mechanismOrdinal) {
+    final mechanismState = _mechanismStates[mechanismOrdinal];
+
+    if (mechanismState == null) {
+      return;
+    }
+
+    logging.debug(
+      null,
+      'disposing Mechanism',
+      mechanismState.mechanism,
+    );
+
+    mechanismState.dispose();
+
+    _mechanismStates[mechanismOrdinal] = null;
   }
 
   @override
@@ -213,7 +297,7 @@ final class StandardCogRuntime implements CogRuntime {
       _cogStateLeaders[cogStateOrdinal] ?? const [];
 
   @override
-  CogState operator [](CogStateOrdinal cogStateOrdinal) =>
+  CogState? operator [](CogStateOrdinal cogStateOrdinal) =>
       _cogStates[cogStateOrdinal];
 
   @override
@@ -254,23 +338,8 @@ final class StandardCogRuntime implements CogRuntime {
   }
 
   @override
-  void pauseMechanism(MechanismOrdinal mechanismOrdinal) {
-    final mechanismState = _mechanismStates[mechanismOrdinal];
-
-    if (mechanismState == null) {
-      return;
-    }
-
-    logging.debug(
-      null,
-      'pausing Mechanism',
-      mechanismState.mechanism,
-    );
-
-    mechanismState.dispose();
-
-    _mechanismStates[mechanismOrdinal] = null;
-  }
+  void pauseMechanism(MechanismOrdinal mechanismOrdinal) =>
+      disposeMechanism(mechanismOrdinal);
 
   @override
   void renewCogStateDependency({
@@ -359,26 +428,27 @@ final class StandardCogRuntime implements CogRuntime {
     required Cog<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
     required CogStateHash cogStateHash,
+    required CogStateOrdinal? cogStateOrdinal,
   }) {
-    final ordinal = _cogStates.length;
+    cogStateOrdinal ??= _cogStates.length;
 
     final cogState = cog.createState(
-      ordinal: ordinal,
+      ordinal: cogStateOrdinal,
       runtime: this,
       spin: cogSpin,
     );
 
-    telemetry.recordCogStateCreation(ordinal);
+    telemetry.recordCogStateCreation(cogStateOrdinal);
 
     _cogStateFollowers.add(null);
     _cogStateLeaders.add(null);
     _cogStateListeningPosts.add(null);
     _cogStates.add(cogState);
-    _cogStateOrdinalByHash[cogStateHash] = ordinal;
+    _cogStateOrdinalByHash[cogStateHash] = cogStateOrdinal;
 
     cogState.init();
 
-    logging.debug(cogState, 'created new cog value');
+    logging.debug(cogState, 'created new cog state');
 
     return cogState;
   }

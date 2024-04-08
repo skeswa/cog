@@ -33,6 +33,27 @@ sealed class Cog<ValueType, SpinType> {
     Spin<SpinType>? spin,
     Duration? ttl,
   }) =>
+      auto(
+        def,
+        async: async,
+        debugLabel: debugLabel,
+        eq: eq,
+        init: init,
+        registry: registry,
+        spin: spin,
+        ttl: ttl,
+      );
+
+  static AutomaticCog<ValueType, SpinType> auto<ValueType, SpinType>(
+    AutomaticCogDefinition<ValueType, SpinType> def, {
+    Async? async,
+    String? debugLabel,
+    CogValueComparator<ValueType>? eq,
+    CogValueInitializer<ValueType>? init,
+    CogRegistry? registry,
+    Spin<SpinType>? spin,
+    Duration? ttl,
+  }) =>
       AutomaticCog._(
         def,
         async: async,
@@ -87,7 +108,7 @@ sealed class Cog<ValueType, SpinType> {
 
   Stream<ValueType> watch(
     Cogtext cogtext, {
-    Priority priority = Priority.normal,
+    Priority? priority,
     SpinType? spin,
   }) {
     assert(thatSpinsMatch(this, spin));
@@ -96,7 +117,7 @@ sealed class Cog<ValueType, SpinType> {
 
     return cogtext.runtime.acquireValueChangeStream(
       cogState: cogState,
-      priority: priority,
+      priority: priority ?? Priority.normal,
     );
   }
 }

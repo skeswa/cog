@@ -99,8 +99,8 @@ final class AutomaticCogState<ValueType, SpinType>
     for (var i = 0; i < leaderOrdinalCount; i++) {
       final leaderOrdinal = leaderOrdinals[i];
 
-      hash +=
-          revisionHashScalingFactor * hash + _runtime[leaderOrdinal].revision;
+      hash += revisionHashScalingFactor * hash +
+          (_runtime[leaderOrdinal]?.revision ?? initialCogStateRevision);
     }
 
     return hash;

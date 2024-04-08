@@ -20,7 +20,18 @@ abstract interface class CogRuntime {
     required Priority priority,
   });
 
+  CogStateOrdinal? cogStateOrdinalOf<CogValueType, CogSpinType>({
+    required Cog<CogValueType, CogSpinType> cog,
+    required CogSpinType? cogSpin,
+  });
+
   Future<void> dispose();
+
+  void disposeCog(Cog cog);
+
+  void disposeCogState(CogStateOrdinal cogStateOrdinal);
+
+  void disposeMechanism(MechanismOrdinal mechanismOrdinal);
 
   List<CogStateOrdinal> followerOrdinalsOf(
     CogStateOrdinal cogStateOrdinal,
@@ -42,7 +53,7 @@ abstract interface class CogRuntime {
 
   void maybeNotifyListenersOf(CogStateOrdinal cogStateOrdinal);
 
-  CogState operator [](CogStateOrdinal cogStateOrdinal);
+  CogState? operator [](CogStateOrdinal cogStateOrdinal);
 
   void pauseMechanism(MechanismOrdinal mechanismOrdinal);
 

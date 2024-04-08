@@ -69,7 +69,7 @@ sealed class CogState<ValueType, SpinType,
     for (var i = 0; i < followerOrdinalCount; i++) {
       final followerOrdinal = followerOrdinals[i];
 
-      _runtime[followerOrdinal].markStale(staleness: staleness);
+      _runtime[followerOrdinal]?.markStale(staleness: staleness);
     }
   }
 
