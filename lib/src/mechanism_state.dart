@@ -35,9 +35,11 @@ final class MechanismState implements MechanismController {
     _disposers.clear();
   }
 
-  void init() {
+  bool init() {
     try {
       mechanism.def(this);
+
+      return true;
     } catch (e, stackTrace) {
       _cogRuntime.handleError(
         error: StateError(
@@ -47,6 +49,8 @@ final class MechanismState implements MechanismController {
         stackTrace: stackTrace,
       );
     }
+
+    return false;
   }
 
   @override

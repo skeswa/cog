@@ -16,6 +16,8 @@ final class GlobalCogRegistry implements CogRegistry {
 
   final _cogs = <Cog>[];
 
+  GlobalCogRegistry();
+
   @override
   CogOrdinal register<CogValueType, CogSpinType>(
     Cog<CogValueType, CogSpinType> cog,

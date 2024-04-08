@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cog/cog.dart';
+import 'package:cog/src/cog_registry.dart';
+import 'package:cog/src/staleness.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,124 +20,6 @@ void main() {
     setUp(() {
       logging = TestingCogRuntimeLogger();
       mechanismRegistry = GlobalMechanismRegistry();
-    });
-
-    tearDown(() {});
-
-    group('Auxilliary details', () {
-      test('automatic Cogs should be stringifiable', () {
-        final fourCog = Cog((c) => 4, spin: Spin<bool>());
-        final falseCog = Cog(
-          (c) => false,
-          debugLabel: 'falseCog',
-          ttl: 1.seconds,
-        );
-        final helloCog = Cog(
-          (c) => 'hello',
-          debugLabel: 'helloCog',
-          async: Async.latestOnly,
-          eq: (a, b) => a.length == b.length,
-        );
-
-        expect('$fourCog', 'AutomaticCog<int, bool>()');
-        expect(
-          '$falseCog',
-          'AutomaticCog<bool>(debugLabel: "falseCog", ttl: 0:00:01.000000)',
-        );
-        expect(
-          '$helloCog',
-          'AutomaticCog<String>('
-              'async: Async.latestOnly, debugLabel: "helloCog", eq: overridden'
-              ')',
-        );
-      });
-
-      test('manual Cogs should be stringifiable', () {
-        final fourCog = Cog.man(null.init<int>(), spin: Spin<bool>());
-        final falseCog = Cog.man(() => false, debugLabel: 'falseCog');
-        final helloCog = Cog.man(
-          () => '',
-          debugLabel: 'helloCog',
-          eq: (a, b) => a.length == b.length,
-        );
-
-        expect('$fourCog', 'ManualCog<int?, bool>()');
-        expect(
-          '$falseCog',
-          'ManualCog<bool>(debugLabel: "falseCog")',
-        );
-        expect(
-          '$helloCog',
-          'ManualCog<String>(debugLabel: "helloCog", eq: overridden)',
-        );
-      });
-
-      test('Priority should be stringifiable', () {
-        expect('${Priority.asap}', 'asap');
-        expect('${Priority.low}', 'low');
-        expect('${Priority.high}', 'high');
-        expect('${Priority.normal}', 'normal');
-      });
-
-      test('Spin<T> requires T', () {
-        expect(() => Spin<dynamic>(), throwsArgumentError);
-        expect(() => Spin(), throwsArgumentError);
-      });
-
-      test('null.of<T>() returns a function that returns null', () {
-        expect(null.init<int>(), isA<int? Function()>());
-        expect(null.init<int>()(), isNull);
-      });
-
-      test('null.of<T>() requires T', () {
-        expect(() => null.init<dynamic>(), throwsArgumentError);
-        expect(() => null.init(), throwsArgumentError);
-      });
-
-      test('int.duration should work as expected', () {
-        expect(3.days, equals(3.days));
-        expect(3.hours, equals(3.hours));
-        expect(3.microseconds, equals(3.microseconds));
-        expect(3.milliseconds, equals(3.milliseconds));
-        expect(3.minutes, equals(3.minutes));
-        expect(3.seconds, equals(3.seconds));
-      });
-
-      test('Cogtext cog state runtime should be optionally replaceable', () {
-        expect(
-          () => Cogtext(),
-          isNot(throwsA(anything)),
-        );
-        expect(
-          () => Cogtext(cogRuntime: const NoOpCogRuntime()),
-          isNot(throwsA(anything)),
-        );
-      });
-
-      test('Standard runtime scheduler can survive errors', () {
-        fakeAsync((async) {
-          var didThrow = false;
-
-          try {
-            final cogRuntime = StandardCogRuntime(
-              logging: logging,
-              mechanismRegistry: mechanismRegistry,
-            );
-
-            cogtext = Cogtext(cogRuntime: cogRuntime);
-
-            cogRuntime.scheduler.scheduleBackgroundTask(() {
-              throw StateError('oh no!');
-            });
-
-            async.elapse(1.days);
-          } catch (e) {
-            didThrow = true;
-          }
-
-          expect(didThrow, isFalse);
-        });
-      });
     });
 
     group('State graph', () {
@@ -4041,17 +3925,34 @@ void main() {
     });
 
     group('Side-effects model', () {
+      late bool didRuntimeHandleError;
+
       setUp(() {
         cogtext = Cogtext(
           cogRuntime: StandardCogRuntime(
             logging: logging,
             mechanismRegistry: mechanismRegistry,
+            onError: ({
+              Cog? cog,
+              Mechanism? mechanism,
+              required Object error,
+              required Object? spin,
+              required StackTrace stackTrace,
+            }) {
+              didRuntimeHandleError = true;
+            },
           ),
         );
+
+        didRuntimeHandleError = false;
       });
 
       tearDown(() async {
         await cogtext.dispose();
+      });
+
+      test('Specifying a MechanismRegistry is optional', () {
+        expect(() => Mechanism((_) {}), isNot(throwsA(anything)));
       });
 
       test('Cogs can use Mechanisms as Cogtext', () async {
@@ -4148,6 +4049,78 @@ void main() {
         expect(onDisposeInvocations, 1);
       });
 
+      test('Mechanisms are resilient to disposal callbacks that throw',
+          () async {
+        var mechanismInvocations = 0;
+        var onDisposeInvocations = 0;
+
+        final mechanism = Mechanism(
+          (m) {
+            m.onDispose(() {
+              onDisposeInvocations++;
+            });
+            m.onDispose(() {
+              throw StateError('uh oh');
+            });
+            m.onDispose(() {
+              onDisposeInvocations++;
+            });
+
+            mechanismInvocations++;
+          },
+          registry: mechanismRegistry,
+        );
+
+        expect(mechanismInvocations, 0);
+        expect(onDisposeInvocations, 0);
+
+        await Future.delayed(Duration.zero);
+
+        expect(mechanismInvocations, 1);
+        expect(onDisposeInvocations, 0);
+
+        await Future.delayed(Duration.zero);
+
+        cogtext.runtime.disposeMechanism(mechanism.ordinal);
+
+        expect(mechanismInvocations, 1);
+        expect(onDisposeInvocations, 2);
+        expect(didRuntimeHandleError, isTrue);
+      });
+
+      test('Mechanisms are resilient to definitions that throw', () async {
+        var mechanismInvocations = 0;
+
+        final mechanism = Mechanism(
+          (m) {
+            mechanismInvocations++;
+
+            if (mechanismInvocations < 2) {
+              throw StateError('uh oh');
+            }
+          },
+          registry: mechanismRegistry,
+        );
+
+        expect(mechanismInvocations, 0);
+        expect(didRuntimeHandleError, isFalse);
+
+        await Future.delayed(Duration.zero);
+
+        expect(mechanismInvocations, 1);
+        expect(didRuntimeHandleError, isTrue);
+
+        await Future.delayed(Duration.zero);
+
+        didRuntimeHandleError = false;
+        mechanism.resume(cogtext);
+
+        await Future.delayed(Duration.zero);
+
+        expect(mechanismInvocations, 2);
+        expect(didRuntimeHandleError, isFalse);
+      });
+
       test('Mechanisms stop tracking Cogs when paused', () async {
         final numberCog = Cog.man(() => 4);
 
@@ -4237,6 +4210,202 @@ void main() {
         numberChangeMechanism.resume(cogtext);
 
         expect(invocations, 2);
+      });
+
+      test('Mechanisms registered before the runtime still work', () async {
+        var mechanism1InvocationCount = 0;
+
+        Mechanism((_) {
+          mechanism1InvocationCount++;
+        }, registry: mechanismRegistry);
+
+        var mechanism2InvocationCount = 0;
+
+        Mechanism((_) {
+          mechanism2InvocationCount++;
+        }, registry: mechanismRegistry);
+
+        await Future.delayed(Duration.zero);
+
+        expect(mechanism1InvocationCount, 1);
+        expect(mechanism2InvocationCount, 1);
+
+        cogtext.dispose();
+
+        await Future.delayed(Duration.zero);
+
+        cogtext = Cogtext(
+          cogRuntime: StandardCogRuntime(
+            logging: logging,
+            mechanismRegistry: mechanismRegistry,
+            onError: ({
+              Cog? cog,
+              Mechanism? mechanism,
+              required Object error,
+              required Object? spin,
+              required StackTrace stackTrace,
+            }) {
+              didRuntimeHandleError = true;
+            },
+          ),
+        );
+
+        await Future.delayed(Duration.zero);
+
+        expect(mechanism1InvocationCount, 2);
+        expect(mechanism2InvocationCount, 2);
+      });
+    });
+
+    group('Auxilliary details', () {
+      test('automatic Cogs should be stringifiable', () {
+        final fourCog = Cog((c) => 4, spin: Spin<bool>());
+        final falseCog = Cog(
+          (c) => false,
+          debugLabel: 'falseCog',
+          ttl: 1.seconds,
+        );
+        final helloCog = Cog(
+          (c) => 'hello',
+          debugLabel: 'helloCog',
+          async: Async.latestOnly,
+          eq: (a, b) => a.length == b.length,
+        );
+
+        expect('$fourCog', 'AutomaticCog<int, bool>()');
+        expect(
+          '$falseCog',
+          'AutomaticCog<bool>(debugLabel: "falseCog", ttl: 0:00:01.000000)',
+        );
+        expect(
+          '$helloCog',
+          'AutomaticCog<String>('
+              'async: Async.latestOnly, debugLabel: "helloCog", eq: overridden'
+              ')',
+        );
+      });
+
+      test('manual Cogs should be stringifiable', () {
+        final fourCog = Cog.man(null.init<int>(), spin: Spin<bool>());
+        final falseCog = Cog.man(() => false, debugLabel: 'falseCog');
+        final helloCog = Cog.man(
+          () => '',
+          debugLabel: 'helloCog',
+          eq: (a, b) => a.length == b.length,
+        );
+
+        expect('$fourCog', 'ManualCog<int?, bool>()');
+        expect(
+          '$falseCog',
+          'ManualCog<bool>(debugLabel: "falseCog")',
+        );
+        expect(
+          '$helloCog',
+          'ManualCog<String>(debugLabel: "helloCog", eq: overridden)',
+        );
+      });
+
+      test('Priority should be stringifiable', () {
+        expect('${Priority.asap}', 'asap');
+        expect('${Priority.low}', 'low');
+        expect('${Priority.high}', 'high');
+        expect('${Priority.normal}', 'normal');
+      });
+
+      test('Spin<T> requires T', () {
+        expect(() => Spin<dynamic>(), throwsArgumentError);
+        expect(() => Spin(), throwsArgumentError);
+      });
+
+      test('null.of<T>() returns a function that returns null', () {
+        expect(null.init<int>(), isA<int? Function()>());
+        expect(null.init<int>()(), isNull);
+      });
+
+      test('null.of<T>() requires T', () {
+        expect(() => null.init<dynamic>(), throwsArgumentError);
+        expect(() => null.init(), throwsArgumentError);
+      });
+
+      test('int.duration should work as expected', () {
+        expect(3.days, equals(3.days));
+        expect(3.hours, equals(3.hours));
+        expect(3.microseconds, equals(3.microseconds));
+        expect(3.milliseconds, equals(3.milliseconds));
+        expect(3.minutes, equals(3.minutes));
+        expect(3.seconds, equals(3.seconds));
+      });
+
+      test('Cogtext cog state runtime should be optionally replaceable', () {
+        expect(
+          () => Cogtext(),
+          isNot(throwsA(anything)),
+        );
+        expect(
+          () => Cogtext(cogRuntime: const NoOpCogRuntime()),
+          isNot(throwsA(anything)),
+        );
+      });
+
+      test('Standard runtime scheduler can survive errors', () {
+        fakeAsync((async) {
+          var didThrow = false;
+
+          try {
+            final cogRuntime = StandardCogRuntime(
+              mechanismRegistry: mechanismRegistry,
+            );
+
+            cogtext = Cogtext(cogRuntime: cogRuntime);
+
+            cogRuntime.scheduler.scheduleBackgroundTask(() {
+              throw StateError('oh no!');
+            });
+
+            async.elapse(1.days);
+          } catch (e) {
+            didThrow = true;
+          }
+
+          expect(didThrow, isFalse);
+        });
+      });
+
+      test('Cogs are globally tracked by default', () {
+        final fakeCog = Cog.man(() => 'fake');
+
+        expect(GlobalCogRegistry.instance.registeredCogs, contains(fakeCog));
+        expect(GlobalCogRegistry.instance[fakeCog.ordinal], equals(fakeCog));
+      });
+
+      test('Default logging strategy does not throw', () {
+        cogtext = Cogtext();
+
+        expect(() => cogtext.runtime.logging.debug(null, 'message'),
+            isNot(throwsA(anything)));
+        expect(() => cogtext.runtime.logging.error(null, 'message'),
+            isNot(throwsA(anything)));
+      });
+
+      test('Internal Cog state is protected from external meddling', () {
+        cogtext = Cogtext();
+
+        final cog = Cog.man(() => 0);
+
+        cog.read(cogtext);
+
+        final cogStateOrdinal =
+            cogtext.runtime.cogStateOrdinalOf(cog: cog, cogSpin: null);
+
+        expect(cogStateOrdinal, isNot(isNull));
+
+        final cogState = cogtext.runtime[cogStateOrdinal!];
+
+        expect(cogState, isNot(isNull));
+
+        expect(() => cogState!.markStale(staleness: Staleness.fresh),
+            throwsA(anything));
+        expect(() => cogState!.spinOrThrow, throwsA(anything));
       });
     });
   });

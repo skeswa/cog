@@ -417,7 +417,14 @@ final class StandardCogRuntime implements CogRuntime {
       _mechanismStates[mechanismOrdinal] = mechanismState =
           MechanismState(cogRuntime: this, mechanism: mechanism);
 
-      mechanismState.init();
+      final didInit = mechanismState.init();
+
+      if (!didInit) {
+        logging.debug(null, 'uninitializing Mechanism due to failure');
+
+        mechanismState.dispose();
+        _mechanismStates[mechanismOrdinal] = null;
+      }
     }
 
     return mechanismState;
