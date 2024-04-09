@@ -359,6 +359,56 @@ void main() {
           expect(numberPlusOneCog.read(cogtext), 3);
           expect(numberFakeObservable.hasListeners, isTrue);
         });
+
+        test('reading from a disposed spun Cog reinstantiates it', () {
+          final numberCog =
+              Cog.man(() => 1, debugLabel: 'numberCog', spin: Spin<bool>());
+
+          final squareCog = Cog((c) {
+            final number = c.link(numberCog, spin: c.spin);
+
+            return number * number;
+          }, debugLabel: 'squareCog', spin: Spin<bool>());
+
+          final sumCog = Cog((c) {
+            final square = c.link(squareCog, spin: c.spin);
+
+            return square + square;
+          }, debugLabel: 'sumCog', spin: Spin<bool>());
+
+          expect(sumCog.read(cogtext, spin: false), 2);
+          expect(sumCog.read(cogtext, spin: true), 2);
+
+          numberCog.write(cogtext, 2, spin: false);
+          numberCog.write(cogtext, 3, spin: true);
+
+          expect(sumCog.read(cogtext, spin: false), 8);
+          expect(sumCog.read(cogtext, spin: true), 18);
+
+          cogtext.runtime.disposeCog(squareCog.ordinal);
+
+          expect(sumCog.read(cogtext, spin: false), 8);
+          expect(sumCog.read(cogtext, spin: true), 18);
+
+          cogtext.runtime.disposeCog(numberCog.ordinal);
+
+          expect(sumCog.read(cogtext, spin: false), 2);
+          expect(sumCog.read(cogtext, spin: true), 2);
+        });
+
+        test('reading from a disposed unspun Cog reinstantiates it', () {
+          final numberCog = Cog.man(() => 1);
+
+          expect(numberCog.read(cogtext), 1);
+
+          numberCog.write(cogtext, 2);
+
+          expect(numberCog.read(cogtext), 2);
+
+          cogtext.runtime.disposeCog(numberCog.ordinal);
+
+          expect(numberCog.read(cogtext), 1);
+        });
       });
 
       group('Simple watching', () {

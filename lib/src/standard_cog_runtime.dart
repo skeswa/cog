@@ -180,31 +180,18 @@ final class StandardCogRuntime implements CogRuntime {
   @override
   void disposeCogState(CogStateOrdinal cogStateOrdinal) {
     logging.debug(
-      null,
-      'disposing Cog state',
       cogStateOrdinal,
+      'disposing Cog state',
     );
 
-    final cogStateFollowers = _cogStateFollowers[cogStateOrdinal];
+    final cogStateLeaderOrdinals = _cogStateLeaders[cogStateOrdinal];
 
-    if (cogStateFollowers != null) {
-      for (final cogStateFollower in cogStateFollowers) {
-        _cogStateLeaders[cogStateFollower]?.remove(cogStateOrdinal);
+    if (cogStateLeaderOrdinals != null) {
+      for (final cogStateLeaderOrdinal in cogStateLeaderOrdinals) {
+        _cogStateFollowers[cogStateLeaderOrdinal]?.remove(cogStateOrdinal);
       }
 
-      _cogStateLeaders.removeAt(cogStateOrdinal);
-    }
-
-    _cogStateFollowers.removeAt(cogStateOrdinal);
-
-    final cogStateLeaders = _cogStateLeaders[cogStateOrdinal];
-
-    if (cogStateLeaders != null) {
-      for (final cogStateLeader in cogStateLeaders) {
-        _cogStateFollowers[cogStateLeader]?.remove(cogStateOrdinal);
-      }
-
-      _cogStateLeaders.removeAt(cogStateOrdinal);
+      _cogStateLeaders[cogStateOrdinal] = null;
     }
 
     final cogStateListeningPost = _cogStateListeningPosts[cogStateOrdinal];
@@ -216,7 +203,22 @@ final class StandardCogRuntime implements CogRuntime {
       cogStateListeningPost.dispose();
     }
 
-    _cogStates.removeAt(cogStateOrdinal);
+    _cogStates[cogStateOrdinal] = null;
+
+    final cogStateFollowerOrdinals = _cogStateFollowers[cogStateOrdinal];
+
+    // NOTE: we do not erase the disposed cog state from its followers. This is
+    // suprising, because we DO erase it from its leaders. The reason is that,
+    // if the disposed cog state gets reinstated quickly, it prevents followers
+    // from getting stale in the short term.
+    //
+    // Below, we mark followers as stale because they depend on a disposed cog
+    // state.
+    if (cogStateFollowerOrdinals != null) {
+      for (final cogStateFollowerOrdinal in cogStateFollowerOrdinals) {
+        _cogStates[cogStateFollowerOrdinal]?.markStale();
+      }
+    }
   }
 
   @override
@@ -450,8 +452,13 @@ final class StandardCogRuntime implements CogRuntime {
     _cogStateFollowers.add(null);
     _cogStateLeaders.add(null);
     _cogStateListeningPosts.add(null);
-    _cogStates.add(cogState);
     _cogStateOrdinalByHash[cogStateHash] = cogStateOrdinal;
+
+    if (cogStateOrdinal >= _cogStates.length) {
+      _cogStates.length = cogStateOrdinal + 1;
+    }
+
+    _cogStates[cogStateOrdinal] = cogState;
 
     cogState.init();
 
