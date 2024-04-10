@@ -21,7 +21,7 @@ const revisionHashSeed = 7;
 const revisionHashScalingFactor = 31;
 
 bool thatSpinsMatch<ValueType, SpinType>(
-  Cog<ValueType, SpinType> cog,
+  CogLike<ValueType, SpinType> cog,
   SpinType? spin,
 ) {
   if (cog.spin == null && spin != null) {

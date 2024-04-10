@@ -2,6 +2,8 @@ import 'async.dart';
 import 'common.dart';
 import 'cog.dart';
 import 'cog_registry.dart';
+import 'cog_runtime.dart';
+import 'cog_state.dart';
 import 'mechanism.dart';
 import 'mechanism_registry.dart';
 import 'priority.dart';
@@ -13,12 +15,20 @@ part 'boxed_mechanism.dart';
 final class CogBox {
   final _boxedCogs = <BoxedCog>[];
   final _boxedMechanisms = <BoxedMechanism>[];
+  final CogRegistry? _cogRegistry;
   final Cogtext _cogtext;
   final String? _debugLabel;
+  final MechanismRegistry? _mechanismRegistry;
 
-  CogBox(Cogtext cogtext, {String? debugLabel})
-      : _cogtext = cogtext,
-        _debugLabel = debugLabel;
+  CogBox(
+    Cogtext cogtext, {
+    CogRegistry? cogRegistry,
+    String? debugLabel,
+    MechanismRegistry? mechanismRegistry,
+  })  : _cogRegistry = cogRegistry,
+        _cogtext = cogtext,
+        _debugLabel = debugLabel,
+        _mechanismRegistry = mechanismRegistry;
 
   BoxedAutomaticCog<ValueType, SpinType> auto<ValueType, SpinType>(
     AutomaticCogDefinition<ValueType, SpinType> def, {
@@ -26,7 +36,6 @@ final class CogBox {
     String? debugLabel,
     CogValueComparator<ValueType>? eq,
     CogValueInitializer<ValueType>? init,
-    CogRegistry? registry,
     Spin<SpinType>? spin,
     Duration? ttl,
   }) {
@@ -36,7 +45,7 @@ final class CogBox {
       debugLabel: _maybeScopeDebugLabel(debugLabel),
       eq: eq,
       init: init,
-      registry: registry,
+      registry: _cogRegistry,
       spin: spin,
       ttl: ttl,
     );
@@ -51,10 +60,14 @@ final class CogBox {
   void dispose() {
     for (final boxedMechanism in _boxedMechanisms) {
       _cogtext.runtime.disposeMechanism(boxedMechanism._mechanism.ordinal);
+
+      boxedMechanism._isDisposed = true;
     }
 
     for (final boxedCog in _boxedCogs) {
       _cogtext.runtime.disposeCog(boxedCog._cog.ordinal);
+
+      boxedCog._isDisposed = true;
     }
 
     _boxedCogs.clear();
@@ -65,14 +78,13 @@ final class CogBox {
     CogValueInitializer<ValueType> init, {
     String? debugLabel,
     CogValueComparator<ValueType>? eq,
-    CogRegistry? registry,
     Spin<SpinType>? spin,
   }) {
     final cog = Cog.man(
       init,
       debugLabel: _maybeScopeDebugLabel(debugLabel),
       eq: eq,
-      registry: registry,
+      registry: _cogRegistry,
       spin: spin,
     );
 
@@ -86,12 +98,11 @@ final class CogBox {
   BoxedMechanism mechanism(
     MechanismDefinition def, {
     String? debugLabel,
-    MechanismRegistry? registry,
   }) {
     final mechanism = Mechanism(
       def,
       debugLabel: _maybeScopeDebugLabel(debugLabel),
-      registry: registry,
+      registry: _mechanismRegistry,
     );
 
     final boxedMechanism = BoxedMechanism._(this, mechanism);

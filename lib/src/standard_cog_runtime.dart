@@ -59,7 +59,7 @@ final class StandardCogRuntime implements CogRuntime {
   @override
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
       acquire<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   }) {
     final cogSpinHash = _hashCogSpin(cogSpin);
@@ -125,7 +125,7 @@ final class StandardCogRuntime implements CogRuntime {
 
   @override
   CogStateOrdinal? cogStateOrdinalOf<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   }) {
     final cogSpinHash = _hashCogSpin(cogSpin);
@@ -197,10 +197,11 @@ final class StandardCogRuntime implements CogRuntime {
     final cogStateListeningPost = _cogStateListeningPosts[cogStateOrdinal];
 
     if (cogStateListeningPost != null) {
-      _cogStateListeningPosts.removeAt(cogStateOrdinal);
       _cogStateListeningPostsToMaybeNotify.remove(cogStateListeningPost);
 
       cogStateListeningPost.dispose();
+
+      _cogStateListeningPosts[cogStateOrdinal] = null;
     }
 
     _cogStates[cogStateOrdinal] = null;
@@ -223,7 +224,9 @@ final class StandardCogRuntime implements CogRuntime {
 
   @override
   void disposeMechanism(MechanismOrdinal mechanismOrdinal) {
-    final mechanismState = _mechanismStates[mechanismOrdinal];
+    final mechanismState = mechanismOrdinal < _mechanismStates.length
+        ? _mechanismStates[mechanismOrdinal]
+        : null;
 
     if (mechanismState == null) {
       return;
@@ -434,7 +437,7 @@ final class StandardCogRuntime implements CogRuntime {
 
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
       _createCogState<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
     required CogStateHash cogStateHash,
     required CogStateOrdinal? cogStateOrdinal,
@@ -483,7 +486,7 @@ final class StandardCogRuntime implements CogRuntime {
       cogSpin.hashCode;
 
   CogStateHash _hashCogState<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinHash cogSpinHash,
   }) =>
       Object.hash(cog.ordinal, cogSpinHash);

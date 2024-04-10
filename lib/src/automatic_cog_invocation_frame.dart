@@ -111,7 +111,7 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
 
   @override
   LinkedCogValueType link<LinkedCogValueType, LinkedCogSpinType>(
-    Cog<LinkedCogValueType, LinkedCogSpinType> cog, {
+    CogLike<LinkedCogValueType, LinkedCogSpinType> cog, {
     LinkedCogSpinType? spin,
   }) {
     assert(thatSpinsMatch(cog, spin));

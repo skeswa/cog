@@ -10,7 +10,7 @@ import 'priority.dart';
 abstract interface class CogRuntime {
   CogState<CogValueType, CogSpinType, Cog<CogValueType, CogSpinType>>
       acquire<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   });
 
@@ -21,7 +21,7 @@ abstract interface class CogRuntime {
   });
 
   CogStateOrdinal? cogStateOrdinalOf<CogValueType, CogSpinType>({
-    required Cog<CogValueType, CogSpinType> cog,
+    required CogLike<CogValueType, CogSpinType> cog,
     required CogSpinType? cogSpin,
   });
 

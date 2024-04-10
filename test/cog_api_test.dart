@@ -4307,6 +4307,212 @@ void main() {
       });
     });
 
+    group('Scoping', () {
+      setUp(() {
+        cogtext = Cogtext(
+          cogRuntime: StandardCogRuntime(
+            logging: logging,
+            mechanismRegistry: mechanismRegistry,
+          ),
+        );
+      });
+
+      tearDown(() async {
+        await cogtext.dispose();
+      });
+
+      test('creating a CogBox does not throw', () {
+        expect(() => CogBox(cogtext), isNot(throwsA(anything)));
+        expect(
+          () => CogBox(cogtext, cogRegistry: GlobalCogRegistry()),
+          isNot(throwsA(anything)),
+        );
+        expect(
+          () => CogBox(
+            cogtext,
+            cogRegistry: GlobalCogRegistry(),
+            mechanismRegistry: GlobalMechanismRegistry(),
+          ),
+          isNot(throwsA(anything)),
+        );
+        expect(
+          () => CogBox(
+            cogtext,
+            cogRegistry: GlobalCogRegistry(),
+            debugLabel: 'Hello World',
+            mechanismRegistry: GlobalMechanismRegistry(),
+          ),
+          isNot(throwsA(anything)),
+        );
+      });
+
+      test(
+          'CogBox can create and dispose scoped Cogs and Mechanisms which can '
+          'be used without passing a Cogtext', () async {
+        final cogBox = CogBox(cogtext, mechanismRegistry: mechanismRegistry);
+
+        final greetingCog = cogBox.man(() => 'Hello', spin: Spin<bool>());
+
+        final numberCog = cogBox.man(() => 1);
+
+        final squareCog = cogBox.auto((c) {
+          final number = c.link(numberCog);
+
+          return number * number;
+        });
+
+        final worldGreetingCog = cogBox.auto((c) {
+          final greeting = c.link(greetingCog, spin: c.spin);
+
+          final worldGreeting = '$greeting, World!';
+
+          return c.spin ? worldGreeting.toUpperCase() : worldGreeting;
+        }, spin: Spin<bool>());
+
+        final squareEmissions = [];
+        final worldGreetingEmissions = [];
+
+        squareCog.watch().listen(
+              squareEmissions.add,
+              onDone: () => squareEmissions.add('done'),
+            );
+        worldGreetingCog.watch(spin: false).listen(
+              worldGreetingEmissions.add,
+              onDone: () => worldGreetingEmissions.add('done'),
+            );
+        worldGreetingCog.watch(spin: true).listen(
+              worldGreetingEmissions.add,
+              onDone: () => worldGreetingEmissions.add('done'),
+            );
+
+        var sum = 0;
+        var wasSumMechanismDisposed = false;
+
+        final sumMechanism = cogBox.mechanism((m) {
+          m.onChange(squareCog, (square) {
+            sum += square;
+          });
+
+          m.onDispose(() {
+            wasSumMechanismDisposed = true;
+          });
+        });
+
+        sumMechanism.pause();
+
+        await Future.delayed(Duration.zero);
+
+        expect(greetingCog.read(spin: false), 'Hello');
+        expect(greetingCog.read(spin: true), 'Hello');
+        expect(numberCog.read(), 1);
+        expect(squareCog.read(), 1);
+        expect(worldGreetingCog.read(spin: false), 'Hello, World!');
+        expect(worldGreetingCog.read(spin: true), 'HELLO, WORLD!');
+
+        sumMechanism.resume();
+
+        expect(squareEmissions, isEmpty);
+        expect(worldGreetingEmissions, isEmpty);
+
+        expect(sum, 0);
+        expect(wasSumMechanismDisposed, isFalse);
+
+        await Future.delayed(Duration.zero);
+
+        greetingCog.write('Howdy', spin: false);
+        greetingCog.write('Sup', spin: true);
+        numberCog.write(2);
+
+        expect(greetingCog.read(spin: false), 'Howdy');
+        expect(greetingCog.read(spin: true), 'Sup');
+        expect(numberCog.read(), 2);
+        expect(squareCog.read(), 4);
+        expect(worldGreetingCog.read(spin: false), 'Howdy, World!');
+        expect(worldGreetingCog.read(spin: true), 'SUP, WORLD!');
+
+        expect(squareEmissions, isEmpty);
+        expect(worldGreetingEmissions, isEmpty);
+
+        expect(sum, 0);
+        expect(wasSumMechanismDisposed, isFalse);
+
+        await Future.delayed(Duration.zero);
+
+        expect(
+            squareEmissions,
+            equals([
+              4,
+            ]));
+        expect(
+            worldGreetingEmissions,
+            equals([
+              'SUP, WORLD!',
+              'Howdy, World!',
+            ]));
+
+        expect(sum, 4);
+        expect(wasSumMechanismDisposed, isFalse);
+
+        cogBox.dispose();
+
+        await Future.delayed(Duration.zero);
+
+        expect(() => greetingCog.read(spin: false), throwsA(anything));
+        expect(() => greetingCog.read(spin: true), throwsA(anything));
+        expect(() => numberCog.read(), throwsA(anything));
+        expect(() => squareCog.read(), throwsA(anything));
+        expect(() => worldGreetingCog.read(spin: false), throwsA(anything));
+        expect(() => worldGreetingCog.read(spin: true), throwsA(anything));
+
+        expect(() => sumMechanism.pause(), throwsA(anything));
+        expect(() => sumMechanism.resume(), throwsA(anything));
+
+        expect(
+            squareEmissions,
+            equals([
+              4,
+              'done',
+            ]));
+        expect(
+            worldGreetingEmissions,
+            equals([
+              'SUP, WORLD!',
+              'Howdy, World!',
+              'done',
+              'done',
+            ]));
+
+        expect(sum, 4);
+        expect(wasSumMechanismDisposed, isTrue);
+      });
+
+      test('CogBox Cogs can be linked with non-CogBox Cogs', () {
+        final cogBox = CogBox(
+          cogtext,
+          debugLabel: 'cogBox',
+          mechanismRegistry: mechanismRegistry,
+        );
+
+        final numberCog = cogBox.man(() => 1);
+
+        final squareCog = Cog((c) {
+          final number = c.link(numberCog);
+
+          return number * number;
+        });
+
+        expect(squareCog.read(cogtext), 1);
+
+        numberCog.write(3);
+
+        expect(squareCog.read(cogtext), 9);
+
+        cogBox.dispose();
+
+        expect(squareCog.read(cogtext), 1);
+      });
+    });
+
     group('Auxilliary details', () {
       test('automatic Cogs should be stringifiable', () {
         final fourCog = Cog((c) => 4, spin: Spin<bool>());

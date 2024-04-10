@@ -9,21 +9,35 @@ final class BoxedAutomaticCog<ValueType, SpinType>
   final CogBox _cogBox;
 
   BoxedAutomaticCog._(this._cog, this._cogBox);
-
-  @override
-  Stream<ValueType> watch({
-    Priority? priority,
-    SpinType? spin,
-  }) =>
-      _cog.watch(_cogBox._cogtext, priority: priority, spin: spin);
 }
 
-sealed class BoxedCog<ValueType, SpinType> {
+sealed class BoxedCog<ValueType, SpinType>
+    implements CogLike<ValueType, SpinType> {
   Cog<ValueType, SpinType> get _cog;
 
   CogBox get _cogBox;
 
-  ValueType read({SpinType? spin}) => _cog.read(_cogBox._cogtext, spin: spin);
+  var _isDisposed = false;
+
+  @override
+  CogState<ValueType, SpinType, Cog<ValueType, SpinType>> createState({
+    required CogStateOrdinal ordinal,
+    required CogRuntime runtime,
+    required SpinType? spin,
+  }) =>
+      _cog.createState(ordinal: ordinal, runtime: runtime, spin: spin);
+
+  @override
+  CogOrdinal get ordinal => _cog.ordinal;
+
+  ValueType read({SpinType? spin}) {
+    assert(_notDisposed());
+
+    return _cog.read(_cogBox._cogtext, spin: spin);
+  }
+
+  @override
+  Spin<SpinType>? get spin => _cog.spin;
 
   @override
   String toString() => 'Boxed($_cog)';
@@ -31,8 +45,19 @@ sealed class BoxedCog<ValueType, SpinType> {
   Stream<ValueType> watch({
     Priority? priority,
     SpinType? spin,
-  }) =>
-      _cog.watch(_cogBox._cogtext, priority: priority, spin: spin);
+  }) {
+    assert(_notDisposed());
+
+    return _cog.watch(_cogBox._cogtext, priority: priority, spin: spin);
+  }
+
+  bool _notDisposed() {
+    if (_isDisposed) {
+      throw StateError('This $this has been disposed');
+    }
+
+    return true;
+  }
 }
 
 final class BoxedManualCog<ValueType, SpinType>
@@ -49,6 +74,9 @@ final class BoxedManualCog<ValueType, SpinType>
     ValueType value, {
     bool quietly = false,
     SpinType? spin,
-  }) =>
-      _cog.write(_cogBox._cogtext, value, quietly: quietly, spin: spin);
+  }) {
+    assert(_notDisposed());
+
+    _cog.write(_cogBox._cogtext, value, quietly: quietly, spin: spin);
+  }
 }

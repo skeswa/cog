@@ -8,7 +8,7 @@ abstract interface class AutomaticCogController<ValueType, SpinType> {
   );
 
   LinkedCogValueType link<LinkedCogValueType, LinkedCogSpinType>(
-    Cog<LinkedCogValueType, LinkedCogSpinType> cog, {
+    CogLike<LinkedCogValueType, LinkedCogSpinType> cog, {
     LinkedCogSpinType? spin,
   });
 

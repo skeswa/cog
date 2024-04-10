@@ -11,16 +11,19 @@ import 'spin.dart';
 
 part 'automatic_cog.dart';
 part 'automatic_cog_controller.dart';
+part 'cog_like.dart';
 part 'cogtext.dart';
 part 'manual_cog.dart';
 
-sealed class Cog<ValueType, SpinType> {
+sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   String? debugLabel;
 
   final CogValueComparator<ValueType>? eq;
 
+  @override
   late final CogOrdinal ordinal;
 
+  @override
   final Spin<SpinType>? spin;
 
   factory Cog(
@@ -88,12 +91,6 @@ sealed class Cog<ValueType, SpinType> {
   }) {
     ordinal = (registry ?? GlobalCogRegistry.instance).register(this);
   }
-
-  CogState<ValueType, SpinType, Cog<ValueType, SpinType>> createState({
-    required CogStateOrdinal ordinal,
-    required CogRuntime runtime,
-    required SpinType? spin,
-  });
 
   ValueType read(
     Cogtext cogtext, {
