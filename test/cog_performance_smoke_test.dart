@@ -1,4 +1,5 @@
 import 'package:cog/cog.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/helpers.dart';
@@ -6,16 +7,19 @@ import 'helpers/helpers.dart';
 void main() {
   group('Cog Performance Smoke', () {
     late Cogtext cogtext;
+    late MechanismRegistry mechanismRegistry;
     late TestingCogRuntimeTelemetry telemetry;
 
     setUpLogging();
 
     setUp(() {
+      mechanismRegistry = GlobalMechanismRegistry();
       telemetry = TestingCogRuntimeTelemetry();
 
       cogtext = Cogtext(
         cogRuntime: StandardCogRuntime(
           logging: TestingCogRuntimeLogger(),
+          mechanismRegistry: mechanismRegistry,
           telemetry: telemetry,
         ),
       );
@@ -148,6 +152,181 @@ void main() {
           meterReads,
           equals([0, 71, 136, 2, 2, 18, 17, 5, 0, 0, 36, 2, 36, 0]),
         );
+      });
+    });
+
+    group('Complex watching and writing', () {
+      test('should do as little work as possible', () {
+        fakeAsync((async) {
+          final timeOfDayCog = Cog(
+            (c) => DateTime(
+              2024,
+              2,
+              26,
+              7 + async.elapsed.inHours,
+              async.elapsed.inMinutes,
+            ),
+            ttl: 1.hours + 30.minutes,
+            debugLabel: 'timeOfDayCog',
+          );
+
+          final zipCodeCog = Cog(
+            (c) => switch (c.spin) {
+              City.austin => 78737,
+              City.brooklyn => 11201,
+              City.cambridge => 02138,
+            },
+            debugLabel: 'zipCodeCog',
+            spin: Spin<City>(),
+          );
+
+          final weatherDataCog = Cog(
+            (c) async {
+              final timeOfDay = c.link(timeOfDayCog);
+              final zipCode = c.link(zipCodeCog, spin: c.spin);
+
+              final weatherData = await fetchWeatherData(
+                timeOfDay: timeOfDay,
+                zipCode: zipCode,
+              );
+
+              return weatherData;
+            },
+            async: Async.latestOnly,
+            debugLabel: 'weatherDataCog',
+            init: null.init<WeatherData>(),
+            spin: Spin<City>(),
+            ttl: 30.minutes,
+          );
+
+          final isSunnyCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return false;
+              }
+
+              return weatherData.cloudCoverPercentage < .3;
+            },
+            debugLabel: 'isSunnyCog',
+            spin: Spin<City>(),
+          );
+
+          final willRainLaterCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return false;
+              }
+
+              return weatherData.percentChanceOfRain > .5;
+            },
+            debugLabel: 'willRainLaterCog',
+            spin: Spin<City>(),
+          );
+
+          final tempInFahrenheitCog = Cog(
+            (c) {
+              final weatherData = c.link(weatherDataCog, spin: c.spin);
+
+              if (weatherData == null) {
+                return null;
+              }
+
+              return (weatherData.tempInCelsius * 9 / 5) + 32;
+            },
+            debugLabel: 'tempInFahrenheitCog',
+            spin: Spin<City>(),
+          );
+
+          final isNiceOutsideCog = Cog(
+            (c) {
+              final isSunny = c.link(isSunnyCog, spin: c.spin);
+              final tempInFahrenheit =
+                  c.link(tempInFahrenheitCog, spin: c.spin);
+
+              if (tempInFahrenheit == null) {
+                return false;
+              }
+
+              return isSunny && tempInFahrenheit > 70.0;
+            },
+            debugLabel: 'isNiceOutsideCog',
+            spin: Spin<City>(),
+          );
+
+          final shouldGoToTheBeachCog = Cog(
+            (c) {
+              final isNiceOutside = c.link(isNiceOutsideCog, spin: c.spin);
+              final willRainLater = c.link(willRainLaterCog, spin: c.spin);
+
+              return isNiceOutside && !willRainLater;
+            },
+            debugLabel: 'shouldGoToTheBeachCog',
+            spin: Spin<City>(),
+          );
+
+          final emissions = [];
+
+          isNiceOutsideCog
+              .watch(cogtext, spin: City.austin)
+              .listen((isNiceOutsideCog) {
+            emissions.add(
+              'isNiceOutsideCog in austin: $isNiceOutsideCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.austin)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in austin: $shouldGoToTheBeachCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.brooklyn)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in brooklyn: $shouldGoToTheBeachCog',
+            );
+          });
+          shouldGoToTheBeachCog
+              .watch(cogtext, spin: City.cambridge)
+              .listen((shouldGoToTheBeachCog) {
+            emissions.add(
+              'shouldGoToTheBeachCog in cambridge: $shouldGoToTheBeachCog',
+            );
+          });
+
+          var lastMeterRead = telemetry.meter;
+          final meterReads = [lastMeterRead];
+
+          async.elapse(2.hours);
+
+          meterReads.add(telemetry.meter - lastMeterRead);
+          lastMeterRead = telemetry.meter;
+
+          async.elapse(2.hours);
+
+          meterReads.add(telemetry.meter - lastMeterRead);
+          lastMeterRead = telemetry.meter;
+
+          async.elapse(2.hours);
+
+          meterReads.add(telemetry.meter - lastMeterRead);
+          lastMeterRead = telemetry.meter;
+
+          async.elapse(2.hours);
+
+          meterReads.add(telemetry.meter - lastMeterRead);
+          lastMeterRead = telemetry.meter;
+
+          expect(
+            meterReads,
+            equals([443, 508, 550, 329, 521]),
+          );
+        });
       });
     });
   });
