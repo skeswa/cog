@@ -109,8 +109,6 @@ final class AutomaticCogInvocationFrame<ValueType, SpinType>
     return _hasValue ? _value as CurrValueType : fallback;
   }
 
-  bool get hasValue => _hasValue;
-
   @override
   LinkedCogValueType link<LinkedCogValueType, LinkedCogSpinType>(
     Cog<LinkedCogValueType, LinkedCogSpinType> cog, {

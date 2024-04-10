@@ -4437,7 +4437,8 @@ void main() {
             isNot(throwsA(anything)));
       });
 
-      test('Internal Cog state is protected from external meddling', () {
+      test('Internal Cog state is somewhat protected from external meddling',
+          () {
         cogtext = Cogtext();
 
         final cog = Cog.man(() => 0);
@@ -4456,6 +4457,28 @@ void main() {
         expect(() => cogState!.markStale(staleness: Staleness.fresh),
             throwsA(anything));
         expect(() => cogState!.spinOrThrow, throwsA(anything));
+      });
+
+      test('Default Cog error handling strategy is to throw', () {
+        cogtext = Cogtext();
+
+        final numberCog = Cog.man(() => 0);
+
+        final maybeNumberPlusOneCog = Cog((c) {
+          final number = c.link(numberCog);
+
+          if (number > 0) {
+            throw StateError('uh oh');
+          }
+
+          return number + 1;
+        });
+
+        maybeNumberPlusOneCog.read(cogtext);
+
+        numberCog.write(cogtext, 1);
+
+        expect(() => maybeNumberPlusOneCog.read(cogtext), throwsA(anything));
       });
     });
   });

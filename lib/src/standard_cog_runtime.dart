@@ -269,6 +269,13 @@ final class StandardCogRuntime implements CogRuntime {
       return;
     }
 
+    logging.error(
+      cogState,
+      'encountered an error while conveying',
+      error,
+      stackTrace,
+    );
+
     assert(() {
       var errorContext = '';
       if (cogState != null) {
@@ -283,13 +290,6 @@ final class StandardCogRuntime implements CogRuntime {
         'Encountered a Cog runtime error$errorContext: $error:\n$stackTrace',
       );
     }());
-
-    logging.error(
-      cogState,
-      'encountered an error while conveying',
-      error,
-      stackTrace,
-    );
   }
 
   @override
