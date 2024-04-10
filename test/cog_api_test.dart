@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cog/cog.dart';
-import 'package:cog/src/cog_registry.dart';
-import 'package:cog/src/staleness.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
