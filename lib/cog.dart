@@ -1,5 +1,6 @@
 export 'src/async.dart';
 export 'src/cog.dart';
+export 'src/cog_box.dart';
 export 'src/cog_state.dart';
 export 'src/cog_runtime.dart';
 export 'src/cog_runtime_logging.dart';
