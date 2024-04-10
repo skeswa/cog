@@ -25,6 +25,9 @@ sealed class BoxedCog<ValueType, SpinType> {
 
   ValueType read({SpinType? spin}) => _cog.read(_cogBox._cogtext, spin: spin);
 
+  @override
+  String toString() => 'Boxed($_cog)';
+
   Stream<ValueType> watch({
     Priority? priority,
     SpinType? spin,
@@ -41,4 +44,11 @@ final class BoxedManualCog<ValueType, SpinType>
   final CogBox _cogBox;
 
   BoxedManualCog._(this._cog, this._cogBox);
+
+  void write(
+    ValueType value, {
+    bool quietly = false,
+    SpinType? spin,
+  }) =>
+      _cog.write(_cogBox._cogtext, value, quietly: quietly, spin: spin);
 }
