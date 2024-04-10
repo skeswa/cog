@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'helpers/helpers.dart';
 
 void main() {
-  group('Cog Performance', () {
+  group('Cog Performance Smoke', () {
     late Cogtext cogtext;
     late TestingCogRuntimeTelemetry telemetry;
 
