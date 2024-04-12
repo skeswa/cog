@@ -46,8 +46,16 @@ part 'manual_cog.dart';
 /// Cogs that specify a [Spin] require that `spin` is always specified when
 /// reading from, or writing to that [Cog].
 sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
+  /// Optional description of the state wrapped by this [Cog].
+  ///
+  /// This label is used by logging and development tools to make understanding
+  /// the application state graph easier.
   String? debugLabel;
 
+  /// [Function] used to determine if two different values of this [Cog] should
+  /// be treated as equivalent.
+  ///
+  /// If left unspecified, the `==` operator is used.
   final CogValueComparator<ValueType>? eq;
 
   @override
