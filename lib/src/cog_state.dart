@@ -5,6 +5,7 @@ import 'cog.dart';
 import 'cog_runtime.dart';
 import 'common.dart';
 import 'priority.dart';
+import 'spin.dart';
 import 'staleness.dart';
 
 part 'async_automatic_cog_state_conveyor.dart';
@@ -16,10 +17,29 @@ part 'manual_cog_state.dart';
 part 'non_cog_tracker.dart';
 part 'sync_automatic_cog_state_conveyor.dart';
 
+/// Internal controller that manages the state and lifecycle for a specific
+/// [Spin] of a particular [cog].
+///
+/// Importantly, [CogState] is an implementation detail that should not be
+/// directly interacted with by the library user. If a Cog specifies a [Spin],
+/// each corresponding [CogState] specifies a [_spin] value of type [SpinType];
+/// in this configuration, Cog and [CogState] are one-to-many. Otherwise, if a
+/// Cog does not specify a [Spin], it was precisely one [CogState] having a
+/// `null` [_spin].
+///
+/// Each [CogState] is bound to precisely one [CogRuntime].
 sealed class CogState<ValueType, SpinType,
-    CogType extends Cog<ValueType, SpinType>> {
+    CogType extends CogLike<ValueType, SpinType>> {
+  /// Cog instance for which this [CogState] controls state changes and
+  /// lifecycle.
   final CogType cog;
 
+  /// Integer that uniquely identifies this [CogState] relative to all other
+  /// instances of [CogState] registered with the [CogRuntime] to which this
+  /// [CogState] belongs.
+  ///
+  /// Despite being specified as a getter, [ordinal] is expected to never change
+  /// and **must** only identify this Cog.
   final CogStateOrdinal ordinal;
 
   CogStateRevision _revision = initialCogStateRevision - 1;

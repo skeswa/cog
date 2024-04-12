@@ -28,6 +28,12 @@ sealed class BoxedCog<ValueType, SpinType>
       _cog.createState(ordinal: ordinal, runtime: runtime, spin: spin);
 
   @override
+  String? get debugLabel => _cog.debugLabel;
+
+  @override
+  CogValueComparator<ValueType>? get eq => _cog.eq;
+
+  @override
   CogOrdinal get ordinal => _cog.ordinal;
 
   ValueType read({SpinType? spin}) {

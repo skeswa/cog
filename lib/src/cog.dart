@@ -36,26 +36,12 @@ part 'manual_cog.dart';
 /// Automatic and manual combine to form a reactive state graph robust enough
 /// for applications spanning the full spectrum of complexity.
 ///
-/// Cogs either wrap a single value of type [ValueType], or many values of type
-/// [ValueType] indexed by a particular [Spin]. Cogs that specify a [Spin] act
-/// sort of like a hash map, allowing listeners and other Cogs to subscribe to
-/// specific variants of a value. For example, it could make sense for a [Cog]
-/// tracking the time to use `TimeZone` as its [Spin]. In this instance,
-/// [SpinType] would be `TimeZone`.
-///
-/// Cogs that specify a [Spin] require that `spin` is always specified when
-/// reading from, or writing to that [Cog].
+/// {@macro cog_like.spin}
 sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
-  /// Optional description of the state wrapped by this [Cog].
-  ///
-  /// This label is used by logging and development tools to make understanding
-  /// the application state graph easier.
+  @override
   String? debugLabel;
 
-  /// [Function] used to determine if two different values of this [Cog] should
-  /// be treated as equivalent.
-  ///
-  /// If left unspecified, the `==` operator is used.
+  @override
   final CogValueComparator<ValueType>? eq;
 
   @override
