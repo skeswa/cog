@@ -4658,8 +4658,7 @@ void main() {
 
         expect(cogState, isNot(isNull));
 
-        expect(() => cogState!.markStale(staleness: Staleness.fresh),
-            throwsA(anything));
+        expect(() => cogState!.markStale(Staleness.fresh), throwsA(anything));
         expect(() => cogState!.spinOrThrow, throwsA(anything));
       });
 

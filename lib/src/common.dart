@@ -1,5 +1,7 @@
 import 'cog.dart';
 
+// TODO(skeswa): all the `int` typedefs should be `extension type`s
+
 typedef AutomaticCogInvocationFrameOrdinal = int;
 typedef CogOrdinal = int;
 typedef CogSpinHash = int;

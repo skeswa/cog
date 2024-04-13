@@ -30,7 +30,7 @@ final class AutomaticCogState<ValueType, SpinType>
   }
 
   @override
-  void markFollowersStale({Staleness staleness = Staleness.stale}) {
+  void markFollowersStale([Staleness? staleness]) {
     if (!_conveyor.propagatesPotentialStaleness &&
         staleness == Staleness.maybeStale) {
       _runtime.logging.debug(
@@ -42,14 +42,12 @@ final class AutomaticCogState<ValueType, SpinType>
       return;
     }
 
-    super.markFollowersStale(staleness: staleness);
+    super.markFollowersStale(staleness);
   }
 
   @override
-  void markStale({
-    Staleness staleness = Staleness.stale,
-  }) {
-    super.markStale(staleness: staleness);
+  void markStale([Staleness? staleness]) {
+    super.markStale(staleness);
 
     if (_conveyor.isEager) {
       _runtime.logging.debug(

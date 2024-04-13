@@ -21,11 +21,14 @@ part 'sync_automatic_cog_state_conveyor.dart';
 /// [Spin] of a particular [cog].
 ///
 /// Importantly, [CogState] is an implementation detail that should not be
-/// directly interacted with by the library user. If a Cog specifies a [Spin],
-/// each corresponding [CogState] specifies a [_spin] value of type [SpinType];
-/// in this configuration, Cog and [CogState] are one-to-many. Otherwise, if a
-/// Cog does not specify a [Spin], it was precisely one [CogState] having a
-/// `null` [_spin].
+/// directly interacted with by the library user.
+///
+/// {@template cog_state.spin}
+/// If a Cog specifies a [Spin], each corresponding [CogState] specifies a
+/// [_spin] value of type [SpinType]; in this configuration, Cog and [CogState]
+/// are one-to-many. Otherwise, if a Cog does not specify a [Spin], it was
+/// precisely one [CogState] having a `null` [_spin].
+/// {@endtemplate}
 ///
 /// Each [CogState] is bound to precisely one [CogRuntime].
 sealed class CogState<ValueType, SpinType,
@@ -37,51 +40,67 @@ sealed class CogState<ValueType, SpinType,
   /// Integer that uniquely identifies this [CogState] relative to all other
   /// instances of [CogState] registered with the [CogRuntime] to which this
   /// [CogState] belongs.
-  ///
-  /// Despite being specified as a getter, [ordinal] is expected to never change
-  /// and **must** only identify this Cog.
   final CogStateOrdinal ordinal;
 
+  /// Ever-increasing integer that changes value every time this [CogState]'s
+  /// value changes.
   CogStateRevision _revision = initialCogStateRevision - 1;
 
+  /// [CogRuntime] to which this [CogState] belongs.
   final CogRuntime _runtime;
 
+  /// Cog [Spin] value to which this [CogState] is bound.
+  ///
+  /// {@macro cog_state.spin}
   final SpinType? _spin;
 
+  /// Describes whether [_value] needs to be recalculated.
   var _staleness = Staleness.stale;
 
+  /// Most-recently calculated value of this [CogState].
+  ///
+  /// This field is `late` because, before this [CogState] is initialized via
+  /// [init], it does not yet have a value.
   late ValueType _value;
 
+  /// Creates a new [CogState].
+  ///
+  /// * [runtime] is the [CogRuntime] to which the resulting [CogState] should
+  ///   belong
+  /// * [spin] is the Cog [Spin] value to which the resulting [CogState] should
+  ///   be bound
   CogState({
     required this.cog,
     required this.ordinal,
-    required SpinType? spin,
     required CogRuntime runtime,
+    required SpinType? spin,
   })  : _runtime = runtime,
         _spin = spin;
 
-  bool assertHasValue() {
-    if (!_hasValue) {
-      throw StateError(
-        'Cog state has not yet been initialized. Typically, this happens '
-        'if the initial invocation of the Cog definition threw.',
-      );
-    }
-
-    return true;
-  }
-
+  /// Returns the current value of this [CogState], throwing when said value has
+  /// not yet been calculated.
+  ///
+  /// In some implementations of [CogState], invocations of this method may
+  /// cause value to be recalculated before being returned.
   ValueType evaluate() {
-    assertHasValue();
+    _assertHasValue();
 
     return _value;
   }
 
+  /// Method invoked on this [CogState] almost immediately following that of the
+  /// constructor.
+  ///
+  /// NOTE: [init] is called separately from the constructor to allow for cyclic
+  /// dependencies between instances of [CogState].
   void init();
 
-  void markFollowersStale({
-    Staleness staleness = Staleness.stale,
-  }) {
+  /// Specifies the desired [staleness] of [CogState] followers of this
+  /// [CogState], potentially notifying affected listeners to re-evaluate the
+  /// respective [CogState] instances.
+  ///
+  /// If left unspecified, [staleness] defaults to [Staleness.stale].
+  void markFollowersStale([Staleness? staleness]) {
     final followerOrdinals = _runtime.followerOrdinalsOf(ordinal);
 
     final followerOrdinalCount = followerOrdinals.length;
@@ -89,13 +108,17 @@ sealed class CogState<ValueType, SpinType,
     for (var i = 0; i < followerOrdinalCount; i++) {
       final followerOrdinal = followerOrdinals[i];
 
-      _runtime[followerOrdinal]?.markStale(staleness: staleness);
+      _runtime[followerOrdinal]?.markStale(staleness);
     }
   }
 
-  void markStale({
-    Staleness staleness = Staleness.stale,
-  }) {
+  /// Specifies the desired [staleness] of this [CogState], potentially
+  /// notifying listeners to re-evaluate this [CogState].
+  ///
+  /// If left unspecified, [staleness] defaults to [Staleness.stale].
+  void markStale([Staleness? staleness]) {
+    staleness ??= Staleness.stale;
+
     assert(() {
       if (staleness == Staleness.fresh) {
         throw ArgumentError('Staleness cannot be set to fresh externally');
@@ -116,13 +139,15 @@ sealed class CogState<ValueType, SpinType,
     }
 
     _runtime.maybeNotifyListenersOf(ordinal);
-    markFollowersStale(staleness: Staleness.maybeStale);
+    markFollowersStale(Staleness.maybeStale);
   }
 
-  bool maybeRevise(
-    ValueType value, {
-    required bool shouldNotify,
-  }) {
+  /// Changes the value of this [CogState] to [value] if it is qualitatively
+  /// different, returning `true` if a change was made.
+  ///
+  /// [shouldNotify] should be `false` when value changes should be made without
+  /// notifying listeners.
+  bool maybeRevise(ValueType value, {required bool shouldNotify}) {
     final shouldRevise = !_hasValue || !_eq(_value, value);
 
     if (shouldRevise) {
@@ -157,10 +182,19 @@ sealed class CogState<ValueType, SpinType,
     return shouldRevise;
   }
 
+  /// Ever-increasing integer that changes value every time this [CogState]'s
+  /// value changes.
   CogStateRevision get revision => _revision;
 
+  /// Spin of this [CogState], or `null` if the Cog underlying this [CogState]
+  /// does not have an associated [Spin].
+  ///
+  /// Importantly, `null` could mean that this [CogState] simply has a spin of
+  /// `null`.
   SpinType? get spinOrNull => _spin;
 
+  /// Evaluates to the spin of this [CogState], throwing if the Cog underlying
+  /// this [CogState] does not have an associated [Spin].
   SpinType get spinOrThrow {
     assert(() {
       if (cog.spin == null) {
@@ -176,10 +210,25 @@ sealed class CogState<ValueType, SpinType,
     return _spin as SpinType;
   }
 
+  /// Throws if this [CogState] does not yet have a value.
+  void _assertHasValue() {
+    if (!_hasValue) {
+      throw StateError(
+        'Cog state has not yet been initialized. Typically, this happens '
+        'if the initial invocation of the Cog definition threw.',
+      );
+    }
+  }
+
+  /// Returns `true` if [cog] considers values [a] and [b] to be qualitatively
+  /// equivalent.
   bool _eq(ValueType a, ValueType b) => cog.eq?.call(a, b) ?? a == b;
 
+  /// `true` if this [CogState] currently has a value.
   bool get _hasValue => _revision >= initialCogStateRevision;
 
+  /// Changes [_staleness] to [staleness] if necessary, return `true` if
+  /// [_staleness] actually changed.
   bool _maybeUpdateStaleness(Staleness staleness) {
     if (staleness == _staleness) {
       return false;
