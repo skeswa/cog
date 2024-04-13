@@ -26,8 +26,8 @@ part 'manual_cog.dart';
 /// There are exactly two kinds of [Cog]:
 /// - **Automatic**\
 ///   Automatic Cogs, created with the default `Cog(...)` constructor, derive
-///   their value by composing the values of other Cogs and/or external state.
-///   In practice, most Cogs should be automatic.
+///   their values by composing and manipulating the values of other Cogs and/or
+///   external state. In practice, most Cogs should be automatic.
 /// - **Manual**\
 ///   Manual Cogs are assigned values imperatively with the `write(...)` method.
 ///   These Cogs, created with the `Cog.man(...)` constructor, are intended to
@@ -50,6 +50,7 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   @override
   final Spin<SpinType>? spin;
 
+  /// {@macro cog.auto.constructor}
   factory Cog(
     AutomaticCogDefinition<ValueType, SpinType> def, {
     Async? async,
@@ -71,6 +72,41 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
         ttl: ttl,
       );
 
+  /// {@template cog.auto.constructor}
+  /// Creates a new automatic [Cog].
+  ///
+  /// Automatic Cogs derive their values by composing and manipulating the
+  /// values of other Cogs and/or external state. At its core, an automatic
+  /// [Cog] is defined by its [def] function. Using the [AutomaticCogController]
+  /// passed into it, the [def] function can link other Cogs and/or external
+  /// state to derive the value of the surrounding automatic [Cog].
+  /// ```dart
+  /// final myAutoCog = Cog.auto((c) {
+  ///   final cogDepValue = c.link(cogDep);
+  ///   final nonCogDepValue = c.linkNonCog(nonCogDep, ...);
+  ///
+  ///   return cogDepValue.combineWith(nonCogDepValue);
+  /// });
+  /// ```
+  /// * [def] defines the resulting automatic [Cog] by linking other Cogs and/or
+  ///   external state and returning the automatic [Cog]'s value
+  /// * [async] specifies the resulting automatic [Cog]'s concurrency strategy
+  ///   when [def] returns a [Future] - defaults to [Async.parallel]
+  /// * [debugLabel] is the optional description of the state wrapped by the
+  ///   resulting automatic [Cog]
+  /// * [eq] is the [Function] used to determine if two different values of the
+  ///   resulting automatic [Cog] should be treated as equivalent - defaults to
+  ///   the `==` operator
+  /// * [init] returns the initial value of the resulting automatic [Cog] - this
+  ///   [Function] is only necessary if [def] returns a [Future]
+  /// * [registry] is the [CogRegistry] with which the resulting automatic [Cog]
+  ///   should be registered upon instantiation
+  /// * [spin] optionally specifies the [SpinType] of the resulting automatic
+  ///   [Cog] - for more information on what [Spin] is and how it works, see the
+  ///   [Cog] docs
+  /// * [ttl] optionally specifies how long it should take for values of the
+  ///   resulting automatic [Cog] to become stale - defaults to ∞
+  /// {@endtemplate}
   static AutomaticCog<ValueType, SpinType> auto<ValueType, SpinType>(
     AutomaticCogDefinition<ValueType, SpinType> def, {
     Async? async,
@@ -92,6 +128,21 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
         ttl: ttl,
       );
 
+  /// Creates a new manual [Cog].
+  ///
+  /// Manual Cogs are assigned values imperatively with the `write(...)` method.
+  ///
+  /// * [init] returns the initial value of the resulting manual [Cog]
+  /// * [debugLabel] is the optional description of the state wrapped by the
+  ///   resulting manual [Cog]
+  /// * [eq] is the [Function] used to determine if two different values of the
+  ///   resulting manual [Cog] should be treated as equivalent - defaults to the
+  ///   `==` operator
+  /// * [registry] is the [CogRegistry] with which the resulting manual [Cog]
+  ///   should be registered upon instantiation
+  /// * [spin] optionally specifies the [SpinType] of the resulting manual [Cog]
+  ///   - for more information on what [Spin] is and how it works, see the [Cog]
+  ///   docs
   static ManualCog<ValueType, SpinType> man<ValueType, SpinType>(
     CogValueInitializer<ValueType> init, {
     String? debugLabel,
@@ -107,6 +158,7 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
         spin: spin,
       );
 
+  /// Internal [Cog] super constructor.
   Cog._({
     required this.debugLabel,
     required this.eq,
@@ -116,10 +168,11 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
     ordinal = (registry ?? GlobalCogRegistry.instance).register(this);
   }
 
-  ValueType read(
-    Cogtext cogtext, {
-    SpinType? spin,
-  }) {
+  /// Returns the current value of the specified [spin] of this [Cog] within the
+  /// given [cogtext].
+  ///
+  /// {@macro cog_like.spin}
+  ValueType read(Cogtext cogtext, {SpinType? spin}) {
     assert(thatSpinsMatch(this, spin));
 
     final cogState = cogtext.runtime.acquire(cog: this, cogSpin: spin);
@@ -127,6 +180,17 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
     return cogState.evaluate();
   }
 
+  /// Returns a [Stream] that emits value of the specified [spin] of this [Cog]
+  /// iven [cogtext] as it changes.
+  ///
+  /// Importantly, the resulting [Stream] does not emit upon subscription - only
+  /// on change.
+  ///
+  /// [priority] specifies how urgently, relative to other listeners, the
+  /// resulting [Stream] should receive new emissions - defaults to
+  /// [Priority.normal]
+  ///
+  /// {@macro cog_like.spin}
   Stream<ValueType> watch(
     Cogtext cogtext, {
     Priority? priority,

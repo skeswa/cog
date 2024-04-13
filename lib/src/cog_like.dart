@@ -51,9 +51,15 @@ abstract interface class CogLike<ValueType, SpinType> {
   /// Cogs either wrap a single value of type [ValueType], or many values of
   /// type [ValueType] indexed by a particular [Spin]. Cogs that specify a
   /// [Spin] act sort of like a hash map, allowing listeners and other Cogs to
-  /// subscribe to specific variants of a value. For example, it could make
-  /// sense for a Cog tracking the time to use `TimeZone` as its [Spin]. In
-  /// this instance, [SpinType] would be `TimeZone`.
+  /// subscribe to specific variants of a value. That way, a single Cog can have
+  /// the same semantic meaning in all scenarios by allowing for contextual
+  /// variation.
+  ///
+  /// For example, it might make sense for a Cog tracking the time to use time
+  /// zone as its [Spin]. This allows a single time Cog to exist: why have
+  /// different Cogs for east coast time and west coast time when you could
+  /// simply use [Spin] to specify which time you're talking about? In this
+  /// instance, [SpinType] might be some `TimeZone` type.
   ///
   /// Cogs that specify a [Spin] require that `spin:` is always specified when
   /// reading from, watching, or writing to that Cog.
