@@ -680,7 +680,7 @@ void main() {
 
                 return 'waited $duration seconds ${times++} times';
               },
-              async: Async.queued,
+              async: Async.sequentialQueued,
               debugLabel: 'waitingCog',
               init: () => '',
               ttl: 5.seconds,
@@ -2032,7 +2032,10 @@ void main() {
               }
 
               return -scalar;
-            }, async: Async.parallel, debugLabel: 'waitingCog', init: () => 0);
+            },
+                async: Async.parallelUnordered,
+                debugLabel: 'waitingCog',
+                init: () => 0);
 
             final emissions = [];
 
@@ -2136,7 +2139,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.latestOnly,
+              async: Async.parallelLatestWins,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2216,7 +2219,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.latestOnly,
+              async: Async.parallelLatestWins,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2309,7 +2312,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.latestOnly,
+              async: Async.parallelLatestWins,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2391,7 +2394,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.oneAtATime,
+              async: Async.sequentialIgnoring,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2472,7 +2475,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.oneAtATime,
+              async: Async.sequentialIgnoring,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2566,7 +2569,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.oneAtATime,
+              async: Async.sequentialIgnoring,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2649,7 +2652,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.parallel,
+              async: Async.parallelUnordered,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2731,7 +2734,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.parallel,
+              async: Async.parallelUnordered,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2826,7 +2829,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.parallel,
+              async: Async.parallelUnordered,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2910,7 +2913,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.queued,
+              async: Async.sequentialQueued,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -2964,7 +2967,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.queued,
+              async: Async.sequentialQueued,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -3031,7 +3034,7 @@ void main() {
 
                 return 'waited $duration';
               },
-              async: Async.queued,
+              async: Async.sequentialQueued,
               debugLabel: 'waitingCog',
               init: () => '',
             );
@@ -3801,7 +3804,7 @@ void main() {
 
                 return weatherData;
               },
-              async: Async.latestOnly,
+              async: Async.parallelLatestWins,
               debugLabel: 'weatherDataCog',
               init: null.init<WeatherData>(),
               spin: Spin<City>(),
@@ -4522,7 +4525,7 @@ void main() {
         final helloCog = Cog(
           (c) => 'hello',
           debugLabel: 'helloCog',
-          async: Async.latestOnly,
+          async: Async.parallelLatestWins,
           eq: (a, b) => a.length == b.length,
         );
 
@@ -4534,7 +4537,9 @@ void main() {
         expect(
           '$helloCog',
           'AutomaticCog<String>('
-              'async: Async.latestOnly, debugLabel: "helloCog", eq: overridden'
+              'async: Async.parallelLatestWins, '
+              'debugLabel: "helloCog", '
+              'eq: overridden'
               ')',
         );
       });

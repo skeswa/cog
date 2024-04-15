@@ -77,7 +77,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
   }) async {
     if (_pendingInvocationFrameCount > 0) {
       switch (_cogState.cog.async) {
-        case Async.oneAtATime:
+        case Async.sequentialIgnoring:
           _cogState._runtime.logging.debug(
             _cogState,
             'skipping convey because one is already in progress',
@@ -89,7 +89,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
         // When scheduling queued, all we need to track is whether there should
         // be a re-convey. We schedule re-convey when an active frame is already
         // in progress so that we can follow it up once complete.
-        case Async.queued:
+        case Async.sequentialQueued:
           if (_reconveyStatus != _ReconveyStatus.scheduled) {
             _reconveyStatus = _ReconveyStatus.necessary;
           }
@@ -143,7 +143,7 @@ final class AsyncAutomaticCogStateConveyor<ValueType, SpinType>
 
       final pendingInvocationResult = await pendingInvocation;
 
-      if (_cogState.cog.async == Async.latestOnly) {
+      if (_cogState.cog.async == Async.parallelLatestWins) {
         if (!_isLatestInvocationFrame(pendingInvocationFrame)) {
           _cogState._runtime.logging.debug(
             _cogState,

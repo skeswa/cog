@@ -91,7 +91,7 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   /// * [def] defines the resulting automatic [Cog] by linking other Cogs and/or
   ///   external state and returning the automatic [Cog]'s value
   /// * [async] specifies the resulting automatic [Cog]'s concurrency strategy
-  ///   when [def] returns a [Future] - defaults to [Async.parallel]
+  ///   when [def] returns a [Future] - defaults to [defaultAsync]
   /// * [debugLabel] is the optional description of the state wrapped by the
   ///   resulting automatic [Cog]
   /// * [eq] is the [Function] used to determine if two different values of the

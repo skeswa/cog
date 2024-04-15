@@ -192,7 +192,7 @@ void main() {
 
               return weatherData;
             },
-            async: Async.latestOnly,
+            async: Async.parallelLatestWins,
             debugLabel: 'weatherDataCog',
             init: null.init<WeatherData>(),
             spin: Spin<City>(),
