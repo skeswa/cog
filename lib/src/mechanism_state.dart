@@ -18,6 +18,11 @@ final class MechanismState implements MechanismController {
   }) : _cogRuntime = cogRuntime;
 
   @override
+  String? get debugLabel => mechanism.debugLabel != null
+      ? 'MechanismController(debugLabel: "${mechanism.debugLabel}")'
+      : null;
+
+  @override
   FutureOr<void> dispose() {
     for (final disposer in _disposers) {
       try {
