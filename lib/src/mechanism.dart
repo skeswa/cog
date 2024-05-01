@@ -10,6 +10,7 @@ part 'mechanism_controller.dart';
 /// [Mechanism] enables side effects that observe, read from or write to the
 /// [Cog] state graph.
 ///
+/// {@template mechanism.blurb}
 /// Mechanisms work by invoking [def] once for every active [Cogtext]. In fact,
 /// following the instantiation of a new [Mechanism] while an active [Cogtext]
 /// exists, [def] is invoked almost immediately. The [def] function can
@@ -28,6 +29,8 @@ part 'mechanism_controller.dart';
 ///   m.onDispose(subscription.cancel);
 /// });
 /// ```
+/// {@endtemplate}
+///
 /// Notice that disposal callbacks can be wired up to the [Mechanism] using
 /// [MechanismController.onDispose]. This way, when a [Mechanism] is disposed,
 /// its [def] closure doesn't spring a leak.
@@ -78,13 +81,17 @@ final class Mechanism {
 
   /// Creates a new [Mechanism].
   ///
+  /// {@macro mechanism.blurb}
+  ///
+  /// {@template mechanism.constructor}
   /// * [def] stipulates the behaviors and configuration of the side effect to
-  ///   be encapsulated by the reuslting [Mechanism]
+  ///   be encapsulated by the resulting [Mechanism]
   /// * [debugLabel] is the optional description of the side-effect encapsulated
-  ///   by the reuslting [Mechanism]
+  ///   by the resulting [Mechanism]
   /// * [registry] is the [MechanismRegistry] with which the resulting
   ///   [Mechanism] will be registered upon instantiation - defaults to
   ///   [GlobalMechanismRegistry]
+  /// {@endtemplate}
   Mechanism(
     this.def, {
     this.debugLabel,
@@ -95,10 +102,21 @@ final class Mechanism {
     ordinal = registry.register(this);
   }
 
+  /// Temporarily halts the functioning of this [Mechanism] within the specified
+  /// [Cogtext].
+  ///
+  /// While a [Mechanism] is paused, it is functionally dormant - almost as if
+  /// it was never created at all. Mechanisms may be "unpaused" with the
+  /// [resume] method.
   void pause(Cogtext cogtext) {
     cogtext.runtime.pauseMechanism(ordinal);
   }
 
+  /// Reverses the effects of a call to [pause] within the specified [Cogtext],
+  /// re-instating this [Mechanism] to a state of full functionality.
+  ///
+  /// This method does nothing if this [Mechanism] is not paused within
+  /// specified [Cogtext].
   void resume(Cogtext cogtext) {
     cogtext.runtime.resumeMechanism(ordinal);
   }
@@ -109,4 +127,8 @@ final class Mechanism {
       ')';
 }
 
+/// Closure that stipulates the behaviors and configuration of the side effect
+/// encapsulated by a [Mechanism].
+///
+/// For more information, see the [Mechanism] docs.
 typedef MechanismDefinition = void Function(MechanismController);

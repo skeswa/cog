@@ -104,6 +104,7 @@ final class CogBox {
     return boxedCog;
   }
 
+  /// Halts and destroys all Cogs and Mechanisms that belong to this [CogBox].
   void dispose() {
     for (final boxedMechanism in _boxedMechanisms) {
       _cogtext.runtime.disposeMechanism(boxedMechanism._mechanism.ordinal);
@@ -145,6 +146,11 @@ final class CogBox {
     return boxedCog;
   }
 
+  /// Creates a new [Mechanism] belonging to this [CogBox].
+  ///
+  /// {@macro mechanism.blurb}
+  ///
+  /// {@macro mechanism.constructor}
   BoxedMechanism mechanism(
     MechanismDefinition def, {
     String? debugLabel,
@@ -162,6 +168,8 @@ final class CogBox {
     return boxedMechanism;
   }
 
+  /// Combines this [CogBox]'s [CogBox.debugLabel] with the specified
+  /// [debugLabel], returning `null` if combination is not possible.
   String? _maybeScopeDebugLabel(String? debugLabel) {
     if (this.debugLabel == null || debugLabel == null) {
       return null;
