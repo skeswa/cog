@@ -1,14 +1,33 @@
 part of 'cog.dart';
 
+/// [AutomaticCog] is the concrete implementation of an Automatic [Cog].
+///
+/// {@macro cog.blurb}
 final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
+  /// Specifies this automatic [Cog]'s concurrency strategy if [def] returns a
+  /// [Future].
+  ///
+  /// When `null`, [async] falls back to [defaultAsync].
   final Async? async;
 
+  /// Closure that defines this automatic [Cog] by linking other Cogs and/or
+  /// external state and returning this automatic [Cog]'s value.
+  ///
+  /// For more information, see the [Cog] docs.
   final AutomaticCogDefinition<ValueType, SpinType> def;
 
+  /// Returns the initial value of this automatic [Cog].
+  ///
+  /// This [Function] is only necessary if [def] returns a [Future].
   final CogValueInitializer<ValueType>? init;
 
+  /// Specifies how long it should take for values of this automatic [Cog] to
+  /// become stale.
+  ///
+  /// When `null`, [ttl] is assumed to be ∞.
   final Duration? ttl;
 
+  /// Internal [AutomaticCog] constructor.
   AutomaticCog._(
     this.def, {
     super.debugLabel,
@@ -96,5 +115,9 @@ final class AutomaticCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
   }
 }
 
+/// Closure that defines an automatic [Cog] by linking other Cogs and/or
+/// external state and returning the automatic [Cog]'s value.
+///
+/// For more information, see the [Cog] docs.
 typedef AutomaticCogDefinition<ValueType, SpinType> = FutureOr<ValueType>
     Function(AutomaticCogController<ValueType, SpinType>);

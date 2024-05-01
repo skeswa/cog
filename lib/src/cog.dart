@@ -18,6 +18,7 @@ part 'manual_cog.dart';
 /// [Cog] is an abstraction that imbues application state with composability and
 /// observability.
 ///
+/// {@template cog.blurb}
 /// Cogs are designed to organize evolving, related data such that operating on
 /// it is akin to turning "interlocking cogs in a machine": The connections
 /// between related data should be explicit and easily understandable. Applying
@@ -35,6 +36,7 @@ part 'manual_cog.dart';
 ///
 /// Automatic and manual combine to form a reactive state graph robust enough
 /// for applications spanning the full spectrum of complexity.
+/// {@endtemplate}
 ///
 /// {@macro cog_like.spin}
 sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
@@ -200,7 +202,7 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   ///
   /// [priority] specifies how urgently, relative to other listeners, the
   /// resulting [Stream] should receive new emissions - defaults to
-  /// [Priority.normal]
+  /// [Priority.normal].
   ///
   /// {@macro cog_like.spin}
   Stream<ValueType> watch(

@@ -1,8 +1,13 @@
 part of 'cog.dart';
 
+/// [ManualCog] is the concrete implementation of a Manual [Cog].
+///
+/// {@macro cog.blurb}
 final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
+  /// Returns the initial value of this [Cog].
   final CogValueInitializer<ValueType> init;
 
+  /// Internal [ManualCog] constructor.
   ManualCog._({
     super.debugLabel,
     required CogValueComparator<ValueType>? eq,
@@ -62,6 +67,13 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
     return stringBuffer.toString();
   }
 
+  /// Sets the current value of the specified [spin] of this [Cog] within the
+  /// given [cogtext] to [value].
+  ///
+  /// [quietly] is `true` if this write shouldn't notify listeners if it
+  /// changes this [Cog]'s value - defaults to `false`.
+  ///
+  /// {@macro cog_like.spin}
   void write(
     Cogtext cogtext,
     ValueType value, {
