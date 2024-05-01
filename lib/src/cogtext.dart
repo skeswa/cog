@@ -4,7 +4,7 @@ class Cogtext {
   /// Optional description of the state wrapped by this [Cog].
   ///
   /// This label is used by logging and development tools to make understanding
-  /// the application state graph easier.
+  /// the application state machine easier.
   final String? debugLabel;
 
   /// [CogRuntime] powering this [Cogtext].

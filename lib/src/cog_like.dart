@@ -1,6 +1,6 @@
 part of 'cog.dart';
 
-/// Any entity that behaves like a [Cog].
+/// Describes anything that behaves like a [Cog].
 ///
 /// This `interface` is implemented by [Cog] and its subclasses. It is also
 /// implemented by convenience wrappers around [Cog] that add or tweak
@@ -26,7 +26,7 @@ abstract interface class CogLike<ValueType, SpinType> {
   /// Optional description of the state wrapped by this [Cog].
   ///
   /// This label is used by logging and development tools to make understanding
-  /// the application state graph easier.
+  /// the application state machine easier.
   String? get debugLabel;
 
   /// [Function] used to determine if two different values of this Cog should

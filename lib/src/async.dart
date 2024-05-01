@@ -9,7 +9,7 @@ enum Async {
   /// Concurrency strategy that permits multiple value calculations to occur at
   /// a time, keeping the result.
   ///
-  /// This is the default concurrency strategy. It is also the the simplest.
+  /// This is the default concurrency strategy. It is also the simplest.
   parallelUnordered,
 
   /// Concurrency strategy that permits only one value calculation to occur at a

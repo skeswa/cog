@@ -12,24 +12,71 @@ import 'spin.dart';
 part 'boxed_cog.dart';
 part 'boxed_mechanism.dart';
 
+/// Abstraction designed to group and scope related Cogs and Mechanisms.
+///
+/// [CogBox] ensures that any Cogs or Mechanisms created against it all use the
+/// same surrounding [Cogtext], can be disposed as a group with [dispose], and
+/// are labeled for debugging in a similar way.
+///
+/// [CogBox] is best used as a way to create Cogs and Mechanisms that "belong"
+/// to an ephemeral entity. For example, in a graphical application that
+/// features a canvas on which shapes can placed and manipulated, it would make
+/// sense to give every shape a [CogBox] to contain its Cogs tracking position,
+/// rotation, and size. By using [CogBox], global state that generalizes over
+/// shape state doesn't need to lean too heavily on [Spin].
 final class CogBox {
+  /// Optional description of the scope or domain represented by this [CogBox].
+  ///
+  /// This label is used by logging and development tools to make understanding
+  /// the application state machine easier.
+  final String? debugLabel;
+
+  /// List of all Cogs created within this [CogBox].
   final _boxedCogs = <BoxedCog>[];
+
+  /// List of all Mechanisms created within this [CogBox].
   final _boxedMechanisms = <BoxedMechanism>[];
+
+  /// [CogRegistry] with which the Cogs created by this [CogBox] are
+  /// registered upon instantiation.
+  ///
+  /// Defaults to [GlobalCogRegistry].
   final CogRegistry? _cogRegistry;
+
+  /// [Cogtext] to which the Cogs and Mechanisms created by this [CogBox] are
+  /// bound.
   final Cogtext _cogtext;
-  final String? _debugLabel;
+
+  /// [MechanismRegistry] with which the Mechanisms created by this [CogBox] are
+  /// registered upon instantiation.
+  ///
+  /// Defaults to [GlobalMechanismRegistry].
   final MechanismRegistry? _mechanismRegistry;
 
+  /// Creates a new [CogBox].
+  ///
+  /// * [cogtext] is the [Cogtext] to which the Cogs and Mechanisms created by
+  ///   the resulting [CogBox] will be bound
+  /// * [cogRegistry] is the [CogRegistry] with which the Cogs created by the
+  ///   resulting [CogBox] will be registered upon instantiation - defaults to
+  ///   [GlobalCogRegistry]
+  /// * [debugLabel] is the optional description of the scope or domain
+  ///   represented by the resulting [CogBox]
+  /// * [mechanismRegistry] is the [MechanismRegistry] with which the Mechanisms
+  ///   created by the resulting [CogBox] will be registered upon instantiation
+  ///   - defaults to [GlobalMechanismRegistry]
   CogBox(
     Cogtext cogtext, {
     CogRegistry? cogRegistry,
-    String? debugLabel,
+    this.debugLabel,
     MechanismRegistry? mechanismRegistry,
   })  : _cogRegistry = cogRegistry,
         _cogtext = cogtext,
-        _debugLabel = debugLabel,
         _mechanismRegistry = mechanismRegistry;
 
+  /// Creates a new automatic Cog belonging to this [CogBox].
+  ///
+  /// {@macro cog.auto.constructor}
   BoxedAutomaticCog<ValueType, SpinType> auto<ValueType, SpinType>(
     AutomaticCogDefinition<ValueType, SpinType> def, {
     Async? async,
@@ -74,6 +121,9 @@ final class CogBox {
     _boxedMechanisms.clear();
   }
 
+  /// Creates a new manual Cog belonging to this [CogBox].
+  ///
+  /// {@macro cog.man.constructor}
   BoxedManualCog<ValueType, SpinType> man<ValueType, SpinType>(
     CogValueInitializer<ValueType> init, {
     String? debugLabel,
@@ -113,10 +163,10 @@ final class CogBox {
   }
 
   String? _maybeScopeDebugLabel(String? debugLabel) {
-    if (_debugLabel == null || debugLabel == null) {
+    if (this.debugLabel == null || debugLabel == null) {
       return null;
     }
 
-    return '$_debugLabel::$debugLabel';
+    return '${this.debugLabel}::$debugLabel';
   }
 }

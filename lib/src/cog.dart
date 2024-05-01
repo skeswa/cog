@@ -15,8 +15,8 @@ part 'cog_like.dart';
 part 'cogtext.dart';
 part 'manual_cog.dart';
 
-/// [Cog] is an abstraction that imbues application state with composability,
-/// observability, and reliability.
+/// [Cog] is an abstraction that imbues application state with composability and
+/// observability.
 ///
 /// Cogs are designed to organize evolving, related data such that operating on
 /// it is akin to turning "interlocking cogs in a machine": The connections
@@ -50,6 +50,11 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   @override
   final Spin<SpinType>? spin;
 
+  /// Creates a new automatic [Cog].
+  ///
+  /// This constructor is generally preferred to [Cog.auto], because it is more
+  /// succinct and conveys that automatic Cogs should be the preferred choice.
+  ///
   /// {@macro cog.auto.constructor}
   factory Cog(
     AutomaticCogDefinition<ValueType, SpinType> def, {
@@ -72,9 +77,9 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
         ttl: ttl,
       );
 
-  /// {@template cog.auto.constructor}
   /// Creates a new automatic [Cog].
   ///
+  /// {@template cog.auto.constructor}
   /// Automatic Cogs derive their values by composing and manipulating the
   /// values of other Cogs and/or external state. At its core, an automatic
   /// [Cog] is defined by its [def] function. Using the [AutomaticCogController]
@@ -100,7 +105,7 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   /// * [init] returns the initial value of the resulting automatic [Cog] - this
   ///   [Function] is only necessary if [def] returns a [Future]
   /// * [registry] is the [CogRegistry] with which the resulting automatic [Cog]
-  ///   should be registered upon instantiation
+  ///   will be registered upon instantiation - defaults to [GlobalCogRegistry]
   /// * [spin] optionally specifies the [SpinType] of the resulting automatic
   ///   [Cog] - for more information on what [Spin] is and how it works, see the
   ///   [Cog] docs
@@ -130,7 +135,13 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
 
   /// Creates a new manual [Cog].
   ///
+  /// {@template cog.man.constructor}
   /// Manual Cogs are assigned values imperatively with the `write(...)` method.
+  /// ```dart
+  /// final myManCog = Cog.man(() => 1);
+  ///
+  /// myManCog.write(cogtext, 2);
+  /// ```
   ///
   /// * [init] returns the initial value of the resulting manual [Cog]
   /// * [debugLabel] is the optional description of the state wrapped by the
@@ -139,10 +150,11 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
   ///   resulting manual [Cog] should be treated as equivalent - defaults to the
   ///   `==` operator
   /// * [registry] is the [CogRegistry] with which the resulting manual [Cog]
-  ///   should be registered upon instantiation
+  ///   will be registered upon instantiation - defaults to [GlobalCogRegistry]
   /// * [spin] optionally specifies the [SpinType] of the resulting manual [Cog]
   ///   - for more information on what [Spin] is and how it works, see the [Cog]
   ///   docs
+  /// {@endtemplate}
   static ManualCog<ValueType, SpinType> man<ValueType, SpinType>(
     CogValueInitializer<ValueType> init, {
     String? debugLabel,
