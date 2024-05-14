@@ -105,9 +105,11 @@ final class Mechanism {
   /// Temporarily halts the functioning of this [Mechanism] within the specified
   /// [Cogtext].
   ///
+  /// {@template mechanism.pause}
   /// While a [Mechanism] is paused, it is functionally dormant - almost as if
   /// it was never created at all. Mechanisms may be "unpaused" with the
   /// [resume] method.
+  /// {@endtemplate}
   void pause(Cogtext cogtext) {
     cogtext.runtime.pauseMechanism(ordinal);
   }
@@ -115,8 +117,10 @@ final class Mechanism {
   /// Reverses the effects of a call to [pause] within the specified [Cogtext],
   /// re-instating this [Mechanism] to a state of full functionality.
   ///
+  /// {@template mechanism.resume}
   /// This method does nothing if this [Mechanism] is not paused within
   /// specified [Cogtext].
+  /// {@endtemplate}
   void resume(Cogtext cogtext) {
     cogtext.runtime.resumeMechanism(ordinal);
   }
