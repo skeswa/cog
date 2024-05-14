@@ -47,6 +47,9 @@ final class CogBox {
   /// bound.
   final Cogtext _cogtext;
 
+  /// `true` if this [CogBox] has been disposed.
+  var _isDisposed = false;
+
   /// [MechanismRegistry] with which the Mechanisms created by this [CogBox] are
   /// registered upon instantiation.
   ///
@@ -86,6 +89,8 @@ final class CogBox {
     Spin<SpinType>? spin,
     Duration? ttl,
   }) {
+    assert(_notDisposed());
+
     final cog = Cog.auto(
       def,
       async: async,
@@ -106,20 +111,22 @@ final class CogBox {
 
   /// Halts and destroys all Cogs and Mechanisms that belong to this [CogBox].
   void dispose() {
+    if (_isDisposed) {
+      return;
+    }
+
     for (final boxedMechanism in _boxedMechanisms) {
       _cogtext.runtime.disposeMechanism(boxedMechanism._mechanism.ordinal);
-
-      boxedMechanism._isDisposed = true;
     }
 
     for (final boxedCog in _boxedCogs) {
       _cogtext.runtime.disposeCog(boxedCog._cog.ordinal);
-
-      boxedCog._isDisposed = true;
     }
 
     _boxedCogs.clear();
     _boxedMechanisms.clear();
+
+    _isDisposed = true;
   }
 
   /// Creates a new manual Cog belonging to this [CogBox].
@@ -131,6 +138,8 @@ final class CogBox {
     CogValueComparator<ValueType>? eq,
     Spin<SpinType>? spin,
   }) {
+    assert(_notDisposed());
+
     final cog = Cog.man(
       init,
       debugLabel: _maybeScopeDebugLabel(debugLabel),
@@ -155,6 +164,8 @@ final class CogBox {
     MechanismDefinition def, {
     String? debugLabel,
   }) {
+    assert(_notDisposed());
+
     final mechanism = Mechanism(
       def,
       debugLabel: _maybeScopeDebugLabel(debugLabel),
@@ -168,6 +179,11 @@ final class CogBox {
     return boxedMechanism;
   }
 
+  @override
+  String toString() => 'CogBox('
+      '${debugLabel != null ? 'debugLabel: "$debugLabel"' : ''}'
+      ')';
+
   /// Combines this [CogBox]'s [CogBox.debugLabel] with the specified
   /// [debugLabel], returning `null` if combination is not possible.
   String? _maybeScopeDebugLabel(String? debugLabel) {
@@ -176,5 +192,15 @@ final class CogBox {
     }
 
     return '${this.debugLabel}::$debugLabel';
+  }
+
+  /// Method used to in `assert`s to ensure that this [BoxedCog] has not yet
+  /// been disposed.
+  bool _notDisposed() {
+    if (_isDisposed) {
+      throw StateError('$this has been disposed');
+    }
+
+    return true;
   }
 }

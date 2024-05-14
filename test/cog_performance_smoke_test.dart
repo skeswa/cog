@@ -166,7 +166,7 @@ void main() {
               7 + async.elapsed.inHours,
               async.elapsed.inMinutes,
             ),
-            ttl: 1.hours + 30.minutes,
+            ttl: const Duration(hours: 1) + const Duration(minutes: 30),
             debugLabel: 'timeOfDayCog',
           );
 
@@ -196,7 +196,7 @@ void main() {
             debugLabel: 'weatherDataCog',
             init: null.init<WeatherData>(),
             spin: Spin<City>(),
-            ttl: 30.minutes,
+            ttl: const Duration(minutes: 30),
           );
 
           final isSunnyCog = Cog(
@@ -302,22 +302,22 @@ void main() {
           var lastMeterRead = telemetry.meter;
           final meterReads = [lastMeterRead];
 
-          async.elapse(2.hours);
+          async.elapse(const Duration(hours: 2));
 
           meterReads.add(telemetry.meter - lastMeterRead);
           lastMeterRead = telemetry.meter;
 
-          async.elapse(2.hours);
+          async.elapse(const Duration(hours: 2));
 
           meterReads.add(telemetry.meter - lastMeterRead);
           lastMeterRead = telemetry.meter;
 
-          async.elapse(2.hours);
+          async.elapse(const Duration(hours: 2));
 
           meterReads.add(telemetry.meter - lastMeterRead);
           lastMeterRead = telemetry.meter;
 
-          async.elapse(2.hours);
+          async.elapse(const Duration(hours: 2));
 
           meterReads.add(telemetry.meter - lastMeterRead);
           lastMeterRead = telemetry.meter;

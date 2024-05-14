@@ -182,8 +182,8 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
     ordinal = (registry ?? GlobalCogRegistry.instance).register(this);
   }
 
-  /// Returns the current value of the specified [spin] of this [Cog] within the
-  /// given [cogtext].
+  /// Infers and returns the current value from the specified [spin] of this
+  /// [Cog] within the given [cogtext].
   ///
   /// {@macro cog_like.spin}
   ValueType read(Cogtext cogtext, {SpinType? spin}) {
@@ -194,15 +194,17 @@ sealed class Cog<ValueType, SpinType> implements CogLike<ValueType, SpinType> {
     return cogState.evaluate();
   }
 
-  /// Returns a [Stream] that emits value of the specified [spin] of this [Cog]
-  /// iven [cogtext] as it changes.
+  /// Returns a [Stream] that emits values from the specified [spin] of this
+  /// [Cog] in the given [cogtext] as it changes.
   ///
+  /// {@template cog.watch}
   /// Importantly, the resulting [Stream] does not emit upon subscription - only
   /// on change.
   ///
   /// [priority] specifies how urgently, relative to other listeners, the
   /// resulting [Stream] should receive new emissions - defaults to
   /// [Priority.normal].
+  /// {@endtemplate}
   ///
   /// {@macro cog_like.spin}
   Stream<ValueType> watch(

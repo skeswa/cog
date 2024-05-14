@@ -491,7 +491,7 @@ void main() {
           fakeAsync((async) {
             final numberCog = Cog(
               (c) => c.currOr(0) < 4 ? c.currOr(0) + 1 : c.currOr(0),
-              ttl: 5.seconds,
+              ttl: const Duration(seconds: 5),
             );
 
             expect(numberCog.read(cogtext), 1);
@@ -500,23 +500,23 @@ void main() {
 
             numberCog.watch(cogtext).listen(emissions.add);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([2]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([2, 3]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([2, 3, 4]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([2, 3, 4]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([2, 3, 4]));
           });
@@ -608,12 +608,12 @@ void main() {
           fakeAsync((async) {
             final numberCog = Cog(
               (c) async {
-                await Future.delayed(1.seconds);
+                await Future.delayed(const Duration(seconds: 1));
 
                 return c.curr < 4 ? c.curr + 1 : c.curr;
               },
               init: () => 0,
-              ttl: 5.seconds,
+              ttl: const Duration(seconds: 5),
             );
 
             expect(numberCog.read(cogtext), 0);
@@ -622,43 +622,43 @@ void main() {
 
             numberCog.watch(cogtext).listen(emissions.add);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals([1]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([1]));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals([1, 2]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([1, 2]));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals([1, 2, 3]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([1, 2, 3]));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals([1, 2, 3, 4]));
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals([1, 2, 3, 4]));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals([1, 2, 3, 4]));
 
-            async.elapse(30.seconds);
+            async.elapse(const Duration(seconds: 30));
 
             expect(emissions, equals([1, 2, 3, 4]));
           });
@@ -676,14 +676,14 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration seconds ${times++} times';
               },
               async: Async.sequentialQueued,
               debugLabel: 'waitingCog',
               init: () => '',
-              ttl: 5.seconds,
+              ttl: const Duration(seconds: 5),
             );
 
             expect(waitingCog.read(cogtext), '');
@@ -698,11 +698,11 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(emissions, equals(['waited 0 seconds 0 times']));
 
-            async.elapse(3.seconds);
+            async.elapse(const Duration(seconds: 3));
 
             expect(
               emissions,
@@ -712,7 +712,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2050,7 +2050,7 @@ void main() {
             expect(waitingCogInvocation, 4);
             expect(emissions, equals([-10]));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(waitingCogInvocation, 4);
             expect(emissions, equals([-10, 11]));
@@ -2067,7 +2067,7 @@ void main() {
               ]),
             );
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(waitingCogInvocation, 4);
             expect(emissions, equals([-10, 11, 24, 39]));
@@ -2086,7 +2086,7 @@ void main() {
             scalarFakeObservable.value = 16;
             scalarFakeObservable.value = 17;
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(waitingCogInvocation, 9);
             expect(emissions, equals([-10, 11, 24, 39, 52, 70]));
@@ -2108,7 +2108,7 @@ void main() {
             durationFakeObservables[7].value++;
             durationFakeObservables[7].value++;
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(waitingCogInvocation, 9);
             expect(emissions, equals([-10, 11, 24, 39, 52, 70, 90, 112, 136]));
@@ -2135,7 +2135,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2156,23 +2156,23 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationCog.write(cogtext, 1);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
 
@@ -2180,7 +2180,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2191,7 +2191,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2215,7 +2215,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2238,23 +2238,23 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationCog.write(cogtext, 1);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
 
@@ -2262,7 +2262,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2273,7 +2273,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2308,7 +2308,7 @@ void main() {
                       subscription.cancel(),
                 );
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2331,23 +2331,23 @@ void main() {
 
             durationFakeObservable.value = 8;
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationFakeObservable.value = 1;
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
             durationFakeObservable.value = 2;
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 1', 'waited 2']));
 
@@ -2355,7 +2355,7 @@ void main() {
             durationFakeObservable.value = 5;
             durationFakeObservable.value = 7;
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2366,7 +2366,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2390,7 +2390,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2411,23 +2411,23 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationCog.write(cogtext, 1);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2435,7 +2435,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2447,7 +2447,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2471,7 +2471,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2494,23 +2494,23 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationCog.write(cogtext, 1);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2518,7 +2518,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2530,7 +2530,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2565,7 +2565,7 @@ void main() {
                       subscription.cancel(),
                 );
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2588,23 +2588,23 @@ void main() {
 
             durationFakeObservable.value = 8;
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
             durationFakeObservable.value = 1;
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationFakeObservable.value = 2;
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2612,7 +2612,7 @@ void main() {
             durationFakeObservable.value = 5;
             durationFakeObservable.value = 7;
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2624,7 +2624,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2648,7 +2648,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2669,21 +2669,21 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2691,7 +2691,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2704,7 +2704,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2730,7 +2730,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2753,21 +2753,21 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationCog.write(cogtext, 2);
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2775,7 +2775,7 @@ void main() {
             durationCog.write(cogtext, 5);
             durationCog.write(cogtext, 7);
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2788,7 +2788,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2825,7 +2825,7 @@ void main() {
                       subscription.cancel(),
                 );
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2848,21 +2848,21 @@ void main() {
 
             durationFakeObservable.value = 8;
 
-            async.elapse(7.seconds);
+            async.elapse(const Duration(seconds: 7));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
             durationFakeObservable.value = 2;
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(1.seconds);
+            async.elapse(const Duration(seconds: 1));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 2']));
 
@@ -2870,7 +2870,7 @@ void main() {
             durationFakeObservable.value = 5;
             durationFakeObservable.value = 7;
 
-            async.elapse(5.seconds);
+            async.elapse(const Duration(seconds: 5));
 
             expect(
               emissions,
@@ -2883,7 +2883,7 @@ void main() {
               ]),
             );
 
-            async.elapse(1.minutes);
+            async.elapse(const Duration(minutes: 1));
 
             expect(
               emissions,
@@ -2909,7 +2909,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2930,24 +2930,24 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(4.seconds);
+            async.elapse(const Duration(seconds: 4));
 
             durationCog.write(cogtext, 2);
             durationCog.write(cogtext, 4);
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
           });
@@ -2963,7 +2963,7 @@ void main() {
               (c) async {
                 final duration = c.link(durationCog);
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -2986,24 +2986,24 @@ void main() {
 
             durationCog.write(cogtext, 8);
 
-            async.elapse(4.seconds);
+            async.elapse(const Duration(seconds: 4));
 
             durationCog.write(cogtext, 2);
             durationCog.write(cogtext, 4);
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
           });
@@ -3030,7 +3030,7 @@ void main() {
                       subscription.cancel(),
                 );
 
-                await Future.delayed(duration.seconds);
+                await Future.delayed(Duration(seconds: duration));
 
                 return 'waited $duration';
               },
@@ -3051,24 +3051,24 @@ void main() {
 
             durationFakeObservable.value = 8;
 
-            async.elapse(4.seconds);
+            async.elapse(const Duration(seconds: 4));
 
             durationFakeObservable.value = 2;
             durationFakeObservable.value = 4;
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8']));
 
-            async.elapse(2.seconds);
+            async.elapse(const Duration(seconds: 2));
 
             expect(emissions, equals(['waited 0', 'waited 8', 'waited 4']));
           });
@@ -3778,7 +3778,7 @@ void main() {
                 7 + async.elapsed.inHours,
                 async.elapsed.inMinutes,
               ),
-              ttl: 1.hours + 30.minutes,
+              ttl: const Duration(hours: 1) + const Duration(minutes: 30),
               debugLabel: 'timeOfDayCog',
             );
 
@@ -3808,7 +3808,7 @@ void main() {
               debugLabel: 'weatherDataCog',
               init: null.init<WeatherData>(),
               spin: Spin<City>(),
-              ttl: 30.minutes,
+              ttl: const Duration(minutes: 30),
             );
 
             final isSunnyCog = Cog(
@@ -3911,7 +3911,7 @@ void main() {
               );
             });
 
-            async.elapse(2.hours);
+            async.elapse(const Duration(hours: 2));
 
             expect(
               emissions,
@@ -3923,22 +3923,7 @@ void main() {
               ]),
             );
 
-            async.elapse(2.hours);
-
-            expect(
-              emissions,
-              equals([
-                'shouldGoToTheBeachCog in austin: true',
-                'isNiceOutsideCog in austin: true',
-                'shouldGoToTheBeachCog in brooklyn: false',
-                'shouldGoToTheBeachCog in cambridge: false',
-                'shouldGoToTheBeachCog in austin: false',
-                'isNiceOutsideCog in austin: false',
-                'shouldGoToTheBeachCog in cambridge: true',
-              ]),
-            );
-
-            async.elapse(2.hours);
+            async.elapse(const Duration(hours: 2));
 
             expect(
               emissions,
@@ -3953,7 +3938,22 @@ void main() {
               ]),
             );
 
-            async.elapse(2.hours);
+            async.elapse(const Duration(hours: 2));
+
+            expect(
+              emissions,
+              equals([
+                'shouldGoToTheBeachCog in austin: true',
+                'isNiceOutsideCog in austin: true',
+                'shouldGoToTheBeachCog in brooklyn: false',
+                'shouldGoToTheBeachCog in cambridge: false',
+                'shouldGoToTheBeachCog in austin: false',
+                'isNiceOutsideCog in austin: false',
+                'shouldGoToTheBeachCog in cambridge: true',
+              ]),
+            );
+
+            async.elapse(const Duration(hours: 2));
 
             expect(
               emissions,
@@ -4520,7 +4520,7 @@ void main() {
         final falseCog = Cog(
           (c) => false,
           debugLabel: 'falseCog',
-          ttl: 1.seconds,
+          ttl: const Duration(seconds: 1),
         );
         final helloCog = Cog(
           (c) => 'hello',
@@ -4587,12 +4587,14 @@ void main() {
       });
 
       test('int.duration should work as expected', () {
-        expect(3.days, equals(3.days));
-        expect(3.hours, equals(3.hours));
-        expect(3.microseconds, equals(3.microseconds));
-        expect(3.milliseconds, equals(3.milliseconds));
-        expect(3.minutes, equals(3.minutes));
-        expect(3.seconds, equals(3.seconds));
+        expect(const Duration(days: 3), equals(const Duration(days: 3)));
+        expect(const Duration(hours: 3), equals(const Duration(hours: 3)));
+        expect(const Duration(microseconds: 3),
+            equals(const Duration(microseconds: 3)));
+        expect(const Duration(milliseconds: 3),
+            equals(const Duration(milliseconds: 3)));
+        expect(const Duration(minutes: 3), equals(const Duration(minutes: 3)));
+        expect(const Duration(seconds: 3), equals(const Duration(seconds: 3)));
       });
 
       test('Cogtext cog state runtime should be optionally replaceable', () {
@@ -4621,7 +4623,7 @@ void main() {
               throw StateError('oh no!');
             });
 
-            async.elapse(1.days);
+            async.elapse(const Duration(days: 1));
           } catch (e) {
             didThrow = true;
           }

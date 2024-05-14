@@ -67,8 +67,8 @@ final class ManualCog<ValueType, SpinType> extends Cog<ValueType, SpinType> {
     return stringBuffer.toString();
   }
 
-  /// Sets the current value of the specified [spin] of this [Cog] within the
-  /// given [cogtext] to [value].
+  /// Assigns [value] to the specified [spin] of this [Cog] within the given
+  /// [cogtext].
   ///
   /// [quietly] is `true` if this write shouldn't notify listeners if it
   /// changes this [Cog]'s value - defaults to `false`.
