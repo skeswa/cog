@@ -1,0 +1,340 @@
+# Cog for Swift: effects and background work
+
+*August 6, 2026*
+
+This file is §6 of [exploration.md](./exploration.md). It covers effects,
+their lifetimes, testing, and work that can outlive the app process. Other
+section numbers point to the core file.
+
+## 6. Side effects, worked
+
+An effect changes something outside the graph. Examples include alerts,
+haptics, logs, files, and system services. Work that only computes graph state
+is not an effect. Keeping that boundary clear makes application behavior
+easier to read and reason about.
+
+### 6.1 Choosing a home for an effect
+
+| Need | Use |
+| --- | --- |
+| Compute state from other state | `AsyncCog` (§5.1), or an op that writes manual cogs |
+| Send something outside the graph | Reaction |
+| Respond to a user action | Op (§3.2) |
+| Run on a clock | Task owned by an `EffectGroup` |
+| Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5) |
+| Continue after process death | Durable state, an engine, and a reconciler (§6.7) |
+
+For example, “check the weather when the ZIP changes” produces state. It
+belongs in the `weatherReport` async cog from §5.1. “Alert me when the weather
+becomes nice” leaves the graph, so it is a reaction.
+
+### 6.2 A complete effect group
+
+```swift
+// WeatherEffects.swift
+
+struct WeatherEffects {
+    var notifier: Notifier
+    var clock: any Clock<Duration> = ContinuousClock()
+
+    @discardableResult
+    func install(in cogs: Cogtext) -> EffectGroup {
+        let group = EffectGroup()
+
+        group.add(cogs.watch(isNiceOutsideHere, initial: .skip,
+                             name: "weather.niceAlert") { was, nice in
+            if nice && !was {
+                notifier.alert("It is nice outside!")
+            }
+        })
+
+        group.task(name: "location.hourlyRefresh") {
+            while true {
+                try await clock.sleep(for: .hours(1))
+                await cogs.refreshCurrentLocation()
+            }
+        }
+
+        return group
+    }
+}
+```
+
+The pieces have narrow jobs:
+
+- `watch` handles one cog and receives its old and new values. `.skip` avoids
+  an alert during installation. Use `run` for several dependencies; it runs
+  once during registration so it can record them.
+- Time-based effects are normal structured tasks. An injected `Clock` makes
+  them testable. Their bodies call ops, so writes keep useful names in debug
+  history.
+- `EffectGroup` owns reaction tokens and tasks. `cancel()` and deinit both
+  cancel the group. Copies point to the same cancellation resource.[^group]
+- Effect names appear in debug history and task names for Instruments.
+
+The ownership rule is simple: **`Cogtext` owns state and reactions;
+`EffectGroup` owns their lifetimes.** `watch` and `run` register with the
+graph, so they stay on `Cogtext`. A plain task does not, so `task` belongs on
+`EffectGroup`.
+
+### 6.3 Registration and lifecycle
+
+Effects exist only after code calls `install`. There is no global registry or
+automatic discovery. This avoids Swift's lazy top-level `let` trap: an unused
+global reaction would never be created.
+
+```swift
+@main
+struct WeatherApp: App {
+    @State private var cogs: Cogtext
+    @State private var effects: EffectGroup
+
+    init() {
+        let cogs = Cogtext()
+        _cogs = State(initialValue: cogs)
+        _effects = State(initialValue:
+            WeatherEffects(notifier: .live).install(in: cogs))
+    }
+
+    var body: some Scene {
+        WindowGroup { RootView().environment(\.cogs, cogs) }
+    }
+}
+```
+
+A screen can own a child `Cogtext` and its `EffectGroup` in `@State`. Both die
+with the screen.
+
+### 6.4 Writing back into the graph
+
+Reactions may cause writes, but they never write into the turn they are
+flushing.
+
+1. The outer `commit` settles state.
+2. Reactions run synchronously, in registration order, against that settled
+   state.
+3. A reaction receives only a read controller. To write, it calls an op or
+   another API that opens `commit`.
+4. That commit waits in a FIFO queue and becomes a new turn after the current
+   flush. Nested commits during the earlier accumulating phase still join the
+   current turn (§3.2).
+
+An old captured writer also fails its turn-ID check. Async writes naturally
+start later turns because they happen after an `await`.
+
+Effects can still form a loop: turn → reaction → turn. A debug guard should
+warn after about 64 turns without reaching idle and print the causal chain.
+The queue prevents re-entrant graph writes, while the trace makes a runaway
+loop clear.
+
+Synchronous reaction flush is deliberate. Tests can assert effects on the
+line after an op returns. A short background task can also know that its
+reconciler finished before its deadline. A future `.deferred` mode may offer
+next-tick coalescing, but only as an opt-in.
+
+### 6.5 View-scoped effects
+
+SwiftUI should own an effect that is useful only while one screen is visible:
+
+```swift
+struct WeatherMapScreen: View {
+    @Environment(\.cogs) private var cogs
+    @State private var camera: MapCameraPosition = .automatic
+
+    var body: some View {
+        Map(position: $camera)
+            .task {
+                for await fix in cogs.values(of: locationFix.latest) {
+                    guard let fix else { continue }
+                    withAnimation { camera = .region(.around(fix)) }
+                }
+            }
+    }
+}
+```
+
+When the view disappears, `.task` cancels the sequence and its graph lease.
+`values` starts with the current settled value. Its default `.newest(1)`
+buffer may skip intermediate turns for a slow screen, which is right for
+camera state.
+
+Use this test: if cancellation on screen exit is correct, use SwiftUI
+lifecycle. App-wide work such as notifications and analytics belongs in an
+installed group. One effect should not use both.
+
+### 6.6 Testing effects
+
+Writable sources are `fileprivate`, so even `@testable import` cannot reach
+them. The owning state file must expose narrow, debug-only test helpers:
+
+```swift
+// WeatherState.swift
+#if DEBUG
+extension Cogtext {
+    func seedCurrentZip(_ zip: ZipCode?) { seed(currentZipSource, to: zip) }
+
+    func seedWeather(_ report: Weather?, zip: ZipCode) {
+        seed(weatherReportSource[zip], to: report)
+    }
+
+    func stubWeather(_ report: Weather?, zip: ZipCode) {
+        commit { w in w[weatherReportSource[zip]] = report }
+    }
+}
+#endif
+```
+
+`seed` is quiet: no turn, history record, UI notice, or reaction. `commit` is
+loud and runs a real named turn. The feature chooses the exact test surface
+instead of exposing all source refs.
+
+```swift
+@Test func alertsWhenTheWeatherTurnsNice() async {
+    let cogs = Cogtext()
+    let notifier = Notifier.recording()
+    let clock = TestClock()
+    let effects = WeatherEffects(notifier: notifier, clock: clock)
+        .install(in: cogs)
+
+    cogs.seedCurrentZip(zip)
+    cogs.seedWeather(.cloudy(60), zip: zip)
+    #expect(notifier.alerts.isEmpty)
+
+    cogs.stubWeather(.clear(75), zip: zip)
+    #expect(notifier.alerts == ["It is nice outside!"])
+
+    await clock.advance(by: .hours(1))
+    #expect(cogs.read(currentZipCode) != nil)
+}
+```
+
+The runtime and helpers both place `seed` behind `#if DEBUG`. Seed before
+anything observes the graph.[^seed]
+
+### 6.7 Background work that outlives the process
+
+Background downloads and sync break a basic assumption: the app may die while
+work continues. In-memory graph state cannot be the source of truth.
+
+Three rules follow:
+
+1. **The graph is a view of durable data.** Store subscriptions, episode
+   records, and download status in SQLite, GRDB, or another durable store. An
+   op writes the store first, then its manual cog. A crash between those writes
+   loses only the in-memory update. A GRDB `ValueObservation` may instead feed
+   the graph as an external input (§8).
+2. **Headless launches build a normal `Cogtext`.** The app creates the graph,
+   seeds it, and installs app effects even when no scene appears. UI-only work
+   stays safe because it lives in views. A background task owns its deadline;
+   expiration cancels its op, while a cancellation shield can protect the
+   final commit (`withTaskCancellationShield` in Swift 6.4).
+3. **System-owned work is not an `AsyncCog`.** An async cog models a task owned
+   by the current process. A background `URLSession` transfer can outlive that
+   task. Model its status as manual state such as `.queued`, `.downloading`,
+   `.downloaded`, or `.failed`, and let an engine own the transfer.
+
+The graph connects to the engine through a **reconciler**. It compares desired
+state with the engine's actual state:
+
+```swift
+let episodesToDownload = Cog { c in
+    c.get(subscribedEpisodes)
+        .filter { episode in
+            c.get(autoDownloadPolicy).wants(episode)
+                && !c.get(downloadState[episode.id]).isDownloadedOrInFlight
+        }
+        .map(\.id)
+}
+
+group.add(cogs.watch(episodesToDownload, initial: .run,
+                     name: "downloads.reconcile") { _, wanted in
+    engine.reconcile(desired: wanted)
+})
+```
+
+The engine owns the background session. Its delegate writes results through
+MainActor ops, always storing durable data before graph state.[^engine]
+
+A refresh entry point stays small:
+
+```swift
+.backgroundTask(.appRefresh("app.feedRefresh")) {
+    await cogs.refreshAllFeeds()
+    await cogs.scheduleNextRefresh()
+}
+```
+
+The full flow is:
+
+1. The system launches the app without a scene. The app rebuilds the graph
+   from the store and installs effects.
+2. Feed refresh commits new episode rows.
+3. The derived desired set changes. The reconciler hands IDs to the background
+   session, then the short refresh task returns. It does not download files.
+4. The app may stop. `nsurlsessiond` keeps transferring.
+5. Completion launches the app again. The engine reconnects to its session
+   identifier, receives replayed delegate events, and calls ops that update the
+   store and graph.
+6. An ordinary reaction can now post a “new episodes” notification.
+
+Feed refresh, policy changes, storage cleanup, and user taps only change
+state. One reconciler owns the imperative `URLSession` edge.
+
+## Appendix A: iOS background tools
+
+- `BGAppRefreshTask` gives short, system-scheduled wakes, often around 30
+  seconds. SwiftUI exposes it through `.backgroundTask(.appRefresh(id))` on
+  iOS 16 and later.
+- `BGProcessingTask` allows minutes of work and can require power or network.
+- `BGContinuedProcessingTask` on iOS 26 continues user-started foreground work
+  with system-visible progress. It fits an explicit “Download now” action.
+- Background `URLSession` runs transfers in `nsurlsessiond`, outside the app
+  process. Transfers survive suspension and death, and completion can launch
+  the app through `handleEventsForBackgroundURLSession`. It uses delegate
+  APIs, not the async conveniences.
+  `isDiscretionary` lets the system schedule bulk work around power and
+  network conditions.
+- A silent push with `content-available` can suggest a server-triggered
+  refresh, but the system may delay or drop it. It is not a schedule.
+
+See Apple's [BackgroundTasks](https://developer.apple.com/documentation/backgroundtasks)
+and [background download](https://developer.apple.com/documentation/foundation/url_loading_system/downloading_files_in_the_background)
+guides.
+
+## Appendix B: background engine sketch
+
+```swift
+final class DownloadEngine: NSObject, URLSessionDownloadDelegate {
+    // URLSessionConfiguration.background(withIdentifier: "app.downloads")
+    // Use isDiscretionary for policy-driven automatic downloads.
+
+    func urlSession(_ session: URLSession,
+                    downloadTask task: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {
+        let id = episodeID(for: task)
+        let file = try! library.claim(location, for: id)
+        Task { @MainActor in
+            await cogs.finishDownload(of: id, at: file)
+        }
+    }
+}
+```
+
+The file must move before the delegate returns. Callbacks arrive on a
+background queue, so they hop to a MainActor op. Coalesce frequent progress
+events before that hop; for example, write only when the whole-number percent
+changes. Equality checks remove duplicate values, but cannot remove the cost
+of too many turns.
+
+[^group]: `EffectGroup` and reaction tokens are idempotent final classes.
+    Explicit MainActor `cancel()` gives tests and lifecycle code a fixed
+    stopping point. Deinit cleanup must also be safe and hop to the MainActor
+    when graph removal needs it.
+
+[^seed]: `seed` still increases the node version, so later reads recompute
+    against the seeded value. It skips only the push side: no turn record,
+    `withMutation`, or reaction flush.
+
+[^engine]: A process-owned `AsyncCog` can cancel and restart Swift tasks. A
+    system-owned transfer has no live Swift task after process death, so its
+    engine and durable status must carry the lifecycle instead.

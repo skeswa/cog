@@ -1,39 +1,44 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Cog
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/guides/libraries/writing-package-pages).
+Cog is a fine-grained state-management project for native mobile UI. It is
+planned as two platform-native libraries:
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-library-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/developing-packages).
--->
+- **iOS:** a Swift library for SwiftUI, using `@Observable` at the UI boundary
+  and its own MainActor-confined dependency graph inside.
+- **Android:** a Kotlin library for Jetpack Compose. Its design work has not
+  started yet.
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+The two libraries will share the same goals, but each should fit its platform
+instead of forcing one platform's API onto the other.
 
-## Features
+## Design principles
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+1. **Cog should feel simple.** Declaring, reading, and changing state should
+   look natural on each platform. Common code should be easy to read and
+   reason about.
+2. **Every state read should be correct.** A read must use the latest committed
+   source state after settling every dependency it needs. It must not expose a
+   torn update, stale derived value, or half-finished change.
+3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
+   allocation, synchronization, and UI updates. Use benchmarks to choose
+   implementation details.
 
-## Getting started
+Correctness is not traded for speed. Performance work should also keep the
+common API simple.
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+## Status
 
-## Usage
+Cog is in the design phase. The Swift design is detailed enough to begin its
+correctness and performance spikes. Android design documents and both library
+implementations still need to be written.
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+The earlier Dart and Flutter experiment has been removed from the current
+tree. It remains available in Git history.
 
-```dart
-const like = 'sample';
-```
+## Documentation
 
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+- **[Swift design](./docs/swift/README.md):** the reading order, current
+  decisions, open questions, and implementation plan for SwiftUI.
+- **Android design:** not started.
+- **[Dart and Flutter design snapshot](./docs/dump-2026-08-06.md):** frozen
+  historical context. It is not normative for either current library.
