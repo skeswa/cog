@@ -5,8 +5,8 @@ planned as two platform-native libraries:
 
 - **iOS:** a Swift library for SwiftUI, using `@Observable` at the UI boundary
   and its own MainActor-confined dependency graph inside.
-- **Android:** a Kotlin library for Jetpack Compose. Its design work has not
-  started yet.
+- **Android:** a Kotlin library for Jetpack Compose, built first over the
+  Compose snapshot runtime with its own store, turn, lifetime, and async rules.
 
 The two libraries will share the same goals, but each should fit its platform
 instead of forcing one platform's API onto the other.
@@ -28,9 +28,9 @@ common API simple.
 
 ## Status
 
-Cog is in the design phase. The Swift design is detailed enough to begin its
-correctness and performance spikes. Android design documents and both library
-implementations still need to be written.
+Cog is in the design phase. The Swift and Android designs are detailed enough
+to begin their correctness and performance spikes. Neither library is
+implemented yet.
 
 The earlier Dart and Flutter experiment has been removed from the current
 tree. It remains available in Git history.
@@ -39,6 +39,8 @@ tree. It remains available in Git history.
 
 - **[Swift design](./docs/swift/README.md):** the reading order, current
   decisions, open questions, and implementation plan for SwiftUI.
-- **Android design:** not started.
+- **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose
+  snapshot architecture, Flow and effects guidance, and Android benchmark
+  plan.
 - **[Dart and Flutter design snapshot](./docs/dump-2026-08-06.md):** frozen
   historical context. It is not normative for either current library.

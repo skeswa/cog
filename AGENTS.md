@@ -12,9 +12,9 @@ native mobile UI. Cog is planned as:
   with its own MainActor-confined dependency graph inside; and
 - a Kotlin library for Jetpack Compose on Android.
 
-Only the Swift design exists today. There is no implementation and there are
-no build, lint, or test commands. The next Swift phase is the spike in
-`docs/swift/exploration.md` §11, as amended by `docs/swift/perf.md` §9.
+The Swift and Kotlin designs exist, but there is no implementation and there
+are no build, lint, or test commands. The next phase for each platform is the
+spike in its `exploration.md` §11, as amended by its `perf.md` §9.
 
 ## Layout
 
@@ -26,9 +26,10 @@ no build, lint, or test commands. The next Swift phase is the spike in
   `exploration.md` covers the core architecture and API; `effects.md` covers
   effects and background work; `rx.md` maps Rx concepts; `perf.md` covers the
   data-oriented implementation and benchmark plan.
-- Android design documents do not exist yet. When that work begins, give it a
-  sibling directory under `docs/` with its own `README.md`, then link it from
-  the root README.
+- `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
+  with `README.md`. `exploration.md` covers the core architecture and API;
+  `effects.md` covers effects and background work; `flows.md` maps Flow and
+  reactive concepts; `perf.md` covers the runtime candidates and benchmark plan.
 
 ## Project principles
 
@@ -43,6 +44,11 @@ every dependency needed for that value. A `Writer` read during a commit sees
 that turn's staged source values. Async uncertainty stays explicit in
 `CogPhase`.
 
+For Kotlin, a correct normal read also uses the latest completed turn and
+settles every dependency it needs. A writer read sees its turn's staged source
+values. A grouped read and a Compose read see one consistent snapshot. Async
+uncertainty stays explicit in `CogPhase`.
+
 ## Conventions
 
 - **Keep platform designs separate.** Shared principles apply to both
@@ -52,17 +58,21 @@ that turn's staged source values. Async uncertainty stays explicit in
 - **Preserve shared Swift section numbering.** The companion docs were split
   from `exploration.md`: `effects.md` is §6 and `rx.md` is §5.4. A reference
   such as “§6.4” resolves in `effects.md`. Do not renumber these sections.
+- **Preserve shared Kotlin section numbering.** The Kotlin companion docs use
+  the same map: `effects.md` is §6 and `flows.md` is §5.4.
 - **Dated files are frozen; undated files are living.** Living design docs use
   short lowercase names and carry an authorship date below the title.
 - **Map new docs.** Add new Swift docs to `docs/swift/README.md`. Add new
   platform doc sets to the root `README.md`.
 - **Do not re-litigate settled decisions.** The Swift snapshot is in
   `docs/swift/README.md` under “Where things stand.” The full settled/open
-  ledger is `docs/swift/exploration.md` §10. Designs are hardened through
-  `/vette` reviews. When the user accepts a decision from a review, update both
-  records. Track real open questions in §10.
-- **Keep performance claims benchmark-gated.** `docs/swift/perf.md` defers ref
-  layout, edge layout, hash tables, and exclusivity attributes to benchmarks.
-  Do not mark them settled without measurements.
+  ledger is `docs/swift/exploration.md` §10. The Kotlin snapshot and ledger are
+  in `docs/kotlin/README.md` and `docs/kotlin/exploration.md` §10. Designs are
+  hardened through `/vette` reviews. When the user accepts a decision from a
+  review, update both records for that platform. Track real open questions in
+  §10.
+- **Keep performance claims benchmark-gated.** Both `perf.md` documents defer
+  representation choices to benchmarks. Do not mark them settled without
+  measurements.
 - **Keep root instructions synchronized.** Any guidance change in `AGENTS.md`
   must also be made in `CLAUDE.md`, and vice versa.
