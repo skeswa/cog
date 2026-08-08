@@ -4,16 +4,16 @@ _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
 an implementation plan. It does not settle ref, edge, hash-table, or
-exclusivity layouts. Benchmarks must choose those details.
+exclusivity layouts; benchmarks must choose those details.
 
-The core idea is to keep graph data in compact arrays owned by one MainActor
+The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogtext`. This avoids locks, per-edge objects, weak references, and repeated
 reference counting in the hot path.
 
-This document serves Cog's third principle: minimize runtime overhead. The
-first, second, and fourth principles remain constraints. A faster layout does
-not win if it weakens read correctness, fragments state, or pushes internal
-complexity into normal app code.
+This document serves Cog's third principle, minimizing runtime overhead. The
+other three principles remain constraints: a faster layout does not win if it
+weakens read correctness, fragments state, or pushes internal complexity into
+normal app code.
 
 ## 1. Cost order
 
@@ -26,7 +26,8 @@ Optimize in this order:
 
 Current Swift systems often pay for locks, weak references, heap objects, or
 `AnyKeyPath` hashing during graph work. Cog's MainActor rule removes the need
-for these costs inside the graph. Appendix A records the source-level evidence.
+for these costs inside the graph. Appendix A records the source-level
+evidence.
 
 ## 2. Shared lessons from other runtimes
 
@@ -38,27 +39,21 @@ Fast reactive systems now use the same broad algorithm:
 - Dependency edges are reused between runs.
 - Versions make “nothing changed” checks fast.
 
-Cog combines a small state flag with versions:
+Cog combines a small state flag with versions: CLEAN, CHECK, and DIRTY decide
+which nodes to visit; `changedAt` says whether a parent's value changed since
+the last check; a global revision answers “has anything changed since turn N?”
+for exports and debug tools.
 
-- CLEAN, CHECK, and DIRTY decide which nodes to visit.
-- `changedAt` says whether a parent's value changed since the last check.
-- A global revision gives a fast answer to “has anything changed since turn
-  N?” for exports and debug tools.
-
-Native runtimes add three useful warnings:
-
-1. Common static node kinds may need special fast paths.
-2. Public refs must name data, not expose arena slots.
-3. Multi-writer snapshots are wasted work in a single-threaded graph.
-
-Appendix B keeps the detailed prior-art notes and measurements.
+Native runtimes add three warnings: common static node kinds may need special
+fast paths; public refs must name data, not expose arena slots; and
+multi-writer snapshots are wasted work in a single-threaded graph. Appendix B
+keeps the detailed prior-art notes and measurements.
 
 ## 3. `Cogtext` as a table of graph data
 
 An entity-component-system (ECS) stores each kind of data in a separate
-column. Cog can use the same pattern: nodes are rows, while flags, versions,
-and edges live in parallel arrays. This is often called a structure of arrays,
-or SoA.
+column. Cog uses the same pattern: nodes are rows, while flags, versions, and
+edges live in parallel arrays — a structure of arrays, or SoA.
 
 ### 3.1 Node storage
 
@@ -75,15 +70,15 @@ var boundary:   ContiguousArray<Int32>
 var generation: ContiguousArray<UInt16>
 ```
 
-The push phase mostly reads `flags` and `subs`. Separate columns keep those
-bytes close in memory instead of loading whole node objects. A generation
+The push phase mostly reads `flags` and `subs`; separate columns keep those
+bytes close in memory instead of loading whole node objects. The generation
 number detects stale internal slot use after reuse.
 
 ### 3.2 Typed value columns
 
 Values have different Swift types, so they cannot share one raw value array.
-Each descriptor owns a typed column inside the app context, or inside the one
-isolated context of a test or preview runtime:
+Each descriptor owns a typed column inside the app context (or the one
+isolated context of a test or preview runtime):
 
 ```swift
 final class Column<Value> {
@@ -93,14 +88,14 @@ final class Column<Value> {
 }
 ```
 
-This keeps value reads concrete. It avoids `Any` boxing and protocol dispatch
+This keeps value reads concrete, avoiding `Any` boxing and protocol dispatch
 per read. A descriptor reaches its known column type through a checked setup
 path and an internal downcast. A keyed box also stores typed keys in its
 column, so selectors do not reopen erased keys during normal computation.
 
-Manual, derived, and async nodes share topology. Their descriptors differ in
+Manual, derived, and async nodes share topology; their descriptors differ in
 how they produce a row. One keyed box stores one compute closure, not one
-closure for every key.
+closure per key.
 
 ### 3.3 Edge layout remains open
 
@@ -117,10 +112,9 @@ struct Edge {
 ```
 
 One edge belongs to the producer's subscriber list and the consumer's
-dependency list. Indices avoid ARC and weak loads. A free list can recycle
-removed edges. A cursor can reuse edges when a selector reads the same
-dependencies in the same order, giving zero steady-state allocation and
-hashing.
+dependency list. Indices avoid ARC and weak loads, a free list recycles
+removed edges, and a cursor can reuse edges when a selector reads the same
+dependencies in the same order — zero steady-state allocation and hashing.
 
 This is only a candidate. Benchmarks must compare:
 
@@ -129,20 +123,20 @@ This is only a candidate. Benchmarks must compare:
 - small inline dependency storage with overflow, based on Incremental's
   common-case layout.
 
-Alien-signals is strongest on mostly static graphs. Reactively performs well
+Alien-signals is strongest on mostly static graphs; Reactively performs well
 when dependencies change often. Cog must measure both.
 
 ### 3.4 Propagation
 
-The push phase walks subscriber edges and changes node flags. It stops when a
+The push phase walks subscriber edges and changes node flags, stopping when a
 branch is already marked. Reactions go into a reused flat queue.
 
 The pull phase walks dependencies and exits early when versions prove that no
 parent changed. If a selector runs, Cog compares its new value with the old
-one. An equal result keeps the old `changedAt`, so children do not recheck.
+one; an equal result keeps the old `changedAt`, so children do not recheck.
 
 Use a reused explicit stack instead of recursion; deep chains are a benchmark
-case. The same stack supplies cycle diagnostics. Mark a node as computing on
+case. The same stack supplies cycle diagnostics: mark a node as computing on
 entry, clear it on every exit path, and fail when a read reaches a computing
 node. Format names and keys only on this rare error path.
 
@@ -168,8 +162,8 @@ The benchmark compares the whole cost of three designs:
 
 1. **Inline `AnyHashable`:** simple and allocation-free to create, but large
    and existential on cursor mismatches.
-2. **Interned key token:** a two-word descriptor and token, but first use needs
-   allocation, interning, and a token-retention rule.
+2. **Interned key token:** a two-word descriptor and token, but first use
+   needs allocation, interning, and a token-retention rule.
 3. **Generic keyed ref:** fully specialized key storage, but adds the key type
    to the public read surface.
 
@@ -183,8 +177,8 @@ concrete key.
 Keep these rules until a benchmark disproves them:
 
 - **Use integers in graph walks.** Retains, releases, and weak loads stay out
-  of propagation. The app registry retains descriptors once. Use
-  `Unmanaged` only where an internal pointer is unavoidable.
+  of propagation. The app registry retains descriptors once. Use `Unmanaged`
+  only where an internal pointer is unavoidable.
 - **Store closures per descriptor.** A keyed box's rows share one closure.
 - **Keep protocol existentials at the API shell.** Kind bits and
   per-descriptor functions handle inner dispatch.
@@ -205,17 +199,15 @@ ordinary collections.
 
 ## 6. Create Observation boundaries only when needed
 
-Interior nodes never need `ObservationRegistrar`. It adds locking and key-path
-lookup even when no view watches the node.
-
-Create one boundary object only on the first UI read of a descriptor and key.
-The `boundary` column uses `-1` until then. A graph with 1,000 nodes but 12
-UI-read values owns 12 registrars.
+Interior nodes never need `ObservationRegistrar`, which adds locking and
+key-path lookup even with no watching view. Create one boundary object only on
+the first UI read of a descriptor and key; the `boundary` column uses `-1`
+until then. A graph with 1,000 nodes but 12 UI-read values owns 12 registrars.
 
 The boundary object can expose one fixed phantom key path. After the graph
-settles a turn, call `withMutation` only if that boundary value changed. SwiftUI
-does not report exact subscription removal, so the boundary and node stay
-pinned to the app context in v1. An optional view lease may come later if
+settles a turn, call `withMutation` only if that boundary value changed.
+SwiftUI does not report exact subscription removal, so the boundary and node
+stay pinned to the app context in v1. An optional view lease may come later if
 measurement shows that old keyed nodes or notices are costly.
 
 ## 7. Arena lifetime must not leak into refs
@@ -232,8 +224,8 @@ that owned its slot, causing leaks and stale handles. Cog avoids that design:
 
 Releasing a sync-derived row drops its value, returns edges to the free list,
 and increases the slot generation. Releasing an async row first cancels its
-task and increases the async generation. Late results then fail before they
-can touch a reused slot. Debug builds also check stale internal slot access.
+task and increases the async generation, so late results fail before they can
+touch a reused slot. Debug builds also check stale internal slot access.
 
 `keepAlive` remains sugar for app lifetime, not an exception added to one
 global observer rule.
@@ -262,9 +254,9 @@ history. Release builds should pay no debug-history cost.
 
 This plan amends §11 of the core document:
 
-1. **Build the simple version first.** Use class nodes, edge arrays, and inline
-   `AnyHashable` refs. Its test suite must cover escaped writers, self and
-   multi-node cycles, dynamic cycles, equality-gated UI values, reaction
+1. **Build the simple version first.** Use class nodes, edge arrays, and
+   inline `AnyHashable` refs. Its test suite must cover escaped writers, self
+   and multi-node cycles, dynamic cycles, equality-gated UI values, reaction
    write-back, manual lifetime, async generation safety, slow exports, guarded
    production-context installation, and scene recreation.
 2. **Port `js-reactivity-benchmark`.** Include Kairo diamond, deep, broad, and
@@ -301,8 +293,9 @@ Source inspection found these costs:
 
 - **swift-state-graph:** each node is a generic class with an
   `NSRecursiveLock`. Each edge is a separate class with two weak references
-  and its own unfair lock. Tracked reads use `Thread.current.threadDictionary`.
-  Propagation therefore walks objects, locks, and weak side tables.
+  and its own unfair lock. Tracked reads use
+  `Thread.current.threadDictionary`. Propagation therefore walks objects,
+  locks, and weak side tables.
 - **Observation:** `withMutation` takes an unfair lock and probes an
   `[AnyKeyPath: Set<Int>]` dictionary twice, even with no observers. Tracked
   reads hash `AnyKeyPath` values. swift-sharing has reduced `withMutation`
@@ -329,8 +322,8 @@ it reported about 30 ns to fire one node and a 3× real-app gain from concrete
 layouts.
 
 **leptos:** moved its primitive away from arena-owned copyable handles after
-scope lifetime and data lifetime diverged. Cog keeps refs as names so slots may
-come and go safely.
+scope lifetime and data lifetime diverged. Cog keeps refs as names so slots
+may come and go safely.
 
 **salsa:** uses revision counters, `changed_at` and `verified_at`, and
 backdating when recomputation returns an equal value. It can also skip whole

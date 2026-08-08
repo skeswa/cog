@@ -8,10 +8,9 @@ section numbers point to the core file.
 
 ## 6. Side effects, worked
 
-An effect changes something outside the graph. Examples include alerts,
-haptics, logs, files, and system services. Work that only computes graph state
-is not an effect. Keeping that boundary clear makes application behavior
-easier to read and reason about.
+An effect changes something outside the graph: alerts, haptics, logs, files,
+system services. Work that only computes graph state is not an effect. Keeping
+that boundary clear makes application behavior easier to read.
 
 ### 6.1 Choosing a home for an effect
 
@@ -24,9 +23,9 @@ easier to read and reason about.
 | Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)        |
 | Continue after process death          | Durable state, an engine, and a reconciler (§6.7)   |
 
-For example, “check the weather when the ZIP changes” produces state. It
-belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the weather
-becomes nice” leaves the graph, so it is a reaction.
+For example, “check the weather when the ZIP changes” produces state, so it
+belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the
+weather becomes nice” leaves the graph, so it is a reaction.
 
 ### 6.2 A complete effect group
 
@@ -64,23 +63,22 @@ The pieces have narrow jobs:
 
 - `watch` handles one cog and receives its old and new values. `.skip` avoids
   an alert during installation. Use `run` for several dependencies; it runs
-  once during registration so it can record them.
+  once during registration to record them.
 - Time-based effects are normal structured tasks. An injected `Clock` makes
   them testable. Their bodies call ops, so writes keep useful names in debug
   history.
 - `EffectGroup` owns reaction tokens and tasks. `cancel()` and deinit both
-  cancel the group. Copies point to the same cancellation resource.[^group]
+  cancel the group; copies point to the same cancellation resource.[^group]
 - Effect names appear in debug history and task names for Instruments.
 
-The ownership rule is simple: **`Cogtext` owns state and reactions;
-`EffectGroup` owns their lifetimes.** `watch` and `run` register with the
-graph, so they stay on `Cogtext`. A plain task does not, so `task` belongs on
-`EffectGroup`.
+The ownership rule: **`Cogtext` owns state and reactions; `EffectGroup` owns
+their lifetimes.** `watch` and `run` register with the graph, so they stay on
+`Cogtext`. A plain task does not, so `task` belongs on `EffectGroup`.
 
 ### 6.3 Registration and lifecycle
 
 Effects exist only after code calls `install`. There is no global registry or
-automatic discovery. This avoids Swift's lazy top-level `let` trap: an unused
+automatic discovery, which avoids Swift's lazy top-level `let` trap: an unused
 global reaction would never be created.
 
 ```swift
@@ -105,15 +103,14 @@ struct WeatherApp: App {
 `installApp()` here and `testing()` in §6.6 are placeholder spellings; the
 final bootstrap helper names are still open (core §10).
 
-The `App` creates this context once and shares it across every scene.
-A screen may own an `EffectGroup` in `@State`, but it borrows
-the app context. It never creates a child `Cogtext`. Closing the
-screen group stops its effects without fragmenting or erasing state.
+The `App` creates this context once and shares it across every scene. A screen
+may own an `EffectGroup` in `@State`, but it borrows the app context and never
+creates a child `Cogtext`. Closing the screen group stops its effects without
+fragmenting or erasing state.
 
 ### 6.4 Writing back into the graph
 
-Reactions may cause writes, but they never write into the turn they are
-flushing.
+Reactions may cause writes, but never into the turn they are flushing:
 
 1. The outer `commit` settles state.
 2. Reactions run synchronously, in registration order, against that settled
@@ -124,18 +121,18 @@ flushing.
    flush. Nested commits during the earlier accumulating phase still join the
    current turn (§3.2).
 
-An old captured writer also fails its turn-ID check. Async writes naturally
-start later turns because they happen after an `await`.
+An old captured writer also fails its turn-ID check, and async writes
+naturally start later turns because they happen after an `await`.
 
 Effects can still form a loop: turn → reaction → turn. A debug guard should
 warn after about 64 turns without reaching idle and print the causal chain.
-The queue prevents re-entrant graph writes, while the trace makes a runaway
-loop clear.
+The queue prevents re-entrant graph writes; the trace makes a runaway loop
+clear.
 
-Synchronous reaction flush is deliberate. Tests can assert effects on the
-line after an op returns. A short background task can also know that its
-reconciler finished before its deadline. A future `.deferred` mode may offer
-next-tick coalescing, but only as an opt-in.
+Synchronous reaction flush is deliberate: tests can assert effects on the line
+after an op returns, and a short background task knows its reconciler finished
+before its deadline. A future `.deferred` mode may offer next-tick coalescing,
+but only as an opt-in.
 
 ### 6.5 View-scoped effects
 
@@ -159,18 +156,18 @@ struct WeatherMapScreen: View {
 ```
 
 When the view disappears, `.task` cancels the sequence and its graph lease.
-`values` starts with the current settled value. Its default `.newest(1)`
+`values` starts with the current settled value; its default `.newest(1)`
 buffer may skip intermediate turns for a slow screen, which is right for
 camera state.
 
-Use this test: if cancellation on screen exit is correct, use SwiftUI
-lifecycle. App-wide work such as notifications and analytics belongs in an
-installed group. One effect should not use both.
+The test: if cancellation on screen exit is correct, use SwiftUI lifecycle.
+App-wide work such as notifications and analytics belongs in an installed
+group. One effect should not use both.
 
 ### 6.6 Testing effects
 
 Writable sources are `fileprivate`, so even `@testable import` cannot reach
-them. The owning state file must expose narrow, debug-only test helpers:
+them. The owning state file exposes narrow, debug-only test helpers:
 
 ```swift
 // WeatherState.swift
@@ -190,7 +187,7 @@ extension Cogtext {
 ```
 
 `seed` is quiet: no turn, history record, UI notice, or reaction. `commit` is
-loud and runs a real named turn. The feature chooses the exact test surface
+loud and runs a real named turn. The feature chooses its exact test surface
 instead of exposing all source refs.
 
 ```swift
@@ -220,28 +217,28 @@ turn settles them before reactions run.[^seed]
 ### 6.7 Background work that outlives the process
 
 Background downloads and sync break a basic assumption: the app may die while
-work continues. In-memory graph state cannot be the source of truth.
-
-Three background-work rules follow:
+work continues, so in-memory graph state cannot be the source of truth. Three
+rules follow:
 
 1. **The graph is a view of durable data.** Store subscriptions, episode
    records, and download status in SQLite, GRDB, or another durable store. An
-   op writes the store first, then its manual cog. A crash between those writes
-   loses only the in-memory update. A GRDB `ValueObservation` may instead feed
-   the graph as an external input (§8).
-2. **A headless app runtime uses its one normal `Cogtext`.** App
-   bootstrap installs and seeds it once, then installs app effects even when
-   no scene appears. UI-only work stays safe because it lives in views. A
-   background task owns its deadline; expiration cancels its op, while a
-   cancellation shield can protect the final commit
-   (`withTaskCancellationShield` in Swift 6.4).
-3. **System-owned work is not an `AsyncCog`.** An async cog models a task owned
-   by the current process. A background `URLSession` transfer can outlive that
-   task. Model its status as manual state such as `.queued`, `.downloading`,
-   `.downloaded`, or `.failed`, and let an engine own the transfer.
+   op writes the store first, then its manual cog; a crash between those
+   writes loses only the in-memory update. A GRDB `ValueObservation` may
+   instead feed the graph as an external input (§8).
+2. **A headless app runtime uses its one normal `Cogtext`.** App bootstrap
+   installs and seeds it once, then installs app effects even when no scene
+   appears. UI-only work stays safe because it lives in views. A background
+   task owns its deadline; expiration cancels its op, while a cancellation
+   shield can protect the final commit (`withTaskCancellationShield` in Swift
+   6.4).
+3. **System-owned work is not an `AsyncCog`.** An async cog models a task
+   owned by the current process. A background `URLSession` transfer can
+   outlive that task. Model its status as manual state such as `.queued`,
+   `.downloading`, `.downloaded`, or `.failed`, and let an engine own the
+   transfer.
 
-The graph connects to the engine through a **reconciler**. It compares desired
-state with the engine's actual state:
+The graph connects to the engine through a **reconciler** that compares
+desired state with the engine's actual state:
 
 ```swift
 let episodesToDownload = Cog { c in
@@ -271,17 +268,17 @@ A refresh entry point stays small:
 }
 ```
 
-The full flow is:
+The full flow:
 
 1. The system launches the app without a scene. The app rebuilds the graph
    from the store and installs effects.
 2. Feed refresh commits new episode rows.
 3. The derived desired set changes. The reconciler hands IDs to the background
-   session, then the short refresh task returns. It does not download files.
+   session, then the short refresh task returns without downloading files.
 4. The app may stop. `nsurlsessiond` keeps transferring.
 5. Completion launches the app again. The engine reconnects to its session
-   identifier, receives replayed delegate events, and calls ops that update the
-   store and graph.
+   identifier, receives replayed delegate events, and calls ops that update
+   the store and graph.
 6. An ordinary reaction can now post a “new episodes” notification.
 
 Feed refresh, policy changes, storage cleanup, and user taps only change
@@ -298,9 +295,8 @@ state. One reconciler owns the imperative `URLSession` edge.
 - Background `URLSession` runs transfers in `nsurlsessiond`, outside the app
   process. Transfers survive suspension and death, and completion can launch
   the app through `handleEventsForBackgroundURLSession`. It uses delegate
-  APIs, not the async conveniences.
-  `isDiscretionary` lets the system schedule bulk work around power and
-  network conditions.
+  APIs, not the async conveniences. `isDiscretionary` lets the system schedule
+  bulk work around power and network conditions.
 - A silent push with `content-available` can suggest a server-triggered
   refresh, but the system may delay or drop it. It is not a schedule.
 
@@ -329,26 +325,26 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate {
 
 The file must move before the delegate returns. Callbacks arrive on a
 background queue, so they hop to a MainActor op. Coalesce frequent progress
-events before that hop; for example, write only when the whole-number percent
+events before that hop — for example, write only when the whole-number percent
 changes. Equality checks remove duplicate values, but cannot remove the cost
 of too many turns.
 
 [^group]:
-    `EffectGroup` and reaction tokens are idempotent final classes.
-    Explicit MainActor `cancel()` gives tests and lifecycle code a fixed
-    stopping point. Deinit cleanup must also be safe and hop to the MainActor
-    when graph removal needs it.
+    `EffectGroup` and reaction tokens are idempotent final classes. Explicit
+    MainActor `cancel()` gives tests and lifecycle code a fixed stopping
+    point. Deinit cleanup must also be safe and hop to the MainActor when
+    graph removal needs it.
 
 [^seed]:
-    `seed` stages its value and pushes dirty flags exactly like a real
-    write, so dependent nodes and reaction roots recheck it on the next read
-    or turn. It skips the rest of the flush: no turn record, `withMutation`
-    notice, or reaction run. The dirty push is required, not an optimization.
-    Without it, a reaction registered before the seed would keep the
-    dependency set from its registration run and never rerun: in the test
-    above, the alert reaction initially depends only on `currentZipCode`
-    (no ZIP means the selector returns early), so a later weather turn would
-    find no subscriber edge to follow and the alert would never fire.
+    `seed` stages its value and pushes dirty flags exactly like a real write,
+    so dependent nodes and reaction roots recheck it on the next read or turn.
+    It skips the rest of the flush: no turn record, `withMutation` notice, or
+    reaction run. The dirty push is required, not an optimization. Without it,
+    a reaction registered before the seed would keep the dependency set from
+    its registration run and never rerun: in the test above, the alert
+    reaction initially depends only on `currentZipCode` (no ZIP means the
+    selector returns early), so a later weather turn would find no subscriber
+    edge to follow and the alert would never fire.
 
 [^engine]:
     A process-owned `AsyncCog` can cancel and restart Swift tasks. A

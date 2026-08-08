@@ -7,7 +7,7 @@ stream operators map to Cog. Other section numbers point to the core file.
 
 ### 5.4 Where the Rx operators went
 
-Signals hold current state. Streams carry events over time. Because these are
+Signals hold current state; streams carry events over time. Because these are
 different jobs, Cog does not copy Rx operators into its state graph. Their
 behavior comes from three smaller tools.
 
@@ -23,8 +23,8 @@ let weatherHere = Cog { c in
 ```
 
 If the ZIP changes, the next run drops the old weather edge and adds the new
-one. This is the state part of `switchMap`. The same rule can flatten a cog of
-cogs or follow a changing set:
+one — the state half of `switchMap`. The same rule flattens a cog of cogs or
+follows a changing set:
 
 ```swift
 let shouldPackHat = Cog { c in
@@ -42,15 +42,15 @@ dependency must be read again on each run, so removed ZIPs lose their edges.
 When dependencies choose async work, the policy in §5.2 controls old and new
 runs:
 
-- `.latest` cancels old work and starts new work. This is `switchMap`.
-- `.queue` runs work in order. This is `concatMap`.
-- `.merged` allows overlap. This is `flatMap` or `merge`.
+- `.latest` cancels old work and starts new work — `switchMap`.
+- `.queue` runs work in order — `concatMap`.
+- `.merged` allows overlap — `flatMap` or `merge`.
 - `.exhaustLatest` finishes the active run, then catches up once with the
   newest state.
 
-A derived value cannot forget state changes forever and remain correct. True
-drop or exhaust behavior therefore belongs to imperative ops, whose inputs
-are events.
+A derived value cannot forget state changes forever and remain correct, so
+true drop or exhaust behavior belongs to imperative ops, whose inputs are
+events.
 
 ```swift
 let forecast = AsyncCog<Forecast>(.latest) { c in
@@ -63,8 +63,8 @@ Here the selector follows the new ZIP, while `.latest` cancels the old fetch.
 
 #### 3. `.stream` follows real streams
 
-Some sources really are streams, such as location updates, websockets, and
-database observations:
+Some sources really are streams: location updates, websockets, database
+observations.
 
 ```swift
 let locationFix = AsyncCog<CLLocation>(.latest) { c in
@@ -74,9 +74,9 @@ let locationFix = AsyncCog<CLLocation>(.latest) { c in
 ```
 
 Cog commits each sequence element as its own turn. If `accuracy` changes, Cog
-cancels the old sequence and starts the new one. This is `flatMapLatest` at a
-graph node. A stream may use only `.latest`; other policies have no safe v1
-meaning for work that may never end.
+cancels the old sequence and starts the new one — `flatMapLatest` at a graph
+node. A stream may use only `.latest`; other policies have no safe v1 meaning
+for work that may never end.
 
 #### Operator dictionary
 
@@ -93,9 +93,9 @@ meaning for work that may never end.
 
 Cog does not replace streams of ordered event history. A cog holds the current
 value, not every tap or duplicate event. Keep those pipelines in ops and
-reactions, backed by `AsyncSequence` and tools such as `share()`. This boundary
-keeps a state read unambiguous: it means “the current value,” not “the next
-event.”
+reactions, backed by `AsyncSequence` and tools such as `share()`. This
+boundary keeps a state read unambiguous: it means “the current value,” not
+“the next event.”
 
 #### Notes and prior art
 
@@ -104,5 +104,5 @@ dependency capture makes that flag needless: every edge must be earned again.
 Cog-of-cog flattening and the old vacation example use the same rule.
 
 `.stream` matches Atoms' `AsyncSequenceAtom` and the `flatMapLatest` work in
-swift-async-algorithms. Timing modifiers also follow Atoms' useful precedent:
-they are optional edge features, not core state semantics.
+swift-async-algorithms. Timing modifiers also follow Atoms' precedent: they
+are optional edge features, not core state semantics.

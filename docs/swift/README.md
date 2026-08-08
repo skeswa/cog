@@ -1,8 +1,8 @@
 # Cog for Swift
 
 Cog is a state library for SwiftUI. It updates only the values and views that
-depend on changed state. At the UI edge, it works with Apple's `@Observable`
-system. Inside, it uses its own MainActor graph.
+depend on changed state. At the UI edge it works with Apple's `@Observable`
+system; inside it uses its own MainActor graph.
 
 This file is the map for the Swift design. The documents share section
 numbers, so a reference such as §6.4 works across files.
@@ -12,31 +12,30 @@ numbers, so a reference such as §6.4 works across files.
 Four principles guide every API and implementation choice:
 
 1. **Cog should feel simple.** Declaring, reading, and changing state should
-   look like normal Swift. Common code should be easy to read and reason about.
-   Runtime complexity should stay behind the API.
+   look like normal Swift. Common code should be easy to read and reason
+   about; runtime complexity stays behind the API.
 2. **Every state read should be correct.** A read must match the latest
-   committed source state after settling every dependency it needs. It must not
-   expose a torn update, stale derived value, or half-finished change.
+   committed source state after settling every dependency it needs. It must
+   not expose a torn update, stale derived value, or half-finished change.
    Uncertain async state must be explicit in `CogPhase`.
 3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
    allocation, reference counting, locks, and UI updates. Measure competing
    implementations instead of guessing.
 4. **Cog state should be singular.** One running app has one authoritative
-   `Cogtext`, and each mutable fact represented in Cog has one
-   writable source in it. Scenes, screens, and features must not create
-   competing contexts or mirror sources. A test or preview is a separate
-   runtime with one context.
+   `Cogtext`, and each mutable fact represented in Cog has one writable source
+   in it. Scenes, screens, and features must not create competing contexts or
+   mirror sources. A test or preview is a separate runtime with one context.
 
-Correctness and singular state are not traded for speed. A faster internal
-design should also keep the common API simple.
+Correctness and singular state are never traded for speed, and a faster
+internal design must keep the common API simple.
 
 ## The documents
 
 Read them in this order:
 
-1. **[dump-2026-08-06.md](../dump-2026-08-06.md): history.** Frozen notes
-   from the Dart and Flutter design. They explain the original problems but
-   do not define the Swift design.
+1. **[dump-2026-08-06.md](../dump-2026-08-06.md): history.** Frozen notes from
+   the Dart and Flutter design. They explain the original problems but do not
+   define the Swift design.
 2. **[exploration.md](./exploration.md): core design (§1–§5, §7–§11).** The
    graph, public API, write rules, async state, SwiftUI boundary, open
    questions, and spike plan.
@@ -49,14 +48,14 @@ Read them in this order:
 
 ## Where things stand (2026-08-07)
 
-These choices are settled. §10 of the core document has the full record.
+These choices are settled; §10 of the core document has the full record.
 
 - `commit(_:_:)` is the only write primitive. Ops are normal `Cogtext`
   methods. `fileprivate` and `.readOnly` control which code may name writable
   state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
-  accumulating, and flushing. Reactions run at the end of the turn. Writes from reactions
-  wait in a FIFO queue as new turns.
+  accumulating, and flushing. Reactions run at the end of the turn; writes
+  from reactions wait in a FIFO queue as new turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
 - Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A ref
@@ -72,9 +71,9 @@ These choices are settled. §10 of the core document has the full record.
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and
   `EffectGroup` handles own lifecycle and cancel safely more than once.
-- Production creates one app-wide `Cogtext` and injects it above all
-  scenes. Screens and features share it. Tests and previews create one
-  isolated context for their runtime.
+- Production creates one app-wide `Cogtext` and injects it above all scenes.
+  Screens and features share it. Tests and previews create one isolated
+  context for their runtime.
 - Production construction is guarded. Feature code cannot create a second
   context.
 - Manual state and nodes seen by the UI live for the app context by default.
@@ -89,9 +88,9 @@ These choices are settled. §10 of the core document has the full record.
   arena slot handles.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, app bootstrap helpers, debug-history tools, and persistence
-helpers. Ref layout, edge layout, and hash tables also remain open until
-benchmarks choose them.
+deferred reactions, app bootstrap helpers, debug-history tools, and
+persistence helpers. Ref layout, edge layout, and hash tables also remain open
+until benchmarks choose them.
 
 ## Next steps
 
