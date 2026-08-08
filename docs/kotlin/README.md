@@ -8,21 +8,31 @@ debug tools.
 
 The goal is small code that stays correct under change.
 
+## Design principles
+
+1. Cog should feel simple.
+2. Every state read should be correct.
+3. Cog should minimize runtime overhead without weakening the other rules.
+4. Cog state should be singular. One running app has one authoritative graph,
+   each mutable fact represented in Cog has one writable source in it, and
+   screens or features do not create state islands or mirror sources.
+
 ## Start here
 
 1. [§1–§5 and §7–§11: core design](exploration.md)
-2. [§5.4: Flow and reactive-library mapping](flows.md)
-3. [§6: effects and background work](effects.md)
-4. [Performance model and spike plan](perf.md)
+2. [Full weather feature](example.md)
+3. [§5.4: Flow and reactive-library mapping](flows.md)
+4. [§6: effects and background work](effects.md)
+5. [Performance model and spike plan](perf.md)
 
 The section numbers match the Swift set where that helps comparison. The
 Kotlin choices stand on their own.
 
 ## The short version
 
-`CogStore` owns one graph. A descriptor such as `Cog<User>` names one
-value in that graph. A keyed descriptor such as `CogBox<User, UserId>`
-names a set of values.
+One process-wide `CogStore` owns the production graph. A descriptor
+such as `Cog<User>` names one value in that graph. A keyed descriptor
+such as `CogBox<User, UserId>` names a set of values.
 
 Compose already has the right low-level parts:
 
@@ -33,6 +43,7 @@ Compose already has the right low-level parts:
 
 Cog builds policy around those parts:
 
+- the app creates one store and shares it across every screen;
 - descriptors have stable identity and readable debug labels;
 - writable descriptors stay private;
 - all writes happen in a named `commit`;
@@ -53,9 +64,9 @@ flowchart LR
 The common path stays small:
 
 ```kotlin
-private val countSource = mutableCog(0)
+private val countSource = ManualCog(0)
 val count = countSource.readOnly
-val doubled = cog { get(count) * 2 }
+val doubled = Cog { get(count) * 2 }
 
 fun CogStore.increment() = commit("increment") {
     countSource.value += 1
@@ -72,11 +83,20 @@ fun Counter() {
 }
 ```
 
+The application or dependency-injection root creates the store once.
+`CogProvider` exposes that same store at the root of Compose. A screen
+or ViewModel never creates or closes the production store.
+Production construction is guarded, so a second app graph fails fast.
+
+Tests and previews may create isolated stores. That keeps test state separate
+without changing the production singleton rule.
+
 ## Where things stand
 
 The first design is ready for a prototype. The prototype must prove:
 
 - staged and atomic writes;
+- escaped-writer failure in every build;
 - dynamic derived dependencies;
 - exact Compose invalidation;
 - ordered reactions;

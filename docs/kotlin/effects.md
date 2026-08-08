@@ -20,6 +20,8 @@ Examples:
 - schedule durable work.
 
 Put each effect at the smallest owner that matches its lifetime.
+The Cog store is app-wide. Effect groups may still be app-wide or
+screen-scoped.
 
 ```mermaid
 flowchart TD
@@ -52,14 +54,15 @@ One group owns registrations and jobs:
 
 ```kotlin
 class WeatherViewModel(
+    appCogs: AppCogState,
     repository: WeatherRepository,
     analytics: Analytics,
 ) : ViewModel() {
-    val cogs = CogStore(scope = viewModelScope)
+    private val cogs = appCogs.store
     private val effects = cogs.effects("weather")
 
     init {
-        addCloseable(cogs)
+        addCloseable(effects)
 
         effects.watch(
             name = "analytics: selected zip",
@@ -80,8 +83,13 @@ class WeatherViewModel(
 }
 ```
 
+`AppCogState` is the process singleton from the application root.
+The ViewModel borrows its store and closes only `effects`.
+
 `watch` runs a plain ordered effect. `watchLatest` gives each run a
 child job and cancels the old one when its tracked input changes.
+`watchExhaustLatest` finishes the active run, then starts only the newest
+waiting input. It fits preference saves that must not overlap.
 
 Use an async cog instead when loading status or data is itself UI state.
 Use a reaction when the result is only an outside action.
@@ -95,12 +103,15 @@ Use a reaction when the result is only an outside action.
 - cancels child jobs;
 - blocks late callbacks from writing through the group.
 
-A ViewModel registers its `CogStore` with `addCloseable`. Closing the
-store closes every child group. A group with a shorter owner may be closed on
-its own.
+A ViewModel registers its effect group with `addCloseable`. Closing
+the ViewModel closes that group, not the process-wide store.
 
-The store creates its own supervisor job under the owner's scope. Closing the
-store cancels that child job. It never cancels `viewModelScope` itself.
+An app-wide owner keeps its own effect groups for the process lifetime. Closing
+the store closes every remaining child group.
+
+The store creates its own supervisor job under the application scope. Closing
+an isolated test store cancels that child job. It never cancels the scope that
+was passed in.
 
 Registration order is effect order within one completed turn. A slow suspending
 effect does not block later registrations; its launch order is still fixed.
@@ -119,7 +130,7 @@ fun CogStore.markDraftSaved(revision: Revision) =
         savedRevisionSource.value = revision
     }
 
-effects.watchLatest(
+effects.watchExhaustLatest(
     name = "save draft",
     read = { get(draft) },
 ) { value ->
@@ -177,7 +188,7 @@ Rules:
 For a Flow that should collect only while the UI is visible, use
 `collectAsStateWithLifecycle` or `repeatOnLifecycle`. Direct Cog
 reads do not need that adapter; their lease already follows composition, and
-their store follows its ViewModel.
+their store follows the app process.
 
 ### 6.6 Testing effects
 

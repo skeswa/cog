@@ -9,7 +9,7 @@ numbers, so a reference such as §6.4 works across files.
 
 ## Design principles
 
-Three principles guide every API and implementation choice:
+Four principles guide every API and implementation choice:
 
 1. **Cog should feel simple.** Declaring, reading, and changing state should
    look like normal Swift. Common code should be easy to read and reason about.
@@ -21,9 +21,14 @@ Three principles guide every API and implementation choice:
 3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
    allocation, reference counting, locks, and UI updates. Measure competing
    implementations instead of guessing.
+4. **Cog state should be singular.** One running app has one authoritative
+   `Cogtext`, and each mutable fact represented in Cog has one
+   writable source in it. Scenes, screens, and features must not create
+   competing contexts or mirror sources. A test or preview is a separate
+   runtime with one context.
 
-Correctness is not traded for speed. A faster internal design should also keep
-the common API simple.
+Correctness and singular state are not traded for speed. A faster internal
+design should also keep the common API simple.
 
 ## The documents
 
@@ -42,40 +47,51 @@ Read them in this order:
 5. **[perf.md](./perf.md): implementation and benchmarks.** The planned
    data-oriented core and the tests that must choose its physical layout.
 
-## Where things stand (2026-08-06)
+## Where things stand (2026-08-07)
 
 These choices are settled. §10 of the core document has the full record.
 
 - `commit(_:_:)` is the only write primitive. Ops are normal `Cogtext`
   methods. `fileprivate` and `.readOnly` control which code may name writable
   state. A turn ID stops an escaped writer from writing later.
-- One outer `commit` is one turn. A turn moves through idle, accumulating,
-  and flushing. Reactions run at the end of the turn. Writes from reactions
+- One outer `commit` is one turn. The context moves through idle,
+  accumulating, and flushing. Reactions run at the end of the turn. Writes from reactions
   wait in a FIFO queue as new turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
-- Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. Boxes
-  create keyed refs. The exact in-memory ref layout is not settled; benchmarks
-  will compare inline keys, interned keys, and generic keyed refs.
+- Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A ref
+  is a value; its identity lives in an internal final-class descriptor plus
+  key. Boxes create keyed refs without allocating new descriptors. The exact
+  in-memory ref layout is not settled; benchmarks will compare inline keys,
+  interned keys, and generic keyed refs.
 - Async selectors read dependencies synchronously, then return `Work.run` or
-  `Work.stream`. Values use `CogPhase` and its `.latest` view. `.latest` is
-  the default policy. Streams allow only `.latest`.
+  `Work.stream`. Values use `CogPhase` and its `.latest` view; an explicit
+  `Previous` case keeps “no previous value” distinct from “previous value was
+  nil.” `.latest` is the default policy. Streams allow only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and
   `EffectGroup` handles own lifecycle and cancel safely more than once.
-- Manual state and nodes seen by the UI live for the context by default.
+- Production creates one app-wide `Cogtext` and injects it above all
+  scenes. Screens and features share it. Tests and previews create one
+  isolated context for their runtime.
+- Production construction is guarded. Feature code cannot create a second
+  context.
+- Manual state and nodes seen by the UI live for the app context by default.
   Graph-only derived and async nodes may be released when unused. Query caches
   have their own retention rules.
+- Debug-only `seed` stages a value and pushes dirty flags like a write, but
+  records no turn, sends no notices, and runs no reactions. Tests may seed
+  after effects install; the next real turn settles what the seed dirtied.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.
 - The runtime will use a data-oriented arena. Public refs remain names, never
   arena slot handles.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, reads across `Cogtext`s, debug-history tools, and
-persistence helpers. Ref layout, edge layout, and hash tables also remain
-open until benchmarks choose them.
+deferred reactions, app bootstrap helpers, debug-history tools, and persistence
+helpers. Ref layout, edge layout, and hash tables also remain open until
+benchmarks choose them.
 
 ## Next steps
 

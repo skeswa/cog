@@ -9,8 +9,8 @@ The design workspace for **Cog**, a fine-grained state-management project for
 native mobile UI. Cog is planned as:
 
 - a Swift library for SwiftUI on iOS, built over `@Observable` at the boundary
-  with its own MainActor-confined dependency graph inside; and
-- a Kotlin library for Jetpack Compose on Android.
+  with one app-wide MainActor-confined dependency graph inside; and
+- a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
 The Swift and Kotlin designs exist, but there is no implementation and there
 are no build, lint, or test commands. The next phase for each platform is the
@@ -28,26 +28,37 @@ spike in its `exploration.md` §11, as amended by its `perf.md` §9.
   data-oriented implementation and benchmark plan.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
-  `effects.md` covers effects and background work; `flows.md` maps Flow and
-  reactive concepts; `perf.md` covers the runtime candidates and benchmark plan.
+  `example.md` gives a full worked feature; `effects.md` covers effects and
+  background work; `flows.md` maps Flow and reactive concepts; `perf.md`
+  covers the runtime candidates and benchmark plan.
 
 ## Project principles
 
-Every design and implementation choice should preserve three rules:
+Every design and implementation choice should preserve four rules:
 
 1. Cog should feel simple to use, read, and reason about.
 2. Every state read should be correct.
-3. Cog should minimize runtime overhead without weakening the first two rules.
+3. Cog should minimize runtime overhead without weakening the other rules.
+4. Cog state should be singular: one running app has one authoritative graph,
+   each mutable fact represented in Cog has one writable source in it, and
+   screens or features do not create state islands or mirror sources.
 
 For Swift, a correct normal read uses the latest completed turn and settles
 every dependency needed for that value. A `Writer` read during a commit sees
 that turn's staged source values. Async uncertainty stays explicit in
-`CogPhase`.
+`CogPhase`. Production uses one app-wide `Cogtext`.
 
 For Kotlin, a correct normal read also uses the latest completed turn and
 settles every dependency it needs. A writer read sees its turn's staged source
 values. A grouped read and a Compose read see one consistent snapshot. Async
 uncertainty stays explicit in `CogPhase`.
+
+Kotlin production uses one process-wide `CogStore`. Screens and
+ViewModels use that singleton and never create or close it.
+
+Tests and previews are separate app runtimes. Each may create one isolated
+`Cogtext` or `CogStore`, but must not fragment state inside
+that runtime.
 
 ## Conventions
 

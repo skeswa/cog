@@ -3,7 +3,10 @@
 *Authored August 6, 2026.*
 
 Correct reads come first. The public API comes second. Data layout comes third.
-An internal win is not a win if it weakens either of the first two.
+An internal win is not a win if it weakens correctness, the public API, or the
+singular graph.
+Splitting features across stores is not a valid optimization; it would
+fragment authoritative state.
 
 ## 1. Cost order
 
@@ -143,8 +146,9 @@ AndroidX scatter maps use flat arrays and avoid a separate entry object for
 each insertion. That is promising, not settled. Library availability, code
 size, key quality, and small-map speed also matter.
 
-Never put a store-specific node id directly on a globally shared descriptor
-unless it supports several stores safely.
+Production has one store, but tests and previews still create isolated stores.
+Never put a store-specific node id directly on a shared descriptor unless that
+mapping supports those isolated stores safely.
 
 ### 4.3 Edges
 
@@ -288,13 +292,16 @@ The same tests run against the snapshot-backed and custom-graph candidates:
 - equal derived result after unequal source writes;
 - nested commit;
 - staged writer read;
+- escaped writer use after its turn closes;
 - failed commit;
 - read and write cycle;
 - reaction order and reaction write-back;
 - key collision and mutable-key misuse;
 - lease loss and cache expiry;
 - async cancel, stale completion, failure, and stream replacement;
-- wrong-lane access.
+- wrong-lane access;
+- second production-store installation;
+- screen recreation without manual-state loss.
 
 Assert values and exact compute counts.
 

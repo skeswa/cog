@@ -25,7 +25,7 @@ flowchart LR
 Write the branch as plain Kotlin:
 
 ```kotlin
-val activeItems = cog<List<Item>> {
+val activeItems = Cog<List<Item>> {
     when (get(selectedTab)) {
         Tab.All -> get(allItems)
         Tab.Saved -> get(savedItems)
@@ -51,8 +51,8 @@ Use a stream adapter for Room queries, DataStore, sockets, sensors, and other
 real multi-value sources:
 
 ```kotlin
-val messages = streamCogBox<List<Message>, ThreadId> { threadId ->
-    repository.observeMessages(threadId)
+val messages = AsyncCogBox<List<Message>, ThreadId> { threadId ->
+    stream(repository.observeMessages(threadId))
 }
 ```
 
@@ -113,7 +113,7 @@ read-only state calculation, not an event recorder.
 | `flatMapLatest` over work | `AsyncPolicy.Latest` |
 | `flatMapMerge` | `AsyncPolicy.Merge(limit)` |
 | `onEach` for an effect | `CogEffects.watch` |
-| `stateIn` | often a Cog node plus an owning store |
+| `stateIn` | often a Cog node in the app store |
 | `shareIn` | repository-owned shared Flow; adapt at the edge |
 | `debounce` | async start policy or explicit effect helper |
 | `retry` | repository or async work policy |
@@ -144,8 +144,8 @@ state, and precise invalidation.
 #### Migration rules
 
 1. Keep existing repository Flows.
-2. Add one screen-owned `CogStore`.
-3. Adapt repository streams at that store edge.
+2. Create the one app-wide `CogStore`.
+3. Adapt repository streams at feature edges in that store.
 4. Move expensive or shared UI derivation into cogs.
 5. Keep leaf composables on plain values and callbacks.
 6. Export Flow only for old consumers that still need it.

@@ -5,15 +5,21 @@
 Cog should feel like normal Kotlin and normal Compose. It should not ask an app
 to learn a second UI model.
 
-The three rules are:
+The four rules are:
 
 1. Cog is simple to use, read, and reason about.
 2. Every read is correct.
-3. Cog cuts runtime cost without weakening the first two rules.
+3. Cog cuts runtime cost without weakening the other rules.
+4. One running app has one Cog state graph. Each mutable fact represented in
+   Cog has one writable source. Screens and features do not create state
+   islands or mirror sources.
 
 The main decision is to build on the Compose snapshot runtime. It already gives
 us tracked reads, cached derived state, atomic writes, and exact UI
 invalidation. Cog adds the missing product rules.
+
+For all pieces in one place, see the
+[worked weather feature](example.md).
 
 ## 1. What the platform gives us, and what it does not
 
@@ -75,26 +81,49 @@ Cog state may point at Room, DataStore, `SavedStateHandle`, or a repository.
 Cog does not replace durable data. It gives UI a fine-grained view of it.
 
 Do not keep the same business value writable in both Cog and a repository.
-Pick one owner. Adapt the other side.
+Pick one owner. Adapt the other side. Inside Cog, do not copy one mutable fact
+into two `ManualCog` sources. Keep one source and derive every other
+view.
+
+### 1.3 Production has one store
+
+An Android app creates one `CogStore` for its process. Every screen,
+ViewModel, effect group, and non-UI consumer uses that same instance.
+
+Production construction is guarded. The normal `CogStore`
+constructor is not public. App bootstrap creates it once; a second production
+install fails fast. The testing artifact exposes an isolated-runtime factory.
+The exact bootstrap names remain open.
+
+The singleton is a lifetime rule, not durable storage. Process death clears
+it. Room, DataStore, saved state, and repositories rebuild needed values in the
+new process.
+
+Tests and previews may create isolated stores. They do not share state with
+each other or with the production singleton.
+
+One store does not mean every node stays hot forever. Leases still stop unused
+async work and release keyed caches. Recreating a screen does not reset manual
+state; an explicit operation does.
 
 ## 2. The core architecture
 
 ### 2.1 Four small parts
 
 1. A descriptor names a node.
-2. A `CogStore` owns node values and runtime state.
+2. One app-wide `CogStore` owns node values and runtime state.
 3. Compose snapshot state stores and derives values.
 4. Leases say which graph roots must stay hot.
 
-A descriptor has no app value inside it. The same descriptor can be used in
-two stores and get two values.
+A descriptor has no app value inside it. Production resolves it in the app
+store. An isolated test resolves the same descriptor in its test store.
 
 ```mermaid
 flowchart LR
-    D["Cog descriptor"] --> A["CogStore A<br/>node and value"]
-    D --> B["CogStore B<br/>different node and value"]
+    D["Cog descriptor"] --> A["App CogStore<br/>one production value"]
     A --> UA["screen A"]
-    B --> UB["screen B or test"]
+    A --> UB["screen B"]
+    D -. test only .-> T["isolated test store"]
 ```
 
 ### 2.2 Reads settle what they need
@@ -123,9 +152,9 @@ The first API has four common descriptor shapes:
 | Shape | Meaning |
 |---|---|
 | `Cog<T>` | one read-only value |
-| `MutableCog<T>` | one writable source |
+| `ManualCog<T>` | one writable source |
 | `CogBox<T, K>` | read-only values of `T`, keyed by `K` |
-| `MutableCogBox<T, K>` | writable values of `T`, keyed by `K` |
+| `ManualCogBox<T, K>` | writable values of `T`, keyed by `K` |
 
 Async descriptors return `CogPhase<T>`. Manual sources use the same
 read-only and writable split.
@@ -145,7 +174,7 @@ A derived body calls `get`. Each call becomes a dependency for that run.
 Old dependencies are removed after the run.
 
 ```kotlin
-val displayName = cog<String> {
+val displayName = Cog<String> {
     if (get(isSignedIn)) get(accountName) else "Guest"
 }
 ```
@@ -176,16 +205,18 @@ allowed for event-like adapters, not normal state.
 Writable names are private. Public code gets a separate read-only type.
 
 ```kotlin
-private val currentZipSource = mutableCog<ZipCode?>(null)
+private val currentZipSource = ManualCog<ZipCode?>(null)
 val currentZip = currentZipSource.readOnly
 
 private val weatherSource =
-    mutableCogBox<WeatherReport?, ZipCode> { null }
+    ManualCogBox<WeatherReport?, ZipCode> { null }
 val weather = weatherSource.readOnly
 
-val isNiceOutside = cogBox<Boolean, ZipCode> { zip ->
-    val report = get(weather, zip) ?: return@cogBox false
-    report.temperatureF in 65..82 && report.rainChance < 0.2
+val isNiceOutside = CogBox<Boolean, ZipCode> { zip ->
+    val report = get(weather, zip)
+    report != null &&
+        report.temperatureF in 65..82 &&
+        report.rainChance < 0.2
 }
 ```
 
@@ -219,7 +250,7 @@ fun CogStore.acceptWeather(
 ```
 
 The commit receiver grants write access through member extensions. Code
-outside it cannot assign to `MutableCog`.
+outside it cannot assign to `ManualCog`.
 
 One outer `commit` is one turn:
 
@@ -230,8 +261,10 @@ One outer `commit` is one turn:
 5. run dirty reactions in registration order;
 6. notify debug tools.
 
-Nested commits join the outer turn. A writer that escapes its body traps in
-debug builds. A failed body applies nothing.
+Nested commits join the outer turn. Writer access carries its turn. When the
+outer body returns, the turn closes, and an escaped writer fails in every
+build, debug and release; a silent late write would break read correctness
+exactly where it is hardest to see. A failed body applies nothing.
 
 ```mermaid
 sequenceDiagram
@@ -274,13 +307,13 @@ observation, and child jobs. See [§6](effects.md).
 
 ### 3.4 Compose
 
-Provide a store near the screen root:
+Provide the app store once, above navigation:
 
 ```kotlin
 @Composable
-fun WeatherRoute(viewModel: WeatherViewModel) {
-    CogProvider(viewModel.cogs) {
-        WeatherScreen()
+fun CogApp(appCogs: AppCogState) {
+    CogProvider(appCogs.store) {
+        AppNavHost()
     }
 }
 ```
@@ -295,8 +328,9 @@ fun WeatherHeader(zip: ZipCode) {
 }
 ```
 
-`cogs` is a short composition-scoped accessor for the provided store.
-Code outside composition uses a store it owns.
+`cogs` is a short composition-scoped accessor for the app store.
+Code outside composition receives the same singleton from the application or
+dependency-injection root.
 
 This read does two jobs:
 
@@ -345,6 +379,7 @@ The runtime must enforce:
 - a normal read sees the latest completed turn;
 - a grouped read is internally consistent;
 - a writer sees its turn's staged writes;
+- a writer cannot write after its turn has closed, in any build;
 - a derived body is pure and cannot commit;
 - a composition body cannot commit;
 - a reaction cannot alter the turn it is observing;
@@ -377,8 +412,9 @@ A root keeps its needed derived path alive. When the last root goes away, the
 store can release keyed nodes, stop async work, and drop cached edges after a
 short grace period.
 
-`CogStore` is also `AutoCloseable`. Closing it ends all leases,
-observers, effects, and async jobs at once.
+`CogStore` is also `AutoCloseable` for tests and controlled
+hosts. Closing it ends all leases, observers, effects, and async jobs at once.
+The Android app does not close and recreate it during navigation.
 
 ```mermaid
 flowchart TD
@@ -431,7 +467,7 @@ An async selector is synchronous and tracked. It reads input cogs, then returns
 work:
 
 ```kotlin
-val weatherRequest = asyncCogBox<WeatherReport, ZipCode>(
+val weatherRequest = AsyncCogBox<WeatherReport, ZipCode>(
     policy = AsyncPolicy.Latest,
 ) { zip ->
     val units = get(temperatureUnits)
@@ -466,8 +502,9 @@ The async node owns its child `Job`. Its root leases decide when work is
 needed. Losing the final lease starts the same grace period as sync nodes, then
 cancels work.
 
-Screen work uses a scope owned by the screen's `ViewModel`. Durable work
-uses WorkManager and durable storage. It is not an extra-long coroutine. See
+Async nodes use child jobs of the app store scope. UI leases decide when
+screen-driven work stays active. Durable work uses WorkManager and durable
+storage. It is not an extra-long coroutine. See
 [§6.7](effects.md#67-work-that-outlives-the-screen-or-process).
 
 ### 5.4 Where Flow operators went
@@ -480,31 +517,33 @@ See the full [Flow map](flows.md).
 
 ## 6. Side effects, worked
 
-Effects, ViewModel ownership, WorkManager, and tests live in
+Effect ownership, WorkManager, and tests live in
 [§6: effects and background work](effects.md).
 
 ## 7. What the Compose boundary must handle
 
 The UI bridge must:
 
-- use a static composition local for the store itself;
+- provide the app singleton through a static composition local above
+  navigation;
 - read the exact node `State` at the call site;
 - remember one lease by store, descriptor, and key;
 - close the lease in `DisposableEffect`;
 - keep the last completed value during normal recomposition;
 - show explicit `CogPhase` for async uncertainty;
-- give previews and tests a small store with overrides.
+- give each preview or test runtime one isolated store with overrides.
 
 It must not:
 
 - copy every Cog into `collectAsStateWithLifecycle`;
 - launch one coroutine per sync value;
 - turn event callbacks into graph reads;
-- hide a process-wide mutable singleton in a composition local.
+- create or replace a production store at a screen boundary;
+- treat the singleton as durable across process death.
 
 ## 8. Interop and migration
 
-Adopt Cog one screen or feature store at a time.
+Create the app store once, then adopt Cog one feature at a time.
 
 - Repository `Flow`: adapt it to an async stream or write it into a manual
   source in an owned effect.
@@ -547,12 +586,16 @@ collection. Measure the gain and offer a compatible fallback.
 ### Settled for the first spike
 
 - Compose snapshots are the first graph engine to test.
-- `CogStore` is store-scoped, not process-global.
+- production has one process-wide `CogStore`;
+- screens and ViewModels never create or close that production store;
+- tests and previews may use isolated stores;
+- production construction prevents a second graph;
 - graph access is confined to one UI lane;
 - descriptors are separate from stored values;
 - writable descriptors have distinct read-only wrappers;
 - all source writes happen inside one `commit` primitive;
 - nested commits join the outer turn;
+- an escaped writer fails in every build, not only in debug;
 - derived dependencies are dynamic;
 - equality gates publication;
 - UI reads a node directly as Compose `State`;
@@ -575,6 +618,7 @@ collection. Measure the gain and offer a compatible fallback.
   infer debug labels;
 - exception policy for reaction bodies;
 - exact module and version floors;
+- exact application bootstrap and dependency-injection helpers;
 - saved-state adapter shape;
 - debug-history size and payload.
 
@@ -582,7 +626,8 @@ collection. Measure the gain and offer a compatible fallback.
 
 Build a small vertical slice before freezing names.
 
-1. Implement source, derived, box, grouped read, and commit.
+1. Implement guarded app bootstrap, source, derived, box, grouped read, and
+   commit.
 2. Prove staged reads and atomic apply with hostile tests.
 3. Add direct Compose reads and count recompositions.
 4. Add dynamic dependencies, equality, cycles, and exceptions.
@@ -591,7 +636,10 @@ Build a small vertical slice before freezing names.
 7. Add latest async work with a cancellation-ignoring fake.
 8. Run the benchmark matrix in [§9](perf.md#9-spike-and-benchmark-plan).
 9. Compare the snapshot-backed graph with the small custom-graph fallback.
-10. Freeze the public API only after both correctness and cost gates pass.
+10. Prove a second production install fails and navigation does not reset
+    manual state.
+11. Freeze the public API only after correctness, singularity, and cost gates
+    pass.
 
 ## Appendix A: why not only StateFlow?
 
@@ -645,7 +693,10 @@ These projects guide the design. None is an API contract for Cog.
 ## Appendix C: terms
 
 - **descriptor:** a stable Kotlin object that names a value;
-- **node:** one descriptor, or descriptor-and-key, inside one store;
+- **node:** one descriptor, or descriptor-and-key, inside the app store or an
+  isolated test store;
+- **process singleton:** the one production store inside one Android process;
+  it is not durable or shared with another process;
 - **turn:** one outer commit and its atomic publication;
 - **settle:** compute a dirty value before returning it;
 - **root:** a value observed by UI, a reaction, Flow, or a host;

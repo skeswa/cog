@@ -11,8 +11,9 @@ The core idea is to keep graph data in compact arrays owned by one MainActor
 reference counting in the hot path.
 
 This document serves Cog's third principle: minimize runtime overhead. The
-first two principles remain constraints. A faster layout does not win if it
-weakens read correctness or pushes internal complexity into normal app code.
+first, second, and fourth principles remain constraints. A faster layout does
+not win if it weakens read correctness, fragments state, or pushes internal
+complexity into normal app code.
 
 ## 1. Cost order
 
@@ -81,7 +82,8 @@ number detects stale internal slot use after reuse.
 ### 3.2 Typed value columns
 
 Values have different Swift types, so they cannot share one raw value array.
-Each descriptor owns a typed column inside each context:
+Each descriptor owns a typed column inside the app context, or inside the one
+isolated context of a test or preview runtime:
 
 ```swift
 final class Column<Value> {
@@ -93,11 +95,11 @@ final class Column<Value> {
 
 This keeps value reads concrete. It avoids `Any` boxing and protocol dispatch
 per read. A descriptor reaches its known column type through a checked setup
-path and an internal downcast. A keyed family also stores typed keys in its
+path and an internal downcast. A keyed box also stores typed keys in its
 column, so selectors do not reopen erased keys during normal computation.
 
 Manual, derived, and async nodes share topology. Their descriptors differ in
-how they produce a row. One keyed family stores one compute closure, not one
+how they produce a row. One keyed box stores one compute closure, not one
 closure for every key.
 
 ### 3.3 Edge layout remains open
@@ -160,7 +162,7 @@ Even this simple ref can avoid most hashing:
 - Only a first lookup or changed dependency set needs a dictionary.
 - Each keyed descriptor owns `Dictionary<Key, Int32>`, so the cold lookup
   hashes the concrete key type rather than `AnyHashable`.
-- A keyless descriptor caches its one slot per context.
+- A keyless descriptor caches its one slot per runtime context.
 
 The benchmark compares the whole cost of three designs:
 
@@ -181,9 +183,9 @@ concrete key.
 Keep these rules until a benchmark disproves them:
 
 - **Use integers in graph walks.** Retains, releases, and weak loads stay out
-  of propagation. The context registry retains descriptors once. Use
+  of propagation. The app registry retains descriptors once. Use
   `Unmanaged` only where an internal pointer is unavoidable.
-- **Store closures per descriptor.** A keyed family's rows share one closure.
+- **Store closures per descriptor.** A keyed box's rows share one closure.
 - **Keep protocol existentials at the API shell.** Kind bits and
   per-descriptor functions handle inner dispatch.
 - **Hoist buffer checks.** A phase may borrow slab storage with
@@ -213,7 +215,7 @@ UI-read values owns 12 registrars.
 The boundary object can expose one fixed phantom key path. After the graph
 settles a turn, call `withMutation` only if that boundary value changed. SwiftUI
 does not report exact subscription removal, so the boundary and node stay
-pinned to the context in v1. An optional view lease may come later if
+pinned to the app context in v1. An optional view lease may come later if
 measurement shows that old keyed nodes or notices are costly.
 
 ## 7. Arena lifetime must not leak into refs
@@ -223,8 +225,8 @@ that owned its slot, causing leaks and stale handles. Cog avoids that design:
 
 - A ref is a stable name: descriptor plus key. If a derived node is released,
   the same ref can later create a fresh slot.
-- ARC owns descriptors. The context arena owns node rows.
-- Manual and UI-boundary nodes live for the context by default.
+- ARC owns descriptors. The app context arena owns node rows.
+- Manual and UI-boundary nodes live for the app context by default.
 - Only `.whileObserved` rows use graph subscriber and explicit lease counts.
   `.cache` rows use cache limits and retention time.
 
@@ -233,23 +235,24 @@ and increases the slot generation. Releasing an async row first cancels its
 task and increases the async generation. Late results then fail before they
 can touch a reused slot. Debug builds also check stale internal slot access.
 
-`keepAlive` remains sugar for context lifetime, not an exception added to one
+`keepAlive` remains sugar for app lifetime, not an exception added to one
 global observer rule.
 
 ## 8. Turns over the arrays
 
-The three turn phases from core §3.2 map to the storage plan:
+Core §3.2's turn model — the accumulating phase, then the six-step flush
+order — maps to the storage plan in four passes:
 
 1. **Accumulate:** writer subscripts update the pending value column and add
    each slot to a reused touched list. Reading through the writer sees staged
    values, so `w[count] += 1` works. Every access checks the turn ID.
-2. **Commit sources:** compare pending with current, keep real changes,
-   increase `changedAt`, and push flags. Do not run selectors.
-3. **Settle hot roots:** pull UI-boundary rows, active exports, and current
-   reaction dependencies. Keep cold branches dirty.
-4. **Notify and react:** notify changed boundaries, offer values to each
-   subscriber buffer, then run the reaction queue in registration order.
-   Reaction writes become later FIFO turns.
+2. **Commit sources (flush steps 1–2):** compare pending with current, keep
+   real changes, increase `changedAt`, and push flags. Do not run selectors.
+3. **Settle hot roots (flush step 3):** pull UI-boundary rows, active exports,
+   and current reaction dependencies. Keep cold branches dirty.
+4. **Notify and react (flush steps 4–6):** notify changed boundaries, offer
+   values to each subscriber buffer, then run the reaction queue in
+   registration order. Reaction writes become later FIFO turns.
 
 In debug builds, store a fixed-size ring of integer records: turn ID, op-name
 index, and touched slots. Resolve descriptor labels only when displaying the
@@ -262,7 +265,8 @@ This plan amends §11 of the core document:
 1. **Build the simple version first.** Use class nodes, edge arrays, and inline
    `AnyHashable` refs. Its test suite must cover escaped writers, self and
    multi-node cycles, dynamic cycles, equality-gated UI values, reaction
-   write-back, manual lifetime, async generation safety, and slow exports.
+   write-back, manual lifetime, async generation safety, slow exports, guarded
+   production-context installation, and scene recreation.
 2. **Port `js-reactivity-benchmark`.** Include Kairo diamond, deep, broad, and
    unstable cases; dynamicBench sweeps; the Cellx lattice; keyed diamonds; and
    key churn. Keep the expected-run-count checks, since timing alone can hide

@@ -25,7 +25,7 @@ easier to read and reason about.
 | Continue after process death | Durable state, an engine, and a reconciler (§6.7) |
 
 For example, “check the weather when the ZIP changes” produces state. It
-belongs in the `weatherReport` async cog from §5.1. “Alert me when the weather
+belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the weather
 becomes nice” leaves the graph, so it is a reaction.
 
 ### 6.2 A complete effect group
@@ -90,7 +90,7 @@ struct WeatherApp: App {
     @State private var effects: EffectGroup
 
     init() {
-        let cogs = Cogtext()
+        let cogs = Cogtext.installApp()
         _cogs = State(initialValue: cogs)
         _effects = State(initialValue:
             WeatherEffects(notifier: .live).install(in: cogs))
@@ -102,8 +102,13 @@ struct WeatherApp: App {
 }
 ```
 
-A screen can own a child `Cogtext` and its `EffectGroup` in `@State`. Both die
-with the screen.
+`installApp()` here and `testing()` in §6.6 are placeholder spellings; the
+final bootstrap helper names are still open (core §10).
+
+The `App` creates this context once and shares it across every scene.
+A screen may own an `EffectGroup` in `@State`, but it borrows
+the app context. It never creates a child `Cogtext`. Closing the
+screen group stops its effects without fragmenting or erasing state.
 
 ### 6.4 Writing back into the graph
 
@@ -190,7 +195,7 @@ instead of exposing all source refs.
 
 ```swift
 @Test func alertsWhenTheWeatherTurnsNice() async {
-    let cogs = Cogtext()
+    let cogs = Cogtext.testing()
     let notifier = Notifier.recording()
     let clock = TestClock()
     let effects = WeatherEffects(notifier: notifier, clock: clock)
@@ -208,26 +213,28 @@ instead of exposing all source refs.
 }
 ```
 
-The runtime and helpers both place `seed` behind `#if DEBUG`. Seed before
-anything observes the graph.[^seed]
+The runtime and helpers both place `seed` behind `#if DEBUG`. Seeding after
+effects install is safe: a seed marks its dependents dirty, and the next real
+turn settles them before reactions run.[^seed]
 
 ### 6.7 Background work that outlives the process
 
 Background downloads and sync break a basic assumption: the app may die while
 work continues. In-memory graph state cannot be the source of truth.
 
-Three rules follow:
+Three background-work rules follow:
 
 1. **The graph is a view of durable data.** Store subscriptions, episode
    records, and download status in SQLite, GRDB, or another durable store. An
    op writes the store first, then its manual cog. A crash between those writes
    loses only the in-memory update. A GRDB `ValueObservation` may instead feed
    the graph as an external input (§8).
-2. **Headless launches build a normal `Cogtext`.** The app creates the graph,
-   seeds it, and installs app effects even when no scene appears. UI-only work
-   stays safe because it lives in views. A background task owns its deadline;
-   expiration cancels its op, while a cancellation shield can protect the
-   final commit (`withTaskCancellationShield` in Swift 6.4).
+2. **A headless app runtime uses its one normal `Cogtext`.** App
+   bootstrap installs and seeds it once, then installs app effects even when
+   no scene appears. UI-only work stays safe because it lives in views. A
+   background task owns its deadline; expiration cancels its op, while a
+   cancellation shield can protect the final commit
+   (`withTaskCancellationShield` in Swift 6.4).
 3. **System-owned work is not an `AsyncCog`.** An async cog models a task owned
    by the current process. A background `URLSession` transfer can outlive that
    task. Model its status as manual state such as `.queued`, `.downloading`,
@@ -331,9 +338,15 @@ of too many turns.
     stopping point. Deinit cleanup must also be safe and hop to the MainActor
     when graph removal needs it.
 
-[^seed]: `seed` still increases the node version, so later reads recompute
-    against the seeded value. It skips only the push side: no turn record,
-    `withMutation`, or reaction flush.
+[^seed]: `seed` stages its value and pushes dirty flags exactly like a real
+    write, so dependent nodes and reaction roots recheck it on the next read
+    or turn. It skips the rest of the flush: no turn record, `withMutation`
+    notice, or reaction run. The dirty push is required, not an optimization.
+    Without it, a reaction registered before the seed would keep the
+    dependency set from its registration run and never rerun: in the test
+    above, the alert reaction initially depends only on `currentZipCode`
+    (no ZIP means the selector returns early), so a later weather turn would
+    find no subscriber edge to follow and the alert would never fire.
 
 [^engine]: A process-owned `AsyncCog` can cancel and restart Swift tasks. A
     system-owned transfer has no live Swift task after process death, so its

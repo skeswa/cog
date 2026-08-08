@@ -16,9 +16,9 @@ The main finding is simple: Swift is a strong fit. The MainActor gives the
 graph one safe execution lane. Observation lets SwiftUI track individual
 values. Swift access control can enforce write ownership. Cog must add the
 parts the platform lacks: cached derived state, consistent updates, keyed
-families, named turns, and async policies.
+boxes, named turns, and async policies.
 
-Three principles judge the design:
+Four principles judge the design:
 
 1. **Feel simple:** normal use should look like ordinary Swift and require few
    concepts.
@@ -26,9 +26,14 @@ Three principles judge the design:
    sources after settling every dependency needed for that value.
 3. **Minimize runtime overhead:** do no more computation, allocation, or UI
    work than the result needs.
+4. **Keep state singular:** one running app has one authoritative
+   `Cogtext`, and each mutable fact represented in Cog has one
+   writable source in it. Scenes, screens, and features do not create separate
+   Cog state islands or mirror sources.
 
-The first two constrain the third. An optimization must not weaken read
-correctness or make the common API harder to understand.
+The first, second, and fourth constrain the third. An optimization must not
+weaken read correctness, fragment state, or make the common API harder to
+understand.
 
 ---
 
@@ -50,7 +55,7 @@ Observation does not provide Cog's inner graph:
 | Explicit turns | iOS 26 `Observations` batches between suspension points, but has no explicit transaction block. |
 | Continuous tracking | One-shot tracking until Swift 6.4 and its newer OS runtime. Manual re-arming can miss changes. |
 | Equality checks | Nothing; setting an equal value still sends a notice. |
-| Keyed families, async values, write control | Nothing. |
+| Keyed boxes, async values, write control | Nothing. |
 
 Two platform rules shape Cog:
 
@@ -88,7 +93,7 @@ cost. §2.5 and Appendix C cover the alternatives.
 
 ### 1.3 The ecosystem leaves room for Cog
 
-No current Swift library combines this platform fit with all three principles
+No current Swift library combines this platform fit with all four principles
 at Cog's intended scale:
 
 - swift-state-graph has cached derived values and Observation support, but
@@ -147,7 +152,8 @@ Terms used below:
 
 - A **source** is writable state.
 - A **derived cog** computes a value from other cogs.
-- A **node** is one source or derived value in one `Cogtext`.
+- A **node** is one source or derived value in the app `Cogtext`, or
+  in the one isolated context of a test or preview runtime.
 - A **turn** is one outermost `commit` and the work it causes.
 - A **hot root** has a live UI, reaction, or stream consumer. A cold node does
   not.
@@ -181,25 +187,47 @@ it. A writer carries a turn ID, so saving it and calling it later fails.
 
 ### 2.3 Descriptors name state; `Cogtext` stores it
 
-A top-level declaration is a light descriptor, not a live global value. Each
-`Cogtext` stores its own node for a descriptor and optional key.
+A top-level declaration is a light descriptor, not a live global value. The
+running app's one `Cogtext` stores the node for a descriptor and
+optional key. A test or preview is a separate runtime with one isolated
+context.
 
 This split gives Cog:
 
-- **Keyed families.** A box plus a key finds one node.
-- **Clean tests.** Each test creates a new `Cogtext`; no global reset is
-  needed.
-- **One history owner.** The context records turns and recomputations.
-- **Local scopes.** A screen may own a child context and private descriptors.
+- **Keyed boxes.** A box plus a key finds one node.
+- **Singular state.** Every production feature resolves through one graph.
+- **Clean tests.** Each test runtime creates one `Cogtext`; no
+  process-global reset is needed.
+- **One history owner.** The app context records every turn and recomputation.
 
-Descriptors are final classes. Their `ObjectIdentifier` gives stable identity
-for the process. Human labels use an explicit `name:` or the captured
+Production code must not create child contexts. Truly view-local state stays
+in SwiftUI `@State`. Cog-backed screen state lives in the app graph,
+uses a screen identity as a key when needed, and resets through an explicit
+op.
+
+One mutable domain fact also gets one manual source. Another feature may read
+it or derive a new shape, but it must not mirror that fact into a second
+`ManualCog`.
+
+Production construction is guarded. The plain `Cogtext` initializer
+is not public to app features. App bootstrap installs one context; a second
+production install fails fast. The testing product exposes an isolated-runtime
+factory. Exact helper names remain open.
+
+Descriptors are internal final classes. Their `ObjectIdentifier` gives stable
+identity for the process. The public types are not the descriptors
+themselves: `Cog<T>`, `ManualCog<T>`, and their boxes are lightweight ref and
+box values that carry a descriptor and, for a keyed ref, a key. A keyless
+declaration such as `Cog<Bool> { ... }` allocates one descriptor and returns
+the ref already bound to it. `box[key]` builds a ref value without allocating
+a new descriptor, which is what lets the perf plan call ref creation
+allocation-free. Human labels use an explicit `name:` or the captured
 `fileID:line`; users never see the object identifier. A future optional macro
 could infer names without changing identity.
 
-The cost is that reads need a context: `c.get(ref)` inside a selector and
-`cogs.get(ref)` outside. That context is also what tracks dependencies and
-records history.
+Reads still need the app context: `c.get(ref)` inside a selector and
+`cogs.get(ref)` outside. It tracks dependencies and records one
+history for the whole app.
 
 ### 2.4 Dependencies are captured on every run
 
@@ -225,6 +253,10 @@ Rules:
   seam lets tests inspect diagnostics without crashing the test process.
 - Synchronous selectors do not throw in v1. Use `Result` for fallible sync
   domain work and `CogPhase` for async failures.
+- `c.read` returns a cog's current value without creating an edge. It is the
+  untracked escape hatch for a value the selector uses but must not follow,
+  as in `withLatestFrom` (§5.4). Keep it rare and loud; a `get` that should
+  have been tracked is a stale-value bug.
 - `c.curr` exposes the cog's prior value so a selector may keep or fold it.
 
 The benchmark port must test diamonds, deep graphs, broad graphs, changing
@@ -245,9 +277,10 @@ Keep small derived values on main and use `@concurrent` work in an `AsyncCog`
 for expensive computation. Network, database, and sensor producers can work
 elsewhere and enter through an op.
 
-If a real server-side use case appears, prefer separate single-executor
-contexts linked by explicit async edges. Only MainActor contexts would attach
-to views. Appendix C gives the full trade-off analysis.
+If a server-side use case appears, that process runtime still gets one
+single-executor context. Off-main work is computation, not a second state
+graph, and returns through explicit async results or ops. Appendix C gives the
+full trade-off analysis.
 
 ---
 
@@ -300,16 +333,18 @@ The public forms are:
 | Declare | Example | Read |
 | --- | --- | --- |
 | One derived value | `Cog<Bool> { ... }` | `c.get(ref)` → `Bool` |
-| A derived family | `CogBox<Bool, ZipCode> { ... }` | `c.get(box[zip])` |
+| A derived box | `CogBox<Bool, ZipCode> { ... }` | `c.get(box[zip])` |
 | One source | `ManualCog<ZipCode?>(nil)` | Read normally; write `w[ref] = zip` |
-| A source family | `ManualCogBox<Weather?, ZipCode>(nil)` | `w[box[zip]] = report` |
+| A source box | `ManualCogBox<Weather?, ZipCode>(nil)` | `w[box[zip]] = report` |
 | One async value | `AsyncCog<Forecast>(.latest) { ... }` | `CogPhase<Forecast>` |
-| An async family | `AsyncCogBox<Weather, ZipCode>(.latest) { ... }` | Full phase or `.latest` value (§5.1) |
+| An async box | `AsyncCogBox<Weather, ZipCode>(.latest) { ... }` | Full phase or `.latest` value (§5.1) |
 
 Four rules keep these forms consistent:
 
 1. **Refs are the only inputs to runtime APIs.** `Cog<T>` is readable;
-   `ManualCog<T>` is readable and writable. Identity is descriptor plus key.
+   `ManualCog<T>` is readable and writable. A ref is a value that pairs an
+   internal final-class descriptor with an optional key; identity is
+   descriptor plus key (§2.3).
 2. **Boxes create refs.** `box[key]` returns a ref. A keyless declaration is
    the same system already bound to its only node.
 3. **Production kind does not change the read type.** Manual, derived, and
@@ -325,7 +360,7 @@ tokens and generic keyed refs. The public ref stays resilient, not `@frozen`,
 until data chooses a winner (perf §4 and §9).
 
 Keys pass through normal lexical capture, as `zip` does above. There is no
-hidden key flow. Nodes appear lazily per descriptor and key. A manual family's
+hidden key flow. Nodes appear lazily per descriptor and key. A manual box's
 initial value may also be a key-based closure.
 
 ### 3.2 Ops and turns
@@ -428,10 +463,10 @@ struct WeatherCard: View {
 `cogs.get` reads through the node's registrar. SwiftUI then tracks that exact
 descriptor and key. The view updates only if one of those values really
 changes. There is no special view, hook, or property wrapper. The app injects
-one `Cogtext` through the environment.
+its one `Cogtext` above every scene through the environment.
 
 SwiftUI does not tell Cog when it stops watching a registrar object. Any node
-that reaches this UI boundary stays pinned until its context dies (§5.3).
+that reaches this UI boundary stays pinned to the app context (§5.3).
 
 Views should not create raw writable bindings because sources are
 `fileprivate`. The state file exports a domain binding:
@@ -482,16 +517,28 @@ from one file to one module.
 Async state uses one phase type and keeps the last good value:
 
 ```swift
+enum Previous<Value> {
+    case none
+    case some(Value)
+}
+
 enum CogPhase<Value> {
     case initial
-    case pending(previous: Value?)
+    case pending(previous: Previous<Value>)
     case success(Value)
-    case failure(any Error, previous: Value?)
+    case failure(any Error, previous: Previous<Value>)
 
     var latestValue: Value? { ... }
     var isLoading: Bool { ... }
 }
 ```
+
+`Previous` keeps “no previous value” distinct from “the previous value was
+nil.” A plain `Value?` would carry that distinction only as a nested optional
+when `Value` is itself optional. That is easy to misread, and a bare `nil`
+becomes ambiguous at use sites. The explicit cases keep phase handling
+legible. `latestValue` still returns `Value?`; its outer layer answers “is
+there a latest value at all.”
 
 There is no failure type parameter in v1. Typed throws may support a typed
 variant after the required Swift and OS versions are practical.
@@ -500,11 +547,16 @@ An async selector is synchronous and tracked. It reads dependencies, then
 returns a description of async work:
 
 ```swift
-let weatherReport = AsyncCogBox<Weather, ZipCode>(.latest) { c, zip in
+let fetchedWeather = AsyncCogBox<Weather, ZipCode>(.latest) { c, zip in
     let service = c.get(weatherService)
     return .run { try await service.weather(for: zip) }
 }
 ```
+
+§3.1 modeled `weatherReport` as a manual box that the `checkWeather` op
+fills. `fetchedWeather` is the async alternative, where the fetch itself is
+derived state. A real app picks one shape per fact; the two appear side by
+side here only to compare them.
 
 `Work` has two forms:
 
@@ -519,14 +571,14 @@ Changing a dependency reruns the selector and creates new work. The policy in
 Read either the full phase or its last good value:
 
 ```swift
-c.get(weatherReport[zip])
-c.get(weatherReport.latest[zip])
+c.get(fetchedWeather[zip])
+c.get(fetchedWeather.latest[zip])
 ```
 
 The `.latest` projection lets downstream code read a manual `Weather?` and an
 async weather value in the same shape. Use `AsyncCog` for async derived state.
 Use an op for an imperative action. A forced refresh can be an op such as
-`cogs.refresh(weatherReport[zip])`.
+`cogs.refresh(fetchedWeather[zip])`.
 
 ### 5.2 Scheduling policies
 
@@ -574,13 +626,13 @@ if a real use case appears.
 A future query layer should support:
 
 - stale rules based on age, network return, or app focus;
-- tag-based invalidation across keyed families;
+- tag-based invalidation across keyed boxes;
 - a stream that yields a disk value, then a network value;
 - separate clocks for freshness and memory retention.
 
 Node lifetime depends on node kind:
 
-- **Manual:** `.context` by default. Releasing a source would reset it on the
+- **Manual:** `.app` by default. Releasing a source would reset it on the
   next read. Ephemeral state may opt into
   `.whileObserved(resetToInitial: true)`.
 - **Sync derived:** `.whileObserved(grace:)` by default. Cog can recompute it.
@@ -588,12 +640,12 @@ Node lifetime depends on node kind:
   advances its generation, and blocks late results from a new slot.
 - **Query:** explicit `.cache(...)` policy with separate freshness and
   retention rules.
-- **UI boundary:** pinned to the context in v1 because SwiftUI exposes no
+- **UI boundary:** pinned to the app context in v1 because SwiftUI exposes no
   reliable observer-removal hook. Reactions and exported streams have exact
   lease tokens and may release normally.
 
-Public lifetime terms are `context`, `whileObserved(grace:)`, and `cache(...)`.
-`keepAlive` is only sugar for `.context`. If UI-pinned keyed growth becomes a
+Public lifetime terms are `app`, `whileObserved(grace:)`, and `cache(...)`.
+`keepAlive` is only sugar for `.app`. If UI-pinned keyed growth becomes a
 measured problem, an optional `DynamicProperty` can own an exact view lease.
 
 ### 5.4 Where the Rx operators went
@@ -616,13 +668,14 @@ testing, background work, and reconciler rules.
 - **Reads in escaping closures are not tracked.** A `Button` action or
   `Task {}` body is outside the view's tracked read. Debug builds should warn
   when a tracked `get` has no consumer, like Perception does.
-- **View-owned model lifetime can be unstable.** Cog state lives in a context,
-  not an `@Observable` object recreated with the view. Screen state uses an
-  explicitly owned child context.
+- **View-owned model lifetime can be unstable.** Cog state lives in the app
+  context, not an `@Observable` object recreated with the view. Truly
+  local UI state uses `@State`. Shared screen state uses keyed app
+  cogs and explicit reset ops.
 - **A collection is one observed property.** Use `CogBox` for per-key nodes. A
   future `ForEach` helper can combine a keys cog with per-key value cogs.
 - **UI liveness is hidden.** Once a node gets a registrar boundary, pin it to
-  the context in v1. Never guess UI liveness from graph subscribers.
+  the app context in v1. Never guess UI liveness from graph subscribers.
 - **MainActor values need not be `Sendable`.** Cog may hold values such as a
   `UIImage` or actor-bound service without extra wrappers. Handles should be
   documented, and later marked with `~Sendable`, as MainActor-only.
@@ -670,9 +723,9 @@ closures are enough; any naming or projection macro must remain optional.
 
 ## 10. Decision record
 
-Use the three principles to judge new choices: does the common path stay easy
-to understand, can every read still be proven correct, and does measurement
-show less runtime work?
+Use the four principles to judge new choices: does the common path stay easy
+to understand, can every read still be proven correct, does state stay
+singular, and does measurement show less runtime work?
 
 ### Settled
 
@@ -681,22 +734,24 @@ show less runtime work?
 | Who may write? | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4). |
 | Op, transaction, or turn? | One named `commit`; ops are ordinary methods (§3.2). |
 | Keyed and keyless API? | Boxes make refs; keyless cogs are pre-bound refs. Physical layout waits for benchmarks (§3.1; perf §4, §9). |
-| Identity and names? | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people (§2.3). |
+| Identity and names? | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are ref values over internal final-class descriptors (§2.3, §3.1). |
 | Static or dynamic dependencies? | Dynamic, captured on each run (§2.4). |
 | Cycles and selector errors? | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4). |
 | Consistent updates? | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2). |
 | Key flow? | Normal lexical capture in a `CogBox` closure (§3.1). |
-| Async value shape? | `CogPhase` with previous value and a `.latest` projection (§5.1). |
+| Async value shape? | `CogPhase` with an explicit `Previous` case, keeping “no previous value” distinct from “previous value was nil,” plus a `.latest` projection (§5.1). |
 | Async dependency tracking? | A sync selector returns `Work`; no reads cross `await` (§5.1). |
 | Default async policy? | `.latest` (§5.2). |
 | Exhaust for derived state? | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2). |
 | Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4). |
 | Effect lifecycle? | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3). |
 | Writes from reactions? | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports loops (§6.4). |
+| Test seeding? | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6). |
 | Accumulating versus flushing? | Nested commits join while accumulating and queue while flushing (§3.2). |
 | Streams with async policies? | `.stream` is `.latest`-only and the type system enforces it (§5.2). |
-| Node disposal? | Per-kind `context`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3). |
-| Global and local state? | Root and child `Cogtext`s supplied through the environment (§2.3). |
+| Node disposal? | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3). |
+| State graph count? | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3). |
+| Context construction? | App bootstrap can install one production context; feature code cannot construct another (§2.3). |
 
 ### Still open
 
@@ -708,8 +763,8 @@ show less runtime work?
 3. **Deferred reactions:** synchronous ordered flush and the write-back queue
    are settled. An optional next-tick `.deferred` mode may or may not earn its
    complexity.
-4. **Cross-context reads:** a child may be able to read a longer-lived parent,
-   but the lifetime rule is not designed.
+4. **App bootstrap:** settle the smallest helpers for installing the one
+   context above every scene and replacing it in a test or preview runtime.
 5. **Debug history UI:** the bounded log records ops, writes, recomputations,
    and notices. Labels are settled. Its display may be `os_log`, an in-app
    inspector, or another developer tool.
@@ -725,8 +780,10 @@ show less runtime work?
 
 1. Build the simple correctness version: class nodes, `AnyHashable` refs,
    writer turn IDs, cycle paths, equality checks, hot-root flush, reactions,
-   and per-kind lifetimes. Test diamonds, changing dependencies, conditional
-   cycles, escaped writers, and reaction write-back.
+   per-kind lifetimes, and guarded app bootstrap. Test diamonds, changing
+   dependencies, conditional cycles, escaped writers, reaction write-back,
+   rejection of a second production context, and scene recreation without
+   manual-state loss.
 2. Add registrar-backed nodes and a small SwiftUI weather app. Verify per-ZIP
    updates, UI pinning, and equality-gated derived notices. Also test UIKit on
    an iOS 26 simulator.
@@ -813,9 +870,9 @@ control such as `TextField` needs its write to be visible on the next immediate
 read. A main → background → main trip can drop characters or move the cursor.
 Keeping form state on main would create two state systems.
 
-The useful escape hatch is per-context isolation. A future context could be
-bound to another actor and link to a MainActor context through explicit async
-edges. Each context would stay single-threaded and keep the same rules.
+Do not use a second context as an escape hatch. Expensive work may use another
+executor, but authoritative state returns to the one app context through an
+async result or op.
 
 This keeps the cheap case cheap. Small selectors such as `temperature > 68`
 stay on main. Only costly user work crosses an executor; graph bookkeeping does
