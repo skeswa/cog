@@ -1,6 +1,6 @@
 # Cog for Kotlin: worked weather example
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 This example shows one small Android feature from end to end. It uses:
 
@@ -532,16 +532,16 @@ gets another later turn.
 
 ## 6. Why each piece exists
 
-| Piece | Job |
-|---|---|
-| `selectedCitySource` | writable single state |
-| `favoriteSource` | writable state per city |
-| `selectedTitle` | cached single derivation |
-| `cityLabel` | cached derivation per city |
-| `forecast` | keyed async work and phase |
-| operations | named, atomic writes |
-| effects | analytics and durable preference writes |
-| direct UI reads | precise Compose invalidation and leases |
+| Piece                | Job                                     |
+| -------------------- | --------------------------------------- |
+| `selectedCitySource` | writable single state                   |
+| `favoriteSource`     | writable state per city                 |
+| `selectedTitle`      | cached single derivation                |
+| `cityLabel`          | cached derivation per city              |
+| `forecast`           | keyed async work and phase              |
+| operations           | named, atomic writes                    |
+| effects              | analytics and durable preference writes |
+| direct UI reads      | precise Compose invalidation and leases |
 
 The app singleton owns current state. The repository owns durable data and
 network work. The ViewModel owns screen effects. Compose renders values and

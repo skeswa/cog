@@ -1,6 +1,6 @@
 # Cog for Kotlin: Flow map
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 ### 5.4 Where the Flow operators went
 
@@ -104,23 +104,23 @@ read-only state calculation, not an event recorder.
 
 #### Operator dictionary
 
-| Flow or Rx idea | Cog shape |
-|---|---|
-| `map` | derived cog |
-| `combine` | one derived body with several `get` calls |
-| `distinctUntilChanged` | node equality policy |
-| `flatMapLatest` over state | dynamic dependency |
-| `flatMapLatest` over work | `AsyncPolicy.Latest` |
-| `flatMapMerge` | `AsyncPolicy.Merge(limit)` |
-| `onEach` for an effect | `CogEffects.watch` |
-| `stateIn` | often a Cog node in the app store |
-| `shareIn` | repository-owned shared Flow; adapt at the edge |
-| `debounce` | async start policy or explicit effect helper |
-| `retry` | repository or async work policy |
-| `catch` | `CogPhase.Failed` or an effect error handler |
-| `scan` | explicit writable source and operation |
-| `buffer` | Flow boundary, not sync state |
-| `collectLatest` | `watchLatest` or latest async work |
+| Flow or Rx idea            | Cog shape                                       |
+| -------------------------- | ----------------------------------------------- |
+| `map`                      | derived cog                                     |
+| `combine`                  | one derived body with several `get` calls       |
+| `distinctUntilChanged`     | node equality policy                            |
+| `flatMapLatest` over state | dynamic dependency                              |
+| `flatMapLatest` over work  | `AsyncPolicy.Latest`                            |
+| `flatMapMerge`             | `AsyncPolicy.Merge(limit)`                      |
+| `onEach` for an effect     | `CogEffects.watch`                              |
+| `stateIn`                  | often a Cog node in the app store               |
+| `shareIn`                  | repository-owned shared Flow; adapt at the edge |
+| `debounce`                 | async start policy or explicit effect helper    |
+| `retry`                    | repository or async work policy                 |
+| `catch`                    | `CogPhase.Failed` or an effect error handler    |
+| `scan`                     | explicit writable source and operation          |
+| `buffer`                   | Flow boundary, not sync state                   |
+| `collectLatest`            | `watchLatest` or latest async work              |
 
 Do not copy an operator just because it exists. Add a Cog helper only when it
 makes a common business rule clearer.

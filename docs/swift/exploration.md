@@ -1,8 +1,8 @@
 # Cog for Swift: core design
 
-*August 6, 2026*
+_August 6, 2026_
 
-*See [README.md](./README.md) for the document map.*
+_See [README.md](./README.md) for the document map._
 
 Cog is a fine-grained state library for SwiftUI. “Fine-grained” means that a
 change updates only the derived values and views that used it. Cog uses
@@ -48,14 +48,14 @@ No view adapter is needed.[^observation-mechanics]
 
 Observation does not provide Cog's inner graph:
 
-| Cog needs | Observation provides |
-| --- | --- |
-| Cached derived values | Nothing; computed properties run on every read. |
-| One consistent snapshot | Nothing below iOS 26; old callbacks start at `willSet`. |
-| Explicit turns | iOS 26 `Observations` batches between suspension points, but has no explicit transaction block. |
-| Continuous tracking | One-shot tracking until Swift 6.4 and its newer OS runtime. Manual re-arming can miss changes. |
-| Equality checks | Nothing; setting an equal value still sends a notice. |
-| Keyed boxes, async values, write control | Nothing. |
+| Cog needs                                | Observation provides                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Cached derived values                    | Nothing; computed properties run on every read.                                                 |
+| One consistent snapshot                  | Nothing below iOS 26; old callbacks start at `willSet`.                                         |
+| Explicit turns                           | iOS 26 `Observations` batches between suspension points, but has no explicit transaction block. |
+| Continuous tracking                      | One-shot tracking until Swift 6.4 and its newer OS runtime. Manual re-arming can miss changes.  |
+| Equality checks                          | Nothing; setting an equal value still sends a notice.                                           |
+| Keyed boxes, async values, write control | Nothing.                                                                                        |
 
 Two platform rules shape Cog:
 
@@ -266,10 +266,10 @@ dependencies, and cycles.
 
 Three off-main designs are possible, but none fits the UI boundary:
 
-| Design | Main problem |
-| --- | --- |
-| Graph on another actor | SwiftUI reads are synchronous and cannot `await`; actor reentrancy can also interleave turns. |
-| Locked graph on any thread | A view can read two cogs from different turns, and all values become `Sendable`. |
+| Design                          | Main problem                                                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Graph on another actor          | SwiftUI reads are synchronous and cannot `await`; actor reentrancy can also interleave turns.                               |
+| Locked graph on any thread      | A view can read two cogs from different turns, and all values become `Sendable`.                                            |
 | Background graph with snapshots | Snapshots are coherent, but text fields need immediate write-then-read behavior. Local UI state would need a second system. |
 
 Graph bookkeeping is cheap. User code inside a selector is the likely cost.
@@ -330,14 +330,14 @@ let isNiceOutsideHere = Cog { c in
 
 The public forms are:
 
-| Declare | Example | Read |
-| --- | --- | --- |
-| One derived value | `Cog<Bool> { ... }` | `c.get(ref)` → `Bool` |
-| A derived box | `CogBox<Bool, ZipCode> { ... }` | `c.get(box[zip])` |
-| One source | `ManualCog<ZipCode?>(nil)` | Read normally; write `w[ref] = zip` |
-| A source box | `ManualCogBox<Weather?, ZipCode>(nil)` | `w[box[zip]] = report` |
-| One async value | `AsyncCog<Forecast>(.latest) { ... }` | `CogPhase<Forecast>` |
-| An async box | `AsyncCogBox<Weather, ZipCode>(.latest) { ... }` | Full phase or `.latest` value (§5.1) |
+| Declare           | Example                                          | Read                                 |
+| ----------------- | ------------------------------------------------ | ------------------------------------ |
+| One derived value | `Cog<Bool> { ... }`                              | `c.get(ref)` → `Bool`                |
+| A derived box     | `CogBox<Bool, ZipCode> { ... }`                  | `c.get(box[zip])`                    |
+| One source        | `ManualCog<ZipCode?>(nil)`                       | Read normally; write `w[ref] = zip`  |
+| A source box      | `ManualCogBox<Weather?, ZipCode>(nil)`           | `w[box[zip]] = report`               |
+| One async value   | `AsyncCog<Forecast>(.latest) { ... }`            | `CogPhase<Forecast>`                 |
+| An async box      | `AsyncCogBox<Weather, ZipCode>(.latest) { ... }` | Full phase or `.latest` value (§5.1) |
 
 Four rules keep these forms consistent:
 
@@ -582,12 +582,12 @@ Use an op for an imperative action. A forced refresh can be an op such as
 
 ### 5.2 Scheduling policies
 
-| Policy | Behavior | Common stream name |
-| --- | --- | --- |
-| `.latest` (default) | Cancel old work; only the newest generation may commit. | `switchMap` |
-| `.queue` | Run requests in order. | `concatMap` |
-| `.exhaustLatest` | Finish current work, coalesce changes, then catch up once. | exhaust with latest catch-up |
-| `.merged` | Allow overlapping runs; each result is its own turn. | `merge` / `flatMap` |
+| Policy              | Behavior                                                   | Common stream name           |
+| ------------------- | ---------------------------------------------------------- | ---------------------------- |
+| `.latest` (default) | Cancel old work; only the newest generation may commit.    | `switchMap`                  |
+| `.queue`            | Run requests in order.                                     | `concatMap`                  |
+| `.exhaustLatest`    | Finish current work, coalesce changes, then catch up once. | exhaust with latest catch-up |
+| `.merged`           | Allow overlapping runs; each result is its own turn.       | `merge` / `flatMap`          |
 
 Cancellation alone is not enough. Old work may finish before it notices
 cancellation, so every run gets a generation number. The MainActor commits a
@@ -708,12 +708,12 @@ Combine bridging is not a goal. `AsyncSequence` is the export surface.
 
 ## 9. Availability strategy
 
-| Floor | Benefit | Cost |
-| --- | --- | --- |
-| **iOS 17 with Swift 6.2 tools** | Recommended. Full Cog graph and Observation boundary. | Cog must re-arm old tracking APIs and use `OSAllocatedUnfairLock` for a few cross-isolation helpers. |
-| iOS 18 | Native `Mutex` and `Atomic`. | Small gain at Cog's edges. |
-| iOS 26 | `Observations`, `Task.immediate`, newer UIKit tracking. | Excludes much of the current install base. |
-| Swift 6.4 and its newer OS | Continuous tracking, cancellation shields, newer isolation tools. | Future shim target. |
+| Floor                           | Benefit                                                           | Cost                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **iOS 17 with Swift 6.2 tools** | Recommended. Full Cog graph and Observation boundary.             | Cog must re-arm old tracking APIs and use `OSAllocatedUnfairLock` for a few cross-isolation helpers. |
+| iOS 18                          | Native `Mutex` and `Atomic`.                                      | Small gain at Cog's edges.                                                                           |
+| iOS 26                          | `Observations`, `Task.immediate`, newer UIKit tracking.           | Excludes much of the current install base.                                                           |
+| Swift 6.4 and its newer OS      | Continuous tracking, cancellation shields, newer isolation tools. | Future shim target.                                                                                  |
 
 The core graph does not need the high floors. New APIs improve only interop
 edges. The package should also avoid required macros. Top-level lets and
@@ -729,29 +729,29 @@ singular, and does measurement show less runtime work?
 
 ### Settled
 
-| Question | Decision |
-| --- | --- |
-| Who may write? | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4). |
-| Op, transaction, or turn? | One named `commit`; ops are ordinary methods (§3.2). |
-| Keyed and keyless API? | Boxes make refs; keyless cogs are pre-bound refs. Physical layout waits for benchmarks (§3.1; perf §4, §9). |
-| Identity and names? | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are ref values over internal final-class descriptors (§2.3, §3.1). |
-| Static or dynamic dependencies? | Dynamic, captured on each run (§2.4). |
-| Cycles and selector errors? | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4). |
-| Consistent updates? | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2). |
-| Key flow? | Normal lexical capture in a `CogBox` closure (§3.1). |
-| Async value shape? | `CogPhase` with an explicit `Previous` case, keeping “no previous value” distinct from “previous value was nil,” plus a `.latest` projection (§5.1). |
-| Async dependency tracking? | A sync selector returns `Work`; no reads cross `await` (§5.1). |
-| Default async policy? | `.latest` (§5.2). |
-| Exhaust for derived state? | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2). |
-| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4). |
-| Effect lifecycle? | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3). |
-| Writes from reactions? | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports loops (§6.4). |
-| Test seeding? | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6). |
-| Accumulating versus flushing? | Nested commits join while accumulating and queue while flushing (§3.2). |
-| Streams with async policies? | `.stream` is `.latest`-only and the type system enforces it (§5.2). |
-| Node disposal? | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3). |
-| State graph count? | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3). |
-| Context construction? | App bootstrap can install one production context; feature code cannot construct another (§2.3). |
+| Question                          | Decision                                                                                                                                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                    |
+| Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                 |
+| Keyed and keyless API?            | Boxes make refs; keyless cogs are pre-bound refs. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                          |
+| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are ref values over internal final-class descriptors (§2.3, §3.1). |
+| Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                |
+| Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                    |
+| Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                              |
+| Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                 |
+| Async value shape?                | `CogPhase` with an explicit `Previous` case, keeping “no previous value” distinct from “previous value was nil,” plus a `.latest` projection (§5.1).                                                 |
+| Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                       |
+| Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                    |
+| Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                   |
+| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                       |
+| Effect lifecycle?                 | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3).                                                                                                                 |
+| Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports loops (§6.4).                                                                                             |
+| Test seeding?                     | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6).                                                           |
+| Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                              |
+| Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                  |
+| Node disposal?                    | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3).                                                                                                        |
+| State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                   |
+| Context construction?             | App bootstrap can install one production context; feature code cannot construct another (§2.3).                                                                                                      |
 
 ### Still open
 
@@ -804,18 +804,18 @@ August 6, 2026.
 
 ## Appendix A: feature availability
 
-| Feature | Swift | OS runtime |
-| --- | --- | --- |
-| `@Observable`, registrar, `withObservationTracking` (SE-0395) | 5.9 | iOS 17 / macOS 14 |
-| SwiftUI property tracking and `@Bindable` | 5.9 | iOS 17 |
-| `Mutex`, `Atomic` (SE-0433, SE-0410) | 6.0 | iOS 18 / macOS 15 |
-| `sending`, `@isolated(any)`, region isolation (SE-0430, SE-0431, SE-0414) | 6.0 | Compile-time |
-| Isolated deinit (SE-0371) | 6.1 | About iOS 18.4 |
-| Default MainActor isolation, caller-isolated async, `@concurrent`, task names (SE-0466, SE-0461, SE-0469) | 6.2 | Compile-time / 6.2 runtime |
-| `Observations`, `Task.immediate` (SE-0475, SE-0472) | 6.2 | iOS 26; not back-deployed |
-| UIKit/AppKit automatic tracking and `updateProperties()` | — | iOS 26; opt-in from iOS 18 |
-| `weak let` (SE-0481) | 6.3 | Compile-time |
-| Continuous tracking, async `defer`, cancellation shields, `~Sendable` (SE-0506, SE-0493, SE-0504, SE-0518) | 6.4 | Newer “OS 27” family |
+| Feature                                                                                                    | Swift | OS runtime                 |
+| ---------------------------------------------------------------------------------------------------------- | ----- | -------------------------- |
+| `@Observable`, registrar, `withObservationTracking` (SE-0395)                                              | 5.9   | iOS 17 / macOS 14          |
+| SwiftUI property tracking and `@Bindable`                                                                  | 5.9   | iOS 17                     |
+| `Mutex`, `Atomic` (SE-0433, SE-0410)                                                                       | 6.0   | iOS 18 / macOS 15          |
+| `sending`, `@isolated(any)`, region isolation (SE-0430, SE-0431, SE-0414)                                  | 6.0   | Compile-time               |
+| Isolated deinit (SE-0371)                                                                                  | 6.1   | About iOS 18.4             |
+| Default MainActor isolation, caller-isolated async, `@concurrent`, task names (SE-0466, SE-0461, SE-0469)  | 6.2   | Compile-time / 6.2 runtime |
+| `Observations`, `Task.immediate` (SE-0475, SE-0472)                                                        | 6.2   | iOS 26; not back-deployed  |
+| UIKit/AppKit automatic tracking and `updateProperties()`                                                   | —     | iOS 26; opt-in from iOS 18 |
+| `weak let` (SE-0481)                                                                                       | 6.3   | Compile-time               |
+| Continuous tracking, async `defer`, cancellation shields, `~Sendable` (SE-0506, SE-0493, SE-0504, SE-0518) | 6.4   | Newer “OS 27” family       |
 
 ## Appendix B: sources and prior art
 
@@ -909,14 +909,16 @@ not.
   Latest-wins is safer for UI state because an old request cannot overwrite a
   new one.
 
-[^observation-mechanics]: `@Observable` rewrites stored properties into
+[^observation-mechanics]:
+    `@Observable` rewrites stored properties into
     computed accessors. Getters call `access(keyPath:)`; setters call
     `withMutation(keyPath:)`. SwiftUI evaluates `body` in an observation scope
     and captures exactly the properties read. UIKit and AppKit use the same
     model on newer OS versions. The small shareup/Signals project proves that
     a hand-written `value` property can join this boundary.
 
-[^tracking-storage]: Observation uses thread-local storage for its active
+[^tracking-storage]:
+    Observation uses thread-local storage for its active
     tracker. Since Cog never leaves the MainActor during sync graph work, one
     actor-isolated stack or slot is enough. It is pushed and popped around
     node computations and reactions.

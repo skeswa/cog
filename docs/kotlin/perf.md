@@ -1,6 +1,6 @@
 # Cog for Kotlin: performance model
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 Correct reads come first. The public API comes second. Data layout comes third.
 An internal win is not a win if it weakens correctness, the public API, or the
@@ -114,13 +114,13 @@ shows composition is the cost.
 
 First candidate:
 
-| Node data | Candidate |
-|---|---|
-| source value | private `MutableState<T>` |
-| derived value | `derivedStateOf(policy)` |
+| Node data      | Candidate                      |
+| -------------- | ------------------------------ |
+| source value   | private `MutableState<T>`      |
+| derived value  | `derivedStateOf(policy)`       |
 | reaction reads | shared `SnapshotStateObserver` |
-| Cog metadata | store-owned flat table |
-| UI boundary | the same node `State<T>` |
+| Cog metadata   | store-owned flat table         |
+| UI boundary    | the same node `State<T>`       |
 
 This gives one value cell rather than a Cog value plus a copied UI value.
 

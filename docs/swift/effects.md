@@ -1,6 +1,6 @@
 # Cog for Swift: effects and background work
 
-*August 6, 2026*
+_August 6, 2026_
 
 This file is §6 of [exploration.md](./exploration.md). It covers effects,
 their lifetimes, testing, and work that can outlive the app process. Other
@@ -15,14 +15,14 @@ easier to read and reason about.
 
 ### 6.1 Choosing a home for an effect
 
-| Need | Use |
-| --- | --- |
-| Compute state from other state | `AsyncCog` (§5.1), or an op that writes manual cogs |
-| Send something outside the graph | Reaction |
-| Respond to a user action | Op (§3.2) |
-| Run on a clock | Task owned by an `EffectGroup` |
-| Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5) |
-| Continue after process death | Durable state, an engine, and a reconciler (§6.7) |
+| Need                                  | Use                                                 |
+| ------------------------------------- | --------------------------------------------------- |
+| Compute state from other state        | `AsyncCog` (§5.1), or an op that writes manual cogs |
+| Send something outside the graph      | Reaction                                            |
+| Respond to a user action              | Op (§3.2)                                           |
+| Run on a clock                        | Task owned by an `EffectGroup`                      |
+| Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)        |
+| Continue after process death          | Durable state, an engine, and a reconciler (§6.7)   |
 
 For example, “check the weather when the ZIP changes” produces state. It
 belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the weather
@@ -333,12 +333,14 @@ events before that hop; for example, write only when the whole-number percent
 changes. Equality checks remove duplicate values, but cannot remove the cost
 of too many turns.
 
-[^group]: `EffectGroup` and reaction tokens are idempotent final classes.
+[^group]:
+    `EffectGroup` and reaction tokens are idempotent final classes.
     Explicit MainActor `cancel()` gives tests and lifecycle code a fixed
     stopping point. Deinit cleanup must also be safe and hop to the MainActor
     when graph removal needs it.
 
-[^seed]: `seed` stages its value and pushes dirty flags exactly like a real
+[^seed]:
+    `seed` stages its value and pushes dirty flags exactly like a real
     write, so dependent nodes and reaction roots recheck it on the next read
     or turn. It skips the rest of the flush: no turn record, `withMutation`
     notice, or reaction run. The dirty push is required, not an optimization.
@@ -348,6 +350,7 @@ of too many turns.
     (no ZIP means the selector returns early), so a later weather turn would
     find no subscriber edge to follow and the alert would never fire.
 
-[^engine]: A process-owned `AsyncCog` can cancel and restart Swift tasks. A
+[^engine]:
+    A process-owned `AsyncCog` can cancel and restart Swift tasks. A
     system-owned transfer has no live Swift task after process death, so its
     engine and durable status must carry the lifecycle instead.

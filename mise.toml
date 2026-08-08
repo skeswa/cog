@@ -1,0 +1,11 @@
+[tools]
+node = "24"
+"npm:oxfmt" = "0.62.0"
+
+[tasks.fmt]
+description = "Format everything in the repo with Oxfmt"
+run = "oxfmt"
+
+[tasks."fmt:check"]
+description = "Verify formatting without writing changes"
+run = "oxfmt --check"

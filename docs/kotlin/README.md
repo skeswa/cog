@@ -1,6 +1,6 @@
 # Cog for Kotlin and Jetpack Compose
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 Cog is a fine-grained state graph for Android UI. It uses the Compose snapshot
 runtime as its engine. Cog adds names, write rules, async work, lifetimes, and

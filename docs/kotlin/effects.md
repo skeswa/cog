@@ -1,6 +1,6 @@
 # Cog for Kotlin: effects and background work
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 ## 6. Side effects, worked
 
@@ -36,14 +36,14 @@ flowchart TD
 
 ### 6.1 Choosing a home for an effect
 
-| Need | Home |
-|---|---|
-| tied to one Compose call | `LaunchedEffect` or `DisposableEffect` |
-| tied to a screen model | `CogEffects` owned by its `ViewModel` |
-| tied to visible lifecycle | lifecycle-aware collection or repeat block |
-| app-session work | explicit application owner and scope |
-| guaranteed later work | WorkManager plus durable input |
-| exact user alarm | AlarmManager, only when its rules fit |
+| Need                          | Home                                       |
+| ----------------------------- | ------------------------------------------ |
+| tied to one Compose call      | `LaunchedEffect` or `DisposableEffect`     |
+| tied to a screen model        | `CogEffects` owned by its `ViewModel`      |
+| tied to visible lifecycle     | lifecycle-aware collection or repeat block |
+| app-session work              | explicit application owner and scope       |
+| guaranteed later work         | WorkManager plus durable input             |
+| exact user alarm              | AlarmManager, only when its rules fit      |
 | active user-visible long work | foreground service, when Android allows it |
 
 A ViewModel is not durable. Its coroutine can die with the process.

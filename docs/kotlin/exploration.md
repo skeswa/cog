@@ -1,6 +1,6 @@
 # Cog for Kotlin: core design
 
-*Authored August 6, 2026.*
+_Authored August 6, 2026._
 
 Cog should feel like normal Kotlin and normal Compose. It should not ask an app
 to learn a second UI model.
@@ -149,12 +149,12 @@ values.
 
 The first API has four common descriptor shapes:
 
-| Shape | Meaning |
-|---|---|
-| `Cog<T>` | one read-only value |
-| `ManualCog<T>` | one writable source |
-| `CogBox<T, K>` | read-only values of `T`, keyed by `K` |
-| `ManualCogBox<T, K>` | writable values of `T`, keyed by `K` |
+| Shape                | Meaning                               |
+| -------------------- | ------------------------------------- |
+| `Cog<T>`             | one read-only value                   |
+| `ManualCog<T>`       | one writable source                   |
+| `CogBox<T, K>`       | read-only values of `T`, keyed by `K` |
+| `ManualCogBox<T, K>` | writable values of `T`, keyed by `K`  |
 
 Async descriptors return `CogPhase<T>`. Manual sources use the same
 read-only and writable split.
@@ -483,12 +483,12 @@ its own named turn.
 
 ### 5.2 Scheduling policies
 
-| Policy | New input does this |
-|---|---|
-| `Latest` | cancel old work and keep only the newest result |
-| `Queue` | run each request in order |
+| Policy          | New input does this                                    |
+| --------------- | ------------------------------------------------------ |
+| `Latest`        | cancel old work and keep only the newest result        |
+| `Queue`         | run each request in order                              |
 | `ExhaustLatest` | finish current work, then run the newest waiting input |
-| `Merge` | run all requests, with an explicit concurrency limit |
+| `Merge`         | run all requests, with an explicit concurrency limit   |
 
 `Latest` is the default. Streams are latest-only in the first release.
 
@@ -710,13 +710,13 @@ These projects guide the design. None is an API contract for Cog.
 These were the stable lines on August 6, 2026. They are research inputs, not
 Cog's final minimums.
 
-| Tool | Stable line checked |
-|---|---|
-| Kotlin | 2.4.10 |
-| Compose runtime | 1.11.4 |
-| AndroidX Lifecycle | 2.11.0 |
-| AndroidX Work | 2.11.2 |
-| AndroidX Collection | 1.6.0 |
+| Tool                | Stable line checked |
+| ------------------- | ------------------- |
+| Kotlin              | 2.4.10              |
+| Compose runtime     | 1.11.4              |
+| AndroidX Lifecycle  | 2.11.0              |
+| AndroidX Work       | 2.11.2              |
+| AndroidX Collection | 1.6.0               |
 
 Work 2.11 and Collection 1.6 list API 23 as their minimum. Keeping WorkManager
 in `cog-work` stops that adapter from deciding the core artifact's floor.

@@ -1,6 +1,6 @@
 # Cog for Swift: data-oriented runtime
 
-*August 6, 2026*
+_August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
 an implementation plan. It does not settle ref, edge, hash-table, or

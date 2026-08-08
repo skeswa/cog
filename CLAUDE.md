@@ -13,8 +13,11 @@ native mobile UI. Cog is planned as:
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
 The Swift and Kotlin designs exist, but there is no implementation and there
-are no build, lint, or test commands. The next phase for each platform is the
-spike in its `exploration.md` §11, as amended by its `perf.md` §9.
+are no build or test commands. Tooling is versioned with mise (`mise.toml`):
+`mise run fmt` formats the repo with Oxfmt, and `mise run fmt:check`
+verifies formatting without writing. `.oxfmtrc.json` excludes the frozen
+`docs/dump-2026-08-06.md` from formatting. The next phase for each platform
+is the spike in its `exploration.md` §11, as amended by its `perf.md` §9.
 
 ## Layout
 

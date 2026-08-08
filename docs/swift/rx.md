@@ -1,6 +1,6 @@
 # Cog for Swift: Rx operator map
 
-*August 6, 2026*
+_August 6, 2026_
 
 This appendix is §5.4 of [exploration.md](./exploration.md). It explains how
 stream operators map to Cog. Other section numbers point to the core file.
@@ -80,15 +80,15 @@ meaning for work that may never end.
 
 #### Operator dictionary
 
-| Rx operator | Cog equivalent |
-| --- | --- |
-| `map`, `combineLatest` | A derived cog. Multiple `c.get` calls combine current values. |
-| `withLatestFrom` | `c.read(...)`: read the current value without tracking it. |
-| `switchMap` | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches. |
-| `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2). |
-| `exhaustMap` | `.exhaustLatest` for state; true exhaust on imperative ops. |
-| `distinctUntilChanged` | Equality checks built into every node (§2.4). |
-| `scan` | `c.curr`, which exposes the cog's prior value. |
+| Rx operator            | Cog equivalent                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `map`, `combineLatest` | A derived cog. Multiple `c.get` calls combine current values.                          |
+| `withLatestFrom`       | `c.read(...)`: read the current value without tracking it.                             |
+| `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.             |
+| `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                            |
+| `exhaustMap`           | `.exhaustLatest` for state; true exhaust on imperative ops.                            |
+| `distinctUntilChanged` | Equality checks built into every node (§2.4).                                          |
+| `scan`                 | `c.curr`, which exposes the cog's prior value.                                         |
 | `debounce`, `throttle` | Timing options at the edge: a reaction modifier or async-cog option, not graph basics. |
 
 Cog does not replace streams of ordered event history. A cog holds the current
