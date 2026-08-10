@@ -55,6 +55,15 @@ const MODES = new Map([
   ["matrix", { configuration: "debug", legs: LEGS }],
 ]);
 
+// Every leg is also a mode of its own, so CI can give each leg its own job —
+// its own runner, scratch path, and cache — instead of looping all four inside
+// one job. `matrix` stays the local spelling; the per-leg modes exist for
+// `swift-ci.yml`. Derived from LEGS, so a new leg needs no edit here and the
+// unknown-mode error lists it automatically.
+for (const leg of LEGS) {
+  MODES.set(leg.name, { configuration: "debug", legs: [leg] });
+}
+
 /** The repository root, resolved from this file so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
