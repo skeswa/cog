@@ -9,10 +9,31 @@ import { dirname, resolve } from "node:path";
 import { buildDependencyGraph, findCycles, reachableFrom, shortestPath } from "./graph.mjs";
 import { isSplitAncestor, parseTaskId, slugifyHeading } from "./parse.mjs";
 import { emptyPlanMap } from "./plan.mjs";
+import {
+  expandFilter,
+  namesBenchmarkArtifact,
+  parseVerifyCommands,
+  runsCommand,
+  SCENARIO_FILTER_COMMANDS,
+  selectsScenario,
+} from "./proof.mjs";
 import { emptyScenarioCensus } from "./scenarios.mjs";
 
 /** Task types that may never carry a `_Greens:_` line. */
 const GREENLESS_TASK_TYPES = ["Infrastructure", "Decision"];
+
+/**
+ * The proof modes a _Gate_ may green. A gate proves a slice whole, so it can
+ * own the scenarios that only a whole suite or a whole release-configuration
+ * run can demonstrate. Everything narrower is a single behavior's job.
+ */
+const GATE_PROOF_MODES = ["suite", "release configuration"];
+
+/**
+ * The proof modes whose scenarios a filtered host test run can select. These
+ * are exactly the modes a behavior task's `_Verify:_` filters must expand to.
+ */
+const FILTERABLE_PROOF_MODES = ["unit", "exit test"];
 
 /**
  * Resolves each milestone's terminal gate — the one _Gate_ task in that
@@ -107,6 +128,15 @@ export function makeContext(path, tasks, scenarios, options = {}) {
     }
   }
 
+  // Each task's `_Verify:_` field, read once as the commands it runs. Keyed by
+  // the task object rather than its ID so a ledger with a duplicated ID still
+  // gets one entry per entry.
+  /** @type {Map<object, object[]>} */
+  const verifyCommands = new Map();
+  for (const task of tasks) {
+    verifyCommands.set(task, parseVerifyCommands(task.verify));
+  }
+
   return {
     path,
     tasks,
@@ -115,6 +145,7 @@ export function makeContext(path, tasks, scenarios, options = {}) {
     cycles,
     cyclicNodes,
     scenarios: census,
+    verifyCommands,
     ownersByScenario,
     milestones: resolveMilestoneGates(tasks, graph),
     plan: options.plan ?? emptyPlanMap(path),
@@ -770,6 +801,255 @@ function checkPlanNamesNonBlocking(context) {
 }
 
 /**
+ * The scenarios a task greens, paired with the census entry that gives each
+ * one its proof mode. Greens naming scenarios the tree does not define are
+ * dropped: `unknown-scenario` owns those, and they have no mode to judge.
+ *
+ * @param {object} context
+ * @param {object} task
+ */
+function greenedScenarios(context, task) {
+  return task.greens
+    .map((id) => context.scenarios.byId.get(id))
+    .filter((scenario) => scenario !== undefined);
+}
+
+/** The task's `_Verify:_` text, never null, for prose matching. */
+function verifyText(task) {
+  return task.verify ?? "";
+}
+
+/**
+ * CHECK 18 — a scenario's proof mode constrains the kind of task that owns it.
+ *
+ * A gate proves a slice whole and never owns the repairs it discovers, so the
+ * only scenarios it may green are the ones only a whole run can show: `suite`
+ * and `release configuration`. Every narrower mode — a unit test, an exit
+ * test, a compile-fail fixture, a simulator or floor run, a benchmark — is one
+ * behavior's promise and belongs to a _Behavior_ task. Infrastructure and
+ * decisions carry no `_Greens:_` at all; `misplaced-greens` owns that.
+ */
+function checkGreensProofMode(context) {
+  const diagnostics = [];
+  for (const task of context.tasks) {
+    if (GREENLESS_TASK_TYPES.includes(task.type)) continue;
+    for (const scenario of greenedScenarios(context, task)) {
+      const gateable = GATE_PROOF_MODES.includes(scenario.mode);
+      if (task.type === "Behavior") continue;
+      if (task.type === "Gate" && gateable) continue;
+      diagnostics.push(
+        diagnostic(
+          "gate-proof-mode",
+          context,
+          task,
+          task.greensLine ?? task.line,
+          `task ${task.id} is _(${task.type})_ and greens ${scenario.id}, whose proof mode is ` +
+            `\`${scenario.mode}\`; ` +
+            (task.type === "Gate"
+              ? `a gate may only green ${GATE_PROOF_MODES.map((mode) => `\`${mode}\``).join(" and ")} ` +
+                `scenarios, so ${scenario.id} belongs to a behavior task`
+              : `only behavior tasks and gates own scenarios`),
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * CHECK 19 — a behavior task's scenario filters expand to exactly its greens.
+ *
+ * Filter expressions are checked, never trusted. Every `--filter` a behavior
+ * task hands to a scenario-selecting mise command is a regular expression over
+ * scenario IDs; the union of what those expressions select must be exactly the
+ * task's `unit`- and `exit test`-mode greens. A wider filter runs scenarios the
+ * task does not claim — and, worse, keeps passing when a later decision task
+ * adds a scenario the expression happens to match. A narrower one claims
+ * coverage no command produces.
+ *
+ * Modes a filtered host run cannot select — compile-fail, simulator, floor,
+ * benchmark, suite, release configuration — are excluded from the expected set
+ * and get their obligations from `proof-mode-command` instead. Only behavior
+ * tasks are in scope: gates run whole suites, and infrastructure greens
+ * nothing, so its arena and sentinel filters claim no coverage to check.
+ */
+function checkFilterExpansion(context) {
+  const diagnostics = [];
+  const scenarioIds = context.scenarios.ids;
+  if (scenarioIds.length === 0) return diagnostics;
+
+  for (const task of context.tasks) {
+    if (task.type !== "Behavior") continue;
+    const commands = context.verifyCommands.get(task) ?? [];
+    const line = task.verifyLine ?? task.line;
+
+    /** @type {Set<string>} */
+    const selected = new Set();
+    for (const command of commands) {
+      if (command.negated) continue;
+      if (command.filter === null) continue;
+      if (!SCENARIO_FILTER_COMMANDS.has(command.command)) continue;
+      const { ids, error } = expandFilter(command.filter, scenarioIds);
+      if (error !== null) {
+        diagnostics.push(
+          diagnostic(
+            "filter-expansion",
+            context,
+            task,
+            line,
+            `task ${task.id} filters on \`${command.filter}\`, which is not a valid regular ` +
+              `expression: ${error}`,
+          ),
+        );
+        continue;
+      }
+      for (const id of ids) selected.add(id);
+    }
+
+    const expected = greenedScenarios(context, task)
+      .filter((scenario) => FILTERABLE_PROOF_MODES.includes(scenario.mode))
+      .map((scenario) => scenario.id);
+    const expectedSet = new Set(expected);
+    const extra = [...selected].filter((id) => !expectedSet.has(id)).sort();
+    const missing = [...expectedSet].filter((id) => !selected.has(id)).sort();
+    if (extra.length === 0 && missing.length === 0) continue;
+
+    const expressions = commands
+      .filter((command) => !command.negated && command.filter !== null)
+      .filter((command) => SCENARIO_FILTER_COMMANDS.has(command.command))
+      .map((command) => `\`${command.filter}\``);
+    const shown = expressions.length === 0 ? "no scenario filter" : expressions.join(", ");
+    const problems = [];
+    if (extra.length > 0) {
+      problems.push(`also selects ${extra.join(", ")}, which ${task.id} does not green`);
+    }
+    if (missing.length > 0) {
+      problems.push(`never selects ${missing.join(", ")}, which ${task.id} does green`);
+    }
+
+    diagnostics.push(
+      diagnostic(
+        "filter-expansion",
+        context,
+        task,
+        line,
+        `task ${task.id} verifies with ${shown}, which expands to ` +
+          `[${[...selected].sort().join(", ")}] but should expand to exactly its unit- and ` +
+          `exit-test-mode greens [${[...expectedSet].sort().join(", ")}]: ${problems.join("; ")}`,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/**
+ * CHECK 20 — an exit-test scenario is proven in debug and in release.
+ *
+ * Exit tests prove a guardrail traps. A guardrail that only traps in debug is
+ * not a guardrail, so every exit-test scenario is selected by a `test` filter
+ * and by a `test:release` filter on the task that greens it.
+ */
+function checkExitTestsRunInRelease(context) {
+  const diagnostics = [];
+  for (const task of context.tasks) {
+    if (task.type !== "Behavior") continue;
+    const commands = context.verifyCommands.get(task) ?? [];
+    for (const scenario of greenedScenarios(context, task)) {
+      if (scenario.mode !== "exit test") continue;
+      const missing = ["test", "test:release"].filter(
+        (command) => !selectsScenario(commands, command, scenario.id),
+      );
+      if (missing.length === 0) continue;
+      diagnostics.push(
+        diagnostic(
+          "exit-test-release",
+          context,
+          task,
+          task.verifyLine ?? task.line,
+          `task ${task.id} greens ${scenario.id}, whose proof mode is \`exit test\`, but no ` +
+            `${missing.map((command) => `\`mise run ${command} --filter\``).join(" or ")} ` +
+            `in \`_Verify:_\` selects it; an exit test proves its trap in debug and in release`,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * CHECK 21 — every other proof mode names the run that proves it.
+ *
+ * Compile-fail scenarios are a batched expected-diagnostic pass, so they need
+ * `mise run test:compilefail`. Release-configuration scenarios need
+ * `mise run test:release`. Simulator and floor scenarios run outside the host
+ * suite, on infrastructure a filter cannot name, so the task's `_Verify:_`
+ * has to name the scenario itself. Benchmark scenarios are proven in the
+ * benchmark package and record the measurement or provisional threshold they
+ * need, so their verification names a benchmark run or a recorded result and
+ * never a plain host test.
+ */
+function checkProofModeCommands(context) {
+  const diagnostics = [];
+  for (const task of context.tasks) {
+    if (task.type !== "Behavior") continue;
+    const commands = context.verifyCommands.get(task) ?? [];
+    const verify = verifyText(task);
+    const line = task.verifyLine ?? task.line;
+
+    for (const scenario of greenedScenarios(context, task)) {
+      /** @type {string | null} */
+      let problem = null;
+      switch (scenario.mode) {
+        case "compile-fail":
+          if (!runsCommand(commands, "test:compilefail")) {
+            problem =
+              "compile-fail fixtures run as one batched expected-diagnostic pass; " +
+              "name `mise run test:compilefail`";
+          }
+          break;
+        case "release configuration":
+          if (!runsCommand(commands, "test:release")) {
+            problem =
+              "a release-configuration scenario is proven outside debug; " +
+              "name `mise run test:release`";
+          }
+          break;
+        case "simulator":
+        case "floor runtime":
+          if (!verify.includes(scenario.id)) {
+            problem =
+              `a \`${scenario.mode}\` scenario runs outside the host suite, where no ` +
+              `\`--filter\` names it; say which run proves ${scenario.id}`;
+          }
+          break;
+        case "benchmark":
+          if (!namesBenchmarkArtifact(verify)) {
+            problem =
+              "a benchmark-gated scenario is proven in the benchmark package and records " +
+              "the measurement or provisional threshold it needs; name the benchmark run, " +
+              "baseline, or recorded `perf.md` result";
+          }
+          break;
+        default:
+          break;
+      }
+      if (problem === null) continue;
+      diagnostics.push(
+        diagnostic(
+          "proof-mode-command",
+          context,
+          task,
+          line,
+          `task ${task.id} greens ${scenario.id}, whose proof mode is \`${scenario.mode}\`, ` +
+            `but its \`_Verify:_\` does not prove it that way — "${verify}"; ${problem}`,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/**
  * The ordered check registry. Later ledger-integrity slices — proof modes and
  * graph order — append entries here.
  */
@@ -791,6 +1071,10 @@ export const LEDGER_CHECKS = [
   { name: "plan-task-link", run: checkPlanTaskLinks },
   { name: "plan-task-reference", run: checkPlanTaskReferences },
   { name: "plan-non-blocking-row", run: checkPlanNamesNonBlocking },
+  { name: "gate-proof-mode", run: checkGreensProofMode },
+  { name: "filter-expansion", run: checkFilterExpansion },
+  { name: "exit-test-release", run: checkExitTestsRunInRelease },
+  { name: "proof-mode-command", run: checkProofModeCommands },
 ];
 
 /**

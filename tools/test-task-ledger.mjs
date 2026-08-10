@@ -160,6 +160,35 @@ const CASES = [
     checks: ["plan-non-blocking-row"],
     mentions: ["M1-04", "the M1 row does not name it"],
   },
+  {
+    name: "every proof mode proven the right way passes",
+    ledger: resolve(FIXTURES, "proof-modes-valid.md"),
+    checks: [],
+  },
+  {
+    name: "compile-fail scenario its verification never compiles",
+    ledger: resolve(FIXTURES, "mode-mismatch.md"),
+    checks: ["proof-mode-command"],
+    mentions: ["M1-02", "DECL-06", "compile-fail", "mise run test:compilefail"],
+  },
+  {
+    name: "gate owning a scenario only a behavior task may own",
+    ledger: resolve(FIXTURES, "gate-ownership.md"),
+    checks: ["gate-proof-mode"],
+    mentions: ["M1-03", "DECL-02", "`unit`", "belongs to a behavior task"],
+  },
+  {
+    name: "exit test filtered in debug but never in release",
+    ledger: resolve(FIXTURES, "missing-release-filter.md"),
+    checks: ["exit-test-release"],
+    mentions: ["M1-03", "TURN-07", "`mise run test:release --filter`"],
+  },
+  {
+    name: "behavior filter that selects more than the task greens",
+    ledger: resolve(FIXTURES, "over-broad-filter.md"),
+    checks: ["filter-expansion"],
+    mentions: ["M1-02", "DECL-0[1-3]", "also selects DECL-03"],
+  },
 ];
 
 /** @param {string} ledger */

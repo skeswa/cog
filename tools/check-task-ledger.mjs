@@ -38,11 +38,18 @@
 //   plan-task-reference       rows name existing tasks of their own milestone
 //   plan-non-blocking-row     every `_Non-blocking:_` task is named in its row
 //
+// Added by this slice (M0-11), over each scenario's `(Proof: …)` mode:
+//
+//   gate-proof-mode           only suite/release-configuration greens on gates
+//   filter-expansion          behavior filters expand to exactly their greens
+//   exit-test-release         exit-test greens run in debug and in release
+//   proof-mode-command        every other mode names the run that proves it
+//
 // Parse-level problems (`malformed-task-entry`, `malformed-task-id`,
 // `unknown-task-type`, `orphan-task`, `duplicate-field`,
 // `malformed-dependency`, `malformed-green`, `duplicate-scenario-id`,
-// `empty-scenario-census`, `missing-plan-table`, `malformed-plan-row`) are
-// reported the same way.
+// `unknown-proof-mode`, `empty-scenario-census`, `missing-plan-table`,
+// `malformed-plan-row`) are reported the same way.
 
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -188,6 +195,7 @@ function main() {
           planPath: displayPath(planPath),
           taskCount: parsed.tasks.length,
           scenarioCount: scenarios.ids.length,
+          scenarioModes: Object.fromEntries([...scenarios.modeCounts].sort()),
           planRowCount: plan.rows.length,
           milestones: parsed.milestones,
           checks: checkNames,
@@ -219,11 +227,16 @@ function main() {
   }
 
   const edges = parsed.tasks.reduce((total, task) => total + task.depends.length, 0);
+  const modes = [...scenarios.modeCounts]
+    .sort()
+    .map(([mode, count]) => `${count} ${mode}`)
+    .join(", ");
   process.stdout.write(
     `check-task-ledger: OK ${displayPath(path)} — ` +
       `${parsed.tasks.length} tasks, ${edges} dependency edges, ` +
       `${parsed.milestones.length} milestone(s) [${parsed.milestones.join(" ")}]; ` +
-      `${scenarios.ids.length} scenarios from ${displayPath(scenariosPath)}, each owned once; ` +
+      `${scenarios.ids.length} scenarios from ${displayPath(scenariosPath)} ` +
+      `(${modes}), each owned once; ` +
       `${plan.rows.length} milestone map row(s) from ${displayPath(planPath)}, each mapped once; ` +
       `${checkNames.length} checks passed: ${checkNames.join(", ")}\n`,
   );
