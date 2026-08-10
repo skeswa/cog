@@ -8,8 +8,8 @@
 // that the diagnostics name the offending IDs. Exits non-zero on any mismatch.
 //
 // Every fixture ledger is self-contained: the checker pairs `<name>.md` with
-// the `<name>.scenarios.md` beside it, so a fixture's scenario census is its
-// own and never the repository's.
+// the `<name>.scenarios.md` and `<name>.plan.md` beside it, so a fixture's
+// scenario census and milestone map are its own and never the repository's.
 
 import { spawnSync } from "node:child_process";
 import { relative, resolve } from "node:path";
@@ -129,6 +129,36 @@ const CASES = [
     ledger: resolve(FIXTURES, "ambiguous-milestone-gate.md"),
     checks: ["milestone-gate"],
     mentions: ["M1-03, M1-04", "no single terminal gate"],
+  },
+  {
+    name: "milestone the plan's map never rows",
+    ledger: resolve(FIXTURES, "plan-missing-row.md"),
+    checks: ["plan-milestone-row"],
+    mentions: ["no row for M1", "plan-missing-row.plan.md:5"],
+  },
+  {
+    name: "map row linking to a section the ledger has not got",
+    ledger: resolve(FIXTURES, "plan-wrong-link.md"),
+    checks: ["plan-task-link"],
+    mentions: ["`#m1-task`", "an anchor the ledger does not define", "`#m1-tasks`"],
+  },
+  {
+    name: "map row naming a task the ledger never defines",
+    ledger: resolve(FIXTURES, "plan-unknown-id.md"),
+    checks: ["plan-task-reference"],
+    mentions: ["M1 row names M1-09", "not an executable task"],
+  },
+  {
+    name: "map row naming another milestone's task",
+    ledger: resolve(FIXTURES, "plan-cross-milestone-id.md"),
+    checks: ["plan-task-reference"],
+    mentions: ["M1 row names M0-01", "belongs to M0"],
+  },
+  {
+    name: "non-blocking task the plan's row never names",
+    ledger: resolve(FIXTURES, "plan-missing-non-blocking.md"),
+    checks: ["plan-non-blocking-row"],
+    mentions: ["M1-04", "the M1 row does not name it"],
   },
 ];
 

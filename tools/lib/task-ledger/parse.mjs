@@ -19,6 +19,12 @@
 /** Matches a milestone section heading, e.g. `## M0 tasks`. */
 const MILESTONE_HEADING_RE = /^##\s+(M\d+)\s+tasks\s*$/;
 
+/** Matches any ATX heading, e.g. `## M0 tasks` or `### Notes ###`. */
+const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+
+/** Matches an explicit HTML anchor, e.g. `<a id="plan-m0"></a>`. */
+const HTML_ANCHOR_RE = /<a\s+[^>]*?(?:id|name)\s*=\s*"([^"]+)"/gi;
+
 /** Matches the opening line of a task entry. */
 const TASK_HEAD_RE = /^-\s+\*\*(.+?)\*\*\s+_\((.+?)\)_\s+—\s*(.*)$/;
 
@@ -38,6 +44,26 @@ export const TASK_ID_RE = /^M(\d+)-(\d+)([a-z]*)$/;
 const SCENARIO_ID_RE = /^[A-Z][A-Z0-9]*-\d+$/;
 
 export const TASK_TYPES = ["Decision", "Infrastructure", "Behavior", "Gate", "Release"];
+
+/**
+ * Derives a heading's fragment the way GitHub does: drop the formatting
+ * punctuation, lowercase, and hyphenate the remaining words. `## M0 tasks`
+ * becomes `m0-tasks`, which is what the plan's milestone map links to.
+ *
+ * Repeated heading text is disambiguated with GitHub's `-1`, `-2` suffixes,
+ * so the caller passes an occurrence count.
+ *
+ * @param {string} text heading text without its leading `#`s
+ * @param {number} [occurrence] 0 for the first heading with this slug
+ */
+export function slugifyHeading(text, occurrence = 0) {
+  const base = text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s+/g, "-");
+  return occurrence === 0 ? base : `${base}-${occurrence}`;
+}
 
 /**
  * Splits a task ID into its structural parts, or returns `null` when the ID
@@ -140,7 +166,7 @@ function collectFields(headRest, bodyLines) {
  *
  * @param {string} source Markdown text.
  * @param {string} path Path used in diagnostics.
- * @returns {{tasks: object[], milestones: string[], diagnostics: object[]}}
+ * @returns {{tasks: object[], milestones: string[], milestoneAnchors: Map<string, string>, anchors: Map<string, number>, diagnostics: object[]}}
  */
 export function parseLedger(source, path) {
   const lines = source.split("\n");
@@ -148,6 +174,13 @@ export function parseLedger(source, path) {
   const tasks = [];
   /** @type {string[]} */
   const milestones = [];
+  /** Every link target this document offers, as fragment → defining line. */
+  /** @type {Map<string, number>} */
+  const anchors = new Map();
+  /** @type {Map<string, string>} */
+  const milestoneAnchors = new Map();
+  /** @type {Map<string, number>} */
+  const slugOccurrences = new Map();
   /** @type {object[]} */
   const diagnostics = [];
 
@@ -156,15 +189,36 @@ export function parseLedger(source, path) {
   };
 
   let milestone = null;
+  let inFence = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const raw = lines[index];
     const lineNumber = index + 1;
 
-    const headingMatch = MILESTONE_HEADING_RE.exec(raw.trim());
-    if (headingMatch !== null) {
-      milestone = headingMatch[1];
-      if (!milestones.includes(milestone)) milestones.push(milestone);
+    if (/^\s*(?:```|~~~)/.test(raw)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    for (const anchorMatch of raw.matchAll(HTML_ANCHOR_RE)) {
+      if (!anchors.has(anchorMatch[1])) anchors.set(anchorMatch[1], lineNumber);
+    }
+
+    const anyHeading = HEADING_RE.exec(raw.trim());
+    if (anyHeading !== null) {
+      const base = slugifyHeading(anyHeading[2]);
+      const occurrences = slugOccurrences.get(base) ?? 0;
+      const slug = slugifyHeading(anyHeading[2], occurrences);
+      slugOccurrences.set(base, occurrences + 1);
+      if (!anchors.has(slug)) anchors.set(slug, lineNumber);
+
+      const headingMatch = MILESTONE_HEADING_RE.exec(raw.trim());
+      if (headingMatch !== null) {
+        milestone = headingMatch[1];
+        if (!milestones.includes(milestone)) milestones.push(milestone);
+        if (!milestoneAnchors.has(milestone)) milestoneAnchors.set(milestone, slug);
+      }
       continue;
     }
 
@@ -284,5 +338,5 @@ export function parseLedger(source, path) {
     });
   }
 
-  return { tasks, milestones, diagnostics };
+  return { tasks, milestones, milestoneAnchors, anchors, diagnostics };
 }

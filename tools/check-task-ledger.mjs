@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // Validates the Swift implementation task ledger.
 //
-//     node tools/check-task-ledger.mjs [path/to/tasks.md] [--scenarios path] [--json]
+//     node tools/check-task-ledger.mjs [path/to/tasks.md] [--scenarios path]
+//         [--plan path] [--json]
 //
 // Defaults to docs/swift/impl/tasks.md. The scenario census comes from
-// docs/swift/impl/scenarios.md unless `--scenarios` names another file, or the
-// ledger has a paired `<name>.scenarios.md` beside it — which is how fixtures
-// stay self-contained. Exits 0 with a one-line summary when every check
-// passes, and non-zero with one greppable `error[<check>]` line per failure
-// otherwise.
+// docs/swift/impl/scenarios.md and the milestone map from
+// docs/swift/impl/plan.md, unless `--scenarios` or `--plan` names another
+// file, or the ledger has a paired `<name>.scenarios.md` or `<name>.plan.md`
+// beside it — which is how fixtures stay self-contained. Exits 0 with a
+// one-line summary when every check passes, and non-zero with one greppable
+// `error[<check>]` line per failure otherwise.
 //
 // Checks in the first slice (M0-09aa):
 //
@@ -29,10 +31,18 @@
 //   non-blocking-policy       `_Non-blocking:_` states an availability policy
 //   unnecessary-non-blocking  only unreachable tasks carry that exception
 //
+// Added by this slice (M0-09ac), over the plan's milestone map:
+//
+//   plan-milestone-row        exactly one map row per ledger milestone
+//   plan-task-link            each row links to that milestone's task section
+//   plan-task-reference       rows name existing tasks of their own milestone
+//   plan-non-blocking-row     every `_Non-blocking:_` task is named in its row
+//
 // Parse-level problems (`malformed-task-entry`, `malformed-task-id`,
 // `unknown-task-type`, `orphan-task`, `duplicate-field`,
 // `malformed-dependency`, `malformed-green`, `duplicate-scenario-id`,
-// `empty-scenario-census`) are reported the same way.
+// `empty-scenario-census`, `missing-plan-table`, `malformed-plan-row`) are
+// reported the same way.
 
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -41,15 +51,17 @@ import { fileURLToPath } from "node:url";
 
 import { runChecks } from "./lib/task-ledger/checks.mjs";
 import { parseLedger } from "./lib/task-ledger/parse.mjs";
+import { parsePlan } from "./lib/task-ledger/plan.mjs";
 import { parseScenarios } from "./lib/task-ledger/scenarios.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DEFAULT_LEDGER = resolve(REPO_ROOT, "docs/swift/impl/tasks.md");
 const DEFAULT_SCENARIOS = resolve(REPO_ROOT, "docs/swift/impl/scenarios.md");
+const DEFAULT_PLAN = resolve(REPO_ROOT, "docs/swift/impl/plan.md");
 
 const USAGE =
   "usage: node tools/check-task-ledger.mjs [path/to/tasks.md] " +
-  "[--scenarios path/to/scenarios.md] [--json]\n";
+  "[--scenarios path/to/scenarios.md] [--plan path/to/plan.md] [--json]\n";
 
 /** @param {string[]} argv */
 function parseArgs(argv) {
@@ -58,6 +70,8 @@ function parseArgs(argv) {
   let path = null;
   /** @type {string | null} */
   let scenarios = null;
+  /** @type {string | null} */
+  let plan = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -78,6 +92,15 @@ function parseArgs(argv) {
       scenarios = resolve(value);
       continue;
     }
+    if (arg === "--plan" || arg.startsWith("--plan=")) {
+      const value = arg === "--plan" ? argv[(index += 1)] : arg.slice("--plan=".length);
+      if (value === undefined || value.length === 0) {
+        process.stderr.write("check-task-ledger: --plan needs a path\n");
+        process.exit(2);
+      }
+      plan = resolve(value);
+      continue;
+    }
     if (arg.startsWith("-")) {
       process.stderr.write(`check-task-ledger: unknown option ${arg}\n`);
       process.exit(2);
@@ -90,18 +113,25 @@ function parseArgs(argv) {
   }
 
   const ledgerPath = path === null ? DEFAULT_LEDGER : resolve(path);
-  return { path: ledgerPath, scenarios: scenarios ?? pairedScenarios(ledgerPath), json };
+  return {
+    path: ledgerPath,
+    scenarios: scenarios ?? paired(ledgerPath, ".scenarios.md", DEFAULT_SCENARIOS),
+    plan: plan ?? paired(ledgerPath, ".plan.md", DEFAULT_PLAN),
+    json,
+  };
 }
 
 /**
- * A ledger's scenario tree: its paired `<name>.scenarios.md` when one exists,
- * and the repository's tree otherwise.
+ * A ledger's companion document: the `<name>.scenarios.md` or `<name>.plan.md`
+ * beside it when one exists, and the repository's own otherwise.
  *
  * @param {string} ledgerPath
+ * @param {string} suffix
+ * @param {string} fallback
  */
-function pairedScenarios(ledgerPath) {
-  const paired = ledgerPath.replace(/\.md$/, ".scenarios.md");
-  return paired !== ledgerPath && existsSync(paired) ? paired : DEFAULT_SCENARIOS;
+function paired(ledgerPath, suffix, fallback) {
+  const candidate = ledgerPath.replace(/\.md$/, suffix);
+  return candidate !== ledgerPath && existsSync(candidate) ? candidate : fallback;
 }
 
 /** Repo-relative path when the file is inside the repo, absolute otherwise. */
@@ -127,12 +157,25 @@ function read(path) {
 }
 
 function main() {
-  const { path, scenarios: scenariosPath, json } = parseArgs(process.argv.slice(2));
+  const { path, scenarios: scenariosPath, plan: planPath, json } = parseArgs(process.argv.slice(2));
 
   const parsed = parseLedger(read(path), path);
   const scenarios = parseScenarios(read(scenariosPath), scenariosPath);
-  const { diagnostics: checkDiagnostics, checkNames } = runChecks(path, parsed.tasks, scenarios);
-  const diagnostics = [...parsed.diagnostics, ...scenarios.diagnostics, ...checkDiagnostics].sort(
+  const plan = parsePlan(read(planPath), planPath);
+  const { diagnostics: checkDiagnostics, checkNames } = runChecks(path, parsed.tasks, scenarios, {
+    plan,
+    ledger: {
+      milestones: parsed.milestones,
+      milestoneAnchors: parsed.milestoneAnchors,
+      anchors: parsed.anchors,
+    },
+  });
+  const diagnostics = [
+    ...parsed.diagnostics,
+    ...scenarios.diagnostics,
+    ...plan.diagnostics,
+    ...checkDiagnostics,
+  ].sort(
     (a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.check.localeCompare(b.check),
   );
 
@@ -142,8 +185,10 @@ function main() {
         {
           path: displayPath(path),
           scenariosPath: displayPath(scenariosPath),
+          planPath: displayPath(planPath),
           taskCount: parsed.tasks.length,
           scenarioCount: scenarios.ids.length,
+          planRowCount: plan.rows.length,
           milestones: parsed.milestones,
           checks: checkNames,
           diagnostics: diagnostics.map((item) => ({
@@ -179,6 +224,7 @@ function main() {
       `${parsed.tasks.length} tasks, ${edges} dependency edges, ` +
       `${parsed.milestones.length} milestone(s) [${parsed.milestones.join(" ")}]; ` +
       `${scenarios.ids.length} scenarios from ${displayPath(scenariosPath)}, each owned once; ` +
+      `${plan.rows.length} milestone map row(s) from ${displayPath(planPath)}, each mapped once; ` +
       `${checkNames.length} checks passed: ${checkNames.join(", ")}\n`,
   );
 }

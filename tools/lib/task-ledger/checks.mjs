@@ -4,8 +4,11 @@
 // the ordered registry the CLI runs; later ledger-integrity slices append
 // their checks here rather than editing existing ones.
 
+import { dirname, resolve } from "node:path";
+
 import { buildDependencyGraph, findCycles, reachableFrom, shortestPath } from "./graph.mjs";
-import { isSplitAncestor } from "./parse.mjs";
+import { isSplitAncestor, parseTaskId, slugifyHeading } from "./parse.mjs";
+import { emptyPlanMap } from "./plan.mjs";
 import { emptyScenarioCensus } from "./scenarios.mjs";
 
 /** Task types that may never carry a `_Greens:_` line. */
@@ -60,13 +63,27 @@ function resolveMilestoneGates(tasks, graph) {
 }
 
 /**
+ * The milestones the ledger declares, in `M0`-first order. The parsed heading
+ * list is authoritative when the caller passes it; otherwise the milestones
+ * the tasks themselves carry stand in.
+ *
+ * @param {object[]} tasks
+ * @param {string[]} [declared]
+ */
+function ledgerMilestones(tasks, declared) {
+  const names = declared ?? [...new Set(tasks.map((task) => task.milestone))];
+  return [...names].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+}
+
+/**
  * Shared, precomputed view of the ledger handed to every check.
  *
  * @param {string} path
  * @param {object[]} tasks
  * @param {{path: string, byId: Map<string, {id: string, line: number}>}} [scenarios]
+ * @param {{plan?: object, ledger?: {milestones?: string[], milestoneAnchors?: Map<string, string>, anchors?: Map<string, number>}}} [options]
  */
-export function makeContext(path, tasks, scenarios) {
+export function makeContext(path, tasks, scenarios, options = {}) {
   const graph = buildDependencyGraph(tasks);
   const cycles = findCycles(graph);
   /** @type {Map<string, object>} */
@@ -100,6 +117,10 @@ export function makeContext(path, tasks, scenarios) {
     scenarios: census,
     ownersByScenario,
     milestones: resolveMilestoneGates(tasks, graph),
+    plan: options.plan ?? emptyPlanMap(path),
+    ledgerMilestones: ledgerMilestones(tasks, options.ledger?.milestones),
+    milestoneAnchors: options.ledger?.milestoneAnchors ?? new Map(),
+    anchors: options.ledger?.anchors ?? new Map(),
   };
 }
 
@@ -517,9 +538,240 @@ function checkNonBlockingNecessary(context) {
   return diagnostics;
 }
 
+/** Builds one diagnostic against the plan document. */
+function planDiagnostic(check, context, line, message) {
+  return { check, path: context.plan.path, line, taskId: null, message };
+}
+
 /**
- * The ordered check registry. Later ledger-integrity slices — the plan-to-task
- * contract, proof modes, and graph order — append entries here.
+ * The rows of the plan's milestone map, keyed by milestone, when there is a
+ * map to read at all. Without one, `missing-plan-table` owns the failure and
+ * every plan check stays quiet rather than repeating it per milestone.
+ */
+function planRows(context) {
+  return context.plan.found ? context.plan.byMilestone : null;
+}
+
+/**
+ * CHECK 14 — the milestone map has exactly one row per ledger milestone.
+ *
+ * The map is the plan's index of the ledger, so a milestone with no row is
+ * unmapped scope, a milestone with two rows has two intents, and a row for a
+ * milestone the ledger does not define points at nothing.
+ */
+function checkPlanMilestoneRows(context) {
+  const rows = planRows(context);
+  if (rows === null) return [];
+  const diagnostics = [];
+
+  for (const milestone of context.ledgerMilestones) {
+    const matching = rows.get(milestone) ?? [];
+    if (matching.length === 1) continue;
+    if (matching.length === 0) {
+      diagnostics.push(
+        planDiagnostic(
+          "plan-milestone-row",
+          context,
+          context.plan.headerLine,
+          `the milestone map has no row for ${milestone}, which the ledger defines as ` +
+            `\`## ${milestone} tasks\`; every milestone is mapped exactly once`,
+        ),
+      );
+      continue;
+    }
+    const lines = matching.map((row) => row.line).join(", ");
+    for (const row of matching.slice(1)) {
+      diagnostics.push(
+        planDiagnostic(
+          "plan-milestone-row",
+          context,
+          row.line,
+          `the milestone map has ${matching.length} rows for ${milestone} (lines ${lines}); ` +
+            "every milestone is mapped exactly once",
+        ),
+      );
+    }
+  }
+
+  const known = new Set(context.ledgerMilestones);
+  for (const row of context.plan.rows) {
+    if (known.has(row.milestone)) continue;
+    diagnostics.push(
+      planDiagnostic(
+        "plan-milestone-row",
+        context,
+        row.line,
+        `the milestone map has a row for ${row.milestone}, which the ledger does not define; ` +
+          `there is no \`## ${row.milestone} tasks\` section`,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/**
+ * CHECK 15 — each row links to its own milestone's task section.
+ *
+ * The link is how a reader crosses from intent to execution, so it must name
+ * this ledger and an anchor the ledger actually offers.
+ */
+function checkPlanTaskLinks(context) {
+  const rows = planRows(context);
+  if (rows === null) return [];
+  const diagnostics = [];
+  const ledgerPath = resolve(context.path);
+  const planDir = dirname(resolve(context.plan.path));
+
+  for (const milestone of context.ledgerMilestones) {
+    const row = (rows.get(milestone) ?? [])[0];
+    if (row === undefined) continue; // `plan-milestone-row` owns a missing row.
+    const expected =
+      context.milestoneAnchors.get(milestone) ?? slugifyHeading(`${milestone} tasks`);
+
+    if (row.links.length !== 1) {
+      diagnostics.push(
+        planDiagnostic(
+          "plan-task-link",
+          context,
+          row.line,
+          `the ${milestone} row's task-ledger cell has ${row.links.length} links; ` +
+            `it names exactly one, the milestone's task section \`#${expected}\``,
+        ),
+      );
+      continue;
+    }
+
+    const [{ target }] = row.links;
+    const hash = target.indexOf("#");
+    const file = hash === -1 ? target : target.slice(0, hash);
+    const anchor = hash === -1 ? "" : target.slice(hash + 1);
+
+    const linked = file.length === 0 ? context.plan.path : resolve(planDir, file);
+    if (linked !== ledgerPath) {
+      diagnostics.push(
+        planDiagnostic(
+          "plan-task-link",
+          context,
+          row.line,
+          `the ${milestone} row links to \`${target}\`, which resolves to ${linked} rather ` +
+            `than the task ledger being checked (${ledgerPath}); ` +
+            `link to \`./${relativeLedgerName(ledgerPath)}#${expected}\``,
+        ),
+      );
+      continue;
+    }
+    if (anchor === expected) continue;
+
+    const known = context.anchors.has(anchor);
+    diagnostics.push(
+      planDiagnostic(
+        "plan-task-link",
+        context,
+        row.line,
+        `the ${milestone} row links to \`#${anchor}\`, ` +
+          `${known ? "another section of the ledger" : "an anchor the ledger does not define"}; ` +
+          `milestone ${milestone}'s tasks are at \`#${expected}\``,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/** The ledger's file name, for a link suggestion in a diagnostic. */
+function relativeLedgerName(ledgerPath) {
+  return ledgerPath.slice(ledgerPath.lastIndexOf("/") + 1);
+}
+
+/**
+ * CHECK 16 — a row names only existing tasks of its own milestone.
+ *
+ * A decision that gates dependent work, or a link in a closing path, is a
+ * pointer into the ledger. A stale ID points nowhere, and an ID from another
+ * milestone moves that milestone's scope without the ledger agreeing.
+ */
+function checkPlanTaskReferences(context) {
+  const rows = planRows(context);
+  if (rows === null) return [];
+  const diagnostics = [];
+  const known = new Set(context.ledgerMilestones);
+
+  for (const row of context.plan.rows) {
+    if (!known.has(row.milestone)) continue; // `plan-milestone-row` owns it.
+    for (const id of row.mentions) {
+      const task = context.byId.get(id);
+      if (task === undefined) {
+        const parts = parseTaskId(id);
+        const split = parts === null ? null : findSplitDescendant(context, parts);
+        diagnostics.push(
+          planDiagnostic(
+            "plan-task-reference",
+            context,
+            row.line,
+            `the ${row.milestone} row names ${id}, which is not an executable task in the ` +
+              `ledger${split === null ? "" : `; it was split into ${split.join(", ")}`}`,
+          ),
+        );
+        continue;
+      }
+      if (task.milestone === row.milestone) continue;
+      diagnostics.push(
+        planDiagnostic(
+          "plan-task-reference",
+          context,
+          row.line,
+          `the ${row.milestone} row names ${id}, which belongs to ${task.milestone} ` +
+            `(${relativeLedgerName(context.path)} line ${task.line}); ` +
+            "a row names only its own milestone's tasks",
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/** The executable descendants of an ID that was split, for a better message. */
+function findSplitDescendant(context, parts) {
+  const found = [...context.byId.values()]
+    .filter((task) => isSplitAncestor(parts, task.parts))
+    .map((task) => task.id)
+    .sort();
+  return found.length === 0 ? null : found;
+}
+
+/**
+ * CHECK 17 — every `_Non-blocking:_` task is named in its milestone's row.
+ *
+ * The exception lets a milestone close without a task, which is a change to
+ * that milestone's closing path. The plan owns closing paths, so the row has
+ * to say so; otherwise the ledger alone quietly drops work from a release.
+ */
+function checkPlanNamesNonBlocking(context) {
+  const rows = planRows(context);
+  if (rows === null) return [];
+  const diagnostics = [];
+
+  for (const task of context.tasks) {
+    if (task.nonBlocking === null) continue;
+    const row = (rows.get(task.milestone) ?? [])[0];
+    if (row === undefined) continue; // `plan-milestone-row` owns a missing row.
+    if (row.text.includes(task.id)) continue;
+    diagnostics.push(
+      planDiagnostic(
+        "plan-non-blocking-row",
+        context,
+        row.line,
+        `task ${task.id} carries a \`_Non-blocking:_\` policy (${relativeLedgerName(context.path)} ` +
+          `line ${task.nonBlockingLine ?? task.line}) but the ${task.milestone} row does not ` +
+          "name it; a milestone that can close without a task says so in its closing path",
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/**
+ * The ordered check registry. Later ledger-integrity slices — proof modes and
+ * graph order — append entries here.
  */
 export const LEDGER_CHECKS = [
   { name: "duplicate-task-id", run: checkDuplicateTaskIds },
@@ -535,6 +787,10 @@ export const LEDGER_CHECKS = [
   { name: "unreachable-behavior", run: checkBehaviorReachableFromGate },
   { name: "non-blocking-policy", run: checkNonBlockingPolicy },
   { name: "unnecessary-non-blocking", run: checkNonBlockingNecessary },
+  { name: "plan-milestone-row", run: checkPlanMilestoneRows },
+  { name: "plan-task-link", run: checkPlanTaskLinks },
+  { name: "plan-task-reference", run: checkPlanTaskReferences },
+  { name: "plan-non-blocking-row", run: checkPlanNamesNonBlocking },
 ];
 
 /**
@@ -543,10 +799,11 @@ export const LEDGER_CHECKS = [
  * @param {string} path
  * @param {object[]} tasks
  * @param {{path: string, byId: Map<string, {id: string, line: number}>}} [scenarios]
+ * @param {{plan?: object, ledger?: object}} [options]
  * @returns {{diagnostics: object[], checkNames: string[], context: object}}
  */
-export function runChecks(path, tasks, scenarios) {
-  const context = makeContext(path, tasks, scenarios);
+export function runChecks(path, tasks, scenarios, options = {}) {
+  const context = makeContext(path, tasks, scenarios, options);
   const diagnostics = [];
   for (const check of LEDGER_CHECKS) {
     diagnostics.push(...check.run(context));
