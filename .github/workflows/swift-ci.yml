@@ -56,6 +56,10 @@ on:
       - "swift/**"
       - ".swift-format"
       - "mise.toml"
+      - "tools/**"
+      - "docs/swift/impl/plan.md"
+      - "docs/swift/impl/tasks.md"
+      - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
   push:
     branches:
@@ -66,6 +70,10 @@ on:
       - "swift/**"
       - ".swift-format"
       - "mise.toml"
+      - "tools/**"
+      - "docs/swift/impl/plan.md"
+      - "docs/swift/impl/tasks.md"
+      - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
 
 concurrency:
@@ -290,6 +298,41 @@ jobs:
 
       - name: Type-check the compile-fail fixtures
         run: mise run test:compilefail
+
+  # ---------------------------------------------------------------------------
+  # Document lane: the plan-to-task contract, on GitHub-hosted ubuntu.
+  #
+  # The checker is platform-neutral Node, so it needs neither macOS nor the
+  # mini, and running it on a hosted runner keeps the mini's single runner free
+  # for the work that genuinely needs it. It lives in this workflow rather than
+  # `markdown.yml` because the ledger is a Swift-implementation input, and the
+  # path filters above are extended to match: a change to the plan, either
+  # ledger, or the checker itself now triggers this workflow, so an
+  # alignment-only change can never skip its validator.
+  #
+  # No fork guard: this is a GitHub-hosted runner, so fork pull requests are
+  # welcome here and are approval-gated by the repository policy.
+  # ---------------------------------------------------------------------------
+
+  ledger:
+    name: Task ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Validate the task ledger against the plan and scenarios
+        run: mise run tasks:check
 
   # ---------------------------------------------------------------------------
   # Fork lane: pull requests from forks, on GitHub-hosted macOS.
