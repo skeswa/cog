@@ -11,3 +11,6 @@ must fire.
   _Depends: M1-01, M1-09._
   _Verify: `mise run test --filter DECL-01`._
   _Greens: DECL-01._
+- **M1-03** _(Gate)_ — Close the milestone.
+  _Depends: M1-02._
+  _Verify: `mise run test:matrix`._

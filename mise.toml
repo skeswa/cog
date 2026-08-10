@@ -60,3 +60,18 @@ run = "node {{config_root}}/tools/swift-test.mjs release"
 [tasks."test:compilefail"]
 description = "Type-check every compile-fail fixture in one batched swiftc pass"
 run = "node {{config_root}}/tools/check-compile-fail.mjs"
+
+# The task ledger is validated by tools/check-task-ledger.mjs, which derives
+# the scenario census from docs/swift/impl/scenarios.md rather than from any
+# hand-maintained count. `tasks:check` runs the checker's own fixture suite
+# first: a checker whose self-tests are broken cannot validate anything, and
+# the milestone gates invoke `tasks:check` as a single self-contained command.
+
+[tasks."tasks:check"]
+description = "Validate the Swift implementation task ledger"
+depends = ["tasks:check:fixtures"]
+run = "node {{config_root}}/tools/check-task-ledger.mjs"
+
+[tasks."tasks:check:fixtures"]
+description = "Run the task-ledger checker's fixture suite"
+run = "node {{config_root}}/tools/test-task-ledger.mjs"

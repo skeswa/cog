@@ -15,3 +15,6 @@ report the loop.
   _Depends: M1-02._
   _Verify: `mise run test --filter DECL-02`._
   _Greens: DECL-02._
+- **M1-04** _(Gate)_ — Close the milestone over both behaviors.
+  _Depends: M1-02._
+  _Verify: `mise run test:matrix`._

@@ -6,6 +6,10 @@
 // Each case runs the checker as a subprocess against one ledger and asserts
 // the exit code, the exact set of `error[<check>]` names in its output, and
 // that the diagnostics name the offending IDs. Exits non-zero on any mismatch.
+//
+// Every fixture ledger is self-contained: the checker pairs `<name>.md` with
+// the `<name>.scenarios.md` beside it, so a fixture's scenario census is its
+// own and never the repository's.
 
 import { spawnSync } from "node:child_process";
 import { relative, resolve } from "node:path";
@@ -66,6 +70,65 @@ const CASES = [
     ledger: resolve(FIXTURES, "cycle.md"),
     checks: ["dependency-cycle"],
     mentions: ["M1-02 -> M1-03 -> M1-02"],
+  },
+  {
+    name: "scenario no task owns",
+    ledger: resolve(FIXTURES, "unowned-scenario.md"),
+    checks: ["unowned-scenario"],
+    mentions: ["DECL-03", "unowned-scenario.scenarios.md:7"],
+  },
+  {
+    name: "scenario greened by two tasks",
+    ledger: resolve(FIXTURES, "duplicate-scenario-owner.md"),
+    checks: ["duplicate-scenario-owner"],
+    mentions: ["DECL-02", "M1-02", "M1-03"],
+  },
+  {
+    name: "green naming a scenario that does not exist",
+    ledger: resolve(FIXTURES, "unknown-scenario.md"),
+    checks: ["unknown-scenario"],
+    mentions: ["M1-03", "DECL-09"],
+  },
+  {
+    name: "infrastructure task that owns a scenario",
+    ledger: resolve(FIXTURES, "misplaced-greens.md"),
+    checks: ["misplaced-greens"],
+    mentions: ["M1-03", "Infrastructure", "DECL-02"],
+  },
+  {
+    name: "behavior no milestone gate covers",
+    ledger: resolve(FIXTURES, "unreachable-behavior.md"),
+    checks: ["unreachable-behavior"],
+    mentions: ["M1-04", "M1-05"],
+  },
+  {
+    name: "allowed non-blocking task passes",
+    ledger: resolve(FIXTURES, "non-blocking-allowed.md"),
+    checks: [],
+  },
+  {
+    name: "non-blocking line that states no policy",
+    ledger: resolve(FIXTURES, "non-blocking-policy.md"),
+    checks: ["non-blocking-policy"],
+    mentions: ["M1-04", "deferred for now"],
+  },
+  {
+    name: "non-blocking task the gate already covers",
+    ledger: resolve(FIXTURES, "unnecessary-non-blocking.md"),
+    checks: ["unnecessary-non-blocking"],
+    mentions: ["M1-04", "M1-05"],
+  },
+  {
+    name: "milestone with behavior and no gate",
+    ledger: resolve(FIXTURES, "missing-milestone-gate.md"),
+    checks: ["milestone-gate"],
+    mentions: ["M1", "no _(Gate)_ task"],
+  },
+  {
+    name: "milestone whose gates have no closing path",
+    ledger: resolve(FIXTURES, "ambiguous-milestone-gate.md"),
+    checks: ["milestone-gate"],
+    mentions: ["M1-03, M1-04", "no single terminal gate"],
   },
 ];
 

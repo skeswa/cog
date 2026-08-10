@@ -59,6 +59,29 @@ export function shortestPath(graph, from, to) {
 }
 
 /**
+ * Every node reachable from `from` by following dependency edges, excluding
+ * `from` itself unless a cycle leads back to it.
+ *
+ * @param {Map<string, string[]>} graph
+ * @param {string} from
+ * @returns {Set<string>}
+ */
+export function reachableFrom(graph, from) {
+  /** @type {Set<string>} */
+  const seen = new Set();
+  const stack = [...(graph.get(from) ?? [])];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const next of graph.get(current) ?? []) {
+      if (!seen.has(next)) stack.push(next);
+    }
+  }
+  return seen;
+}
+
+/**
  * Finds dependency cycles, one per back edge discovered by depth-first search
  * and deduplicated by rotation-independent identity.
  *

@@ -25,3 +25,6 @@ must stay silent.
   _Depends: M1-04a._
   _Verify: `mise run test --filter DECL-04`._
   _Greens: DECL-04._
+- **M1-05** _(Gate)_ — Close the milestone.
+  _Depends: M1-02, M1-02a, M1-04b._
+  _Verify: `mise run test:matrix`._
