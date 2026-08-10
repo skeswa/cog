@@ -8,6 +8,11 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
 
 ## Execution rules
 
+- **Plan and tasks are one execution contract.** [plan.md](./plan.md) owns
+  milestone scope, exit criteria, and release boundaries; this ledger owns
+  executable slices, dependencies, commands, and scenario ownership. Use the
+  plan's milestone-to-task table for closure paths. Any change that crosses
+  those ownership boundaries updates both documents in the same change.
 - **Half a day is the cap.** The estimate includes writing the red tests,
   implementation, local verification, and the task's required documentation.
   Known multi-mechanism work is split here rather than deferred until it
@@ -58,6 +63,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   GitHub Release creation are separate tasks.
 
 ## M0 tasks
+
+_Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
 
 - **M0-01** _(Infrastructure)_ — Root `Package.swift` (tools 6.2, platforms,
   library settings) with stub `Cog` and `CogTesting` targets and test targets;
@@ -117,16 +124,24 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   unknown-dependency, redundant-edge, and cycle fixtures for
   `tools/check-task-ledger.mjs`._
 - **M0-09ab** _(Infrastructure)_ — Add exact scenario ownership, milestone
-  gate reachability, and `_Non-blocking:_` policy checks; expose the complete
+  gate reachability, and `_Non-blocking:_` policy checks; expose the combined
   checker as `mise run tasks:check`.
   _Depends: M0-09aa._
   _Verify: `mise run tasks:check` plus missing, duplicate-owner, unreachable,
   and allowed-non-blocking fixtures._
+- **M0-09ac** _(Infrastructure)_ — Validate the plan-to-task contract: exactly
+  one M0–M7 map row, the matching task-section link, only existing
+  same-milestone task IDs, and every explicit `_Non-blocking:_` task named in
+  its row.
+  _Depends: M0-09ab._
+  _Verify: `mise run tasks:check` plus missing-row, wrong-link, unknown-ID,
+  cross-milestone-ID, and missing-non-blocking fixtures._
 - **M0-09b** _(Infrastructure)_ — Add the task-ledger check to Swift CI after
   the workflow and checker both exist. Extend the workflow paths to the task
-  and scenario ledgers plus `tools/check-task-ledger.mjs`, so a ledger-only
-  change cannot skip its validator.
-  _Depends: M0-05b, M0-09ab._
+  implementation plan, task and scenario ledgers, plus
+  `tools/check-task-ledger.mjs`, so an alignment-only change cannot skip its
+  validator.
+  _Depends: M0-05b, M0-09ac._
   _Verify: a pull-request run completes the ledger step._
 - **M0-10** _(Gate)_ — Close scaffolding with every local command and CI job
   green on the stub.
@@ -136,6 +151,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   `mise run test:compilefail`._
 
 ## M1 tasks
+
+_Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
   `ObjectIdentifier` identity, human labels, and `ManualCog<T>` ref values.
@@ -515,6 +532,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
 
 ## M2 tasks
 
+_Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
+
 - **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare
   `cogs.get(ref)`, `cogs[ref]`, and callable refs before boundary call sites
   multiply.
@@ -635,6 +654,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
 
 ## M3 tasks
 
+_Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
+
 - **M3-01** _(Behavior)_ — Add `CogPhase`, `Previous`, `latestValue`, and
   `isLoading` value semantics with exhaustive phase accessor tests.
   _Depends: M2-20._
@@ -728,6 +749,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
 
 ## M4 tasks
 
+_Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
+
 - **M4-01a** _(Decision)_ — Time-box a source review of swift-state-graph;
   compare tracked reads with capture lists and record a public-name decision
   matrix with prior-art credit.
@@ -780,6 +803,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   _Verify: published GitHub Release points at the approved tag._
 
 ## M5 tasks
+
+_Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 - **M5-01a** _(Infrastructure)_ — Scaffold `CogScenarios` graph builders,
   in-selector counters, expected counts, and ref-layout parameterization.
@@ -896,6 +921,8 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   _Verify: `mise run test:matrix`, `mise run bench`, and baseline check._
 
 ## M6 tasks
+
+_Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
 
 - **M6-01a** _(Infrastructure)_ — Add arena slot allocation, reuse,
   generations, and the scalar SoA column skeleton.
@@ -1093,6 +1120,8 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: published GitHub Release, or not-applicable record._
 
 ## M7 tasks
+
+_Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
 
 - **M7-01a** _(Decision)_ — Settle `.queue` failure independently; add its
   scenarios in the reserved `M7-03c*` task branch, then add that branch's

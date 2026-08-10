@@ -1,6 +1,6 @@
 # Cog for Swift: implementation plan
 
-_August 9, 2026_
+_August 10, 2026_
 
 This plan turns the Swift spike ([exploration.md](../design/exploration.md)
 §11, amended by [perf.md](../design/perf.md) §9) into milestones. It also fills in package
@@ -67,12 +67,12 @@ cog/                                  (git root = SwiftPM package root)
 ├── LICENSE                           # missing today; required before 0.1.0
 ├── .swift-format
 ├── .github/workflows/
-│   ├── swift-ci.yml                  # path-filtered on Package.swift + swift/**
+│   ├── swift-ci.yml                  # path-filtered for all Swift inputs
 │   ├── swift-docs.yml                # DocC → GitHub Pages, on tag push
 │   └── markdown.yml                  # oxfmt --check, ubuntu, *.md paths
 ├── tools/
-│   └── check-task-ledger.mjs         # scenario coverage + task DAG validator
-├── docs/                             # living design docs (unchanged)
+│   └── check-task-ledger.mjs         # plan/task/scenario alignment + task DAG
+├── docs/                             # living design and implementation docs
 ├── swift/
 │   ├── Sources/
 │   │   ├── Cog/                      # the library; Cog.docc/ catalog inside
@@ -114,11 +114,41 @@ Manifest choices:
 - swift-docc-plugin is env-gated (`COG_DOCC=1`, set only by the docs
   workflow), so consumers resolve a zero-dependency package.
 
+## Plan-to-task contract
+
+The design docs remain normative for architecture and behavior. This plan owns
+milestone intent, scope, exit criteria, and release boundaries. The task ledger
+owns executable slices, immediate dependencies, exact verification commands,
+and scenario ownership. Neither document silently overrides the other: a
+change to a milestone boundary or exit updates its task graph in the same
+change, and a task change that moves scope, changes a public command, or alters
+a gate updates this plan in the same change.
+
+Dependencies in the ledger are deliberately narrower than milestone order. A
+prior milestone is a barrier only where the table below or an explicit
+`_Depends:_` edge says it is. This permits independent work to start early
+without weakening a milestone gate. Gates diagnose but never absorb repairs;
+the smallest repair task is inserted before a failed gate is rerun.
+
+| Plan milestone                   | Task ledger                     | Decisions before dependent work                                            | Closing path                                                                                                                   |
+| -------------------------------- | ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner/Xcode pin                                                  | `M0-10`                                                                                                                        |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                     | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-18a` floor-runtime policy                      | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when hosted iOS 17 is unavailable                                 |
+| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                         | `M3-11`                                                                                                                        |
+| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
+| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility | `M5-10`                                                                                                                        |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                             | `M6-05a` edge gate, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                            |
+| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
+
 ## Milestones
+
+<a id="plan-m0"></a>
 
 ### M0: Scaffolding
 
-- Root `Package.swift` with a stub `Cog` target so CI runs end to end. Add
+- Root `Package.swift` with stub `Cog` and `CogTesting` targets, test targets,
+  and one sentinel test so every CI test leg proves it selected work. Add
   `LICENSE`.
 - `.swift-format`: start from `swift format dump-configuration`, trim,
   two-space indent.
@@ -127,19 +157,23 @@ Manifest choices:
   under `fmt` and `fmt:check` umbrellas; add `test`, `test:matrix` (loops
   the four legs), and `test:release` (`swift test -c release` on the default
   leg, so the guardrails that promise every-build behavior really run in a
-  release configuration). Add `bench` in M5. mise cannot pin Xcode. The README
-  documents the required version, and CI selects it with `xcode-select`.
-- `swift-ci.yml`: concurrency-cancel; path filters (`Package.swift`,
-  `swift/**`, `.swift-format`, the workflow itself). M0 includes only the jobs
-  the stub can satisfy: `format` (swift format lint), `test-host`
-  (four-leg matrix of `swift test --parallel`, `.build` cached per leg), and
-  `test-release` (`swift test -c release` on the default leg — the leg where
-  every-build guardrails such as the second-context guard, escaped writers,
-  cycle detection, the absence of `seed`, and free debug history are proven
-  outside debug). Add `test-simulator` in M2 and `bench-build` in M5. Use the `macos-26`
-  runner with a pinned Xcode 26.x. Verify image contents against
-  `actions/runner-images` when writing the workflow. `markdown.yml` runs
-  oxfmt on ubuntu.
+  release configuration). The test wrappers list tests before every filtered
+  run and fail if the expression selects none; raw `swift test --filter` is not
+  a valid task-verification command because SwiftPM succeeds on an empty
+  selection. Add `bench` in M5. mise cannot pin Xcode. The README documents
+  the required version, and CI selects it with `xcode-select`.
+- `swift-ci.yml`: concurrency-cancel; path filters for `Package.swift`,
+  `Package.resolved`, `swift/**`, `.swift-format`, `mise.toml`, the workflow,
+  the implementation plan, task/scenario ledgers, and their checker. M0
+  includes only the jobs the stub can satisfy: `format` (swift format lint),
+  `test-host` (four-leg matrix of `swift test --parallel`, `.build` cached per
+  leg), and `test-release` (`swift test -c release` on the default leg — the
+  leg where every-build guardrails such as the second-context guard, escaped
+  writers, cycle detection, the absence of `seed`, and free debug history are
+  proven outside debug). Add `test-simulator` in M2 and `bench-build` in M5.
+  Use the `macos-26` runner with a pinned Xcode 26.x. Verify image contents
+  against `actions/runner-images` when writing the workflow. `markdown.yml`
+  runs oxfmt on ubuntu.
 - Compile-fail harness: a fixtures directory of expected-failure sources,
   compiled in one batched pass by a `test:compilefail` mise task and CI step
   that asserts each fixture fails with the expected diagnostic. The
@@ -147,12 +181,19 @@ Manifest choices:
   never as per-test compiler invocations.
 - Task-ledger checker: the pinned Node tool runs
   `tools/check-task-ledger.mjs`; `mise run tasks:check` verifies unique task
-  IDs, exact scenario coverage, existing dependency IDs, and an acyclic task
-  graph, plus reachability of every behavior from its milestone gate except an
-  explicitly non-blocking external-availability task. Run it in CI with the
-  other documentation checks.
+  IDs including recursive split suffixes; prefix-free executable IDs; exact,
+  single-owner scenario coverage; existing and transitively minimal dependency
+  IDs; and an acyclic task graph. It also verifies reachability of every
+  behavior from its milestone gate except a task with a valid explicit
+  `_Non-blocking:_` external-availability policy. Finally, it verifies that the
+  plan-to-task table has exactly one row per milestone, links the matching task
+  section, references only existing same-milestone task IDs, and names every
+  explicit non-blocking exception. Run it in CI with the other documentation
+  checks.
 - Update the root `README.md`, `docs/swift/README.md`, and `CLAUDE.md` plus
   `AGENTS.md` (kept in sync) with the new commands.
+
+<a id="plan-m1"></a>
 
 ### M1: Simple correctness core (spike §11.1)
 
@@ -185,13 +226,15 @@ The class-node build. Correctness first; no perf tricks.
   manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
   graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  Add the `CogTesting` isolated-context factory for tests and previews; a
-  testing context accepts an injected clock, and `whileObserved` grace timing
-  runs on the context's clock, so lifetime tests never wait wall-clock time.
-  Verify
-  that separate preview runtimes neither share values nor touch the production
-  install guard. Settle the helper spellings (`installApp()` and `testing()`
-  are placeholders); record in §10 and the README snapshot.
+  Settle the production-install and testing-factory helper spellings before
+  implementing either helper or multiplying call sites (`installApp()` and
+  `testing()` are placeholders); record the result in §10 and the README
+  snapshot. Add the `CogTesting` isolated-context factory for tests and
+  previews. Introduce its injected clock and cleanup-acknowledgement seams
+  independently near the start of M1; `whileObserved` grace timing runs on the
+  context's clock, so lifetime tests never wait wall-clock time. Verify that
+  separate preview runtimes neither share values nor touch the production
+  install guard.
 - Seeding: debug-only `seed` stages a value and pushes dirty flags, with
   no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
@@ -217,6 +260,8 @@ graph edges acting as leases; seed-then-turn settling (the §6.6 alert test
 verbatim); sibling commits as separate turns; off-MainActor token and group
 deinit with deterministic MainActor cleanup acknowledgements; preview
 isolation; and named effect runs in history.
+
+<a id="plan-m2"></a>
 
 ### M2: SwiftUI boundary and weather example (spike §11.2)
 
@@ -252,6 +297,8 @@ isolation; and named effect runs in history.
   whether hosted-runner availability can block a release; absent a reliable
   hosted runtime, the nightly remains explicitly non-blocking.
 
+<a id="plan-m3"></a>
+
 ### M3: First async slice (moved up from spike §11.6)
 
 Limit this milestone to the async pieces needed for 0.1.0:
@@ -281,6 +328,8 @@ Limit this milestone to the async pieces needed for 0.1.0:
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.
 
+<a id="plan-m4"></a>
+
 ### M4: API review, docs, and 0.1.0 (spike §11.4)
 
 - Read swift-state-graph source before freezing public names; credit prior
@@ -293,6 +342,12 @@ query caching.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin
   instructions, and DocC are in place. Benchmark numbers are not required.
   The ref layout may change in 0.2 because 0.x minors may break.
+- Once the immutable `0.1.0` tag exists, M5 scenario scaffolding may start
+  while Pages and GitHub Release verification finish; the M5 gate still waits
+  for the published 0.1.0 GitHub Release. Later commits cannot change the tag,
+  so this overlap shortens the critical path without weakening either release.
+
+<a id="plan-m5"></a>
 
 ### M5: Benchmark port (spike §11.3, perf §9.2)
 
@@ -303,21 +358,24 @@ query caching.
   layout under test.
 - `CogScenarioTests` asserts `actual == expected` as ordinary tests, so
   duplicate work fails CI regardless of timing noise.
-- The `swift/Benchmarks` package (ordo-one/package-benchmark plus jemalloc,
-  confined there): wraps the same scenarios in `Benchmark {}` closures.
-  Metrics per perf §9.4: `.wallClock`; `.mallocCountTotal` with a
+- Scaffold `swift/Benchmarks` first as an empty, separate SwiftPM package and
+  prove its dependencies cannot enter the shipped root package. Before adding
+  a benchmark dependency or allocator backend, probe and record its canonical
+  repository, minimum compatible version, exact ARC metric names, baseline
+  CLI, Swift 6.2/6.3 allocator behavior, and MainActor compatibility. Then pin
+  only the verified dependency/backend and add an isolation shim only if the
+  probe proves one necessary. The package wraps the same scenarios in
+  `Benchmark {}` closures. Metrics per perf §9.4: `.wallClock`;
+  `.mallocCountTotal` with a
   **threshold of zero** for steady turns and for `box[key]` ref creation;
   `.peakMemoryResident` at 1,000 nodes; notice counts for pinned keyed
-  nodes; ARC retain and release counters (verify exact metric names and
-  minimum version; check whether MainActor-confined bodies need an
-  `assumeIsolated` shim). Baselines via
-  `swift package benchmark baseline update/check`. Every baseline pins its
-  environment: exact Xcode and Swift version, package-benchmark version,
-  architecture, and allocator backend. Package-benchmark counts mallocs with
-  jemalloc through Swift 6.2 and with a malloc interposer from Swift 6.3, so
-  redo malloc baselines across that boundary. Per-callsite ARC
-  attribution stays a manual `xcrun xctrace` workflow documented in
-  `swift/Benchmarks/README.md`.
+  nodes; and verified ARC retain and release counters. Baselines use the CLI
+  spelling proven by the compatibility probe. Every baseline pins its
+  environment: exact Xcode and Swift version, benchmark dependency version,
+  architecture, and allocator backend. Redo malloc baselines whenever the
+  supported allocator path changes, including any Swift 6.2/6.3 boundary the
+  probe confirms. Per-callsite ARC attribution stays a manual `xcrun xctrace`
+  workflow documented in `swift/Benchmarks/README.md`.
 - Each benchmark-gated task ends by recording the measurement or provisional
   threshold needed to turn its scenario green. Baseline automation follows
   those first results; no task closes while its assigned benchmark is red.
@@ -328,30 +386,35 @@ query caching.
   [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6. Every behavior scenario
-  implemented through M5 must pass under each ref layout being measured.
+  implemented through M5 must pass under each ref layout selected by
+  `COG_TEST_REF_LAYOUT`; `mise run test:refs` loops the complete set.
+
+<a id="plan-m6"></a>
 
 ### M6: Data-oriented core (spike §11.5, perf §3–§8)
 
 - M6a, runnable edge-layout gate: build arena allocation, typed value columns,
   and explicit-stack propagation over one baseline edge implementation first.
-  Put both the core and edge layout behind internal test selectors. Only after
-  that vertical slice runs the M5 scenarios, implement the remaining perf
-  §3.3 candidates (Reactively-style per-node prefix arrays and
-  inline-plus-overflow), run the same correctness set over all three, and
-  measure mostly-static and high-churn dependencies. Record the numbers in
+  Put both representations behind the internal test-only `COG_TEST_CORE` and
+  `COG_TEST_EDGE` selectors. Only after that vertical slice runs the M5
+  scenarios, implement the remaining perf §3.3 candidates (Reactively-style
+  per-node prefix arrays and inline-plus-overflow), run the same correctness
+  set over all three, and close the runnable edge gate at `M6-05a`. Measure
+  mostly-static and high-churn dependencies next. Record the numbers in
   perf.md; only then settle the layout.
 - Behind the same tests and public API: SoA columns (`flags`, `changedAt`,
   `checkedAt`, `deps`, `subs`, `boundary`, `generation`); typed
   per-descriptor value columns with pending and current values; the
-  edge layout selected in M6a; explicit-stack propagation with cycle marks; lazy
-  boundary creation; slot generations for safe reuse; a debug ring buffer
-  with zero release cost.
+  edge layout selected in M6a; explicit-stack propagation with cycle marks;
+  lazy boundary creation; slot generations for safe reuse; a debug ring
+  buffer with zero release cost.
 - Every behavior scenario implemented through M6 passes unchanged on the
   replacement core.
 - Integrate that suite by behavior group throughout M6 — manual values and
   turns, graph and cycles, reactions and lifetimes, then UI and async — using
   the internal simple/arena selector. Switching the default core is the final
-  small gate, not the first full integration point.
+  small gate, not the first full integration point. `mise run test:cores`
+  loops the complete suite over both implementations.
 - Follow the perf §5 rules (no ARC, locks, or existentials in graph walks)
   until a benchmark disproves one.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
@@ -359,7 +422,12 @@ query caching.
   `mallocCountTotal == 0` threshold plus generous absolute time thresholds.
   Update perf.md and §10 with what the data settled.
 - Tag `0.2.0` when the data-oriented core replaces the simple one. If it does
-  not, record why the simple core stays.
+  not, record why the simple core stays. After `M6-12b` approves that release
+  candidate (or closes the no-release branch), M7's independent design and
+  behavior tracks may start while any conditional tag and verification tasks
+  finish against the already approved commit.
+
+<a id="plan-m7"></a>
 
 ### M7: Async completion and exports (rest of spike §11.6)
 
@@ -449,38 +517,50 @@ release gates.
   every scenario ID stays covered by exactly one task's _Greens:_ line.
 - New, split, or reordered tasks → update `_Depends:` and `_Verify:` in the
   same change and keep `mise run tasks:check` green.
+- Milestone scope, order, exit, public-command, gate, release-boundary, or
+  non-blocking-policy changes → update both this plan and the affected task
+  section, including the plan-to-task table, in the same change.
 
 ## Verification
 
-- M0: `mise run fmt:check`, `mise run tasks:check`, and
-  `mise run test:matrix` pass on the stub; CI green end to end; a
-  leg-assertion test confirms the env legs really change test-target flags.
-- M1: the full test matrix above is green in all four legs and in the
-  `test-release` leg; escaped-writer, second-context, and cycle tests assert
-  failure in debug and release alike.
-- M2: run Weather in a simulator; confirm one ZIP's write re-renders only that
-  ZIP's card (`Self._printChanges` or re-render counters), a two-value view
-  never renders a torn pair, and UI notices precede reactions; UIKit check on
-  an iOS 26 simulator. Run the pinned iOS 17 boundary subset when that nightly
-  job is available.
-- M3: async tests deterministic and green; a pending fetch cancelled by
-  release commits nothing; initial and reload failures each produce the
+- M0 (`M0-10`): `mise run fmt:check`, `mise run tasks:check`,
+  `mise run test:matrix`, `mise run test:release`, and
+  `mise run test:compilefail` pass on the stub; CI is green end to end; a
+  leg-assertion test confirms the env legs really change test-target flags;
+  the test wrapper's sentinel filter succeeds and an unmatched filter fails.
+- M1 (`M1-33c` → `M1-32`): the full test matrix above is green in all four
+  legs and in the `test-release` leg; escaped-writer, second-context, and cycle
+  tests assert failure in debug and release alike.
+- M2 (`M2-16` → `M2-20`): run Weather in a simulator; confirm one ZIP's write
+  re-renders only that ZIP's card (`Self._printChanges` or re-render counters),
+  a two-value view never renders a torn pair, and UI notices precede reactions;
+  UIKit check on an iOS 26 simulator. Run the pinned iOS 17 boundary subset
+  when that nightly job is available.
+- M3 (`M3-11`): async tests deterministic and green; a pending fetch cancelled
+  by release commits nothing; initial and reload failures each produce the
   specified pending and failure turns.
-- M4: a scratch iOS 17 app consumes tagged 0.1.0 by URL and builds; the
-  DocC site deploys.
-- M5 and M6: run-count tests green under every candidate layout; the
-  `mallocCountTotal == 0` steady-turn threshold holds; ref-layout, edge-layout,
-  and runtime-comparison numbers are recorded in perf.md before choices settle.
-- M7: exact export buffers, subscriber independence, stream-before-reaction
-  order, and external post-mutation value tests are green; the complete
-  behavior suite passes on the selected core.
+- M4 (`M4-05b` → `M4-05e`): approve a non-mutating candidate, push the tag,
+  then prove a scratch iOS 17 app consumes exact 0.1.0 and the DocC site
+  deploys before publishing the GitHub Release.
+- M5 (`M5-10`): run-count tests are green under every ref candidate selected
+  by `COG_TEST_REF_LAYOUT`; the `mallocCountTotal == 0` steady-turn threshold
+  holds; ref-layout numbers are recorded in perf.md before the choice settles.
+- M6 (`M6-05a`, then `M6-12b`): the M5 set is green under every arena edge
+  candidate; `mise run test:cores` is green; edge-layout and runtime-comparison
+  numbers are recorded before choices settle. Continue through `M6-12c`–
+  `M6-12e` only if `M6-12a` approves 0.2.0.
+- M7 (`M7-16a` → `M7-16e`): exact export buffers, subscriber independence,
+  stream-before-reaction order, and external post-mutation value tests are
+  green; the complete behavior suite passes on the selected core before the
+  release sequence starts.
 - Always: formatting and task-ledger checks clean; path-filtered CI green.
 
 ## Flagged uncertainties (verify at implementation time)
 
 - Exact `macos-26` runner image contents and preinstalled Xcode 26.x
   versions (check `actions/runner-images`).
-- package-benchmark ARC metric names, minimum version, and MainActor
+- Benchmark package canonical repository, ARC metric names, minimum version,
+  baseline CLI, allocator backend across Swift 6.2/6.3, and MainActor
   compatibility.
 - SwiftPM env-var manifest re-evaluation (expected fine; fallback
   `--manifest-cache none`).
