@@ -16,11 +16,12 @@ const REPOSITORY = "skeswa/cog";
 /**
  * Runner labels that mean "self-hosted" outright.
  *
- * `M0-05a` has not settled the Mac mini's repo-specific labels yet. When it
- * does, add them here — that is the whole update. Nothing else has to change,
- * because unknown labels already fail closed: see `HOSTED_RUNNER_IMAGE`.
+ * `M0-05a` settled the Mac mini's repo-specific label as `cog-mini`. Add any
+ * future runner label here — that is the whole update. Nothing else has to
+ * change, because unknown labels already fail closed: see
+ * `HOSTED_RUNNER_IMAGE`.
  */
-const SELF_HOSTED_LABELS = ["self-hosted"];
+const SELF_HOSTED_LABELS = ["self-hosted", "cog-mini"];
 
 /**
  * Labels that name a GitHub-hosted runner image. Anything else — a bare
