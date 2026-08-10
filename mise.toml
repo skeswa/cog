@@ -2,10 +2,31 @@
 node = "24"
 "npm:oxfmt" = "0.62.0"
 
+# Formatting is split per language under the `fmt` and `fmt:check` umbrellas.
+# Oxfmt owns Markdown, JSON, and YAML; the Swift toolchain's own `swift format`
+# owns Swift. There is no SwiftLint. A future `fmt:kotlin` joins the same
+# umbrellas without touching either existing leg.
+
 [tasks.fmt]
-description = "Format everything in the repo with Oxfmt"
+description = "Format everything in the repo"
+depends = ["fmt:md", "fmt:swift"]
+
+[tasks."fmt:md"]
+description = "Format Markdown, JSON, and YAML with Oxfmt"
 run = "oxfmt"
 
+[tasks."fmt:swift"]
+description = "Format Swift sources with the toolchain's swift-format"
+run = "swift format --in-place --parallel --recursive swift Package.swift"
+
 [tasks."fmt:check"]
-description = "Verify formatting without writing changes"
+description = "Verify formatting everywhere without writing changes"
+depends = ["fmt:check:md", "fmt:check:swift"]
+
+[tasks."fmt:check:md"]
+description = "Verify Markdown, JSON, and YAML formatting"
 run = "oxfmt --check"
+
+[tasks."fmt:check:swift"]
+description = "Lint Swift formatting strictly, writing nothing"
+run = "swift format lint --strict --parallel --recursive swift Package.swift"
