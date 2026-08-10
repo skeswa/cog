@@ -152,6 +152,7 @@ export function makeContext(path, tasks, scenarios, options = {}) {
     ledgerMilestones: ledgerMilestones(tasks, options.ledger?.milestones),
     milestoneAnchors: options.ledger?.milestoneAnchors ?? new Map(),
     anchors: options.ledger?.anchors ?? new Map(),
+    notes: options.ledger?.notes ?? [],
   };
 }
 
@@ -1050,6 +1051,309 @@ function checkProofModeCommands(context) {
 }
 
 /**
+ * CHECK 22 — every _Release_ task lies on one dependency-ordered chain.
+ *
+ * Publications are totally ordered: two release sequences that could run in
+ * either order can interleave, and a repository cannot publish `0.3.0` while
+ * `0.2.0` is still mid-flight. Total order is exactly the condition that for
+ * every pair of _Release_ tasks one transitively depends on the other, so a
+ * fork is reported as the pair that has no order between them — the ledger has
+ * to say which of the two comes first.
+ */
+function checkReleaseChain(context) {
+  const diagnostics = [];
+  const releases = context.tasks.filter((task) => task.type === "Release");
+  if (releases.length < 2) return diagnostics;
+
+  /** @type {Map<string, Set<string>>} */
+  const reach = new Map();
+  for (const release of releases) {
+    if (!reach.has(release.id)) reach.set(release.id, reachableFrom(context.graph, release.id));
+  }
+
+  for (let i = 0; i < releases.length; i += 1) {
+    for (let j = i + 1; j < releases.length; j += 1) {
+      const first = releases[i];
+      const second = releases[j];
+      if (first.id === second.id) continue; // `duplicate-task-id` owns it.
+      if (reach.get(first.id).has(second.id)) continue;
+      if (reach.get(second.id).has(first.id)) continue;
+      const [earlier, later] = first.line <= second.line ? [first, second] : [second, first];
+      diagnostics.push(
+        diagnostic(
+          "release-chain",
+          context,
+          later,
+          later.line,
+          `release tasks ${earlier.id} (line ${earlier.line}) and ${later.id} (line ${later.line}) ` +
+            `are not dependency-ordered: neither depends on the other, directly or transitively, ` +
+            `so their publications could interleave; every _Release_ task depends on the previous ` +
+            `release's terminal task`,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * CHECK 23 — every _Release_ task sits downstream of a _Gate_.
+ *
+ * A publication is irreversible, so nothing may be published that no gate has
+ * proven. Preparation and publication are separate tasks precisely so the
+ * non-mutating candidate gate can run first; a release that reaches no gate
+ * at all has skipped that separation.
+ */
+function checkReleaseAfterGate(context) {
+  const diagnostics = [];
+  for (const task of context.tasks) {
+    if (task.type !== "Release") continue;
+    const reachable = reachableFrom(context.graph, task.id);
+    const gates = [...reachable]
+      .map((id) => context.byId.get(id))
+      .filter((other) => other !== undefined && other.type === "Gate");
+    if (gates.length > 0) continue;
+    diagnostics.push(
+      diagnostic(
+        "release-after-gate",
+        context,
+        task,
+        task.dependsLine,
+        `release task ${task.id} transitively depends on no _(Gate)_ task, so it would publish ` +
+          `work nothing has proven; a release candidate gate precedes every publication`,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/** The milestone that re-proves existing behavior under the arena core. */
+const ARENA_MILESTONE = "M6";
+
+/** The selector, and its value, that puts a run on the arena core. */
+const ARENA_CORE_ENV = "COG_TEST_CORE";
+const ARENA_CORE_VALUE = "arena";
+
+/** The label of the milestone note that names this check's exceptions. */
+const ARENA_EXCEPTIONS_LABEL = "Arena-coverage exceptions";
+
+/** Matches `COUNT-01–COUNT-08`: an inclusive range of scenario IDs. */
+const SCENARIO_RANGE_RE = /\b([A-Z][A-Z0-9]*)-(\d+)\s*[–—-]\s*([A-Z][A-Z0-9]*)-(\d+)\b/g;
+
+/** Matches one scenario ID standing on its own. */
+const SCENARIO_TOKEN_RE = /\b[A-Z][A-Z0-9]*-\d+\b/g;
+
+/**
+ * The *arena-integration* tasks: tasks of the arena milestone whose `_Verify:_`
+ * runs at least one non-negated, scenario-selecting mise command that both
+ * carries a `--filter` and runs under `COG_TEST_CORE=arena`. That shape is
+ * exactly "re-prove named behavior under the arena core", which is what this
+ * check measures coverage of.
+ *
+ * The rule deliberately leaves out three neighbouring kinds of M6 task. A task
+ * whose `_Verify:_` names runs only in prose (`M6-01b`'s selector sentinels,
+ * `M6-05a`'s whole-suite edge gate) contributes no filter and claims no
+ * per-scenario coverage. A command under another selector — `COG_TEST_CORE=simple`,
+ * or none at all — does not exercise the arena. And an unfiltered command such
+ * as `mise run test:compilefail` or `mise run test:cores` selects nothing by
+ * scenario, so it cannot be expanded.
+ *
+ * @param {object} context
+ */
+function arenaIntegrationTasks(context) {
+  /** @type {{task: object, commands: object[]}[]} */
+  const found = [];
+  for (const task of context.tasks) {
+    if (task.milestone !== ARENA_MILESTONE) continue;
+    const commands = (context.verifyCommands.get(task) ?? []).filter(
+      (command) =>
+        !command.negated &&
+        command.filter !== null &&
+        SCENARIO_FILTER_COMMANDS.has(command.command) &&
+        command.env[ARENA_CORE_ENV] === ARENA_CORE_VALUE,
+    );
+    if (commands.length > 0) found.push({ task, commands });
+  }
+  return found;
+}
+
+/**
+ * Reads the scenarios the arena-coverage note excepts. The note is prose, so
+ * inline code spans are dropped first — `M6-10` has a scenario ID's shape and
+ * would otherwise be mistaken for one — and what remains is read as a list of
+ * IDs and inclusive `LOW–HIGH` ranges.
+ *
+ * @param {object} context
+ * @param {string} text the note's body, terminator already stripped
+ * @returns {{ids: Set<string>, problems: string[]}}
+ */
+function parseArenaExceptions(context, text) {
+  /** @type {string[]} */
+  const problems = [];
+  /** @type {Set<string>} */
+  const ids = new Set();
+
+  const prose = text.replace(/`[^`]*`/g, " ");
+  const rest = prose.replace(SCENARIO_RANGE_RE, (match, lowTag, lowNumber, highTag, highNumber) => {
+    if (lowTag !== highTag) {
+      problems.push(`its range \`${match}\` spans two scenario groups (${lowTag}, ${highTag})`);
+      return " ";
+    }
+    const low = Number(lowNumber);
+    const high = Number(highNumber);
+    if (low > high) {
+      problems.push(`its range \`${match}\` counts down`);
+      return " ";
+    }
+    for (let number = low; number <= high; number += 1) {
+      ids.add(`${lowTag}-${String(number).padStart(lowNumber.length, "0")}`);
+    }
+    return " ";
+  });
+  for (const token of rest.matchAll(SCENARIO_TOKEN_RE)) ids.add(token[0]);
+
+  const unknown = [...ids].filter((id) => !context.scenarios.byId.has(id)).sort();
+  if (unknown.length > 0) {
+    const shown = unknown.slice(0, 5).join(", ");
+    problems.push(
+      `it excepts ${unknown.length} scenario(s) the tree does not define — ` +
+        `${shown}${unknown.length > 5 ? `, and ${unknown.length - 5} more` : ""}`,
+    );
+  }
+  return { ids, problems };
+}
+
+/** The line a milestone's `## M<n> tasks` heading sits on, or 1. */
+function milestoneHeadingLine(context, milestone) {
+  const slug = context.milestoneAnchors.get(milestone);
+  const line = slug === undefined ? undefined : context.anchors.get(slug);
+  return line ?? 1;
+}
+
+/**
+ * CHECK 24 — the arena milestone re-proves every filterable scenario before it.
+ *
+ * M6 replaces the core the whole library runs on, so every behavior already
+ * proven against the simple core has to be proven again against the arena one.
+ * The arena-integration tasks make that promise one filter at a time, and
+ * `filter-expansion` cannot judge them: they are _Infrastructure_, they green
+ * nothing, and their filters are deliberately wider than any one task's claim.
+ * This check comes at them from the other side. Expanded against the scenario
+ * census, the arena filters must between them select every unit- and
+ * exit-test-mode scenario owned by an M1–M6 task, so nothing silently keeps its
+ * simple-core-only proof. Overlap between filters is fine and expected.
+ *
+ * The exceptions come from the ledger itself — the arena milestone's
+ * `_Arena-coverage exceptions:_` note — so moving a scenario's arena proof from
+ * a filter to a gate is one edit in one place. A missing or unreadable note is
+ * a failure rather than an empty exception set, as is an empty arena task set
+ * or an expansion that reaches no scenario at all: each would make the check
+ * pass by proving nothing.
+ */
+function checkArenaIntegrationCoverage(context) {
+  const diagnostics = [];
+  if (!context.ledgerMilestones.includes(ARENA_MILESTONE)) return diagnostics;
+  const headingLine = milestoneHeadingLine(context, ARENA_MILESTONE);
+  const fail = (line, message) =>
+    diagnostics.push(diagnostic("arena-integration-coverage", context, null, line, message));
+
+  const note =
+    context.notes.find(
+      (entry) => entry.milestone === ARENA_MILESTONE && entry.label === ARENA_EXCEPTIONS_LABEL,
+    ) ?? null;
+  if (note === null) {
+    fail(
+      headingLine,
+      `milestone ${ARENA_MILESTONE} has no \`_${ARENA_EXCEPTIONS_LABEL}: …._\` note; the ` +
+        `scenarios an arena filter is not expected to reach are named there, so without it this ` +
+        `check cannot tell an exception from a hole`,
+    );
+    return diagnostics;
+  }
+
+  const { ids: exceptions, problems } = parseArenaExceptions(context, note.text);
+  for (const problem of problems) {
+    fail(note.line, `the \`_${ARENA_EXCEPTIONS_LABEL}:_\` note is unreadable: ${problem}`);
+  }
+  if (problems.length > 0) return diagnostics;
+  if (exceptions.size === 0) {
+    fail(
+      note.line,
+      `the \`_${ARENA_EXCEPTIONS_LABEL}:_\` note names no scenario — "${note.text}"; name the ` +
+        `excepted scenarios as IDs or \`LOW–HIGH\` ranges, or remove the note`,
+    );
+    return diagnostics;
+  }
+
+  const arena = arenaIntegrationTasks(context);
+  if (arena.length === 0) {
+    fail(
+      headingLine,
+      `milestone ${ARENA_MILESTONE} has no arena-integration task: no \`_Verify:_\` runs a ` +
+        `filtered scenario command under \`${ARENA_CORE_ENV}=${ARENA_CORE_VALUE}\`, so this ` +
+        `check would measure coverage against nothing`,
+    );
+    return diagnostics;
+  }
+
+  /** @type {Set<string>} */
+  const covered = new Set();
+  for (const { task, commands } of arena) {
+    for (const command of commands) {
+      const { ids, error } = expandFilter(command.filter, context.scenarios.ids);
+      if (error !== null) {
+        diagnostics.push(
+          diagnostic(
+            "arena-integration-coverage",
+            context,
+            task,
+            task.verifyLine ?? task.line,
+            `arena-integration task ${task.id} filters on \`${command.filter}\`, which is not a ` +
+              `valid regular expression: ${error}`,
+          ),
+        );
+        continue;
+      }
+      for (const id of ids) covered.add(id);
+    }
+  }
+  if (covered.size === 0) {
+    fail(
+      headingLine,
+      `the ${arena.length} arena-integration filter(s) of milestone ${ARENA_MILESTONE} expand to ` +
+        `no scenario at all; a filter that selects nothing proves nothing`,
+    );
+    return diagnostics;
+  }
+
+  const arenaMilestoneNumber = Number(ARENA_MILESTONE.slice(1));
+  for (const [id, scenario] of context.scenarios.byId) {
+    if (!FILTERABLE_PROOF_MODES.includes(scenario.mode)) continue;
+    if (covered.has(id)) continue;
+    if (exceptions.has(id)) continue;
+    const owner = (context.ownersByScenario.get(id) ?? []).find(
+      (task) => task.parts.milestone >= 1 && task.parts.milestone <= arenaMilestoneNumber,
+    );
+    if (owner === undefined) continue;
+    diagnostics.push(
+      diagnostic(
+        "arena-integration-coverage",
+        context,
+        owner,
+        owner.greensLine ?? owner.line,
+        `scenario ${id} is a \`${scenario.mode}\` scenario greened by ${owner.id}, but no ` +
+          `${ARENA_MILESTONE} arena-integration filter selects it under ` +
+          `\`${ARENA_CORE_ENV}=${ARENA_CORE_VALUE}\`; ${ARENA_MILESTONE} replaces the core every ` +
+          `behavior runs on, so widen an arena filter to cover ${id} or name it in the ` +
+          `\`_${ARENA_EXCEPTIONS_LABEL}:_\` note (${relativeLedgerName(context.path)} line ` +
+          `${note.line})`,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/**
  * The ordered check registry. Later ledger-integrity slices — proof modes and
  * graph order — append entries here.
  */
@@ -1075,6 +1379,9 @@ export const LEDGER_CHECKS = [
   { name: "filter-expansion", run: checkFilterExpansion },
   { name: "exit-test-release", run: checkExitTestsRunInRelease },
   { name: "proof-mode-command", run: checkProofModeCommands },
+  { name: "release-chain", run: checkReleaseChain },
+  { name: "release-after-gate", run: checkReleaseAfterGate },
+  { name: "arena-integration-coverage", run: checkArenaIntegrationCoverage },
 ];
 
 /**

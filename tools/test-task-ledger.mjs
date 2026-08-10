@@ -189,6 +189,24 @@ const CASES = [
     checks: ["filter-expansion"],
     mentions: ["M1-02", "DECL-0[1-3]", "also selects DECL-03"],
   },
+  {
+    name: "two release sequences that can interleave",
+    ledger: resolve(FIXTURES, "forked-release-chain.md"),
+    checks: ["release-chain"],
+    mentions: ["M1-03", "M2-03", "not dependency-ordered"],
+  },
+  {
+    name: "publication no gate stands behind",
+    ledger: resolve(FIXTURES, "gateless-release.md"),
+    checks: ["release-after-gate"],
+    mentions: ["M1-03", "transitively depends on no _(Gate)_ task"],
+  },
+  {
+    name: "arena filter that leaves a scenario behind",
+    ledger: resolve(FIXTURES, "integration-hole.md"),
+    checks: ["arena-integration-coverage"],
+    mentions: ["DECL-03", "M1-03", "COG_TEST_CORE=arena", "Arena-coverage exceptions"],
+  },
 ];
 
 /** @param {string} ledger */

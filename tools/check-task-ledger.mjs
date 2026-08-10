@@ -45,6 +45,15 @@
 //   exit-test-release         exit-test greens run in debug and in release
 //   proof-mode-command        every other mode names the run that proves it
 //
+// Added by this slice (M0-12), over the shape of the dependency graph:
+//
+//   release-chain             _Release_ tasks form one total dependency order
+//   release-after-gate        every _Release_ task sits downstream of a _Gate_
+//   arena-integration-coverage
+//                             M6's arena filters re-prove every filterable
+//                             M1–M6 scenario, bar the ones the milestone's
+//                             `_Arena-coverage exceptions:_` note names
+//
 // Parse-level problems (`malformed-task-entry`, `malformed-task-id`,
 // `unknown-task-type`, `orphan-task`, `duplicate-field`,
 // `malformed-dependency`, `malformed-green`, `duplicate-scenario-id`,
@@ -175,6 +184,7 @@ function main() {
       milestones: parsed.milestones,
       milestoneAnchors: parsed.milestoneAnchors,
       anchors: parsed.anchors,
+      notes: parsed.notes,
     },
   });
   const diagnostics = [

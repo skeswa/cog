@@ -35,6 +35,14 @@ const TASK_HEAD_CANDIDATE_RE = /^-\s+\*\*\s*M\d/;
 const FIELD_RE = /^_(Depends|Verify|Greens|Non-blocking):\s*(.*)$/;
 
 /**
+ * Matches the opening line of a milestone note: an italic paragraph, outside
+ * any task entry, that labels itself. `## M6 tasks` carries two —
+ * `_Plan scope and exit: …._` and `_Arena-coverage exceptions: …._` — and the
+ * second is normative, so the parser keeps them rather than skipping prose.
+ */
+const NOTE_HEAD_RE = /^_([A-Z][^:_]*):\s*(.*)$/;
+
+/**
  * A task ID is `M<milestone>-<number>` followed by zero or more lowercase
  * letters. Splits append a letter recursively: `M1-07` → `M1-07a` → `M1-07aa`.
  */
@@ -166,7 +174,7 @@ function collectFields(headRest, bodyLines) {
  *
  * @param {string} source Markdown text.
  * @param {string} path Path used in diagnostics.
- * @returns {{tasks: object[], milestones: string[], milestoneAnchors: Map<string, string>, anchors: Map<string, number>, diagnostics: object[]}}
+ * @returns {{tasks: object[], milestones: string[], milestoneAnchors: Map<string, string>, anchors: Map<string, number>, notes: {milestone: string, label: string, line: number, text: string}[], diagnostics: object[]}}
  */
 export function parseLedger(source, path) {
   const lines = source.split("\n");
@@ -179,6 +187,8 @@ export function parseLedger(source, path) {
   const anchors = new Map();
   /** @type {Map<string, string>} */
   const milestoneAnchors = new Map();
+  /** @type {{milestone: string, label: string, line: number, text: string}[]} */
+  const notes = [];
   /** @type {Map<string, number>} */
   const slugOccurrences = new Map();
   /** @type {object[]} */
@@ -222,7 +232,32 @@ export function parseLedger(source, path) {
       continue;
     }
 
-    if (!TASK_HEAD_CANDIDATE_RE.test(raw)) continue;
+    if (!TASK_HEAD_CANDIDATE_RE.test(raw)) {
+      // A labelled italic paragraph between task entries is a milestone note.
+      // Task fields (`_Depends: …_`) never reach here: they are consumed as
+      // part of the entry above them, which a blank line always precedes.
+      const noteMatch = milestone === null ? null : NOTE_HEAD_RE.exec(raw.trim());
+      if (noteMatch !== null) {
+        const parts = [noteMatch[2].trim()];
+        let noteCursor = index + 1;
+        while (noteCursor < lines.length) {
+          const next = lines[noteCursor];
+          if (next.trim().length === 0) break;
+          if (next.startsWith("#")) break;
+          if (/^\s*-\s/.test(next)) break;
+          parts.push(next.trim());
+          noteCursor += 1;
+        }
+        index = noteCursor - 1;
+        notes.push({
+          milestone,
+          label: noteMatch[1].trim(),
+          line: lineNumber,
+          text: stripFieldTerminator(parts.join(" ")),
+        });
+      }
+      continue;
+    }
 
     const headMatch = TASK_HEAD_RE.exec(raw.trim());
     if (headMatch === null) {
@@ -338,5 +373,5 @@ export function parseLedger(source, path) {
     });
   }
 
-  return { tasks, milestones, milestoneAnchors, anchors, diagnostics };
+  return { tasks, milestones, milestoneAnchors, anchors, notes, diagnostics };
 }

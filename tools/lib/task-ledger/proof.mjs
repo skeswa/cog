@@ -28,6 +28,33 @@ const MISE_RUN_RE = /(?:^|[\s;&|(])mise\s+run\s+([A-Za-z][\w:.-]*)/g;
 const FILTER_RE = /--filter[=\s]+(?:'([^']*)'|"([^"]*)"|(\S+))/;
 
 /**
+ * Matches the run of `NAME=value` assignments immediately ahead of a command,
+ * anchored to the end of the text that precedes it. `COG_TEST_CORE=arena
+ * COG_TEST_EDGE=pool mise run test …` yields both assignments; a trailing
+ * `--filter=x` does not, because an assignment has to start at a separator.
+ */
+const ENV_PREFIX_RE =
+  /(?:^|[\s;&|(])((?:[A-Za-z_][A-Za-z0-9_]*=\S*)(?:\s+[A-Za-z_][A-Za-z0-9_]*=\S*)*)\s*$/;
+
+/**
+ * Reads the environment a command runs under from the text ahead of it.
+ *
+ * @param {string} before
+ * @returns {Record<string, string>}
+ */
+function parseEnvPrefix(before) {
+  /** @type {Record<string, string>} */
+  const env = {};
+  const match = ENV_PREFIX_RE.exec(before);
+  if (match === null) return env;
+  for (const token of match[1].split(/\s+/)) {
+    const split = token.indexOf("=");
+    env[token.slice(0, split)] = token.slice(split + 1);
+  }
+  return env;
+}
+
+/**
  * The mise commands that select tests by scenario filter. `test:compilefail`
  * is deliberately absent: compile-fail fixtures are a batched pass with no
  * filter, so a compile-fail scenario is never named by a filter expression.
@@ -44,11 +71,11 @@ export const SCENARIO_FILTER_COMMANDS = new Set([
  * Parses one `_Verify:_` field into the commands it runs.
  *
  * @param {string | null} verify
- * @returns {{command: string, filter: string | null, negated: boolean, text: string}[]}
+ * @returns {{command: string, filter: string | null, env: Record<string, string>, negated: boolean, text: string}[]}
  */
 export function parseVerifyCommands(verify) {
   if (verify === null || verify === undefined) return [];
-  /** @type {{command: string, filter: string | null, negated: boolean, text: string}[]} */
+  /** @type {{command: string, filter: string | null, env: Record<string, string>, negated: boolean, text: string}[]} */
   const commands = [];
 
   for (const span of verify.matchAll(CODE_SPAN_RE)) {
@@ -67,6 +94,7 @@ export function parseVerifyCommands(verify) {
           filterMatch === null
             ? null
             : (filterMatch[1] ?? filterMatch[2] ?? filterMatch[3] ?? null),
+        env: parseEnvPrefix(before),
         // `!` immediately ahead of this command, with nothing but separators
         // between, negates it: the command is expected to fail.
         negated: /![\s(]*$/.test(before),
