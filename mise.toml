@@ -50,3 +50,13 @@ run = "node {{config_root}}/tools/swift-test.mjs matrix"
 [tasks."test:release"]
 description = "Run the Swift tests on the default leg in release configuration"
 run = "node {{config_root}}/tools/swift-test.mjs release"
+
+# Compile-fail fixtures live outside every SwiftPM target and are type-checked
+# in one batched `swiftc` pass, never one compiler invocation per test. The
+# runner derives its flags from `Package.swift` rather than duplicating them,
+# and fails both when a fixture misses its expected diagnostic and when a
+# fixture stops failing altogether.
+
+[tasks."test:compilefail"]
+description = "Type-check every compile-fail fixture in one batched swiftc pass"
+run = "node {{config_root}}/tools/check-compile-fail.mjs"
