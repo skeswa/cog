@@ -40,6 +40,35 @@ implemented yet.
 The earlier Dart and Flutter experiment has been removed from the current
 tree. It remains available in the repository history.
 
+## Continuous integration
+
+### Actions fork security
+
+This repository is public and its CI is pull-request-driven, so macOS jobs on
+the self-hosted runner are protected by layered settings rather than by
+omitting the `pull_request` trigger. Three repository-level Actions settings
+are part of that hardening. They were applied on 2026-08-10 and are the
+recorded values below; verify them with these exact commands:
+
+```sh
+# 1. Approval required for workflow runs from all external contributors.
+gh api repos/skeswa/cog/actions/permissions/fork-pr-contributor-approval
+#    => {"approval_policy":"all_external_contributors"}
+
+# 2. Actions must be pinned to a full-length commit SHA.
+gh api repos/skeswa/cog/actions/permissions --jq '.sha_pinning_required'
+#    => true
+
+# 3. The default GITHUB_TOKEN is read-only and cannot approve pull requests.
+gh api repos/skeswa/cog/actions/permissions/workflow
+#    => {"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
+```
+
+These settings are the repository half of the hardening. The workflow half —
+the same-repo guard on every self-hosted job, least-privilege `permissions:`
+blocks, `persist-credentials: false`, and job timeouts — lives in the
+workflows themselves and is enforced by `mise run workflows:check`.
+
 ## Documentation
 
 - **[Swift design](./docs/swift/README.md):** the reading order, current
