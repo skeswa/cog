@@ -23,6 +23,14 @@ that drive red-green implementation.
   0.1.0 includes the async state an app needs. Keep the rest of §11's order:
   benchmarks precede the data-oriented core, and public names remain open
   until after the swift-state-graph review.
+- Testing posture (settled 2026-08-10): every test is fully optimistic, as
+  fast and cheap as possible, and as implementation agnostic as possible.
+  The normative statement is the "Testing constraints" section of
+  [scenarios.md](./scenarios.md). The mechanisms it requires — an injected
+  clock on testing contexts that drives `whileObserved` grace timing, named
+  diagnostic seams exposed through `CogTesting`, Swift Testing exit tests
+  for trap guarantees, and one batched expected-failure fixture pass for
+  compile-fail checks — land in M0 and M1 below.
 
 Execution constraints from the design docs:
 
@@ -119,6 +127,11 @@ Manifest choices:
   runner with a pinned Xcode 26.x. Verify image contents against
   `actions/runner-images` when writing the workflow. `markdown.yml` runs
   oxfmt on ubuntu.
+- Compile-fail harness: a fixtures directory of expected-failure sources,
+  compiled in one batched pass by a `test:compilefail` mise task and CI step
+  that asserts each fixture fails with the expected diagnostic. The
+  scenarios marked "(A compile-fail check.)" all run through this harness,
+  never as per-test compiler invocations.
 - Update the root `README.md`, `docs/swift/README.md`, and `CLAUDE.md` plus
   `AGENTS.md` (kept in sync) with the new commands.
 
@@ -153,7 +166,10 @@ The class-node build. Correctness first; no perf tricks.
   manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
   graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  Add the `CogTesting` isolated-context factory for tests and previews. Verify
+  Add the `CogTesting` isolated-context factory for tests and previews; a
+  testing context accepts an injected clock, and `whileObserved` grace timing
+  runs on the context's clock, so lifetime tests never wait wall-clock time.
+  Verify
   that separate preview runtimes neither share values nor touch the production
   install guard. Settle the helper spellings (`installApp()` and `testing()`
   are placeholders); record in §10 and the README snapshot.
@@ -161,8 +177,17 @@ The class-node build. Correctness first; no perf tricks.
   no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
   notices; `os_log` display for now; zero release-build cost.
+- Test seams and traps: the cycle diagnostic, quiescence warning,
+  no-consumer warning, and cross-executor cleanup acknowledgements are named
+  diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
+  never peeks at node storage or graph representation. Trap guarantees (a
+  second production context, an escaped writer) are proven with Swift
+  Testing exit tests in the debug and release legs, so no trap check crashes
+  the suite process and no guard needs a test-only failure hook in the
+  library.
 
-Tests use Swift Testing on the host in all four legs. Cover the union of §11.1
+Tests use Swift Testing on the host in all four legs, under the scenarios.md
+testing constraints. Cover the union of §11.1
 and perf §9.1: diamonds; deep and broad graphs; changing and conditional
 dependencies; self and multi-node cycles; escaped writers; reaction write-back
 ordering; the finite quiescence-guard diagnostic; correct untracked reads;
@@ -182,7 +207,8 @@ isolation; and named effect runs in history.
 - The `\.cogs` environment key; tracked `cogs.get` in `body`; `binding(for:)`
   pairs a tracked read with a named commit; untracked one-shot `cogs.read`.
 - A debug warning when a tracked `get` runs with no consumer
-  (escaping-closure misuse, §7).
+  (escaping-closure misuse, §7), surfaced through the diagnostic seam so
+  tests assert it without scraping logs.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
   `fileprivate` sources plus ops, an effects group, and bindings.
   Verify per-ZIP invalidation, equality-gated derived notices, and a view that

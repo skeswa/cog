@@ -55,7 +55,7 @@ The design lives in [design/](./design/); the implementation effort lives in
    scenario tree that drives red-green implementation: every behavior the
    library promises, written as small user stories and grouped by milestone.
 
-## Where things stand (2026-08-09)
+## Where things stand (2026-08-10)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -108,6 +108,13 @@ These choices are settled; §10 of the core document has the full record.
   Synchronous selectors do not throw in v1.
 - The runtime will use a data-oriented arena. Public refs remain names, never
   arena slot handles.
+- Tests are fully optimistic, as fast and cheap as possible, and as
+  implementation agnostic as possible: every wait is a definite injected
+  signal (clocks, continuations, acknowledgements), host-side `swift test` is
+  the default home with injected time everywhere, and behavior tests observe
+  the public surface before any diagnostic seam — so the suite must pass
+  unchanged across the planned core swap. The normative statement is the
+  "Testing constraints" section of impl/scenarios.md.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
 deferred reactions, app bootstrap helpers, debug-history tools, and

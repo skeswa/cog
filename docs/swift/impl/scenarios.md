@@ -25,9 +25,9 @@ Cog is the library.
   [effects.md](../design/effects.md), §5.4 in [rx.md](../design/rx.md), perf
   §n in [perf.md](../design/perf.md), everything else in
   [exploration.md](../design/exploration.md).
-- Tests involving time, async scheduling, Observation re-arming, or
-  cross-executor cleanup use injected clocks, continuations, or deterministic
-  internal acknowledgements — never sleeps or run-loop guessing. UI tests live
+- Every test obeys the three testing constraints in the next section: fully
+  optimistic, as fast and cheap as possible, and as implementation agnostic
+  as possible. UI tests live
   in `CogBoundaryTests`; run-count tests in `CogScenarioTests`; everything else
   in `CogTests`, run in all four build legs and once more in the
   release-configuration `test-release` leg (plan M0), which is where every-build
@@ -44,6 +44,41 @@ Cog is the library.
 - Scenarios in group 18 are benchmark-gated. Threshold scenarios hold
   provisional thresholds, and comparison scenarios keep representation choices
   open, until perf.md records numbers.
+
+## Testing constraints
+
+Three constraints govern every test this tree produces. When a scenario and a
+constraint seem to collide, rewrite the test until both hold; no scenario
+justifies a slow, flaky, or core-coupled test.
+
+1. **Fully optimistic.** A test drives straight to its conclusion and never
+   hedges against nondeterminism. Every suspension awaits a definite signal
+   the test controls — an injected clock advancing, a continuation resuming,
+   a deterministic internal acknowledgement — never a sleep, a timeout used
+   as synchronization, a poll loop, a retry, or a flake allowance. Nothing in
+   a test happens "eventually"; if a promised signal might not arrive, that
+   is a library bug for the test to expose, not a reason to wait longer.
+2. **As fast and cheap as possible.** The default home for every test is
+   host-side `swift test`. Simulators appear only where the promise is about
+   a device runtime, and only in `CogBoundaryTests`; the iOS 17 floor subset
+   runs nightly, never per PR. Time is always injected — including
+   `whileObserved` grace periods, which elapse on the testing context's
+   injected clock — so no test spends wall-clock time waiting. Graphs are as
+   small as the behavior allows. Compile-fail checks batch into one
+   expected-failure fixture pass, and trap guarantees are Swift Testing exit
+   tests, kept few because each spawns a child process.
+3. **As implementation agnostic as possible.** A test observes the loosest
+   surface that can prove its behavior, in this order: the public `Cog` API,
+   the `CogTesting` product, the debug history surface, and only then a named
+   diagnostic seam. Wherever a scenario says "internal seam," it means such a
+   seam: a narrow behavior contract exposed through the testing product —
+   "the last cycle diagnostic," "deinit cleanup reached the MainActor" —
+   never a peek at node storage, edge layout, or any other representation.
+   COUNT-09 through COUNT-11 are the enforcement: the whole behavior suite
+   must pass unchanged across ref layouts and the M6 core swap, so a test
+   that could notice the swap is wrong. Group 18 (PERF) is the one declared
+   exception; it gates the implementation itself and lives in the benchmark
+   package.
 
 ## The tree
 
@@ -83,7 +118,8 @@ My whole app shares one Cog world. Tests get their own little worlds.
   through the installed context sees it — no other setup, no second
   context anywhere.
 - **ONE-02.** Some code tries to install a second app context. Cog stops
-  it right away with a clear error, in debug builds and release builds.
+  it right away with a clear error, in debug builds and release builds. (An
+  exit-test check.)
 - **ONE-03.** Feature code tries to build a plain `Cogtext` with an
   initializer. The compiler says no. (A compile-fail check.)
 - **ONE-04.** My test asks the testing product for a context. It gets a
@@ -191,7 +227,8 @@ _Milestone M1. Design: §3.2, §2.2._
   from a custom name I pass. That name is what history shows.
 - **TURN-07.** I sneak the writer out of the commit — stashed in a
   variable or captured into an async task — and use it after the commit
-  ended. Cog stops me with an error, in every kind of build.
+  ended. Cog stops me with an error, in every kind of build. (An exit-test
+  check.)
 - **TURN-08.** Several commits queue up during a flush. They run one at a
   time in the order they arrived, and each queued turn finishes
   completely — settle, notify, react — before the next one starts.
@@ -330,8 +367,9 @@ flush — from inside another reaction — makes its initial run._
   state.
 - **REACT-17.** Two reactions deliberately wake each other for 65 turns
   and then stop. In debug, Cog warns after about 64 uninterrupted turns,
-  exposes the warning through an internal diagnostic seam, prints the
-  causal chain of turns and reactions, and eventually returns to idle.
+  exposing the warning and its causal chain of turns and reactions through
+  the diagnostic seam, and the context is idle again before the op that
+  started the chain returns — asserted directly, never awaited.
 - **REACT-18.** The last copy of a reaction token is dropped on a
   background executor. I await an internal acknowledgement that deinit
   cleanup reached the MainActor, then commit a dependency change. The
@@ -384,7 +422,9 @@ already-cancelled group cancels it immediately or traps._
 _Milestone M1 (UI pinning lands with M2; async release with M3). Design: §5.3,
 perf §7._
 
-State lives as long as its kind says, and coming back is always safe.
+State lives as long as its kind says, and coming back is always safe. Grace
+periods elapse on the testing context's injected clock; no lifetime test
+waits wall-clock time.
 
 - **LIFE-01.** Nobody watches a manual cog for a long time. Its value
   survives anyway, because manual state defaults to app lifetime.
@@ -438,7 +478,8 @@ When I wonder what happened, the debug history can tell me.
 - **HIST-01.** Every turn lands in history with its name.
 - **HIST-02.** History records writes and recomputations.
 - **HIST-03.** History is bounded: after many turns, the oldest entries
-  fall off and memory does not grow.
+  fall off and the entry count never passes the cap. (Memory itself is
+  benchmark territory, not a unit-test assertion.)
 - **HIST-04.** Release builds pay nothing for history. (A build check.)
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
   history under that effect name.
@@ -450,7 +491,9 @@ When I wonder what happened, the debug history can tell me.
 _Milestone M2, in `CogBoundaryTests` and the Weather example. Design: §3.4,
 §7, §9, perf §6._
 
-My views update when — and only when — the values they read change.
+My views update when — and only when — the values they read change. Boundary
+tests assert Observation notices and re-render counters, never pixels or
+wall-clock waits; real rendering is proven once by the Weather example.
 
 - **UI-01.** A view reads a cog with `cogs.get`. When that cog changes,
   the view re-renders.
@@ -472,8 +515,8 @@ My views update when — and only when — the values they read change.
 - **UI-09.** A view uses one-shot `cogs.read` in its body. Later changes
   to that cog do not re-render the view.
 - **UI-10.** In debug, reading with tracked `get` from a place with no
-  consumer — like a `Button` action — prints a warning that points at the
-  mistake.
+  consumer — like a `Button` action — surfaces a warning through the
+  diagnostic seam that points at the mistake.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
   an iOS 26 simulator.
 - **UI-12.** AppKit automatic tracking works through the same boundary on
@@ -673,7 +716,10 @@ _Milestones M5, M6, and M7, in `CogScenarioTests`. Design: perf §9, plan M5._
 
 Cog never does the same work twice. These scenarios count actual selector
 runs and compare them with the expected number — as plain tests, so duplicate
-work fails CI even when timing looks fine.
+work fails CI even when timing looks fine. Counts come from counters the
+scenarios increment inside their own selector closures — public API, no
+seam — and `CogScenarioTests` may run reduced sizes of the benchmark shapes,
+since expected counts derive from the parameters.
 
 - **COUNT-01.** Kairo diamond: runs match the expected count exactly.
 - **COUNT-02.** Kairo deep chain: runs match exactly.
@@ -696,7 +742,9 @@ work fails CI even when timing looks fine.
 _Milestones M5 and M6, in the benchmark package. Design: perf §5–§9._
 
 Benchmark-gated: thresholds stay provisional and representation choices stay
-open until perf.md records numbers.
+open until perf.md records numbers. This group is the declared exception to
+implementation agnosticism: it gates the implementation itself, lives in the
+benchmark package, and never constrains the behavior suite.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
   nothing (`mallocCountTotal == 0`).
