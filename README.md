@@ -79,10 +79,22 @@ The topology:
   same-repo guard means **no code from outside this repository ever reaches
   the host**. The dedicated non-admin user remains the target state, and the
   revisit triggers below apply with more force because of this.
-- **Xcode.** Pinned to **26.5**, installed with `xcodes` and selected with
-  `xcode-select`. 26.5 is the one version present in both lanes — it is on
+- **Xcode.** Pinned to **26.5**, installed with `xcodes` and selected through
+  `DEVELOPER_DIR`. 26.5 is the one version present in both lanes — it is on
   the GitHub-hosted `macos-26` arm64 image too, so the fork lane pins
   identically. mise cannot pin Xcode, hence this record.
+
+  **A full Xcode is required; the Command Line Tools are not enough.** CLT
+  carries `swift` and `swift-format`, so building and linting succeed, but
+  `swift test` fails with `no such module 'Testing'` — SwiftPM does not wire
+  up the CLT copy of `Testing.framework`. This was established by a real CI
+  run, after CLT was assumed sufficient and was not.
+
+  Selection uses `DEVELOPER_DIR` rather than `sudo xcode-select` because it
+  needs no privilege, so it keeps working under the dedicated non-admin
+  runner user this section still targets, and because it is job-scoped, so
+  two concurrent jobs cannot fight over a machine-wide setting.
+
 - **Runners.** Two runner services, each **repository-scoped to
   `skeswa/cog`** so no other repository can target this hardware, each with
   its own `_work`, installed as launchd services.
