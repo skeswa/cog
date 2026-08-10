@@ -69,9 +69,16 @@ between _our own_ commits.
 
 The topology:
 
-- **Runner user.** A dedicated non-admin account, `cogci`, with no iCloud
-  sign-in, no signing certificates, no SSH keys, no `gh` credentials, and no
-  admin group membership. A compromised build has nothing to steal.
+- **Runner user.** _Amended 2026-08-10 to match the provisioned host._ The
+  runner runs as `remembot` on `homemac`, a personal Apple Silicon Mac —
+  **an account in the `admin` group**, not the dedicated credential-free
+  `cogci` user this section originally specified. That is a genuinely weaker
+  posture, and it is recorded rather than quietly assumed: a malicious build
+  reaching this runner would execute as a user that can escalate and that
+  holds the owner's personal credentials. It is accepted only because the
+  same-repo guard means **no code from outside this repository ever reaches
+  the host**. The dedicated non-admin user remains the target state, and the
+  revisit triggers below apply with more force because of this.
 - **Xcode.** Pinned to **26.5**, installed with `xcodes` and selected with
   `xcode-select`. 26.5 is the one version present in both lanes — it is on
   the GitHub-hosted `macos-26` arm64 image too, so the fork lane pins
