@@ -80,16 +80,16 @@ for work that may never end.
 
 #### Operator dictionary
 
-| Rx operator            | Cog equivalent                                                                         |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| `map`, `combineLatest` | A derived cog. Multiple `c.get` calls combine current values.                          |
-| `withLatestFrom`       | `c.read(...)`: read the current value without tracking it.                             |
-| `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.             |
-| `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                            |
-| `exhaustMap`           | `.exhaustLatest` for state; true exhaust on imperative ops.                            |
-| `distinctUntilChanged` | Equality checks built into every node (§2.4).                                          |
-| `scan`                 | `c.curr`, which exposes the cog's prior value.                                         |
-| `debounce`, `throttle` | Timing options at the edge: a reaction modifier or async-cog option, not graph basics. |
+| Rx operator            | Cog equivalent                                                                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `map`, `combineLatest` | A derived cog. Multiple `c.get` calls combine current values.                                                                                       |
+| `withLatestFrom`       | `c.read(...)`: read the current value without tracking it.                                                                                          |
+| `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.                                                                          |
+| `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                                                                                         |
+| `exhaustMap`           | `.exhaustLatest` for state; true exhaust on imperative ops.                                                                                         |
+| `distinctUntilChanged` | Equality checks built into every node (§2.4).                                                                                                       |
+| `scan`                 | `c.curr`, which exposes the cog's prior value.                                                                                                      |
+| `debounce`, `throttle` | Timing options at the edge: a reaction modifier or async-cog option, not graph basics. Not yet designed or scheduled; deferred backlog in core §10. |
 
 Cog does not replace streams of ordered event history. A cog holds the current
 value, not every tap or duplicate event. Keep those pipelines in ops and

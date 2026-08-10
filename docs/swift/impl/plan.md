@@ -153,9 +153,10 @@ The class-node build. Correctness first; no perf tricks.
   manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
   graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  Add the `CogTesting` isolated-context factory. Settle the helper spellings
-  (`installApp()` and `testing()` are placeholders); record in §10 and the
-  README snapshot.
+  Add the `CogTesting` isolated-context factory for tests and previews. Verify
+  that separate preview runtimes neither share values nor touch the production
+  install guard. Settle the helper spellings (`installApp()` and `testing()`
+  are placeholders); record in §10 and the README snapshot.
 - Seeding: debug-only `seed` stages a value and pushes dirty flags, with
   no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
@@ -168,8 +169,10 @@ ordering; the finite quiescence-guard diagnostic; correct untracked reads;
 MainActor execution and non-`Sendable` values; second-production-context
 rejection; scene recreation without manual-state loss; equality-gated
 notifications; manual lifetime; `whileObserved` release and recreate without
-graph edges acting as leases; and seed-then-turn settling (the §6.6 alert test
-verbatim).
+graph edges acting as leases; seed-then-turn settling (the §6.6 alert test
+verbatim); sibling commits as separate turns; off-MainActor token and group
+deinit with deterministic MainActor cleanup acknowledgements; preview
+isolation; and named effect runs in history.
 
 ### M2: SwiftUI boundary and weather example (spike §11.2)
 
@@ -182,18 +185,22 @@ verbatim).
   (escaping-closure misuse, §7).
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
   `fileprivate` sources plus ops, an effects group, and bindings.
-  Verify per-ZIP invalidation and equality-gated derived notices. Test UIKit
-  automatic tracking on an iOS 26 simulator (files behind
-  `#if canImport(UIKit)` in `CogBoundaryTests`).
+  Verify per-ZIP invalidation, equality-gated derived notices, and a view that
+  reads two values changed in one commit without ever rendering a torn pair.
+  Verify that boundary notices and their history entries precede reaction
+  runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
+  `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
+  on the macOS 26 host (files behind `#if canImport(AppKit)`).
 - Read spelling: try `cogs.get(ref)`, `cogs[ref]`, and callable refs in the
   example; record the winner in §10 and the README snapshot.
 - CI: add `test-simulator`
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
   Weather build so the example cannot rot.
-- Optional nightly job once the floor shims exist: install an iOS 17.x
-  simulator runtime and run `CogBoundaryTests` to validate the
-  `withObservationTracking` re-arm path. Too slow for per-PR.
+- Optional nightly job once the floor runtime is available: install a pinned
+  iOS 17.x simulator and run the core tracked-read, unrelated-write,
+  equality-gated notice, and immediate-binding boundary scenarios. M7 extends
+  this job with the pre-iOS-26 `c.track` re-arm scenarios. Too slow for per-PR.
 
 ### M3: First async slice (moved up from spike §11.6)
 
@@ -212,8 +219,11 @@ Limit this milestone to the async pieces needed for 0.1.0:
 - A `cogs.refresh(ref)` op; task names from descriptor labels for
   Instruments.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
-  dependency changes mid-flight, omitted-policy `.latest` behavior, and release
-  while pending. Use injected clocks and continuations; do not sleep.
+  dependency changes mid-flight, omitted-policy `.latest` behavior, release
+  while pending, initial pending-to-failure turns, reload pending-to-failure
+  turns with the last successful value, MainActor-by-default and `@concurrent`
+  work isolation, and task naming. Use injected clocks and continuations; do
+  not sleep.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.
@@ -243,7 +253,8 @@ query caching.
 - The `swift/Benchmarks` package (ordo-one/package-benchmark plus jemalloc,
   confined there): wraps the same scenarios in `Benchmark {}` closures.
   Metrics per perf §9.4: `.wallClock`; `.mallocCountTotal` with a
-  **threshold of zero** for steady turns; `.peakMemoryResident` at 1,000
+  **threshold of zero** for steady turns and for `box[key]` ref creation;
+  `.peakMemoryResident` at 1,000 nodes; notice counts for pinned keyed
   nodes; ARC retain and release counters (verify exact metric names and
   minimum version; check whether MainActor-confined bodies need an
   `assumeIsolated` shim). Baselines via
@@ -260,7 +271,8 @@ query caching.
   generic keyed refs) on keyed diamonds and key churn. Record results in
   [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
-  core, so benchmark them at the start of M6.
+  core, so benchmark them at the start of M6. Every behavior scenario
+  implemented through M5 must pass under each ref layout being measured.
 
 ### M6: Data-oriented core (spike §11.5, perf §3–§8)
 
@@ -276,6 +288,8 @@ query caching.
   edge layout selected in M6a; explicit-stack propagation with cycle marks; lazy
   boundary creation; slot generations for safe reuse; a debug ring buffer
   with zero release cost.
+- Every behavior scenario implemented through M6 passes unchanged on the
+  replacement core.
 - Follow the perf §5 rules (no ARC, locks, or existentials in graph walks)
   until a benchmark disproves one.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
@@ -291,14 +305,23 @@ query caching.
   once); `.merged`. The `LatestPolicy`/`OrderedPolicy` type split keeps
   `.stream` `.latest`-only by construction (§5.2).
 - `Work.stream`: each element is its own turn; a dependency change cancels
-  and restarts the sequence.
+  and restarts the sequence; release of a live stream cancels it, and late
+  elements commit nothing. Settle the open §10 questions on stream
+  termination and failure before implementing.
 - `cogs.values(of:buffering:)`: a current-value-first multicast
   `AsyncSequence`; `.newest(1)` default, plus `.oldest(n)` and `.unbounded`;
-  per-subscriber graph leases (§8). Test exact overflow sequences for all three
-  policies. Validate the §6.5 view-scoped `.task` pattern in the example app.
-- The `c.track` shim for external `@Observable` objects: re-armed
-  `withObservationTracking` before iOS 26, `Observations` on 26 and later
-  (§8). Test repeated changes and property granularity on both paths.
+  independent per-subscriber buffers and graph leases (§8). Test exact
+  overflow sequences for all three policies, subscriber independence, and
+  buffer offers before reactions. Validate the §6.5 view-scoped `.task`
+  pattern in the example app.
+- The `c.track` shim for external `@Observable` objects, in both its
+  key-path and closure forms: re-armed `withObservationTracking` before
+  iOS 26, `Observations` on 26 and later (§8). Test the newest post-mutation
+  value after each propagation boundary, allowed coalescing, property
+  granularity, deterministic re-arm acknowledgement, and the documented
+  pre-iOS-26 disarmed race. Never assert only that recomputation occurred.
+- Run the complete behavior suite on the selected ref layout and
+  data-oriented core after the M7 features land.
 - Tag `0.3.0`. Query caching (`.cache`), persistence helpers, and the
   debug-history UI stay deferred backlog (§5.3, §10 items 5 and 7).
 
@@ -357,15 +380,22 @@ query caching.
 - M1: the full test matrix above is green in all four legs and in the
   `test-release` leg; escaped-writer, second-context, and cycle tests assert
   failure in debug and release alike.
-- M2: run Weather in a simulator; confirm one ZIP's write re-renders
-  only that ZIP's card (`Self._printChanges` or re-render counters); UIKit
-  check on an iOS 26 simulator.
+- M2: run Weather in a simulator; confirm one ZIP's write re-renders only that
+  ZIP's card (`Self._printChanges` or re-render counters), a two-value view
+  never renders a torn pair, and UI notices precede reactions; UIKit check on
+  an iOS 26 simulator. Run the pinned iOS 17 boundary subset when that nightly
+  job is available.
 - M3: async tests deterministic and green; a pending fetch cancelled by
-  release commits nothing.
+  release commits nothing; initial and reload failures each produce the
+  specified pending and failure turns.
 - M4: a scratch iOS 17 app consumes tagged 0.1.0 by URL and builds; the
   DocC site deploys.
-- M5 and M6: run-count tests green; the `mallocCountTotal == 0` steady-
-  turn threshold holds; comparative numbers recorded in perf.md.
+- M5 and M6: run-count tests green under every candidate layout; the
+  `mallocCountTotal == 0` steady-turn threshold holds; ref-layout, edge-layout,
+  and runtime-comparison numbers are recorded in perf.md before choices settle.
+- M7: exact export buffers, subscriber independence, stream-before-reaction
+  order, and external post-mutation value tests are green; the complete
+  behavior suite passes on the selected core.
 - Always: format checks clean; path-filtered CI green.
 
 ## Flagged uncertainties (verify at implementation time)

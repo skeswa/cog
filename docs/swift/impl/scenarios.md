@@ -15,21 +15,28 @@ Cog is the library.
 - Scenario IDs are stable. Never renumber or reuse an ID; add new scenarios at
   the end of their group. Tests should carry their scenario ID in their name
   or a comment so the suite and this tree stay linked.
+- API spellings in these stories follow the current design sketch. When core
+  §10 settles a provisional spelling such as tracked `cogs.get`, update the
+  story and its test call sites without changing the scenario ID; the ID names
+  the behavior, not the spelling.
 - Each group is tagged with the milestone from [plan.md](./plan.md) that turns
   it green, and points at the design sections it comes from. Section numbers
   resolve per the shared map: §6 lives in
   [effects.md](../design/effects.md), §5.4 in [rx.md](../design/rx.md), perf
   §n in [perf.md](../design/perf.md), everything else in
   [exploration.md](../design/exploration.md).
-- Async tests use injected clocks and continuations, never sleeps. UI tests
-  live in `CogBoundaryTests`; run-count tests in `CogScenarioTests`;
-  everything else in `CogTests`, run in all four build legs and once more in
-  the release-configuration `test-release` leg (plan M0), which is where
-  every-build guardrail claims are proven outside debug.
+- Tests involving time, async scheduling, Observation re-arming, or
+  cross-executor cleanup use injected clocks, continuations, or deterministic
+  internal acknowledgements — never sleeps or run-loop guessing. UI tests live
+  in `CogBoundaryTests`; run-count tests in `CogScenarioTests`; everything else
+  in `CogTests`, run in all four build legs and once more in the
+  release-configuration `test-release` leg (plan M0), which is where every-build
+  guardrail claims are proven outside debug.
 - A dropped scenario keeps its ID forever with a note pointing at what
   subsumed it. Never delete an ID line.
-- Scenarios in group 18 are benchmark-gated: they hold thresholds, not settled
-  claims, until perf.md records numbers.
+- Scenarios in group 18 are benchmark-gated. Threshold scenarios hold
+  provisional thresholds, and comparison scenarios keep representation choices
+  open, until perf.md records numbers.
 
 ## The tree
 
@@ -81,6 +88,9 @@ My whole app shares one Cog world. Tests get their own little worlds.
 - [ ] **ONE-07.** SwiftUI throws my views away and rebuilds them (a scene is
       recreated). My manual state is still there, because it lives in the app
       context, not in the views.
+- [ ] **ONE-08.** Two previews each ask the testing product for an isolated
+      runtime. Each preview has one context, neither touches the production
+      install guard, and a write in one is invisible to the other.
 
 ## 2. DECL — Declaring state
 
@@ -120,6 +130,12 @@ I declare state at the top of a file and it just works.
       talks about the cog (diagnostics and debug history).
 - [ ] **DECL-12.** I declare a cog without a name. Cog falls back to the file
       and line where I declared it.
+
+### 2.4 Selector shape
+
+- [ ] **DECL-13.** I declare a derived cog whose selector throws. The
+      compiler says no: synchronous selectors do not throw in v1. (A
+      compile-fail check.)
 
 ## 3. READ — Reading state
 
@@ -200,6 +216,9 @@ _Milestone M1. Design: §3.2, §2.2._
       decide whether a new value counts as a change.
 - [ ] **TURN-16.** A cog holds a value with no `Equatable`. Cog plays it safe
       and treats every write as a change.
+- [ ] **TURN-17.** I run two sibling commits back to back in one event
+      handler. Each is its own named turn: two history entries, and reactions
+      run after each one.
 
 ## 5. GRAPH — Derived values stay right and lazy
 
@@ -270,7 +289,8 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
 
 ## 7. REACT — Reactions
 
-_Milestone M1. Design: §3.3, §6.2, §6.4._
+_Milestone M1, except REACT-20 (M2) and REACT-21 (M7). Design: §3.3, §6.2,
+§6.4._
 
 A reaction watches state and does something outside the graph when it
 changes.
@@ -320,6 +340,18 @@ changes.
       and then stop. In debug, Cog warns after about 64 uninterrupted turns,
       exposes the warning through an internal diagnostic seam, prints the
       causal chain of turns and reactions, and eventually returns to idle.
+- [ ] **REACT-19.** The last copy of a reaction token is dropped on a
+      background executor. I await an internal acknowledgement that deinit
+      cleanup reached the MainActor, then commit a dependency change. The
+      reaction does not run; immediate stopping still requires explicit
+      `cancel()`.
+- [ ] **REACT-20.** Within one flush, every changed UI boundary is notified
+      before any reaction runs — flush step 4 before step 5. (Checked through
+      history or an internal seam once M2 boundaries exist.)
+- [ ] **REACT-21.** Within one flush, every changed export value is offered to
+      its subscriber buffers before any reaction runs — flush step 4 before
+      step 5. (Checked through history or an internal seam once M7 exports
+      exist.)
 
 ## 8. GROUP — Effect groups and timers
 
@@ -343,6 +375,11 @@ An `EffectGroup` owns the lifetime of my app's effects.
       screen's effects stop, but the app's state is untouched.
 - [ ] **GROUP-08.** Declaring an effects struct does nothing by itself.
       Effects exist only after I call `install(in:)`.
+- [ ] **GROUP-09.** The last copy of a group is dropped on a background
+      executor. I await an internal acknowledgement that deinit cleanup reached
+      the MainActor, then verify its reaction registrations are gone and every
+      owned task has received cancellation. Immediate stopping still requires
+      explicit `cancel()`.
 
 ## 9. LIFE — How long state lives
 
@@ -396,20 +433,24 @@ My tests set up state quietly with `seed`, or loudly with a real commit.
 
 ## 11. HIST — Debug history
 
-_Milestone M1. Design: §2.3, §6.2, perf §8._
+_Milestone M1, except HIST-06 (M2). Design: §2.3, §6.2, perf §8._
 
 When I wonder what happened, the debug history can tell me.
 
 - [ ] **HIST-01.** Every turn lands in history with its name.
-- [ ] **HIST-02.** History records writes, recomputations, and UI notices.
+- [ ] **HIST-02.** History records writes and recomputations.
 - [ ] **HIST-03.** History is bounded: after many turns, the oldest entries
       fall off and memory does not grow.
 - [ ] **HIST-04.** Release builds pay nothing for history. (A build check.)
+- [ ] **HIST-05.** A watch registered with a `name:` runs. Its run lands in
+      history under that effect name.
+- [ ] **HIST-06.** Once M2 boundaries exist, history records each changed UI
+      notice with the cog's human-readable label.
 
 ## 12. UI — SwiftUI and UIKit boundary
 
 _Milestone M2, in `CogBoundaryTests` and the Weather example. Design: §3.4,
-§7, perf §6._
+§7, §9, perf §6._
 
 My views update when — and only when — the values they read change.
 
@@ -437,6 +478,15 @@ My views update when — and only when — the values they read change.
       mistake.
 - [ ] **UI-11.** UIKit automatic tracking works through the same boundary on
       an iOS 26 simulator.
+- [ ] **UI-12.** AppKit automatic tracking works through the same boundary on
+      a macOS 26 host.
+- [ ] **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
+      render sees either the old pair before the commit or the new pair after
+      it — never one old value and one new value.
+- [ ] **UI-14.** On an iOS 17 simulator, the tracked-read, unrelated-write,
+      equality-gated notice, and immediate binding scenarios (UI-01, UI-02,
+      UI-04, and UI-08) have the same behavior through the floor-runtime
+      Observation boundary. This may run in the pinned nightly floor job.
 
 ## 13. ASYNC — Async values, first slice
 
@@ -497,6 +547,27 @@ what it had.
       dependency changes while work is running, so the old run is cancelled
       and only the newest generation may commit: the default is `.latest`.
 
+### 13.4 Work isolation and previous values
+
+- [ ] **ASYNC-19.** A cog that succeeded once and then failed reloads. The
+      new pending phase carries the last good value — the earlier success,
+      not the failure.
+- [ ] **ASYNC-20.** An async cog's work body runs on the MainActor by
+      default. A runtime precondition inside the work proves it in every leg.
+- [ ] **ASYNC-21.** Expensive work opts into `@concurrent`. It runs off the
+      main actor, and its result still commits on the MainActor under the
+      same generation check.
+- [ ] **ASYNC-22.** The internal task that runs an async cog's work carries
+      the descriptor's name and key, so Instruments can show it. (Checked
+      through an internal seam.)
+- [ ] **ASYNC-23.** Initial work throws. A watcher and history see pending with
+      no previous value, then failure with no previous value, as two distinct
+      turns.
+- [ ] **ASYNC-24.** Work succeeds, then a dependency change starts a reload
+      that fails. A watcher and history see success, pending with that success
+      as the previous value, then failure with the same previous value, each as
+      its own turn.
+
 ## 14. POLICY — Ordered async policies
 
 _Milestone M7. Design: §5.2, §5.4._
@@ -532,6 +603,9 @@ Some state really is a stream — locations, sockets, database watches.
       loading.
 - [ ] **STREAM-03.** A dependency changes. The old sequence is cancelled and
       a new one starts; late elements from the old sequence commit nothing.
+- [ ] **STREAM-04.** An unwatched `.stream` cog is released while its
+      sequence is live. The sequence is cancelled, and late elements commit
+      nothing.
 
 ## 16. EXPORT — Exports and interop
 
@@ -540,7 +614,8 @@ _Milestone M7. Design: §8, §6.5._
 Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 
 - [ ] **EXPORT-01.** I subscribe with `cogs.values(of:)`. The first thing I
-      get is the current settled value.
+      get is the current settled value — even for a cold cog nobody has read
+      before; subscribing settles it.
 - [ ] **EXPORT-02.** After that, I get a value each time it changes.
 - [ ] **EXPORT-03.** After consuming the initial value, I pause a default
       `.newest(1)` reader and commit A, B, then C. Its next value is settled C;
@@ -548,31 +623,41 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 - [ ] **EXPORT-04.** After consuming the initial value, I pause an `.oldest(2)`
       reader and commit A, B, then C. It receives settled A and B in order and
       drops C; none of the commits waits for the reader.
-- [ ] **EXPORT-05.** Two subscribers to the same cog each get their own full
-      feed of values.
+- [ ] **EXPORT-05.** Two subscribers to the same cog own independent buffers
+      and graph leases. Pausing or cancelling one neither drops values from nor
+      releases the lease of the other.
 - [ ] **EXPORT-06.** Cancelling the reading task releases that subscriber's
       graph lease, so a `whileObserved` cog can be let go.
 - [ ] **EXPORT-07.** A view's `.task` loops over `values(of:)`. When the view
       disappears, the loop ends and the lease is gone — the §6.5 map-camera
       story.
 - [ ] **EXPORT-08.** I link an outside `@Observable` property in with
-      `c.track`. Several sequential changes to that property each make my
-      dependent cogs recompute.
+      `c.track`. After an observed mutation finishes propagating, my dependent
+      cog returns the newest post-mutation value — never the pre-write value.
+      Repeating this after each propagation boundary keeps returning the newest
+      value; mutations within one boundary may coalesce.
 - [ ] **EXPORT-09.** After consuming the initial value, I pause an `.unbounded`
       reader and commit A, B, then C. It receives every settled value in order.
 - [ ] **EXPORT-10.** I track one property of an outside `@Observable` object.
       Changing another property on that object does not recompute my dependent
       cogs.
 - [ ] **EXPORT-11.** On a pre-iOS-26 runtime, the
-      `withObservationTracking` shim re-arms after each observed change, so
-      several sequential changes keep propagating.
+      `withObservationTracking` shim exposes an internal acknowledgement when
+      it has re-armed after an observed change. A mutation made after that
+      acknowledgement propagates the newest post-mutation value. The test does
+      not promise delivery for a mutation made inside the documented disarmed
+      re-arm window.
 - [ ] **EXPORT-12.** On an iOS 26 simulator, the `Observations` path has the
-      same repeated-change and property-granularity behavior as the older
-      shim.
+      same post-mutation value correctness and property granularity. Several
+      synchronous mutations may coalesce until the next observation suspension
+      boundary, where the newest value propagates.
+- [ ] **EXPORT-13.** I link outside state in with `c.track`'s closure form
+      instead of a key path. It has the same post-mutation value, coalescing,
+      and pre-iOS-26 re-arm semantics as the key-path form.
 
 ## 17. COUNT — Run counts
 
-_Milestones M5 and M6, in `CogScenarioTests`. Design: perf §9, plan M5._
+_Milestones M5, M6, and M7, in `CogScenarioTests`. Design: perf §9, plan M5._
 
 Cog never does the same work twice. These scenarios count actual selector
 runs and compare them with the expected number — as plain tests, so duplicate
@@ -587,17 +672,19 @@ work fails CI even when timing looks fine.
 - [ ] **COUNT-07.** Keyed diamonds: runs match exactly.
 - [ ] **COUNT-08.** Key churn (keys added and removed over and over): runs
       match exactly, and dropped keys stop running.
-- [ ] **COUNT-09.** The whole scenario suite passes unchanged over every ref
-      layout under test.
-- [ ] **COUNT-10.** The whole scenario suite — and every group above — passes
-      unchanged when the data-oriented core replaces the simple core (M6).
+- [ ] **COUNT-09.** Every behavior scenario implemented through M5 passes
+      unchanged over every ref layout under test.
+- [ ] **COUNT-10.** Every behavior scenario implemented through M6 passes
+      unchanged when the data-oriented core replaces the simple core.
+- [ ] **COUNT-11.** After M7, the complete behavior suite passes unchanged on
+      the selected ref layout and data-oriented core.
 
 ## 18. PERF — Performance guarantees
 
 _Milestones M5 and M6, in the benchmark package. Design: perf §5–§9._
 
-Benchmark-gated: these hold thresholds, not settled claims, until perf.md
-records numbers.
+Benchmark-gated: thresholds stay provisional and representation choices stay
+open until perf.md records numbers.
 
 - [ ] **PERF-01.** A steady turn — same graph shape, new values — allocates
       nothing (`mallocCountTotal == 0`).
@@ -609,10 +696,26 @@ records numbers.
       boundary objects, not 1,000.
 - [ ] **PERF-05.** A released node's slot is reused safely: its generation
       changes, and stale internal access is caught in debug builds.
+- [ ] **PERF-06.** Building a ref with `box[key]` allocates nothing.
+- [ ] **PERF-07.** Notice traffic for pinned keyed nodes — old keys the UI
+      once read but no longer shows — stays within the baseline recorded in
+      perf.md. While no baseline exists, this check is red, never skipped.
+- [ ] **PERF-08.** Keyed diamonds and key churn run under inline `AnyHashable`,
+      interned-token, and generic-keyed ref layouts in one pinned environment.
+      Results land in perf.md before the ref layout is selected.
+- [ ] **PERF-09.** Mostly static and high-churn graphs run under the shared
+      edge pool, per-node prefix arrays, and inline-plus-overflow edge layouts
+      in one pinned environment. Results land in perf.md before the edge layout
+      is selected.
+- [ ] **PERF-10.** The selected core is measured against the simple core,
+      swift-state-graph, and raw `@Observable` in one pinned environment.
+      perf.md records wall-clock results and generous absolute regression
+      thresholds before timing gates enter CI.
 
 ## 19. LEG — Build-settings matrix
 
-_Milestones M0 and M1. Design: §7, plan Manifest choices._
+_Milestones M0 and M1, except LEG-04 (M4). Design: §7, §9, plan Manifest
+choices._
 
 Cog behaves the same no matter how my app is compiled.
 
@@ -626,6 +729,10 @@ Cog behaves the same no matter how my app is compiled.
       `test-release` leg, where the every-build guardrails — second app
       context, escaped writer, cycles, no `seed`, no history cost — prove
       they hold outside debug.
+- [ ] **LEG-04.** The package builds with its macOS 14 deployment target, and
+      a scratch app plus the Weather example build with an iOS 17 deployment
+      target under Swift 6.2 tools, with no accidental dependency on newer
+      runtime APIs.
 
 ## 20. ACTOR — MainActor confinement
 

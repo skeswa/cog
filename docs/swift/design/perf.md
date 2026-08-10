@@ -266,8 +266,9 @@ This plan amends §11 of the core document:
 3. **Build the data-oriented core behind the same tests.** Compare it with the
    simple build, swift-state-graph, and raw `@Observable`.
 4. **Measure more than time.** Track steady-turn allocations (target zero),
-   retain and release traffic in propagation (target zero), peak memory for
-   1,000-node graphs, registrar counts, and notices for pinned keyed nodes.
+   `box[key]` ref-creation allocations (target zero), retain and release
+   traffic in propagation (target zero), peak memory for 1,000-node graphs,
+   registrar counts, and notices for pinned keyed nodes.
 5. **Tune only from evidence.** Compare edge layouts, then consider unchecked
    exclusivity or custom hash tables only when a profile points there.
 

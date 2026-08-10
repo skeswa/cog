@@ -649,10 +649,17 @@ testing, background work, and reconciler rules.
 ## 8. Interop and migration
 
 - **Inputs from external `@Observable` objects:** `c.track(model, \.name)` or
-  a closure form links outside state into the graph. On iOS 26, use
-  `Observations`; on older systems, re-arm `withObservationTracking` and
-  document its small race. Swift 6.4 can upgrade the shim to continuous
-  tracking.
+  a closure form links outside state into the graph. The guarantee is at an
+  observation propagation boundary: after an observed mutation propagates, a
+  dependent cog returns the newest post-mutation value, never the pre-write
+  value. Several mutations within one boundary may coalesce. On iOS 26,
+  `Observations` supplies those boundaries at suspension points. On older
+  systems, Cog defers invalidation until the setter has completed, then re-arms
+  `withObservationTracking`; an internal test seam acknowledges that re-arm,
+  and a mutation made afterward has the same post-mutation guarantee. The
+  one-shot API still has a small disarmed window in which another mutation may
+  be missed, and Cog documents that limitation rather than promising
+  continuous tracking. Swift 6.4 can upgrade the shim to continuous tracking.
 - **Exports:** `cogs.values(of:buffering:)` is a current-value-first multicast
   `AsyncSequence`. The default `.newest(1)` keeps memory bounded and never
   blocks a synchronous commit; a slow reader may skip turns, but every value
@@ -716,6 +723,7 @@ singular, and does measurement show less runtime work?
 | State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                        |
 | Untracked reads?                  | `c.read` and one-shot `cogs.read` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                               |
 | Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                              |
+| External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8). |
 | Context construction?             | App bootstrap can install one production context; feature code cannot construct another (§2.3).                                                                                                                           |
 
 ### Still open
@@ -738,6 +746,21 @@ singular, and does measurement show less runtime work?
 7. **Persistence helpers:** durable state writes the store first and its cog
    second (§6.7). Open whether this needs `PersistedCog` sugar or stays an op
    pattern, and when GRDB observation should replace seeding.
+8. **Stream termination:** what a `.stream` cog's phase does when its
+   sequence ends naturally — stay at the last success forever, or something
+   observable.
+9. **Stream failure:** whether a `.stream` sequence that throws publishes a
+   failure phase. §5.2 defines only the replaced-cancelled case.
+10. **`.queue` failure:** whether a failed queued run stops the queue or the
+    next queued run still starts.
+11. **Writes from a selector:** reactions are guarded (§6.4), but the failure
+    mode for a selector that calls an op which commits mid-computation is
+    undefined. Presumably an error like a cycle; decide and document.
+12. **`EffectGroup.add` after cancel:** whether a token added to an
+    already-cancelled group is cancelled immediately or traps.
+13. **Timing modifiers:** §5.4 points `debounce` and `throttle` at "a
+    reaction modifier or async-cog option," but no design or milestone
+    exists. Deferred backlog.
 
 ---
 

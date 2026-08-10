@@ -97,6 +97,10 @@ These choices are settled; §10 of the core document has the full record.
   value and never make a commit wait: `.newest(1)` may skip turns for a slow
   reader, `.oldest(n)` delivers the oldest n in order and drops newer while
   full, and `.unbounded` delivers everything.
+- External `@Observable` inputs publish the newest post-mutation value at each
+  propagation boundary; several mutations may coalesce. The pre-iOS-26
+  one-shot shim internally acknowledges re-arming for deterministic tests, but
+  its small disarmed race remains a documented platform limitation.
 - Debug-only `seed` stages a value and pushes dirty flags like a write, but
   records no turn, sends no notices, and runs no reactions. Tests may seed
   after effects install; the next real turn settles what the seed dirtied.
@@ -107,7 +111,11 @@ These choices are settled; §10 of the core document has the full record.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
 deferred reactions, app bootstrap helpers, debug-history tools, and
-persistence helpers. Ref layout, edge layout, and hash tables also remain open
+persistence helpers. Also open are several edge behaviors: what a stream's
+phase does when its sequence ends or throws, whether a failed `.queue` run
+stops the queue, the failure mode for a selector that commits, adding to an
+already-cancelled `EffectGroup`, and debounce/throttle timing modifiers
+(deferred backlog). Ref layout, edge layout, and hash tables also remain open
 until benchmarks choose them.
 
 ## Next steps
