@@ -20,7 +20,9 @@ Cog is the library.
   story and its test call sites without changing the scenario ID; the ID names
   the behavior, not the spelling.
 - Each group is tagged with the milestone from [plan.md](./plan.md) that turns
-  it green, and points at the design sections it comes from. Section numbers
+  it green, and points at the design sections it comes from. Every scenario is
+  also covered by exactly one task in [tasks.md](./tasks.md); a task's
+  _Greens:_ line is the coverage ledger. Section numbers
   resolve per the shared map: §6 lives in
   [effects.md](../design/effects.md), §5.4 in [rx.md](../design/rx.md), perf
   §n in [perf.md](../design/perf.md), everything else in
@@ -451,13 +453,13 @@ waits wall-clock time.
 
 ## 10. SEED — Test helpers: seed and stub
 
-_Milestone M1. Design: §6.6, §4._
+_Milestone M1, except SEED-07 (M2). Design: §6.6, §4._
 
 My tests set up state quietly with `seed`, or loudly with a real commit.
 
 - **SEED-01.** I seed a source. The next read returns the seeded value.
-- **SEED-02.** Seeding is quiet: no turn in history, no UI notice, no
-  reaction runs.
+- **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
+  and no reaction runs.
 - **SEED-03.** Seeding still marks dependents dirty: a derived cog read
   after the seed recomputes from the seeded value.
 - **SEED-04.** The §6.6 alert story, verbatim: install a nice-weather
@@ -468,6 +470,9 @@ My tests set up state quietly with `seed`, or loudly with a real commit.
   way to seed. (A build check.)
 - **SEED-06.** I try to seed a derived cog. The compiler says no: only
   manual sources can be seeded. (A compile-fail check.)
+- **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
+  read. Seeding sends no UI notice; the next real turn still settles and
+  notices the value dirtied by the seed.
 
 ## 11. HIST — Debug history
 

@@ -19,9 +19,11 @@ verifies formatting without writing. `.oxfmtrc.json` excludes the frozen
 `docs/dump-2026-08-06.md` from formatting. The next phase for each platform
 is the spike in its `exploration.md` §11, as amended by its `perf.md` §9. For
 Swift, `docs/swift/impl/plan.md` turns that spike into milestones with package
-layout, tooling, CI, and release steps, and `docs/swift/impl/scenarios.md`
-breaks those milestones into the test scenarios that drive red-green
-implementation.
+layout, tooling, CI, and release steps; `docs/swift/impl/scenarios.md` breaks
+those milestones into the test scenarios that drive red-green implementation;
+and `docs/swift/impl/tasks.md` decomposes the milestones into dependency-aware
+execution tasks scoped to half a day or less, with explicit verification and
+every scenario covered by exactly one task.
 
 ## Layout
 
@@ -35,7 +37,9 @@ implementation.
   `rx.md` maps Rx concepts; `perf.md` covers the data-oriented implementation
   and benchmark plan. Implementation docs live in `docs/swift/impl/`:
   `plan.md` is the implementation plan with milestones, tooling, CI, and
-  release process; `scenarios.md` is the test-scenario tree.
+  the release process; `scenarios.md` is the test-scenario tree; `tasks.md`
+  is the dependency-aware half-day task graph with explicit verification,
+  covering every scenario exactly once.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and

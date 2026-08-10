@@ -8,7 +8,9 @@ layout, formatting, tests, CI, and releases. The aim is to get Cog into iOS
 apps soon without making a future Kotlin package awkward. The architecture is
 settled elsewhere; its decision ledger stays in exploration §10. The companion
 [scenarios.md](./scenarios.md) breaks these milestones into the test scenarios
-that drive red-green implementation.
+that drive red-green implementation, and [tasks.md](./tasks.md) decomposes
+every milestone into tasks of half an engineering day or less, assigning every
+scenario to exactly one task.
 
 ## Plan decisions
 
@@ -31,6 +33,15 @@ that drive red-green implementation.
   diagnostic seams exposed through `CogTesting`, Swift Testing exit tests
   for trap guarantees, and one batched expected-failure fixture pass for
   compile-fail checks — land in M0 and M1 below.
+- Execution posture (settled 2026-08-10): implementation runs from the
+  dependency graph in [tasks.md](./tasks.md), not from a flat backlog. Every
+  executable task is a decision, infrastructure slice, red-green behavior
+  slice, milestone gate, or single publication step; it is capped at half a
+  day, names its immediate dependencies and closing verification, and ends
+  green. Scenario credit belongs only to the task that can prove every clause
+  against real infrastructure. Known compound work is split before execution,
+  representation swaps integrate incrementally, and release preparation stays
+  separate from remote publication.
 
 Execution constraints from the design docs:
 
@@ -59,6 +70,8 @@ cog/                                  (git root = SwiftPM package root)
 │   ├── swift-ci.yml                  # path-filtered on Package.swift + swift/**
 │   ├── swift-docs.yml                # DocC → GitHub Pages, on tag push
 │   └── markdown.yml                  # oxfmt --check, ubuntu, *.md paths
+├── tools/
+│   └── check-task-ledger.mjs         # scenario coverage + task DAG validator
 ├── docs/                             # living design docs (unchanged)
 ├── swift/
 │   ├── Sources/
@@ -132,6 +145,12 @@ Manifest choices:
   that asserts each fixture fails with the expected diagnostic. The
   scenarios marked "(A compile-fail check.)" all run through this harness,
   never as per-test compiler invocations.
+- Task-ledger checker: the pinned Node tool runs
+  `tools/check-task-ledger.mjs`; `mise run tasks:check` verifies unique task
+  IDs, exact scenario coverage, existing dependency IDs, and an acyclic task
+  graph, plus reachability of every behavior from its milestone gate except an
+  explicitly non-blocking external-availability task. Run it in CI with the
+  other documentation checks.
 - Update the root `README.md`, `docs/swift/README.md`, and `CLAUDE.md` plus
   `AGENTS.md` (kept in sync) with the new commands.
 
@@ -218,7 +237,9 @@ isolation; and named effect runs in history.
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
 - Read spelling: try `cogs.get(ref)`, `cogs[ref]`, and callable refs in the
-  example; record the winner in §10 and the README snapshot.
+  smallest tracked-view prototype before boundary call sites multiply; record
+  the winner in §10 and the README snapshot, then use only that spelling in
+  the Weather example.
 - CI: add `test-simulator`
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
@@ -227,6 +248,9 @@ isolation; and named effect runs in history.
   iOS 17.x simulator and run the core tracked-read, unrelated-write,
   equality-gated notice, and immediate-binding boundary scenarios. M7 extends
   this job with the pre-iOS-26 `c.track` re-arm scenarios. Too slow for per-PR.
+  A time-boxed feasibility task records the exact runtime-install path and
+  whether hosted-runner availability can block a release; absent a reliable
+  hosted runtime, the nightly remains explicitly non-blocking.
 
 ### M3: First async slice (moved up from spike §11.6)
 
@@ -244,6 +268,9 @@ Limit this milestone to the async pieces needed for 0.1.0:
   (§5.3).
 - A `cogs.refresh(ref)` op; task names from descriptor labels for
   Instruments.
+- Settle the still-open behavior of a one-shot read or refresh of a never-read
+  async ref before implementing refresh, then add the resulting scenarios and
+  tasks in the same change.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure
@@ -291,6 +318,9 @@ query caching.
   redo malloc baselines across that boundary. Per-callsite ARC
   attribution stays a manual `xcrun xctrace` workflow documented in
   `swift/Benchmarks/README.md`.
+- Each benchmark-gated task ends by recording the measurement or provisional
+  threshold needed to turn its scenario green. Baseline automation follows
+  those first results; no task closes while its assigned benchmark is red.
 - Add `mise run bench` and the `bench-build` CI job (release build, no
   gating yet).
 - Compare the three ref layouts (inline `AnyHashable`, interned tokens,
@@ -302,12 +332,14 @@ query caching.
 
 ### M6: Data-oriented core (spike §11.5, perf §3–§8)
 
-- M6a, edge-layout gate: build the SoA arena core with the edge
-  representation behind an internal seam. Implement the three perf §3.3
-  candidates (shared linked edge pool, Reactively-style per-node prefix
-  arrays, inline-plus-overflow) and run the M5 scenarios over all three.
-  Measure both mostly-static graphs and high-churn dynamic dependencies.
-  Record the numbers in perf.md; only then settle the layout.
+- M6a, runnable edge-layout gate: build arena allocation, typed value columns,
+  and explicit-stack propagation over one baseline edge implementation first.
+  Put both the core and edge layout behind internal test selectors. Only after
+  that vertical slice runs the M5 scenarios, implement the remaining perf
+  §3.3 candidates (Reactively-style per-node prefix arrays and
+  inline-plus-overflow), run the same correctness set over all three, and
+  measure mostly-static and high-churn dependencies. Record the numbers in
+  perf.md; only then settle the layout.
 - Behind the same tests and public API: SoA columns (`flags`, `changedAt`,
   `checkedAt`, `deps`, `subs`, `boundary`, `generation`); typed
   per-descriptor value columns with pending and current values; the
@@ -316,6 +348,10 @@ query caching.
   with zero release cost.
 - Every behavior scenario implemented through M6 passes unchanged on the
   replacement core.
+- Integrate that suite by behavior group throughout M6 — manual values and
+  turns, graph and cycles, reactions and lifetimes, then UI and async — using
+  the internal simple/arena selector. Switching the default core is the final
+  small gate, not the first full integration point.
 - Follow the perf §5 rules (no ARC, locks, or existentials in graph walks)
   until a benchmark disproves one.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
@@ -326,6 +362,12 @@ query caching.
   not, record why the simple core stays.
 
 ### M7: Async completion and exports (rest of spike §11.6)
+
+The milestone has four dependency tracks. The `.queue` failure decision gates
+only ordered-policy work; stream termination, failure, and equality settle as
+three independent stream decisions; exports and external Observation tracking
+proceed independently. The tracks converge only for the complete-suite and
+release gates.
 
 - `OrderedPolicy`: `.queue`; `.exhaustLatest` (finish, coalesce, catch up
   once); `.merged`. The `LatestPolicy`/`OrderedPolicy` type split keeps
@@ -374,11 +416,17 @@ query caching.
   those steps. Update the CHANGELOG, tag, and push. Then verify the Pages
   deploy, create a GitHub Release with the changelog excerpt, and smoke-test
   `exact:` consumption from a scratch iOS 17 app.
+- Task boundaries: build and exercise release automation first; close a
+  non-mutating release-candidate gate with immutable CI links second; create
+  and push the annotated tag third; then verify Pages and exact consumption
+  before creating the GitHub Release. The tag task never also owns workflow
+  creation, deployment troubleshooting, or post-release smoke testing.
 
 ## Kotlin headroom
 
-- Only `Package.swift`, `.swift-format`, and `LICENSE` are Swift-flavored
-  root files. Everything else Swift lives under `swift/`, leaving `kotlin/`
+- Only `Package.swift`, `.swift-format`, and `LICENSE` are Swift-flavored root
+  files. The root `tools/` directory holds platform-neutral repository
+  validation. Everything else Swift lives under `swift/`, leaving `kotlin/`
   as a sibling Gradle project.
 - Bare semver tags are reserved for Swift; Kotlin versioning is Maven-based.
 - CI is path-filtered per platform (`swift/**` now, `kotlin/**` later); mise
@@ -397,12 +445,16 @@ query caching.
   measured.
 - Build, test, and bench commands → `CLAUDE.md` and `AGENTS.md`, in sync.
 - New documents → mapped in `docs/swift/README.md` or the root `README.md`.
+- New or retired scenarios → [tasks.md](./tasks.md), in the same change:
+  every scenario ID stays covered by exactly one task's _Greens:_ line.
+- New, split, or reordered tasks → update `_Depends:` and `_Verify:` in the
+  same change and keep `mise run tasks:check` green.
 
 ## Verification
 
-- M0: `mise run fmt:check` and `mise run test:matrix` pass on the stub;
-  CI green end to end; a leg-assertion test confirms the env legs really
-  change test-target flags.
+- M0: `mise run fmt:check`, `mise run tasks:check`, and
+  `mise run test:matrix` pass on the stub; CI green end to end; a
+  leg-assertion test confirms the env legs really change test-target flags.
 - M1: the full test matrix above is green in all four legs and in the
   `test-release` leg; escaped-writer, second-context, and cycle tests assert
   failure in debug and release alike.
@@ -422,7 +474,7 @@ query caching.
 - M7: exact export buffers, subscriber independence, stream-before-reaction
   order, and external post-mutation value tests are green; the complete
   behavior suite passes on the selected core.
-- Always: format checks clean; path-filtered CI green.
+- Always: formatting and task-ledger checks clean; path-filtered CI green.
 
 ## Flagged uncertainties (verify at implementation time)
 

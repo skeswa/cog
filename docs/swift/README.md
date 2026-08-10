@@ -49,11 +49,15 @@ The design lives in [design/](./design/); the implementation effort lives in
    planned data-oriented core and the tests that must choose its physical
    layout.
 6. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
-   turned into milestones, plus the package layout, tooling, CI, and release
-   process.
+   turned into milestones, plus the package layout, tooling, CI, and the
+   release process.
 7. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
    scenario tree that drives red-green implementation: every behavior the
    library promises, written as small user stories and grouped by milestone.
+8. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
+   into dependency-aware tasks of half an engineering day or less, each with
+   explicit closing verification; every scenario is covered by exactly one
+   task's _Greens:_ line.
 
 ## Where things stand (2026-08-10)
 
@@ -115,20 +119,29 @@ These choices are settled; §10 of the core document has the full record.
   the public surface before any diagnostic seam — so the suite must pass
   unchanged across the planned core swap. The normative statement is the
   "Testing constraints" section of impl/scenarios.md.
+- Implementation runs from a checked dependency graph of half-day tasks. Each
+  task has one type, explicit prerequisites and closing verification, and ends
+  green; scenario credit requires proving the whole story against real
+  infrastructure. Core swaps integrate by behavior group, and every release
+  separates its candidate gate, tag, and post-release verification. The
+  normative rules are in impl/tasks.md.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
 deferred reactions, app bootstrap helpers, debug-history tools, and
 persistence helpers. Also open are several edge behaviors: what a stream's
-phase does when its sequence ends or throws, whether a failed `.queue` run
-stops the queue, the failure mode for a selector that commits, adding to an
-already-cancelled `EffectGroup`, and debounce/throttle timing modifiers
-(deferred backlog). Ref layout, edge layout, and hash tables also remain open
-until benchmarks choose them.
+phase does when its sequence ends or throws, whether equal stream elements
+commit distinct turns, whether a failed `.queue` run stops the queue, the
+failure mode for a selector that commits, adding to an already-cancelled
+`EffectGroup`, when a reaction registered during a flush first runs, what a
+one-shot read or refresh of a cold async cog does, and debounce/throttle timing
+modifiers (deferred backlog). Ref layout, edge layout, and hash tables also
+remain open until benchmarks choose them.
 
 ## Next steps
 
-[impl/plan.md](./impl/plan.md) is the execution plan, and
-[impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree. Build the
+[impl/plan.md](./impl/plan.md) is the execution plan,
+[impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
+[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. Build the
 simple correctness version first, then the SwiftUI boundary, then a first
 async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare ref layouts before
 building the data-oriented core, and measure that core against the simple
