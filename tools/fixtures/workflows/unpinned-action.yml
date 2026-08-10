@@ -1,0 +1,53 @@
+name: Unpinned action
+
+# Fixture: every way a `uses:` can fail to be a pin — a tag, a branch, a short
+# SHA, an uppercase SHA, a bare action with no reference, an unpinned
+# `docker://` image, and a reusable workflow on a tag. The local action and the
+# digest-pinned image beside them are exempt and must stay silent.
+#
+# Only `sha-pinned-actions` may fire.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up mise
+        uses: jdx/mise-action@main
+
+      - name: Short SHA
+        uses: actions/cache@3d3c42e
+
+      - name: Uppercase SHA
+        uses: actions/upload-artifact@3D3C42E5AAC5BA805825DA76410C181273BA90B1
+
+      - name: No reference at all
+        uses: actions/setup-node
+
+      - name: Unpinned image
+        uses: docker://ghcr.io/skeswa/notes:latest
+
+      - name: Digest-pinned image
+        uses: docker://ghcr.io/skeswa/notes@sha256:14e0a7b0dbbd21bb2f1a3add6cd8b8e2ba54b0f7f13a3e42b8dd60b73d15b1cf
+
+      - name: Local action
+        uses: ./.github/actions/scrub
+
+  reusable:
+    name: Reusable
+    uses: skeswa/cog-actions/.github/workflows/release.yml@v3
+    permissions:
+      contents: read

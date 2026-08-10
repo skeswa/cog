@@ -1,0 +1,40 @@
+name: Mentions pull_request_target
+
+# Fixture: the false-positive guard for `no-pull-request-target`.
+#
+# The string `pull_request_target` appears in this workflow's name, in this
+# comment, in a job name, in an environment variable, in a step name, and in a
+# shell command — everywhere except the `on:` key, which is the only place
+# that would actually enable the trigger. A substring scan flags this file; a
+# checker that reads the parsed triggers does not. An earlier revision of
+# `markdown.yml` was reworded to appease exactly that bug, so this fixture
+# exists to keep it from coming back.
+#
+# Nothing may fire.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  BANNED_TRIGGER: pull_request_target
+
+jobs:
+  audit:
+    name: Explain why pull_request_target is banned
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Warn about pull_request_target
+        run: |
+          echo "pull_request_target runs fork code with the base repo's token."
+          echo "This repository uses pull_request instead: $BANNED_TRIGGER is banned."

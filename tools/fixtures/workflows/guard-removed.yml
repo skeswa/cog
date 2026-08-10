@@ -1,0 +1,42 @@
+name: Guard removed
+
+# Fixture: `valid.yml` with the same-repo guards taken off the self-hosted
+# jobs. `host-tests` has no `if:` at all; `lint` keeps an `if:` that gates on
+# something else entirely. Both must fire `self-hosted-guard`, and nothing
+# else may fire.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: [self-hosted, macOS, arm64]
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the host tests
+        run: mise run test:matrix
+
+  lint:
+    name: Lint
+    runs-on: self-hosted
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint
+        run: mise run fmt:check:swift

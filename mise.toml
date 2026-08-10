@@ -75,3 +75,18 @@ run = "node {{config_root}}/tools/check-task-ledger.mjs"
 [tasks."tasks:check:fixtures"]
 description = "Run the task-ledger checker's fixture suite"
 run = "node {{config_root}}/tools/test-task-ledger.mjs"
+
+# The workflow-contract check over `.github/workflows`: the same-repo guard on
+# every self-hosted job, least-privilege `permissions:`, `persist-credentials:
+# false`, job timeouts, no `pull_request_target`, and full-SHA action pins.
+# The policy constants — including which labels count as self-hosted — live at
+# the top of tools/lib/workflows/checks.mjs.
+
+[tasks."workflows:check"]
+description = "Verify the GitHub Actions workflow hardening contract"
+depends = ["workflows:check:fixtures"]
+run = "node {{config_root}}/tools/check-workflows.mjs"
+
+[tasks."workflows:check:fixtures"]
+description = "Run the workflow-contract checker against its fixtures"
+run = "node {{config_root}}/tools/test-workflows.mjs"

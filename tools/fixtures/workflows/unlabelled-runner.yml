@@ -1,0 +1,48 @@
+name: Unlabelled runner
+
+# Fixture: the fail-closed rule.
+#
+# Neither job says `self-hosted`. `mini-tests` uses a repo-specific label of
+# the kind `M0-05a` will settle, and `matrix-tests` computes its label from a
+# matrix. Neither is a GitHub-hosted runner image, so both are treated as
+# self-hosted and both must fire `self-hosted-guard` — a new label cannot
+# quietly opt out of the guard by not being listed in the checker.
+#
+# Nothing else may fire.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  mini-tests:
+    name: Host tests
+    runs-on: cog-mac-mini-1
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the host tests
+        run: mise run test:matrix
+
+  matrix-tests:
+    name: Host tests (matrix)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        runner: [macos-15, cog-mac-mini-1]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the host tests
+        run: mise run test

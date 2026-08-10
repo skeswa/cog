@@ -1,0 +1,51 @@
+name: Guard bypassed
+
+# Fixture: guards that look right and are not.
+#
+# `host-tests` writes the full guard and then ORs an escape hatch onto it at
+# the top level, so a fork pull request opened by the named actor reaches the
+# runner anyway. `partial-guard` keeps only the repository half, which a fork
+# pull request satisfies — `github.repository` is the *base* repository on a
+# `pull_request` event, so that clause alone lets fork code onto the mini.
+#
+# Both must fire `self-hosted-guard`, and nothing else may fire.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: [self-hosted, macOS, arm64]
+    timeout-minutes: 45
+    if: >-
+      (github.repository == 'skeswa/cog' &&
+      github.event.pull_request.head.repo.full_name == github.repository) ||
+      github.actor == 'release-bot'
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the host tests
+        run: mise run test:matrix
+
+  partial-guard:
+    name: Benchmarks
+    runs-on: [self-hosted, macOS, arm64]
+    timeout-minutes: 30
+    if: ${{ github.repository == 'skeswa/cog' }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Benchmark
+        run: mise run bench

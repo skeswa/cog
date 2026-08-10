@@ -15,9 +15,14 @@ name: Oxfmt
 # also lints Swift, and there is no Swift toolchain on ubuntu. Swift
 # formatting is gated by the `format` job in `swift-ci.yml`.
 
+# The two path lists are deliberately duplicated rather than shared through a
+# YAML anchor. GitHub Actions has supported anchors since September 2025, but
+# `on:` is read by the trigger parser rather than the runner, and a parse
+# failure there does not error — the lane simply never runs. Duplication is
+# cheap; a silently dead formatting gate is not.
 on:
   pull_request:
-    paths: &oxfmt-paths
+    paths:
       - "**/*.md"
       - "**/*.json"
       - "**/*.yml"
@@ -28,7 +33,14 @@ on:
   push:
     branches:
       - main
-    paths: *oxfmt-paths
+    paths:
+      - "**/*.md"
+      - "**/*.json"
+      - "**/*.yml"
+      - "**/*.yaml"
+      - "**/*.mjs"
+      - "**/*.js"
+      - "mise.toml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -57,3 +69,10 @@ jobs:
 
       - name: Verify formatting
         run: mise run fmt:check:md
+
+      # The workflow-contract check lives here rather than in `swift-ci.yml`
+      # because this is the repository's only GitHub-hosted lane, and the
+      # filters above already cover both its inputs: the workflows themselves
+      # (`**/*.yml`) and the checker (`**/*.mjs`).
+      - name: Verify the workflow hardening contract
+        run: mise run workflows:check
