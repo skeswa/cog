@@ -45,6 +45,8 @@ Read them in this order:
    state dependencies, async policies, and real event streams.
 5. **[perf.md](./perf.md): implementation and benchmarks.** The planned
    data-oriented core and the tests that must choose its physical layout.
+6. **[plan.md](./plan.md): implementation plan.** The spike plan turned into
+   milestones, plus the package layout, tooling, CI, and release process.
 
 ## Where things stand (2026-08-07)
 
@@ -94,7 +96,8 @@ until benchmarks choose them.
 
 ## Next steps
 
-Build the simple correctness version first. Then add the SwiftUI boundary and
-port `js-reactivity-benchmark`. Compare ref layouts before building the
-data-oriented core. Measure that core against the simple version,
-swift-state-graph, and raw `@Observable`.
+[plan.md](./plan.md) is the execution plan. Build the simple correctness
+version first, then the SwiftUI boundary, then a first async slice for a
+usable 0.1.0. Port `js-reactivity-benchmark` and compare ref layouts before
+building the data-oriented core, and measure that core against the simple
+version, swift-state-graph, and raw `@Observable`.

@@ -17,7 +17,9 @@ are no build or test commands. Tooling is versioned with mise (`mise.toml`):
 `mise run fmt` formats the repo with Oxfmt, and `mise run fmt:check`
 verifies formatting without writing. `.oxfmtrc.json` excludes the frozen
 `docs/dump-2026-08-06.md` from formatting. The next phase for each platform
-is the spike in its `exploration.md` §11, as amended by its `perf.md` §9.
+is the spike in its `exploration.md` §11, as amended by its `perf.md` §9. For
+Swift, `docs/swift/plan.md` turns that spike into milestones with package
+layout, tooling, CI, and release steps.
 
 ## Layout
 
@@ -28,7 +30,8 @@ is the spike in its `exploration.md` §11, as amended by its `perf.md` §9.
 - `docs/swift/` — living Swift design documents. Start with `README.md`.
   `exploration.md` covers the core architecture and API; `effects.md` covers
   effects and background work; `rx.md` maps Rx concepts; `perf.md` covers the
-  data-oriented implementation and benchmark plan.
+  data-oriented implementation and benchmark plan; `plan.md` is the
+  implementation plan with milestones, tooling, CI, and release process.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and
