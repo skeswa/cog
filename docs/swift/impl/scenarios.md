@@ -27,6 +27,16 @@ Cog is the library.
   [effects.md](../design/effects.md), §5.4 in [rx.md](../design/rx.md), perf
   §n in [perf.md](../design/perf.md), everything else in
   [exploration.md](../design/exploration.md).
+- Every scenario carries a proof mode naming the check class that greens it:
+  `unit` (a host `swift test` — the default, left unmarked), `compile-fail`,
+  `exit test`, `release configuration`, `simulator`, `floor runtime`,
+  `suite`, and `benchmark` (the default for every scenario in group 18).
+  Non-unit modes are marked with a trailing `(Proof: ….)` on the scenario.
+  The task-ledger checker matches each mode against the owning task's type
+  and verification commands — exit tests must be proven in debug and
+  release, behavior filters must expand to exactly their unit- and
+  exit-test-mode scenarios, and only suite- and release-configuration-mode
+  scenarios may be greened by a gate.
 - Every test obeys the three testing constraints in the next section: fully
   optimistic, as fast and cheap as possible, and as implementation agnostic
   as possible. UI tests live
@@ -120,10 +130,10 @@ My whole app shares one Cog world. Tests get their own little worlds.
   through the installed context sees it — no other setup, no second
   context anywhere.
 - **ONE-02.** Some code tries to install a second app context. Cog stops
-  it right away with a clear error, in debug builds and release builds. (An
-  exit-test check.)
+  it right away with a clear error, in debug builds and release builds.
+  (Proof: exit test.)
 - **ONE-03.** Feature code tries to build a plain `Cogtext` with an
-  initializer. The compiler says no. (A compile-fail check.)
+  initializer. The compiler says no. (Proof: compile-fail.)
 - **ONE-04.** My test asks the testing product for a context. It gets a
   fresh, isolated one that works without any app setup.
 - **ONE-05.** Tests and previews each make their own context — two at
@@ -154,7 +164,7 @@ I declare state at the top of a file and it just works.
 - **DECL-05.** I expose a source through `.readOnly`. Reading the
   read-only ref always gives the same value as the source.
 - **DECL-06.** I try to write through a `.readOnly` ref. The compiler says
-  no. (A compile-fail check.)
+  no. (Proof: compile-fail.)
 
 ### 2.2 Derived cogs
 
@@ -176,8 +186,7 @@ I declare state at the top of a file and it just works.
 ### 2.4 Selector shape
 
 - **DECL-12.** I declare a derived cog whose selector throws. The
-  compiler says no: synchronous selectors do not throw in v1. (A
-  compile-fail check.)
+  compiler says no: synchronous selectors do not throw in v1. (Proof: compile-fail.)
 
 ## 3. READ — Reading state
 
@@ -229,8 +238,8 @@ _Milestone M1. Design: §3.2, §2.2._
   from a custom name I pass. That name is what history shows.
 - **TURN-07.** I sneak the writer out of the commit — stashed in a
   variable or captured into an async task — and use it after the commit
-  ended. Cog stops me with an error, in every kind of build. (An exit-test
-  check.)
+  ended. Cog stops me with an error, in every kind of build. (Proof: exit
+  test.)
 - **TURN-08.** Several commits queue up during a flush. They run one at a
   time in the order they arrived, and each queued turn finishes
   completely — settle, notify, react — before the next one starts.
@@ -307,9 +316,10 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
 _Pending (core §10, open question 11): the failure mode for a selector that
 calls an op which commits mid-computation._
 
-- **CYCLE-01.** A cog reads itself. Cog fails and names the cog.
+- **CYCLE-01.** A cog reads itself. Cog fails and names the cog. (Proof:
+  exit test.)
 - **CYCLE-02.** Cog A reads cog B, and B reads A. Cog fails and shows the
-  whole path, A to B and back.
+  whole path, A to B and back. (Proof: exit test.)
 - **CYCLE-03.** The cycle runs through keyed cogs. The message includes
   the keys, so I can see which items looped.
 - **CYCLE-04.** A cycle only exists when a condition is true. Everything
@@ -360,7 +370,7 @@ flush — from inside another reaction — makes its initial run._
 ### 7.3 Writing back
 
 - **REACT-14.** A reaction gets a read-only view of the graph. It cannot
-  write directly. (A compile-fail check.)
+  write directly. (Proof: compile-fail.)
 - **REACT-15.** A reaction calls an op that commits. That write becomes a
   brand-new turn after the current flush — never a change to the turn
   being flushed.
@@ -467,9 +477,9 @@ My tests set up state quietly with `seed`, or loudly with a real commit.
   sunny weather with a real commit. The alert fires exactly once, even
   though the reaction's first run never read the weather.
 - **SEED-05.** `seed` exists only in debug builds. A release build has no
-  way to seed. (A build check.)
+  way to seed. (Proof: release configuration.)
 - **SEED-06.** I try to seed a derived cog. The compiler says no: only
-  manual sources can be seeded. (A compile-fail check.)
+  manual sources can be seeded. (Proof: compile-fail.)
 - **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
   read. Seeding sends no UI notice; the next real turn still settles and
   notices the value dirtied by the seed.
@@ -485,7 +495,7 @@ When I wonder what happened, the debug history can tell me.
 - **HIST-03.** History is bounded: after many turns, the oldest entries
   fall off and the entry count never passes the cap. (Memory itself is
   benchmark territory, not a unit-test assertion.)
-- **HIST-04.** Release builds pay nothing for history. (A build check.)
+- **HIST-04.** Release builds pay nothing for history. (Proof: release configuration.)
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
   history under that effect name.
 - **HIST-06.** Once M2 boundaries exist, history records each changed UI
@@ -523,7 +533,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
   consumer — like a `Button` action — surfaces a warning through the
   diagnostic seam that points at the mistake.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
-  an iOS 26 simulator.
+  an iOS 26 simulator. (Proof: simulator.)
 - **UI-12.** AppKit automatic tracking works through the same boundary on
   a macOS 26 host.
 - **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
@@ -533,6 +543,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
   equality-gated notice, and immediate binding scenarios (UI-01, UI-02,
   UI-04, and UI-08) have the same behavior through the floor-runtime
   Observation boundary. This may run in the pinned nightly floor job.
+  (Proof: floor runtime.)
 
 ## 13. ASYNC — Async values, first slice
 
@@ -637,8 +648,7 @@ the queue or the next queued run still starts._
 - **POLICY-04.** With `.merged`, runs overlap, and each result commits as
   its own turn when it lands.
 - **POLICY-05.** A `.stream` selector cannot use `.queue`,
-  `.exhaustLatest`, or `.merged`. The type system says no. (A
-  compile-fail check.)
+  `.exhaustLatest`, or `.merged`. The type system says no. (Proof: compile-fail.)
 
 ## 15. STREAM — Streams
 
@@ -684,17 +694,17 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
   graph lease, so a `whileObserved` cog can be let go.
 - **EXPORT-07.** A view's `.task` loops over `values(of:)`. When the view
   disappears, the loop ends and the lease is gone — the §6.5 map-camera
-  story.
+  story. (Proof: simulator.)
 - **EXPORT-08.** I link an outside `@Observable` property in with
   `c.track`. After an observed mutation finishes propagating, my dependent
   cog returns the newest post-mutation value — never the pre-write value.
   Repeating this after each propagation boundary keeps returning the newest
-  value; mutations within one boundary may coalesce.
+  value; mutations within one boundary may coalesce. (Proof: simulator.)
 - **EXPORT-09.** After consuming the initial value, I pause an `.unbounded`
   reader and commit A, B, then C. It receives every settled value in order.
 - **EXPORT-10.** I track one property of an outside `@Observable` object.
   Changing another property on that object does not recompute my dependent
-  cogs.
+  cogs. (Proof: simulator.)
 - **EXPORT-11.** On a pre-iOS-26 runtime, the
   `withObservationTracking` shim exposes an internal acknowledgement when
   it has re-armed after an observed change. A mutation made after that
@@ -704,10 +714,10 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 - **EXPORT-12.** On an iOS 26 simulator, the `Observations` path has the
   same post-mutation value correctness and property granularity. Several
   synchronous mutations may coalesce until the next observation suspension
-  boundary, where the newest value propagates.
+  boundary, where the newest value propagates. (Proof: simulator.)
 - **EXPORT-13.** I link outside state in with `c.track`'s closure form
   instead of a key path. It has the same post-mutation value, coalescing,
-  and pre-iOS-26 re-arm semantics as the key-path form.
+  and pre-iOS-26 re-arm semantics as the key-path form. (Proof: simulator.)
 - **EXPORT-14.** I subscribe to a derived cog. A turn recomputes it to an
   equal value. Nothing is offered to my buffer: only changed values reach
   subscribers.
@@ -736,11 +746,12 @@ since expected counts derive from the parameters.
 - **COUNT-08.** Key churn (keys added and removed over and over): runs
   match exactly, and dropped keys stop running.
 - **COUNT-09.** Every behavior scenario implemented through M5 passes
-  unchanged over every ref layout under test.
+  unchanged over every ref layout under test. (Proof: suite.)
 - **COUNT-10.** Every behavior scenario implemented through M6 passes
-  unchanged when the data-oriented core replaces the simple core.
+  unchanged with the data-oriented core selected in place of the simple
+  core, before any default switch. (Proof: suite.)
 - **COUNT-11.** After M7, the complete behavior suite passes unchanged on
-  the selected ref layout and data-oriented core.
+  the selected ref layout and data-oriented core. (Proof: suite.)
 
 ## 18. PERF — Performance guarantees
 
@@ -749,7 +760,9 @@ _Milestones M5 and M6, in the benchmark package. Design: perf §5–§9._
 Benchmark-gated: thresholds stay provisional and representation choices stay
 open until perf.md records numbers. This group is the declared exception to
 implementation agnosticism: it gates the implementation itself, lives in the
-benchmark package, and never constrains the behavior suite.
+benchmark package, and never constrains the behavior suite. Every scenario
+in this group has proof mode `benchmark` by default; no per-scenario marker
+is needed.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
   nothing (`mallocCountTotal == 0`).
@@ -787,17 +800,17 @@ Cog behaves the same no matter how my app is compiled.
 - **LEG-01.** The whole host-runnable suite passes in all four legs:
   default MainActor isolation on and off, crossed with
   `NonisolatedNonsendingByDefault` on and off. (`CogBoundaryTests` runs
-  on the simulator in its own single configuration.)
+  on the simulator in its own single configuration.) (Proof: suite.)
 - **LEG-02.** A leg-assertion test proves each leg really compiled with
   its intended settings, so the matrix cannot silently collapse.
 - **LEG-03.** The suite also passes in the release-configuration
   `test-release` leg, where the every-build guardrails — second app
   context, escaped writer, cycles, no `seed`, no history cost — prove
-  they hold outside debug.
+  they hold outside debug. (Proof: release configuration.)
 - **LEG-04.** The package builds with its macOS 14 deployment target, and
   a scratch app plus the Weather example build with an iOS 17 deployment
   target under Swift 6.2 tools, with no accidental dependency on newer
-  runtime APIs.
+  runtime APIs. (Proof: suite.)
 
 ## 20. ACTOR — MainActor confinement
 
@@ -809,7 +822,6 @@ settings.
 - **ACTOR-01.** Selectors, commit bodies, and reactions all execute on the
   MainActor. Runtime preconditions prove it in every build-settings leg.
 - **ACTOR-02.** Code on another executor tries to access the synchronous
-  graph API without a MainActor hop. The compiler says no. (A compile-fail
-  check.)
+  graph API without a MainActor hop. The compiler says no. (Proof: compile-fail.)
 - **ACTOR-03.** A manual cog holds a non-`Sendable`, MainActor-bound value,
   and a derived cog reads it without a wrapper or an unchecked conformance.

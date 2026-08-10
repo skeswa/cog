@@ -13,6 +13,10 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   executable slices, dependencies, commands, and scenario ownership. Use the
   plan's milestone-to-task table for closure paths. Any change that crosses
   those ownership boundaries updates both documents in the same change.
+  Live execution bookkeeping — claiming, status, discussion, and closure
+  evidence — happens in the GitHub issue mirror under the plan's "Task
+  bookkeeping" section; a task change here updates that mirror in the same
+  change.
 - **Half a day is the cap.** The estimate includes writing the red tests,
   implementation, local verification, and the task's required documentation.
   Known multi-mechanism work is split here rather than deferred until it
@@ -46,12 +50,24 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   expression matches none; raw `swift test --filter` is forbidden because
   SwiftPM exits successfully for an empty selection. Compile-fail fixtures use
   `mise run test:compilefail`; milestone gates use the mise commands from
-  [plan.md](./plan.md).
+  [plan.md](./plan.md). Filter expressions are checked, never trusted: for a
+  behavior task, the scenario filters in `_Verify:_` must expand — against
+  the scenario set in [scenarios.md](./scenarios.md) — to exactly the task's
+  unit- and exit-test-mode `_Greens:_` entries; exit-test scenarios appear in
+  both a `test` and a `test:release` filter; compile-fail scenarios require
+  `mise run test:compilefail`; and simulator, floor, benchmark, and suite
+  scenarios name their runs explicitly. The checker enforces these
+  expansions, so a filter can never silently drift from its coverage claim
+  when a decision task adds scenarios.
 - **_Greens:_ is the coverage ledger.** It means every clause of those
   scenarios is observable and passing, never merely implemented in part or
-  vacuously true because a consumer does not exist yet. Every one of the 195
-  current scenario IDs appears in exactly one `_Greens:_` line. Infrastructure
-  and decisions have no such line.
+  vacuously true because a consumer does not exist yet. Every scenario ID in
+  [scenarios.md](./scenarios.md) appears in exactly one `_Greens:_` line; the
+  checker derives that census from scenarios.md itself, so no count is
+  maintained by hand. A scenario's proof mode also constrains its owner:
+  only suite- and release-configuration-mode scenarios may be greened by a
+  gate; every other mode belongs to a behavior task. Infrastructure and
+  decisions have no such line.
 - **No task ends red.** Benchmark-gated scenarios record the measurement or
   provisional threshold they need in `perf.md` within the same task that first
   turns them green. Later baseline automation does not stand in for that
@@ -60,7 +76,13 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   gate into an unbounded debugging task.
 - **Releases separate preparation from publication.** A non-mutating release
   candidate gate precedes the tag; tag creation, deployment verification, and
-  GitHub Release creation are separate tasks.
+  GitHub Release creation are separate tasks. Publications are also totally
+  ordered: every _Release_ task depends, directly or transitively, on the
+  previous release's terminal task — including a conditional release's
+  recorded not-applicable closure — so no two release sequences can
+  interleave, and every _Release_ task sits downstream of a _Gate_. A patch
+  release inserts a new candidate → tag → verification → GitHub Release link
+  into the same chain, reusing the M4 template.
 
 ## M0 tasks
 
@@ -143,9 +165,31 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   validator.
   _Depends: M0-05b, M0-09ac._
   _Verify: a pull-request run completes the ledger step._
+- **M0-11** _(Infrastructure)_ — Add proof-mode consistency checks: parse
+  each scenario's `(Proof: …)` marker (default `unit`; group 18 defaults to
+  `benchmark`), derive the scenario census from scenarios.md instead of any
+  hand-maintained count, verify greens ownership by mode (suite and
+  release-configuration scenarios on behavior tasks or gates; every other
+  mode only on behavior tasks), and verify verification commands per mode:
+  behavior filters expand to exactly their unit- and exit-test greens,
+  exit-test greens appear in both `test` and `test:release` filters,
+  compile-fail greens require `test:compilefail`, benchmark greens carry the
+  recorded-result obligation, and simulator and floor greens name their runs.
+  _Depends: M0-09ab._
+  _Verify: `mise run tasks:check` plus mode-mismatch, gate-ownership,
+  missing-release-filter, and over-broad-filter fixtures._
+- **M0-12** _(Infrastructure)_ — Add graph-order invariants: _Release_ tasks
+  form one dependency-ordered chain; every _Release_ task transitively
+  depends on a _Gate_; and the M6 arena-integration filters, expanded
+  against scenarios.md, cover every unit- and exit-test-mode scenario owned
+  by M1–M6 tasks except the exceptions the M6 section's arena-coverage note
+  names.
+  _Depends: M0-11._
+  _Verify: `mise run tasks:check` plus forked-release-chain, gateless-release,
+  and integration-hole fixtures._
 - **M0-10** _(Gate)_ — Close scaffolding with every local command and CI job
   green on the stub.
-  _Depends: M0-05c, M0-06, M0-08, M0-09b._
+  _Depends: M0-05c, M0-06, M0-08, M0-09b, M0-12._
   _Verify: `mise run fmt:check`, `mise run tasks:check`,
   `mise run test:matrix`, `mise run test:release`, and
   `mise run test:compilefail`._
@@ -924,6 +968,9 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 _Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
 
+_Arena-coverage exceptions: COUNT-01–COUNT-08 are proven under the arena core
+by the `M6-05a` edge gate rather than an `M6-10` filter._
+
 - **M6-01a** _(Infrastructure)_ — Add arena slot allocation, reuse,
   generations, and the scalar SoA column skeleton.
   _Depends: M5-10._
@@ -1010,19 +1057,22 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10aa._
   _Verify: `COG_TEST_CORE=arena mise run test --filter TURN`._
 - **M6-10ba** _(Infrastructure)_ — Pass tracked, untracked, lazy, equal, and
-  dynamically recaptured derived reads through the arena selector.
+  dynamically recaptured derived reads, plus derived declaration and
+  laziness behavior, through the arena selector.
   _Depends: M6-10ab._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'READ|GRAPH'`._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter
+'READ|GRAPH|DECL-0[7-9]'`._
 - **M6-10bb** _(Infrastructure)_ — Pass public self, multi-node, conditional,
   and keyed cycle behavior through the arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter CYCLE` and
   `COG_TEST_CORE=arena mise run test:release --filter CYCLE`._
 - **M6-10ca** _(Infrastructure)_ — Pass reaction tracking, ordering,
-  equality, watch, token, and cleanup behavior through the arena selector.
+  equality, watch, token, and cleanup behavior, plus MainActor confinement
+  and non-`Sendable` values, through the arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-(0[1-9]|1[0-4]|18|21)'`._
+'REACT-(0[1-9]|1[0-4]|18|21)|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
   and the quiescence diagnostic through the arena selector.
   _Depends: M6-10ca._
@@ -1048,16 +1098,17 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-09, M6-10cb._
   _Verify: `COG_TEST_CORE=arena mise run test --filter 'SEED-0[1-4]'`,
   `mise run test:compilefail`, and the release absence check._
-- **M6-10g** _(Infrastructure)_ — Pass UI boundary behavior through the arena
-  core selector.
+- **M6-10g** _(Infrastructure)_ — Pass UI boundary behavior and
+  UI-before-reaction flush ordering through the arena core selector.
   _Depends: M6-08a, M6-10ca._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter UI` plus UIKit simulator
-  scenarios with `COG_TEST_CORE=arena`._
-- **M6-10fb** _(Infrastructure)_ — Pass bounded history, labels, named effect
-  runs, and UI notices through the arena ring buffer.
+  _Verify: `COG_TEST_CORE=arena mise run test --filter 'UI|REACT-19'` plus
+  UIKit simulator scenarios with `COG_TEST_CORE=arena`._
+- **M6-10fb** _(Infrastructure)_ — Pass bounded history, explicit and
+  `fileID:line` labels, named effect runs, and UI notices through the arena
+  ring buffer and diagnostics.
   _Depends: M6-09, M6-10cb, M6-10g._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter HIST` plus the release
-  zero-cost check._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter 'HIST|DECL-1[01]'`
+  plus the release zero-cost check._
 - **M6-10fc** _(Infrastructure)_ — Prove seed stays silent at a real arena UI
   boundary.
   _Depends: M6-10fa, M6-10g._
@@ -1074,9 +1125,11 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10eb, M6-10ha._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'ASYNC-(0[7-9]|10|1[349]|21)'`._
-- **M6-10i** _(Behavior)_ — Make the selected arena the default core and run
-  the complete behavior suite unchanged; expose simple-versus-arena checking
-  as `mise run test:cores`.
+- **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
+  the arena core selected in place of the simple one, leaving the default
+  core untouched; expose simple-versus-arena checking as
+  `mise run test:cores`. This task is outcome-neutral: it proves the arena,
+  it does not adopt it.
   _Depends: M6-10bb, M6-10d, M6-10fb, M6-10fc, M6-10hb._
   _Verify: `mise run test:cores` and `mise run test:compilefail`._
   _Greens: COUNT-10._
@@ -1101,10 +1154,18 @@ ArenaDirtyPropagationInfrastructure`._
   arena replaces the simple core; update `perf.md`, §10, and the snapshot.
   _Depends: M6-11d._
   _Verify: recorded core decision and release recommendation._
+- **M6-13** _(Infrastructure)_ — Execute the recorded core decision. If
+  `M6-12a` approves replacement, switch the default core to the arena and
+  rerun the complete suite; otherwise keep the simple core as the default and
+  record the arena's retained selector-only role. The default core never
+  changes upstream of this task.
+  _Depends: M6-12a._
+  _Verify: `mise run test:cores` with the default core matching the recorded
+  decision._
 - **M6-12b** _(Gate)_ — If the recorded decision calls for 0.2.0, prepare its
   non-mutating release candidate across behavior, benchmarks, docs, and
   changelog; otherwise close M6 with the recorded no-release rationale.
-  _Depends: M6-12a._
+  _Depends: M6-13._
   _Verify: approved release checklist or approved no-release record._
 - **M6-12c** _(Release)_ — Conditionally create and push the annotated `0.2.0`
   tag.
@@ -1269,8 +1330,10 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   including benchmarks, docs, and changelog.
   _Depends: M7-16a._
   _Verify: approved release checklist with immutable CI links._
-- **M7-16c** _(Release)_ — Create and push the annotated `0.3.0` tag.
-  _Depends: M7-16b._
+- **M7-16c** _(Release)_ — Create and push the annotated `0.3.0` tag, only
+  after the 0.2.0 chain has resolved — published, or closed with `M6-12a`'s
+  recorded not-applicable outcome.
+  _Depends: M6-12e, M7-16b._
   _Verify: remote tag resolves to the approved commit._
 - **M7-16d** _(Gate)_ — Verify docs and exact 0.3.0 consumption.
   _Depends: M7-16c._

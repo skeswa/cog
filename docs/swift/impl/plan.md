@@ -42,6 +42,26 @@ scenario to exactly one task.
   against real infrastructure. Known compound work is split before execution,
   representation swaps integrate incrementally, and release preparation stays
   separate from remote publication.
+- Task bookkeeping (settled 2026-08-10): day-to-day execution bookkeeping —
+  claiming, status, discussion, and closure — lives in the repository's
+  GitHub issues, one issue per task with dependencies as native blocked-by
+  relationships. The documents in this directory stay normative and never
+  track live status; the "Task bookkeeping" section below is the contract.
+- Ledger-integrity posture (settled 2026-08-10): four rules close the gaps a
+  ledger review found. First, a task that mutates a default or publishes
+  externally runs only downstream of the decision or gate that authorizes
+  it — the M6 core-default switch is such a step (`M6-13`), so M6
+  integration and measurement stay outcome-neutral behind the core selector
+  and no measurement outcome can invalidate completed work. Second,
+  externally visible releases form one dependency-ordered chain across
+  milestones, patches included, so publications never interleave. Third, the
+  task-ledger checker owns every derivable fact: the scenario census, exact
+  filter expansion of behavior verifies, and completeness of the M6
+  arena-integration filters, with exceptions named in the ledger rather than
+  implied. Fourth, every scenario carries a proof mode (default `unit`);
+  the checker matches greens ownership and verification commands to modes,
+  and only suite- and release-configuration-mode scenarios may be greened by
+  a gate.
 
 Execution constraints from the design docs:
 
@@ -138,8 +158,38 @@ the smallest repair task is inserted before a failed gate is rerun.
 | M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                         | `M3-11`                                                                                                                        |
 | M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
 | M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility | `M5-10`                                                                                                                        |
-| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                             | `M6-05a` edge gate, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                            |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved |
 | M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
+
+## Task bookkeeping
+
+Execution bookkeeping lives in the repository's GitHub issues. The documents
+in this directory stay normative for what the work is; the issue tracker
+carries the live state of doing it.
+
+- One issue per task, titled `Mx-yy: <first sentence>`, labeled with its
+  type (`decision`, `infrastructure`, `behavior`, `gate`, `release`, plus
+  `non-blocking` where the ledger grants that policy), and assigned to its
+  GitHub milestone. The M0–M7 milestones carry each plan-table row: the
+  decisions that gate dependent work and the closing path.
+- Every `_Depends:_` edge is encoded as a native GitHub blocked-by
+  relationship, so the tracker's ready set — open issues with no open
+  blockers — matches the ledger's dependency graph. Issues are created in
+  dependency order so blockers always carry lower numbers.
+- A per-milestone tracking issue holds the dependency-ordered checklist for
+  progress at a glance.
+- Claiming a task means assigning its issue. Closing a task requires posting
+  the `_Verify:_` evidence — command output or immutable CI links — as a
+  comment first. Gate issues close only after every blocking issue is
+  closed, per the milestone's closing path.
+- The ledger remains the source of truth. Any task change in
+  [tasks.md](./tasks.md) — a new, split, or retired task, or changed
+  dependencies, verification, or greens — updates the issue mirror in the
+  same change: new issues for new tasks, blocked-by edits for dependency
+  changes, a parent issue closed with a pointer to its split children, and
+  retired tasks closed as not planned. `mise run tasks:check` validates only
+  the documents; every issue title starts with its task ID precisely so the
+  ledger and tracker can be diffed when drift is suspected.
 
 ## Milestones
 
@@ -177,7 +227,7 @@ the smallest repair task is inserted before a failed gate is rerun.
 - Compile-fail harness: a fixtures directory of expected-failure sources,
   compiled in one batched pass by a `test:compilefail` mise task and CI step
   that asserts each fixture fails with the expected diagnostic. The
-  scenarios marked "(A compile-fail check.)" all run through this harness,
+  scenarios marked "(Proof: compile-fail.)" all run through this harness,
   never as per-test compiler invocations.
 - Task-ledger checker: the pinned Node tool runs
   `tools/check-task-ledger.mjs`; `mise run tasks:check` verifies unique task
@@ -188,8 +238,16 @@ the smallest repair task is inserted before a failed gate is rerun.
   `_Non-blocking:_` external-availability policy. Finally, it verifies that the
   plan-to-task table has exactly one row per milestone, links the matching task
   section, references only existing same-milestone task IDs, and names every
-  explicit non-blocking exception. Run it in CI with the other documentation
-  checks.
+  explicit non-blocking exception. Two further check families (`M0-11`,
+  `M0-12`) make the checker own every derivable fact: proof-mode
+  consistency — each scenario's `(Proof: …)` mode, default `unit`, must
+  match its owning task's type and verification commands, behavior filters
+  must expand to exactly their unit- and exit-test greens, and the scenario
+  census is derived, never hand-counted — and graph-order invariants —
+  release tasks form one dependency-ordered chain, every release task
+  follows a gate, and the M6 arena-integration filters cover every unit- and
+  exit-test scenario owned by M1–M6 tasks except the exceptions the M6
+  section names. Run it in CI with the other documentation checks.
 - Update the root `README.md`, `docs/swift/README.md`, and `CLAUDE.md` plus
   `AGENTS.md` (kept in sync) with the new commands.
 
@@ -412,8 +470,12 @@ query caching.
   replacement core.
 - Integrate that suite by behavior group throughout M6 — manual values and
   turns, graph and cycles, reactions and lifetimes, then UI and async — using
-  the internal simple/arena selector. Switching the default core is the final
-  small gate, not the first full integration point. `mise run test:cores`
+  the internal simple/arena selector. Integration and measurement stay
+  outcome-neutral: every check through `M6-12a` runs through the selector,
+  and switching the default core is a publication-grade step (`M6-13`) that
+  runs only after `M6-12a` records the decision. If the simple core stays,
+  `M6-13` keeps the simple default and records the arena's selector-only
+  disposition, so no completed work needs reverting. `mise run test:cores`
   loops the complete suite over both implementations.
 - Follow the perf §5 rules (no ARC, locks, or existentials in graph walks)
   until a benchmark disproves one.
@@ -421,11 +483,13 @@ query caching.
   (perf §9.3–§9.5). Enable `baseline check` gating in CI: the noise-free
   `mallocCountTotal == 0` threshold plus generous absolute time thresholds.
   Update perf.md and §10 with what the data settled.
-- Tag `0.2.0` when the data-oriented core replaces the simple one. If it does
-  not, record why the simple core stays. After `M6-12b` approves that release
-  candidate (or closes the no-release branch), M7's independent design and
-  behavior tracks may start while any conditional tag and verification tasks
-  finish against the already approved commit.
+- Tag `0.2.0` when the data-oriented core replaces the simple one (`M6-13`
+  executes whichever outcome `M6-12a` records). If it does not, record why
+  the simple core stays. After `M6-12b` approves that release candidate (or
+  closes the no-release branch), M7's independent design and behavior tracks
+  may start while any conditional tag and verification tasks finish against
+  the already approved commit; the 0.3.0 tag itself still waits for the
+  0.2.0 chain to resolve, per the serialized release chain.
 
 <a id="plan-m7"></a>
 
@@ -489,6 +553,12 @@ release gates.
   and push the annotated tag third; then verify Pages and exact consumption
   before creating the GitHub Release. The tag task never also owns workflow
   creation, deployment troubleshooting, or post-release smoke testing.
+- Serialization: releases form one dependency-ordered chain. A tag task
+  depends on the previous release's terminal task — including a conditional
+  release's recorded not-applicable closure — so publications never
+  interleave, and the ledger checker enforces the chain. A patch release
+  (for example `0.1.1`) inserts a new candidate → tag → verification →
+  GitHub Release link into the chain, reusing the M4 task template.
 
 ## Kotlin headroom
 
@@ -517,6 +587,8 @@ release gates.
   every scenario ID stays covered by exactly one task's _Greens:_ line.
 - New, split, or reordered tasks → update `_Depends:` and `_Verify:` in the
   same change and keep `mise run tasks:check` green.
+- Task changes → the GitHub issue mirror (new, re-linked, or closed issues
+  per the "Task bookkeeping" section), in the same change.
 - Milestone scope, order, exit, public-command, gate, release-boundary, or
   non-blocking-policy changes → update both this plan and the affected task
   section, including the plan-to-task table, in the same change.
@@ -545,9 +617,10 @@ release gates.
 - M5 (`M5-10`): run-count tests are green under every ref candidate selected
   by `COG_TEST_REF_LAYOUT`; the `mallocCountTotal == 0` steady-turn threshold
   holds; ref-layout numbers are recorded in perf.md before the choice settles.
-- M6 (`M6-05a`, then `M6-12b`): the M5 set is green under every arena edge
-  candidate; `mise run test:cores` is green; edge-layout and runtime-comparison
-  numbers are recorded before choices settle. Continue through `M6-12c`–
+- M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
+  arena edge candidate; `mise run test:cores` is green; edge-layout and
+  runtime-comparison numbers are recorded before choices settle; the default
+  core matches the decision `M6-12a` recorded. Continue through `M6-12c`–
   `M6-12e` only if `M6-12a` approves 0.2.0.
 - M7 (`M7-16a` → `M7-16e`): exact export buffers, subscriber independence,
   stream-before-reaction order, and external post-mutation value tests are
