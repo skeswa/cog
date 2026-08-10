@@ -1,12 +1,14 @@
 # Cog for Swift: implementation plan
 
-_August 8, 2026_
+_August 9, 2026_
 
-This plan turns the Swift spike ([exploration.md](./exploration.md) §11,
-amended by [perf.md](./perf.md) §9) into milestones. It also fills in package
+This plan turns the Swift spike ([exploration.md](../design/exploration.md)
+§11, amended by [perf.md](../design/perf.md) §9) into milestones. It also fills in package
 layout, formatting, tests, CI, and releases. The aim is to get Cog into iOS
 apps soon without making a future Kotlin package awkward. The architecture is
-settled elsewhere; its decision ledger stays in exploration §10.
+settled elsewhere; its decision ledger stays in exploration §10. The companion
+[scenarios.md](./scenarios.md) breaks these milestones into the test scenarios
+that drive red-green implementation.
 
 ## Plan decisions
 
@@ -30,8 +32,9 @@ Execution constraints from the design docs:
   phases, six-step flush order (§3.2).
 - Lazy pull plus pushed dirty flags; CLEAN, CHECK, DIRTY with versions;
   equality gates; dependencies recaptured every run.
-- `CogPhase` with explicit `Previous`; async selectors are synchronous and
-  return `Work`; `.latest` is the default; streams are `.latest`-only.
+- `CogPhase` begins publicly at `pending` with explicit `Previous`; async
+  selectors are synchronous and return `Work`; `.latest` is the default;
+  streams are `.latest`-only.
 - Public refs stay resilient (no `@frozen`) and never expose arena slots.
   Ref, edge, and hash layouts wait for benchmarks (perf §4, §9).
 - iOS 17 / Swift 6.2 floor; test with default MainActor isolation on and off
@@ -100,14 +103,19 @@ Manifest choices:
   two-space indent.
 - `mise.toml`: split `fmt` into `fmt:md` and `fmt:swift`
   (`swift format --in-place --parallel --recursive swift Package.swift`)
-  under `fmt` and `fmt:check` umbrellas; add `test` and `test:matrix` (loops
-  the four legs). Add `bench` in M5. mise cannot pin Xcode. The README
+  under `fmt` and `fmt:check` umbrellas; add `test`, `test:matrix` (loops
+  the four legs), and `test:release` (`swift test -c release` on the default
+  leg, so the guardrails that promise every-build behavior really run in a
+  release configuration). Add `bench` in M5. mise cannot pin Xcode. The README
   documents the required version, and CI selects it with `xcode-select`.
 - `swift-ci.yml`: concurrency-cancel; path filters (`Package.swift`,
   `swift/**`, `.swift-format`, the workflow itself). M0 includes only the jobs
-  the stub can satisfy: `format` (swift format lint) and `test-host`
-  (four-leg matrix of `swift test --parallel`, `.build` cached per leg).
-  Add `test-simulator` in M2 and `bench-build` in M5. Use the `macos-26`
+  the stub can satisfy: `format` (swift format lint), `test-host`
+  (four-leg matrix of `swift test --parallel`, `.build` cached per leg), and
+  `test-release` (`swift test -c release` on the default leg — the leg where
+  every-build guardrails such as the second-context guard, escaped writers,
+  cycle detection, the absence of `seed`, and free debug history are proven
+  outside debug). Add `test-simulator` in M2 and `bench-build` in M5. Use the `macos-26`
   runner with a pinned Xcode 26.x. Verify image contents against
   `actions/runner-images` when writing the workflow. `markdown.yml` runs
   oxfmt on ubuntu.
@@ -124,7 +132,7 @@ The class-node build. Correctness first; no perf tricks.
   keys; allocation-free `box[key]`; the `.readOnly` projection.
 - Cogtext: nodes stored by descriptor plus key, created lazily; `get`,
   `read`, and `curr` on the tracking controller; a MainActor-confined
-  tracking slot.
+  tracking slot. Untracked reads still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
   `Writer` subscripts read and write, so `w[count] += 1` works; unforgeable
   turn IDs; idle → accumulating → flushing; nested commits join; commits
@@ -139,9 +147,11 @@ The class-node build. Correctness first; no perf tricks.
 - Reactions and effects: `cogs.run`; `cogs.watch(_:initial:name:)`;
   final-class `ReactionToken`; `EffectGroup` with `add` and `task(name:)`;
   cancel is idempotent and runs on deinit; write-back queues new FIFO turns;
-  a debug quiescence guard (about 64 turns) prints the causal chain (§6.4).
+  a debug quiescence guard (about 64 turns) prints the causal chain through an
+  internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
-  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3.
+  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
+  graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
   Add the `CogTesting` isolated-context factory. Settle the helper spellings
   (`installApp()` and `testing()` are placeholders); record in §10 and the
@@ -154,10 +164,12 @@ The class-node build. Correctness first; no perf tricks.
 Tests use Swift Testing on the host in all four legs. Cover the union of §11.1
 and perf §9.1: diamonds; deep and broad graphs; changing and conditional
 dependencies; self and multi-node cycles; escaped writers; reaction write-back
-ordering; the quiescence guard; second-production-context rejection; scene
-recreation without manual-state loss; equality-gated notifications; manual
-lifetime; `whileObserved` release and recreate; and seed-then-turn settling
-(the §6.6 alert test verbatim).
+ordering; the finite quiescence-guard diagnostic; correct untracked reads;
+MainActor execution and non-`Sendable` values; second-production-context
+rejection; scene recreation without manual-state loss; equality-gated
+notifications; manual lifetime; `whileObserved` release and recreate without
+graph edges acting as leases; and seed-then-turn settling (the §6.6 alert test
+verbatim).
 
 ### M2: SwiftUI boundary and weather example (spike §11.2)
 
@@ -188,7 +200,9 @@ lifetime; `whileObserved` release and recreate; and seed-then-turn settling
 Limit this milestone to the async pieces needed for 0.1.0:
 
 - `CogPhase<Value>` plus `Previous<Value>`, `latestValue`, `isLoading`, and
-  the `.latest` projection so async and manual values read alike.
+  the `.latest` projection so async and manual values read alike. There is no
+  observable `initial` phase: first read starts work, publishes
+  `pending(previous: .none)` as a turn, and returns that phase.
 - `AsyncCog` and `AsyncCogBox`: synchronous tracked selectors returning
   `Work.run`; the `.latest` policy with generation numbers (the MainActor
   commits a result only if its generation is still current); each visible
@@ -198,8 +212,8 @@ Limit this milestone to the async pieces needed for 0.1.0:
 - A `cogs.refresh(ref)` op; task names from descriptor labels for
   Instruments.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
-  dependency changes mid-flight, and release while pending. Use injected
-  clocks and continuations; do not sleep.
+  dependency changes mid-flight, omitted-policy `.latest` behavior, and release
+  while pending. Use injected clocks and continuations; do not sleep.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.
@@ -244,7 +258,7 @@ query caching.
   gating yet).
 - Compare the three ref layouts (inline `AnyHashable`, interned tokens,
   generic keyed refs) on keyed diamonds and key churn. Record results in
-  [perf.md](./perf.md); layouts stay open until the numbers exist. Edge
+  [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6.
 
@@ -280,11 +294,11 @@ query caching.
   and restarts the sequence.
 - `cogs.values(of:buffering:)`: a current-value-first multicast
   `AsyncSequence`; `.newest(1)` default, plus `.oldest(n)` and `.unbounded`;
-  per-subscriber graph leases (§8). Validate the §6.5 view-scoped `.task`
-  pattern in the example app.
+  per-subscriber graph leases (§8). Test exact overflow sequences for all three
+  policies. Validate the §6.5 view-scoped `.task` pattern in the example app.
 - The `c.track` shim for external `@Observable` objects: re-armed
   `withObservationTracking` before iOS 26, `Observations` on 26 and later
-  (§8).
+  (§8). Test repeated changes and property granularity on both paths.
 - Tag `0.3.0`. Query caching (`.cache`), persistence helpers, and the
   debug-history UI stay deferred backlog (§5.3, §10 items 5 and 7).
 
@@ -322,12 +336,13 @@ query caching.
   tasks are namespaced (`fmt:swift` now, `fmt:kotlin` later) under repo-wide
   umbrellas.
 - Record Swift spike results that may inform Kotlin as notes in the Kotlin
-  ledger ([../kotlin/exploration.md](../kotlin/exploration.md) §10). Do not
+  ledger ([../../kotlin/exploration.md](../../kotlin/exploration.md) §10). Do
+  not
   apply Swift decisions to Kotlin automatically.
 
 ## Documentation obligations (every milestone)
 
-- Settled decisions → exploration §10 and the [README.md](./README.md)
+- Settled decisions → exploration §10 and the [README.md](../README.md)
   "Where things stand" snapshot.
 - Benchmark results → perf.md; representation choices stay open until
   measured.
@@ -339,8 +354,9 @@ query caching.
 - M0: `mise run fmt:check` and `mise run test:matrix` pass on the stub;
   CI green end to end; a leg-assertion test confirms the env legs really
   change test-target flags.
-- M1: the full test matrix above is green in all four legs;
-  escaped-writer and second-context tests assert failure in every build.
+- M1: the full test matrix above is green in all four legs and in the
+  `test-release` leg; escaped-writer, second-context, and cycle tests assert
+  failure in debug and release alike.
 - M2: run Weather in a simulator; confirm one ZIP's write re-renders
   only that ZIP's card (`Self._printChanges` or re-render counters); UIKit
   check on an iOS 26 simulator.

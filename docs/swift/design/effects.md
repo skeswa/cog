@@ -1,6 +1,6 @@
 # Cog for Swift: effects and background work
 
-_August 6, 2026_
+_August 9, 2026_
 
 This file is §6 of [exploration.md](./exploration.md). It covers effects,
 their lifetimes, testing, and work that can outlive the app process. Other
@@ -127,7 +127,10 @@ naturally start later turns because they happen after an `await`.
 Effects can still form a loop: turn → reaction → turn. A debug guard should
 warn after about 64 turns without reaching idle and print the causal chain.
 The queue prevents re-entrant graph writes; the trace makes a runaway loop
-clear.
+clear. An internal diagnostic seam lets tests capture the warning without
+scraping logs. The guard test uses a finite reaction chain that crosses the
+threshold and then stops, so warning-only behavior remains testable without an
+infinite drain.
 
 Synchronous reaction flush is deliberate: tests can assert effects on the line
 after an op returns, and a short background task knows its reconciler finished

@@ -18,8 +18,10 @@ are no build or test commands. Tooling is versioned with mise (`mise.toml`):
 verifies formatting without writing. `.oxfmtrc.json` excludes the frozen
 `docs/dump-2026-08-06.md` from formatting. The next phase for each platform
 is the spike in its `exploration.md` §11, as amended by its `perf.md` §9. For
-Swift, `docs/swift/plan.md` turns that spike into milestones with package
-layout, tooling, CI, and release steps.
+Swift, `docs/swift/impl/plan.md` turns that spike into milestones with package
+layout, tooling, CI, and release steps, and `docs/swift/impl/scenarios.md`
+breaks those milestones into the test scenarios that drive red-green
+implementation.
 
 ## Layout
 
@@ -27,11 +29,13 @@ layout, tooling, CI, and release steps.
   documentation entry points.
 - `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
   design. Historical background only; never normative and never edited.
-- `docs/swift/` — living Swift design documents. Start with `README.md`.
-  `exploration.md` covers the core architecture and API; `effects.md` covers
-  effects and background work; `rx.md` maps Rx concepts; `perf.md` covers the
-  data-oriented implementation and benchmark plan; `plan.md` is the
-  implementation plan with milestones, tooling, CI, and release process.
+- `docs/swift/` — living Swift documents. Start with `README.md`, the map.
+  Design docs live in `docs/swift/design/`: `exploration.md` covers the core
+  architecture and API; `effects.md` covers effects and background work;
+  `rx.md` maps Rx concepts; `perf.md` covers the data-oriented implementation
+  and benchmark plan. Implementation docs live in `docs/swift/impl/`:
+  `plan.md` is the implementation plan with milestones, tooling, CI, and
+  release process; `scenarios.md` is the test-scenario tree.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and
@@ -83,7 +87,8 @@ that runtime.
   platform doc sets to the root `README.md`.
 - **Do not re-litigate settled decisions.** The Swift snapshot is in
   `docs/swift/README.md` under “Where things stand.” The full settled/open
-  ledger is `docs/swift/exploration.md` §10. The Kotlin snapshot and ledger are
+  ledger is `docs/swift/design/exploration.md` §10. The Kotlin snapshot and
+  ledger are
   in `docs/kotlin/README.md` and `docs/kotlin/exploration.md` §10. Designs are
   hardened through `/vette` reviews. When the user accepts a decision from a
   review, update both records for that platform. Track real open questions in

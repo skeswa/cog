@@ -1,8 +1,8 @@
 # Cog for Swift: core design
 
-_August 6, 2026_
+_August 9, 2026_
 
-_See [README.md](./README.md) for the document map._
+_See [README.md](../README.md) for the document map._
 
 Cog is a fine-grained state library for SwiftUI: a change updates only the
 derived values and views that used it. Cog uses Apple's Observation system at
@@ -218,8 +218,10 @@ Rules:
   domain work and `CogPhase` for async failures.
 - `c.read` returns a cog's current value without creating an edge — the
   untracked escape hatch for a value the selector uses but must not follow, as
-  in `withLatestFrom` (§5.4). Keep it rare and loud; an untracked read that
-  should have been tracked is a stale-value bug.
+  in `withLatestFrom` (§5.4). Untracked reads still settle: `c.read` and the
+  one-shot `cogs.read` compute a dirty value before returning it, so skipping
+  the edge never means seeing a stale value. Keep it rare and loud; an
+  untracked read that should have been tracked is a stale-value bug.
 - `c.curr` exposes the cog's own prior value so a selector may keep or fold
   it.
 
@@ -485,7 +487,6 @@ enum Previous<Value> {
 }
 
 enum CogPhase<Value> {
-    case initial
     case pending(previous: Previous<Value>)
     case success(Value)
     case failure(any Error, previous: Previous<Value>)
@@ -494,6 +495,12 @@ enum CogPhase<Value> {
     var isLoading: Bool { ... }
 }
 ```
+
+There is no public `initial` phase. Before first use, an async node does not
+exist in the context and has no phase to observe. Its first read creates the
+node, starts its work, publishes `.pending(previous: .none)` as a turn, and
+returns that pending phase. This keeps the first observable state honest: work
+has begun and no value has completed yet.
 
 `Previous` keeps “no previous value” distinct from “the previous value was
 nil.” With a plain `Value?`, that distinction would hide in a nested optional
@@ -649,8 +656,10 @@ testing, background work, and reconciler rules.
 - **Exports:** `cogs.values(of:buffering:)` is a current-value-first multicast
   `AsyncSequence`. The default `.newest(1)` keeps memory bounded and never
   blocks a synchronous commit; a slow reader may skip turns, but every value
-  it gets is settled. `.oldest(n)` and `.unbounded` cover explicit needs. Each
-  subscriber owns a graph lease. Exact turn history belongs in the fixed debug
+  it gets is settled. `.oldest(n)` keeps the first n undelivered values in
+  order and drops newer ones while its buffer is full; `.unbounded` delivers
+  every settled value. Both cover explicit needs, and no policy makes a commit
+  wait on a reader. Each subscriber owns a graph lease. Exact turn history belongs in the fixed debug
   log, not the default state stream.
 - **UIKit and AppKit:** registrar-backed nodes work with their automatic
   tracking on supported OS versions. The same boundary serves all Apple UI
@@ -683,29 +692,31 @@ singular, and does measurement show less runtime work?
 
 ### Settled
 
-| Question                          | Decision                                                                                                                                                                                             |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                    |
-| Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                 |
-| Keyed and keyless API?            | Boxes make refs; keyless cogs are pre-bound refs. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                          |
-| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are ref values over internal final-class descriptors (§2.3, §3.1). |
-| Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                |
-| Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                    |
-| Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                              |
-| Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                 |
-| Async value shape?                | `CogPhase` with an explicit `Previous` case, keeping “no previous value” distinct from “previous value was nil,” plus a `.latest` projection (§5.1).                                                 |
-| Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                       |
-| Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                    |
-| Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                   |
-| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                       |
-| Effect lifecycle?                 | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3).                                                                                                                 |
-| Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports loops (§6.4).                                                                                             |
-| Test seeding?                     | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6).                                                           |
-| Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                              |
-| Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                  |
-| Node disposal?                    | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3).                                                                                                        |
-| State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                   |
-| Context construction?             | App bootstrap can install one production context; feature code cannot construct another (§2.3).                                                                                                      |
+| Question                          | Decision                                                                                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                         |
+| Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                                      |
+| Keyed and keyless API?            | Boxes make refs; keyless cogs are pre-bound refs. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                                               |
+| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are ref values over internal final-class descriptors (§2.3, §3.1).                      |
+| Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                                     |
+| Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                                         |
+| Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                                                   |
+| Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                                      |
+| Async value shape?                | `CogPhase` begins publicly at `pending`—there is no observable `initial` phase—and uses an explicit `Previous` case to distinguish “no previous value” from “previous value was nil,” plus a `.latest` projection (§5.1). |
+| Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                            |
+| Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                                         |
+| Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                                        |
+| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                                            |
+| Effect lifecycle?                 | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3).                                                                                                                                      |
+| Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports long causal chains through a testable diagnostic seam (§6.4).                                                                  |
+| Test seeding?                     | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6).                                                                                |
+| Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                                                   |
+| Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                       |
+| Node disposal?                    | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges (§5.3).                                                                                                                             |
+| State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                        |
+| Untracked reads?                  | `c.read` and one-shot `cogs.read` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                               |
+| Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                              |
+| Context construction?             | App bootstrap can install one production context; feature code cannot construct another (§2.3).                                                                                                                           |
 
 ### Still open
 
