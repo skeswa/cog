@@ -44,6 +44,25 @@ scenario to exactly one task.
   against real infrastructure. Known compound work is split before execution,
   representation swaps integrate incrementally, and release preparation stays
   separate from remote publication.
+- CI runners (settled 2026-08-10): macOS CI runs on a personal self-hosted
+  Apple Silicon Mac mini; Linux jobs stay on GitHub-hosted `ubuntu`. Because
+  the repo is public and its CI is pull-request-driven, fork security is
+  layered rather than trigger-omitted (the dootdoot pattern of push-only
+  self-hosted CI would leave pull requests with no macOS signal). The
+  layers: every self-hosted job carries a same-repo guard
+  (`github.repository == 'skeswa/cog'` and, on `pull_request` events,
+  `github.event.pull_request.head.repo.full_name == github.repository`), so
+  fork pull requests structurally never reach the mini and run instead in
+  an approval-gated GitHub-hosted macOS lane; repository settings require
+  approval for workflow runs from all external contributors, full-SHA
+  action pins, and a read-only default `GITHUB_TOKEN` (applied 2026-08-10;
+  `M0-14` records and verifies them); the runner topology targets one
+  ephemeral VM per job (Tart-based, orchestrator settled by `M0-05a`) with
+  dootdoot-style persistent-bare-metal hygiene — workspace scrub,
+  `persist-credentials: false`, timeouts — as the recorded fallback; and a
+  committed workflow-contract check (`M0-15`) enforces the guards,
+  permissions blocks, credential hygiene, and pins so the hardening cannot
+  silently regress.
 - Task bookkeeping (settled 2026-08-10): day-to-day execution bookkeeping —
   claiming, status, discussion, and closure — lives in the repository's
   GitHub issues, one issue per task with dependencies as native blocked-by
@@ -154,9 +173,9 @@ the smallest repair task is inserted before a failed gate is rerun.
 
 | Plan milestone                   | Task ledger                     | Decisions before dependent work                                            | Closing path                                                                                                                   |
 | -------------------------------- | ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner/Xcode pin                                                  | `M0-10`                                                                                                                        |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                   | `M0-10`                                                                                                                        |
 | M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                     | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-18a` floor-runtime policy                      | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when hosted iOS 17 is unavailable                                 |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-18a` floor-runtime policy                      | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when no pinned iOS 17 runtime is available                        |
 | M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                         | `M3-11`                                                                                                                        |
 | M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
 | M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility | `M5-10`                                                                                                                        |
@@ -223,9 +242,19 @@ carries the live state of doing it.
   leg where every-build guardrails such as the second-context guard, escaped
   writers, cycle detection, the absence of `seed`, and free debug history are
   proven outside debug). Add `test-simulator` in M2 and `bench-build` in M5.
-  Use the `macos-26` runner with a pinned Xcode 26.x. Verify image contents
-  against `actions/runner-images` when writing the workflow. `markdown.yml`
-  runs oxfmt on ubuntu.
+  macOS jobs run on the self-hosted Mac mini under the labels and topology
+  `M0-05a` records, with the pinned Xcode 26.x baked into the runner image;
+  every self-hosted job carries the same-repo fork guard, a `permissions:`
+  block no broader than `contents: read`, `persist-credentials: false` on
+  checkout, and a timeout, and fork pull requests run only in the
+  approval-gated GitHub-hosted macOS lane. `markdown.yml` runs oxfmt on
+  GitHub-hosted ubuntu.
+- Self-hosted runner: provision the Mac mini per the `M0-05a` topology
+  decision — orchestrator, pinned Xcode image, ephemeral registration under
+  a repo-specific label, and a hardened dedicated runner user (`M0-13`);
+  record and verify the repository's Actions fork-security settings
+  (`M0-14`); and add the workflow-contract check that fails CI if a
+  hardening invariant regresses (`M0-15`).
 - Compile-fail harness: a fixtures directory of expected-failure sources,
   compiled in one batched pass by a `test:compilefail` mise task and CI step
   that asserts each fixture fails with the expected diagnostic. The
@@ -353,9 +382,11 @@ isolation; and named effect runs in history.
   iOS 17.x simulator and run the core tracked-read, unrelated-write,
   equality-gated notice, and immediate-binding boundary scenarios. M7 extends
   this job with the pre-iOS-26 `c.track` re-arm scenarios. Too slow for per-PR.
-  A time-boxed feasibility task records the exact runtime-install path and
-  whether hosted-runner availability can block a release; absent a reliable
-  hosted runtime, the nightly remains explicitly non-blocking.
+  A time-boxed feasibility task records the exact runtime-install path —
+  now into the self-hosted runner's pinned image, which owning the hardware
+  makes far more tractable than a hosted-runner install — and whether that
+  runtime can be kept reliably available; absent a reliable pinned runtime,
+  the nightly remains explicitly non-blocking.
 
 <a id="plan-m3"></a>
 
@@ -432,7 +463,9 @@ query caching.
   nodes; and verified ARC retain and release counters. Baselines use the CLI
   spelling proven by the compatibility probe. Every baseline pins its
   environment: exact Xcode and Swift version, benchmark dependency version,
-  architecture, and allocator backend. Redo malloc baselines whenever the
+  architecture, allocator backend, and the runner environment — the pinned
+  VM image, or the bare mini host if the `M5-05bb` probe shows VM noise
+  breaks the thresholds. Redo malloc baselines whenever the
   supported allocator path changes, including any Swift 6.2/6.3 boundary the
   probe confirms. Per-callsite ARC attribution stays a manual `xcrun xctrace`
   workflow documented in `swift/Benchmarks/README.md`.
@@ -635,8 +668,12 @@ release gates.
 
 ## Flagged uncertainties (verify at implementation time)
 
-- Exact `macos-26` runner image contents and preinstalled Xcode 26.x
-  versions (check `actions/runner-images`).
+- Mac mini runner topology: maturity of the Tart VM orchestrators
+  (Tartelet, ekiden, Cilicon), the Virtualization.framework two-VM
+  concurrency limit, simulator performance inside a VM, and whether a
+  pinned iOS 17.x runtime installs cleanly into the runner image.
+- VM-versus-bare-metal benchmark noise on the mini (probed at `M5-05bb`
+  before baselines are recorded).
 - Benchmark package canonical repository, ARC metric names, minimum version,
   baseline CLI, allocator backend across Swift 6.2/6.3, and MainActor
   compatibility.

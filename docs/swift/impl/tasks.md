@@ -115,16 +115,25 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   batched expected-diagnostic runner, and `test:compilefail` mise command.
   _Depends: M0-01._
   _Verify: `mise run test:compilefail` against one sentinel fixture._
-- **M0-05a** _(Decision)_ — Verify the `macos-26` image and pinned Xcode 26.x
-  against `actions/runner-images`; record the exact runner/Xcode pair and
-  selection command in the README before the workflow is created.
-  _Verify: recorded runner-image source and selected version._
+- **M0-05a** _(Decision)_ — Settle the self-hosted runner topology for the
+  Mac mini: the ephemeral Tart-VM orchestrator (Tartelet, ekiden, or
+  Cilicon — or record persistent bare metal with scrub hygiene as the
+  fallback), the pinned runner image with Xcode 26.x, the repo-specific
+  runner labels, and the fork-PR routing through the approval-gated
+  GitHub-hosted macOS lane. Record the topology in the README before the
+  workflow is created.
+  _Verify: recorded topology decision, pinned image/Xcode pair, and runner
+  labels._
 - **M0-05b** _(Infrastructure)_ — Create `swift-ci.yml` with
   concurrency-cancel; path filters for `Package.swift`, `Package.resolved`,
   `swift/**`, `.swift-format`, `mise.toml`, and the workflow itself; format;
-  the runner/Xcode pair selected by M0-05a; and four cached host-test legs.
-  _Depends: M0-02, M0-04, M0-05a._
-  _Verify: a pull-request run completes all format and host-test jobs._
+  four cached host-test legs on the provisioned self-hosted runner; the
+  same-repo fork guard, least-privilege `permissions:`,
+  `persist-credentials: false`, and a timeout on every self-hosted job; and
+  the approval-gated GitHub-hosted macOS lane for fork pull requests.
+  _Depends: M0-02, M0-04, M0-13._
+  _Verify: a same-repo pull-request run completes all format and host-test
+  jobs on the self-hosted runner._
 - **M0-05c** _(Infrastructure)_ — Add release-configuration and batched
   compile-fail jobs to `swift-ci.yml`.
   _Depends: M0-05b, M0-07._
@@ -187,9 +196,33 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   _Depends: M0-11._
   _Verify: `mise run tasks:check` plus forked-release-chain, gateless-release,
   and integration-hole fixtures._
+- **M0-13** _(Infrastructure)_ — Provision the Mac mini per the recorded
+  topology: install the orchestrator, build or pull the pinned Xcode 26.x
+  runner image, register ephemeral single-use runners under the
+  repo-specific label, and harden a dedicated non-admin runner user holding
+  no personal credentials.
+  _Depends: M0-05a._
+  _Verify: a sentinel workflow run from a same-repo branch executes on the
+  runner, and a second run starts from a fresh environment (or the recorded
+  bare-metal scrub applies)._
+- **M0-14** _(Infrastructure)_ — Record and verify the repository's Actions
+  fork-security settings: approval required for workflow runs from all
+  external contributors, required full-SHA action pins, and the read-only
+  default `GITHUB_TOKEN`; document the exact `gh api` verification commands
+  in the README.
+  _Verify: the three `gh api` reads return the recorded values._
+- **M0-15** _(Infrastructure)_ — Add the workflow-contract check as
+  `mise run workflows:check` and a CI step: every self-hosted job carries
+  the same-repo guard, a least-privilege `permissions:` block,
+  `persist-credentials: false`, and a timeout; no workflow uses
+  `pull_request_target`; and every action is pinned to a full-length commit
+  SHA.
+  _Depends: M0-05b, M0-09aa._
+  _Verify: `mise run workflows:check` plus guard-removed, over-broad
+  permissions, unpinned-action, and `pull_request_target` fixtures._
 - **M0-10** _(Gate)_ — Close scaffolding with every local command and CI job
   green on the stub.
-  _Depends: M0-05c, M0-06, M0-08, M0-09b, M0-12._
+  _Depends: M0-05c, M0-06, M0-08, M0-09b, M0-12, M0-14, M0-15._
   _Verify: `mise run fmt:check`, `mise run tasks:check`,
   `mise run test:matrix`, `mise run test:release`, and
   `mise run test:compilefail`._
@@ -673,14 +706,15 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-15._
   _Verify: the Weather build job passes in CI._
 - **M2-18a** _(Decision)_ — Time-box investigation of pinned iOS 17 runtime
-  installation; record exact mechanics and whether runner availability can
-  block a release. The nightly remains non-blocking unless this task records
-  a reliable hosted runtime.
+  installation into the self-hosted runner's pinned image; record exact
+  mechanics and whether that runtime can be kept reliably available. The
+  nightly remains non-blocking unless this task records a reliable pinned
+  runtime.
   _Verify: reproducible install command or documented non-blocking fallback._
 - **M2-18b** _(Behavior)_ — Add the pinned nightly floor subset when the
   recorded runtime path is available.
   _Depends: M2-04, M2-05, M2-18a._
-  _Non-blocking: execute when M2-18a records a reliable hosted runtime;
+  _Non-blocking: execute when M2-18a records a reliable pinned runtime;
   otherwise leave deferred without blocking M2-20 or a release._
   _Verify: a scheduled or manually dispatched floor job passes UI-14._
   _Greens: UI-14._
@@ -896,8 +930,9 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-01a._
   _Verify: checked-in package, metric, and CLI compatibility table._
 - **M5-05bb** _(Decision)_ — Probe allocator behavior across the Swift 6.2 to
-  6.3 transition and MainActor benchmark compatibility; record the supported
-  backends and any required isolation shim.
+  6.3 transition and MainActor benchmark compatibility, and measure
+  VM-versus-bare-metal noise on the mini; record the supported backends, any
+  required isolation shim, and where benchmarks run.
   _Depends: M5-05a, M5-05ba._
   _Verify: checked-in allocator/isolation compatibility table and probe logs._
 - **M5-05c** _(Infrastructure)_ — Make one MainActor benchmark build and run,
