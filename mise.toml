@@ -30,3 +30,23 @@ run = "oxfmt --check"
 [tasks."fmt:check:swift"]
 description = "Lint Swift formatting strictly, writing nothing"
 run = "swift format lint --strict --parallel --recursive swift Package.swift"
+
+# Testing goes through `tools/swift-test.mjs`, never `swift test` directly.
+# The wrapper gives every isolation-matrix leg and configuration its own
+# SwiftPM scratch path, and — whenever `--filter` is passed — enumerates the
+# built tests before running and fails when the expression selects none.
+# SwiftPM exits 0 on an empty selection, so a raw `swift test --filter` can
+# report a green for work it never ran. Extra arguments are passed straight
+# through: `mise run test --filter 'DECL-01|ONE-04' --parallel`.
+
+[tasks.test]
+description = "Run the Swift tests on the default matrix leg"
+run = "node {{config_root}}/tools/swift-test.mjs default"
+
+[tasks."test:matrix"]
+description = "Run the Swift tests across all four isolation-matrix legs"
+run = "node {{config_root}}/tools/swift-test.mjs matrix"
+
+[tasks."test:release"]
+description = "Run the Swift tests on the default leg in release configuration"
+run = "node {{config_root}}/tools/swift-test.mjs release"
