@@ -22,6 +22,15 @@ name: Swift CI
 # `runs-on:` that routes by event would put fork code one expression bug away
 # from the mini. Duplication is cheap; that mistake is not.
 #
+# NO XCODE, ON PURPOSE. Nothing M0 runs needs it: `swift build`, `swift test`,
+# and `swift format lint` all come from the Command Line Tools, which is all
+# the mini has installed. There is therefore no `xcode-select` step anywhere
+# in this file — one would fail every macOS job today and buy nothing. M2
+# introduces the pinned selection when `test-simulator` arrives and a
+# simulator runtime is genuinely required; the version to pin then is **Xcode
+# 26.5**, which the README topology records for both lanes. The `format` job
+# marks the spot.
+#
 # The rest of the hardening posture is enforced by `mise run workflows:check`:
 # least-privilege `permissions:`, `persist-credentials: false`, a timeout on
 # every job, no `pull_request_target`, and full-SHA action pins.
@@ -64,16 +73,6 @@ permissions:
   contents: read
 
 env:
-  # THE XCODE PIN. Both macOS lanes pin the same version, which is the whole
-  # reason the README picked one that exists in both: 26.5 is installed on the
-  # mini and is on the GitHub-hosted `macos-26` arm64 image at
-  # `/Applications/Xcode_26.5.app` (the hosted image's *default* is 26.6, so
-  # this pin is doing real work there). mise cannot pin Xcode, so this is the
-  # one place the version is written down in CI. `M0-13` confirms what the
-  # mini actually has installed; if it differs, change this line and the
-  # README's topology record together — nothing else in this file names a
-  # version.
-  COG_XCODE_VERSION: "26.5"
   # Kept in step with `markdown.yml`.
   COG_MISE_VERSION: "2026.8.3"
 
@@ -103,30 +102,25 @@ jobs:
         with:
           version: ${{ env.COG_MISE_VERSION }}
 
-      # Xcode is selected with `DEVELOPER_DIR` rather than `sudo xcode-select`.
-      # `DEVELOPER_DIR` needs no privilege, so it keeps working when the mini
-      # moves to the dedicated non-admin runner user the topology targets, and
-      # it scopes the selection to this job, so two jobs sharing the mini can
-      # never fight over a machine-wide setting. Every `xcrun`-dispatched tool
-      # — `swift`, `swift format`, `xcodebuild` — honors it.
+      # THIS IS WHERE THE PINNED `xcode-select` GOES — in M2, not now. The
+      # mini has only the Command Line Tools, which supply every toolchain M0
+      # uses, so selecting a version that is not installed would fail every
+      # macOS job for no benefit. When M2's `test-simulator` needs Xcode, pin
+      # **26.5**: it is the version the README topology records, and the one
+      # version present on both this host and the GitHub-hosted `macos-26`
+      # image, so both lanes can pin alike.
       #
-      # The step prints what is actually installed and fails with that
-      # inventory in the message when the pin is missing, rather than quietly
-      # building against whatever version happens to be the default.
-      - name: Select the pinned Xcode
+      # Until then the toolchain is simply whatever the host has — and the
+      # host is bare metal with no image pinning, so record it rather than
+      # guess later which compiler produced a result. One job, not all five:
+      # the mini has one selected toolchain, and printing it in each of the
+      # four legs would be the same three lines four times.
+      - name: Record the toolchain that produced this run
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          echo "Installed Xcodes:"
-          echo "${installed:-  (none)}"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$developer_dir" xcodebuild -version
-          DEVELOPER_DIR="$developer_dir" swift --version
+          xcode-select -p
+          swift --version
+          swift format --version
 
       # `fmt:check:swift`, not the `fmt:check` umbrella: the umbrella also runs
       # Oxfmt over Markdown, JSON, and YAML, which `markdown.yml` already gates
@@ -150,8 +144,9 @@ jobs:
       fail-fast: false
       matrix:
         # The four legs of the isolation matrix, named exactly as
-        # `tools/swift-test.mjs` names them. Each leg gets its own job so the
-        # legs parallelize across the mini's runners and cache separately.
+        # `tools/swift-test.mjs` names them — the wrapper takes each leg name
+        # as a mode of its own. Each leg gets its own job so the legs
+        # parallelize across the mini's runners and cache separately.
         leg:
           - mainactor-nnbd-on
           - mainactor-nnbd-off
@@ -169,35 +164,23 @@ jobs:
         with:
           version: ${{ env.COG_MISE_VERSION }}
 
-      # Same pin, same mechanism, same failure mode as the `format` job above.
-      - name: Select the pinned Xcode
-        run: |
-          set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          echo "Installed Xcodes:"
-          echo "${installed:-  (none)}"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$developer_dir" xcodebuild -version
-          DEVELOPER_DIR="$developer_dir" swift --version
-
       # The cached directory is the leg's SwiftPM scratch path, which
       # `tools/swift-test.mjs` derives as `.build/<leg>-<configuration>`. The
       # names have to match the wrapper's exactly or the cache restores into a
-      # directory nothing reads. The key covers everything that invalidates a
-      # build plan: the manifest, the resolved dependency graph, the pinned
-      # toolchain, and the Xcode version the objects were compiled by.
+      # directory nothing reads.
+      #
+      # The key covers the manifest, the resolved dependency graph, and the
+      # pinned tooling. It deliberately does not name a compiler: nothing here
+      # pins one, and SwiftPM already stamps the scratch path with a
+      # `swift-version-*.txt` and rebuilds when the compiler changes, so a
+      # cache restored across a toolchain upgrade is slow, never wrong.
       - name: Restore the leg's build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .build/${{ matrix.leg }}-debug
-          key: swift-${{ matrix.leg }}-debug-${{ runner.arch }}-xcode${{ env.COG_XCODE_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          key: swift-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
           restore-keys: |
-            swift-${{ matrix.leg }}-debug-${{ runner.arch }}-xcode${{ env.COG_XCODE_VERSION }}-
+            swift-${{ matrix.leg }}-debug-${{ runner.arch }}-
 
       - name: Run the host tests for this leg
         env:
@@ -208,10 +191,14 @@ jobs:
   # Fork lane: pull requests from forks, on GitHub-hosted macOS.
   #
   # These jobs are the fork's entire macOS signal, so they mirror the
-  # self-hosted lane above step for step. They need no same-repo guard because
-  # they carry its complement, and they are approval-gated by the repository's
-  # `all_external_contributors` fork-PR policy (`M0-14`), not by anything in
-  # this file.
+  # self-hosted lane above step for step — including the absence of any
+  # `xcode-select`. The hosted image does have Xcode, but pinning it in one
+  # lane only would mean the two lanes prove different things, and M0 needs no
+  # Xcode in either. M2 pins both together.
+  #
+  # These jobs need no same-repo guard because they carry its complement, and
+  # they are approval-gated by the repository's `all_external_contributors`
+  # fork-PR policy (`M0-14`), not by anything in this file.
   # ---------------------------------------------------------------------------
 
   fork-format:
@@ -233,22 +220,6 @@ jobs:
         uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
         with:
           version: ${{ env.COG_MISE_VERSION }}
-
-      # Same pin, same mechanism, same failure mode as the `format` job above.
-      - name: Select the pinned Xcode
-        run: |
-          set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          echo "Installed Xcodes:"
-          echo "${installed:-  (none)}"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$developer_dir" xcodebuild -version
-          DEVELOPER_DIR="$developer_dir" swift --version
 
       - name: Lint Swift formatting
         run: mise run fmt:check:swift
@@ -281,29 +252,15 @@ jobs:
         with:
           version: ${{ env.COG_MISE_VERSION }}
 
-      # Same pin, same mechanism, same failure mode as the `format` job above.
-      - name: Select the pinned Xcode
-        run: |
-          set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          echo "Installed Xcodes:"
-          echo "${installed:-  (none)}"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$developer_dir" xcodebuild -version
-          DEVELOPER_DIR="$developer_dir" swift --version
-
+      # Keyed apart from the self-hosted lane's caches: same leg, different
+      # host, different toolchain.
       - name: Restore the leg's build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .build/${{ matrix.leg }}-debug
-          key: swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-xcode${{ env.COG_XCODE_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          key: swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
           restore-keys: |
-            swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-xcode${{ env.COG_XCODE_VERSION }}-
+            swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-
 
       - name: Run the host tests for this leg
         env:
