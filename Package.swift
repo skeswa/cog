@@ -17,18 +17,66 @@ let librarySettings: [SwiftSetting] = [
   .enableUpcomingFeature("InternalImportsByDefault"),
 ]
 
-/// Settings applied to every test target.
+// MARK: - The isolation matrix
+
+// The same test targets compile in four legs — {MainActor-default,
+// nonisolated} × {`NonisolatedNonsendingByDefault` on, off} — selected by the
+// two environment variables read below. `tools/swift-test.mjs` sets them; an
+// unset variable is the default leg, so a bare `swift test` still works.
+//
+// Each leg is also mirrored into a `.define()`, which is what lets the LEG-02
+// test in `CogTests` prove the leg it was compiled for matches the leg its
+// environment asked for. Without the defines, a manifest that quietly stopped
+// reading the environment would collapse the matrix into four identical runs
+// that all still pass.
+//
+// An unrecognized value is a hard error rather than a silent fall back to the
+// default leg: a typo in a CI matrix entry would otherwise buy a green from a
+// leg that never ran.
+
+let requestedIsolation = Context.environment["COG_TEST_ISOLATION"] ?? "mainactor"
+let requestedNonisolatedNonsending = Context.environment["COG_TEST_NNBD"] ?? "1"
+
+/// Settings applied to every test target, for the leg the environment selects.
 ///
-/// Today this is the default leg of the isolation matrix: MainActor-by-default
-/// with `NonisolatedNonsendingByDefault` on. `M0-04` replaces the constants
-/// below with values selected from `COG_TEST_ISOLATION` and `COG_TEST_NNBD`
-/// and mirrors each leg into a `.define()`; nothing else in this manifest has
-/// to move when it does.
-let testSettings: [SwiftSetting] = [
-  .swiftLanguageMode(.v6),
-  .defaultIsolation(MainActor.self),
-  .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+/// Only the *test* targets vary; `librarySettings` above is fixed, because the
+/// shipped library has exactly one shape no matter how it is tested.
+var testSettings: [SwiftSetting] = [
+  .swiftLanguageMode(.v6)
 ]
+
+switch requestedIsolation {
+case "mainactor":
+  testSettings.append(.defaultIsolation(MainActor.self))
+  testSettings.append(.define("COG_LEG_ISOLATION_MAINACTOR"))
+case "nonisolated":
+  // SE-0466 spells "no default actor isolation" as a nil isolation, which
+  // SwiftPM lowers to `-default-isolation nonisolated`.
+  testSettings.append(.defaultIsolation(nil))
+  testSettings.append(.define("COG_LEG_ISOLATION_NONISOLATED"))
+default:
+  fatalError(
+    """
+    COG_TEST_ISOLATION was \(requestedIsolation), which is not an isolation leg. \
+    Expected mainactor or nonisolated, or leave it unset for mainactor.
+    """
+  )
+}
+
+switch requestedNonisolatedNonsending {
+case "1":
+  testSettings.append(.enableUpcomingFeature("NonisolatedNonsendingByDefault"))
+  testSettings.append(.define("COG_LEG_NNBD_ON"))
+case "0":
+  testSettings.append(.define("COG_LEG_NNBD_OFF"))
+default:
+  fatalError(
+    """
+    COG_TEST_NNBD was \(requestedNonisolatedNonsending), which is not a \
+    NonisolatedNonsendingByDefault leg. Expected 1 or 0, or leave it unset for 1.
+    """
+  )
+}
 
 // MARK: - Optional dependencies
 
