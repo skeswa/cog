@@ -31,9 +31,16 @@ Cog is the library.
   in `CogBoundaryTests`; run-count tests in `CogScenarioTests`; everything else
   in `CogTests`, run in all four build legs and once more in the
   release-configuration `test-release` leg (plan M0), which is where every-build
-  guardrail claims are proven outside debug.
-- A dropped scenario keeps its ID forever with a note pointing at what
-  subsumed it. Never delete an ID line.
+  guardrail claims are proven outside debug. Scenarios that exercise
+  debug-only surface — `seed`, debug history content, debug warnings —
+  compile out of the `test-release` leg behind `#if DEBUG`; that leg proves
+  their absence instead (SEED-05, HIST-04).
+- A dropped scenario's line is deleted. While no tests exist yet, its group
+  is renumbered to stay gapless; once tests link to IDs, the ID retires
+  instead and a gap is expected.
+- Behavior blocked on a core §10 open question has no scenario yet. The
+  affected group carries a _Pending_ line naming the question; add the
+  scenarios at the end of that group when the decision lands.
 - Scenarios in group 18 are benchmark-gated. Threshold scenarios hold
   provisional thresholds, and comparison scenarios keep representation choices
   open, until perf.md records numbers.
@@ -81,16 +88,13 @@ My whole app shares one Cog world. Tests get their own little worlds.
       initializer. The compiler says no. (A compile-fail check.)
 - [ ] **ONE-04.** My test asks the testing product for a context. It gets a
       fresh, isolated one that works without any app setup.
-- [ ] **ONE-05.** Two tests each make their own context and write the same
-      cog. Neither test sees the other's value.
-- [ ] **ONE-06.** A process makes many test contexts, one after another. Each
-      one starts clean, and none of them trips the app-install guard.
-- [ ] **ONE-07.** SwiftUI throws my views away and rebuilds them (a scene is
+- [ ] **ONE-05.** Tests and previews each make their own context — two at
+      once, then many more, one after another. Each context starts clean, a
+      write in one is invisible to every other, and none of them trips the
+      app-install guard.
+- [ ] **ONE-06.** SwiftUI throws my views away and rebuilds them (a scene is
       recreated). My manual state is still there, because it lives in the app
       context, not in the views.
-- [ ] **ONE-08.** Two previews each ask the testing product for an isolated
-      runtime. Each preview has one context, neither touches the production
-      install guard, and a write in one is invisible to the other.
 
 ## 2. DECL — Declaring state
 
@@ -107,33 +111,33 @@ I declare state at the top of a file and it just works.
 - [ ] **DECL-03.** I give a box a starting-value closure instead. Each key
       starts at what the closure returns for that key.
 - [ ] **DECL-04.** I build `box[5]` in two different places. Both refs point
-      at the same state: writing through one shows up when reading the other.
-- [ ] **DECL-05.** I write `box[5]`. `box[6]` does not change.
-- [ ] **DECL-06.** I expose a source through `.readOnly`. Reading the
+      at the same state: writing through one shows up when reading the other,
+      and `box[6]` does not change.
+- [ ] **DECL-05.** I expose a source through `.readOnly`. Reading the
       read-only ref always gives the same value as the source.
-- [ ] **DECL-07.** I try to write through a `.readOnly` ref. The compiler says
+- [ ] **DECL-06.** I try to write through a `.readOnly` ref. The compiler says
       no. (A compile-fail check.)
 
 ### 2.2 Derived cogs
 
-- [ ] **DECL-08.** I declare a `Cog` that computes from other cogs. Reading it
+- [ ] **DECL-07.** I declare a `Cog` that computes from other cogs. Reading it
       gives the computed value.
-- [ ] **DECL-09.** I declare a derived `CogBox`. The closure receives the key
+- [ ] **DECL-08.** I declare a derived `CogBox`. The closure receives the key
       as a parameter and passes it to inner keyed reads by normal lexical
       capture, and each key computes with its own key.
-- [ ] **DECL-10.** Declaring cogs runs nothing. A derived cog's closure runs
+- [ ] **DECL-09.** Declaring cogs runs nothing. A derived cog's closure runs
       for the first time only when someone first reads it.
 
 ### 2.3 Names
 
-- [ ] **DECL-11.** I declare a cog with a `name:`. That name appears when Cog
+- [ ] **DECL-10.** I declare a cog with a `name:`. That name appears when Cog
       talks about the cog (diagnostics and debug history).
-- [ ] **DECL-12.** I declare a cog without a name. Cog falls back to the file
+- [ ] **DECL-11.** I declare a cog without a name. Cog falls back to the file
       and line where I declared it.
 
 ### 2.4 Selector shape
 
-- [ ] **DECL-13.** I declare a derived cog whose selector throws. The
+- [ ] **DECL-12.** I declare a derived cog whose selector throws. The
       compiler says no: synchronous selectors do not throw in v1. (A
       compile-fail check.)
 
@@ -147,24 +151,17 @@ Every read I make is correct: the latest committed state, fully settled.
       sees the new value.
 - [ ] **READ-02.** I read a derived cog twice with nothing changing in
       between. Its closure ran only once; the second read used the cache.
-- [ ] **READ-03.** I change a source, then read a derived cog that uses it.
-      I get the value computed from the new source — never a stale one.
-- [ ] **READ-04.** I change two sources in one commit. A derived cog that
+- [ ] **READ-03.** I change two sources in one commit. A derived cog that
       combines them sees both new values together, never one new and one old.
-- [ ] **READ-05.** A selector peeks at a cog with `c.read` instead of
-      `c.get`. Later, that cog changes. The selector does not rerun, because
-      a peek is not a dependency.
-- [ ] **READ-06.** A selector uses `c.curr` to see its own previous value and
+- [ ] **READ-04.** A selector uses `c.curr` to see its own previous value and
       keeps a running total. Each turn folds the new input into the total.
-- [ ] **READ-07.** The very first run of a `c.curr` selector has no previous
+- [ ] **READ-05.** The very first run of a `c.curr` selector has no previous
       value, and the selector can tell.
-- [ ] **READ-08.** Outside any selector, `cogs.read` gives me a one-shot
-      value without subscribing to anything.
-- [ ] **READ-09.** A selector tracks a trigger and peeks at cog X with
+- [ ] **READ-06.** A selector tracks a trigger and peeks at cog X with
       `c.read`. Changing X alone does not rerun the selector. When the trigger
       later changes, the selector reruns and the peek returns X's newest
       settled value.
-- [ ] **READ-10.** I leave a derived cog cold while its source changes, then
+- [ ] **READ-07.** I leave a derived cog cold while its source changes, then
       use one-shot `cogs.read`. It settles the derived cog and returns its
       newest value without creating a subscription.
 
@@ -176,49 +173,44 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ### 4.1 The writer
 
-- [ ] **TURN-01.** Inside `commit`, I set a source with `w[ref] = value`.
-      After the commit, reads see it.
-- [ ] **TURN-02.** Inside one commit, `w[count] += 1` works: the writer reads
+- [ ] **TURN-01.** Inside one commit, `w[count] += 1` works: the writer reads
       back the value it just staged.
-- [ ] **TURN-03.** I write the same source twice in one commit. The last
+- [ ] **TURN-02.** I write the same source twice in one commit. The last
       write wins, and downstream sees exactly one change.
-- [ ] **TURN-04.** The writer reads a source I have not written this turn. It
+- [ ] **TURN-03.** The writer reads a source I have not written this turn. It
       sees the current committed value.
-- [ ] **TURN-05.** While a commit body is still running, a normal read (not
+- [ ] **TURN-04.** While a commit body is still running, a normal read (not
       through the writer) still sees the old values. Staged values are
       visible only to the writer.
 
 ### 4.2 Turns join, queue, and end
 
-- [ ] **TURN-06.** A commit inside a commit joins the outer turn. Everything
+- [ ] **TURN-05.** A commit inside a commit joins the outer turn. Everything
       flushes once, when the outer body ends, and reactions run once.
-- [ ] **TURN-07.** A turn takes its name from the op method that made it, or
+- [ ] **TURN-06.** A turn takes its name from the op method that made it, or
       from a custom name I pass. That name is what history shows.
-- [ ] **TURN-08.** I sneak the writer out of the commit and use it later. Cog
-      stops me with an error, in every kind of build.
-- [ ] **TURN-09.** I capture the writer into an async task that runs after
-      the commit ended. Using it fails the same way.
-- [ ] **TURN-10.** A commit that starts while a flush is running (for
-      example, from a reaction) waits its turn. It runs as its own new turn
-      after the flush.
-- [ ] **TURN-11.** Several commits queue up during a flush. They run one at a
-      time, in the order they arrived.
-- [ ] **TURN-12.** Each queued turn finishes completely — settle, notify,
-      react — before the next queued turn starts.
+- [ ] **TURN-07.** I sneak the writer out of the commit — stashed in a
+      variable or captured into an async task — and use it after the commit
+      ended. Cog stops me with an error, in every kind of build.
+- [ ] **TURN-08.** Several commits queue up during a flush. They run one at a
+      time in the order they arrived, and each queued turn finishes
+      completely — settle, notify, react — before the next one starts.
 
 ### 4.3 Equal writes are not changes
 
-- [ ] **TURN-13.** I write a source to the value it already has. Nothing
+- [ ] **TURN-09.** I write a source to the value it already has. Nothing
       happens: no recompute, no notice, no reaction.
-- [ ] **TURN-14.** In one commit I change a value and then change it back.
+- [ ] **TURN-10.** In one commit I change a value and then change it back.
       At flush time that counts as no change at all.
-- [ ] **TURN-15.** I give a cog a custom `equals:`. Cog uses my rule to
+- [ ] **TURN-11.** I give a cog a custom `equals:`. Cog uses my rule to
       decide whether a new value counts as a change.
-- [ ] **TURN-16.** A cog holds a value with no `Equatable`. Cog plays it safe
+- [ ] **TURN-12.** A cog holds a value with no `Equatable`. Cog plays it safe
       and treats every write as a change.
-- [ ] **TURN-17.** I run two sibling commits back to back in one event
+- [ ] **TURN-13.** I run two sibling commits back to back in one event
       handler. Each is its own named turn: two history entries, and reactions
       run after each one.
+- [ ] **TURN-14.** Inside one commit, `w[box[k]] += 1` works: the writer
+      reads back the value staged for that key, and other keys are untouched.
 
 ## 5. GRAPH — Derived values stay right and lazy
 
@@ -233,7 +225,8 @@ half-finished picture.
       right.
 - [ ] **GRAPH-02.** A diamond: A feeds B and C, which both feed D. I change A
       once. D recomputes once, using B and C from the same turn.
-- [ ] **GRAPH-03.** A very deep chain settles correctly from top to bottom.
+- [ ] **GRAPH-03.** A chain deep enough to overflow a recursive walk settles
+      correctly from top to bottom without exhausting the stack.
 - [ ] **GRAPH-04.** One source feeds many derived cogs. Each one I read is
       right, and only the ones I read recompute.
 
@@ -251,22 +244,18 @@ half-finished picture.
 - [ ] **GRAPH-08.** A cold cog misses ten turns of changes. When I finally
       read it, it computes once, from the newest values — not once per
       missed turn.
-- [ ] **GRAPH-09.** A derived cog is watched by a reaction. When a turn
-      changes its source, it settles during the flush, before the reaction
-      runs.
 
 ### 5.4 Dependencies follow the code
 
-- [ ] **GRAPH-10.** A selector reads cog X or cog Y depending on a switch.
-      While it reads X, changing Y does nothing.
-- [ ] **GRAPH-11.** I flip the switch. Now changing Y reruns the selector,
-      and changing X does nothing.
-- [ ] **GRAPH-12.** A selector returns early and never reaches cog Z. Once a
+- [ ] **GRAPH-09.** A selector reads cog X or cog Y depending on a switch.
+      While it reads X, changing Y does nothing. After the switch flips,
+      changing Y reruns the selector and changing X does nothing.
+- [ ] **GRAPH-10.** A selector returns early and never reaches cog Z. Once a
       later run does read Z, changes to Z rerun the selector.
-- [ ] **GRAPH-13.** A selector reads a list cog and then a keyed cog for each
+- [ ] **GRAPH-11.** A selector reads a list cog and then a keyed cog for each
       item. I remove an item from the list. That item's cog is dropped:
       changing it no longer reruns the selector.
-- [ ] **GRAPH-14.** A selector reads a cog that tells it which other cog to
+- [ ] **GRAPH-12.** A selector reads a cog that tells it which other cog to
       read (`currentZip`, then `weather[zip]`). When the zip changes, the
       selector follows the new zip and lets go of the old one.
 
@@ -275,6 +264,9 @@ half-finished picture.
 _Milestone M1. Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
+
+_Pending (core §10, open question 11): the failure mode for a selector that
+calls an op which commits mid-computation._
 
 - [ ] **CYCLE-01.** A cog reads itself. Cog fails and names the cog.
 - [ ] **CYCLE-02.** Cog A reads cog B, and B reads A. Cog fails and shows the
@@ -285,15 +277,17 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
       works until the condition flips; then Cog catches it.
 - [ ] **CYCLE-05.** My test can look at the cycle diagnostic through an
       internal seam without crashing the test process.
-- [ ] **CYCLE-06.** Cycle detection works in debug builds and release builds.
 
 ## 7. REACT — Reactions
 
-_Milestone M1, except REACT-20 (M2) and REACT-21 (M7). Design: §3.3, §6.2,
+_Milestone M1, except REACT-19 (M2) and REACT-20 (M7). Design: §3.3, §6.2,
 §6.4._
 
 A reaction watches state and does something outside the graph when it
 changes.
+
+_Pending (core §10, open question 16): when a reaction registered during a
+flush — from inside another reaction — makes its initial run._
 
 ### 7.1 Running
 
@@ -303,61 +297,65 @@ changes.
       runs again.
 - [ ] **REACT-03.** A turn changes something my reaction does not read. The
       reaction stays quiet.
-- **REACT-04.** _Dropped: subsumed by TURN-13, which asserts an equal write
-  causes no recompute, no notice, and no reaction._
-- [ ] **REACT-05.** When a reaction runs, everything it reads is already
+- [ ] **REACT-04.** When a reaction runs, everything it reads is already
       settled from the turn that woke it.
-- [ ] **REACT-06.** I register three reactions. When a turn wakes all three,
+- [ ] **REACT-05.** I register three reactions. When a turn wakes all three,
       they run in the order I registered them.
-- [ ] **REACT-07.** A reaction's reads change from run to run, like a
+- [ ] **REACT-06.** A reaction's reads change from run to run, like a
       selector's. It is re-tracked every run.
-- [ ] **REACT-08.** Reactions run before the op that committed the turn
+- [ ] **REACT-07.** Reactions run before the op that committed the turn
       returns. The very next line of my test can check what the reaction did.
-- [ ] **REACT-09.** `watch(_, initial: .skip)` does not call me at install
+- [ ] **REACT-08.** `watch(_, initial: .skip)` does not call me at install
       time; the first real change calls me with the old and new values.
-- [ ] **REACT-10.** `watch(_, initial: .run)` calls me once at install time.
+- [ ] **REACT-09.** `watch(_, initial: .run)` calls me once at install time.
 
 ### 7.2 Tokens
 
-- [ ] **REACT-11.** I cancel a reaction token. The reaction never runs again.
-- [ ] **REACT-12.** I cancel the same token twice. Nothing bad happens.
-- [ ] **REACT-13.** I drop the last copy of a token. The reaction is
+- [ ] **REACT-10.** I cancel a reaction token. The reaction never runs again.
+- [ ] **REACT-11.** I cancel the same token twice. Nothing bad happens.
+- [ ] **REACT-12.** I drop the last copy of a token. The reaction is
       cancelled by deinit.
-- [ ] **REACT-14.** I copy a token. Both copies mean the same registration;
+- [ ] **REACT-13.** I copy a token. Both copies mean the same registration;
       cancelling either one stops the reaction.
 
 ### 7.3 Writing back
 
-- [ ] **REACT-15.** A reaction gets a read-only view of the graph. It cannot
+- [ ] **REACT-14.** A reaction gets a read-only view of the graph. It cannot
       write directly. (A compile-fail check.)
-- [ ] **REACT-16.** A reaction calls an op that commits. That write becomes a
+- [ ] **REACT-15.** A reaction calls an op that commits. That write becomes a
       brand-new turn after the current flush — never a change to the turn
       being flushed.
-- [ ] **REACT-17.** Reaction A's write wakes reaction B, whose write wakes C.
+- [ ] **REACT-16.** Reaction A's write wakes reaction B, whose write wakes C.
       The turns run one at a time, first-in first-out, and each sees settled
       state.
-- [ ] **REACT-18.** Two reactions deliberately wake each other for 65 turns
+- [ ] **REACT-17.** Two reactions deliberately wake each other for 65 turns
       and then stop. In debug, Cog warns after about 64 uninterrupted turns,
       exposes the warning through an internal diagnostic seam, prints the
       causal chain of turns and reactions, and eventually returns to idle.
-- [ ] **REACT-19.** The last copy of a reaction token is dropped on a
+- [ ] **REACT-18.** The last copy of a reaction token is dropped on a
       background executor. I await an internal acknowledgement that deinit
       cleanup reached the MainActor, then commit a dependency change. The
       reaction does not run; immediate stopping still requires explicit
       `cancel()`.
-- [ ] **REACT-20.** Within one flush, every changed UI boundary is notified
+- [ ] **REACT-19.** Within one flush, every changed UI boundary is notified
       before any reaction runs — flush step 4 before step 5. (Checked through
       history or an internal seam once M2 boundaries exist.)
-- [ ] **REACT-21.** Within one flush, every changed export value is offered to
+- [ ] **REACT-20.** Within one flush, every changed export value is offered to
       its subscriber buffers before any reaction runs — flush step 4 before
       step 5. (Checked through history or an internal seam once M7 exports
       exist.)
+- [ ] **REACT-21.** A reaction watches a derived cog. A turn changes that
+      cog's source, but the recompute lands on an equal value. The reaction
+      does not run: only changed reactions run in flush step 5.
 
 ## 8. GROUP — Effect groups and timers
 
 _Milestone M1. Design: §6.2, §6.3._
 
 An `EffectGroup` owns the lifetime of my app's effects.
+
+_Pending (core §10, open question 12): whether adding a token to an
+already-cancelled group cancels it immediately or traps._
 
 - [ ] **GROUP-01.** I add a watch token to a group. Cancelling the group
       stops the watch.
@@ -428,8 +426,8 @@ My tests set up state quietly with `seed`, or loudly with a real commit.
       though the reaction's first run never read the weather.
 - [ ] **SEED-05.** `seed` exists only in debug builds. A release build has no
       way to seed. (A build check.)
-- [ ] **SEED-06.** A stub helper that commits is loud: it runs a real named
-      turn, and reactions fire.
+- [ ] **SEED-06.** I try to seed a derived cog. The compiler says no: only
+      manual sources can be seeded. (A compile-fail check.)
 
 ## 11. HIST — Debug history
 
@@ -495,78 +493,80 @@ _Milestone M3. Design: §5.1, §5.2 (`.latest` only), §5.3._
 Async state is honest: it always says whether it is loading, what it has, and
 what it had.
 
+_Pending (core §10, open question 15): what a one-shot `cogs.read` of a
+never-read async cog does — does it create the node, start work, and publish
+a pending turn? — and what `cogs.refresh` of a never-read ref does._
+
 ### 13.1 Phases
 
 - [ ] **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
       work, publishes a pending turn, and returns
       `.pending(previous: .none)`. There is no observable `initial` phase.
-- [ ] **ASYNC-02.** The work finishes. The phase becomes success with the
-      value, and that change is its own turn.
-- [ ] **ASYNC-03.** The work throws. The phase becomes failure holding the
+- [ ] **ASYNC-02.** The work throws. The phase becomes failure holding the
       error — and the previous value, if there was one.
-- [ ] **ASYNC-04.** A dependency changes, so the cog reloads. While loading,
-      the phase still carries the last good value: `latestValue` returns it
-      and `isLoading` is true.
-- [ ] **ASYNC-05.** An async cog whose value is optional succeeded with
+- [ ] **ASYNC-03.** An async cog whose value is optional succeeded with
       `nil`. When it reloads, its previous value is "some(nil)" — clearly
       different from "never had a value."
-- [ ] **ASYNC-06.** `latestValue` and `isLoading` are right in every phase:
+- [ ] **ASYNC-04.** `latestValue` and `isLoading` are right in every phase:
       nothing and loading at first; the old value and loading while
       reloading; the value and not loading on success; the last good value
       and not loading on failure.
-- **ASYNC-07.** _Dropped: merged into ASYNC-06's phase sweep._
-- [ ] **ASYNC-08.** The `.latest` projection lets me read an async cog as a
+- [ ] **ASYNC-05.** The `.latest` projection lets me read an async cog as a
       plain optional value, the same shape as a manual cog.
-- [ ] **ASYNC-09.** A watcher sees each visible phase change as its own turn:
+- [ ] **ASYNC-06.** A watcher sees each visible phase change as its own turn:
       first pending, then success, two separate turns.
 
 ### 13.2 Latest wins
 
-- [ ] **ASYNC-10.** A dependency changes while work is in flight. The old
-      work is cancelled and new work starts.
-- [ ] **ASYNC-11.** The old work finishes anyway, ignoring cancellation. Its
+- [ ] **ASYNC-07.** A dependency changes while work is in flight. The old
+      work is cancelled and new work starts — whether the policy was spelled
+      `.latest` or omitted, since `.latest` is the default.
+- [ ] **ASYNC-08.** The old work finishes anyway, ignoring cancellation. Its
       result is thrown away. Only the newest run may commit.
-- [ ] **ASYNC-12.** Work that was cancelled because it was replaced publishes
+- [ ] **ASYNC-09.** Work that was cancelled because it was replaced publishes
       no failure phase.
-- [ ] **ASYNC-13.** I call `cogs.refresh(ref)`. The work runs again even
+- [ ] **ASYNC-10.** I call `cogs.refresh(ref)`. The work runs again even
       though no dependency changed, and the phases cycle again.
-- [ ] **ASYNC-14.** Only what the selector reads with `c.get` before
+- [ ] **ASYNC-11.** Only what the selector reads with `c.get` before
       returning counts as a dependency. Values the work closure touches after
       an `await` do not retrigger it.
-- [ ] **ASYNC-15.** Two keys of an `AsyncCogBox` fetch independently. One can
+- [ ] **ASYNC-12.** Two keys of an `AsyncCogBox` fetch independently. One can
       be loading while the other has succeeded.
 
 ### 13.3 Safe release
 
-- [ ] **ASYNC-16.** An unwatched async cog is released while its work is
+- [ ] **ASYNC-13.** An unwatched async cog is released while its work is
       pending. The work is cancelled, and if a late result sneaks through, it
       commits nothing.
-- [ ] **ASYNC-17.** After a release, reading the ref again starts fresh work
+- [ ] **ASYNC-14.** After a release, reading the ref again starts fresh work
       and fresh phases, unpolluted by anything from before.
-- [ ] **ASYNC-18.** I declare an async cog without specifying a policy. A
-      dependency changes while work is running, so the old run is cancelled
-      and only the newest generation may commit: the default is `.latest`.
 
 ### 13.4 Work isolation and previous values
 
-- [ ] **ASYNC-19.** A cog that succeeded once and then failed reloads. The
-      new pending phase carries the last good value — the earlier success,
-      not the failure.
-- [ ] **ASYNC-20.** An async cog's work body runs on the MainActor by
+- [ ] **ASYNC-15.** An async cog's work body runs on the MainActor by
       default. A runtime precondition inside the work proves it in every leg.
-- [ ] **ASYNC-21.** Expensive work opts into `@concurrent`. It runs off the
+- [ ] **ASYNC-16.** Expensive work opts into `@concurrent`. It runs off the
       main actor, and its result still commits on the MainActor under the
       same generation check.
-- [ ] **ASYNC-22.** The internal task that runs an async cog's work carries
+- [ ] **ASYNC-17.** The internal task that runs an async cog's work carries
       the descriptor's name and key, so Instruments can show it. (Checked
       through an internal seam.)
-- [ ] **ASYNC-23.** Initial work throws. A watcher and history see pending with
+- [ ] **ASYNC-18.** Initial work throws. A watcher and history see pending with
       no previous value, then failure with no previous value, as two distinct
       turns.
-- [ ] **ASYNC-24.** Work succeeds, then a dependency change starts a reload
+- [ ] **ASYNC-19.** Work succeeds, then a dependency change starts a reload
       that fails. A watcher and history see success, pending with that success
       as the previous value, then failure with the same previous value, each as
-      its own turn.
+      its own turn. A further reload's pending still carries that success —
+      the last good value, never the failure.
+- [ ] **ASYNC-20.** A reload succeeds with a value equal to the one it had.
+      Watchers of the full phase see the pending and success turns, but
+      consumers of the `.latest` projection see no change: no recompute, no
+      re-render.
+- [ ] **ASYNC-21.** I call `cogs.refresh(ref)` while work is already in
+      flight. Under `.latest`, the in-flight run is cancelled and only the
+      newest run may commit — a refresh replaces work the same way a
+      dependency change does.
 
 ## 14. POLICY — Ordered async policies
 
@@ -574,20 +574,21 @@ _Milestone M7. Design: §5.2, §5.4._
 
 When order matters more than speed, I pick a policy that says so.
 
+_Pending (core §10, open question 10): whether a failed `.queue` run stops
+the queue or the next queued run still starts._
+
 - [ ] **POLICY-01.** After the initial run succeeds, three quick dependency
       changes under `.queue` make exactly three additional runs, one at a time
       and in input order. Each run starts only after the preceding one
       finishes.
 - [ ] **POLICY-02.** With `.queue`, results commit in run order, so the final
       value always matches the newest input.
-- [ ] **POLICY-03.** With `.exhaustLatest`, changes during a run do not start
-      new runs. When the run finishes, exactly one catch-up run uses the
-      newest state.
-- [ ] **POLICY-04.** With `.exhaustLatest`, ten changes during a run still
-      mean just one catch-up run.
-- [ ] **POLICY-05.** With `.merged`, runs overlap, and each result commits as
+- [ ] **POLICY-03.** With `.exhaustLatest`, changes during a run — one or
+      ten — start no new runs. When the run finishes, exactly one catch-up
+      run uses the newest state.
+- [ ] **POLICY-04.** With `.merged`, runs overlap, and each result commits as
       its own turn when it lands.
-- [ ] **POLICY-06.** A `.stream` selector cannot use `.queue`,
+- [ ] **POLICY-05.** A `.stream` selector cannot use `.queue`,
       `.exhaustLatest`, or `.merged`. The type system says no. (A
       compile-fail check.)
 
@@ -596,6 +597,11 @@ When order matters more than speed, I pick a policy that says so.
 _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
+
+_Pending (core §10, open questions 8, 9, and 14): what phase a stream
+publishes when its sequence ends naturally, whether a throwing sequence
+publishes a failure, and whether consecutive equal elements each commit a
+turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
 
 - [ ] **STREAM-01.** A `.stream` cog commits each element of its sequence as
       its own turn. Watchers see every committed value.
@@ -654,6 +660,12 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 - [ ] **EXPORT-13.** I link outside state in with `c.track`'s closure form
       instead of a key path. It has the same post-mutation value, coalescing,
       and pre-iOS-26 re-arm semantics as the key-path form.
+- [ ] **EXPORT-14.** I subscribe to a derived cog. A turn recomputes it to an
+      equal value. Nothing is offered to my buffer: only changed values reach
+      subscribers.
+- [ ] **EXPORT-15.** A `whileObserved` derived cog's only consumer is my
+      `values(of:)` subscription. Grace periods come and go; the cog is never
+      released while my subscription lives, and each change still reaches me.
 
 ## 17. COUNT — Run counts
 
@@ -748,5 +760,3 @@ settings.
       check.)
 - [ ] **ACTOR-03.** A manual cog holds a non-`Sendable`, MainActor-bound value,
       and a derived cog reads it without a wrapper or an unchecked conformance.
-- [ ] **ACTOR-04.** The public isolation contract and runtime behavior are the
-      same in all four build-settings legs.

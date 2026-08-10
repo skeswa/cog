@@ -761,6 +761,18 @@ singular, and does measurement show less runtime work?
 13. **Timing modifiers:** §5.4 points `debounce` and `throttle` at "a
     reaction modifier or async-cog option," but no design or milestone
     exists. Deferred backlog.
+14. **Equal stream elements:** §5.2 commits each `.stream` element as its own
+    turn, while §3.2 discards equal writes at flush. Decide which rule wins
+    when a sequence yields consecutive equal elements.
+15. **One-shot reads of cold async cogs:** untracked reads settle (§2.4), and
+    an async cog's first read starts work and publishes a pending turn
+    (§5.1). Define what a subscription-free `cogs.read` of a never-read
+    async cog does — and, relatedly, what `cogs.refresh` of a never-read ref
+    does.
+16. **Registration during a flush:** a reaction registered with `cogs.run`
+    runs once immediately to record dependencies (§3.3). Define when that
+    initial run happens if registration occurs during a flush — for example,
+    from inside another reaction.
 
 ---
 
