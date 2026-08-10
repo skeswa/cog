@@ -34,11 +34,43 @@ should also keep the common API simple.
 ## Status
 
 Cog is in the design phase. The Swift and Android designs are detailed enough
-to begin their correctness and performance spikes. Neither library is
-implemented yet.
+to begin their correctness and performance spikes.
+
+Swift scaffolding has landed. The repository is a SwiftPM package rooted at
+the git root, with the package layout, formatter, test matrix, compile-fail
+harness, document checkers, and CI in place. The `Cog` library itself is a
+stub: no Cog API exists yet, and the Android library has not been started.
 
 The earlier Dart and Flutter experiment has been removed from the current
 tree. It remains available in the repository history.
+
+## Working in this repository
+
+Tooling is versioned with [mise](https://mise.jdx.dev); `mise.toml` is the
+authoritative list of commands and `mise tasks` prints it. Building and
+testing Swift also needs a full Xcode — the version and the reason are in
+"Continuous integration" below.
+
+```sh
+mise run fmt          # format Markdown, JSON, YAML, and Swift
+mise run fmt:check    # verify formatting, writing nothing
+mise run test         # Swift tests on the default isolation leg
+mise run test:matrix  # all four isolation legs
+mise run test:release # the default leg in release configuration
+mise run tasks:check  # validate the Swift implementation task ledger
+```
+
+`mise run test:compilefail` type-checks the expected-failure fixtures under
+`swift/CompileFail/`, and `mise run workflows:check` validates the GitHub
+Actions hardening contract.
+
+Tests always run through the `mise` wrapper rather than `swift test`, because
+SwiftPM exits 0 when `--filter` selects nothing and the wrapper fails instead.
+Pass arguments straight through:
+`mise run test --filter 'DECL-01|ONE-04' --parallel`.
+
+`AGENTS.md` and `CLAUDE.md` carry the full command reference, the repository
+layout, and the version-control conventions.
 
 ## Continuous integration
 

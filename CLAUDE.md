@@ -12,13 +12,14 @@ native mobile UI. Cog is planned as:
   with one app-wide MainActor-confined dependency graph inside; and
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
-The Swift and Kotlin designs exist, but there is no implementation and there
-are no build or test commands. Tooling is versioned with mise (`mise.toml`):
-`mise run fmt` formats the repo with Oxfmt, and `mise run fmt:check`
-verifies formatting without writing. `.oxfmtrc.json` excludes the frozen
-`docs/dump-2026-08-06.md` from formatting. The next phase for each platform
-is the spike in its `exploration.md` §11, as amended by its `perf.md` §9. For
-Swift, `docs/swift/impl/plan.md` turns that spike into milestones with package
+The Swift and Kotlin designs exist. Swift work has started: the repository is
+now a SwiftPM package rooted at the git root, with the M0 scaffolding
+milestone built except its closing gate. The scaffolding is real — package,
+formatter, test wrappers, compile-fail harness, document checkers, and CI —
+but the library itself is a stub. No Cog API exists yet, and Kotlin has no
+implementation at all. The next phase for each platform is the spike in its
+`exploration.md` §11, as amended by its `perf.md` §9. For Swift,
+`docs/swift/impl/plan.md` turns that spike into milestones with package
 layout, tooling, CI, and release steps; `docs/swift/impl/scenarios.md` breaks
 those milestones into the test scenarios that drive red-green implementation;
 and `docs/swift/impl/tasks.md` decomposes the milestones into dependency-aware
@@ -27,8 +28,29 @@ every scenario covered by exactly one task.
 
 ## Layout
 
-- `README.md` — project overview, shared principles, platform status, and
-  documentation entry points.
+- `README.md` — project overview, shared principles, platform status, the CI
+  topology record, and documentation entry points.
+- `Package.swift` — the SwiftPM manifest. The package root is the git root;
+  every Swift target reaches under `swift/` through an explicit `path:`. The
+  manifest reads `COG_TEST_ISOLATION` and `COG_TEST_NNBD` to select a test
+  leg.
+- `swift/Sources/` — `Cog` (the library, a stub today), `CogTesting` (the
+  isolated-context factory for tests and previews), and `CogScenarios` (the
+  shared scenario graphs, exported as the non-API `_CogScenarios` product).
+- `swift/Tests/` — `CogTests` (correctness), `CogScenarioTests` (run counts),
+  and `CogBoundaryTests` (the Observation and SwiftUI boundary).
+- `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
+  SwiftPM target, type-checked in one batched pass.
+- `tools/` — pinned Node tooling: `swift-test.mjs`, `check-compile-fail.mjs`,
+  `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
+  fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
+  `fixtures/`.
+- `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
+  matrix, release tests, compile-fail fixtures, and the ledger check, in a
+  self-hosted lane and a GitHub-hosted fork lane) and `markdown.yml` (Oxfmt
+  and the workflow-contract check on GitHub-hosted ubuntu).
+- `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
+  task definitions, formatter configuration, and the license.
 - `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
   design. Historical background only; never normative and never edited.
 - `docs/swift/` — living Swift documents. Start with `README.md`, the map.
@@ -45,6 +67,59 @@ every scenario covered by exactly one task.
   `example.md` gives a full worked feature; `effects.md` covers effects and
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
+
+## Commands
+
+Every command is a mise task defined in `mise.toml`, which is authoritative;
+`mise tasks` prints the current list. mise cannot pin Xcode, so the required
+Xcode version lives in the root `README.md` under "Continuous integration".
+A full Xcode is required, not the Command Line Tools alone: CLT can build and
+lint but `swift test` fails there with `no such module 'Testing'`.
+
+Formatting is split per language under two umbrellas, and either leg can be
+run alone:
+
+- `mise run fmt` — `fmt:md` (Oxfmt over Markdown, JSON, YAML, and JavaScript)
+  and `fmt:swift` (`swift format --in-place`).
+- `mise run fmt:check` — `fmt:check:md` and `fmt:check:swift`
+  (`swift format lint --strict`). Writes nothing.
+
+`.oxfmtrc.json` excludes the frozen `docs/dump-2026-08-06.md` from formatting.
+
+Tests go through `tools/swift-test.mjs`, never `swift test` directly:
+
+- `mise run test` — the default isolation leg.
+- `mise run test:matrix` — all four isolation legs.
+- `mise run test:release` — the default leg in release configuration.
+- `mise run test:compilefail` — type-checks every fixture in
+  `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
+  when a fixture misses its expected diagnostic and when it stops failing.
+
+Extra arguments pass straight through, as in
+`mise run test --filter 'DECL-01|ONE-04' --parallel`. **Never run a filtered
+`swift test` yourself.** SwiftPM exits 0 when `--filter` selects nothing, so a
+raw filtered run can report a green for work it never ran. The wrapper guards
+twice — it enumerates the built tests before the run and checks the
+authoritative executed-test count after it — and gives each leg and
+configuration its own scratch path.
+
+The isolation matrix is {MainActor-default, nonisolated} × {NNBD on, off},
+selected through `COG_TEST_ISOLATION` and `COG_TEST_NNBD`. Each leg is also a
+wrapper mode of its own — `mainactor-nnbd-on`, `mainactor-nnbd-off`,
+`nonisolated-nnbd-on`, `nonisolated-nnbd-off` — which CI uses to run one leg
+per job. `COG_TEST_MANIFEST_CACHE=none` is an escape hatch for a stale
+manifest cache; it is not needed today.
+
+Document and workflow checks, each of which runs its own fixture suite first
+because a broken checker cannot validate anything:
+
+- `mise run tasks:check` — validates `docs/swift/impl/tasks.md` against
+  `scenarios.md` and `plan.md`.
+- `mise run workflows:check` — validates the GitHub Actions hardening
+  contract over `.github/workflows`.
+
+Every change must leave `mise run fmt:check` green, and any change under
+`docs/swift/impl/` must also leave `mise run tasks:check` green.
 
 ## Version control
 
@@ -122,5 +197,8 @@ that runtime.
 - **Keep performance claims benchmark-gated.** Both `perf.md` documents defer
   representation choices to benchmarks. Do not mark them settled without
   measurements.
+- **Document new commands.** A new or changed mise task belongs in the
+  "Commands" section of both root instruction files in the same change, and in
+  the root `README.md` when a newcomer would need it.
 - **Keep root instructions synchronized.** Any guidance change in `AGENTS.md`
   must also be made in `CLAUDE.md`, and vice versa.

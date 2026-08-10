@@ -59,6 +59,39 @@ The design lives in [design/](./design/); the implementation effort lives in
    explicit closing verification; every scenario is covered by exactly one
    task's _Greens:_ line.
 
+## Building and testing
+
+The library is not implemented — `swift/Sources/Cog` is an M0 stub with no Cog
+API — but the package and its commands are real. The repository is a SwiftPM
+package rooted at the git root, with every Swift target under `swift/`.
+Commands are mise tasks; `mise tasks` lists them all.
+
+```sh
+mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
+mise run fmt:check        # the same checks, writing nothing
+mise run test             # the default isolation leg
+mise run test:matrix      # all four isolation legs
+mise run test:release     # the default leg in release configuration
+mise run test:compilefail # batched swiftc pass over swift/CompileFail/
+mise run tasks:check      # validate impl/tasks.md against the plan and scenarios
+```
+
+Tests run through `tools/swift-test.mjs`, never `swift test` directly: SwiftPM
+exits 0 when `--filter` selects nothing, so a raw filtered run can report a
+green for work it never ran. The wrapper enumerates the built tests before the
+run and checks the executed-test count after it, and gives each leg its own
+scratch path. Arguments pass through, as in
+`mise run test --filter 'DECL-01|ONE-04' --parallel`.
+
+The four legs are {MainActor-default, nonisolated} ×
+{`NonisolatedNonsendingByDefault` on, off}, selected through
+`COG_TEST_ISOLATION` and `COG_TEST_NNBD`, which `Package.swift` reads. CI runs
+one leg per job using the leg names as wrapper modes (`mainactor-nnbd-on`,
+`mainactor-nnbd-off`, `nonisolated-nnbd-on`, `nonisolated-nnbd-off`). Running
+the tests needs a full Xcode; the Command Line Tools alone fail with
+`no such module 'Testing'`. The root [README.md](../../README.md) records the
+pinned version and the runner topology.
+
 ## Where things stand (2026-08-10)
 
 These choices are settled; §10 of the core document has the full record.
