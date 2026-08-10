@@ -84,10 +84,11 @@ permissions:
   contents: read
 
 env:
-  # THE XCODE PIN. One line, both lanes. 26.5 is the version the README
-  # topology records and the one present on both the mini and the
-  # GitHub-hosted `macos-26` image, so the lanes prove the same thing.
-  COG_XCODE_VERSION: "26.5"
+  # THE XCODE PIN. One line, every job. 26.6 is build 17F113 on the mini and
+  # build 17F113 on the GitHub-hosted `macos-26` image, where it is also the
+  # default — so the two lanes compile with the identical toolchain, not
+  # merely the same version number.
+  COG_XCODE_VERSION: "26.6"
   # Kept in step with `markdown.yml`.
   COG_MISE_VERSION: "2026.8.3"
 
@@ -120,12 +121,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           # The host is bare metal with no image pinning, so record exactly
           # which toolchain produced this run rather than infer it later.
@@ -177,12 +194,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$developer_dir" xcodebuild -version
           DEVELOPER_DIR="$developer_dir" swift --version
@@ -239,12 +272,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$developer_dir" xcodebuild -version
           DEVELOPER_DIR="$developer_dir" swift --version
@@ -286,12 +335,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$developer_dir" xcodebuild -version
           DEVELOPER_DIR="$developer_dir" swift --version
@@ -371,12 +436,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$developer_dir" xcodebuild -version
           DEVELOPER_DIR="$developer_dir" swift --version
@@ -415,12 +496,28 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: |
           set -euo pipefail
-          installed="$(ls -d /Applications/Xcode*.app 2>/dev/null || true)"
-          developer_dir="/Applications/Xcode_${COG_XCODE_VERSION}.app/Contents/Developer"
-          if [ ! -d "$developer_dir" ]; then
-            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Wanted ${developer_dir}. Installed: ${installed:-(none)}"
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
             exit 1
           fi
+          developer_dir="${found}/Contents/Developer"
           echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$developer_dir" xcodebuild -version
           DEVELOPER_DIR="$developer_dir" swift --version

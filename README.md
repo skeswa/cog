@@ -79,10 +79,18 @@ The topology:
   same-repo guard means **no code from outside this repository ever reaches
   the host**. The dedicated non-admin user remains the target state, and the
   revisit triggers below apply with more force because of this.
-- **Xcode.** Pinned to **26.5**, installed with `xcodes` and selected through
-  `DEVELOPER_DIR`. 26.5 is the one version present in both lanes — it is on
-  the GitHub-hosted `macos-26` arm64 image too, so the fork lane pins
-  identically. mise cannot pin Xcode, hence this record.
+- **Xcode.** Pinned to **26.6**, build **17F113**, installed with `xcodes`
+  and selected through `DEVELOPER_DIR`. The hosted `macos-26` arm64 image
+  carries the same build and defaults to it, so both lanes compile with an
+  identical toolchain rather than merely the same version number. mise cannot
+  pin Xcode, hence this record.
+
+  CI finds Xcode by **version, never by path**: `xcodes` installs it as
+  `/Applications/Xcode.app`, while the hosted image uses
+  `/Applications/Xcode_<version>.app`. Every job scans `/Applications/
+Xcode*.app` and reads each bundle's `version.plist`, which is the only
+  spelling that works in both lanes. Changing the pin means changing
+  `COG_XCODE_VERSION` in `swift-ci.yml` and this record together.
 
   **A full Xcode is required; the Command Line Tools are not enough.** CLT
   carries `swift` and `swift-format`, so building and linting succeed, but
