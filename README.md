@@ -42,6 +42,104 @@ tree. It remains available in the repository history.
 
 ## Continuous integration
 
+### macOS runner topology
+
+_Settled 2026-08-10 (`M0-05a`)._
+
+macOS CI runs on a personal Apple Silicon Mac mini. Linux jobs stay on
+GitHub-hosted `ubuntu`. The mini runs **persistent bare metal with scrub
+hygiene**, which the implementation plan sanctions as the alternative to
+ephemeral Tart VMs. Tart VMs are recorded as a deferred upgrade, not the
+current topology.
+
+Why bare metal won. Tart itself is healthy — it moved to
+`github.com/openai/tart`, released 2.35.0 on 2026-08-04, and relicensed to
+FSL-1.1-ALv2 in June 2026, dropping the old core-count threshold. The
+_orchestrators_ are not: **no macOS ephemeral-runner orchestrator has shipped
+a release in 2026.** Cilicon's GitHub Actions provider is organization-only,
+so it cannot register a runner for a personal-account repository at all.
+Tartelet fits on paper and is the closest candidate, but its last release was
+2025-06-13, it has one commit in all of 2026, and four unmerged 2026 pull
+requests that read as Tart-compatibility fixes. ekiden is a reference
+architecture of Packer templates and shell scripts rather than a product.
+Against that, ephemeral VMs would cost roughly 210–350 GB of SSD, cap the
+host at two concurrent jobs, and buy little here — fork pull requests
+structurally never reach the mini, so the isolation boundary they add is
+between _our own_ commits.
+
+The topology:
+
+- **Runner user.** A dedicated non-admin account, `cogci`, with no iCloud
+  sign-in, no signing certificates, no SSH keys, no `gh` credentials, and no
+  admin group membership. A compromised build has nothing to steal.
+- **Xcode.** Pinned to **26.5**, installed with `xcodes` and selected with
+  `xcode-select`. 26.5 is the one version present in both lanes — it is on
+  the GitHub-hosted `macos-26` arm64 image too, so the fork lane pins
+  identically. mise cannot pin Xcode, hence this record.
+- **Runners.** Two runner services, each **repository-scoped to
+  `skeswa/cog`** so no other repository can target this hardware, each with
+  its own `_work`, installed as launchd services.
+- **Labels.** Registered with `--labels cog-mini`, keeping the default
+  `self-hosted`, `macOS`, and `ARM64`. Jobs use
+  `runs-on: [self-hosted, macOS, ARM64, cog-mini]`. Label matching is
+  cumulative, so the distinctive `cog-mini` term stops a copied
+  `runs-on: self-hosted` elsewhere from landing here. No runner group —
+  runner groups do not exist for repository-scoped runners on a personal
+  account.
+- **Scrub hygiene** replaces VM ephemerality and is what the `M0-13`
+  verification checks. `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` deletes `_work`,
+  `~/Library/Developer/Xcode/DerivedData`,
+  `~/Library/Caches/org.swift.swiftpm`, and `$TMPDIR`;
+  `ACTIONS_RUNNER_HOOK_JOB_STARTED` asserts a clean tree and fails fast
+  otherwise. Checkout uses `persist-credentials: false` and `clean: true`.
+- **Concurrency.** Two jobs, by policy rather than by platform limit. The M5
+  benchmark job must serialize against everything else on the mini through a
+  workflow `concurrency:` group, or its numbers will carry contention noise.
+
+Fork pull requests never reach the mini. Every self-hosted job carries a
+same-repo guard, and an approval-gated GitHub-hosted `macos-26` lane covers
+forks. The two conditions are exhaustive and mutually exclusive, so exactly
+one macOS lane runs per event:
+
+```yaml
+# Self-hosted lane.
+if: >-
+  github.repository == 'skeswa/cog'
+  && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+
+# Approval-gated GitHub-hosted lane.
+if: >-
+  github.event_name == 'pull_request'
+  && github.event.pull_request.head.repo.full_name != github.repository
+```
+
+The `event_name != 'pull_request' ||` clause matters: on `push` and
+`schedule` there is no `github.event.pull_request`, so a bare comparison
+would evaluate false and silently skip the job.
+
+Recorded risks, to revisit rather than forget:
+
+- Bare metal has **no isolation boundary between jobs**. The mitigation is
+  the scrub hooks plus the same-repo guard. **If Cog ever grants push access
+  to co-maintainers, or the same-repo guard is relaxed, this decision must be
+  revisited.**
+- A compromised SwiftPM dependency with a build plugin would execute as
+  `cogci`. `Package.resolved` is committed and reviewed and the shipped
+  package is dependency-free, but the residual risk is accepted, not removed.
+- The Virtualization.framework limit of two concurrent macOS guests is
+  asserted by the macOS Tahoe 26 SLA and by pre-2026 reports, but **no
+  2026-dated primary source re-tests it on macOS 26**. Verify empirically
+  before ever taking the VM path.
+- `ghcr.io/cirruslabs/macos-tahoe-xcode:26.6` does not exist despite a `26.6`
+  template release; the per-Xcode image cadence appears to have lapsed after
+  the OpenAI transition. A future VM path should budget for building images
+  locally.
+- Simulator throughput inside a Tart VM is **unmeasured**. Bare metal defuses
+  this for M2, since the simulator lane runs on the host directly.
+- The mini's SSD capacity has not been confirmed. Bare metal needs roughly
+  40–60 GB; the VM path needs 210–350 GB.
+
 ### Actions fork security
 
 This repository is public and its CI is pull-request-driven, so macOS jobs on
