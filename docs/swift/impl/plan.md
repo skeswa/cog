@@ -18,7 +18,9 @@ scenario to exactly one task.
   packages only from a git root. There is no subdirectory option. All
   Swift sources live under `swift/` through custom target `path:` values (the
   firebase-ios-sdk pattern). A future `kotlin/` directory is a sibling that
-  SwiftPM never sees.
+  SwiftPM never sees. Local development uses jj colocated with git; SwiftPM,
+  GitHub, and CI consume only the git side, so colocation changes nothing
+  about this layout.
 - Lint and format: use only the toolchain's `swift format`, both formatting and
   `lint --strict`. No SwiftLint.
 - Order: async `.run` and `.latest` move ahead of the data-oriented core so
@@ -530,7 +532,10 @@ release gates.
 - Tags: use bare, annotated semver git tags (`0.1.0`) permanently. Bare tags
   belong to the Swift package. Kotlin releases through Maven coordinates
   and, if it ever wants tags, uses namespaced ones (`kotlin/1.2.3`), which
-  SwiftPM ignores.
+  SwiftPM ignores. The repo is jj-colocated and jj does not author annotated
+  tags, so a tag task runs `git tag -a` in the colocated repo and pushes the
+  tag with `git push origin <tag>`; all other pushes go through
+  `jj git push`.
 - 0.x policy: minor may break; patch is additive or a fix. The README
   tells consumers to pin
   `.package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.1.0"))`.

@@ -38,7 +38,7 @@ to begin their correctness and performance spikes. Neither library is
 implemented yet.
 
 The earlier Dart and Flutter experiment has been removed from the current
-tree. It remains available in Git history.
+tree. It remains available in the repository history.
 
 ## Documentation
 

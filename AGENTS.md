@@ -46,6 +46,28 @@ every scenario covered by exactly one task.
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
 
+## Version control
+
+- This is a Jujutsu (`jj`) repository colocated with git. Do day-to-day
+  version control with `jj` — `jj st`, `jj diff`, `jj commit`,
+  `jj bookmark`, `jj git push` — not `git add`/`git commit`. There is no
+  staging area; the working copy is itself a commit. `main` is a jj
+  bookmark tracking the GitHub default branch.
+- Make all changes as small, well-described revisions: one logical change
+  per revision, never a batch of unrelated edits. Describe each revision
+  when it lands (`jj commit -m`, or `jj describe` on the working copy) with
+  a scoped, imperative summary in the existing style — for example
+  `docs(swift): align plan with task graph`. If the working copy has grown
+  past one logical change, split it (`jj split`) rather than describing a
+  grab bag. Paired obligations — `CLAUDE.md` with `AGENTS.md`, plan with
+  task ledger, ledger with issue mirror — belong together in the one
+  revision that makes them true.
+- Git remains because the outside world consumes it: SwiftPM resolves the
+  package from the git repo GitHub serves, CI checks out git, and releases
+  are annotated git tags. Create release tags with `git tag -a` in the
+  colocated repo (jj does not author annotated tags) and push them with
+  `git push origin <tag>`; everything else pushes through `jj git push`.
+
 ## Project principles
 
 Every design and implementation choice should preserve four rules:
