@@ -175,10 +175,17 @@ a screen identity when needed, and resets through an explicit op. One mutable
 domain fact gets one manual source; another feature may read it or derive a
 new shape, but must not mirror it into a second `ManualCog`.
 
-Production construction is guarded: the plain `Cogtext` initializer is not
-public to app features. App bootstrap installs one context, and a second
-production install fails fast. The testing product exposes an isolated-runtime
-factory. Exact helper names remain open.
+Production construction is guarded: the plain `Cogtext` initializer is
+`package`, so application code cannot name it at all. The app's bootstrap
+calls `Cogtext.bootstrapApp()` once, at launch; a second call fails fast in
+debug and release builds. The `CogTesting` product adds
+`Cogtext.forTesting()`, which hands a test or preview runtime a fresh isolated
+context as often as it asks and never registers as the production context.
+
+The two spellings differ in grammar on purpose. Creating the app's context is
+a once-per-process act, so it reads as a verb; creating a test context is
+ordinary value creation, so it reads as a noun phrase. Neither is spelled
+`install`, which §6.3 gives to effects.
 
 Descriptors are internal final classes whose `ObjectIdentifier` gives stable
 process identity. The public types — `Cog<T>`, `ManualCog<T>`, and their
@@ -724,11 +731,15 @@ singular, and does measurement show less runtime work?
 | Untracked reads?                  | `c.read` and one-shot `cogs.read` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                                                                                                                                                                                                                                                                                        |
 | Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                                                                                                                                                                                                                                                                                       |
 | External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                          |
-| Context construction?             | App bootstrap can install one production context; feature code cannot construct another (§2.3).                                                                                                                                                                                                                                                                                                                                                                                    |
+| Context construction?             | App bootstrap calls `Cogtext.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                           |
+| Bootstrap helper names?           | `Cogtext.bootstrapApp()`, vended by `Cog`, creates the one production context and fails fast on a second call; `Cogtext.forTesting()`, vended by `CogTesting`, returns a fresh isolated context as often as a test or preview asks. A `package` initializer leaves those two as the only ways in, and separating them by product rather than by an argument keeps the test factory out of a shipping app target (§2.3, §6.3, §6.6).                                                |
 | Testing posture?                  | Fully optimistic (every wait is a definite injected signal: clocks, continuations, acknowledgements), as fast and cheap as possible (host-first; simulators only at the device boundary; injected time everywhere, including `whileObserved` grace), and as implementation agnostic as possible (public API, then `CogTesting`, then debug history, then named diagnostic seams; the behavior suite passes unchanged across core swaps). Normative statement in impl/scenarios.md. |
 | Implementation execution?         | Dependency-aware half-day tasks, each typed as a decision, infrastructure slice, red-green behavior slice, gate, or single publication step. Every task names its dependencies and closing verification and ends green; representation changes integrate incrementally, and releases separate non-mutating preparation from publication. Normative statement in impl/tasks.md.                                                                                                     |
 
 ### Still open
+
+These numbers are stable identifiers that other documents cite. A settled item
+keeps its slot and points at the table above instead of renumbering the rest.
 
 1. **Read spelling:** `cogs.get(ref)`, `cogs[ref]`, or callable refs. Current
    lean: keep `get` because a tracked read creates an edge. Try all three in
@@ -738,8 +749,8 @@ singular, and does measurement show less runtime work?
 3. **Deferred reactions:** synchronous ordered flush and the write-back queue
    are settled. An optional next-tick `.deferred` mode may or may not earn its
    complexity.
-4. **App bootstrap:** settle the smallest helpers for installing the one
-   context above every scene and replacing it in a test or preview runtime.
+4. **App bootstrap:** settled on August 11, 2026 as `Cogtext.bootstrapApp()`
+   and `Cogtext.forTesting()`. See "Bootstrap helper names?" above.
 5. **Debug history UI:** the bounded log records ops, writes, recomputations,
    and notices. Labels are settled. Display may be `os_log`, an in-app
    inspector, or another developer tool.

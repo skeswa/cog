@@ -92,7 +92,7 @@ the tests needs a full Xcode; the Command Line Tools alone fail with
 `no such module 'Testing'`. The root [README.md](../../README.md) records the
 pinned version and the runner topology.
 
-## Where things stand (2026-08-10)
+## Where things stand (2026-08-11)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -123,8 +123,11 @@ These choices are settled; §10 of the core document has the full record.
 - Production creates one app-wide `Cogtext` and injects it above all scenes.
   Screens and features share it. Tests and previews create one isolated
   context for their runtime.
-- Production construction is guarded. Feature code cannot create a second
-  context.
+- Production construction is guarded. `Cogtext.bootstrapApp()` creates the one
+  production context and fails fast on a second call; the plain initializer is
+  `package`, so feature code cannot name it. The `CogTesting` product adds
+  `Cogtext.forTesting()` for a test or preview runtime, which never registers
+  as the production context.
 - Manual state and nodes seen by the UI live for the app context by default.
   Graph-only derived and async nodes may be released when unused. Query caches
   have their own retention rules.
@@ -160,15 +163,15 @@ These choices are settled; §10 of the core document has the full record.
   normative rules are in impl/tasks.md.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, app bootstrap helpers, debug-history tools, and
-persistence helpers. Also open are several edge behaviors: what a stream's
-phase does when its sequence ends or throws, whether equal stream elements
-commit distinct turns, whether a failed `.queue` run stops the queue, the
-failure mode for a selector that commits, adding to an already-cancelled
-`EffectGroup`, when a reaction registered during a flush first runs, what a
-one-shot read or refresh of a cold async cog does, and debounce/throttle timing
-modifiers (deferred backlog). Ref layout, edge layout, and hash tables also
-remain open until benchmarks choose them.
+deferred reactions, debug-history tools, and persistence helpers. Also open
+are several edge behaviors: what a stream's phase does when its sequence ends
+or throws, whether equal stream elements commit distinct turns, whether a
+failed `.queue` run stops the queue, the failure mode for a selector that
+commits, adding to an already-cancelled `EffectGroup`, when a reaction
+registered during a flush first runs, what a one-shot read or refresh of a
+cold async cog does, and debounce/throttle timing modifiers (deferred
+backlog). Ref layout, edge layout, and hash tables also remain open until
+benchmarks choose them.
 
 ## Next steps
 

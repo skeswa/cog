@@ -88,7 +88,7 @@ struct WeatherApp: App {
     @State private var effects: EffectGroup
 
     init() {
-        let cogs = Cogtext.installApp()
+        let cogs = Cogtext.bootstrapApp()
         _cogs = State(initialValue: cogs)
         _effects = State(initialValue:
             WeatherEffects(notifier: .live).install(in: cogs))
@@ -99,9 +99,6 @@ struct WeatherApp: App {
     }
 }
 ```
-
-`installApp()` here and `testing()` in §6.6 are placeholder spellings; the
-final bootstrap helper names are still open (core §10).
 
 The `App` creates this context once and shares it across every scene. A screen
 may own an `EffectGroup` in `@State`, but it borrows the app context and never
@@ -195,7 +192,7 @@ instead of exposing all source refs.
 
 ```swift
 @Test func alertsWhenTheWeatherTurnsNice() async {
-    let cogs = Cogtext.testing()
+    let cogs = Cogtext.forTesting()
     let notifier = Notifier.recording()
     let clock = TestClock()
     let effects = WeatherEffects(notifier: notifier, clock: clock)

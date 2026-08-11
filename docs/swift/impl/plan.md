@@ -57,12 +57,15 @@ scenario to exactly one task.
   approval for workflow runs from all external contributors, full-SHA
   action pins, and a read-only default `GITHUB_TOKEN` (applied 2026-08-10;
   `M0-14` records and verifies them); the runner topology is the
-  persistent-bare-metal branch `M0-05a` settled on 2026-08-10 — a dedicated
-  non-admin runner user, pinned Xcode 26.5, two repository-scoped runners
-  under the `cog-mini` label, and dootdoot-style scrub hygiene (workspace
-  scrub hooks, `persist-credentials: false`, timeouts) in place of VM
-  ephemerality, with Tart-based ephemeral VMs recorded as a deferred
-  upgrade because no macOS orchestrator shipped a release in 2026; and a
+  persistent-bare-metal branch `M0-05a` settled on 2026-08-10 — one
+  repository-scoped runner under the `cog-mini` label, pinned Xcode 26.6,
+  and dootdoot-style scrub hygiene (workspace scrub hooks,
+  `persist-credentials: false`, timeouts) in place of VM ephemerality, with
+  Tart-based ephemeral VMs recorded as a deferred upgrade because no macOS
+  orchestrator shipped a release in 2026. A dedicated non-admin runner user
+  remains the target state but was declined on 2026-08-11, because the
+  simulator lane needs an Aqua session and macOS allows one auto-login user;
+  the accepted risk is recorded in the README. A
   committed workflow-contract check (`M0-15`) enforces the guards,
   permissions blocks, credential hygiene, and pins so the hardening cannot
   silently regress. The full topology record, including its revisit
@@ -319,10 +322,9 @@ The class-node build. Correctness first; no perf tricks.
   manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
   graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  Settle the production-install and testing-factory helper spellings before
-  implementing either helper or multiplying call sites (`installApp()` and
-  `testing()` are placeholders); record the result in §10 and the README
-  snapshot. Add the `CogTesting` isolated-context factory for tests and
+  `M1-34a` settled the helper spellings on 2026-08-11: `Cogtext.bootstrapApp()`
+  from `Cog` and `Cogtext.forTesting()` from `CogTesting`, with a `package`
+  initializer so neither can be bypassed. Add the `CogTesting` isolated-context factory for tests and
   previews. Introduce its injected clock and cleanup-acknowledgement seams
   independently near the start of M1; `whileObserved` grace timing runs on the
   context's clock, so lifetime tests never wait wall-clock time. Verify that
