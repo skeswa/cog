@@ -128,3 +128,21 @@ import Testing
   #expect(seen == [1, 11, 12])
   _ = token
 }
+
+@MainActor
+@Test func `REACT-07 a changed reaction completes before commit returns`() {
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(0)
+  var observed = -1
+
+  let token = cogs.run { c in
+    observed = c.get(source)
+  }
+
+  cogs.commit { w in w[source] = 1 }
+
+  // No await, polling, or callback: the line immediately after the commit
+  // sees the work the reaction completed during that commit's flush.
+  #expect(observed == 1)
+  _ = token
+}
