@@ -58,6 +58,10 @@ extension Cogtext {
   /// phrase because making a test context is ordinary value creation (§2.3).
   /// Neither is spelled `install`; that word belongs to effects (§6.3).
   ///
+  /// Calling it a second time is a programmer error and traps, in debug builds
+  /// and in release builds alike (§2.3). A test or preview runtime wants
+  /// `Cogtext.forTesting()` instead.
+  ///
   /// - Returns: The app's context.
   @discardableResult
   public static func bootstrapApp() -> Cogtext {
@@ -76,13 +80,43 @@ extension Cogtext {
     installedAppContext
   }
 
-  /// Registers `cogs` as the app's context.
+  /// Registers `cogs` as the app's context, trapping if one is already
+  /// installed.
   ///
   /// Separate from ``Cogtext/bootstrapApp()`` so that every path that could
-  /// ever make a context the app's context is this one line. `M1-29b` adds
-  /// the second-install guard here, and adding it here is the whole change:
-  /// nothing else has to move, and no caller learns a new spelling.
+  /// ever make a context the app's context runs this one guard. Nothing else
+  /// has to check, and no caller learns a new spelling.
+  ///
+  /// A second install is a programmer error, not a condition an app could
+  /// handle: by the time it happens the process has two graphs, and every
+  /// later read is a coin flip over which one holds the fact it wants. So the
+  /// guard is unconditional — it fires in release exactly as it does in debug,
+  /// because shipping the same mistake to users silently is strictly worse
+  /// than stopping (§2.3).
+  ///
+  /// It is spelled `fatalError` rather than `preconditionFailure` for the
+  /// message, not the trap. Both trap in a release build, but the standard
+  /// library drops `preconditionFailure`'s message under `-O` — the process
+  /// dies with no explanation at all — while `fatalError` prints in every
+  /// configuration. A guarantee to fail "with a clear error in debug builds
+  /// and release builds" is only kept by the second.
   private static func installAsAppContext(_ cogs: Cogtext) {
+    guard installedAppContext == nil else {
+      fatalError(
+        """
+        Cog is already bootstrapped. `Cogtext.bootstrapApp()` installs the \
+        app's one context and runs exactly once, at launch; a second install \
+        would leave this process holding two graphs, with the app's state \
+        split between them. Keep the context the first call returned and pass \
+        it to your scenes, effects, and services rather than bootstrapping \
+        again. A test or a preview is a separate app runtime and wants its \
+        own isolated context: call `Cogtext.forTesting()` from the \
+        `CogTesting` product, or, when the app install itself is the subject, \
+        `Cogtext.withBootstrappedApp { }` — which is not re-entrant, so do \
+        not nest it.
+        """
+      )
+    }
     installedAppContext = cogs
   }
 
