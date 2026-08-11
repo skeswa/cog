@@ -51,6 +51,14 @@ public final class Cogtext {
   /// buffer, so no write-back re-enters a flush and FIFO order is preserved.
   internal var queuedTurns: [QueuedCogTurn] = []
 
+  /// Reactions this context owns, in registration order.
+  ///
+  /// The simple core walks this array at the end of a flush. Invalidations
+  /// leave clean reactions alone and mark only reachable ones, so an unrelated
+  /// turn pays the scan but never runs user code. M6 replaces the scan with its
+  /// measured flat queue without changing ordering or behavior.
+  internal var reactions: [CogReaction] = []
+
   /// Every node this context has been asked for, filed by descriptor and key.
   ///
   /// Heterogeneous on purpose: a context holds nodes of every value type an app

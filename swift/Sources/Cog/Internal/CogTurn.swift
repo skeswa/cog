@@ -84,6 +84,7 @@ extension Cogtext {
     body(turn)
     startFlushing(turn.id)
     turn.flushPendingSources(in: self)
+    flushReactions()
     finishTurn(turn.id)
   }
 
