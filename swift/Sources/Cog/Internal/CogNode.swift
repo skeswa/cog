@@ -24,6 +24,13 @@ internal protocol CogNode: AnyObject {
 
   /// The last graph revision through which this node was proved current.
   var checkedAt: CogVersion { get set }
+
+  /// Consumers whose last run read this node.
+  ///
+  /// Reverse edges make source writes a cheap push of flags rather than a scan
+  /// of the context. The simple core stores class references; M6 replaces the
+  /// physical layout behind unchanged behavior.
+  var subscribers: [CogSubscriberEdge] { get set }
 }
 
 /// What a ``Cogtext`` files a node under: a declaration plus a key.

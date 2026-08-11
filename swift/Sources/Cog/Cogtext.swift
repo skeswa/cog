@@ -31,8 +31,8 @@
 public final class Cogtext {
   /// The monotonic version assigned to graph work as turns are flushed.
   ///
-  /// `M1-06aa` installs the counter; `M1-06ab` advances it at the source
-  /// commit boundary and uses it to settle a linear chain.
+  /// The source commit boundary advances it, and the settle engine compares
+  /// node versions while pulling a derived root current.
   internal private(set) var revision: CogVersion = .initial
 
   /// One enter/exit buffer reused by iterative settle walks.
@@ -190,12 +190,11 @@ extension Cogtext {
   /// whatever *it* depends on, down as far as the first read has to go. What
   /// comes back is a value, never a promise of one.
   ///
-  /// Computing is not the same as settling. Once the settle engine exists
-  /// (`M1-06aa`, `M1-06ab`), this path also brings a cog that a later turn
-  /// dirtied back up to date before returning, so that skipping the edge never
-  /// means seeing a stale value. That step belongs here, in the one read path
-  /// every caller shares, rather than at call sites where a caller could spell
-  /// a read that skips it.
+  /// Computing is not the same as settling. This path also brings a cog that a
+  /// later turn dirtied back up to date before returning, so that skipping the
+  /// edge never means seeing a stale value. That step belongs here, in the one
+  /// read path every caller shares, rather than at call sites where a caller
+  /// could spell a read that skips it.
   ///
   /// - Parameter ref: The derived cog to read.
   /// - Returns: Its value in this context.

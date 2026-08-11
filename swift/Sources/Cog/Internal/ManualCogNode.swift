@@ -49,13 +49,18 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// The revision through which the current slot was last verified.
   var checkedAt: CogVersion
 
+  /// Derived nodes whose last run read this source.
+  var subscribers: [CogSubscriberEdge]
+
   var label: CogLabel { descriptor.label }
 
   /// Moves a staged value across the commit boundary, if this turn wrote one.
-  func flushPendingValue() {
+  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion) {
     guard case .some(let value) = pendingValue else { return }
     currentValue = value
     pendingValue = .none
+    markChanged(at: revision)
+    cogs.invalidateSubscribers(of: self)
   }
 
   /// Creates the node at its declaration's starting value for this key.
@@ -74,6 +79,7 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
     self.settleState = .clean
     self.changedAt = .initial
     self.checkedAt = .initial
+    self.subscribers = []
   }
 
   // Written out, and `nonisolated`, per the rule at the top of
@@ -84,5 +90,5 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
 /// The type-erased flush capability one turn needs from a touched source.
 @MainActor
 internal protocol PendingCogSource: AnyObject {
-  func flushPendingValue()
+  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion)
 }

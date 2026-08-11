@@ -25,9 +25,10 @@ internal final class CogTurn {
     touchedSources.append(source)
   }
 
-  func flushPendingSources() {
+  func flushPendingSources(in cogs: Cogtext) {
+    let revision = cogs.advanceRevision()
     for source in touchedSources {
-      source.flushPendingValue()
+      source.flushPendingValue(in: cogs, at: revision)
     }
     touchedSources.removeAll(keepingCapacity: true)
   }
@@ -53,7 +54,7 @@ extension Cogtext {
     let turn = startTurn(named: name)
     body(turn)
     startFlushing(turn.id)
-    turn.flushPendingSources()
+    turn.flushPendingSources(in: self)
     finishTurn(turn.id)
   }
 

@@ -20,10 +20,9 @@ import Testing
 // file-scope `let` would say different things in the MainActor and nonisolated
 // legs of the matrix (§7).
 //
-// What is deliberately *not* asserted here is what happens to a derived value
-// after a source it read is written. Invalidation is the settle engine's
-// (`M1-06aa`, `M1-06ab`), and until it lands a cached value can be stale. No
-// test below writes a source and then reads a cog that had already computed.
+// The GRAPH-01 section is the first write-after-compute behavior. It stays on
+// the same public surface: selector-owned counters show which cached nodes ran
+// again, without exposing settle flags, versions, or the explicit stack.
 
 // MARK: - DECL-07
 
@@ -318,4 +317,35 @@ import Testing
   #expect(first.read(doubled) == 12)
   #expect(second.read(doubled) == 12)
   #expect(runs == 2)
+}
+
+// MARK: - GRAPH-01
+
+@MainActor
+@Test func `GRAPH-01 a changed source settles a derived chain before the read returns`() {
+  var middleRuns = 0
+  var rootRuns = 0
+
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(1)
+  let middle = Cog<Int> { c in
+    middleRuns += 1
+    return c.get(source) + 1
+  }
+  let root = Cog<Int> { c in
+    rootRuns += 1
+    return c.get(middle) * 2
+  }
+
+  #expect(cogs.read(root) == 4)
+  #expect(middleRuns == 1)
+  #expect(rootRuns == 1)
+
+  cogs.commit { w in w[source] = 10 }
+
+  // The read is the pull boundary: it returns only after every dependency it
+  // needs has caught up to the newest committed source value.
+  #expect(cogs.read(root) == 22)
+  #expect(middleRuns == 2)
+  #expect(rootRuns == 2)
 }

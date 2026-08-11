@@ -12,14 +12,12 @@ import Testing
 // that nothing public can see yet: a derived node exists before it has a value,
 // the tracking slot names the consumer that is running, and a tracked read
 // records the edge §2.4 says it records. Dependency edges are invisible from
-// outside until the settle engine (`M1-06aa`) makes them do something, and
-// silently failing to capture them would look exactly like working code today
-// and like a stale-value bug three tasks from now.
+// outside even though the settle engine now uses them, and silently failing to
+// capture one would surface later as a stale-value bug.
 //
 // Being implementation tests, they are allowed to reach through `@testable`,
-// and they are expected to change when `M1-06aa` adds settle state and when the
-// data-oriented core (`M6`) replaces dictionary storage and edge lists. The
-// scenario tests are not.
+// and they are expected to change when the data-oriented core (`M6`) replaces
+// dictionary storage and edge lists. The scenario tests are not.
 
 // MARK: - Storage
 

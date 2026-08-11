@@ -11,18 +11,17 @@
 /// a node that is never read never runs at all (`DECL-09`).
 ///
 /// **Cached.** A run's value is kept, so a second read is a lookup rather than
-/// a second run (`READ-02`). The node now carries CLEAN/CHECK/DIRTY and version
-/// storage, but the write-to-read propagation that makes those flags settle a
-/// changed chain belongs to `M1-06ab`. Until that task lands, a write to a
-/// source that this node already computed from can still leave the cache stale.
-/// That remains a deliberate ledger boundary, not desired behavior.
+/// a second run (`READ-02`). CLEAN/CHECK/DIRTY state and versions make that
+/// cache valid across source writes: a read pulls every dirty dependency it
+/// needs current before returning. Equality backdating and dynamic edge
+/// removal land in their later, separately tested slices.
 ///
 /// The dependencies a run captured are recorded even though nothing consumes
 /// them yet, because they are captured *by the run* (§2.4) and there is no
 /// second chance to collect them later. `M1-06aa` reads them to walk parents,
 /// and `M1-09a` makes recapture across conditionals and early returns
 /// observable.
-internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
+internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSettleNode {
   /// The declaration this node belongs to.
   let descriptor: DerivedCogDescriptor<Value>
 
@@ -61,6 +60,9 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
   /// The revision through which the cached value was last proved current.
   var checkedAt: CogVersion
 
+  /// Consumers whose last run read this derived value.
+  var subscribers: [CogSubscriberEdge]
+
   var label: CogLabel { descriptor.label }
 
   /// Whether the selector has run in this context yet.
@@ -82,6 +84,7 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
     self.settleState = .dirty
     self.changedAt = .initial
     self.checkedAt = .initial
+    self.subscribers = []
   }
 
   /// The node's value, running the selector if this is its first read.
@@ -92,14 +95,28 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
   /// choke point, which is why it is stated as "settled value" rather than
   /// "cached value or run".
   func settledValue(in cogs: Cogtext) -> Value {
-    if case .some(let cached) = cachedValue {
-      return cached
+    guard hasComputed else {
+      return run(in: cogs)
     }
-    return run(in: cogs)
+
+    if settleState != .clean {
+      cogs.settle(self)
+    }
+
+    guard case .some(let cached) = cachedValue else {
+      fatalError("A settled derived Cog lost its cached value.")
+    }
+    return cached
   }
 
   func recordDependency(on producer: any CogNode) {
     dependencies.append(producer)
+    producer.addSubscriber(self)
+  }
+
+  /// Reruns the generic selector behind a type-erased settle exit frame.
+  func recompute(in cogs: Cogtext) {
+    _ = run(in: cogs)
   }
 
   /// Runs the selector once, tracking what it reads, and keeps the result.

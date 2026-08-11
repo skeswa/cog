@@ -51,7 +51,28 @@ internal enum CogSettleState: UInt8, Comparable {
   }
 }
 
+/// One weak reverse edge in the class-node correctness core.
+///
+/// A derived node strongly owns the producers in its dependency list. Keeping
+/// the reverse edge weak prevents those two arrays from forming a retain cycle
+/// when a context or, later, a released node lets the graph go.
+internal final class CogSubscriberEdge {
+  weak var node: (any CogNode)?
+
+  init(_ node: any CogNode) {
+    self.node = node
+  }
+}
+
 extension CogNode {
+  /// Adds one reverse edge, reusing the existing edge when a stable selector
+  /// reads the same producer again.
+  func addSubscriber(_ consumer: any CogNode) {
+    subscribers.removeAll { $0.node == nil }
+    guard !subscribers.contains(where: { $0.node === consumer }) else { return }
+    subscribers.append(CogSubscriberEdge(consumer))
+  }
+
   /// Records possible upstream work without weakening an existing DIRTY mark.
   func markForCheck() {
     if settleState < .check {
@@ -76,6 +97,17 @@ extension CogNode {
     checkedAt = version
     settleState = .clean
   }
+}
+
+/// The type-erased capabilities only a derived node needs during settlement.
+///
+/// The explicit stack holds heterogeneous nodes. This protocol lets its exit
+/// frame inspect a derived node's parents and rerun a generic selector without
+/// erasing the selector's value at each graph edge.
+@MainActor
+internal protocol DerivedCogSettleNode: CogNode {
+  var dependencies: [any CogNode] { get }
+  func recompute(in cogs: Cogtext)
 }
 
 /// One half of the iterative pull walk.
@@ -118,5 +150,75 @@ internal struct CogSettleStack {
 
   mutating func popLast() -> CogSettleFrame? {
     frames.popLast()
+  }
+}
+
+extension Cogtext {
+  /// Pushes invalidation away from a node whose value really changed.
+  ///
+  /// Direct consumers become DIRTY because one of their own inputs changed.
+  /// Nodes farther downstream become CHECK because equality may stop the wave
+  /// before it reaches them. The local work list keeps even a deep subscriber
+  /// chain off the Swift call stack.
+  internal func invalidateSubscribers(of producer: any CogNode) {
+    var work: [(any CogNode, CogSettleState)] = []
+    for edge in producer.subscribers {
+      if let subscriber = edge.node {
+        work.append((subscriber, .dirty))
+      }
+    }
+
+    while let (node, requestedState) = work.popLast() {
+      guard node.settleState < requestedState else { continue }
+
+      node.settleState = requestedState
+      for edge in node.subscribers {
+        if let subscriber = edge.node {
+          work.append((subscriber, .check))
+        }
+      }
+    }
+  }
+
+  /// Pulls one cached derived root current through iterative enter/exit frames.
+  ///
+  /// Enter schedules dirty parents before their consumer. Exit then uses
+  /// `changedAt` versus the consumer's prior `checkedAt` to decide whether a
+  /// CHECK node must run. `M1-07b` adds equality backdating; until then every
+  /// selector run is conservatively a change.
+  internal func settle(_ root: any DerivedCogSettleNode) {
+    settleStack.reset(startingAt: root)
+
+    while let frame = settleStack.popLast() {
+      switch frame {
+      case .enter(let node):
+        guard node.settleState != .clean else { continue }
+        guard let derived = node as? any DerivedCogSettleNode else {
+          // Sources are settled when their pending value moves to current, so
+          // an invalid source here would be an internal propagation mistake.
+          node.markChecked(at: revision)
+          continue
+        }
+
+        settleStack.pushExit(derived)
+        for dependency in derived.dependencies.reversed()
+        where dependency.settleState != .clean {
+          settleStack.pushEnter(dependency)
+        }
+
+      case .exit(let node):
+        guard let derived = node as? any DerivedCogSettleNode else { continue }
+
+        let parentChanged = derived.dependencies.contains {
+          $0.changedAt > derived.checkedAt
+        }
+
+        if derived.settleState == .dirty || parentChanged {
+          derived.recompute(in: self)
+        } else {
+          derived.markChecked(at: revision)
+        }
+      }
+    }
   }
 }
