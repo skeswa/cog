@@ -48,8 +48,8 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   /// Rebuilt from empty on every run, because dependencies are exactly what
   /// this run read (§2.4) and an edge that is not read again is not an edge.
   /// A list, with repeats left in, is the correctness build's answer. Reverse
-  /// edges are reused today; removing dropped dependencies belongs to
-  /// `M1-09a`, and the physical layout remains benchmark-gated for `M6`
+  /// edges are reused for producers that remain and removed from producers the
+  /// next run drops. The physical layout remains benchmark-gated for `M6`
   /// (perf §3.3).
   internal private(set) var dependencies: [any CogNode] = []
 
@@ -128,10 +128,16 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
     let previousValue = cachedValue
+    let previousDependencies = dependencies
     dependencies.removeAll(keepingCapacity: true)
 
     let value = cogs.tracking(self) {
       descriptor.compute(Reader(cogs: cogs, node: self))
+    }
+
+    for previousDependency in previousDependencies
+    where !dependencies.contains(where: { $0 === previousDependency }) {
+      previousDependency.removeSubscriber(self)
     }
 
     if case .some(let previousValue) = previousValue,

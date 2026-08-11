@@ -73,6 +73,15 @@ extension CogNode {
     subscribers.append(CogSubscriberEdge(consumer))
   }
 
+  /// Removes the reverse edge for a consumer that did not read this producer
+  /// on its latest run, while also pruning subscribers that have gone away.
+  func removeSubscriber(_ consumer: any CogNode) {
+    subscribers.removeAll { edge in
+      guard let subscriber = edge.node else { return true }
+      return subscriber === consumer
+    }
+  }
+
   /// Records possible upstream work without weakening an existing DIRTY mark.
   func markForCheck() {
     if settleState < .check {

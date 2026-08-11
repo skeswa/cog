@@ -13,9 +13,9 @@
 internal protocol CogConsumer: AnyObject {
   /// Records that this consumer read `producer` during the run in progress.
   ///
-  /// Called once per tracked read, in read order. Reusing and removing edges
-  /// across runs is the recapture work in `M1-06aa` and `M1-09a`; today a run
-  /// starts from an empty list and appends what it reads.
+  /// Called once per tracked read, in read order. Every run starts from an
+  /// empty list, appends what it reads, and removes reverse edges for producers
+  /// the completed run did not read again.
   func recordDependency(on producer: any CogNode)
 }
 
