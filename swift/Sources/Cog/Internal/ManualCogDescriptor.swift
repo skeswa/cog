@@ -23,10 +23,24 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// value of one node and get the same answer either way.
   private let start: ManualCogStartingValue<Value>
 
+  /// Whether two values count as the same state, or `nil` when every write
+  /// must conservatively count as a change.
+  ///
+  /// The declaration owns this policy because every live node for it — across
+  /// keys and isolated contexts — follows the same rule. `ManualCog` and
+  /// `ManualCogBox` install `==` for an `Equatable` value, preserve an
+  /// explicit `equals:` closure, or leave this nil for an opaque value.
+  private let equals: (@MainActor (Value, Value) -> Bool)?
+
   /// Declares a source whose nodes all start at the same value.
-  init(startingValue: Value, label: CogLabel) {
+  init(
+    startingValue: Value,
+    equals: (@MainActor (Value, Value) -> Bool)?,
+    label: CogLabel
+  ) {
     self.label = label
     self.start = .constant(startingValue)
+    self.equals = equals
   }
 
   /// Declares a keyed source whose nodes start at a value computed from the
@@ -36,9 +50,14 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// concrete key type, because this descriptor is deliberately not generic
   /// over the key. ``ManualCogBox`` is the only thing that builds one, and it
   /// wraps the user's typed closure so the erasure never reaches user code.
-  init(startingValueForKey: @escaping @MainActor (AnyHashable?) -> Value, label: CogLabel) {
+  init(
+    startingValueForKey: @escaping @MainActor (AnyHashable?) -> Value,
+    equals: (@MainActor (Value, Value) -> Bool)?,
+    label: CogLabel
+  ) {
     self.label = label
     self.start = .perKey(startingValueForKey)
+    self.equals = equals
   }
 
   /// The value the node for `key` holds before anything writes to it.
@@ -51,6 +70,16 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
     case .perKey(let makeStartingValue):
       return makeStartingValue(key)
     }
+  }
+
+  /// Whether a staged value is equal to the source's current value.
+  ///
+  /// No comparator means "assume changed," so this method deliberately
+  /// returns false rather than trying to discover `Equatable` dynamically.
+  /// The public declaration overloads make that choice statically and keep
+  /// the hot flush path concrete.
+  func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
+    equals?(oldValue, newValue) ?? false
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

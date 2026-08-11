@@ -53,6 +53,39 @@ public struct ManualCog<Value> {
     self.init(
       descriptor: ManualCogDescriptor(
         startingValue: startingValue,
+        equals: nil,
+        label: CogLabel(name: name, fileID: fileID, line: line)
+      ),
+      key: nil
+    )
+  }
+
+  /// Declares a source with an explicit rule for deciding whether a write
+  /// changes its value.
+  ///
+  /// Cog calls `equals` once at flush with the latest completed value and the
+  /// final value staged by the turn. Returning `true` suppresses downstream
+  /// work; returning `false` commits and propagates the new value. This also
+  /// makes a change followed by a reversion in one turn count as no change.
+  ///
+  /// - Parameters:
+  ///   - startingValue: The value reads see until something writes.
+  ///   - equals: Whether the old and newly staged values count as equal.
+  ///   - name: What Cog should call this cog in diagnostics and debug history.
+  ///     Defaults to the file and line of the declaration.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  public init(
+    _ startingValue: Value,
+    equals: @escaping @MainActor (Value, Value) -> Bool,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line
+  ) {
+    self.init(
+      descriptor: ManualCogDescriptor(
+        startingValue: startingValue,
+        equals: equals,
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -64,5 +97,28 @@ public struct ManualCog<Value> {
   internal init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
+  }
+}
+
+extension ManualCog where Value: Equatable {
+  /// Declares an `Equatable` source whose equal writes are not changes.
+  ///
+  /// This overload is selected automatically when `Value` conforms to
+  /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to substitute a
+  /// domain-specific equality rule.
+  public init(
+    _ startingValue: Value,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line
+  ) {
+    self.init(
+      descriptor: ManualCogDescriptor(
+        startingValue: startingValue,
+        equals: { oldValue, newValue in oldValue == newValue },
+        label: CogLabel(name: name, fileID: fileID, line: line)
+      ),
+      key: nil
+    )
   }
 }

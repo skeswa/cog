@@ -57,8 +57,14 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// Moves a staged value across the commit boundary, if this turn wrote one.
   func flushPendingValue(in cogs: Cogtext, at revision: CogVersion) {
     guard case .some(let value) = pendingValue else { return }
-    currentValue = value
     pendingValue = .none
+
+    // Equality is decided against the final staged value, once, at flush.
+    // That makes repeated writes cheap and makes a change followed by a
+    // reversion disappear without ever dirtying downstream nodes.
+    guard !descriptor.valuesAreEqual(currentValue, value) else { return }
+
+    currentValue = value
     markChanged(at: revision)
     cogs.invalidateSubscribers(of: self)
   }
