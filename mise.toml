@@ -2,10 +2,91 @@
 node = "24"
 "npm:oxfmt" = "0.62.0"
 
+# Formatting is split per language under the `fmt` and `fmt:check` umbrellas.
+# Oxfmt owns Markdown, JSON, and YAML; the Swift toolchain's own `swift format`
+# owns Swift. There is no SwiftLint. A future `fmt:kotlin` joins the same
+# umbrellas without touching either existing leg.
+
 [tasks.fmt]
-description = "Format everything in the repo with Oxfmt"
+description = "Format everything in the repo"
+depends = ["fmt:md", "fmt:swift"]
+
+[tasks."fmt:md"]
+description = "Format Markdown, JSON, and YAML with Oxfmt"
 run = "oxfmt"
 
+[tasks."fmt:swift"]
+description = "Format Swift sources with the toolchain's swift-format"
+run = "swift format --in-place --parallel --recursive swift Package.swift"
+
 [tasks."fmt:check"]
-description = "Verify formatting without writing changes"
+description = "Verify formatting everywhere without writing changes"
+depends = ["fmt:check:md", "fmt:check:swift"]
+
+[tasks."fmt:check:md"]
+description = "Verify Markdown, JSON, and YAML formatting"
 run = "oxfmt --check"
+
+[tasks."fmt:check:swift"]
+description = "Lint Swift formatting strictly, writing nothing"
+run = "swift format lint --strict --parallel --recursive swift Package.swift"
+
+# Testing goes through `tools/swift-test.mjs`, never `swift test` directly.
+# The wrapper gives every isolation-matrix leg and configuration its own
+# SwiftPM scratch path, and — whenever `--filter` is passed — enumerates the
+# built tests before running and fails when the expression selects none.
+# SwiftPM exits 0 on an empty selection, so a raw `swift test --filter` can
+# report a green for work it never ran. Extra arguments are passed straight
+# through: `mise run test --filter 'DECL-01|ONE-04' --parallel`.
+
+[tasks.test]
+description = "Run the Swift tests on the default matrix leg"
+run = "node {{config_root}}/tools/swift-test.mjs default"
+
+[tasks."test:matrix"]
+description = "Run the Swift tests across all four isolation-matrix legs"
+run = "node {{config_root}}/tools/swift-test.mjs matrix"
+
+[tasks."test:release"]
+description = "Run the Swift tests on the default leg in release configuration"
+run = "node {{config_root}}/tools/swift-test.mjs release"
+
+# Compile-fail fixtures live outside every SwiftPM target and are type-checked
+# in one batched `swiftc` pass, never one compiler invocation per test. The
+# runner derives its flags from `Package.swift` rather than duplicating them,
+# and fails both when a fixture misses its expected diagnostic and when a
+# fixture stops failing altogether.
+
+[tasks."test:compilefail"]
+description = "Type-check every compile-fail fixture in one batched swiftc pass"
+run = "node {{config_root}}/tools/check-compile-fail.mjs"
+
+# The task ledger is validated by tools/check-task-ledger.mjs, which derives
+# the scenario census from docs/swift/impl/scenarios.md rather than from any
+# hand-maintained count. `tasks:check` runs the checker's own fixture suite
+# first: a checker whose self-tests are broken cannot validate anything, and
+# the milestone gates invoke `tasks:check` as a single self-contained command.
+
+[tasks."tasks:check"]
+description = "Validate the Swift implementation task ledger"
+depends = ["tasks:check:fixtures"]
+run = "node {{config_root}}/tools/check-task-ledger.mjs"
+
+[tasks."tasks:check:fixtures"]
+description = "Run the task-ledger checker's fixture suite"
+run = "node {{config_root}}/tools/test-task-ledger.mjs"
+
+# The workflow-contract check over `.github/workflows`: the same-repo guard on
+# every self-hosted job, least-privilege `permissions:`, `persist-credentials:
+# false`, job timeouts, no `pull_request_target`, and full-SHA action pins.
+# The policy constants — including which labels count as self-hosted — live at
+# the top of tools/lib/workflows/checks.mjs.
+
+[tasks."workflows:check"]
+description = "Verify the GitHub Actions workflow hardening contract"
+depends = ["workflows:check:fixtures"]
+run = "node {{config_root}}/tools/check-workflows.mjs"
+
+[tasks."workflows:check:fixtures"]
+description = "Run the workflow-contract checker against its fixtures"
+run = "node {{config_root}}/tools/test-workflows.mjs"

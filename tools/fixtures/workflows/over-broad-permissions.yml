@@ -1,0 +1,48 @@
+name: Over-broad permissions
+
+# Fixture: three ways to hand a job more than `contents: read`.
+#
+# `publish` asks for write scopes outright, `everything` takes the `write-all`
+# shorthand, and `inherited` names no block at all — and there is no
+# workflow-level block for it to inherit, so its grant is whatever the
+# repository default happens to be that week. All three must fire
+# `least-privilege-permissions`, and nothing else may fire.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      packages: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Publish
+        run: mise run publish
+
+  everything:
+    name: Everything
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: write-all
+    steps:
+      - name: Report
+        run: echo done
+
+  inherited:
+    name: Inherited
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Report
+        run: echo done

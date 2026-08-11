@@ -56,13 +56,17 @@ scenario to exactly one task.
   an approval-gated GitHub-hosted macOS lane; repository settings require
   approval for workflow runs from all external contributors, full-SHA
   action pins, and a read-only default `GITHUB_TOKEN` (applied 2026-08-10;
-  `M0-14` records and verifies them); the runner topology targets one
-  ephemeral VM per job (Tart-based, orchestrator settled by `M0-05a`) with
-  dootdoot-style persistent-bare-metal hygiene — workspace scrub,
-  `persist-credentials: false`, timeouts — as the recorded fallback; and a
+  `M0-14` records and verifies them); the runner topology is the
+  persistent-bare-metal branch `M0-05a` settled on 2026-08-10 — a dedicated
+  non-admin runner user, pinned Xcode 26.5, two repository-scoped runners
+  under the `cog-mini` label, and dootdoot-style scrub hygiene (workspace
+  scrub hooks, `persist-credentials: false`, timeouts) in place of VM
+  ephemerality, with Tart-based ephemeral VMs recorded as a deferred
+  upgrade because no macOS orchestrator shipped a release in 2026; and a
   committed workflow-contract check (`M0-15`) enforces the guards,
   permissions blocks, credential hygiene, and pins so the hardening cannot
-  silently regress.
+  silently regress. The full topology record, including its revisit
+  triggers, is the "macOS runner topology" section of the root README.
 - Task bookkeeping (settled 2026-08-10): day-to-day execution bookkeeping —
   claiming, status, discussion, and closure — lives in the repository's
   GitHub issues, one issue per task with dependencies as native blocked-by
@@ -668,10 +672,13 @@ release gates.
 
 ## Flagged uncertainties (verify at implementation time)
 
-- Mac mini runner topology: maturity of the Tart VM orchestrators
-  (Tartelet, ekiden, Cilicon), the Virtualization.framework two-VM
-  concurrency limit, simulator performance inside a VM, and whether a
-  pinned iOS 17.x runtime installs cleanly into the runner image.
+- Mac mini runner topology: resolved by `M0-05a` on 2026-08-10 in favour of
+  persistent bare metal, which moots the VM-only questions (orchestrator
+  maturity, the Virtualization.framework two-VM limit, simulator
+  performance inside a VM) unless the deferred Tart upgrade is ever taken.
+  The remaining live question is whether a pinned iOS 17.x runtime installs
+  cleanly onto the runner host; `M2-18a` owns it. The mini's SSD capacity is
+  still unconfirmed.
 - VM-versus-bare-metal benchmark noise on the mini (probed at `M5-05bb`
   before baselines are recorded).
 - Benchmark package canonical repository, ARC metric names, minimum version,

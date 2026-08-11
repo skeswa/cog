@@ -1,0 +1,25 @@
+{
+  "//": [
+    "Trimmed from `swift format dump-configuration`. Every key absent here",
+    "keeps its toolchain default, so this file records only deliberate",
+    "choices and does not drift as the toolchain evolves.",
+    "",
+    "`indentConditionalCompilationBlocks` is off because the boundary and",
+    "benchmark targets wrap whole files in `#if canImport(UIKit)` and",
+    "`#if DEBUG`; indenting those would reindent the entire file body.",
+    "",
+    "There is deliberately no `rules` block. swift-format REPLACES the rule",
+    "dictionary rather than merging it, so naming even one rule here would",
+    "silently disable every other default rule. Verify any future change",
+    "with `swift format dump-configuration --effective`."
+  ],
+  "version": 1,
+  "indentation": {
+    "spaces": 2
+  },
+  "indentConditionalCompilationBlocks": false,
+  "lineLength": 100,
+  "maximumBlankLines": 1,
+  "respectsExistingLineBreaks": true,
+  "spacesBeforeEndOfLineComments": 2
+}

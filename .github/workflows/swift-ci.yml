@@ -1,0 +1,538 @@
+name: Swift CI
+
+# The Swift lane. Everything here needs a Swift toolchain, so every job runs on
+# macOS — and macOS means one of exactly two runner lanes:
+#
+#   1. The self-hosted Mac mini, `runs-on: [self-hosted, macOS, ARM64,
+#      cog-mini]`, for pushes to `main` and same-repo pull requests.
+#   2. An approval-gated GitHub-hosted `macos-26` runner, for pull requests
+#      from forks, which structurally never reach the mini.
+#
+# The two `if:` guards below are exhaustive and mutually exclusive, so exactly
+# one lane runs per event. They are copied verbatim from the "macOS runner
+# topology" section of the root README (`M0-05a`), which is the normative
+# record; do not paraphrase them here. In particular the
+# `github.event_name != 'pull_request' ||` clause is load-bearing: on `push`
+# there is no `github.event.pull_request`, so a bare comparison would evaluate
+# false and silently skip the self-hosted lane.
+#
+# The lanes are spelled out twice rather than shared through a YAML anchor or a
+# computed `runs-on:`. A single job cannot carry both guards — the whole point
+# of the same-repo guard is that it is absent from the fork lane — and a
+# `runs-on:` that routes by event would put fork code one expression bug away
+# from the mini. Duplication is cheap; that mistake is not.
+#
+# XCODE IS REQUIRED, and the pin is `COG_XCODE_VERSION` below. The Command
+# Line Tools alone are not enough: they carry `swift` and `swift-format`, so
+# building and linting work, but `swift test` fails with `no such module
+# 'Testing'` because SwiftPM does not wire up the CLT copy of
+# `Testing.framework`. That was proven by a real run, not assumed. Xcode is
+# needed for M2's simulator lane anyway, so the pin covers both.
+#
+# Selection is via `DEVELOPER_DIR` rather than `sudo xcode-select`: it needs
+# no privilege, so it survives the mini moving to the dedicated non-admin
+# runner user the topology still targets, and it is job-scoped, so two
+# concurrent jobs on the mini cannot fight over a machine-wide setting.
+#
+# The rest of the hardening posture is enforced by `mise run workflows:check`:
+# least-privilege `permissions:`, `persist-credentials: false`, a timeout on
+# every job, no `pull_request_target`, and full-SHA action pins.
+#
+# Jobs land here as the milestones that need them land: `M0-05c` adds the
+# release-configuration and compile-fail jobs, `M0-09b` adds the task-ledger
+# check and widens the path filters below, M2 adds `test-simulator`, and M5
+# adds `bench-build` (which must also serialize against the rest of the mini
+# through its own `concurrency:` group, or its numbers carry contention noise).
+
+# The two path lists are deliberately duplicated rather than shared through a
+# YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
+# trigger parser rather than the runner, and a parse failure there does not
+# error — the lane simply never runs.
+on:
+  pull_request:
+    paths:
+      - "Package.swift"
+      - "Package.resolved"
+      - "swift/**"
+      - ".swift-format"
+      - "mise.toml"
+      - "tools/**"
+      - "docs/swift/impl/plan.md"
+      - "docs/swift/impl/tasks.md"
+      - "docs/swift/impl/scenarios.md"
+      - ".github/workflows/swift-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Package.swift"
+      - "Package.resolved"
+      - "swift/**"
+      - ".swift-format"
+      - "mise.toml"
+      - "tools/**"
+      - "docs/swift/impl/plan.md"
+      - "docs/swift/impl/tasks.md"
+      - "docs/swift/impl/scenarios.md"
+      - ".github/workflows/swift-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # THE XCODE PIN. One line, every job. 26.6 is build 17F113 on the mini and
+  # build 17F113 on the GitHub-hosted `macos-26` image, where it is also the
+  # default — so the two lanes compile with the identical toolchain, not
+  # merely the same version number.
+  COG_XCODE_VERSION: "26.6"
+  # Kept in step with `markdown.yml`.
+  COG_MISE_VERSION: "2026.8.3"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Self-hosted lane: pushes to `main` and same-repo pull requests.
+  # ---------------------------------------------------------------------------
+
+  format:
+    name: Format (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          # The host is bare metal with no image pinning, so record exactly
+          # which toolchain produced this run rather than infer it later.
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      # `fmt:check:swift`, not the `fmt:check` umbrella: the umbrella also runs
+      # Oxfmt over Markdown, JSON, and YAML, which `markdown.yml` already gates
+      # on GitHub-hosted ubuntu. Splitting them keeps each failure in the lane
+      # that can explain it.
+      - name: Lint Swift formatting
+        run: mise run fmt:check:swift
+
+  test-host:
+    name: Host tests (self-hosted, ${{ matrix.leg }})
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    strategy:
+      # One leg's failure is not the other three legs' failure, and the whole
+      # point of the matrix is to learn which legs disagree.
+      fail-fast: false
+      matrix:
+        # The four legs of the isolation matrix, named exactly as
+        # `tools/swift-test.mjs` names them — the wrapper takes each leg name
+        # as a mode of its own. Each leg gets its own job so the legs
+        # parallelize across the mini's runners and cache separately.
+        leg:
+          - mainactor-nnbd-on
+          - mainactor-nnbd-off
+          - nonisolated-nnbd-on
+          - nonisolated-nnbd-off
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      # The cached directory is the leg's SwiftPM scratch path, which
+      # `tools/swift-test.mjs` derives as `.build/<leg>-<configuration>`. The
+      # names have to match the wrapper's exactly or the cache restores into a
+      # directory nothing reads.
+      #
+      # The key covers the manifest, the resolved dependency graph, and the
+      # pinned tooling. It deliberately does not name a compiler: nothing here
+      # pins one, and SwiftPM already stamps the scratch path with a
+      # `swift-version-*.txt` and rebuilds when the compiler changes, so a
+      # cache restored across a toolchain upgrade is slow, never wrong.
+      - name: Restore the leg's build directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/${{ matrix.leg }}-debug
+          key: swift-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-${{ matrix.leg }}-debug-${{ runner.arch }}-
+
+      - name: Run the host tests for this leg
+        env:
+          COG_TEST_LEG: ${{ matrix.leg }}
+        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --parallel
+
+  # The release-configuration leg. The guardrails that promise every-build
+  # behaviour — the second-context guard, escaped writers, cycle detection, the
+  # absence of `seed`, and free debug history — only mean something if they are
+  # proven outside debug. Runs the default leg only; the isolation matrix is a
+  # debug-side concern.
+  test-release:
+    name: Release tests (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Restore the release build directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/mainactor-nnbd-on-release
+          key: swift-mainactor-nnbd-on-release-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-mainactor-nnbd-on-release-${{ runner.arch }}-
+
+      - name: Run the release-configuration tests
+        run: mise run test:release
+
+  # The compile-fail fixtures, type-checked in one batched `swiftc` pass. Its
+  # own scratch path, so it never contends with the test legs' caches.
+  compile-fail:
+    name: Compile-fail fixtures (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Type-check the compile-fail fixtures
+        run: mise run test:compilefail
+
+  # ---------------------------------------------------------------------------
+  # Document lane: the plan-to-task contract, on GitHub-hosted ubuntu.
+  #
+  # The checker is platform-neutral Node, so it needs neither macOS nor the
+  # mini, and running it on a hosted runner keeps the mini's single runner free
+  # for the work that genuinely needs it. It lives in this workflow rather than
+  # `markdown.yml` because the ledger is a Swift-implementation input, and the
+  # path filters above are extended to match: a change to the plan, either
+  # ledger, or the checker itself now triggers this workflow, so an
+  # alignment-only change can never skip its validator.
+  #
+  # No fork guard: this is a GitHub-hosted runner, so fork pull requests are
+  # welcome here and are approval-gated by the repository policy.
+  # ---------------------------------------------------------------------------
+
+  ledger:
+    name: Task ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Validate the task ledger against the plan and scenarios
+        run: mise run tasks:check
+
+  # ---------------------------------------------------------------------------
+  # Fork lane: pull requests from forks, on GitHub-hosted macOS.
+  #
+  # These jobs are the fork's entire macOS signal, so they mirror the
+  # self-hosted lane above step for step, including the same pinned Xcode.
+  # Pinning in one lane only would mean the two lanes prove different things.
+  # `macos-26` ships several Xcodes and defaults to a newer one, so the pin is
+  # doing real work here, not just documenting.
+  #
+  # These jobs need no same-repo guard because they carry its complement, and
+  # they are approval-gated by the repository's `all_external_contributors`
+  # fork-PR policy (`M0-14`), not by anything in this file.
+  # ---------------------------------------------------------------------------
+
+  fork-format:
+    name: Format (fork, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Lint Swift formatting
+        run: mise run fmt:check:swift
+
+  fork-test-host:
+    name: Host tests (fork, GitHub-hosted, ${{ matrix.leg }})
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        leg:
+          - mainactor-nnbd-on
+          - mainactor-nnbd-off
+          - nonisolated-nnbd-on
+          - nonisolated-nnbd-off
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          # Find Xcode by VERSION, never by path. The two lanes name the same
+          # release differently: `xcodes` installs it as `/Applications/
+          # Xcode.app`, while the GitHub-hosted image uses
+          # `/Applications/Xcode_<version>.app`. Reading each bundle's
+          # `version.plist` is the only spelling that works in both.
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s). Install it, or change COG_XCODE_VERSION in this workflow and the topology record in README.md together."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      # Keyed apart from the self-hosted lane's caches: same leg, different
+      # host, different toolchain.
+      - name: Restore the leg's build directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/${{ matrix.leg }}-debug
+          key: swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-
+
+      - name: Run the host tests for this leg
+        env:
+          COG_TEST_LEG: ${{ matrix.leg }}
+        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --parallel

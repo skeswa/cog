@@ -1,0 +1,34 @@
+name: No timeout
+
+# Fixture: an unbounded job and a nonsensical bound. `build` sets no
+# `timeout-minutes` at all and would hold its runner for the six-hour platform
+# default; `soak` sets zero. Both must fire `job-timeout`, and nothing else
+# may fire.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: mise run build
+
+  soak:
+    name: Soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 0
+    steps:
+      - name: Soak
+        run: mise run soak

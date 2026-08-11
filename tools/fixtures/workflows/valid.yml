@@ -1,0 +1,73 @@
+name: Valid hardened workflow
+
+# Fixture: the shape a self-hosted lane has to have. Every check passes.
+#
+# It exercises the reader as well as the checks: an anchor and its alias, a
+# folded multi-line guard whose fork clause sits inside parentheses, a
+# flow-sequence `runs-on:`, a runner-group `runs-on:`, a local action, and a
+# `docker://` reference pinned by digest.
+
+on:
+  pull_request:
+    paths: &swift-paths
+      - "swift/**"
+      - "Package.swift"
+      - "mise.toml"
+  push:
+    branches: [main]
+    paths: *swift-paths
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: [self-hosted, macOS, arm64]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scrub the workspace
+        uses: ./.github/actions/scrub
+
+      - name: Run the host tests
+        run: mise run test:matrix
+
+  release-notes:
+    name: Release notes
+    runs-on: { group: cog-macs, labels: [self-hosted, tart] }
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: none
+    if: "github.repository == 'skeswa/cog' && github.event.pull_request.head.repo.full_name == github.repository"
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: "false"
+
+      - name: Render
+        uses: docker://ghcr.io/skeswa/notes@sha256:14e0a7b0dbbd21bb2f1a3add6cd8b8e2ba54b0f7f13a3e42b8dd60b73d15b1cf
+
+  fork-lane:
+    name: Fork lane (GitHub-hosted)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the host tests
+        run: mise run test
