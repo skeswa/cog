@@ -173,6 +173,13 @@ that runtime.
 
 ## Conventions
 
+- **Spell a fail-fast trap `fatalError`, never `preconditionFailure`.** The
+  standard library drops `preconditionFailure`'s message under `-O`: the
+  process still traps, but with no explanation, so a scenario promising "a
+  clear error … in release builds" would be unprovable. Measured — under
+  `-Onone` both print; under `-O` only `fatalError` does. An exit test for a
+  trap should assert on the child's `standardErrorContent`, not merely its
+  exit status, or it cannot tell a clear error from a bare trap.
 - **A scenario test never uses `@testable import Cog`.** Tests that own a
   scenario ID prove it through the public API and `CogTesting` only.
   COUNT-09 through COUNT-11 require the whole behavior suite to pass
