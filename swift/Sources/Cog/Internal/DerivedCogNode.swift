@@ -127,6 +127,16 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   /// duration of the run, so a nested read of another derived cog computes
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
+    // Recorded here rather than in `recompute(in:)`, because this is the one
+    // place the selector actually runs: recording at the settle-driven entry
+    // would miss every lazy first computation, which is a large part of what a
+    // person wants history to explain. Recorded on the way in rather than at
+    // either exit, so a rerun that lands on an equal value still shows the run
+    // it really did.
+    #if DEBUG
+    cogs.historyLog.recordRecompute(label: label, key: key)
+    #endif
+
     let previousValue = cachedValue
     let previousDependencies = dependencies
     dependencies.removeAll(keepingCapacity: true)

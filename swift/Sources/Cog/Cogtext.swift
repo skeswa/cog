@@ -91,6 +91,17 @@ public final class Cogtext {
   /// why the slot lives in this file with the rest of the context's state.
   internal var trackedConsumer: (any CogConsumer)?
 
+  #if DEBUG
+  /// What this context has done lately (§2.3, perf §8).
+  ///
+  /// Debug builds only, so a release build carries no ring, records nothing,
+  /// and compiles no recording call (`HIST-04`). This is the library's first
+  /// `#if DEBUG`, and the pattern it sets is to gate the storage, the record
+  /// types, the reader, and every call site together — release never has to
+  /// compile around a hole.
+  internal var historyLog = CogHistoryLog()
+  #endif
+
   /// Creates an empty context.
   ///
   /// `package` rather than `public` so that the only ways to make a context

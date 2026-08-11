@@ -65,6 +65,16 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
     guard !descriptor.valuesAreEqual(currentValue, value) else { return }
 
     currentValue = value
+
+    // Recorded below the equality gate, so history holds writes that changed
+    // something. A write reverted within its own turn is invisible to every
+    // other part of the model, and a history that contradicted the model would
+    // mislead the person reading it — besides letting one unchanged write in a
+    // loop evict the whole ring.
+    #if DEBUG
+    cogs.historyLog.recordWrite(label: label, key: key)
+    #endif
+
     markChanged(at: revision)
     cogs.invalidateSubscribers(of: self)
   }

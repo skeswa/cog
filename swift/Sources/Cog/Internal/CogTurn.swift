@@ -108,6 +108,17 @@ extension Cogtext {
 
     let turn = CogTurn(id: CogTurnID(), name: name)
     turnPhase = .accumulating(turn)
+
+    // Recorded here, at the one place a turn is minted, so that every path
+    // reaching a turn records exactly one entry: the outer commit, and the
+    // FIFO drain's replay of a queued body. A nested commit returns from
+    // `withTurn` above without arriving here, which is what makes a joined
+    // commit one turn in history rather than two. Recorded at the start, so a
+    // turn precedes the writes and recomputations it caused.
+    #if DEBUG
+    historyLog.recordTurn(named: name)
+    #endif
+
     return turn
   }
 
