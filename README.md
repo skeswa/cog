@@ -135,9 +135,13 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   runner user this section still targets, and because it is job-scoped, so
   two concurrent jobs cannot fight over a machine-wide setting.
 
-- **Runners.** Two runner services, each **repository-scoped to
-  `skeswa/cog`** so no other repository can target this hardware, each with
-  its own `_work`, installed as launchd services.
+- **Runners.** _Amended 2026-08-10 to match the provisioned host._ One
+  runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other
+  repository can target it, with its own `_work`. It runs as `./run.sh`
+  inside a long-lived tmux session rather than as a launchd service, so **it
+  does not survive a reboot**; `svc.sh install` is the fix when that matters.
+  The same host and user also run a second runner for another repository,
+  which is why the scrub below is carefully scoped.
 - **Labels.** Registered with `--labels cog-mini`, keeping the default
   `self-hosted`, `macOS`, and `ARM64`. Jobs use
   `runs-on: [self-hosted, macOS, ARM64, cog-mini]`. Label matching is
@@ -145,12 +149,31 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   `runs-on: self-hosted` elsewhere from landing here. No runner group —
   runner groups do not exist for repository-scoped runners on a personal
   account.
-- **Scrub hygiene** replaces VM ephemerality and is what the `M0-13`
-  verification checks. `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` deletes `_work`,
-  `~/Library/Developer/Xcode/DerivedData`,
-  `~/Library/Caches/org.swift.swiftpm`, and `$TMPDIR`;
-  `ACTIONS_RUNNER_HOOK_JOB_STARTED` asserts a clean tree and fails fast
-  otherwise. Checkout uses `persist-credentials: false` and `clean: true`.
+- **Scrub hygiene** replaces VM ephemerality. Installed and verified in CI
+  on 2026-08-10 as `actions-runner-cog/hooks/{job-started,job-completed}.sh`,
+  wired through the runner's `.env`. Checkout uses
+  `persist-credentials: false` and `clean: true`.
+
+  `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` removes the job's `RUNNER_WORKSPACE`,
+  empties `RUNNER_TEMP`, and deletes `DerivedData/cog-*`. It is deliberately
+  **narrower than first specified**: it does not touch `$TMPDIR` or
+  `~/Library/Caches/org.swift.swiftpm`, because the runner user also hosts
+  another repository's runner and wiping shared state could break a job
+  running concurrently next door. Nothing removed belongs to anything but
+  cog. Removing the workspace costs no caching, because `actions/cache`
+  uploads in its post step, before this hook.
+
+  `ACTIONS_RUNNER_HOOK_JOB_STARTED` fails the job if `GITHUB_WORKSPACE` is
+  not empty before checkout, so a scrub that silently stops working halts the
+  next run instead of letting it build on an unknown tree. It asserts on the
+  _checkout directory_ specifically: the runner pre-creates both
+  `RUNNER_WORKSPACE` and the checkout directory inside it, so "absent" and
+  "empty workspace" are both always false and neither can be asserted.
+
+  The completed hook never exits non-zero — a failed scrub must not fail an
+  otherwise good job — because the started hook is what turns a missed scrub
+  into a loud failure at the next opportunity, before any code is built.
+
 - **Concurrency.** Two jobs, by policy rather than by platform limit. The M5
   benchmark job must serialize against everything else on the mini through a
   workflow `concurrency:` group, or its numbers will carry contention noise.
