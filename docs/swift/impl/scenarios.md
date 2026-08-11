@@ -335,9 +335,6 @@ _Milestone M1, except REACT-19 (M2) and REACT-20 (M7). Design: §3.3, §6.2,
 A reaction watches state and does something outside the graph when it
 changes.
 
-_Pending (core §10, open question 16): when a reaction registered during a
-flush — from inside another reaction — makes its initial run._
-
 ### 7.1 Running
 
 - **REACT-01.** I register a reaction with `cogs.run`. It runs once right
@@ -354,6 +351,10 @@ flush — from inside another reaction — makes its initial run._
   selector's. It is re-tracked every run.
 - **REACT-07.** Reactions run before the op that committed the turn
   returns. The very next line of my test can check what the reaction did.
+- **REACT-23.** While one reaction runs during a flush, it registers several
+  more. Their initial tracking runs do not re-enter it: they wait behind every
+  reaction already scheduled for that flush, keep registration order, and run
+  before any write-back turn queued by those reactions.
 - **REACT-08.** `watch(_, initial: .skip)` does not call me at install
   time; the first real change calls me with the old and new values.
 - **REACT-09.** `watch(_, initial: .run)` calls me once at install time.

@@ -103,6 +103,9 @@ These choices are settled; §10 of the core document has the full record.
   accumulating, and flushing. Reactions run at the end of the turn; writes
   from reactions wait in a FIFO queue as new turns. A debug quiescence guard
   reports long causal chains through an internal diagnostic seam.
+- A reaction registered during a flush never runs reentrantly. Its initial
+  tracking run joins that flush's reaction tail in registration order, after
+  already-scheduled reactions and before queued write-back turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
 - Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A ref
@@ -173,11 +176,10 @@ deferred reactions, debug-history tools, and persistence helpers. Also open
 are several edge behaviors: what a stream's phase does when its sequence ends
 or throws, whether equal stream elements commit distinct turns, whether a
 failed `.queue` run stops the queue, the failure mode for a selector that
-commits, adding to an already-cancelled `EffectGroup`, when a reaction
-registered during a flush first runs, what a one-shot read or refresh of a
-cold async cog does, and debounce/throttle timing modifiers (deferred
-backlog). Ref layout, edge layout, and hash tables also remain open until
-benchmarks choose them.
+commits, adding to an already-cancelled `EffectGroup`, what a one-shot read or
+refresh of a cold async cog does, and debounce/throttle timing modifiers
+(deferred backlog). Ref layout, edge layout, and hash tables also remain open
+until benchmarks choose them.
 
 ## Next steps
 

@@ -419,7 +419,11 @@ let token = cogs.run { c in
 ```
 
 A reaction runs once when registered to record dependencies, and again after a
-turn changes one of them, always against settled state. The returned
+turn changes one of them, always against settled state. Outside a flush, that
+initial run happens before `cogs.run` returns. During a flush, registration
+does not re-enter the reaction that made it: the initial run joins the tail of
+that flush's reaction queue in registration order, after reactions already
+scheduled for the turn and before queued write-back turns begin. The returned
 final-class token cancels safely more than once and also cancels on deinit;
 copies refer to the same registration. §6 covers effect ownership, timers,
 registration, and reaction write-back.
@@ -739,6 +743,7 @@ singular, and does measurement show less runtime work?
 | Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Effect lifecycle?                 | Explicit `install(in:)` returns an idempotent final-class `EffectGroup` (§6.2–§6.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug quiescence guard reports long causal chains through a testable diagnostic seam (§6.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Reaction registration in a flush? | Do not run the new reaction reentrantly. Append its initial tracking run to the tail of the current flush's reaction queue, in registration order: after reactions already scheduled for that turn and before queued write-back turns begin (§3.3).                                                                                                                                                                                                                                                                                                                                                                                     |
 | Test seeding?                     | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -805,10 +810,10 @@ keeps its slot and points at the table above instead of renumbering the rest.
     (§5.1). Define what a subscription-free `cogs.read` of a never-read
     async cog does — and, relatedly, what `cogs.refresh` of a never-read ref
     does.
-16. **Registration during a flush:** a reaction registered with `cogs.run`
-    runs once immediately to record dependencies (§3.3). Define when that
-    initial run happens if registration occurs during a flush — for example,
-    from inside another reaction.
+16. **Registration during a flush:** settled on August 11, 2026. The initial
+    run joins the current flush's reaction tail without re-entry, after work
+    already scheduled for the turn and before queued write-back turns. See
+    "Reaction registration in a flush?" above.
 
 ---
 
