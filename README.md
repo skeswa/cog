@@ -107,10 +107,23 @@ The topology:
   `cogci` user this section originally specified. That is a genuinely weaker
   posture, and it is recorded rather than quietly assumed: a malicious build
   reaching this runner would execute as a user that can escalate and that
-  holds the owner's personal credentials. It is accepted only because the
-  same-repo guard means **no code from outside this repository ever reaches
-  the host**. The dedicated non-admin user remains the target state, and the
-  revisit triggers below apply with more force because of this.
+  holds the owner's personal credentials — concretely, one SSH private key,
+  two stored `gh` OAuth tokens, the login keychain, and write access to
+  `/opt/homebrew`.
+
+  **This was weighed and accepted on 2026-08-11, not overlooked.** The
+  mitigation is that the same-repo guard means no code from outside this
+  repository reaches the host. The sharpest residual risk is not Cog, whose
+  shipped package is dependency-free: it is the _other_ repository sharing
+  this runner user, a Rust project whose `cargo build` executes `build.rs`
+  from its whole dependency tree as this admin account.
+
+  A dedicated non-admin `cogci` account remains the target state, and the
+  full migration procedure is written up. It requires switching auto-login,
+  because the simulator lane needs an Aqua session and macOS allows only one
+  auto-login user. The revisit triggers below apply with more force because
+  of this.
+
 - **Xcode.** Pinned to **26.6**, build **17F113**, installed with `xcodes`
   and selected through `DEVELOPER_DIR`. The hosted `macos-26` arm64 image
   carries the same build and defaults to it, so both lanes compile with an
@@ -135,13 +148,13 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   runner user this section still targets, and because it is job-scoped, so
   two concurrent jobs cannot fight over a machine-wide setting.
 
-- **Runners.** _Amended 2026-08-10 to match the provisioned host._ One
+- **Runners.** _Amended 2026-08-11 to match the provisioned host._ One
   runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other
-  repository can target it, with its own `_work`. It runs as `./run.sh`
-  inside a long-lived tmux session rather than as a launchd service, so **it
-  does not survive a reboot**; `svc.sh install` is the fix when that matters.
-  The same host and user also run a second runner for another repository,
-  which is why the scrub below is carefully scoped.
+  repository can target it, with its own `_work`. It runs as a launchd
+  LaunchAgent installed by `svc.sh install` and bootstrapped into `gui/501`,
+  so it starts at login and survives a reboot. The same host and user also
+  run a second runner for another repository, which is why the scrub below is
+  carefully scoped.
 - **Labels.** Registered with `--labels cog-mini`, keeping the default
   `self-hosted`, `macOS`, and `ARM64`. Jobs use
   `runs-on: [self-hosted, macOS, ARM64, cog-mini]`. Label matching is
@@ -206,9 +219,11 @@ Recorded risks, to revisit rather than forget:
   the scrub hooks plus the same-repo guard. **If Cog ever grants push access
   to co-maintainers, or the same-repo guard is relaxed, this decision must be
   revisited.**
-- A compromised SwiftPM dependency with a build plugin would execute as
-  `cogci`. `Package.resolved` is committed and reviewed and the shipped
-  package is dependency-free, but the residual risk is accepted, not removed.
+- A compromised dependency with a build plugin or build script would execute
+  as the runner user. `Package.resolved` is committed and reviewed and Cog's
+  shipped package is dependency-free, but the runner user is shared with a
+  Rust project whose dependency build scripts run arbitrary code. The
+  residual risk is accepted, not removed.
 - The Virtualization.framework limit of two concurrent macOS guests is
   asserted by the macOS Tahoe 26 SLA and by pre-2026 reports, but **no
   2026-dated primary source re-tests it on macOS 26**. Verify empirically
