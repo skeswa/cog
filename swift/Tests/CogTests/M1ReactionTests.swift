@@ -234,3 +234,60 @@ extension Cogtext {
   #expect(snapshots == ["1:0", "1:1"])
   _ = (writer, observer)
 }
+
+@MainActor
+@Test func `REACT-16 reaction write-back chains drain settled and FIFO`() {
+  let cogs = Cogtext.forTesting()
+  let trigger = ManualCog<Int>(0)
+  let middle = ManualCog<Int>(0)
+  let side = ManualCog<Int>(0)
+  let leaf = ManualCog<Int>(0)
+  var events: [String] = []
+  var reactionDepth = 0
+  var maximumDepth = 0
+
+  func record(_ name: String) {
+    reactionDepth += 1
+    maximumDepth = max(maximumDepth, reactionDepth)
+    defer { reactionDepth -= 1 }
+    events.append(
+      "\(name):\(cogs.read(trigger))/\(cogs.read(middle))/\(cogs.read(side))/\(cogs.read(leaf))"
+    )
+  }
+
+  let first = cogs.run { c in
+    guard c.get(trigger) == 1 else { return }
+    record("first")
+    cogs.setFromReaction(middle, to: 1)
+    cogs.setFromReaction(side, to: 1)
+  }
+
+  let second = cogs.run { c in
+    guard c.get(middle) == 1 else { return }
+    record("second")
+    cogs.setFromReaction(leaf, to: 1)
+  }
+
+  let sideObserver = cogs.run { c in
+    guard c.get(side) == 1 else { return }
+    record("side")
+  }
+
+  let third = cogs.run { c in
+    guard c.get(leaf) == 1 else { return }
+    record("third")
+  }
+
+  cogs.commit { w in w[trigger] = 1 }
+
+  #expect(
+    events == [
+      "first:1/0/0/0",
+      "second:1/1/0/0",
+      "side:1/1/1/0",
+      "third:1/1/1/1",
+    ]
+  )
+  #expect(maximumDepth == 1)
+  _ = (first, second, sideObserver, third)
+}
