@@ -38,18 +38,25 @@ public struct Writer {
 }
 
 extension Cogtext {
-  /// Runs one named, synchronous state transition.
+  /// Starts or schedules one named, synchronous state transition.
   ///
-  /// Writes made through `body`'s ``Writer`` remain staged until the body
-  /// returns. The outer boundary then commits them together before this method
-  /// returns. Ops are ordinary `Cogtext` methods that wrap this primitive.
+  /// From idle, `body` starts a new outer turn. Inside an accumulating turn it
+  /// joins that turn immediately. During a flush it waits in the context's
+  /// FIFO queue and runs as a later turn, after the active turn is completely
+  /// settled. Queuing is non-reentrant: this particular call returns before a
+  /// queued body runs, while the active outer `commit` drains all arrivals
+  /// before *its* call returns.
+  ///
+  /// Writes made through `body`'s ``Writer`` remain staged until the outer
+  /// accumulating body returns, then cross the commit boundary together. Ops
+  /// are ordinary `Cogtext` methods that wrap this primitive.
   ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. By default,
   ///     this is the op method that called `commit`.
   ///   - body: The synchronous writes that make up the turn. The writer it
-  ///     receives must not outlive the call.
-  public func commit(_ name: String = #function, _ body: (Writer) -> Void) {
+  ///     receives is valid only while that body is executing.
+  public func commit(_ name: String = #function, _ body: @escaping (Writer) -> Void) {
     withTurn(name) { turn in
       body(Writer(cogs: self, turnID: turn.id))
     }

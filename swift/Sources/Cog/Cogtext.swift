@@ -44,6 +44,13 @@ public final class Cogtext {
   /// data-oriented core later replaces it without exposing the phase as API.
   internal var turnPhase: CogTurnPhase = .idle
 
+  /// Commits requested while a turn is flushing, in arrival order.
+  ///
+  /// The outer `withTurn` call drains this buffer only after its active turn
+  /// returns to idle. Bodies added by a queued turn's own flush extend the same
+  /// buffer, so no write-back re-enters a flush and FIFO order is preserved.
+  internal var queuedTurns: [QueuedCogTurn] = []
+
   /// Every node this context has been asked for, filed by descriptor and key.
   ///
   /// Heterogeneous on purpose: a context holds nodes of every value type an app

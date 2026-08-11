@@ -34,6 +34,12 @@ internal final class CogTurn {
   }
 }
 
+/// One commit body waiting for the active flush to finish.
+internal struct QueuedCogTurn {
+  let name: String
+  let body: (CogTurn) -> Void
+}
+
 /// Where a context is in the structural commit boundary (§3.2).
 internal enum CogTurnPhase {
   case idle
@@ -52,19 +58,44 @@ extension Cogtext {
   /// A nested commit receives the existing turn and returns without changing
   /// phase, so only the outermost body closes the structural write boundary.
   /// A sibling call arrives after that flush returned the context to idle and
-  /// therefore mints its own turn. Calls made while flushing remain invalid
-  /// until `M1-13a` adds their non-reentrant FIFO queue.
-  internal func withTurn(_ name: String = #function, _ body: (CogTurn) -> Void) {
-    if case .accumulating(let turn) = turnPhase {
+  /// therefore mints its own turn. A call made while flushing appends its body
+  /// to the non-reentrant FIFO drained by the active outer call.
+  internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
+    switch turnPhase {
+    case .accumulating(let turn):
       body(turn)
       return
+
+    case .flushing:
+      queuedTurns.append(QueuedCogTurn(name: name, body: body))
+      return
+
+    case .idle:
+      break
     }
 
+    runOuterTurn(named: name, body)
+    drainQueuedTurns()
+  }
+
+  /// Runs exactly one idle → accumulating → flushing → idle transition.
+  private func runOuterTurn(named name: String, _ body: (CogTurn) -> Void) {
     let turn = startTurn(named: name)
     body(turn)
     startFlushing(turn.id)
     turn.flushPendingSources(in: self)
     finishTurn(turn.id)
+  }
+
+  /// Runs queued turns in arrival order without recursively entering a flush.
+  private func drainQueuedTurns() {
+    var index = 0
+    while index < queuedTurns.count {
+      let queued = queuedTurns[index]
+      index += 1
+      runOuterTurn(named: queued.name, queued.body)
+    }
+    queuedTurns.removeAll(keepingCapacity: true)
   }
 
   /// Starts a new outer turn.
