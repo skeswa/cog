@@ -173,6 +173,12 @@ that runtime.
 
 ## Conventions
 
+- **Give every generic class an explicit `nonisolated deinit`.** With
+  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` on a generic
+  class is main-actor-isolated, and Swift 6.3.0 and 6.3.3 both crash the
+  optimizer on it in release configuration. Debug builds are fine, so
+  `mise run test:matrix` will not catch it — only `mise run test:release`
+  will. This applies to nodes, boxes, descriptors, and async state alike.
 - **Keep platform designs separate.** Shared principles apply to both
   libraries, but Swift decisions are normative only for Swift. Do not assume
   an API or implementation choice also applies to Android without recording an
