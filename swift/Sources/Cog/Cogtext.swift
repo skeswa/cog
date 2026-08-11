@@ -48,6 +48,18 @@ public final class Cogtext {
   /// through ``manualNode(for:)`` rather than the dictionary directly.
   internal private(set) var nodes: [CogNodeIdentity: any CogNode] = [:]
 
+  /// Whose run is capturing dependencies right now, or `nil` between runs.
+  ///
+  /// §2.4 puts the current consumer in a MainActor tracking slot while a
+  /// selector or reaction runs, and that is what this is. One slot is enough
+  /// because the graph has one execution lane (§1.2): runs nest, but they
+  /// never interleave, so ``Cogtext/tracking(_:_:)`` can save and restore this
+  /// like a stack frame.
+  ///
+  /// A stored property rather than something an extension could add, which is
+  /// why the slot lives in this file with the rest of the context's state.
+  internal var trackedConsumer: (any CogConsumer)?
+
   /// Creates an empty context.
   ///
   /// `package` rather than `public` so that the only ways to make a context
@@ -69,30 +81,57 @@ extension Cogtext {
   /// lets a keyed box be declared once and used for any number of keys: the key
   /// is half of the storage identity, so `box[90210]` and `box[10001]` resolve
   /// to two nodes of the same declaration.
+  internal func manualNode<Value>(for ref: ManualCog<Value>) -> ManualCogNode<Value> {
+    node(CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)) {
+      ManualCogNode(descriptor: ref.descriptor, key: ref.key)
+    }
+  }
+
+  /// The node this derived ref names in this context, created if this is its
+  /// first use.
+  ///
+  /// Creating a derived node still computes nothing: the node arrives without a
+  /// value and runs its selector when something first reads it (§2.2). The
+  /// filing rule is the same one manual sources use, which is the point — a
+  /// derived cog is another declaration with another kind of node behind it,
+  /// not another kind of storage.
+  internal func derivedNode<Value>(for ref: Cog<Value>) -> DerivedCogNode<Value> {
+    node(CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)) {
+      DerivedCogNode(descriptor: ref.descriptor, key: ref.key)
+    }
+  }
+
+  /// Finds the node filed under `identity`, filing what `create` makes if there
+  /// is none.
   ///
   /// The cast back to a concrete node type cannot fail in a correct build. The
-  /// identity contains the descriptor, the descriptor is generic over `Value`,
-  /// and only this method ever files a node — so a hit means a node built from
-  /// this very descriptor. The check stays anyway, and fails loudly rather than
+  /// identity contains the descriptor, the descriptor is generic over the
+  /// value, and only this method ever files a node — so a hit means a node
+  /// built from this very descriptor, by the one ref kind that owns that
+  /// descriptor kind. The check stays anyway, and fails loudly rather than
   /// silently reinterpreting memory, because it is the kind of invariant a
   /// future storage change could break quietly.
-  internal func manualNode<Value>(for ref: ManualCog<Value>) -> ManualCogNode<Value> {
-    let identity = CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)
-
+  private func node<Node: CogNode>(
+    _ identity: CogNodeIdentity,
+    create: () -> Node
+  ) -> Node {
     if let existing = nodes[identity] {
-      guard let node = existing as? ManualCogNode<Value> else {
-        preconditionFailure(
+      guard let node = existing as? Node else {
+        // `fatalError`, not `preconditionFailure`: this message is composed,
+        // and an optimized `preconditionFailure` drops composed messages, so
+        // a release crash here would say nothing at all.
+        fatalError(
           """
           The node for \(existing.label) is a \(type(of: existing)), not a \
-          \(ManualCogNode<Value>.self). Two declarations cannot share one \
-          descriptor identity, so this context's node storage is corrupt.
+          \(Node.self). Two declarations cannot share one descriptor identity, \
+          so this context's node storage is corrupt.
           """
         )
       }
       return node
     }
 
-    let created = ManualCogNode(descriptor: ref.descriptor, key: ref.key)
+    let created = create()
     nodes[identity] = created
     return created
   }
@@ -112,15 +151,39 @@ extension Cogtext {
   /// Untracked never means stale. The rule is that skipping the edge skips only
   /// the subscription: the value handed back is still the settled value of the
   /// latest completed turn. A manual source satisfies that for free, because
-  /// nothing computes it — there is no work that could be outstanding. Derived
-  /// cogs will need settling before their value is returned, and that settle
-  /// step belongs inside this read path (`M1-05a`, `M1-06aa`), not at call
-  /// sites, so that no caller can spell a read that skips it.
+  /// nothing computes it — there is no work that could be outstanding. The
+  /// derived read below is where that promise takes work.
   ///
   /// - Parameter ref: The source to read.
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
   public func read<Value>(_ ref: ManualCog<Value>) -> Value {
     manualNode(for: ref).currentValue
+  }
+
+  /// Reads a derived cog's value without creating a dependency edge.
+  ///
+  /// The same one-shot untracked read as the one for a source (§2.4), and the
+  /// spelling a test, an op, or any other code outside a selector uses to look
+  /// at a computed value once. Inside a selector, use `c.get` instead, so the
+  /// selector reruns when this value changes.
+  ///
+  /// A derived value can be outstanding work rather than a stored fact, so this
+  /// read is where laziness becomes visible: if nothing has ever read this cog
+  /// in this context, reading it here runs its selector, and running it reads
+  /// whatever *it* depends on, down as far as the first read has to go. What
+  /// comes back is a value, never a promise of one.
+  ///
+  /// Computing is not the same as settling. Once the settle engine exists
+  /// (`M1-06aa`, `M1-06ab`), this path also brings a cog that a later turn
+  /// dirtied back up to date before returning, so that skipping the edge never
+  /// means seeing a stale value. That step belongs here, in the one read path
+  /// every caller shares, rather than at call sites where a caller could spell
+  /// a read that skips it.
+  ///
+  /// - Parameter ref: The derived cog to read.
+  /// - Returns: Its value in this context.
+  public func read<Value>(_ ref: Cog<Value>) -> Value {
+    derivedNode(for: ref).settledValue(in: self)
   }
 }
