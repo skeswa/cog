@@ -1,0 +1,121 @@
+import CogTesting
+import Testing
+
+@testable import Cog
+
+// M1-12a pins the structural turn boundaries without claiming the later
+// reaction and history stories. These tests intentionally inspect phases,
+// turn identities, revisions, and pending storage; they green no scenario and
+// may change with the M6 core.
+
+@MainActor
+@Test func `TurnCompositionInfrastructure nested commits join one outer turn`() {
+  let cogs = Cogtext.forTesting()
+  var comparisons = 0
+  var flushingTurn: CogTurnID?
+  let source = ManualCog<Int>(
+    0,
+    equals: { oldValue, newValue in
+      comparisons += 1
+      guard case .flushing(let turn) = cogs.turnPhase else {
+        Issue.record("Equality did not run inside the flush boundary")
+        return oldValue == newValue
+      }
+      flushingTurn = turn.id
+      return oldValue == newValue
+    }
+  )
+
+  var outerTurn: CogTurnID?
+  var innerTurn: CogTurnID?
+
+  cogs.commit("outer") { outerWriter in
+    guard case .accumulating(let outer) = cogs.turnPhase else {
+      Issue.record("The outer body did not accumulate")
+      return
+    }
+    outerTurn = outer.id
+    #expect(outer.name == "outer")
+
+    outerWriter[source] = 1
+
+    cogs.commit("inner") { innerWriter in
+      guard case .accumulating(let inner) = cogs.turnPhase else {
+        Issue.record("The inner body did not join accumulation")
+        return
+      }
+      innerTurn = inner.id
+
+      #expect(inner.id === outer.id)
+      #expect(inner.name == "outer")
+      #expect(innerWriter[source] == 1)
+
+      innerWriter[source] = 2
+      #expect(cogs.read(source) == 0)
+      #expect(cogs.revision == .initial)
+    }
+
+    #expect(outerWriter[source] == 2)
+    #expect(cogs.read(source) == 0)
+    #expect(cogs.revision == .initial)
+  }
+
+  #expect(outerTurn != nil)
+  #expect(innerTurn === outerTurn)
+  #expect(flushingTurn === outerTurn)
+  #expect(comparisons == 1)
+  #expect(cogs.read(source) == 2)
+  #expect(cogs.revision > .initial)
+  guard case .idle = cogs.turnPhase else {
+    Issue.record("The joined turn did not finish idle")
+    return
+  }
+}
+
+@MainActor
+@Test func `TurnCompositionInfrastructure sibling commits are separate turns`() {
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(0)
+  var turnIDs: [CogTurnID] = []
+  var turnNames: [String] = []
+
+  cogs.commit("first") { writer in
+    guard case .accumulating(let turn) = cogs.turnPhase else {
+      Issue.record("The first sibling did not accumulate")
+      return
+    }
+    turnIDs.append(turn.id)
+    turnNames.append(turn.name)
+    writer[source] = 1
+  }
+
+  let firstRevision = cogs.revision
+  #expect(cogs.read(source) == 1)
+  guard case .idle = cogs.turnPhase else {
+    Issue.record("The first sibling did not finish before the second began")
+    return
+  }
+
+  cogs.commit("second") { writer in
+    guard case .accumulating(let turn) = cogs.turnPhase else {
+      Issue.record("The second sibling did not accumulate")
+      return
+    }
+    turnIDs.append(turn.id)
+    turnNames.append(turn.name)
+    writer[source] = 2
+  }
+
+  guard turnIDs.count == 2 else {
+    Issue.record("The sibling commits did not both capture a turn")
+    return
+  }
+  #expect(turnIDs[0] !== turnIDs[1])
+  #expect(turnNames == ["first", "second"])
+  #expect(cogs.read(source) == 2)
+  #expect(cogs.revision > firstRevision)
+  guard case .idle = cogs.turnPhase else {
+    Issue.record("The second sibling did not finish idle")
+    return
+  }
+}

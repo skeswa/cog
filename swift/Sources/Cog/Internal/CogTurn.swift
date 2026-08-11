@@ -47,10 +47,19 @@ internal enum CogTurnPhase {
 // program without saying why is barely a guard. Keep them `fatalError`.
 
 extension Cogtext {
-  /// Runs the accumulating body and the empty correctness-core flush for one
-  /// outer turn. Later tasks put source settlement and graph work between the
-  /// two final transitions without changing the commit boundary.
+  /// Joins an accumulating turn, or runs one new outer turn through its flush.
+  ///
+  /// A nested commit receives the existing turn and returns without changing
+  /// phase, so only the outermost body closes the structural write boundary.
+  /// A sibling call arrives after that flush returned the context to idle and
+  /// therefore mints its own turn. Calls made while flushing remain invalid
+  /// until `M1-13a` adds their non-reentrant FIFO queue.
   internal func withTurn(_ name: String = #function, _ body: (CogTurn) -> Void) {
+    if case .accumulating(let turn) = turnPhase {
+      body(turn)
+      return
+    }
+
     let turn = startTurn(named: name)
     body(turn)
     startFlushing(turn.id)
