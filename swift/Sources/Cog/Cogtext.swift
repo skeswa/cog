@@ -59,6 +59,13 @@ public final class Cogtext {
   /// measured flat queue without changing ordering or behavior.
   internal var reactions: [CogReaction] = []
 
+  /// Work still to run in the active flush's reaction phase.
+  ///
+  /// Changed registrations are scheduled first. A registration made anywhere
+  /// in the flush appends an initial run to the tail, so it cannot re-enter its
+  /// caller and still completes before queued write-back turns begin.
+  internal var reactionRuns: [CogReactionRun] = []
+
   /// Every node this context has been asked for, filed by descriptor and key.
   ///
   /// Heterogeneous on purpose: a context holds nodes of every value type an app

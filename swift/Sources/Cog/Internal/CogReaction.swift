@@ -76,3 +76,18 @@ internal final class CogReaction: CogNode, CogConsumer {
     markChecked(at: cogs.revision)
   }
 }
+
+/// One entry in the active flush's registration-ordered reaction queue.
+internal enum CogReactionRun {
+  case changed(CogReaction)
+  case initial(CogReaction)
+
+  func perform(in cogs: Cogtext) {
+    switch self {
+    case .changed(let reaction):
+      reaction.runIfNeeded(in: cogs)
+    case .initial(let reaction):
+      reaction.runInitially(in: cogs)
+    }
+  }
+}

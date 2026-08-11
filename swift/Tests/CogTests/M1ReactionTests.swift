@@ -146,3 +146,60 @@ import Testing
   #expect(observed == 1)
   _ = token
 }
+
+@MainActor
+@Test func `REACT-23 flush-time registrations join the reaction queue tail`() {
+  let cogs = Cogtext.forTesting()
+  let trigger = ManualCog<Int>(0)
+  let writeback = ManualCog<Int>(0)
+  var events: [String] = []
+  var spawned: [ReactionToken] = []
+
+  let first = cogs.run { c in
+    guard c.get(trigger) == 1 else { return }
+
+    events.append("first:begin")
+    spawned.append(
+      cogs.run { c in
+        _ = c.get(trigger)
+        events.append("third:initial")
+        cogs.commit("third.writeback") { w in w[writeback] = 1 }
+      }
+    )
+    spawned.append(
+      cogs.run { c in
+        _ = c.get(trigger)
+        events.append("fourth:initial")
+        cogs.commit("fourth.writeback") { w in w[writeback] = 2 }
+      }
+    )
+    events.append("first:end")
+  }
+
+  let second = cogs.run { c in
+    guard c.get(trigger) == 1 else { return }
+    events.append("second")
+  }
+
+  let writebackObserver = cogs.run { c in
+    let value = c.get(writeback)
+    guard value > 0 else { return }
+    events.append("writeback:\(value)")
+  }
+
+  cogs.commit { w in w[trigger] = 1 }
+
+  #expect(
+    events == [
+      "first:begin",
+      "first:end",
+      "second",
+      "third:initial",
+      "fourth:initial",
+      "writeback:1",
+      "writeback:2",
+    ]
+  )
+  #expect(spawned.count == 2)
+  _ = (first, second, writebackObserver)
+}
