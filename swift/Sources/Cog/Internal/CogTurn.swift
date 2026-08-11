@@ -40,6 +40,11 @@ internal enum CogTurnPhase {
   case flushing(CogTurn)
 }
 
+// Every trap below is `fatalError` rather than `preconditionFailure` for the
+// reason spelled out at `Cogtext.requireWriterTurn` in `Writer.swift`: an
+// optimized `preconditionFailure` drops its message, and a guard that stops the
+// program without saying why is barely a guard. Keep them `fatalError`.
+
 extension Cogtext {
   /// Runs the accumulating body and the empty correctness-core flush for one
   /// outer turn. Later tasks put source settlement and graph work between the
@@ -56,7 +61,7 @@ extension Cogtext {
   @discardableResult
   internal func startTurn(named name: String) -> CogTurn {
     guard case .idle = turnPhase else {
-      preconditionFailure("A new outer Cog turn can start only while its context is idle.")
+      fatalError("A new outer Cog turn can start only while its context is idle.")
     }
 
     let turn = CogTurn(id: CogTurnID(), name: name)
@@ -67,7 +72,7 @@ extension Cogtext {
   /// Closes the write boundary and begins the settled flush.
   internal func startFlushing(_ id: CogTurnID) {
     guard case .accumulating(let turn) = turnPhase, turn.id === id else {
-      preconditionFailure("Only the context's accumulating Cog turn can start its flush.")
+      fatalError("Only the context's accumulating Cog turn can start its flush.")
     }
 
     turnPhase = .flushing(turn)
@@ -76,7 +81,7 @@ extension Cogtext {
   /// Returns the context to idle after the turn has fully flushed.
   internal func finishTurn(_ id: CogTurnID) {
     guard case .flushing(let turn) = turnPhase, turn.id === id else {
-      preconditionFailure("Only the context's flushing Cog turn can finish.")
+      fatalError("Only the context's flushing Cog turn can finish.")
     }
 
     turnPhase = .idle
