@@ -1,23 +1,11 @@
 import Cog
 
-// The second stand-in feature file. Two features, neither of which knows the
-// other exists and neither of which was handed a context, are what make
-// "shared app-wide" a claim with something behind it: one file reaching the
-// app context could be a coincidence of how the test was written, two cannot.
-
-/// Whether the user asked for temperatures in Celsius.
-@MainActor private let usesCelsiusSource = ManualCog<Bool>(true, name: "usesCelsius")
-
-/// A second feature, in a second file, resolving through the same graph.
+// A second feature file, separate from the source and op. It receives the app
+// context at its composition boundary just as a view receives `\.cogs` from
+// the environment, then reads the weather feature through that same graph.
 @MainActor
 enum SettingsFeature {
-  /// The context this feature resolves through.
-  static var context: Cogtext {
-    Cogtext.app
-  }
-
-  /// The unit preference, read through the app's context.
-  static func usesCelsius() -> Bool {
-    Cogtext.app.read(usesCelsiusSource)
+  static func selectedWeatherZip(in cogs: Cogtext) -> String? {
+    cogs.selectedWeatherZip()
   }
 }

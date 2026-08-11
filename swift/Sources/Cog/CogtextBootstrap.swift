@@ -1,5 +1,5 @@
-// The production install: how one app gets one context, and how the rest of
-// the app finds it.
+// The production install: how one app gets one context and guards that
+// once-per-process construction path.
 //
 // This lives beside `Cogtext` rather than inside it because the registry is
 // process-global state, not context state. A `Cogtext` knows nothing about
@@ -46,14 +46,12 @@ extension Cogtext {
   /// }
   /// ```
   ///
-  /// The returned context is also the one ``Cogtext/app`` hands back, so a
-  /// feature that is nowhere near the app entry point — an op called off a
-  /// notification, a service constructed before any view exists — resolves
-  /// through the same graph without an injection chain reaching it first.
-  /// Passing the context down is still the better habit where a call site can
-  /// take it: injection is testable, and a test runtime substitutes its own
-  /// context by handing over a different one rather than by reinstalling this
-  /// one.
+  /// The return value is the app's ownership handle. Keep it at the entry
+  /// point and pass it to effects, services, and every scene; views receive it
+  /// through the `\.cogs` environment value (§3.4, §6.3). Cog deliberately
+  /// exposes no ambient static accessor: ops are instance methods on this
+  /// context, and an isolated test substitutes its own context by passing a
+  /// different instance through the same boundary.
   ///
   /// It reads as a verb because installing the app's context is a
   /// once-per-process act, where `Cogtext.forTesting()` reads as a noun
@@ -68,41 +66,12 @@ extension Cogtext {
     return cogs
   }
 
-  /// The app's context.
-  ///
-  /// This is the process's answer to "which graph?", and there is only ever
-  /// one answer to give (§2.3). A feature file that reads through here and a
-  /// view that reads through the injected `\.cogs` environment value are
-  /// reading the same context, so a write either of them makes is a write the
-  /// other sees.
-  ///
-  /// Reaching for this is not the first choice. Prefer taking a `Cogtext`
-  /// as a parameter or reading the environment, both of which let a test hand
-  /// the code under test an isolated context; this static is for the places
-  /// that genuinely have nothing to take it from.
-  ///
-  /// - Precondition: ``Cogtext/bootstrapApp()`` has been called.
-  public static var app: Cogtext {
-    guard let installedAppContext else {
-      preconditionFailure(
-        """
-        This app has no Cog context. Call Cogtext.bootstrapApp() once, at \
-        launch, before any feature code reads through Cogtext.app. A test or \
-        preview runtime should call Cogtext.forTesting() from the CogTesting \
-        product instead and pass the context it gets back.
-        """
-      )
-    }
-    return installedAppContext
-  }
-
   /// The app's context, or `nil` when nothing has bootstrapped one.
   ///
-  /// The non-trapping view of the same slot, `package` because the only thing
-  /// outside this file with a reason to ask is the `CogTesting` product's
-  /// scoped-bootstrap seam. Application code gets ``Cogtext/app``, which does
-  /// not offer "no context installed" as an outcome to handle, because in an
-  /// app it is not one.
+  /// This is `package` because the only thing outside this file with a reason
+  /// to inspect the registry is the `CogTesting` product's scoped-bootstrap
+  /// fixture. Production code owns the context returned by
+  /// ``Cogtext/bootstrapApp()`` and passes that object explicitly.
   package static var installedApp: Cogtext? {
     installedAppContext
   }

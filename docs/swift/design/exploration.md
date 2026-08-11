@@ -187,6 +187,22 @@ a once-per-process act, so it reads as a verb; creating a test context is
 ordinary value creation, so it reads as a noun phrase. Neither is spelled
 `install`, which §6.3 gives to effects.
 
+`bootstrapApp()`'s return value is the production ownership handle. The app
+keeps it and passes it into effects, services, and every scene; views receive
+that same object through the `\.cogs` environment value. Ops remain ordinary
+instance methods on `Cogtext`. There is deliberately no ambient
+`Cogtext.app`: code outside an injection chain receives the context at its
+composition boundary, which keeps the same feature usable with an isolated
+testing context and avoids a separate missing-bootstrap trap contract.
+
+Tests whose subject is the production install use a synchronous MainActor
+`CogTesting` fixture that calls the real bootstrap, passes its result into the
+body, and removes the process-global registration in `defer`. The fixture
+cannot be `async`, because suspension would let parallel tests observe or
+collide with the temporary install. Narrow testing-only predicates may inspect
+whether a context is the installed object; they do not expose graph storage or
+add ambient lookup to the shipping product.
+
 Descriptors are internal final classes whose `ObjectIdentifier` gives stable
 process identity. The public types — `Cog<T>`, `ManualCog<T>`, and their
 boxes — are lightweight ref and box values that carry a descriptor and, for a
@@ -733,6 +749,8 @@ singular, and does measurement show less runtime work?
 | External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Context construction?             | App bootstrap calls `Cogtext.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Bootstrap helper names?           | `Cogtext.bootstrapApp()`, vended by `Cog`, creates the one production context and fails fast on a second call; `Cogtext.forTesting()`, vended by `CogTesting`, returns a fresh isolated context as often as a test or preview asks. A `package` initializer leaves those two as the only ways in, and separating them by product rather than by an argument keeps the test factory out of a shipping app target (§2.3, §6.3, §6.6).                                                                                                                                                                                                     |
+| Production context access?        | `bootstrapApp()` returns the ownership handle; the app passes it into effects, services, and scenes, and views receive it through `\.cogs`. Ops are `Cogtext` instance methods. There is no ambient `Cogtext.app`, so production and isolated tests use the same explicit composition boundaries (§2.3, §3.2, §3.4, §6.3).                                                                                                                                                                                                                                                                                                              |
+| Production-install test fixture?  | `CogTesting` vends a synchronous MainActor `withBootstrappedApp` scope plus narrow install predicates. It calls the real bootstrap and removes the registration in `defer`; it is deliberately not async, so parallel tests cannot interleave through process-global install state (§2.3; impl scenarios constraint 3).                                                                                                                                                                                                                                                                                                                 |
 | Testing posture?                  | Fully optimistic (every wait is a definite injected signal: clocks, continuations, acknowledgements), as fast and cheap as possible (host-first; simulators only at the device boundary; injected time everywhere, including `whileObserved` grace), and as implementation agnostic as possible (public API, then `CogTesting`, then debug history, then named diagnostic seams; the behavior suite passes unchanged across core swaps). Normative statement in impl/scenarios.md.                                                                                                                                                      |
 | Generic class `deinit`?           | Every generic class in the library writes an explicit `nonisolated deinit`. Under `.defaultIsolation(MainActor.self)` a _synthesized_ `deinit` on a generic class is main-actor-isolated, and Apple Swift 6.3.0 and 6.3.3 both crash the optimizer on it (SIGSEGV in `EarlyPerfInliner`) in release configuration only. Debug builds are unaffected, so only a release build catches a regression — `mise run test:release` is the guard, and it runs in CI. The rule is independently correct, since these deinits only release their own stored properties and the classes are never `Sendable`. Revisit when the toolchain fixes it. |
 | Implementation execution?         | Dependency-aware half-day tasks, each typed as a decision, infrastructure slice, red-green behavior slice, gate, or single publication step. Every task names its dependencies and closing verification and ends green; representation changes integrate incrementally, and releases separate non-mutating preparation from publication. Normative statement in impl/tasks.md.                                                                                                                                                                                                                                                          |
@@ -751,7 +769,10 @@ keeps its slot and points at the table above instead of renumbering the rest.
    are settled. An optional next-tick `.deferred` mode may or may not earn its
    complexity.
 4. **App bootstrap:** settled on August 11, 2026 as `Cogtext.bootstrapApp()`
-   and `Cogtext.forTesting()`. See "Bootstrap helper names?" above.
+   and `Cogtext.forTesting()`, with explicit ownership/injection and the scoped
+   `CogTesting` production-install fixture. See "Bootstrap helper names?",
+   "Production context access?", and "Production-install test fixture?"
+   above.
 5. **Debug history UI:** the bounded log records ops, writes, recomputations,
    and notices. Labels are settled. Display may be `os_log`, an in-app
    inspector, or another developer tool.

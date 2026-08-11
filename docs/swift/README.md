@@ -128,6 +128,12 @@ These choices are settled; §10 of the core document has the full record.
   `package`, so feature code cannot name it. The `CogTesting` product adds
   `Cogtext.forTesting()` for a test or preview runtime, which never registers
   as the production context.
+- The context returned by `bootstrapApp()` is the app's ownership handle. The
+  app passes it to effects, services, and scenes; views receive it through the
+  environment, and ops are instance methods on it. There is no ambient
+  `Cogtext.app`. Tests of production installation use a synchronous scoped
+  fixture from `CogTesting`, so they cannot leak global install state across
+  the suite.
 - Manual state and nodes seen by the UI live for the app context by default.
   Graph-only derived and async nodes may be released when unused. Query caches
   have their own retention rules.

@@ -22,7 +22,7 @@ extension Cogtext {
   /// @MainActor
   /// @Test func theWholeAppSharesOneGraph() {
   ///   Cogtext.withBootstrappedApp { cogs in
-  ///     #expect(WeatherFeature.context() === cogs)
+  ///     #expect(Cogtext.isBootstrappedApp(cogs))
   ///   }
   /// }
   /// ```
@@ -40,13 +40,22 @@ extension Cogtext {
   /// a second install, and the production guard treats it as one.
   ///
   /// - Parameter body: What to run while the app context is installed. It
-  ///   receives the context ``Cogtext/bootstrapApp()`` just made, which is
-  ///   also what ``Cogtext/app`` returns for the length of the call.
+  ///   receives the context ``Cogtext/bootstrapApp()`` just made.
   /// - Returns: Whatever `body` returns.
   @discardableResult
   public static func withBootstrappedApp<R>(_ body: (Cogtext) throws -> R) rethrows -> R {
     defer { Cogtext.uninstallApp() }
     return try body(Cogtext.bootstrapApp())
+  }
+
+  /// Whether `context` is the exact object in the production-install slot.
+  ///
+  /// This proves bootstrap identity without adding an ambient context accessor
+  /// to the shipping `Cog` product. It is a lifecycle diagnostic only: tests
+  /// still receive the context from ``withBootstrappedApp(_:)`` and pass it
+  /// through the same composition boundaries as production.
+  public static func isBootstrappedApp(_ context: Cogtext) -> Bool {
+    Cogtext.installedApp === context
   }
 
   /// Whether an app context is installed right now.
