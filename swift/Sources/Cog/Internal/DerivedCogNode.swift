@@ -13,8 +13,9 @@
 /// **Cached.** A run's value is kept, so a second read is a lookup rather than
 /// a second run (`READ-02`). CLEAN/CHECK/DIRTY state and versions make that
 /// cache valid across source writes: a read pulls every dirty dependency it
-/// needs current before returning. Equality backdating and dynamic edge
-/// removal land in their later, separately tested slices.
+/// needs current before returning. Equality backdating stops downstream work
+/// when a rerun lands equal; dynamic edge removal remains the separately
+/// tested recapture slice.
 ///
 /// The dependencies a run captured are recorded even though nothing consumes
 /// them yet, because they are captured *by the run* (§2.4) and there is no
@@ -46,9 +47,10 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   ///
   /// Rebuilt from empty on every run, because dependencies are exactly what
   /// this run read (§2.4) and an edge that is not read again is not an edge.
-  /// A list, with repeats left in, is the correctness build's answer: reusing
-  /// edges, removing dropped ones, and the physical layout are all
-  /// benchmark-gated (perf §3.3) and belong to `M1-06aa` and `M6`.
+  /// A list, with repeats left in, is the correctness build's answer. Reverse
+  /// edges are reused today; removing dropped dependencies belongs to
+  /// `M1-09a`, and the physical layout remains benchmark-gated for `M6`
+  /// (perf §3.3).
   internal private(set) var dependencies: [any CogNode] = []
 
   /// Fresh derived nodes are DIRTY because they have no value to return yet.
@@ -125,10 +127,22 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   /// duration of the run, so a nested read of another derived cog computes
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
+    let previousValue = cachedValue
     dependencies.removeAll(keepingCapacity: true)
 
     let value = cogs.tracking(self) {
       descriptor.compute(Reader(cogs: cogs, node: self))
+    }
+
+    if case .some(let previousValue) = previousValue,
+      descriptor.valuesAreEqual(previousValue, value)
+    {
+      // Equality backdates the recomputation: dependencies were recaptured and
+      // the node is current through this revision, but its value did not
+      // change in it. Keeping `changedAt` old is what lets a CHECK consumer
+      // stop without running.
+      markChecked(at: cogs.revision)
+      return previousValue
     }
 
     cachedValue = .some(value)

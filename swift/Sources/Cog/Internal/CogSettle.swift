@@ -3,7 +3,7 @@
 /// A node's `changedAt` records the last revision in which its value really
 /// changed. Its `checkedAt` records the last revision through which Cog proved
 /// the value current, including a recomputation that landed equal. Keeping the
-/// two separate is what later lets an equal middle node stop a downstream
+/// two separate is what lets an equal middle node stop a downstream
 /// wave (§2.4, perf §3.4).
 ///
 /// The class-node core uses a wide scalar and leaves the compact integer
@@ -184,8 +184,8 @@ extension Cogtext {
   ///
   /// Enter schedules dirty parents before their consumer. Exit then uses
   /// `changedAt` versus the consumer's prior `checkedAt` to decide whether a
-  /// CHECK node must run. `M1-07b` adds equality backdating; until then every
-  /// selector run is conservatively a change.
+  /// CHECK node must run. A recomputation that lands equal advances only
+  /// `checkedAt`, so consumers farther down a CHECK wave stay cached.
   internal func settle(_ root: any DerivedCogSettleNode) {
     settleStack.reset(startingAt: root)
 

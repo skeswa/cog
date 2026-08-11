@@ -23,10 +23,19 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// the declaration site rather than a runtime rule (`DECL-12`).
   private let selector: @MainActor (Reader<Value>) -> Value
 
+  /// Whether two computed values count as the same state, or `nil` when every
+  /// recomputation must conservatively count as a change.
+  private let equals: (@MainActor (Value, Value) -> Bool)?
+
   /// Declares a derived value computed by `selector`.
-  init(selector: @escaping @MainActor (Reader<Value>) -> Value, label: CogLabel) {
+  init(
+    selector: @escaping @MainActor (Reader<Value>) -> Value,
+    equals: (@MainActor (Value, Value) -> Bool)?,
+    label: CogLabel
+  ) {
     self.label = label
     self.selector = selector
+    self.equals = equals
   }
 
   /// Runs the selector once for the node `reader` belongs to.
@@ -36,6 +45,14 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// through here, and nothing at the call site has to know which form ran.
   func compute(_ reader: Reader<Value>) -> Value {
     selector(reader)
+  }
+
+  /// Whether a recomputation is equivalent to the node's cached value.
+  ///
+  /// The public declaration overloads install `==`, preserve a custom rule,
+  /// or leave the comparator absent so an opaque value assumes change.
+  func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
+    equals?(oldValue, newValue) ?? false
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

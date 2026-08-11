@@ -13,7 +13,7 @@ internal final class CogTurn {
 
   /// Sources written while this turn accumulates. Repeated entries are safe:
   /// the first flush consumes the one pending slot and later entries are
-  /// no-ops. A later equality-gating task can deduplicate this work.
+  /// no-ops. A future measured representation may deduplicate this work.
   private var touchedSources: [any PendingCogSource] = []
 
   init(id: CogTurnID, name: String) {
