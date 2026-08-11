@@ -122,8 +122,8 @@ import Testing
   let retryLimit = ManualCog<Int>(3)
   let keyed = ManualCog(descriptor: retryLimit.descriptor, key: 90210)
 
-  #expect(cogs.manualNode(for: retryLimit).value == 3)
-  #expect(cogs.manualNode(for: keyed).value == 3)
+  #expect(cogs.manualNode(for: retryLimit).currentValue == 3)
+  #expect(cogs.manualNode(for: keyed).currentValue == 3)
 }
 
 @MainActor

@@ -26,12 +26,19 @@ internal final class ManualCogNode<Value>: CogNode {
   /// storage (§2.4).
   let key: AnyHashable?
 
-  /// What this source currently holds.
+  /// What this source holds in the latest completed turn.
   ///
-  /// One value today, because there are no turns yet. `M1-04aa` splits the
-  /// committed value from the value a commit has staged but not yet flushed;
-  /// normal reads keep returning this one, which is the committed side.
-  var value: Value
+  /// Normal reads use only this slot, including while another turn is still
+  /// accumulating. That is what prevents a staged value from leaking across
+  /// the structural commit boundary (§2.2).
+  var currentValue: Value
+
+  /// What the accumulating turn has staged, if anything.
+  ///
+  /// This optional is storage presence, not value optionality. When `Value`
+  /// itself is optional, `.some(.none)` means the turn really did stage nil,
+  /// while `.none` means it did not write this source.
+  var pendingValue: Value?
 
   var label: CogLabel { descriptor.label }
 
@@ -46,7 +53,8 @@ internal final class ManualCogNode<Value>: CogNode {
   init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
-    self.value = descriptor.startingValue(forKey: key)
+    self.currentValue = descriptor.startingValue(forKey: key)
+    self.pendingValue = nil
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

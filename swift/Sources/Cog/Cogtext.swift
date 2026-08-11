@@ -29,6 +29,12 @@
 /// their own default isolation is (§7).
 @MainActor
 public final class Cogtext {
+  /// The structural phase of the current turn, or idle between turns.
+  ///
+  /// This begins as the small correctness representation from §3.2. The
+  /// data-oriented core later replaces it without exposing the phase as API.
+  internal var turnPhase: CogTurnPhase = .idle
+
   /// Every node this context has been asked for, filed by descriptor and key.
   ///
   /// Heterogeneous on purpose: a context holds nodes of every value type an app
@@ -115,6 +121,6 @@ extension Cogtext {
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
   public func read<Value>(_ ref: ManualCog<Value>) -> Value {
-    manualNode(for: ref).value
+    manualNode(for: ref).currentValue
   }
 }
