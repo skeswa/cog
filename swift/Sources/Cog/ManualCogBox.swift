@@ -116,7 +116,9 @@ public struct ManualCogBox<Value, Key: Hashable> {
     self.descriptor = ManualCogDescriptor(
       startingValueForKey: { key in
         guard let key = key as? Key else {
-          preconditionFailure(
+          // `fatalError`, not `preconditionFailure`: the message is composed,
+          // and an optimized `preconditionFailure` drops composed messages.
+          fatalError(
             """
             A node of \(label) was asked to start at a value for \
             \(String(describing: key)), which is not a \(Key.self). Only this \
