@@ -35,11 +35,18 @@ internal final class ManualCogNode<Value>: CogNode {
 
   var label: CogLabel { descriptor.label }
 
-  /// Creates the node at its declaration's starting value.
+  /// Creates the node at its declaration's starting value for this key.
+  ///
+  /// The key is part of the question, not just part of the filing: a keyed
+  /// declaration may start each key at its own value (`ManualCogBox<Int,
+  /// ZipCode> { zip in ... }`), and that closure runs here — once, when this
+  /// node first appears — rather than on every read. Whatever it returns is a
+  /// starting value like any other, so a later write replaces it and the
+  /// closure is never consulted again for this key in this context.
   init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
-    self.value = descriptor.startingValue
+    self.value = descriptor.startingValue(forKey: key)
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

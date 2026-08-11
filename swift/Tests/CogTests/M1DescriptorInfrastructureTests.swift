@@ -104,6 +104,6 @@ private func passedThrough(_ ref: ManualCog<Int>) -> ManualCog<Int> {
   let counter = ManualCog<Int>(7)
   let optional = ManualCog<String?>(nil)
 
-  #expect(counter.descriptor.startingValue == 7)
-  #expect(optional.descriptor.startingValue == nil)
+  #expect(counter.descriptor.startingValue(forKey: nil) == 7)
+  #expect(optional.descriptor.startingValue(forKey: nil) == nil)
 }
