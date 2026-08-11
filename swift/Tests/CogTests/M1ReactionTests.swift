@@ -2,6 +2,12 @@ import Cog
 import CogTesting
 import Testing
 
+extension Cogtext {
+  fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
+    commit("reaction.writeback") { w in w[source] = value }
+  }
+}
+
 // Reaction behavior is proved through the public registration, read, and turn
 // APIs. Tokens stay alive for the duration of each test so later cancellation
 // semantics cannot turn these wake-up tests into lifetime tests by accident.
@@ -202,4 +208,29 @@ import Testing
   )
   #expect(spawned.count == 2)
   _ = (first, second, writebackObserver)
+}
+
+@MainActor
+@Test func `REACT-15 an op called by a reaction becomes a later turn`() {
+  let cogs = Cogtext.forTesting()
+  let trigger = ManualCog<Int>(0)
+  let followup = ManualCog<Int>(0)
+  var snapshots: [String] = []
+
+  let writer = cogs.run { c in
+    guard c.get(trigger) == 1 else { return }
+    cogs.setFromReaction(followup, to: 1)
+  }
+
+  let observer = cogs.run { c in
+    let triggerValue = c.get(trigger)
+    let followupValue = c.get(followup)
+    guard triggerValue == 1 else { return }
+    snapshots.append("\(triggerValue):\(followupValue)")
+  }
+
+  cogs.commit { w in w[trigger] = 1 }
+
+  #expect(snapshots == ["1:0", "1:1"])
+  _ = (writer, observer)
 }
