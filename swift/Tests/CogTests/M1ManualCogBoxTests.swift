@@ -10,13 +10,9 @@ import Testing
 // storage invariants boxes rest on are asserted separately, in
 // `M1ManualCogBoxInfrastructureTests.swift`, which greens no scenario.
 //
-// Keyed staging belongs to `M1-04b`, which is what TURN-14 owns. Where a
-// declaration scenario says "writing through one ref shows up through the
-// other," these tests keep the `M1-02` proof on state identity: a key's node
-// holds one value, and when that value is a reference type, reaching it through
-// either ref reaches the same object. TURN-14 proves that same identity again
-// through a real keyed turn without making this declaration slice depend on
-// later write semantics.
+// M1-02 first proved keyed identity with a reference-typed value before turns
+// existed. M1-04b strengthens DECL-04's write clause in place with a real
+// keyed commit, while TURN-14 separately owns the writer read-back behavior.
 //
 // Refs and boxes are declared inside each test rather than at file scope. A
 // `ManualCogBox` is MainActor-isolated, and a file-scope `let` would say
@@ -214,6 +210,17 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
   recordAnUpload(in: cogs, using: ledgers)
 
   #expect(entriesForFive(in: cogs, using: ledgers) == ["upload"])
+
+  let writtenElsewhere = Ledger()
+  writtenElsewhere.entries.append("replacement")
+  let firstRef = ledgers[5]
+  let secondRef = ledgers[2 + 3]
+
+  cogs.commit { w in w[firstRef] = writtenElsewhere }
+
+  #expect(cogs.read(secondRef) === writtenElsewhere)
+  #expect(cogs.read(secondRef).entries == ["replacement"])
+  #expect(cogs.read(ledgers[6]).entries.isEmpty)
 }
 
 @MainActor

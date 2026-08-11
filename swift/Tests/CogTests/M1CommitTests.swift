@@ -34,6 +34,32 @@ import Testing
 }
 
 @MainActor
+@Test func `TURN-02 the last repeated write is the one downstream sees`() {
+  var sourceValuesSeen: [Int] = []
+
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(0)
+  let doubled = Cog<Int> { c in
+    let value = c.get(source)
+    sourceValuesSeen.append(value)
+    return value * 2
+  }
+
+  #expect(cogs.read(doubled) == 0)
+
+  cogs.commit { w in
+    w[source] = 1
+    #expect(w[source] == 1)
+
+    w[source] = 2
+    #expect(w[source] == 2)
+  }
+
+  #expect(cogs.read(doubled) == 4)
+  #expect(sourceValuesSeen == [0, 2])
+}
+
+@MainActor
 @Test func `TURN-03 the writer reads current state before staging that source`() {
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(0)
@@ -62,4 +88,20 @@ import Testing
   }
 
   #expect(cogs.read(count) == 7)
+}
+
+@MainActor
+@Test func `TURN-14 keyed writer read-back changes only the selected key`() {
+  let cogs = Cogtext.forTesting()
+  let unreadCounts = ManualCogBox<Int, String>(0)
+
+  cogs.commit { w in
+    w[unreadCounts["inbox"]] += 1
+
+    #expect(w[unreadCounts["inbox"]] == 1)
+    #expect(w[unreadCounts["archive"]] == 0)
+  }
+
+  #expect(cogs.read(unreadCounts["inbox"]) == 1)
+  #expect(cogs.read(unreadCounts["archive"]) == 0)
 }
