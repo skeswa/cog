@@ -2,12 +2,11 @@ import Cog
 import CogTesting
 import Testing
 
-// The three scenarios `M1-05a` greens, written against the public `Cog` API and
-// the `CogTesting` product and nothing else — no `@testable`, no node storage,
-// no internal counters. That is scenarios.md constraint 3, and DECL-09 and
-// READ-02 are exactly the place it would be tempting to break: both are claims
-// about *how much work ran*, which the implementation knows precisely and the
-// public API does not expose at all.
+// Derived-value scenarios written against the public `Cog` API and the
+// `CogTesting` product and nothing else — no `@testable`, no node storage, no
+// internal counters. That is scenarios.md constraint 3, and run-count claims
+// are exactly the place it would be tempting to break: the implementation
+// knows them precisely and the public API does not expose them at all.
 //
 // The way to ask "did it run?" without reaching inside is to make the selector
 // itself do the counting. A counter the test owns, incremented in the closure
@@ -20,9 +19,10 @@ import Testing
 // file-scope `let` would say different things in the MainActor and nonisolated
 // legs of the matrix (§7).
 //
-// The GRAPH-01 section is the first write-after-compute behavior. It stays on
-// the same public surface: selector-owned counters show which cached nodes ran
-// again, without exposing settle flags, versions, or the explicit stack.
+// The GRAPH and READ-03 sections add write-after-compute behavior on the same
+// public surface: selector-owned counters and snapshots show which cached
+// nodes ran and what they saw, without exposing settle flags, versions, or the
+// explicit stack.
 
 // MARK: - DECL-07
 
@@ -348,4 +348,70 @@ import Testing
   #expect(cogs.read(root) == 22)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
+}
+
+// MARK: - READ-03
+
+@MainActor
+@Test func `READ-03 one commit presents two changed sources as one settled pair`() {
+  var pairsSeen: [String] = []
+
+  let cogs = Cogtext.forTesting()
+  let left = ManualCog<Int>(1)
+  let right = ManualCog<Int>(10)
+  let pair = Cog<String> { c in
+    let currentLeft = c.get(left)
+    let currentRight = c.get(right)
+    let snapshot = "\(currentLeft):\(currentRight)"
+    pairsSeen.append(snapshot)
+    return snapshot
+  }
+
+  #expect(cogs.read(pair) == "1:10")
+
+  cogs.commit { w in
+    w[left] = 2
+    w[right] = 20
+  }
+
+  #expect(cogs.read(pair) == "2:20")
+  #expect(pairsSeen == ["1:10", "2:20"])
+}
+
+// MARK: - GRAPH-02
+
+@MainActor
+@Test func `GRAPH-02 a diamond settles both arms and its root exactly once`() {
+  var leftRuns = 0
+  var rightRuns = 0
+  var rootRuns = 0
+  var rootPairs: [String] = []
+
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(1)
+  let left = Cog<Int> { c in
+    leftRuns += 1
+    return c.get(source) + 1
+  }
+  let right = Cog<Int> { c in
+    rightRuns += 1
+    return c.get(source) * 10
+  }
+  let root = Cog<Int> { c in
+    rootRuns += 1
+    let currentLeft = c.get(left)
+    let currentRight = c.get(right)
+    rootPairs.append("\(currentLeft):\(currentRight)")
+    return currentLeft + currentRight
+  }
+
+  #expect(cogs.read(root) == 12)
+
+  cogs.commit { w in w[source] = 3 }
+
+  #expect(cogs.read(root) == 34)
+  #expect(leftRuns == 2)
+  #expect(rightRuns == 2)
+  #expect(rootRuns == 2)
+  #expect(rootPairs == ["2:10", "4:30"])
 }
