@@ -6,10 +6,31 @@
 /// internal, so application code cannot manufacture a matching token.
 internal final class CogTurnID {}
 
-/// The stable facts about one turn while the context advances through it.
-internal struct CogTurn {
+/// The state of one turn while the context advances through it.
+internal final class CogTurn {
   let id: CogTurnID
   let name: String
+
+  /// Sources written while this turn accumulates. Repeated entries are safe:
+  /// the first flush consumes the one pending slot and later entries are
+  /// no-ops. A later equality-gating task can deduplicate this work.
+  private var touchedSources: [any PendingCogSource] = []
+
+  init(id: CogTurnID, name: String) {
+    self.id = id
+    self.name = name
+  }
+
+  func touch(_ source: any PendingCogSource) {
+    touchedSources.append(source)
+  }
+
+  func flushPendingSources() {
+    for source in touchedSources {
+      source.flushPendingValue()
+    }
+    touchedSources.removeAll(keepingCapacity: true)
+  }
 }
 
 /// Where a context is in the structural commit boundary (§3.2).
@@ -27,6 +48,7 @@ extension Cogtext {
     let turn = startTurn(named: name)
     body(turn)
     startFlushing(turn.id)
+    turn.flushPendingSources()
     finishTurn(turn.id)
   }
 

@@ -9,7 +9,7 @@
 /// The node is created the first time a context is asked for this descriptor
 /// and key, and it starts at the declaration's starting value because there is
 /// no earlier turn to ask (see ``ManualCogDescriptor/startingValue``).
-internal final class ManualCogNode<Value>: CogNode {
+internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// The declaration this node belongs to.
   ///
   /// Holding the descriptor rather than copying pieces out of it keeps the
@@ -42,6 +42,13 @@ internal final class ManualCogNode<Value>: CogNode {
 
   var label: CogLabel { descriptor.label }
 
+  /// Moves a staged value across the commit boundary, if this turn wrote one.
+  func flushPendingValue() {
+    guard case .some(let value) = pendingValue else { return }
+    currentValue = value
+    pendingValue = .none
+  }
+
   /// Creates the node at its declaration's starting value for this key.
   ///
   /// The key is part of the question, not just part of the filing: a keyed
@@ -60,4 +67,10 @@ internal final class ManualCogNode<Value>: CogNode {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.
   nonisolated deinit {}
+}
+
+/// The type-erased flush capability one turn needs from a touched source.
+@MainActor
+internal protocol PendingCogSource: AnyObject {
+  func flushPendingValue()
 }

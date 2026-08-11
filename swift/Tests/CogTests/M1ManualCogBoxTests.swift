@@ -10,14 +10,13 @@ import Testing
 // storage invariants boxes rest on are asserted separately, in
 // `M1ManualCogBoxInfrastructureTests.swift`, which greens no scenario.
 //
-// Writes do not exist yet: `commit` and `Writer` arrive with `M1-04ab`, and
-// keyed staging with `M1-04b`, which is what TURN-14 owns. So where a scenario
-// says "writing through one ref shows up through the other," these tests prove
-// the same claim the only way the current public surface allows — a key's node
-// holds one value, and when that value is a reference type, reaching it
-// through either ref reaches the same object. That is the state-identity half
-// of the promise, which is the half `M1-02` is responsible for; TURN-14 proves
-// the same identity again through a real turn once turns exist.
+// Keyed staging belongs to `M1-04b`, which is what TURN-14 owns. Where a
+// declaration scenario says "writing through one ref shows up through the
+// other," these tests keep the `M1-02` proof on state identity: a key's node
+// holds one value, and when that value is a reference type, reaching it through
+// either ref reaches the same object. TURN-14 proves that same identity again
+// through a real keyed turn without making this declaration slice depend on
+// later write semantics.
 //
 // Refs and boxes are declared inside each test rather than at file scope. A
 // `ManualCogBox` is MainActor-isolated, and a file-scope `let` would say
@@ -29,9 +28,9 @@ import Testing
 
 /// A value with an identity and something to change about it.
 ///
-/// Boxes exist to give each key its own state, and with no way to write yet, a
-/// reference type is what makes "its own" observable: two keys either hand
-/// back the same object or they do not.
+/// Boxes exist to give each key its own state. A reference type makes "its
+/// own" observable without depending on keyed turn behavior: two keys either
+/// hand back the same object or they do not.
 private final class Ledger {
   var entries: [String] = []
 }

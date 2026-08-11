@@ -8,7 +8,7 @@ import Testing
 // stays on the public surface. What is checked here is the invariant that
 // behavior rests on — one node per descriptor and key, created on first use —
 // and there is no public way to observe it yet, because boxes (`M1-02`) and
-// writes (`M1-04ab`) are what make per-key and per-context identity visible
+// keyed writes (`M1-04b`) are what make per-key and per-context identity visible
 // from outside. Until they land, this file is the only thing standing between
 // a silent storage bug and the tasks that build on it.
 //
