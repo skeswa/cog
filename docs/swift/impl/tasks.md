@@ -545,7 +545,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter LIFE-09`._
   _Greens: LIFE-09._
 - **M1-29a** _(Behavior)_ — Install one production context shared app-wide.
-  _Depends: M1-01b._
+  _Depends: M1-04ab._
   _Verify: `mise run test --filter ONE-01`._
   _Greens: ONE-01._
 - **M1-29b** _(Behavior)_ — Reject a second production install in debug and
