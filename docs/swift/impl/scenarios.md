@@ -246,8 +246,8 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ### 4.3 Equal writes are not changes
 
-- **TURN-09.** I write a source to the value it already has. Nothing
-  happens: no recompute, no notice, no reaction.
+- **TURN-09.** I write a source to the value it already has. A derived cog
+  that reads it does not recompute.
 - **TURN-10.** In one commit I change a value and then change it back.
   At flush time that counts as no change at all.
 - **TURN-11.** I give a cog a custom `equals:`. Cog uses my rule to
@@ -397,6 +397,8 @@ flush — from inside another reaction — makes its initial run._
 - **REACT-21.** A reaction watches a derived cog. A turn changes that
   cog's source, but the recompute lands on an equal value. The reaction
   does not run: only changed reactions run in flush step 5.
+- **REACT-22.** A reaction reads a manual source. I write that source to
+  an equal value. The reaction does not run.
 
 ## 8. GROUP — Effect groups and timers
 
@@ -544,6 +546,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
   UI-04, and UI-08) have the same behavior through the floor-runtime
   Observation boundary. This may run in the pinned nightly floor job.
   (Proof: floor runtime.)
+- **UI-15.** A view reads a manual source. I write that source to an equal
+  value. Cog sends no Observation notice, and the view does not re-render.
 
 ## 13. ASYNC — Async values, first slice
 

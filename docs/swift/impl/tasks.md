@@ -443,11 +443,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-03, M1-16b._
   _Verify: `mise run test:compilefail`._
   _Greens: REACT-14._
-- **M1-19b** _(Behavior)_ — Do not wake a reaction when its derived dependency
-  recomputes equal.
+- **M1-19b** _(Behavior)_ — Do not wake reactions for equal manual writes or
+  equal derived recomputation.
   _Depends: M1-16c._
-  _Verify: `mise run test --filter REACT-21`._
-  _Greens: REACT-21._
+  _Verify: `mise run test --filter 'REACT-21|REACT-22'`._
+  _Greens: REACT-21, REACT-22._
 - **M1-20a** _(Behavior)_ — Queue one op called by a reaction as a new turn.
   _Depends: M1-16d._
   _Verify: `mise run test --filter REACT-15`._
@@ -643,10 +643,11 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-03`._
   _Greens: UI-03._
-- **M2-04** _(Behavior)_ — Suppress UI notice when recomputation lands equal.
+- **M2-04** _(Behavior)_ — Suppress UI notices for equal manual writes and
+  equal derived recomputation.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter UI-04`._
-  _Greens: UI-04._
+  _Verify: `mise run test --filter 'UI-04|UI-15'`._
+  _Greens: UI-04, UI-15._
 - **M2-05** _(Behavior)_ — Add `binding(for:)` with named history commits and
   immediate read-back.
   _Depends: M2-02ab._
@@ -1107,7 +1108,7 @@ ArenaDirtyPropagationInfrastructure`._
   and non-`Sendable` values, through the arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-(0[1-9]|1[0-4]|18|21)|ACTOR-0[13]'`._
+'REACT-(0[1-9]|1[0-4]|18|2[12])|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
   and the quiescence diagnostic through the arena selector.
   _Depends: M6-10ca._
