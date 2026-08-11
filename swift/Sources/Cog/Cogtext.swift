@@ -1,0 +1,120 @@
+/// The one place Cog state lives.
+///
+/// A declaration is a ref — a light value naming one piece of state — and the
+/// state itself is a node that lives here. A `Cogtext` stores one node per
+/// descriptor and key, creates each node the first time something needs it,
+/// and never creates one for a declaration nobody uses (§2.3). That split is
+/// what keeps a top-level `let` cheap enough to write freely: an app may
+/// declare a thousand cogs and pay for the handful it actually reads.
+///
+/// One running app has one context. Every feature resolves through it, which
+/// is what makes state singular — no screen-local islands, no second copy of a
+/// fact to keep in step — and it gives Cog one owner for the whole app's turn
+/// history. Tests and previews are separate app runtimes rather than exceptions
+/// to that rule: each gets its own isolated context and fragments nothing
+/// inside it.
+///
+/// Construction is therefore guarded. The initializer below is `package`, so
+/// application code cannot name it at all. The app's bootstrap calls
+/// `Cogtext.bootstrapApp()` once at launch, and the `CogTesting` product vends
+/// `Cogtext.forTesting()` for a fresh isolated context as often as a test or
+/// preview asks. Splitting the two by product, rather than by an argument to
+/// one helper, keeps the test factory out of a shipping app target entirely.
+///
+/// The whole graph is confined to the MainActor (§1.2, §2.5). SwiftUI reads are
+/// synchronous and cannot `await`, so a graph on another actor could not serve
+/// them; one execution lane also means a turn is never interleaved with
+/// another. Isolation is stated explicitly here rather than inherited from the
+/// module's default, so the type says the same thing to every consumer whatever
+/// their own default isolation is (§7).
+@MainActor
+public final class Cogtext {
+  /// Every node this context has been asked for, filed by descriptor and key.
+  ///
+  /// Heterogeneous on purpose: a context holds nodes of every value type an app
+  /// declares, and nothing about storing them needs to know those types.
+  /// ``CogNode`` is the narrow view across them, and the concrete type comes
+  /// back at the point of use, where the ref's own `Value` names it.
+  ///
+  /// A dictionary is the correctness build's answer, not the final one. The
+  /// data-oriented core (perf §3) replaces it with slotted storage; nothing
+  /// outside this file may depend on the shape, which is why lookup goes
+  /// through ``manualNode(for:)`` rather than the dictionary directly.
+  internal private(set) var nodes: [CogNodeIdentity: any CogNode] = [:]
+
+  /// Creates an empty context.
+  ///
+  /// `package` rather than `public` so that the only ways to make a context
+  /// from outside are the two deliberate ones: `Cogtext.bootstrapApp()` for the
+  /// app, and `Cogtext.forTesting()` for a test or preview runtime. Feature
+  /// code that tries to build a plain context does not get a runtime error, it
+  /// gets a compile error, because the name is not visible to it.
+  package init() {}
+}
+
+// MARK: - Node storage
+
+extension Cogtext {
+  /// The node this ref names in this context, created if this is its first use.
+  ///
+  /// Lazy creation is not a memory optimization bolted onto declarations; it is
+  /// what a declaration means. A `ManualCog` is a name, and a name costs
+  /// nothing until something asks this context to resolve it. It is also what
+  /// lets a keyed box be declared once and used for any number of keys: the key
+  /// is half of the storage identity, so `box[90210]` and `box[10001]` resolve
+  /// to two nodes of the same declaration.
+  ///
+  /// The cast back to a concrete node type cannot fail in a correct build. The
+  /// identity contains the descriptor, the descriptor is generic over `Value`,
+  /// and only this method ever files a node — so a hit means a node built from
+  /// this very descriptor. The check stays anyway, and fails loudly rather than
+  /// silently reinterpreting memory, because it is the kind of invariant a
+  /// future storage change could break quietly.
+  internal func manualNode<Value>(for ref: ManualCog<Value>) -> ManualCogNode<Value> {
+    let identity = CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)
+
+    if let existing = nodes[identity] {
+      guard let node = existing as? ManualCogNode<Value> else {
+        preconditionFailure(
+          """
+          The node for \(existing.label) is a \(type(of: existing)), not a \
+          \(ManualCogNode<Value>.self). Two declarations cannot share one \
+          descriptor identity, so this context's node storage is corrupt.
+          """
+        )
+      }
+      return node
+    }
+
+    let created = ManualCogNode(descriptor: ref.descriptor, key: ref.key)
+    nodes[identity] = created
+    return created
+  }
+}
+
+// MARK: - Reading
+
+extension Cogtext {
+  /// Reads a source's current value without creating a dependency edge.
+  ///
+  /// This is the one-shot untracked read (§2.4): the spelling for an op, a
+  /// test, or any other place outside a selector that needs a value once and is
+  /// not going to be rerun when it changes. Inside a selector, use the tracked
+  /// read on the controller instead — an untracked read that should have been
+  /// tracked is a stale-value bug, so keep this one rare and deliberate.
+  ///
+  /// Untracked never means stale. The rule is that skipping the edge skips only
+  /// the subscription: the value handed back is still the settled value of the
+  /// latest completed turn. A manual source satisfies that for free, because
+  /// nothing computes it — there is no work that could be outstanding. Derived
+  /// cogs will need settling before their value is returned, and that settle
+  /// step belongs inside this read path (`M1-05a`, `M1-06aa`), not at call
+  /// sites, so that no caller can spell a read that skips it.
+  ///
+  /// - Parameter ref: The source to read.
+  /// - Returns: The value the source holds in this context, which is its
+  ///   declaration's starting value until a turn writes it.
+  public func read<Value>(_ ref: ManualCog<Value>) -> Value {
+    manualNode(for: ref).value
+  }
+}
