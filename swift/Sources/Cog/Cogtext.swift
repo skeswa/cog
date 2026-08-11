@@ -29,6 +29,15 @@
 /// their own default isolation is (§7).
 @MainActor
 public final class Cogtext {
+  /// The monotonic version assigned to graph work as turns are flushed.
+  ///
+  /// `M1-06aa` installs the counter; `M1-06ab` advances it at the source
+  /// commit boundary and uses it to settle a linear chain.
+  internal private(set) var revision: CogVersion = .initial
+
+  /// One enter/exit buffer reused by iterative settle walks.
+  internal var settleStack = CogSettleStack()
+
   /// The structural phase of the current turn, or idle between turns.
   ///
   /// This begins as the small correctness representation from §3.2. The
@@ -73,6 +82,13 @@ public final class Cogtext {
 // MARK: - Node storage
 
 extension Cogtext {
+  /// Advances the global graph revision once for a later flush.
+  @discardableResult
+  internal func advanceRevision() -> CogVersion {
+    revision = revision.advanced()
+    return revision
+  }
+
   /// The node this ref names in this context, created if this is its first use.
   ///
   /// Lazy creation is not a memory optimization bolted onto declarations; it is

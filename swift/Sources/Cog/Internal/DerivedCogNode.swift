@@ -11,14 +11,11 @@
 /// a node that is never read never runs at all (`DECL-09`).
 ///
 /// **Cached.** A run's value is kept, so a second read is a lookup rather than
-/// a second run (`READ-02`). Keeping a value is only correct while nothing it
-/// was computed from has changed, and *noticing* that change is the settle
-/// engine's job (`M1-06aa`, `M1-06ab`), which does not exist yet. Until it
-/// does, a write to a source that a derived cog already computed from leaves
-/// this node holding the value it computed before the write. That is a known,
-/// deliberate hole in this slice of the ledger, not a behavior anything should
-/// rely on: `M1-06aa` adds CLEAN/CHECK/DIRTY and versions, and this cache
-/// becomes valid only while the node is clean.
+/// a second run (`READ-02`). The node now carries CLEAN/CHECK/DIRTY and version
+/// storage, but the write-to-read propagation that makes those flags settle a
+/// changed chain belongs to `M1-06ab`. Until that task lands, a write to a
+/// source that this node already computed from can still leave the cache stale.
+/// That remains a deliberate ledger boundary, not desired behavior.
 ///
 /// The dependencies a run captured are recorded even though nothing consumes
 /// them yet, because they are captured *by the run* (§2.4) and there is no
@@ -55,6 +52,15 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
   /// benchmark-gated (perf §3.3) and belong to `M1-06aa` and `M6`.
   internal private(set) var dependencies: [any CogNode] = []
 
+  /// Fresh derived nodes are DIRTY because they have no value to return yet.
+  var settleState: CogSettleState
+
+  /// The revision in which the cached value last really changed.
+  var changedAt: CogVersion
+
+  /// The revision through which the cached value was last proved current.
+  var checkedAt: CogVersion
+
   var label: CogLabel { descriptor.label }
 
   /// Whether the selector has run in this context yet.
@@ -73,6 +79,9 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
     self.descriptor = descriptor
     self.key = key
     self.cachedValue = .none
+    self.settleState = .dirty
+    self.changedAt = .initial
+    self.checkedAt = .initial
   }
 
   /// The node's value, running the selector if this is its first read.
@@ -106,6 +115,7 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer {
     }
 
     cachedValue = .some(value)
+    markChanged(at: cogs.revision)
     return value
   }
 

@@ -40,6 +40,15 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// while `.none` means it did not write this source.
   var pendingValue: Value?
 
+  /// Sources are always settled: their current slot is already their value.
+  var settleState: CogSettleState
+
+  /// The revision of the last committed real change.
+  var changedAt: CogVersion
+
+  /// The revision through which the current slot was last verified.
+  var checkedAt: CogVersion
+
   var label: CogLabel { descriptor.label }
 
   /// Moves a staged value across the commit boundary, if this turn wrote one.
@@ -62,6 +71,9 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
     self.key = key
     self.currentValue = descriptor.startingValue(forKey: key)
     self.pendingValue = nil
+    self.settleState = .clean
+    self.changedAt = .initial
+    self.checkedAt = .initial
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

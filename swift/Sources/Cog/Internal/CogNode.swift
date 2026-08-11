@@ -6,16 +6,24 @@
 /// runtime, and no node at all in a context that has never been asked for it.
 ///
 /// The protocol carries only what code holding a node of unknown value type
-/// still needs. Today that is the label, which is what a cycle diagnostic and
-/// the debug history print (§2.4, §6.5); the settle state, versions, and edge
-/// storage join it as the later M1 tasks land. Keeping it this narrow is
-/// deliberate: `Cogtext`'s storage is heterogeneous, so every capability that
-/// crosses the existential has to be spelled out here rather than recovered by
-/// casting to a concrete node kind.
+/// still needs: its label for diagnostics, and the state and versions the
+/// settle walk updates. Keeping it this narrow is deliberate: `Cogtext`'s
+/// storage is heterogeneous, so every capability that crosses the existential
+/// has to be spelled out here rather than recovered by casting to a concrete
+/// node kind.
 @MainActor
 internal protocol CogNode: AnyObject {
   /// What Cog calls the declaration this node belongs to.
   var label: CogLabel { get }
+
+  /// Whether the node is current, may need checking, or must recompute.
+  var settleState: CogSettleState { get set }
+
+  /// The last graph revision in which this node's value really changed.
+  var changedAt: CogVersion { get set }
+
+  /// The last graph revision through which this node was proved current.
+  var checkedAt: CogVersion { get set }
 }
 
 /// What a ``Cogtext`` files a node under: a declaration plus a key.
