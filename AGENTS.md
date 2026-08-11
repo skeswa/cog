@@ -173,6 +173,12 @@ that runtime.
 
 ## Conventions
 
+- **A scenario test never uses `@testable import Cog`.** Tests that own a
+  scenario ID prove it through the public API and `CogTesting` only.
+  COUNT-09 through COUNT-11 require the whole behavior suite to pass
+  unchanged across the ref-layout and core swaps, so a scenario test able to
+  observe node storage would fail a swap it should not care about. Reach for
+  `@testable` only in infrastructure tests, which green no scenario.
 - **Give every generic class an explicit `nonisolated deinit`.** With
   `.defaultIsolation(MainActor.self)`, a synthesized `deinit` on a generic
   class is main-actor-isolated, and Swift 6.3.0 and 6.3.3 both crash the
