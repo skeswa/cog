@@ -86,54 +86,84 @@ nonisolated struct WeatherService: Sendable {
     try await advisoryRequest(zip)
   }
 
-  static let live: Self = {
+  /// The canned feed the app runs on.
+  ///
+  /// `latency` stands in for a network round trip. Tests pass `.zero` to walk
+  /// the whole rotation without waiting through it.
+  static func demo(latency: Duration = .seconds(1)) -> Self {
     let feed = DemoWeatherFeed()
     return Self(
       weather: { zip in
-        try await Task.sleep(for: .seconds(1))
-        return await feed.nextWeather(for: zip)
+        try await Task.sleep(for: latency)
+        return await feed.reading(for: zip).weather
       },
-      advisories: { _ in
-        try await Task.sleep(for: .seconds(1))
-        return []
+      advisories: { zip in
+        try await Task.sleep(for: latency)
+        return await feed.reading(for: zip).advisories
       }
     )
-  }()
+  }
+
+  static let live = demo()
 }
 
+/// One day of canned demo data: a forecast and the advisories in force with it.
+nonisolated struct WeatherReading: Equatable, Sendable {
+  let weather: Weather
+  let advisories: [WeatherAdvisory]
+
+  init(_ kind: Weather.Kind, _ temperatureF: Double, advisories: [WeatherAdvisory] = []) {
+    weather = Weather(kind: kind, temperatureF: temperatureF)
+    self.advisories = advisories
+  }
+}
+
+/// Vends the demo's canned forecasts.
+///
+/// One refresh makes two requests — weather and advisories — and they have to
+/// describe the same day, or a mild afternoon arrives carrying a heat
+/// advisory. Each reading is therefore served exactly twice: whichever request
+/// arrives first starts the day, and the other joins it. A refresh cancelled
+/// between the two leaves the pairing half a day out, which the next refresh
+/// absorbs.
 private actor DemoWeatherFeed {
-  private var nextIndexByZip: [ZipCode: Int] = [:]
+  private var servedByZip: [ZipCode: Int] = [:]
 
-  func nextWeather(for zip: ZipCode) -> Weather {
-    let reports: [Weather] =
-      switch zip {
-      case .newYork:
-        [
-          Weather(kind: .clear, temperatureF: 75),
-          Weather(kind: .partlyCloudy, temperatureF: 72),
-          Weather(kind: .rain, temperatureF: 64),
-          Weather(kind: .clear, temperatureF: 78),
-        ]
-      case .sanFrancisco:
-        [
-          Weather(kind: .partlyCloudy, temperatureF: 68),
-          Weather(kind: .cloudy, temperatureF: 63),
-          Weather(kind: .clear, temperatureF: 65),
-          Weather(kind: .rain, temperatureF: 59),
-        ]
-      case .seattle:
-        [
-          Weather(kind: .cloudy, temperatureF: 60),
-          Weather(kind: .rain, temperatureF: 57),
-          Weather(kind: .partlyCloudy, temperatureF: 62),
-          Weather(kind: .rain, temperatureF: 55),
-        ]
-      default:
-        [Weather(kind: .clear, temperatureF: 72)]
-      }
+  func reading(for zip: ZipCode) -> WeatherReading {
+    let served = servedByZip[zip, default: 0]
+    servedByZip[zip] = served + 1
 
-    let index = nextIndexByZip[zip, default: 0]
-    nextIndexByZip[zip] = index + 1
-    return reports[index % reports.count]
+    let readings = Self.readings(for: zip)
+    return readings[(served / 2) % readings.count]
+  }
+
+  private static func readings(for zip: ZipCode) -> [WeatherReading] {
+    switch zip {
+    case .newYork:
+      [
+        WeatherReading(.clear, 75),
+        WeatherReading(.partlyCloudy, 72),
+        WeatherReading(.rain, 64),
+        // Clear and sunny, and still no day to be outside: the advisory and
+        // the temperature both push `isNiceOutside` false on their own.
+        WeatherReading(.clear, 94, advisories: [.heat]),
+      ]
+    case .sanFrancisco:
+      [
+        WeatherReading(.partlyCloudy, 68),
+        WeatherReading(.cloudy, 63),
+        WeatherReading(.clear, 65),
+        WeatherReading(.rain, 59),
+      ]
+    case .seattle:
+      [
+        WeatherReading(.cloudy, 60),
+        WeatherReading(.rain, 57),
+        WeatherReading(.partlyCloudy, 62),
+        WeatherReading(.rain, 55),
+      ]
+    default:
+      [WeatherReading(.clear, 72)]
+    }
   }
 }
