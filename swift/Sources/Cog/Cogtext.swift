@@ -63,6 +63,17 @@ public final class Cogtext {
   /// it with slotted storage (perf §3), so lookups go through the methods below.
   internal private(set) var states: [CogStateIdentity: any CogState] = [:]
 
+  /// States whose exact values have crossed the UI observation boundary.
+  ///
+  /// First UI reads append here in creation order. Flushes walk only these hot
+  /// roots instead of scanning every interior state in the graph.
+  internal private(set) var observationStates: [any CogObservationState] = []
+
+  /// Pins one newly UI-read state in boundary creation order.
+  internal func registerObservationState(_ state: any CogObservationState) {
+    observationStates.append(state)
+  }
+
   /// Whose run is capturing dependencies right now, or `nil` between runs.
   ///
   /// Runs may nest but cannot interleave on the MainActor. ``tracking(_:_:)``

@@ -5,7 +5,7 @@ extension Cogtext {
   /// invalidate the view, use ``read(_:)``.
   public func get<Value>(_ valueReference: ManualCog<Value>) -> Value {
     let state = manualState(for: valueReference)
-    state.accessObservationBoundary()
+    state.accessObservationBoundary(in: self)
     return state.currentValue
   }
 
@@ -16,7 +16,7 @@ extension Cogtext {
   /// the consumer only when the settled value changes.
   public func get<Value>(_ valueReference: Cog<Value>) -> Value {
     let state = derivedState(for: valueReference)
-    state.accessObservationBoundary()
+    state.accessObservationBoundary(in: self)
     return state.settledValue(in: self)
   }
 

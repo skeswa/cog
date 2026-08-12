@@ -32,13 +32,14 @@ internal protocol CogObservationState: CogState {
 extension CogObservationState {
   /// Gets or creates this state's boundary and records one UI read.
   @discardableResult
-  func accessObservationBoundary() -> CogObservationBoundary {
+  func accessObservationBoundary(in cogs: Cogtext) -> CogObservationBoundary {
     let boundary: CogObservationBoundary
     if let existing = observationBoundary {
       boundary = existing
     } else {
       boundary = CogObservationBoundary()
       observationBoundary = boundary
+      cogs.registerObservationState(self)
     }
 
     boundary.access()
@@ -49,18 +50,11 @@ extension CogObservationState {
 extension Cogtext {
   /// Settles UI-read roots and notifies only values changed in this revision.
   ///
-  /// Snapshot the observed states before settlement because a selector may
-  /// lazily create another state while it runs.
+  /// Snapshot the count before settlement because a selector may lazily create
+  /// another boundary while it runs.
   internal func flushObservationBoundaries() {
-    let observedStates = states.values.compactMap { state -> (any CogObservationState)? in
-      guard
-        let observed = state as? any CogObservationState,
-        observed.observationBoundary != nil
-      else { return nil }
-      return observed
-    }
-
-    for state in observedStates {
+    let boundaryCount = observationStates.count
+    for state in observationStates.prefix(boundaryCount) {
       if state.settleState != .clean,
         let derived = state as? any DerivedCogSettleState
       {

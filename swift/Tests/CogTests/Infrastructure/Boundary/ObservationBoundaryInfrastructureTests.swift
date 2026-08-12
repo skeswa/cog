@@ -15,11 +15,13 @@ import os
   #expect(firstState.observationBoundary == nil)
   #expect(secondState.observationBoundary == nil)
 
-  let firstBoundary = firstState.accessObservationBoundary()
+  let firstBoundary = firstState.accessObservationBoundary(in: cogs)
 
   #expect(firstState.observationBoundary === firstBoundary)
-  #expect(firstState.accessObservationBoundary() === firstBoundary)
+  #expect(firstState.accessObservationBoundary(in: cogs) === firstBoundary)
   #expect(secondState.observationBoundary == nil)
+  #expect(cogs.observationStates.count == 1)
+  #expect(cogs.observationStates[0] === firstState)
 }
 
 @MainActor
@@ -30,7 +32,7 @@ import os
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   _ = withObservationTracking {
-    state.accessObservationBoundary()
+    state.accessObservationBoundary(in: cogs)
   } onChange: {
     notices.withLock { $0 += 1 }
   }
@@ -52,7 +54,7 @@ func `ObservationBoundaryInfrastructure settles a derived boundary before change
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   withObservationTracking {
-    state.accessObservationBoundary()
+    state.accessObservationBoundary(in: cogs)
     #expect(state.settledValue(in: cogs))
   } onChange: {
     notices.withLock { $0 += 1 }
