@@ -110,6 +110,12 @@ public final class Cogtext {
   /// have a later state mark erase the seed's invalidation.
   internal var seedBarrierDepth = 0
 
+  /// One synchronous root turn and the FIFO write-back turns it causes.
+  ///
+  /// The tracker warns once after a long uninterrupted drain and retains only
+  /// the last structured warning for the `CogTesting` diagnostic seam.
+  internal var quiescenceTracker = CogQuiescenceTracker()
+
   /// What this context has done lately (§2.3, perf §8).
   ///
   /// Debug builds only, so a release build carries no ring, records nothing,

@@ -159,6 +159,7 @@ internal final class CogReaction: CogNode, CogConsumer {
     // still says so.
     #if DEBUG
     cogs.historyLog.recordEffect(label: label)
+    cogs.quiescenceTracker.recordReaction(label: label)
     #endif
 
     let previousDependencies = dependencies

@@ -74,6 +74,11 @@ extension Cogtext {
       break
     }
 
+    #if DEBUG
+    quiescenceTracker.beginEpisode()
+    defer { quiescenceTracker.endEpisode() }
+    #endif
+
     runOuterTurn(named: name, body)
     drainQueuedTurns()
   }
@@ -86,6 +91,10 @@ extension Cogtext {
     turn.flushPendingSources(in: self)
     flushReactions()
     finishTurn(turn.id)
+
+    #if DEBUG
+    quiescenceTracker.completeTurn()
+    #endif
   }
 
   /// Runs queued turns in arrival order without recursively entering a flush.
@@ -117,6 +126,7 @@ extension Cogtext {
     // turn precedes the writes and recomputations it caused.
     #if DEBUG
     historyLog.recordTurn(named: name)
+    quiescenceTracker.recordTurn(named: name)
     #endif
 
     return turn
