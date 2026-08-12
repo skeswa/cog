@@ -11,7 +11,15 @@ struct WeatherCard: View {
   }
 }
 
-/// The environment-free card body used by deterministic render tests.
+/// The card body, taking its context explicitly rather than from the
+/// environment.
+///
+/// Every tracked read a card makes happens here, and the render tests evaluate
+/// this `body` directly instead of hosting it. An unhosted view resolves no
+/// environment, so `@Environment(\.cogs)` would trap; taking the context as a
+/// parameter is what lets those tests count renders without a host. Views that
+/// only act on the graph rather than read it — the refresh button below — have
+/// no such constraint and read the environment normally.
 struct WeatherCardContent: View {
   let cogs: Cogtext
   let zip: ZipCode
@@ -87,7 +95,7 @@ struct WeatherCardContent: View {
 
           Spacer(minLength: 8)
 
-          RefreshButton(cogs: cogs, zip: zip, status: status)
+          RefreshButton(zip: zip, status: status)
         }
 
         if status == .failed {
@@ -99,7 +107,7 @@ struct WeatherCardContent: View {
           .foregroundStyle(.red)
         }
       } else {
-        EmptyForecast(cogs: cogs, zip: zip, status: status)
+        EmptyForecast(zip: zip, status: status)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,7 +124,6 @@ struct WeatherCardContent: View {
 }
 
 private struct EmptyForecast: View {
-  let cogs: Cogtext
   let zip: ZipCode
   let status: WeatherLoadStatus
 
@@ -143,7 +150,7 @@ private struct EmptyForecast: View {
         .font(.caption)
         .foregroundStyle(.secondary)
 
-        RefreshButton(cogs: cogs, zip: zip, status: status)
+        RefreshButton(zip: zip, status: status)
       }
     }
     .frame(maxWidth: .infinity)
@@ -153,7 +160,8 @@ private struct EmptyForecast: View {
 }
 
 private struct RefreshButton: View {
-  let cogs: Cogtext
+  @Environment(\.cogs) private var cogs
+
   let zip: ZipCode
   let status: WeatherLoadStatus
 

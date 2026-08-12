@@ -2,13 +2,11 @@ import Cog
 import SwiftUI
 
 struct WeatherDashboard: View {
-  @Environment(\.cogs) private var cogs
-
   var body: some View {
     NavigationStack {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 16) {
-          BackgroundUpdatesCard(cogs: cogs)
+          BackgroundUpdatesCard()
 
           HStack(alignment: .firstTextBaseline) {
             Text("Forecasts")
@@ -38,7 +36,7 @@ struct WeatherDashboard: View {
 }
 
 private struct BackgroundUpdatesCard: View {
-  let cogs: Cogtext
+  @Environment(\.cogs) private var cogs
 
   var body: some View {
     let cadence = cogs[refreshInterval]?.cadenceDescription
