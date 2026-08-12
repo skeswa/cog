@@ -116,15 +116,16 @@ struct WeatherApp: App {
 
   var body: some Scene {
     WindowGroup {
-      RootScene(cogs: cogs)
+      RootScene()
+        .environment(\.cogs, cogs)
     }
   }
 }
 ```
 
-`RootScene(cogs:)` represents the app's own explicit composition boundary, not
-a Cog API. M2 will add the SwiftUI environment boundary; until then, do not copy
-the planned `\.cogs` environment spelling into current code.
+Every scene receives the same retained object through `\.cogs`. A view reads it
+with `@Environment(\.cogs) private var cogs`; tests and previews inject their
+isolated context through that same boundary.
 
 An ordinary test or preview-support target depends on `CogTesting`. Create one
 fresh context for that test or preview runtime and pass it through the same
