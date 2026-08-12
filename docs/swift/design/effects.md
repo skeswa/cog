@@ -68,7 +68,8 @@ The pieces have narrow jobs:
   them testable. Their bodies call ops, so writes keep useful names in debug
   history.
 - `EffectGroup` owns reaction tokens and tasks. `cancel()` and deinit both
-  cancel the group; copies point to the same cancellation resource.[^group]
+  cancel the group; copies point to the same terminal cancellation
+  resource.[^group]
 - Effect names appear in debug history and task names for Instruments.
 
 The ownership rule: **`Cogtext` owns state and reactions; `EffectGroup` owns
@@ -81,6 +82,13 @@ Effects exist only after code calls `install`. There is no global registry or
 automatic discovery, which avoids Swift's lazy top-level `let` trap: an unused
 global reaction would never be created.
 
+Group cancellation is terminal. If lifecycle ordering adds a live reaction
+token after the group has already been cancelled, `add` synchronously cancels
+that token before returning, retains nothing, and never reopens the group.
+Adding an already-cancelled token to that cancelled group is harmless. A task
+requested after cancellation is already cancelled when `task` returns. Every
+copy observes the same terminal state.
+
 ```swift
 @main
 struct WeatherApp: App {
@@ -88,7 +96,7 @@ struct WeatherApp: App {
     @State private var effects: EffectGroup
 
     init() {
-        let cogs = Cogtext.installApp()
+        let cogs = Cogtext.bootstrapApp()
         _cogs = State(initialValue: cogs)
         _effects = State(initialValue:
             WeatherEffects(notifier: .live).install(in: cogs))
@@ -99,9 +107,6 @@ struct WeatherApp: App {
     }
 }
 ```
-
-`installApp()` here and `testing()` in §6.6 are placeholder spellings; the
-final bootstrap helper names are still open (core §10).
 
 The `App` creates this context once and shares it across every scene. A screen
 may own an `EffectGroup` in `@State`, but it borrows the app context and never
@@ -191,11 +196,11 @@ extension Cogtext {
 
 `seed` is quiet: no turn, history record, UI notice, or reaction. `commit` is
 loud and runs a real named turn. The feature chooses its exact test surface
-instead of exposing all source refs.
+instead of exposing all source value references.
 
 ```swift
 @Test func alertsWhenTheWeatherTurnsNice() async {
-    let cogs = Cogtext.testing()
+    let cogs = Cogtext.forTesting()
     let notifier = Notifier.recording()
     let clock = TestClock()
     let effects = WeatherEffects(notifier: notifier, clock: clock)
@@ -340,7 +345,7 @@ of too many turns.
 
 [^seed]:
     `seed` stages its value and pushes dirty flags exactly like a real write,
-    so dependent nodes and reaction roots recheck it on the next read or turn.
+    so dependent states and reaction roots recheck it on the next read or turn.
     It skips the rest of the flush: no turn record, `withMutation` notice, or
     reaction run. The dirty push is required, not an optimization. Without it,
     a reaction registered before the seed would keep the dependency set from

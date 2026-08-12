@@ -34,10 +34,10 @@ That is the hard base. Cog should reuse it.
 
 Compose does not give the app one clear place for:
 
-- stable identity and readable labels for graph nodes;
+- stable identity and readable labels for graph states;
 - private write rights;
 - a record of one business change;
-- keyed node cleanup;
+- keyed state cleanup;
 - ordered reactions;
 - async status and stale-result rules;
 - graph history and inspection.
@@ -102,7 +102,7 @@ new process.
 Tests and previews may create isolated stores. They do not share state with
 each other or with the production singleton.
 
-One store does not mean every node stays hot forever. Leases still stop unused
+One store does not mean every state stays hot forever. Leases still stop unused
 async work and release keyed caches. Recreating a screen does not reset manual
 state; an explicit operation does.
 
@@ -110,8 +110,8 @@ state; an explicit operation does.
 
 ### 2.1 Four small parts
 
-1. A descriptor names a node.
-2. One app-wide `CogStore` owns node values and runtime state.
+1. A descriptor names a state.
+2. One app-wide `CogStore` owns state values and runtime state.
 3. Compose snapshot state stores and derives values.
 4. Leases say which graph roots must stay hot.
 
@@ -128,7 +128,7 @@ flowchart LR
 
 ### 2.2 Reads settle what they need
 
-A normal read sees the latest completed turn. It settles every derived node
+A normal read sees the latest completed turn. It settles every derived state
 needed for that value before it returns.
 
 A grouped read pins one read-only snapshot:
@@ -159,7 +159,7 @@ The first API has four common descriptor shapes:
 Async descriptors return `CogPhase<T>`. Manual sources use the same
 read-only and writable split.
 
-Descriptor object identity names a node within the process. An optional
+Descriptor object identity names a state within the process. An optional
 `name` gives it a human label. In debug builds, an unnamed descriptor
 falls back to its declaration source location. This adds no release hot-path
 reflection. Descriptor classes are final and compare by reference, never by
@@ -186,14 +186,14 @@ After sign-in, they do.
 
 ### 2.5 Equality stops needless work
 
-Every node has an equality rule. The default is Kotlin `==`. A derived
-node uses an explicit Compose structural equality policy.
+Every state has an equality rule. The default is Kotlin `==`. A derived
+state uses an explicit Compose structural equality policy.
 
 If a new value equals the old value:
 
-- downstream Cog nodes stay clean;
+- downstream Cog states stay clean;
 - reactions do not run;
-- Compose readers do not recompose for that node.
+- Compose readers do not recompose for that state.
 
 Custom equality is allowed for a real domain reason. “Always changed” is
 allowed for event-like adapters, not normal state.
@@ -334,7 +334,7 @@ dependency-injection root.
 
 This read does two jobs:
 
-- it reads the node's Compose `State`, so Compose tracks the exact scope;
+- it reads the state's Compose `State`, so Compose tracks the exact scope;
 - it owns a remembered lease until that call leaves composition.
 
 The operator is `@Composable`. An event callback cannot call it by
@@ -353,10 +353,10 @@ to hide every parameter behind a global store.
 
 ### 4.1 The snapshot runtime is the data engine
 
-Candidate node storage:
+Candidate state storage:
 
-- source node: private `MutableState<T>`;
-- derived node: `State<T>` from
+- source state: private `MutableState<T>`;
+- derived state: `State<T>` from
   `derivedStateOf(structuralEqualityPolicy())`;
 - reaction observation: `SnapshotStateObserver`;
 - turn: one isolated mutable snapshot applied on the store lane.
@@ -364,7 +364,7 @@ Candidate node storage:
 Observer callbacks only mark reactions dirty. The store coalesces those marks
 and flushes reactions once for the turn.
 
-Cog keeps its own small node table for names, keys, leases, async state,
+Cog keeps its own small state table for names, keys, leases, async state,
 dependency summaries, and debug data. It does not reach into private Compose
 runtime types.
 
@@ -384,11 +384,11 @@ The runtime must enforce:
 - a composition body cannot commit;
 - a reaction cannot alter the turn it is observing;
 - a cycle fails with the full descriptor-and-key path;
-- an exception never leaves a node marked as computing;
+- an exception never leaves a state marked as computing;
 - a stale async result cannot publish;
 - a wrong-lane call fails.
 
-Code should never depend on the order in which sibling derived nodes settle.
+Code should never depend on the order in which sibling derived states settle.
 
 ### 4.3 Collections
 
@@ -409,7 +409,7 @@ These things own root leases:
 - an explicit host lease.
 
 A root keeps its needed derived path alive. When the last root goes away, the
-store can release keyed nodes, stop async work, and drop cached edges after a
+store can release keyed states, stop async work, and drop cached edges after a
 short grace period.
 
 `CogStore` is also `AutoCloseable` for tests and controlled
@@ -421,11 +421,11 @@ flowchart TD
     UI["Compose read"] --> L["root lease"]
     RX["reaction"] --> L
     F["Flow collector"] --> L
-    L --> D["derived node"]
+    L --> D["derived state"]
     D --> S1["source"]
     D --> S2["keyed source"]
     L -. last lease closes .-> G["grace period"]
-    G --> X["cancel work<br/>drop edges and keyed nodes"]
+    G --> X["cancel work<br/>drop edges and keyed states"]
 ```
 
 Source defaults remain available. Derived values use
@@ -498,11 +498,11 @@ that ignored cancellation.
 
 ### 5.3 Freshness and lifetime
 
-The async node owns its child `Job`. Its root leases decide when work is
-needed. Losing the final lease starts the same grace period as sync nodes, then
+The async state owns its child `Job`. Its root leases decide when work is
+needed. Losing the final lease starts the same grace period as sync states, then
 cancels work.
 
-Async nodes use child jobs of the app store scope. UI leases decide when
+Async states use child jobs of the app store scope. UI leases decide when
 screen-driven work stays active. Durable work uses WorkManager and durable
 storage. It is not an extra-long coroutine. See
 [§6.7](effects.md#67-work-that-outlives-the-screen-or-process).
@@ -526,7 +526,7 @@ The UI bridge must:
 
 - provide the app singleton through a static composition local above
   navigation;
-- read the exact node `State` at the call site;
+- read the exact state `State` at the call site;
 - remember one lease by store, descriptor, and key;
 - close the lease in `DisposableEffect`;
 - keep the last completed value during normal recomposition;
@@ -598,7 +598,7 @@ collection. Measure the gain and offer a compatible fallback.
 - an escaped writer fails in every build, not only in debug;
 - derived dependencies are dynamic;
 - equality gates publication;
-- UI reads a node directly as Compose `State`;
+- UI reads a state directly as Compose `State`;
 - boxes use direct descriptor-and-key reads on the hot path;
 - UI, reaction, and Flow use leases;
 - async state uses `CogPhase` and generation guards;
@@ -612,7 +612,7 @@ collection. Measure the gain and offer a compatible fallback.
 - whether `SnapshotStateObserver` is the final reaction bridge;
 - the exact grace period and keyed-cache limits;
 - whether primitive-specialized cogs pay for their API weight;
-- descriptor, key, node-table, and edge layouts;
+- descriptor, key, state-table, and edge layouts;
 - whether `at(key)` handles are interned, inline, or short-lived;
 - whether an optional property-delegate form is worth its access cost just to
   infer debug labels;
@@ -632,7 +632,7 @@ Build a small vertical slice before freezing names.
 3. Add direct Compose reads and count recompositions.
 4. Add dynamic dependencies, equality, cycles, and exceptions.
 5. Add reactions and queued write-back.
-6. Add leases and show keyed nodes and jobs are released.
+6. Add leases and show keyed states and jobs are released.
 7. Add latest async work with a cancellation-ignoring fake.
 8. Run the benchmark matrix in [§9](perf.md#9-spike-and-benchmark-plan).
 9. Compare the snapshot-backed graph with the small custom-graph fallback.
@@ -693,7 +693,7 @@ These projects guide the design. None is an API contract for Cog.
 ## Appendix C: terms
 
 - **descriptor:** a stable Kotlin object that names a value;
-- **node:** one descriptor, or descriptor-and-key, inside the app store or an
+- **state:** one descriptor, or descriptor-and-key, inside the app store or an
   isolated test store;
 - **process singleton:** the one production store inside one Android process;
   it is not durable or shared with another process;

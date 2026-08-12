@@ -75,7 +75,7 @@ let locationFix = AsyncCog<CLLocation>(.latest) { c in
 
 Cog commits each sequence element as its own turn. If `accuracy` changes, Cog
 cancels the old sequence and starts the new one — `flatMapLatest` at a graph
-node. A stream may use only `.latest`; other policies have no safe v1 meaning
+state. A stream may use only `.latest`; other policies have no safe v1 meaning
 for work that may never end.
 
 #### Operator dictionary
@@ -87,7 +87,7 @@ for work that may never end.
 | `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.                                                                          |
 | `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                                                                                         |
 | `exhaustMap`           | `.exhaustLatest` for state; true exhaust on imperative ops.                                                                                         |
-| `distinctUntilChanged` | Equality checks built into every node (§2.4).                                                                                                       |
+| `distinctUntilChanged` | Equality checks built into every state (§2.4).                                                                                                      |
 | `scan`                 | `c.curr`, which exposes the cog's prior value.                                                                                                      |
 | `debounce`, `throttle` | Timing options at the edge: a reaction modifier or async-cog option, not graph basics. Not yet designed or scheduled; deferred backlog in core §10. |
 

@@ -56,7 +56,7 @@ val messages = AsyncCogBox<List<Message>, ThreadId> { threadId ->
 }
 ```
 
-The first release collects only the latest selected Flow for an async node.
+The first release collects only the latest selected Flow for an async state.
 Each emission is one Cog turn.
 
 #### 4. Exporting a Cog
@@ -108,12 +108,12 @@ read-only state calculation, not an event recorder.
 | -------------------------- | ----------------------------------------------- |
 | `map`                      | derived cog                                     |
 | `combine`                  | one derived body with several `get` calls       |
-| `distinctUntilChanged`     | node equality policy                            |
+| `distinctUntilChanged`     | state equality policy                           |
 | `flatMapLatest` over state | dynamic dependency                              |
 | `flatMapLatest` over work  | `AsyncPolicy.Latest`                            |
 | `flatMapMerge`             | `AsyncPolicy.Merge(limit)`                      |
 | `onEach` for an effect     | `CogEffects.watch`                              |
-| `stateIn`                  | often a Cog node in the app store               |
+| `stateIn`                  | often a Cog state in the app store              |
 | `shareIn`                  | repository-owned shared Flow; adapt at the edge |
 | `debounce`                 | async start policy or explicit effect helper    |
 | `retry`                    | repository or async work policy                 |

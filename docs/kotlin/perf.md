@@ -12,9 +12,9 @@ fragment authoritative state.
 
 Optimize in this order:
 
-1. do not recompute a node that cannot change;
+1. do not recompute a state that cannot change;
 2. do not recompose UI that did not read a changed value;
-3. do not keep dead keyed nodes or jobs;
+3. do not keep dead keyed states or jobs;
 4. avoid allocation in a steady turn;
 5. improve tables and edge layout;
 6. specialize primitive storage only if measurements justify the API weight.
@@ -56,7 +56,7 @@ The snapshot-backed prototype must use:
 - direct `State.value` reads in the smallest useful Compose scope;
 - explicit structural equality for every derived state;
 - one mutable snapshot per outer commit;
-- one observer per store or effect group, not per node;
+- one observer per store or effect group, not per state;
 - stable descriptor objects;
 - descriptor-and-key reads without a temporary handle.
 
@@ -65,7 +65,7 @@ The snapshot-backed prototype must use:
 ### 3.1 Dynamic edges
 
 Capture only dependencies read on the current run. Remove old edges. When a
-branch changes, stale sources must stop dirtying the node.
+branch changes, stale sources must stop dirtying the state.
 
 Measure both branch switching and steady branches. A design that rebuilds a
 large edge set every read may lose even when it saves later work.
@@ -88,7 +88,7 @@ referential equality just to hide in-place mutation.
 
 ### 3.3 Lazy and hot work
 
-Cold derived nodes compute on read. Hot roots settle after a commit so
+Cold derived states compute on read. Hot roots settle after a commit so
 reactions and UI have ready, equality-gated values.
 
 The prototype must compare:
@@ -114,13 +114,13 @@ shows composition is the cost.
 
 First candidate:
 
-| Node data      | Candidate                      |
+| State data     | Candidate                      |
 | -------------- | ------------------------------ |
 | source value   | private `MutableState<T>`      |
 | derived value  | `derivedStateOf(policy)`       |
 | reaction reads | shared `SnapshotStateObserver` |
 | Cog metadata   | store-owned flat table         |
-| UI boundary    | the same node `State<T>`       |
+| UI boundary    | the same state `State<T>`      |
 
 This gives one value cell rather than a Cog value plus a copied UI value.
 
@@ -133,13 +133,13 @@ Second candidate, only if needed:
 The second shape controls graph layout but duplicates more logic. Correctness
 tests must be identical for both.
 
-### 4.2 Node and key tables
+### 4.2 State and key tables
 
 Candidates for descriptor and box lookup:
 
 - Kotlin `HashMap`;
 - AndroidX `MutableScatterMap`;
-- an integer node id stored on an installed descriptor;
+- an integer state id stored on an installed descriptor;
 - a two-level table: descriptor id, then box key.
 
 AndroidX scatter maps use flat arrays and avoid a separate entry object for
@@ -147,7 +147,7 @@ each insertion. That is promising, not settled. Library availability, code
 size, key quality, and small-map speed also matter.
 
 Production has one store, but tests and previews still create isolated stores.
-Never put a store-specific node id directly on a shared descriptor unless that
+Never put a store-specific state id directly on a shared descriptor unless that
 mapping supports those isolated stores safely.
 
 ### 4.3 Edges
@@ -157,13 +157,13 @@ Compose owns correctness edges.
 
 Candidates:
 
-- a small mutable set per node;
+- a small mutable set per state;
 - packed integer arrays with tombstones;
 - a shared edge arena;
 - store only live-root paths and rebuild on derived runs.
 
 Measure dynamic churn, not only a fixed diamond. Any arena must reclaim edges
-when keyed nodes die.
+when keyed states die.
 
 ### 4.4 Primitive values
 
@@ -183,12 +183,12 @@ The primary path is:
 cogs[weather, zip]
 ```
 
-It should not allocate a `Pair` or temporary ref. Compare that with:
+It should not allocate a `Pair` or temporary value reference. Compare that with:
 
 - `cogs[weather.at(zip)]`;
 - an interned key handle;
 - an `@JvmInline` handle;
-- a cached node token remembered by Compose.
+- a cached state token remembered by Compose.
 
 An inline class does not promise zero boxing in every generic or interface
 call. Inspect bytecode and allocations.
@@ -219,11 +219,11 @@ The prototype must count:
 
 - recompositions;
 - skipped recompositions;
-- node `State` reads;
+- state `State` reads;
 - leases created and released;
 - allocations on first composition and steady recomposition;
 - time to enter and leave a large lazy list;
-- retained keyed nodes after list items leave.
+- retained keyed states after list items leave.
 
 Use stable lazy-list item keys. A box key should normally match the item's
 domain id.
@@ -242,8 +242,8 @@ Measure:
 - work that ignores cancellation;
 - streams with fast equal and unequal emissions;
 - grace-period cancel and restart;
-- 1,000 keyed async nodes entering and leaving observation;
-- process of clearing completed node cache entries.
+- 1,000 keyed async states entering and leaving observation;
+- process of clearing completed state cache entries.
 
 Every async launch allocates a Job. The goal is not “no allocation” there. The
 goal is no needless launch, collector, or retained job.
@@ -270,11 +270,11 @@ Key metrics:
 - nanoseconds per turn at several graph sizes;
 - allocations per steady turn;
 - derived compute count;
-- dirty nodes visited;
+- dirty states visited;
 - UI recomposition and skip count;
 - frame timing and jank;
-- memory after 1,000 and 10,000 keyed nodes;
-- node and edge count after leases close;
+- memory after 1,000 and 10,000 keyed states;
+- state and edge count after leases close;
 - cold start and first-read cost;
 - APK or AAR size change.
 
@@ -310,7 +310,7 @@ Assert values and exact compute counts.
 Port useful shapes from
 [js-reactivity-benchmark](https://github.com/milomg/js-reactivity-benchmark):
 
-- 10, 100, 1,000, and 10,000 node chains;
+- 10, 100, 1,000, and 10,000 state chains;
 - diamond and layered diamonds;
 - one source with many readers;
 - many sources with one sum;
@@ -350,9 +350,9 @@ The first prototype passes only if:
 - direct UI reads recompose no wider than raw Compose state;
 - a steady one-source turn does not allocate after warm-up, or the remaining
   allocation is understood and accepted;
-- keyed nodes and jobs return near baseline after lease expiry;
+- keyed states and jobs return near baseline after lease expiry;
 - no compared common graph shape has an unexplained order-of-magnitude loss;
-- tracing can name the nodes and turn behind a slow update.
+- tracing can name the states and turn behind a slow update.
 
 These are design gates. Exact numeric budgets should be set on the reference
 devices after the first run.

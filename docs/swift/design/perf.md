@@ -3,7 +3,7 @@
 _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. It does not settle ref, edge, hash-table, or
+an implementation plan. It does not settle value-reference, edge, hash-table, or
 exclusivity layouts; benchmarks must choose those details.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
@@ -40,28 +40,28 @@ Fast reactive systems now use the same broad algorithm:
 - Versions make “nothing changed” checks fast.
 
 Cog combines a small state flag with versions: CLEAN, CHECK, and DIRTY decide
-which nodes to visit; `changedAt` says whether a parent's value changed since
+which states to visit; `changedAt` says whether a parent's value changed since
 the last check; a global revision answers “has anything changed since turn N?”
 for exports and debug tools.
 
-Native runtimes add three warnings: common static node kinds may need special
-fast paths; public refs must name data, not expose arena slots; and
+Native runtimes add three warnings: common static state kinds may need special
+fast paths; public value references must name data, not expose arena slots; and
 multi-writer snapshots are wasted work in a single-threaded graph. Appendix B
 keeps the detailed prior-art notes and measurements.
 
 ## 3. `Cogtext` as a table of graph data
 
 An entity-component-system (ECS) stores each kind of data in a separate
-column. Cog uses the same pattern: nodes are rows, while flags, versions, and
+column. Cog uses the same pattern: states are rows, while flags, versions, and
 edges live in parallel arrays — a structure of arrays, or SoA.
 
-### 3.1 Node storage
+### 3.1 State storage
 
-Each live node gets a dense `Int32` slot and a generation number. The context
+Each live state gets a dense `Int32` slot and a generation number. The context
 owns parallel columns:
 
 ```swift
-var flags:      ContiguousArray<NodeFlags>
+var flags:      ContiguousArray<StateFlags>
 var changedAt:  ContiguousArray<UInt32>
 var checkedAt:  ContiguousArray<UInt32>
 var deps:       ContiguousArray<EdgeIndex>
@@ -71,7 +71,7 @@ var generation: ContiguousArray<UInt16>
 ```
 
 The push phase mostly reads `flags` and `subs`; separate columns keep those
-bytes close in memory instead of loading whole node objects. The generation
+bytes close in memory instead of loading whole state objects. The generation
 number detects stale internal slot use after reuse.
 
 ### 3.2 Typed value columns
@@ -93,7 +93,7 @@ per read. A descriptor reaches its known column type through a checked setup
 path and an internal downcast. A keyed box also stores typed keys in its
 column, so selectors do not reopen erased keys during normal computation.
 
-Manual, derived, and async nodes share topology; their descriptors differ in
+Manual, derived, and async states share topology; their descriptors differ in
 how they produce a row. One keyed box stores one compute closure, not one
 closure per key.
 
@@ -119,7 +119,7 @@ dependencies in the same order — zero steady-state allocation and hashing.
 This is only a candidate. Benchmarks must compare:
 
 - the shared linked edge pool;
-- per-node arrays with prefix reuse, as in Reactively;
+- per-state arrays with prefix reuse, as in Reactively;
 - small inline dependency storage with overflow, based on Incremental's
   common-case layout.
 
@@ -128,7 +128,7 @@ when dependencies change often. Cog must measure both.
 
 ### 3.4 Propagation
 
-The push phase walks subscriber edges and changes node flags, stopping when a
+The push phase walks subscriber edges and changes state flags, stopping when a
 branch is already marked. Reactions go into a reused flat queue.
 
 The pull phase walks dependencies and exits early when versions prove that no
@@ -136,20 +136,20 @@ parent changed. If a selector runs, Cog compares its new value with the old
 one; an equal result keeps the old `changedAt`, so children do not recheck.
 
 Use a reused explicit stack instead of recursion; deep chains are a benchmark
-case. The same stack supplies cycle diagnostics: mark a node as computing on
+case. The same stack supplies cycle diagnostics: mark a state as computing on
 entry, clear it on every exit path, and fail when a read reaches a computing
-node. Format names and keys only on this rare error path.
+state. Format names and keys only on this rare error path.
 
-## 4. Ref layout and hashing stay benchmark-gated
+## 4. Value-reference layout and hashing stay benchmark-gated
 
-A public ref names a descriptor and key. It never stores a node slot. Its
+A public value reference names a descriptor and key. It never stores a state slot. Its
 exact memory layout is open.
 
 The correctness build uses inline `AnyHashable?`. This is several machine
-words on current 64-bit Swift, so it is not a two-word ref. Keep the public
+words on current 64-bit Swift, so it is not a two-word value reference. Keep the public
 struct resilient and do not mark it `@frozen`.
 
-Even this simple ref can avoid most hashing:
+Even this simple value reference can avoid most hashing:
 
 - During recomputation, first compare the next existing edge. If descriptor
   and key match the next read, follow its `Int32` slot directly.
@@ -164,7 +164,7 @@ The benchmark compares the whole cost of three designs:
    and existential on cursor mismatches.
 2. **Interned key token:** a two-word descriptor and token, but first use
    needs allocation, interning, and a token-retention rule.
-3. **Generic keyed ref:** fully specialized key storage, but adds the key type
+3. **Generic keyed value reference:** fully specialized key storage, but adds the key type
    to the public read surface.
 
 Keyed diamonds and key churn must decide. Hash caching, token interning, and a
@@ -187,7 +187,7 @@ Keep these rules until a benchmark disproves them:
   once. Use `@exclusivity(unchecked)` only if release profiles show a real
   cost.
 - **Respect package boundaries.** Measured accessors may need narrow
-  `@inlinable` and `@usableFromInline` paths. Do not freeze ref layout just to
+  `@inlinable` and `@usableFromInline` paths. Do not freeze value-reference layout just to
   gain early specialization.
 - **Use new fixed storage where it helps.** `InlineArray` may hold small
   dependency caches or the first stack entries. `Span` can expose borrowed
@@ -199,26 +199,26 @@ ordinary collections.
 
 ## 6. Create Observation boundaries only when needed
 
-Interior nodes never need `ObservationRegistrar`, which adds locking and
+Interior states never need `ObservationRegistrar`, which adds locking and
 key-path lookup even with no watching view. Create one boundary object only on
 the first UI read of a descriptor and key; the `boundary` column uses `-1`
-until then. A graph with 1,000 nodes but 12 UI-read values owns 12 registrars.
+until then. A graph with 1,000 states but 12 UI-read values owns 12 registrars.
 
 The boundary object can expose one fixed phantom key path. After the graph
 settles a turn, call `withMutation` only if that boundary value changed.
-SwiftUI does not report exact subscription removal, so the boundary and node
+SwiftUI does not report exact subscription removal, so the boundary and state
 stay pinned to the app context in v1. An optional view lease may come later if
-measurement shows that old keyed nodes or notices are costly.
+measurement shows that old keyed states or notices are costly.
 
-## 7. Arena lifetime must not leak into refs
+## 7. Arena lifetime must not leak into value references
 
 leptos once exposed copyable arena-slot handles. Data could outlive the scope
 that owned its slot, causing leaks and stale handles. Cog avoids that design:
 
-- A ref is a stable name: descriptor plus key. If a derived node is released,
-  the same ref can later create a fresh slot.
-- ARC owns descriptors. The app context arena owns node rows.
-- Manual and UI-boundary nodes live for the app context by default.
+- A value reference is a stable name: descriptor plus key. If a derived state is released,
+  the same value reference can later create a fresh slot.
+- ARC owns descriptors. The app context arena owns state rows.
+- Manual and UI-boundary states live for the app context by default.
 - Only `.whileObserved` rows use graph subscriber and explicit lease counts.
   `.cache` rows use cache limits and retention time.
 
@@ -254,26 +254,26 @@ history. Release builds should pay no debug-history cost.
 
 This plan amends §11 of the core document:
 
-1. **Build the simple version first.** Use class nodes, edge arrays, and
-   inline `AnyHashable` refs. Its test suite must cover escaped writers, self
-   and multi-node cycles, dynamic cycles, equality-gated UI values, reaction
+1. **Build the simple version first.** Use class states, edge arrays, and
+   inline `AnyHashable` value references. Its test suite must cover escaped writers, self
+   and multi-state cycles, dynamic cycles, equality-gated UI values, reaction
    write-back, manual lifetime, async generation safety, slow exports, guarded
    production-context installation, and scene recreation.
 2. **Port `js-reactivity-benchmark`.** Include Kairo diamond, deep, broad, and
    unstable cases; dynamicBench sweeps; the Cellx lattice; keyed diamonds; and
    key churn. Keep the expected-run-count checks, since timing alone can hide
-   duplicate work. Compare all three ref layouts.
+   duplicate work. Compare all three value-reference layouts.
 3. **Build the data-oriented core behind the same tests.** Compare it with the
    simple build, swift-state-graph, and raw `@Observable`.
 4. **Measure more than time.** Track steady-turn allocations (target zero),
-   `box[key]` ref-creation allocations (target zero), retain and release
-   traffic in propagation (target zero), peak memory for 1,000-node graphs,
-   registrar counts, and notices for pinned keyed nodes.
+   `box[key]` value-reference creation allocations (target zero), retain and release
+   traffic in propagation (target zero), peak memory for 1,000-state graphs,
+   registrar counts, and notices for pinned keyed states.
 5. **Tune only from evidence.** Compare edge layouts, then consider unchecked
    exclusivity or custom hash tables only when a profile points there.
 
 Prepare measured accessors so they can become inlinable without exposing all
-storage. Do not mark refs `@frozen` before the layout result. Reserve reusable
+storage. Do not mark value references `@frozen` before the layout result. Reserve reusable
 buffer capacity from known descriptor counts to keep growth noise out of
 benchmarks.
 
@@ -281,18 +281,18 @@ benchmarks.
 
 - **No MVCC or snapshot record lists.** They solve multi-writer isolation,
   which a MainActor graph does not have.
-- **No height-based eager recompute queue.** Lazy pull does not need node
+- **No height-based eager recompute queue.** Lazy pull does not need state
   heights. Revisit only if an eager batch mode becomes a requirement.
 - **No locks or atomics in the graph.** Async generation checks live at the
   concurrency boundary, not in graph storage.
-- **No unmeasured representation choice.** Ref layout, edge layout, hash
+- **No unmeasured representation choice.** Value-reference layout, edge layout, hash
   tables, and exclusivity attributes wait for benchmarks.
 
 ## Appendix A: costs in current Swift designs
 
 Source inspection found these costs:
 
-- **swift-state-graph:** each node is a generic class with an
+- **swift-state-graph:** each state is a generic class with an
   `NSRecursiveLock`. Each edge is a separate class with two weak references
   and its own unfair lock. Tracked reads use
   `Thread.current.threadDictionary`. Propagation therefore walks objects,
@@ -302,7 +302,7 @@ Source inspection found these costs:
   reads hash `AnyKeyPath` values. swift-sharing has reduced `withMutation`
   calls to lower this contention.
 
-Cog's single-executor arena can remove those costs from interior nodes: no
+Cog's single-executor arena can remove those costs from interior states: no
 locks, weak edges, per-edge allocation, key-path identity, or thread
 dictionary. This remains a hypothesis to measure, not a benchmark result.
 
@@ -316,14 +316,14 @@ effect queue, and split pending from current values. Vue 3.6 reported about
 pull-heavy cases after adopting this core. Reactively's array prefix matching
 can win when dependencies change often.
 
-**Jane Street Incremental:** stores compact mutable node records, inlines the
+**Jane Street Incremental:** stores compact mutable state records, inlines the
 first parent, and uses overflow storage for more. Its retrospective argues for
-special static node kinds and concrete layouts instead of records of closures;
-it reported about 30 ns to fire one node and a 3× real-app gain from concrete
+special static state kinds and concrete layouts instead of records of closures;
+it reported about 30 ns to fire one state and a 3× real-app gain from concrete
 layouts.
 
 **leptos:** moved its primitive away from arena-owned copyable handles after
-scope lifetime and data lifetime diverged. Cog keeps refs as names so slots
+scope lifetime and data lifetime diverged. Cog keeps value references as names so slots
 may come and go safely.
 
 **salsa:** uses revision counters, `changed_at` and `verified_at`, and

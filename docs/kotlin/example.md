@@ -135,7 +135,7 @@ val cityLabel = CogBox<String, CityId> { cityId ->
 ```
 
 `selectedTitle` is one derived value. `cityLabel` is one derived
-descriptor with a separate node for each city key.
+descriptor with a separate state for each city key.
 
 The forecast is async and keyed:
 
@@ -396,7 +396,7 @@ private fun WeatherScreen(
 }
 ```
 
-Each city row reads its own two box nodes:
+Each city row reads its own two box states:
 
 ```kotlin
 @Composable
@@ -434,8 +434,8 @@ private fun CityPicker(
 }
 ```
 
-Changing London's favorite node updates London's row and the save effect. It
-does not update the New York or Tokyo box nodes.
+Changing London's favorite state updates London's row and the save effect. It
+does not update the New York or Tokyo box states.
 
 The units picker has no Cog knowledge:
 

@@ -103,7 +103,7 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   regular expression selects no test.
   _Depends: M0-01._
   _Verify: `mise run test`, `mise run test:release`,
-  `mise run test --filter M0Sentinel`, and
+  `mise run test --filter HarnessSentinelInfrastructure`, and
   `! mise run test --filter DOES-NOT-EXIST`._
 - **M0-04** _(Behavior)_ — Select test isolation and NNBD legs from
   `COG_TEST_ISOLATION` and `COG_TEST_NNBD`, mirror them into `.define()`s,
@@ -232,15 +232,15 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
 _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
-  `ObjectIdentifier` identity, human labels, and `ManualCog<T>` ref values.
+  `ObjectIdentifier` identity, human labels, and `ManualCog<T>` value references.
   _Depends: M0-10._
-  _Verify: `mise run test --filter M1DescriptorInfrastructure`._
+  _Verify: `mise run test --filter DescriptorInfrastructure`._
 - **M1-34a** _(Decision)_ — Settle production-install and testing-factory
   helper spellings before either helper or its call sites exist; record the
   choice in §10 and the Swift README snapshot.
   _Depends: M0-10._
   _Verify: recorded decision, API sketch, and call-site vocabulary search._
-- **M1-01b** _(Behavior)_ — Add descriptor-plus-key node storage, the
+- **M1-01b** _(Behavior)_ — Add descriptor-plus-key state storage, the
   `CogTesting` isolated-context factory, and untracked manual reads.
   _Depends: M1-01a, M1-34a._
   _Verify: `mise run test --filter 'DECL-01|ONE-04'`._
@@ -254,7 +254,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-01b._
   _Verify: `mise run test --filter CogTestingAcknowledgementInfrastructure`._
 - **M1-02** _(Behavior)_ — Add `ManualCogBox`, constant and closure starting
-  values, allocation-free `box[key]` refs, and per-key state identity.
+  values, allocation-free `box[key]` value references, and per-key state identity.
   _Depends: M1-01b._
   _Verify: `mise run test --filter 'DECL-02|DECL-03|DECL-04'`._
   _Greens: DECL-02, DECL-03, DECL-04._
@@ -334,8 +334,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter 'GRAPH-09|GRAPH-10'`._
   _Greens: GRAPH-09, GRAPH-10._
 - **M1-09b** _(Behavior)_ — Remove dropped keyed dependencies and recapture
-  ref-through-ref indirection.
-  _Depends: M1-05b, M1-09a._
+  value-reference indirection.
+  _Depends: M1-04b, M1-05b, M1-09a._
   _Verify: `mise run test --filter 'GRAPH-11|GRAPH-12'`._
   _Greens: GRAPH-11, GRAPH-12._
 - **M1-09c** _(Behavior)_ — Add `c.read` peeks that skip edges but settle.
@@ -343,7 +343,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter READ-06`._
   _Greens: READ-06._
 - **M1-10** _(Behavior)_ — Add `c.curr`, including the no-previous first run.
-  _Depends: M1-05a._
+  _Depends: M1-06ab._
   _Verify: `mise run test --filter 'READ-04|READ-05'`._
   _Greens: READ-04, READ-05._
 - **M1-11** _(Behavior)_ — Stress the existing explicit stack with a chain
@@ -380,18 +380,24 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-15b** _(Infrastructure)_ — Add computing marks and full
   descriptor-and-key cycle paths over the explicit stack.
   _Depends: M1-09b, M1-15a._
-  _Verify: internal self, multi-node, and keyed cycle probes._
+  _Verify: internal self, multi-state, and keyed cycle probes._
 - **M1-15c** _(Behavior)_ — Add conditional/keyed cycle reporting and the
   narrow `CogTesting` diagnostic seam.
   _Depends: M1-15b._
   _Verify: `mise run test --filter 'CYCLE-03|CYCLE-04|CYCLE-05'`._
   _Greens: CYCLE-03, CYCLE-04, CYCLE-05._
-- **M1-15d** _(Behavior)_ — Prove self and multi-node cycle failure in debug
+- **M1-15d** _(Behavior)_ — Prove self and multi-state cycle failure in debug
   and release with exit tests.
   _Depends: M1-15c._
   _Verify: `mise run test --filter 'CYCLE-01|CYCLE-02'` and
   `mise run test:release --filter 'CYCLE-01|CYCLE-02'`._
   _Greens: CYCLE-01, CYCLE-02._
+- **M1-15ea** _(Behavior)_ — Reject a commit throughout derived computation,
+  including custom equality, before its body or attempted graph mutation.
+  _Depends: M1-07b, M1-15b._
+  _Verify: `mise run test --filter CYCLE-06` and
+  `mise run test:release --filter CYCLE-06`._
+  _Greens: CYCLE-06._
 - **M1-31b** _(Behavior)_ — Show explicit and `fileID:line` labels in both
   cycle diagnostics and debug history.
   _Depends: M1-15c, M1-31a._
@@ -418,6 +424,12 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-16c._
   _Verify: `mise run test --filter REACT-07`._
   _Greens: REACT-07._
+- **M1-16ea** _(Behavior)_ — Queue initial runs for reactions registered during
+  a flush without re-entry, after already-scheduled reactions and before queued
+  write-back turns.
+  _Depends: M1-16c._
+  _Verify: `mise run test --filter REACT-23`._
+  _Greens: REACT-23._
 - **M1-12b** _(Behavior)_ — Verify nested and sibling turns end to end through
   real reactions and history.
   _Depends: M1-16d, M1-31a._
@@ -443,11 +455,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-03, M1-16b._
   _Verify: `mise run test:compilefail`._
   _Greens: REACT-14._
-- **M1-19b** _(Behavior)_ — Do not wake a reaction when its derived dependency
-  recomputes equal.
+- **M1-19b** _(Behavior)_ — Do not wake reactions for equal manual writes or
+  equal derived recomputation.
   _Depends: M1-16c._
-  _Verify: `mise run test --filter REACT-21`._
-  _Greens: REACT-21._
+  _Verify: `mise run test --filter 'REACT-21|REACT-22'`._
+  _Greens: REACT-21, REACT-22._
 - **M1-20a** _(Behavior)_ — Queue one op called by a reaction as a new turn.
   _Depends: M1-16d._
   _Verify: `mise run test --filter REACT-15`._
@@ -462,7 +474,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-20b._
   _Verify: `mise run test --filter TURN-08`._
   _Greens: TURN-08._
-- **M1-21** _(Behavior)_ — Add the debug quiescence warning, causal chain,
+- **M1-21** _(Behavior)_ — Add the debug turn-chain warning, causal chain,
   deterministic diagnostic seam, and synchronous return to idle.
   _Depends: M1-20b, M1-31a._
   _Verify: `mise run test --filter REACT-17`._
@@ -479,7 +491,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-31d** _(Infrastructure)_ — Display bounded debug history through
   `os_log` without making display part of graph correctness.
   _Depends: M1-31c._
-  _Verify: focused debug smoke test plus `mise run fmt:check`._
+  _Verify: `mise run test --filter DebugHistoryDisplayInfrastructure` plus
+  `mise run fmt:check`._
 - **M1-23a** _(Decision)_ — Settle adding a token to an already-cancelled
   `EffectGroup`; update §10, snapshot, scenarios, and tasks, using the
   `M1-23d*` branch for any new behavior tasks.
@@ -496,8 +509,15 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-23b._
   _Verify: `mise run test --filter GROUP-04`._
   _Greens: GROUP-04._
-- **M1-24a** _(Behavior)_ — Add `group.task(name:)` and propagate explicit
-  group cancellation to the task.
+- **M1-23da** _(Behavior)_ — Cancel a reaction token synchronously when any
+  copy adds it to an already-cancelled group, without retaining the token or
+  reopening that group.
+  _Depends: M1-23b._
+  _Verify: `mise run test --filter GROUP-10`._
+  _Greens: GROUP-10._
+- **M1-24a** _(Behavior)_ — Add `group.task(name:)`, propagate explicit group
+  cancellation, and return an already-cancelled task when the group is
+  terminal.
   _Depends: M1-23b._
   _Verify: `mise run test --filter GROUP-02`._
   _Greens: GROUP-02._
@@ -516,36 +536,37 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-01cb, M1-23c, M1-24a._
   _Verify: `mise run test --filter GROUP-09`._
   _Greens: GROUP-09._
-- **M1-27a** _(Behavior)_ — Add manual `.app` default and derived `keepAlive`
-  sugar.
-  _Depends: M1-08a._
-  _Verify: `mise run test --filter 'LIFE-01|LIFE-06'`._
-  _Greens: LIFE-01, LIFE-06._
-- **M1-27b** _(Behavior)_ — Count a registered reaction as an external lease.
-  _Depends: M1-16b, M1-27a._
-  _Verify: `mise run test --filter LIFE-07`._
-  _Greens: LIFE-07._
-- **M1-28a** _(Behavior)_ — Release an unobserved derived cog after injected
+- **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
+  manual `.app` and synchronous-derived `.whileObserved` defaults, plus
+  derived `keepAlive` sugar for `.app`.
+  _Depends: M1-05b, M1-08a._
+  _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
+- **M1-27b** _(Infrastructure)_ — Track registered reactions as external
+  lifetime leases, including dependency retracking and cancellation.
+  _Depends: M1-16c, M1-18a, M1-27a._
+  _Verify: `mise run test --filter ReactionLeaseInfrastructure`._
+- **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
+  testing override, then release an unobserved derived cog after injected
   grace and recreate it correctly.
-  _Depends: M1-01ca, M1-27a._
+  _Depends: M1-01ca, M1-27b._
   _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._
   _Greens: LIFE-02, LIFE-03._
-- **M1-28b** _(Behavior)_ — Cancel pending release when a consumer returns
-  within grace.
+- **M1-28b** _(Behavior)_ — Cancel pending derived release and prove
+  `keepAlive` and reaction leases suppress release.
   _Depends: M1-28a._
-  _Verify: `mise run test --filter LIFE-04`._
-  _Greens: LIFE-04._
-- **M1-28c** _(Behavior)_ — Reset opted-in manual state to its initial value
-  after release.
-  _Depends: M1-02, M1-28a._
-  _Verify: `mise run test --filter LIFE-05`._
-  _Greens: LIFE-05._
+  _Verify: `mise run test --filter 'LIFE-04|LIFE-06|LIFE-07'`._
+  _Greens: LIFE-04, LIFE-06, LIFE-07._
+- **M1-28c** _(Behavior)_ — Preserve default manual state and reset opted-in
+  manual state to its initial value after release.
+  _Depends: M1-28a._
+  _Verify: `mise run test --filter 'LIFE-01|LIFE-05'`._
+  _Greens: LIFE-01, LIFE-05._
 - **M1-28d** _(Behavior)_ — Prove internal graph edges never act as leases.
-  _Depends: M1-09a, M1-28a._
+  _Depends: M1-28a._
   _Verify: `mise run test --filter LIFE-09`._
   _Greens: LIFE-09._
 - **M1-29a** _(Behavior)_ — Install one production context shared app-wide.
-  _Depends: M1-01b._
+  _Depends: M1-04ab._
   _Verify: `mise run test --filter ONE-01`._
   _Greens: ONE-01._
 - **M1-29b** _(Behavior)_ — Reject a second production install in debug and
@@ -596,8 +617,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-33c** _(Gate)_ — Run the complete host-runnable M1 suite in all four
   build-settings legs.
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
-  M1-14, M1-15d, M1-19a, M1-19b, M1-21, M1-22, M1-24b, M1-25,
-  M1-26, M1-27b, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
+  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-23da, M1-24b, M1-25,
+  M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
   M1-31b, M1-31d, M1-33b, M1-34b._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
   _Greens: LEG-01._
@@ -612,7 +633,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
 - **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare
-  `cogs.get(ref)`, `cogs[ref]`, and callable refs before boundary call sites
+  `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references before boundary call sites
   multiply.
   _Depends: M1-32._
   _Verify: checked-in prototype diff and decision rationale._
@@ -621,7 +642,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-17a._
   _Verify: API call-site search plus `mise run fmt:check`._
 - **M2-01** _(Infrastructure)_ — Add registrar-backed boundary objects,
-  one phantom key path, lazy per-node storage, and change-only mutation.
+  one phantom key path, lazy per-state storage, and change-only mutation.
   _Depends: M2-17b._
   _Verify: focused registrar infrastructure tests._
 - **M2-02aa** _(Behavior)_ — Add the `\.cogs` environment key and prove views
@@ -634,8 +655,8 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02aa._
   _Verify: `mise run test --filter 'UI-01|UI-02'`._
   _Greens: UI-01, UI-02._
-- **M2-02b** _(Behavior)_ — Prove only UI-read nodes receive boundary objects
-  and interior nodes never do.
+- **M2-02b** _(Behavior)_ — Prove only UI-read states receive boundary objects
+  and interior states never do.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-05`._
   _Greens: UI-05._
@@ -643,10 +664,11 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-03`._
   _Greens: UI-03._
-- **M2-04** _(Behavior)_ — Suppress UI notice when recomputation lands equal.
+- **M2-04** _(Behavior)_ — Suppress UI notices for equal manual writes and
+  equal derived recomputation.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter UI-04`._
-  _Greens: UI-04._
+  _Verify: `mise run test --filter 'UI-04|UI-15'`._
+  _Greens: UI-04, UI-15._
 - **M2-05** _(Behavior)_ — Add `binding(for:)` with named history commits and
   immediate read-back.
   _Depends: M2-02ab._
@@ -671,7 +693,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter 'REACT-19|HIST-06'`._
   _Greens: REACT-19, HIST-06._
-- **M2-10** _(Behavior)_ — Pin a node after its first UI read for the app
+- **M2-10** _(Behavior)_ — Pin a state after its first UI read for the app
   context's lifetime.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter LIFE-08`._
@@ -789,7 +811,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter ASYNC-12`._
   _Greens: ASYNC-12._
 - **M3-08a** _(Decision)_ — Settle one-shot reads and refreshes of never-read
-  async refs; update §10, snapshot, scenarios, and tasks before implementing
+  async value references; update §10, snapshot, scenarios, and tasks before implementing
   refresh, using the `M3-08c*` branch for any additional behavior tasks.
   _Depends: M3-02._
   _Verify: recorded decision, any `M3-08c*` terminal added to M3-11, and
@@ -885,7 +907,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 - **M5-01a** _(Infrastructure)_ — Scaffold `CogScenarios` graph builders,
-  in-selector counters, expected counts, and ref-layout parameterization.
+  in-selector counters, expected counts, and value-reference layout parameterization.
   Start after the approved tag exists; Pages and GitHub Release verification
   may finish in parallel because later commits cannot change that tag.
   _Depends: M4-05c._
@@ -941,7 +963,7 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-05bb._
   _Verify: one MainActor benchmark builds and runs in the pinned environment._
 - **M5-06** _(Behavior)_ — Add zero-allocation steady-turn and `box[key]`
-  ref-creation benchmarks.
+  value-reference creation benchmarks.
   _Depends: M5-05c, M5-02a, M5-04a._
   _Verify: benchmark filters for PERF-01 and PERF-06 report zero mallocs._
   _Greens: PERF-01, PERF-06._
@@ -954,7 +976,7 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-08a._
   _Verify: benchmark filter for PERF-02 plus recorded result._
   _Greens: PERF-02._
-- **M5-07b** _(Behavior)_ — Measure 1,000-node peak memory, record its initial
+- **M5-07b** _(Behavior)_ — Measure 1,000-state peak memory, record its initial
   threshold, and turn the check green.
   _Depends: M5-08a._
   _Verify: benchmark filter for PERF-03 plus `perf.md` threshold._
@@ -972,30 +994,30 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   `bench-build` CI job.
   _Depends: M5-07a, M5-07b, M5-07c, M5-07d._
   _Verify: local bench command and CI release build._
-- **M5-09a** _(Infrastructure)_ — Put ref layout behind a test/benchmark
-  candidate seam selected by `COG_TEST_REF_LAYOUT`; record inline
+- **M5-09a** _(Infrastructure)_ — Put value-reference layout behind a test/benchmark
+  candidate seam selected by `COG_TEST_VALUE_REFERENCE_LAYOUT`; record inline
   `AnyHashable` as the baseline candidate.
   _Depends: M5-04b, M5-08b._
-  _Verify: `COG_TEST_REF_LAYOUT=inline mise run test` and the keyed benchmark
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline mise run test` and the keyed benchmark
   slice run through the seam._
 - **M5-09b** _(Infrastructure)_ — Implement the interned-token candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_REF_LAYOUT=interned mise run test --filter COUNT-07`._
-- **M5-09c** _(Infrastructure)_ — Implement the generic-keyed-ref candidate.
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=interned mise run test --filter COUNT-07`._
+- **M5-09c** _(Infrastructure)_ — Implement the generic-keyed-value-reference candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_REF_LAYOUT=generic mise run test --filter COUNT-07`._
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=generic mise run test --filter COUNT-07`._
 - **M5-09d** _(Behavior)_ — Run every behavior scenario through M5 unchanged
-  under all three ref layouts; expose the loop as `mise run test:refs`.
+  under all three value-reference layouts; expose the loop as `mise run test:value-references`.
   _Depends: M5-02b, M5-03a, M5-03b, M5-09b, M5-09c._
-  _Verify: `mise run test:refs`._
+  _Verify: `mise run test:value-references`._
   _Greens: COUNT-09._
 - **M5-09e** _(Behavior)_ — Benchmark keyed diamonds and churn under every
-  ref layout, record results, and settle the layout in `perf.md` and §10.
+  value-reference layout, record results, and settle the layout in `perf.md` and §10.
   _Depends: M5-09d._
   _Verify: recorded comparison and selected-layout rationale._
   _Greens: PERF-08._
 - **M5-10** _(Gate)_ — Close M5 with scenario tests, benchmark build,
-  baselines, records, and the selected ref layout green.
+  baselines, records, and the selected value-reference layout green.
   _Depends: M4-05e, M5-09e._
   _Verify: `mise run test:matrix`, `mise run bench`, and baseline check._
 
@@ -1044,7 +1066,7 @@ ArenaDirtyPropagationInfrastructure`._
   paths.
   _Depends: M6-07ac._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter CYCLE`._
-- **M6-03** _(Infrastructure)_ — Implement Reactively-style per-node prefix
+- **M6-03** _(Infrastructure)_ — Implement Reactively-style per-state prefix
   arrays behind the runnable edge seam.
   _Depends: M6-07ac._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=prefix mise run test --filter
@@ -1097,8 +1119,9 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10ab._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'READ|GRAPH|DECL-0[7-9]'`._
-- **M6-10bb** _(Infrastructure)_ — Pass public self, multi-node, conditional,
-  and keyed cycle behavior through the arena selector.
+- **M6-10bb** _(Infrastructure)_ — Pass public self, multi-state, conditional,
+  keyed, and commit-during-derived-computation failure behavior through the
+  arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter CYCLE` and
   `COG_TEST_CORE=arena mise run test:release --filter CYCLE`._
@@ -1107,27 +1130,25 @@ ArenaDirtyPropagationInfrastructure`._
   and non-`Sendable` values, through the arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-(0[1-9]|1[0-4]|18|21)|ACTOR-0[13]'`._
+'REACT-(0[1-9]|1[0-4]|18|2[1-3])|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
-  and the quiescence diagnostic through the arena selector.
+  and the turn-chain diagnostic through the arena selector.
   _Depends: M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-15|REACT-16|REACT-17'`._
-- **M6-10d** _(Infrastructure)_ — Pass effect-group and task behavior through
-  the arena core selector.
+- **M6-10d** _(Infrastructure)_ — Pass terminal effect-group cancellation and
+  task behavior through the arena core selector.
   _Depends: M6-10cb._
   _Verify: `COG_TEST_CORE=arena mise run test --filter GROUP`._
-- **M6-10ea** _(Infrastructure)_ — Pass app lifetime, keep-alive, external
-  reaction leases, and UI pinning through arena lease counts.
+- **M6-10ea** _(Infrastructure)_ — Pass lifetime policies, external reaction
+  leases, and UI pinning through arena lease counts.
   _Depends: M6-08b, M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'LIFE-01|LIFE-06|LIFE-07|LIFE-08'`._
-- **M6-10eb** _(Infrastructure)_ — Pass grace cancellation, release,
-  recreation, manual reset, and non-leasing internal edges through arena slot
-  reuse.
+'ArenaLifetimePolicyInfrastructure|ArenaLeaseInfrastructure'`._
+- **M6-10eb** _(Infrastructure)_ — Pass the complete lifetime behavior suite
+  through arena grace, release, manual reset, and slot reuse.
   _Depends: M6-10ea._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'LIFE-02|LIFE-03|LIFE-04|LIFE-05|LIFE-09'`._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter LIFE`._
 - **M6-10fa** _(Infrastructure)_ — Pass the M1 debug-seed semantics through
   arena dirty propagation without turns, reactions, or history.
   _Depends: M6-09, M6-10cb._
@@ -1354,7 +1375,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-13b, M7-14b._
   _Verify: modern simulator and legacy host tests for EXPORT-13._
   _Greens: EXPORT-13._
-- **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected ref,
+- **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
   _Depends: M7-03b, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
   M7-12, M7-15._

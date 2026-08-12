@@ -61,10 +61,10 @@ The design lives in [design/](./design/); the implementation effort lives in
 
 ## Building and testing
 
-The library is not implemented — `swift/Sources/Cog` is an M0 stub with no Cog
-API — but the package and its commands are real. The repository is a SwiftPM
-package rooted at the git root, with every Swift target under `swift/`.
-Commands are mise tasks; `mise tasks` lists them all.
+The package and its M1 simple correctness core are being implemented now. The
+SwiftUI boundary and later async slices have not landed yet. The repository is
+a SwiftPM package rooted at the git root, with every Swift target under
+`swift/`. Commands are mise tasks; `mise tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
@@ -92,7 +92,85 @@ the tests needs a full Xcode; the Command Line Tools alone fail with
 `no such module 'Testing'`. The root [README.md](../../README.md) records the
 pinned version and the runner topology.
 
-## Where things stand (2026-08-10)
+## Production, tests, and previews
+
+Production depends on `Cog` only. Call `Cogtext.bootstrapApp()` exactly once,
+at app launch, and retain the context it returns as the app's ownership handle.
+Pass that same object into services, effects, and every scene. A rebuilt scene
+receives the existing context; it never bootstraps another one. Features cannot
+construct a `Cogtext` directly, and there is deliberately no ambient
+`Cogtext.app` lookup.
+
+```swift
+import Cog
+import SwiftUI
+
+@main
+@MainActor
+struct WeatherApp: App {
+  private let cogs: Cogtext
+
+  init() {
+    cogs = Cogtext.bootstrapApp()
+  }
+
+  var body: some Scene {
+    WindowGroup {
+      RootScene(cogs: cogs)
+    }
+  }
+}
+```
+
+`RootScene(cogs:)` represents the app's own explicit composition boundary, not
+a Cog API. M2 will add the SwiftUI environment boundary; until then, do not copy
+the planned `\.cogs` environment spelling into current code.
+
+An ordinary test or preview-support target depends on `CogTesting`. Create one
+fresh context for that test or preview runtime and pass it through the same
+composition boundaries as production. It starts isolated, never occupies the
+production-install slot, and needs no reset or uninstall. Multiple tests and
+previews may each create a context, but creating a second one partway through a
+single runtime would split the state under test.
+
+```swift
+import Cog
+import CogTesting
+import Testing
+
+@MainActor
+@Test func counterStartsClean() {
+  let count = ManualCog<Int>(0)
+  let cogs = Cogtext.forTesting()
+
+  #expect(cogs.read(count) == 0)
+  cogs.commit { writer in writer[count] = 1 }
+  #expect(cogs.read(count) == 1)
+}
+```
+
+Keep `CogTesting` in test or preview-support targets rather than the shipping
+app target. A timed test retains its own controllable `Clock<Duration>` and
+passes it as `Cogtext.forTesting(clock:)`; CogTesting does not ship a separate
+test-clock type. Untimed tests use the default continuous clock.
+
+Only a test whose subject is the production install uses the scoped fixture:
+
+```swift
+@MainActor
+@Test func appBootstrapIsTheSubject() {
+  Cogtext.withBootstrappedApp { cogs in
+    #expect(Cogtext.isBootstrappedApp(cogs))
+  }
+}
+```
+
+`withBootstrappedApp` calls the real guarded bootstrap and removes its temporary
+registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
+and non-nestable: do not put `await` in it, and do not use it as general test or
+preview setup.
+
+## Where things stand (2026-08-12)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -101,15 +179,18 @@ These choices are settled; §10 of the core document has the full record.
   state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
-  from reactions wait in a FIFO queue as new turns. A debug quiescence guard
+  from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
   reports long causal chains through an internal diagnostic seam.
+- A reaction registered during a flush never runs reentrantly. Its initial
+  tracking run joins that flush's reaction tail in registration order, after
+  already-scheduled reactions and before queued write-back turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
-- Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A ref
+- Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
   is a value; its identity lives in an internal final-class descriptor plus
-  key. Boxes create keyed refs without allocating new descriptors. The exact
-  in-memory ref layout is not settled; benchmarks will compare inline keys,
-  interned keys, and generic keyed refs.
+  key. Boxes create keyed value references without allocating new descriptors. The exact
+  in-memory value-reference layout is not settled; benchmarks will compare inline keys,
+  interned keys, and generic keyed value references.
 - Async selectors read dependencies synchronously, then return `Work.run` or
   `Work.stream`. The first read starts work and publicly begins at
   `pending(previous: .none)`; there is no observable `initial` phase. Values
@@ -119,15 +200,30 @@ These choices are settled; §10 of the core document has the full record.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and
-  `EffectGroup` handles own lifecycle and cancel safely more than once.
+  `EffectGroup` handles own lifecycle and cancel safely more than once. A
+  cancelled group is terminal; adding a reaction token afterward synchronously
+  cancels the token without retaining it, and a task requested afterward is
+  already cancelled when `task` returns. Neither operation reopens the group.
 - Production creates one app-wide `Cogtext` and injects it above all scenes.
   Screens and features share it. Tests and previews create one isolated
   context for their runtime.
-- Production construction is guarded. Feature code cannot create a second
-  context.
-- Manual state and nodes seen by the UI live for the app context by default.
-  Graph-only derived and async nodes may be released when unused. Query caches
-  have their own retention rules.
+- Production construction is guarded. `Cogtext.bootstrapApp()` creates the one
+  production context and fails fast on a second call; the plain initializer is
+  `package`, so feature code cannot name it. The `CogTesting` product adds
+  `Cogtext.forTesting()` for a test or preview runtime, which never registers
+  as the production context.
+- The context returned by `bootstrapApp()` is the app's ownership handle. The
+  app passes it to effects, services, and scenes; views receive it through the
+  planned M2 environment boundary, and ops are instance methods on it. Current
+  M1 composition passes the same object explicitly. There is no ambient
+  `Cogtext.app`. Tests of production installation use a synchronous scoped
+  fixture from `CogTesting`, so they cannot leak global install state across
+  the suite.
+- Manual state and states seen by the UI live for the app context by default.
+  Graph-only derived and async states may be released when unused. Query caches
+  have their own retention rules. A `whileObserved` declaration with no
+  explicit grace uses the context default: 30 seconds in production, with an
+  explicit `CogTesting` override for deterministic timed tests.
 - Untracked reads (`c.read` in a selector, one-shot `cogs.read` outside) skip
   the dependency edge but still settle the value they return; they are never
   stale. Exported streams (`cogs.values(of:)`) start from the current settled
@@ -143,7 +239,12 @@ These choices are settled; §10 of the core document has the full record.
   after effects install; the next real turn settles what the seed dirtied.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.
-- The runtime will use a data-oriented arena. Public refs remain names, never
+- Derived computation is read-only through selector execution, dependency
+  reconciliation, custom equality, and result publication. A commit attempted
+  in that region fails immediately in every build, names the cog/key and turn,
+  and tells the caller to invoke the op outside derived computation, from event
+  handling or a reaction.
+- The runtime will use a data-oriented arena. Public value references remain names, never
   arena slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
@@ -160,15 +261,13 @@ These choices are settled; §10 of the core document has the full record.
   normative rules are in impl/tasks.md.
 
 Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, app bootstrap helpers, debug-history tools, and
-persistence helpers. Also open are several edge behaviors: what a stream's
-phase does when its sequence ends or throws, whether equal stream elements
-commit distinct turns, whether a failed `.queue` run stops the queue, the
-failure mode for a selector that commits, adding to an already-cancelled
-`EffectGroup`, when a reaction registered during a flush first runs, what a
-one-shot read or refresh of a cold async cog does, and debounce/throttle timing
-modifiers (deferred backlog). Ref layout, edge layout, and hash tables also
-remain open until benchmarks choose them.
+deferred reactions, debug-history tools, and persistence helpers. Also open
+are several edge behaviors: what a stream's phase does when its sequence ends
+or throws, whether equal stream elements commit distinct turns, whether a
+failed `.queue` run stops the queue, what a one-shot read or refresh of a cold
+async cog does, and debounce/throttle timing modifiers
+(deferred backlog). Value-reference layout, edge layout, and hash tables also remain open
+until benchmarks choose them.
 
 ## Next steps
 
@@ -176,6 +275,6 @@ remain open until benchmarks choose them.
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. Build the
 simple correctness version first, then the SwiftUI boundary, then a first
-async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare ref layouts before
+async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare value-reference layouts before
 building the data-oriented core, and measure that core against the simple
 version, swift-state-graph, and raw `@Observable`.

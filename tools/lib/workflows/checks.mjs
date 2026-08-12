@@ -352,11 +352,11 @@ function shaPinnedActions(workflow) {
       return;
     }
 
-    const ref = reference.slice(at + 1);
-    if (FULL_SHA.test(ref)) return;
-    const detail = /^[0-9a-fA-F]{40}$/.test(ref)
+    const actionReference = reference.slice(at + 1);
+    if (FULL_SHA.test(actionReference)) return;
+    const detail = /^[0-9a-fA-F]{40}$/.test(actionReference)
       ? "a commit SHA must be lowercase"
-      : /^[0-9a-f]{7,39}$/.test(ref)
+      : /^[0-9a-f]{7,39}$/.test(actionReference)
         ? "a short SHA is not a pin; use all 40 characters"
         : "tags and branches are mutable; pin to a full-length commit SHA";
     diagnostics.push({

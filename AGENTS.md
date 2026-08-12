@@ -38,7 +38,11 @@ every scenario covered by exactly one task.
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
 - `swift/Tests/` — `CogTests` (correctness), `CogScenarioTests` (run counts),
-  and `CogBoundaryTests` (the Observation and SwiftUI boundary).
+  and `CogBoundaryTests` (the Observation and SwiftUI boundary). Inside
+  `CogTests`, public behavior proofs live under `Scenarios/<PREFIX>/` in
+  `...ScenarioTests.swift` files named for their raw IDs; internal proofs live
+  separately under `Infrastructure/<seam>/` in
+  `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `check-compile-fail.mjs`,
@@ -173,6 +177,34 @@ that runtime.
 
 ## Conventions
 
+- **Spell a fail-fast trap `fatalError`, never `preconditionFailure`.** The
+  standard library drops `preconditionFailure`'s message under `-O`: the
+  process still traps, but with no explanation, so a scenario promising "a
+  clear error … in release builds" would be unprovable. Measured — under
+  `-Onone` both print; under `-O` only `fatalError` does. An exit test for a
+  trap should assert on the child's `standardErrorContent`, not merely its
+  exit status, or it cannot tell a clear error from a bare trap.
+- **A scenario test never uses `@testable import Cog`.** Tests that own a
+  scenario ID prove it through the public API and `CogTesting` only.
+  COUNT-09 through COUNT-11 require the whole behavior suite to pass
+  unchanged across the value-reference layout and core swaps, so a scenario test able to
+  observe state storage would fail a swap it should not care about. Reach for
+  `@testable` only in infrastructure tests, which green no scenario.
+- **Give every generic class an explicit `nonisolated deinit`.** With
+  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` on a generic
+  class is main-actor-isolated, and Swift 6.3.0 and 6.3.3 both crash the
+  optimizer on it in release configuration. Debug builds are fine, so
+  `mise run test:matrix` will not catch it — only `mise run test:release`
+  will. This applies to states, boxes, descriptors, and async state alike.
+- **A `deinit` that must touch the graph is spelled `isolated deinit`, and
+  its class must not be generic.** A written `deinit` is nonisolated unless it
+  says otherwise, so it cannot call a MainActor-isolated method at all — the
+  compiler rejects it outright, which is the opposite failure from the
+  synthesized case above and is caught at build time rather than in release.
+  `ReactionToken` is the worked example: non-generic, so it can take the
+  isolation, and the isolation is what lets a handle released on the MainActor
+  clean up synchronously instead of hopping. Do not "fix" one of these two
+  spellings into the other; they solve opposite problems.
 - **Keep platform designs separate.** Shared principles apply to both
   libraries, but Swift decisions are normative only for Swift. Do not assume
   an API or implementation choice also applies to Android without recording an

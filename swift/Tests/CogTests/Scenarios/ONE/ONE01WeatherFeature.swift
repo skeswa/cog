@@ -1,0 +1,20 @@
+import Cog
+
+// The source and write op live in a different feature file from the reader,
+// matching an app's ownership boundary.
+@MainActor private let selectedZipSource = ManualCog<String?>(nil, name: "selectedZip")
+
+extension Cogtext {
+  /// The feature op: an ordinary context method beside the source it owns.
+  func selectZip(_ zip: String?) {
+    commit { w in
+      w[selectedZipSource] = zip
+    }
+  }
+
+  /// The feature's read path, which another feature can call with the context
+  /// it received at its composition boundary.
+  func selectedWeatherZip() -> String? {
+    read(selectedZipSource)
+  }
+}

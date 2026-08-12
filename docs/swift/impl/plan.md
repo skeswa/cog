@@ -57,12 +57,15 @@ scenario to exactly one task.
   approval for workflow runs from all external contributors, full-SHA
   action pins, and a read-only default `GITHUB_TOKEN` (applied 2026-08-10;
   `M0-14` records and verifies them); the runner topology is the
-  persistent-bare-metal branch `M0-05a` settled on 2026-08-10 — a dedicated
-  non-admin runner user, pinned Xcode 26.5, two repository-scoped runners
-  under the `cog-mini` label, and dootdoot-style scrub hygiene (workspace
-  scrub hooks, `persist-credentials: false`, timeouts) in place of VM
-  ephemerality, with Tart-based ephemeral VMs recorded as a deferred
-  upgrade because no macOS orchestrator shipped a release in 2026; and a
+  persistent-bare-metal branch `M0-05a` settled on 2026-08-10 — one
+  repository-scoped runner under the `cog-mini` label, pinned Xcode 26.6,
+  and dootdoot-style scrub hygiene (workspace scrub hooks,
+  `persist-credentials: false`, timeouts) in place of VM ephemerality, with
+  Tart-based ephemeral VMs recorded as a deferred upgrade because no macOS
+  orchestrator shipped a release in 2026. A dedicated non-admin runner user
+  remains the target state but was declined on 2026-08-11, because the
+  simulator lane needs an Aqua session and macOS allows one auto-login user;
+  the accepted risk is recorded in the README. A
   committed workflow-contract check (`M0-15`) enforces the guards,
   permissions blocks, credential hygiene, and pins so the hardening cannot
   silently regress. The full topology record, including its revisit
@@ -99,8 +102,8 @@ Execution constraints from the design docs:
 - `CogPhase` begins publicly at `pending` with explicit `Previous`; async
   selectors are synchronous and return `Work`; `.latest` is the default;
   streams are `.latest`-only.
-- Public refs stay resilient (no `@frozen`) and never expose arena slots.
-  Ref, edge, and hash layouts wait for benchmarks (perf §4, §9).
+- Public value references stay resilient (no `@frozen`) and never expose arena slots.
+  Value reference, edge, and hash layouts wait for benchmarks (perf §4, §9).
 - iOS 17 / Swift 6.2 floor; test with default MainActor isolation on and off
   and `NonisolatedNonsendingByDefault` on and off; no required macros.
 
@@ -290,13 +293,13 @@ carries the live state of doing it.
 
 ### M1: Simple correctness core (spike §11.1)
 
-The class-node build. Correctness first; no perf tricks.
+The class-state build. Correctness first; no perf tricks.
 
 - Names: internal final-class descriptors (`ObjectIdentifier` identity;
-  `name:` or `fileID:line` labels). Public ref values `Cog<T>` and
+  `name:` or `fileID:line` labels). Public value references `Cog<T>` and
   `ManualCog<T>`; boxes `CogBox` and `ManualCogBox`; inline `AnyHashable?`
   keys; allocation-free `box[key]`; the `.readOnly` projection.
-- Cogtext: nodes stored by descriptor plus key, created lazily; `get`,
+- Cogtext: states stored by descriptor plus key, created lazily; `get`,
   `read`, and `curr` on the tracking controller; a MainActor-confined
   tracking slot. Untracked reads still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
@@ -312,17 +315,21 @@ The class-node build. Correctness first; no perf tricks.
   the diagnostic; an internal seam so tests inspect without crashing (§2.4).
 - Reactions and effects: `cogs.run`; `cogs.watch(_:initial:name:)`;
   final-class `ReactionToken`; `EffectGroup` with `add` and `task(name:)`;
-  cancel is idempotent and runs on deinit; write-back queues new FIFO turns;
-  a debug quiescence guard (about 64 turns) prints the causal chain through an
+  cancel is idempotent, terminal, shared across copies, and runs on deinit; a
+  reaction token added after cancellation is cancelled synchronously without
+  retention, and a task requested afterward returns already cancelled;
+  write-back queues new FIFO turns;
+  a debug turn-chain guard (about 64 turns) prints the causes through an
   internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
-  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
-  graph edges never count as lifetime leases.
+  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. A
+  declaration without an explicit grace uses its context default: 30 seconds
+  in production and an explicit testing override when elapsed time is under
+  test. Internal graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  Settle the production-install and testing-factory helper spellings before
-  implementing either helper or multiplying call sites (`installApp()` and
-  `testing()` are placeholders); record the result in §10 and the README
-  snapshot. Add the `CogTesting` isolated-context factory for tests and
+  `M1-34a` settled the helper spellings on 2026-08-11: `Cogtext.bootstrapApp()`
+  from `Cog` and `Cogtext.forTesting()` from `CogTesting`, with a `package`
+  initializer so neither can be bypassed. Add the `CogTesting` isolated-context factory for tests and
   previews. Introduce its injected clock and cleanup-acknowledgement seams
   independently near the start of M1; `whileObserved` grace timing runs on the
   context's clock, so lifetime tests never wait wall-clock time. Verify that
@@ -332,20 +339,20 @@ The class-node build. Correctness first; no perf tricks.
   no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
   notices; `os_log` display for now; zero release-build cost.
-- Test seams and traps: the cycle diagnostic, quiescence warning,
+- Test seams and traps: the cycle diagnostic, turn-chain warning,
   no-consumer warning, and cross-executor cleanup acknowledgements are named
   diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
-  never peeks at node storage or graph representation. Trap guarantees (a
-  second production context, an escaped writer) are proven with Swift
-  Testing exit tests in the debug and release legs, so no trap check crashes
-  the suite process and no guard needs a test-only failure hook in the
-  library.
+  never peeks at state storage or graph representation. Trap guarantees (a
+  second production context, an escaped writer, a commit during derived
+  computation) are proven with Swift Testing exit tests in the debug and
+  release legs, so no trap check crashes the suite process and no guard needs
+  a test-only failure hook in the library.
 
 Tests use Swift Testing on the host in all four legs, under the scenarios.md
 testing constraints. Cover the union of §11.1
 and perf §9.1: diamonds; deep and broad graphs; changing and conditional
-dependencies; self and multi-node cycles; escaped writers; reaction write-back
-ordering; the finite quiescence-guard diagnostic; correct untracked reads;
+dependencies; self and multi-state cycles; escaped writers; reaction write-back
+ordering; the finite turn-chain diagnostic; correct untracked reads;
 MainActor execution and non-`Sendable` values; second-production-context
 rejection; scene recreation without manual-state loss; equality-gated
 notifications; manual lifetime; `whileObserved` release and recreate without
@@ -359,7 +366,7 @@ isolation; and named effect runs in history.
 ### M2: SwiftUI boundary and weather example (spike §11.2)
 
 - Registrar-backed boundary objects, created lazily on the first UI read: one
-  phantom key path, `withMutation` only when the value changes. UI-read nodes
+  phantom key path, `withMutation` only when the value changes. UI-read states
   stay pinned to the app context (§5.3, perf §6).
 - The `\.cogs` environment key; tracked `cogs.get` in `body`; `binding(for:)`
   pairs a tracked read with a named commit; untracked one-shot `cogs.read`.
@@ -374,7 +381,7 @@ isolation; and named effect runs in history.
   runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
-- Read spelling: try `cogs.get(ref)`, `cogs[ref]`, and callable refs in the
+- Read spelling: try `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references in the
   smallest tracked-view prototype before boundary call sites multiply; record
   the winner in §10 and the README snapshot, then use only that spelling in
   the Weather example.
@@ -408,10 +415,10 @@ Limit this milestone to the async pieces needed for 0.1.0:
   phase change is its own turn; replaced-cancelled work publishes no failure.
 - Safe release: cancel and advance the generation on `.whileObserved` expiry
   (§5.3).
-- A `cogs.refresh(ref)` op; task names from descriptor labels for
+- A `cogs.refresh(valueReference)` op; task names from descriptor labels for
   Instruments.
 - Settle the still-open behavior of a one-shot read or refresh of a never-read
-  async ref before implementing refresh, then add the resulting scenarios and
+  async value reference before implementing refresh, then add the resulting scenarios and
   tasks in the same change.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
@@ -436,7 +443,7 @@ query caching.
   consumes the repo URL.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin
   instructions, and DocC are in place. Benchmark numbers are not required.
-  The ref layout may change in 0.2 because 0.x minors may break.
+  The value-reference layout may change in 0.2 because 0.x minors may break.
 - Once the immutable `0.1.0` tag exists, M5 scenario scaffolding may start
   while Pages and GitHub Release verification finish; the M5 gate still waits
   for the published 0.1.0 GitHub Release. Later commits cannot change the tag,
@@ -449,7 +456,7 @@ query caching.
 - `CogScenarios`: each js-reactivity-benchmark case (Kairo diamond, deep,
   broad, unstable; dynamicBench sweeps; the Cellx lattice; keyed diamonds;
   key churn) is a struct that builds the graph, runs N turns, and records
-  actual versus expected recomputation counts, parameterized over the ref
+  actual versus expected recomputation counts, parameterized over the value reference
   layout under test.
 - `CogScenarioTests` asserts `actual == expected` as ordinary tests, so
   duplicate work fails CI regardless of timing noise.
@@ -462,9 +469,9 @@ query caching.
   probe proves one necessary. The package wraps the same scenarios in
   `Benchmark {}` closures. Metrics per perf §9.4: `.wallClock`;
   `.mallocCountTotal` with a
-  **threshold of zero** for steady turns and for `box[key]` ref creation;
-  `.peakMemoryResident` at 1,000 nodes; notice counts for pinned keyed
-  nodes; and verified ARC retain and release counters. Baselines use the CLI
+  **threshold of zero** for steady turns and for `box[key]` value-reference creation;
+  `.peakMemoryResident` at 1,000 states; notice counts for pinned keyed
+  states; and verified ARC retain and release counters. Baselines use the CLI
   spelling proven by the compatibility probe. Every baseline pins its
   environment: exact Xcode and Swift version, benchmark dependency version,
   architecture, allocator backend, and the runner environment — the pinned
@@ -478,13 +485,13 @@ query caching.
   those first results; no task closes while its assigned benchmark is red.
 - Add `mise run bench` and the `bench-build` CI job (release build, no
   gating yet).
-- Compare the three ref layouts (inline `AnyHashable`, interned tokens,
-  generic keyed refs) on keyed diamonds and key churn. Record results in
+- Compare the three value-reference layouts (inline `AnyHashable`, interned tokens,
+  generic keyed value references) on keyed diamonds and key churn. Record results in
   [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6. Every behavior scenario
-  implemented through M5 must pass under each ref layout selected by
-  `COG_TEST_REF_LAYOUT`; `mise run test:refs` loops the complete set.
+  implemented through M5 must pass under each value-reference layout selected by
+  `COG_TEST_VALUE_REFERENCE_LAYOUT`; `mise run test:value-references` loops the complete set.
 
 <a id="plan-m6"></a>
 
@@ -495,7 +502,7 @@ query caching.
   Put both representations behind the internal test-only `COG_TEST_CORE` and
   `COG_TEST_EDGE` selectors. Only after that vertical slice runs the M5
   scenarios, implement the remaining perf §3.3 candidates (Reactively-style
-  per-node prefix arrays and inline-plus-overflow), run the same correctness
+  per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
   perf.md; only then settle the layout.
@@ -559,7 +566,7 @@ release gates.
   value after each propagation boundary, allowed coalescing, property
   granularity, deterministic re-arm acknowledgement, and the documented
   pre-iOS-26 disarmed race. Never assert only that recomputation occurred.
-- Run the complete behavior suite on the selected ref layout and
+- Run the complete behavior suite on the selected value-reference layout and
   data-oriented core after the M7 features land.
 - Tag `0.3.0`. Query caching (`.cache`), persistence helpers, and the
   debug-history UI stay deferred backlog (§5.3, §10 items 5 and 7).
@@ -656,9 +663,9 @@ release gates.
 - M4 (`M4-05b` → `M4-05e`): approve a non-mutating candidate, push the tag,
   then prove a scratch iOS 17 app consumes exact 0.1.0 and the DocC site
   deploys before publishing the GitHub Release.
-- M5 (`M5-10`): run-count tests are green under every ref candidate selected
-  by `COG_TEST_REF_LAYOUT`; the `mallocCountTotal == 0` steady-turn threshold
-  holds; ref-layout numbers are recorded in perf.md before the choice settles.
+- M5 (`M5-10`): run-count tests are green under every value-reference candidate selected
+  by `COG_TEST_VALUE_REFERENCE_LAYOUT`; the `mallocCountTotal == 0` steady-turn threshold
+  holds; value-reference layout numbers are recorded in perf.md before the choice settles.
 - M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
   arena edge candidate; `mise run test:cores` is green; edge-layout and
   runtime-comparison numbers are recorded before choices settle; the default

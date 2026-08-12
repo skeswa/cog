@@ -85,12 +85,20 @@ justifies a slow, flaky, or core-coupled test.
    diagnostic seam. Wherever a scenario says "internal seam," it means such a
    seam: a narrow behavior contract exposed through the testing product —
    "the last cycle diagnostic," "deinit cleanup reached the MainActor" —
-   never a peek at node storage, edge layout, or any other representation.
+   never a peek at state storage, edge layout, or any other representation.
    COUNT-09 through COUNT-11 are the enforcement: the whole behavior suite
-   must pass unchanged across ref layouts and the M6 core swap, so a test
+   must pass unchanged across value-reference layouts and the M6 core swap, so a test
    that could notice the swap is wrong. Group 18 (PERF) is the one declared
    exception; it gates the implementation itself and lives in the benchmark
    package.
+4. **Physically separated by proof kind.** Public behavior proofs in
+   `CogTests` live under `Scenarios/<PREFIX>/`, and each
+   `<PREFIX><IDs>ScenarioTests.swift` file contains only raw IDs from that
+   scenario family. Scenario fixtures live beside that family without a
+   `Tests` suffix. Proofs that green no scenario live under
+   `Infrastructure/<seam>/`, use the `...InfrastructureTests.swift` suffix,
+   and never put a raw scenario ID in a test name. Only infrastructure tests
+   may use `@testable import Cog`.
 
 ## The tree
 
@@ -158,12 +166,12 @@ I declare state at the top of a file and it just works.
   I look up starts at that value, and each key holds its own value.
 - **DECL-03.** I give a box a starting-value closure instead. Each key
   starts at what the closure returns for that key.
-- **DECL-04.** I build `box[5]` in two different places. Both refs point
+- **DECL-04.** I build `box[5]` in two different places. Both value references point
   at the same state: writing through one shows up when reading the other,
   and `box[6]` does not change.
 - **DECL-05.** I expose a source through `.readOnly`. Reading the
-  read-only ref always gives the same value as the source.
-- **DECL-06.** I try to write through a `.readOnly` ref. The compiler says
+  read-only value reference always gives the same value as the source.
+- **DECL-06.** I try to write through a `.readOnly` value reference. The compiler says
   no. (Proof: compile-fail.)
 
 ### 2.2 Derived cogs
@@ -246,8 +254,8 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ### 4.3 Equal writes are not changes
 
-- **TURN-09.** I write a source to the value it already has. Nothing
-  happens: no recompute, no notice, no reaction.
+- **TURN-09.** I write a source to the value it already has. A derived cog
+  that reads it does not recompute.
 - **TURN-10.** In one commit I change a value and then change it back.
   At flush time that counts as no change at all.
 - **TURN-11.** I give a cog a custom `equals:`. Cog uses my rule to
@@ -313,9 +321,6 @@ _Milestone M1. Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
 
-_Pending (core §10, open question 11): the failure mode for a selector that
-calls an op which commits mid-computation._
-
 - **CYCLE-01.** A cog reads itself. Cog fails and names the cog. (Proof:
   exit test.)
 - **CYCLE-02.** Cog A reads cog B, and B reads A. Cog fails and shows the
@@ -326,6 +331,12 @@ calls an op which commits mid-computation._
   works until the condition flips; then Cog catches it.
 - **CYCLE-05.** My test can look at the cycle diagnostic through an
   internal seam without crashing the test process.
+- **CYCLE-06.** A keyed selector or its custom equality rule calls a named op
+  that commits while the derived cog is computing. Cog rejects both paths
+  before the attempted commit body runs or that attempt mutates graph state,
+  in debug and release. The message names the cog, key, and attempted turn and
+  tells me to invoke the op outside derived computation, from event handling
+  or a reaction. (Proof: exit test.)
 
 ## 7. REACT — Reactions
 
@@ -334,9 +345,6 @@ _Milestone M1, except REACT-19 (M2) and REACT-20 (M7). Design: §3.3, §6.2,
 
 A reaction watches state and does something outside the graph when it
 changes.
-
-_Pending (core §10, open question 16): when a reaction registered during a
-flush — from inside another reaction — makes its initial run._
 
 ### 7.1 Running
 
@@ -354,6 +362,10 @@ flush — from inside another reaction — makes its initial run._
   selector's. It is re-tracked every run.
 - **REACT-07.** Reactions run before the op that committed the turn
   returns. The very next line of my test can check what the reaction did.
+- **REACT-23.** While one reaction runs during a flush, it registers several
+  more. Their initial tracking runs do not re-enter it: they wait behind every
+  reaction already scheduled for that flush, keep registration order, and run
+  before any write-back turn queued by those reactions.
 - **REACT-08.** `watch(_, initial: .skip)` does not call me at install
   time; the first real change calls me with the old and new values.
 - **REACT-09.** `watch(_, initial: .run)` calls me once at install time.
@@ -397,6 +409,8 @@ flush — from inside another reaction — makes its initial run._
 - **REACT-21.** A reaction watches a derived cog. A turn changes that
   cog's source, but the recompute lands on an equal value. The reaction
   does not run: only changed reactions run in flush step 5.
+- **REACT-22.** A reaction reads a manual source. I write that source to
+  an equal value. The reaction does not run.
 
 ## 8. GROUP — Effect groups and timers
 
@@ -404,13 +418,11 @@ _Milestone M1. Design: §6.2, §6.3._
 
 An `EffectGroup` owns the lifetime of my app's effects.
 
-_Pending (core §10, open question 12): whether adding a token to an
-already-cancelled group cancels it immediately or traps._
-
 - **GROUP-01.** I add a watch token to a group. Cancelling the group
   stops the watch.
 - **GROUP-02.** I start a task with `group.task`. Cancelling the group
-  cancels the task.
+  cancels the task. A task requested after the group is cancelled is already
+  cancelled when `group.task` returns and does not reopen the group.
 - **GROUP-03.** I cancel a group twice. Nothing bad happens.
 - **GROUP-04.** I drop the last copy of a group. Everything it owned is
   cancelled.
@@ -428,6 +440,11 @@ already-cancelled group cancels it immediately or traps._
   the MainActor, then verify its reaction registrations are gone and every
   owned task has received cancellation. Immediate stopping still requires
   explicit `cancel()`.
+- **GROUP-10.** I cancel a group, then add a live reaction token through a
+  copied handle. The token is cancelled synchronously before `add` returns,
+  is not retained, and the shared group stays terminal. A second live token
+  added through another copy is also cancelled, and adding an already-cancelled
+  token to that cancelled group is harmless.
 
 ## 9. LIFE — How long state lives
 
@@ -435,15 +452,16 @@ _Milestone M1 (UI pinning lands with M2; async release with M3). Design: §5.3,
 perf §7._
 
 State lives as long as its kind says, and coming back is always safe. Grace
-periods elapse on the testing context's injected clock; no lifetime test
-waits wall-clock time.
+periods default to 30 seconds in production. Tests override that context
+default and elapse it on the testing context's injected clock; no lifetime
+test waits wall-clock time.
 
 - **LIFE-01.** Nobody watches a manual cog for a long time. Its value
   survives anyway, because manual state defaults to app lifetime.
 - **LIFE-02.** A derived cog defaults to `whileObserved`. After its last
   watcher leaves and the grace period passes, Cog lets it go. The next
   read simply computes it fresh.
-- **LIFE-03.** A released derived cog is read again through the same ref.
+- **LIFE-03.** A released derived cog is read again through the same value reference.
   It comes back with the correct current value, as if it never left.
 - **LIFE-04.** A watcher leaves and comes back within the grace period.
   The cog was never released and did not recompute.
@@ -458,7 +476,7 @@ waits wall-clock time.
   life of the app context. It is never released behind SwiftUI's back.
 - **LIFE-09.** Derived cog B reads derived cog A, then both lose their last
   external consumer. Their internal graph edge does not keep them alive.
-  After the grace period, reading either ref recreates the needed nodes
+  After the grace period, reading either value reference recreates the needed states
   with the correct current values.
 
 ## 10. SEED — Test helpers: seed and stub
@@ -519,7 +537,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-04.** A derived cog recomputes but lands on an equal value. Views
   reading it do not re-render.
 - **UI-05.** Only cogs that a view actually read get an Observation
-  boundary object. Interior graph nodes never do. (Checked through an
+  boundary object. Interior graph states never do. (Checked through an
   internal seam.)
 - **UI-06.** Views find the one app context through the `\.cogs`
   environment key.
@@ -544,6 +562,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
   UI-04, and UI-08) have the same behavior through the floor-runtime
   Observation boundary. This may run in the pinned nightly floor job.
   (Proof: floor runtime.)
+- **UI-15.** A view reads a manual source. I write that source to an equal
+  value. Cog sends no Observation notice, and the view does not re-render.
 
 ## 13. ASYNC — Async values, first slice
 
@@ -553,8 +573,8 @@ Async state is honest: it always says whether it is loading, what it has, and
 what it had.
 
 _Pending (core §10, open question 15): what a one-shot `cogs.read` of a
-never-read async cog does — does it create the node, start work, and publish
-a pending turn? — and what `cogs.refresh` of a never-read ref does._
+never-read async cog does — does it create the state, start work, and publish
+a pending turn? — and what `cogs.refresh` of a never-read value reference does._
 
 ### 13.1 Phases
 
@@ -584,7 +604,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
   result is thrown away. Only the newest run may commit.
 - **ASYNC-09.** Work that was cancelled because it was replaced publishes
   no failure phase.
-- **ASYNC-10.** I call `cogs.refresh(ref)`. The work runs again even
+- **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
   though no dependency changed, and the phases cycle again.
 - **ASYNC-11.** Only what the selector reads with `c.get` before
   returning counts as a dependency. Values the work closure touches after
@@ -597,7 +617,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
 - **ASYNC-13.** An unwatched async cog is released while its work is
   pending. The work is cancelled, and if a late result sneaks through, it
   commits nothing.
-- **ASYNC-14.** After a release, reading the ref again starts fresh work
+- **ASYNC-14.** After a release, reading the value reference again starts fresh work
   and fresh phases, unpolluted by anything from before.
 
 ### 13.4 Work isolation and previous values
@@ -622,7 +642,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
   Watchers of the full phase see the pending and success turns, but
   consumers of the `.latest` projection see no change: no recompute, no
   re-render.
-- **ASYNC-21.** I call `cogs.refresh(ref)` while work is already in
+- **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
   newest run may commit — a refresh replaces work the same way a
   dependency change does.
@@ -746,12 +766,12 @@ since expected counts derive from the parameters.
 - **COUNT-08.** Key churn (keys added and removed over and over): runs
   match exactly, and dropped keys stop running.
 - **COUNT-09.** Every behavior scenario implemented through M5 passes
-  unchanged over every ref layout under test. (Proof: suite.)
+  unchanged over every value-reference layout under test. (Proof: suite.)
 - **COUNT-10.** Every behavior scenario implemented through M6 passes
   unchanged with the data-oriented core selected in place of the simple
   core, before any default switch. (Proof: suite.)
 - **COUNT-11.** After M7, the complete behavior suite passes unchanged on
-  the selected ref layout and data-oriented core. (Proof: suite.)
+  the selected value-reference layout and data-oriented core. (Proof: suite.)
 
 ## 18. PERF — Performance guarantees
 
@@ -767,22 +787,22 @@ is needed.
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
   nothing (`mallocCountTotal == 0`).
 - **PERF-02.** Propagation does no retain or release traffic.
-- **PERF-03.** Peak memory for a 1,000-node graph stays within the
+- **PERF-03.** Peak memory for a 1,000-state graph stays within the
   baseline threshold recorded in perf.md. While no baseline exists, this
   check is red, never skipped.
-- **PERF-04.** A graph with 1,000 nodes and 12 UI-read values owns 12
+- **PERF-04.** A graph with 1,000 states and 12 UI-read values owns 12
   boundary objects, not 1,000.
-- **PERF-05.** A released node's slot is reused safely: its generation
+- **PERF-05.** A released state's slot is reused safely: its generation
   changes, and stale internal access is caught in debug builds.
-- **PERF-06.** Building a ref with `box[key]` allocates nothing.
-- **PERF-07.** Notice traffic for pinned keyed nodes — old keys the UI
+- **PERF-06.** Building a value reference with `box[key]` allocates nothing.
+- **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
   perf.md. While no baseline exists, this check is red, never skipped.
 - **PERF-08.** Keyed diamonds and key churn run under inline `AnyHashable`,
-  interned-token, and generic-keyed ref layouts in one pinned environment.
-  Results land in perf.md before the ref layout is selected.
+  interned-token, and generic-keyed value-reference layouts in one pinned environment.
+  Results land in perf.md before the value-reference layout is selected.
 - **PERF-09.** Mostly static and high-churn graphs run under the shared
-  edge pool, per-node prefix arrays, and inline-plus-overflow edge layouts
+  edge pool, per-state prefix arrays, and inline-plus-overflow edge layouts
   in one pinned environment. Results land in perf.md before the edge layout
   is selected.
 - **PERF-10.** The selected core is measured against the simple core,
