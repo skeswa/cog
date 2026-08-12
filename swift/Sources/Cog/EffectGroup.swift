@@ -9,12 +9,21 @@ public final class EffectGroup {
   private var reactionTokens: [ReactionToken] = []
   private var tasks: [Task<Void, any Error>] = []
   private var isCancelled = false
+  private var deinitCleanupAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// Creates an empty live group.
   public init() {}
 
   isolated deinit {
     cancel()
+    deinitCleanupAcknowledgement?()
+  }
+
+  /// Installs the test-only signal emitted after isolated deinit cleanup.
+  package func acknowledgeDeinitCleanup(
+    with body: @escaping @MainActor @Sendable () -> Void
+  ) {
+    deinitCleanupAcknowledgement = body
   }
 
   /// Gives this group ownership of one reaction registration.
