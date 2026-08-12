@@ -49,7 +49,7 @@ struct WeatherEffects {
 
         group.task(name: "location.hourlyRefresh") {
             while true {
-                try await clock.sleep(for: .hours(1))
+                try await clock.sleep(for: .seconds(3_600))
                 await cogs.refreshCurrentLocation()
             }
         }
@@ -213,7 +213,7 @@ instead of exposing all source value references.
     cogs.stubWeather(.clear(75), zip: zip)
     #expect(notifier.alerts == ["It is nice outside!"])
 
-    await clock.advance(by: .hours(1))
+    await clock.advance(by: .seconds(3_600))
     #expect(cogs.read(currentZipCode) != nil)
 }
 ```
