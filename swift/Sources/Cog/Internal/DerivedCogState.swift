@@ -57,6 +57,8 @@ internal final class DerivedCogState<Value>:
   /// Created only after this exact descriptor-and-key state reaches the UI.
   var observationBoundary: CogObservationBoundary?
 
+  var observationKey: AnyHashable? { key }
+
   var label: CogLabel { descriptor.label }
 
   /// The declaration's lifetime policy, shared by every key of a box.

@@ -44,6 +44,8 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
   /// Created only after this exact descriptor-and-key state reaches the UI.
   var observationBoundary: CogObservationBoundary?
 
+  var observationKey: AnyHashable? { key }
+
   var label: CogLabel { descriptor.label }
 
   /// Moves a staged value across the commit boundary, if this turn wrote one.

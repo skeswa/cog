@@ -27,6 +27,7 @@ internal final class CogObservationBoundary: Observable {
 @MainActor
 internal protocol CogObservationState: CogState {
   var observationBoundary: CogObservationBoundary? { get set }
+  var observationKey: AnyHashable? { get }
 }
 
 extension CogObservationState {
@@ -62,6 +63,9 @@ extension Cogtext {
       }
 
       guard state.changedAt == revision else { continue }
+      #if DEBUG
+      historyLog.recordNotice(label: state.label, key: state.observationKey)
+      #endif
       state.observationBoundary?.notifyChange()
     }
   }

@@ -11,6 +11,9 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
   /// A derived cog's selector ran.
   case recompute
 
+  /// One changed UI boundary sent its Observation notice.
+  case notice
+
   /// A reaction or watch ran.
   case effect
 }
