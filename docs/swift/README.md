@@ -179,7 +179,7 @@ These choices are settled; §10 of the core document has the full record.
   state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
-  from reactions wait in a FIFO queue as new turns. A debug quiescence guard
+  from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
   reports long causal chains through an internal diagnostic seam.
 - A reaction registered during a flush never runs reentrantly. Its initial
   tracking run joins that flush's reaction tail in registration order, after

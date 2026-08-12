@@ -99,7 +99,7 @@ public final class Cogtext {
   ///
   /// The tracker warns once after a long uninterrupted drain and retains only
   /// the last structured warning for the `CogTesting` diagnostic seam.
-  internal var quiescenceTracker = CogQuiescenceTracker()
+  internal var turnChainTracker = CogTurnChainTracker()
 
   /// What this context has done lately (§2.3, perf §8).
   ///

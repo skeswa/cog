@@ -101,8 +101,8 @@ extension Cogtext {
     }
 
     #if DEBUG
-    quiescenceTracker.beginEpisode()
-    defer { quiescenceTracker.endEpisode() }
+    turnChainTracker.beginChain()
+    defer { turnChainTracker.endChain() }
     #endif
 
     runOuterTurn(named: name, body)
@@ -119,7 +119,7 @@ extension Cogtext {
     finishTurn(turn.id)
 
     #if DEBUG
-    quiescenceTracker.completeTurn()
+    turnChainTracker.completeTurn()
     #endif
   }
 
@@ -152,7 +152,7 @@ extension Cogtext {
     // turn precedes the writes and recomputations it caused.
     #if DEBUG
     historyLog.recordTurn(named: name)
-    quiescenceTracker.recordTurn(named: name)
+    turnChainTracker.recordTurn(named: name)
     #endif
 
     return turn

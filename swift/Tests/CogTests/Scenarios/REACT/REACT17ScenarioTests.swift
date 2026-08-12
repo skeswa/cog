@@ -5,7 +5,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `REACT-17 a finite reaction loop warns and returns quiescent`() throws {
+@Test func `REACT-17 a finite reaction loop warns and returns idle`() throws {
   let cogs = Cogtext.forTesting()
   let ping = ManualCog<Int>(0)
   let pong = ManualCog<Int>(0)
@@ -35,12 +35,12 @@ import Testing
     }
   }
 
-  #expect(cogs.quiescenceDiagnostic.warningCount == 0)
-  #expect(cogs.quiescenceDiagnostic.isIdle)
+  #expect(cogs.turnChainDiagnostic.warningCount == 0)
+  #expect(cogs.turnChainDiagnostic.isIdle)
 
   var initiatingBodySawBusyContext = false
   cogs.commit("react17.turn.1") { w in
-    initiatingBodySawBusyContext = !cogs.quiescenceDiagnostic.isIdle
+    initiatingBodySawBusyContext = !cogs.turnChainDiagnostic.isIdle
     w[ping] = 1
   }
 
@@ -52,7 +52,7 @@ import Testing
   #expect(reactionRuns == 65)
   #expect(initiatingBodySawBusyContext)
 
-  let diagnostic = cogs.quiescenceDiagnostic
+  let diagnostic = cogs.turnChainDiagnostic
   let warning = try #require(diagnostic.lastWarning)
   #expect(diagnostic.warningCount == 1)
   #expect(diagnostic.isIdle)
@@ -61,7 +61,7 @@ import Testing
 
   let pingReactionName = "\(#fileID):\(pingReactionLine)"
   let pongReactionName = "\(#fileID):\(pongReactionLine)"
-  let expectedChain = (1...65).flatMap { turn -> [CogQuiescenceCause] in
+  let expectedChain = (1...65).flatMap { turn -> [CogTurnChainCause] in
     [
       .turn("react17.turn.\(turn)"),
       .reaction(turn.isMultiple(of: 2) ? pongReactionName : pingReactionName),
@@ -73,7 +73,7 @@ import Testing
 }
 
 @MainActor
-@Test func `REACT-17 turns separated by idle do not form one causal episode`() {
+@Test func `REACT-17 turns separated by idle do not form one turn chain`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(0)
 
@@ -81,12 +81,12 @@ import Testing
     cogs.commit("react17.separate.\(turn)") { w in
       w[source] = turn
     }
-    #expect(cogs.quiescenceDiagnostic.isIdle)
+    #expect(cogs.turnChainDiagnostic.isIdle)
   }
 
   #expect(cogs.read(source) == 65)
-  #expect(cogs.quiescenceDiagnostic.warningCount == 0)
-  #expect(cogs.quiescenceDiagnostic.lastWarning == nil)
+  #expect(cogs.turnChainDiagnostic.warningCount == 0)
+  #expect(cogs.turnChainDiagnostic.lastWarning == nil)
 }
 
 #endif

@@ -319,7 +319,7 @@ The class-state build. Correctness first; no perf tricks.
   reaction token added after cancellation is cancelled synchronously without
   retention, and a task requested afterward returns already cancelled;
   write-back queues new FIFO turns;
-  a debug quiescence guard (about 64 turns) prints the causal chain through an
+  a debug turn-chain guard (about 64 turns) prints the causes through an
   internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
   manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. A
@@ -339,7 +339,7 @@ The class-state build. Correctness first; no perf tricks.
   no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
   notices; `os_log` display for now; zero release-build cost.
-- Test seams and traps: the cycle diagnostic, quiescence warning,
+- Test seams and traps: the cycle diagnostic, turn-chain warning,
   no-consumer warning, and cross-executor cleanup acknowledgements are named
   diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
   never peeks at state storage or graph representation. Trap guarantees (a
@@ -352,7 +352,7 @@ Tests use Swift Testing on the host in all four legs, under the scenarios.md
 testing constraints. Cover the union of §11.1
 and perf §9.1: diamonds; deep and broad graphs; changing and conditional
 dependencies; self and multi-state cycles; escaped writers; reaction write-back
-ordering; the finite quiescence-guard diagnostic; correct untracked reads;
+ordering; the finite turn-chain diagnostic; correct untracked reads;
 MainActor execution and non-`Sendable` values; second-production-context
 rejection; scene recreation without manual-state loss; equality-gated
 notifications; manual lifetime; `whileObserved` release and recreate without

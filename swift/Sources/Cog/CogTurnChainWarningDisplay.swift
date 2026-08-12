@@ -2,16 +2,16 @@
 
 import OSLog
 
-private let cogQuiescenceOSLog = OSLog(
+private let cogTurnChainOSLog = OSLog(
   subsystem: "dev.skeswa.cog",
-  category: "quiescence"
+  category: "turn-chain"
 )
 
-/// Emits the human-facing half of the quiescence diagnostic.
+/// Logs a readable warning for a long turn chain.
 ///
 /// Tests inspect the stored structured snapshot through `CogTesting`; unified
 /// log delivery and retention are deliberately not part of graph correctness.
-internal func logCogQuiescenceWarning(_ warning: CogQuiescenceWarningSnapshot) {
+internal func logCogTurnChainWarning(_ warning: CogTurnChainWarningSnapshot) {
   let chain = warning.causalChain.map { cause in
     switch cause {
     case .turn(let name):
@@ -23,11 +23,11 @@ internal func logCogQuiescenceWarning(_ warning: CogQuiescenceWarningSnapshot) {
   let truncation = warning.causalChainIsTruncated ? "\n  … causal chain truncated" : ""
   let message =
     """
-    Cog warning: \(warning.uninterruptedTurnCount) turns ran without returning to idle. \
-    The causal chain was:
+    Cog warning: A turn chain ran \(warning.uninterruptedTurnCount) turns before returning \
+    to idle. The causes were:
       \(chain)\(truncation)
     """
-  os_log("%{public}@", log: cogQuiescenceOSLog, type: .error, message)
+  os_log("%{public}@", log: cogTurnChainOSLog, type: .error, message)
 }
 
 #endif

@@ -474,7 +474,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-20b._
   _Verify: `mise run test --filter TURN-08`._
   _Greens: TURN-08._
-- **M1-21** _(Behavior)_ — Add the debug quiescence warning, causal chain,
+- **M1-21** _(Behavior)_ — Add the debug turn-chain warning, causal chain,
   deterministic diagnostic seam, and synchronous return to idle.
   _Depends: M1-20b, M1-31a._
   _Verify: `mise run test --filter REACT-17`._
@@ -1132,7 +1132,7 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-(0[1-9]|1[0-4]|18|2[1-3])|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
-  and the quiescence diagnostic through the arena selector.
+  and the turn-chain diagnostic through the arena selector.
   _Depends: M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-15|REACT-16|REACT-17'`._
