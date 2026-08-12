@@ -39,7 +39,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   init(
     selector: @escaping @MainActor (Reader<Value>, AnyHashable?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
-    lifetime: CogNodeLifetime = .whileObserved,
+    lifetime: CogNodeLifetime = .whileObserved(grace: nil),
     label: CogLabel
   ) {
     self.label = label

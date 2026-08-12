@@ -65,7 +65,10 @@ extension Cogtext {
   /// - Returns: The app's context.
   @discardableResult
   public static func bootstrapApp() -> Cogtext {
-    let cogs = Cogtext(clock: ContinuousClock())
+    let cogs = Cogtext(
+      clock: ContinuousClock(),
+      defaultWhileObservedGrace: .seconds(30)
+    )
     installAsAppContext(cogs)
     return cogs
   }

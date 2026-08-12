@@ -83,6 +83,14 @@ internal final class DerivedCogNode<Value>:
   /// External consumers currently keeping this derived root observed.
   var externalLeaseCount: Int
 
+  /// The descriptor-and-key identity this context files the node under.
+  var nodeIdentity: CogNodeIdentity {
+    CogNodeIdentity(descriptor: descriptorIdentity, key: key)
+  }
+
+  /// Invalidates a pending grace completion when observation changes.
+  var lifetimeReleaseGeneration: UInt64
+
   /// Whether the selector has run in this context yet.
   ///
   /// Named separately from the cache so that a caller asking the lazy question
@@ -105,6 +113,7 @@ internal final class DerivedCogNode<Value>:
     self.checkedAt = .initial
     self.subscribers = []
     self.externalLeaseCount = 0
+    self.lifetimeReleaseGeneration = 0
   }
 
   /// The node's value, running the selector if this is its first read.
@@ -135,6 +144,13 @@ internal final class DerivedCogNode<Value>:
   }
 
   func releaseDependenciesForContextTeardown() {
+    dependencies.removeAll()
+  }
+
+  func releaseDependenciesForLifetime() {
+    for dependency in dependencies {
+      dependency.removeSubscriber(self)
+    }
     dependencies.removeAll()
   }
 

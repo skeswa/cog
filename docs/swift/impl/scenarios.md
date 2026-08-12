@@ -444,8 +444,9 @@ _Milestone M1 (UI pinning lands with M2; async release with M3). Design: §5.3,
 perf §7._
 
 State lives as long as its kind says, and coming back is always safe. Grace
-periods elapse on the testing context's injected clock; no lifetime test
-waits wall-clock time.
+periods default to 30 seconds in production. Tests override that context
+default and elapse it on the testing context's injected clock; no lifetime
+test waits wall-clock time.
 
 - **LIFE-01.** Nobody watches a manual cog for a long time. Its value
   survives anyway, because manual state defaults to app lifetime.

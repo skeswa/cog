@@ -190,7 +190,7 @@ internal final class CogReaction: CogNode, CogConsumer {
     for dependency in dependencies {
       guard
         let leaseNode = dependency as? any CogLifetimeLeaseNode,
-        leaseNode.lifetime == .whileObserved,
+        case .whileObserved = leaseNode.lifetime,
         !nextLeasedDependencies.contains(where: { $0 === leaseNode })
       else { continue }
       nextLeasedDependencies.append(leaseNode)

@@ -36,6 +36,12 @@ public final class Cogtext {
   /// wait for a definite signal rather than wall-clock time.
   internal let clock: any Clock<Duration>
 
+  /// Grace used when a descriptor selects the context default.
+  internal let defaultWhileObservedGrace: Duration
+
+  /// One test-only acknowledgement installed through the CogTesting product.
+  private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
+
   /// The monotonic version assigned to graph work.
   ///
   /// Every outer turn advances it once at its commit boundary, including an
@@ -133,8 +139,12 @@ public final class Cogtext {
   /// app, and `Cogtext.forTesting()` for a test or preview runtime. Feature
   /// code that tries to build a plain context does not get a runtime error, it
   /// gets a compile error, because the name is not visible to it.
-  package init(clock: any Clock<Duration> = ContinuousClock()) {
+  package init(
+    clock: any Clock<Duration> = ContinuousClock(),
+    defaultWhileObservedGrace: Duration = .seconds(30)
+  ) {
     self.clock = clock
+    self.defaultWhileObservedGrace = defaultWhileObservedGrace
   }
 
   /// Breaks graph-owned dependency chains before stored properties release.
@@ -160,10 +170,11 @@ public final class Cogtext {
 extension Cogtext {
   /// Adds one reaction-owned lease when this node uses observed lifetime.
   ///
-  /// This is the normal transition choke point. The later grace-period engine
-  /// extends it without making reactions know how release is scheduled.
+  /// Invalidating an earlier release generation makes reacquisition safe even
+  /// when its clock sleep has already begun.
   internal func acquireExternalLease(on node: any CogLifetimeLeaseNode) {
-    guard node.lifetime == .whileObserved else { return }
+    guard case .whileObserved = node.lifetime else { return }
+    node.advanceLifetimeReleaseGeneration()
     node.incrementExternalLeaseCount()
   }
 
@@ -172,8 +183,62 @@ extension Cogtext {
   /// Context teardown bypasses this normal path because no release work should
   /// be scheduled while the whole graph is already being destroyed.
   internal func releaseExternalLease(on node: any CogLifetimeLeaseNode) {
-    guard node.lifetime == .whileObserved else { return }
+    guard case .whileObserved(let declaredGrace) = node.lifetime else { return }
     node.decrementExternalLeaseCount()
+    guard node.externalLeaseCount == 0 else { return }
+
+    let generation = node.advanceLifetimeReleaseGeneration()
+    let identity = node.nodeIdentity
+    let grace = declaredGrace ?? defaultWhileObservedGrace
+    let clock = clock
+
+    Task { @MainActor [weak self, weak node] in
+      do {
+        try await clock.sleep(for: grace)
+      } catch {
+        return
+      }
+
+      guard let self, let node else { return }
+      self.releaseDerivedNodeIfEligible(
+        node,
+        identity: identity,
+        generation: generation
+      )
+    }
+  }
+
+  /// Installs a one-shot behavior acknowledgement for a lifetime scenario.
+  package func acknowledgeNextDerivedRelease(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextLifetimeReleaseAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next derived release.")
+    }
+    nextLifetimeReleaseAcknowledgement = acknowledgement
+  }
+
+  /// Removes the exact still-unobserved node after its grace task resumes.
+  private func releaseDerivedNodeIfEligible(
+    _ node: any CogLifetimeLeaseNode,
+    identity: CogNodeIdentity,
+    generation: UInt64
+  ) {
+    guard let stored = nodes[identity], stored === node else { return }
+    guard node.lifetimeReleaseGeneration == generation else { return }
+    guard node.externalLeaseCount == 0 else { return }
+    guard case .whileObserved = node.lifetime else { return }
+
+    // A still-live internal consumer needs this exact producer until the later
+    // closure-release slice can collect the whole unobserved dependency graph.
+    guard node.subscribers.isEmpty else { return }
+
+    nodes.removeValue(forKey: identity)
+    node.releaseDependenciesForLifetime()
+
+    let acknowledgement = nextLifetimeReleaseAcknowledgement
+    nextLifetimeReleaseAcknowledgement = nil
+    acknowledgement?()
   }
 
   /// Advances the graph revision for one turn flush or changed debug seed.

@@ -221,7 +221,9 @@ These choices are settled; §10 of the core document has the full record.
   the suite.
 - Manual state and nodes seen by the UI live for the app context by default.
   Graph-only derived and async nodes may be released when unused. Query caches
-  have their own retention rules.
+  have their own retention rules. A `whileObserved` declaration with no
+  explicit grace uses the context default: 30 seconds in production, with an
+  explicit `CogTesting` override for deterministic timed tests.
 - Untracked reads (`c.read` in a selector, one-shot `cogs.read` outside) skip
   the dependency edge but still settle the value they return; they are never
   stale. Exported streams (`cogs.values(of:)`) start from the current settled

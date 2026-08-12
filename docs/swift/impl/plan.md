@@ -322,8 +322,10 @@ The class-node build. Correctness first; no perf tricks.
   a debug quiescence guard (about 64 turns) prints the causal chain through an
   internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
-  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. Internal
-  graph edges never count as lifetime leases.
+  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. A
+  declaration without an explicit grace uses its context default: 30 seconds
+  in production and an explicit testing override when elapsed time is under
+  test. Internal graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
   `M1-34a` settled the helper spellings on 2026-08-11: `Cogtext.bootstrapApp()`
   from `Cog` and `Cogtext.forTesting()` from `CogTesting`, with a `package`

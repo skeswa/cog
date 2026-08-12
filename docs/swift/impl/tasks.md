@@ -544,7 +544,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   lifetime leases, including dependency retracking and cancellation.
   _Depends: M1-16c, M1-18a, M1-27a._
   _Verify: `mise run test --filter M1ReactionLeaseInfrastructure`._
-- **M1-28a** _(Behavior)_ — Release an unobserved derived cog after injected
+- **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
+  testing override, then release an unobserved derived cog after injected
   grace and recreate it correctly.
   _Depends: M1-01ca, M1-27b._
   _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._

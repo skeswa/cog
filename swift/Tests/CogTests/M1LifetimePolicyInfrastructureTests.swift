@@ -76,7 +76,7 @@ private nonisolated struct LifetimeOpaqueValue {
     keyedCustomDefault.descriptor.lifetime,
     keyedEquatableDefault.descriptor.lifetime,
   ]
-  #expect(defaults.allSatisfy { $0 == .whileObserved })
+  #expect(defaults.allSatisfy { $0 == .whileObserved(grace: nil) })
 
   let keylessKept = Cog<LifetimeOpaqueValue>(keepAlive: true) {
     _ in LifetimeOpaqueValue(rawValue: 0)

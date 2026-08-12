@@ -36,12 +36,17 @@ extension Cogtext {
   /// that depends only on `Cog` has no way to name this function, so a test
   /// helper cannot drift into shipping code by accident.
   ///
-  /// - Parameter clock: The monotonic clock context-owned timing work uses.
-  ///   Keep the concrete clock in a timed test so the test can advance it
-  ///   without waiting for wall-clock time.
+  /// - Parameters:
+  ///   - clock: The monotonic clock context-owned timing work uses. Keep the
+  ///     concrete clock in a timed test so the test can advance it without
+  ///     waiting for wall-clock time.
+  ///   - whileObservedGrace: The context default for declarations that do not
+  ///     supply their own grace. Production and ordinary tests use 30 seconds;
+  ///     a lifetime test passes an explicit duration to its controllable clock.
   public static func forTesting(
-    clock: any Clock<Duration> = ContinuousClock()
+    clock: any Clock<Duration> = ContinuousClock(),
+    whileObservedGrace: Duration = .seconds(30)
   ) -> Cogtext {
-    Cogtext(clock: clock)
+    Cogtext(clock: clock, defaultWhileObservedGrace: whileObservedGrace)
   }
 }
