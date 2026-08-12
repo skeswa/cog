@@ -335,7 +335,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Greens: GRAPH-09, GRAPH-10._
 - **M1-09b** _(Behavior)_ — Remove dropped keyed dependencies and recapture
   ref-through-ref indirection.
-  _Depends: M1-05b, M1-09a._
+  _Depends: M1-04b, M1-05b, M1-09a._
   _Verify: `mise run test --filter 'GRAPH-11|GRAPH-12'`._
   _Greens: GRAPH-11, GRAPH-12._
 - **M1-09c** _(Behavior)_ — Add `c.read` peeks that skip edges but settle.
