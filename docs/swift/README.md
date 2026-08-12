@@ -200,7 +200,10 @@ These choices are settled; §10 of the core document has the full record.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and
-  `EffectGroup` handles own lifecycle and cancel safely more than once.
+  `EffectGroup` handles own lifecycle and cancel safely more than once. A
+  cancelled group is terminal; adding a reaction token afterward synchronously
+  cancels the token without retaining it, and a task requested afterward is
+  already cancelled when `task` returns. Neither operation reopens the group.
 - Production creates one app-wide `Cogtext` and injects it above all scenes.
   Screens and features share it. Tests and previews create one isolated
   context for their runtime.
@@ -259,9 +262,8 @@ Still open: the read API spelling, how much `Op` support v1 needs, optional
 deferred reactions, debug-history tools, and persistence helpers. Also open
 are several edge behaviors: what a stream's phase does when its sequence ends
 or throws, whether equal stream elements commit distinct turns, whether a
-failed `.queue` run stops the queue, adding to an already-cancelled
-`EffectGroup`, what a one-shot read or refresh of a cold async cog does, and
-debounce/throttle timing modifiers
+failed `.queue` run stops the queue, what a one-shot read or refresh of a cold
+async cog does, and debounce/throttle timing modifiers
 (deferred backlog). Ref layout, edge layout, and hash tables also remain open
 until benchmarks choose them.
 

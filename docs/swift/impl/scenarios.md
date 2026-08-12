@@ -410,13 +410,11 @@ _Milestone M1. Design: §6.2, §6.3._
 
 An `EffectGroup` owns the lifetime of my app's effects.
 
-_Pending (core §10, open question 12): whether adding a token to an
-already-cancelled group cancels it immediately or traps._
-
 - **GROUP-01.** I add a watch token to a group. Cancelling the group
   stops the watch.
 - **GROUP-02.** I start a task with `group.task`. Cancelling the group
-  cancels the task.
+  cancels the task. A task requested after the group is cancelled is already
+  cancelled when `group.task` returns and does not reopen the group.
 - **GROUP-03.** I cancel a group twice. Nothing bad happens.
 - **GROUP-04.** I drop the last copy of a group. Everything it owned is
   cancelled.
@@ -434,6 +432,11 @@ already-cancelled group cancels it immediately or traps._
   the MainActor, then verify its reaction registrations are gone and every
   owned task has received cancellation. Immediate stopping still requires
   explicit `cancel()`.
+- **GROUP-10.** I cancel a group, then add a live reaction token through a
+  copied handle. The token is cancelled synchronously before `add` returns,
+  is not retained, and the shared group stays terminal. A second live token
+  added through another copy is also cancelled, and adding an already-cancelled
+  token to that cancelled group is harmless.
 
 ## 9. LIFE — How long state lives
 

@@ -508,8 +508,15 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-23b._
   _Verify: `mise run test --filter GROUP-04`._
   _Greens: GROUP-04._
-- **M1-24a** _(Behavior)_ — Add `group.task(name:)` and propagate explicit
-  group cancellation to the task.
+- **M1-23da** _(Behavior)_ — Cancel a reaction token synchronously when any
+  copy adds it to an already-cancelled group, without retaining the token or
+  reopening that group.
+  _Depends: M1-23b._
+  _Verify: `mise run test --filter GROUP-10`._
+  _Greens: GROUP-10._
+- **M1-24a** _(Behavior)_ — Add `group.task(name:)`, propagate explicit group
+  cancellation, and return an already-cancelled task when the group is
+  terminal.
   _Depends: M1-23b._
   _Verify: `mise run test --filter GROUP-02`._
   _Greens: GROUP-02._
@@ -608,7 +615,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-33c** _(Gate)_ — Run the complete host-runnable M1 suite in all four
   build-settings legs.
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
-  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-24b, M1-25,
+  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-23da, M1-24b, M1-25,
   M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
   M1-31b, M1-31d, M1-33b, M1-34b._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
@@ -1127,8 +1134,8 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-15|REACT-16|REACT-17'`._
-- **M6-10d** _(Infrastructure)_ — Pass effect-group and task behavior through
-  the arena core selector.
+- **M6-10d** _(Infrastructure)_ — Pass terminal effect-group cancellation and
+  task behavior through the arena core selector.
   _Depends: M6-10cb._
   _Verify: `COG_TEST_CORE=arena mise run test --filter GROUP`._
 - **M6-10ea** _(Infrastructure)_ — Pass lifetime policies, external reaction

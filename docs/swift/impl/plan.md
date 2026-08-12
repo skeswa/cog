@@ -315,7 +315,10 @@ The class-node build. Correctness first; no perf tricks.
   the diagnostic; an internal seam so tests inspect without crashing (§2.4).
 - Reactions and effects: `cogs.run`; `cogs.watch(_:initial:name:)`;
   final-class `ReactionToken`; `EffectGroup` with `add` and `task(name:)`;
-  cancel is idempotent and runs on deinit; write-back queues new FIFO turns;
+  cancel is idempotent, terminal, shared across copies, and runs on deinit; a
+  reaction token added after cancellation is cancelled synchronously without
+  retention, and a task requested afterward returns already cancelled;
+  write-back queues new FIFO turns;
   a debug quiescence guard (about 64 turns) prints the causal chain through an
   internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`

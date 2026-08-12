@@ -68,7 +68,8 @@ The pieces have narrow jobs:
   them testable. Their bodies call ops, so writes keep useful names in debug
   history.
 - `EffectGroup` owns reaction tokens and tasks. `cancel()` and deinit both
-  cancel the group; copies point to the same cancellation resource.[^group]
+  cancel the group; copies point to the same terminal cancellation
+  resource.[^group]
 - Effect names appear in debug history and task names for Instruments.
 
 The ownership rule: **`Cogtext` owns state and reactions; `EffectGroup` owns
@@ -80,6 +81,13 @@ their lifetimes.** `watch` and `run` register with the graph, so they stay on
 Effects exist only after code calls `install`. There is no global registry or
 automatic discovery, which avoids Swift's lazy top-level `let` trap: an unused
 global reaction would never be created.
+
+Group cancellation is terminal. If lifecycle ordering adds a live reaction
+token after the group has already been cancelled, `add` synchronously cancels
+that token before returning, retains nothing, and never reopens the group.
+Adding an already-cancelled token to that cancelled group is harmless. A task
+requested after cancellation is already cancelled when `task` returns. Every
+copy observes the same terminal state.
 
 ```swift
 @main
