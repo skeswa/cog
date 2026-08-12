@@ -156,6 +156,14 @@ internal struct CogSettleStack {
   var computingCount: Int { computingPath.count }
   var isComputingEmpty: Bool { computingPath.isEmpty }
 
+  /// The innermost cog whose derived computation has not published yet.
+  ///
+  /// Commit rejection uses only this exceptional-path lookup. Ordinary reads
+  /// and turns continue to pay the per-node Boolean check alone.
+  var innermostComputingNode: (any DerivedCogSettleNode)? {
+    computingPath.last
+  }
+
   /// Resets only the raw frame buffer for low-level stack infrastructure tests.
   /// Production settlement uses checkpoints so a nested pull preserves its
   /// caller's pending frames and active computation path.

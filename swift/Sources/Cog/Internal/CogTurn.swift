@@ -59,8 +59,20 @@ extension Cogtext {
   /// phase, so only the outermost body closes the structural write boundary.
   /// A sibling call arrives after that flush returned the context to idle and
   /// therefore mints its own turn. A call made while flushing appends its body
-  /// to the non-reentrant FIFO drained by the active outer call.
+  /// to the non-reentrant FIFO drained by the active outer call. A call made
+  /// during derived computation is rejected before any of those paths can run.
   internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
+    if let computing = settleStack.innermostComputingNode {
+      let cogName = CogCycleStep(node: computing).name
+      fatalError(
+        """
+        Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \
+        computing. Derived computation may only read Cog state. Invoke this op outside \
+        derived computation, from event handling or a reaction.
+        """
+      )
+    }
+
     switch turnPhase {
     case .accumulating(let turn):
       body(turn)

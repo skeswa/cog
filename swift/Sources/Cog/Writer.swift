@@ -51,6 +51,12 @@ extension Cogtext {
   /// accumulating body returns, then cross the commit boundary together. Ops
   /// are ordinary `Cogtext` methods that wrap this primitive.
   ///
+  /// A derived computation is read-only through selector execution, custom
+  /// equality, dependency reconciliation, and result publication. Calling
+  /// `commit` in that region is a programmer error: Cog fails before `body`
+  /// runs or the attempted turn changes graph state, and names both the active
+  /// derived cog and this attempted turn.
+  ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. By default,
   ///     this is the op method that called `commit`.
