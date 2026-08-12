@@ -522,32 +522,32 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-01cb, M1-23c, M1-24a._
   _Verify: `mise run test --filter GROUP-09`._
   _Greens: GROUP-09._
-- **M1-27a** _(Behavior)_ — Add manual `.app` default and derived `keepAlive`
-  sugar.
-  _Depends: M1-08a._
-  _Verify: `mise run test --filter 'LIFE-01|LIFE-06'`._
-  _Greens: LIFE-01, LIFE-06._
-- **M1-27b** _(Behavior)_ — Count a registered reaction as an external lease.
-  _Depends: M1-16b, M1-27a._
-  _Verify: `mise run test --filter LIFE-07`._
-  _Greens: LIFE-07._
+- **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
+  manual `.app` and synchronous-derived `.whileObserved` defaults, plus
+  derived `keepAlive` sugar for `.app`.
+  _Depends: M1-05b, M1-08a._
+  _Verify: `mise run test --filter M1LifetimePolicyInfrastructure`._
+- **M1-27b** _(Infrastructure)_ — Track registered reactions as external
+  lifetime leases, including dependency retracking and cancellation.
+  _Depends: M1-16c, M1-18a, M1-27a._
+  _Verify: `mise run test --filter M1ReactionLeaseInfrastructure`._
 - **M1-28a** _(Behavior)_ — Release an unobserved derived cog after injected
   grace and recreate it correctly.
-  _Depends: M1-01ca, M1-27a._
+  _Depends: M1-01ca, M1-27b._
   _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._
   _Greens: LIFE-02, LIFE-03._
-- **M1-28b** _(Behavior)_ — Cancel pending release when a consumer returns
-  within grace.
+- **M1-28b** _(Behavior)_ — Cancel pending derived release and prove
+  `keepAlive` and reaction leases suppress release.
   _Depends: M1-28a._
-  _Verify: `mise run test --filter LIFE-04`._
-  _Greens: LIFE-04._
-- **M1-28c** _(Behavior)_ — Reset opted-in manual state to its initial value
-  after release.
-  _Depends: M1-02, M1-28a._
-  _Verify: `mise run test --filter LIFE-05`._
-  _Greens: LIFE-05._
+  _Verify: `mise run test --filter 'LIFE-04|LIFE-06|LIFE-07'`._
+  _Greens: LIFE-04, LIFE-06, LIFE-07._
+- **M1-28c** _(Behavior)_ — Preserve default manual state and reset opted-in
+  manual state to its initial value after release.
+  _Depends: M1-28a._
+  _Verify: `mise run test --filter 'LIFE-01|LIFE-05'`._
+  _Greens: LIFE-01, LIFE-05._
 - **M1-28d** _(Behavior)_ — Prove internal graph edges never act as leases.
-  _Depends: M1-09a, M1-28a._
+  _Depends: M1-28a._
   _Verify: `mise run test --filter LIFE-09`._
   _Greens: LIFE-09._
 - **M1-29a** _(Behavior)_ — Install one production context shared app-wide.
@@ -603,7 +603,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   build-settings legs.
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
   M1-14, M1-15d, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-24b, M1-25,
-  M1-26, M1-27b, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
+  M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
   M1-31b, M1-31d, M1-33b, M1-34b._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
   _Greens: LEG-01._
@@ -1124,17 +1124,15 @@ ArenaDirtyPropagationInfrastructure`._
   the arena core selector.
   _Depends: M6-10cb._
   _Verify: `COG_TEST_CORE=arena mise run test --filter GROUP`._
-- **M6-10ea** _(Infrastructure)_ — Pass app lifetime, keep-alive, external
-  reaction leases, and UI pinning through arena lease counts.
+- **M6-10ea** _(Infrastructure)_ — Pass lifetime policies, external reaction
+  leases, and UI pinning through arena lease counts.
   _Depends: M6-08b, M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'LIFE-01|LIFE-06|LIFE-07|LIFE-08'`._
-- **M6-10eb** _(Infrastructure)_ — Pass grace cancellation, release,
-  recreation, manual reset, and non-leasing internal edges through arena slot
-  reuse.
+'ArenaLifetimePolicyInfrastructure|ArenaLeaseInfrastructure'`._
+- **M6-10eb** _(Infrastructure)_ — Pass the complete lifetime behavior suite
+  through arena grace, release, manual reset, and slot reuse.
   _Depends: M6-10ea._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'LIFE-02|LIFE-03|LIFE-04|LIFE-05|LIFE-09'`._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter LIFE`._
 - **M6-10fa** _(Infrastructure)_ — Pass the M1 debug-seed semantics through
   arena dirty propagation without turns, reactions, or history.
   _Depends: M6-09, M6-10cb._
