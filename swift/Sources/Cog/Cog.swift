@@ -57,6 +57,8 @@ public struct Cog<Value> {
   /// (§2.3).
   ///
   /// - Parameters:
+  ///   - keepAlive: Whether this declaration has app lifetime instead of the
+  ///     synchronous-derived `whileObserved` default.
   ///   - selector: How to compute the value. Read other cogs through the
   ///     ``Reader`` it is given, and read nothing any other way.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
@@ -64,6 +66,7 @@ public struct Cog<Value> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
+    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -73,6 +76,7 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: nil,
+        lifetime: CogNodeLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -87,6 +91,8 @@ public struct Cog<Value> {
   /// downstream cogs follow it.
   ///
   /// - Parameters:
+  ///   - keepAlive: Whether this declaration has app lifetime instead of the
+  ///     synchronous-derived `whileObserved` default.
   ///   - selector: How to compute the value. Read other cogs through the
   ///     ``Reader`` it is given, and read nothing any other way.
   ///   - equals: Whether the cached and newly computed values count as equal.
@@ -95,6 +101,7 @@ public struct Cog<Value> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
+    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     equals: @escaping @MainActor (Value, Value) -> Bool,
     name: String? = nil,
@@ -105,6 +112,7 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: equals,
+        lifetime: CogNodeLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -123,9 +131,10 @@ extension Cog where Value: Equatable {
   /// Declares an `Equatable` derived value whose equal reruns stop the wave.
   ///
   /// This overload is selected automatically when `Value` conforms to
-  /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to substitute a
-  /// domain-specific equality rule.
+  /// `Equatable`. Use ``init(keepAlive:_:equals:name:fileID:line:)`` to
+  /// substitute a domain-specific equality rule.
   public init(
+    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -135,6 +144,7 @@ extension Cog where Value: Equatable {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: { oldValue, newValue in oldValue == newValue },
+        lifetime: CogNodeLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil

@@ -10,6 +10,13 @@
 internal final class ManualCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
+  /// Manual state stays resident until its context ends by default.
+  ///
+  /// Releasing a source would otherwise silently restore its starting value.
+  /// The later manual lifetime opt-in may select `whileObserved`, but every
+  /// ordinary source and box uses this app-lifetime default.
+  let lifetime: CogNodeLifetime
+
   /// Where a node of this declaration gets its first value.
   ///
   /// The starting value lives on the descriptor because the declaration is
@@ -36,9 +43,11 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   init(
     startingValue: Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
+    lifetime: CogNodeLifetime = .app,
     label: CogLabel
   ) {
     self.label = label
+    self.lifetime = lifetime
     self.start = .constant(startingValue)
     self.equals = equals
   }
@@ -53,9 +62,11 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   init(
     startingValueForKey: @escaping @MainActor (AnyHashable?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
+    lifetime: CogNodeLifetime = .app,
     label: CogLabel
   ) {
     self.label = label
+    self.lifetime = lifetime
     self.start = .perKey(startingValueForKey)
     self.equals = equals
   }

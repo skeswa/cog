@@ -14,6 +14,14 @@
 internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
+  /// Whether nodes of this declaration are releasable when unobserved.
+  ///
+  /// Synchronous derived values default to `whileObserved` because Cog can
+  /// recompute them. The public `keepAlive` declaration sugar instead stores
+  /// `app`; the later lifetime engine consumes this policy when it schedules
+  /// release.
+  let lifetime: CogNodeLifetime
+
   /// How a node of this declaration computes its value.
   ///
   /// `@MainActor` because the graph is (§1.2, §2.5), stated explicitly so the
@@ -31,9 +39,11 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   init(
     selector: @escaping @MainActor (Reader<Value>, AnyHashable?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
+    lifetime: CogNodeLifetime = .whileObserved,
     label: CogLabel
   ) {
     self.label = label
+    self.lifetime = lifetime
     self.selector = selector
     self.equals = equals
   }
