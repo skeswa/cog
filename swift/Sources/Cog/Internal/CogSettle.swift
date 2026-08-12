@@ -115,6 +115,15 @@ extension CogNode {
 /// erasing the selector's value at each graph edge.
 @MainActor
 internal protocol DerivedCogSettleNode: CogNode {
+  /// The declaration half of this node's stable descriptor-and-key identity.
+  var descriptorIdentity: ObjectIdentifier { get }
+
+  /// The key half of this node's identity, or `nil` for a keyless declaration.
+  var key: AnyHashable? { get }
+
+  /// Whether this node is on the context's active derived-computation path.
+  var isComputing: Bool { get set }
+
   var dependencies: [any CogNode] { get }
   func recompute(in cogs: Cogtext)
 }
@@ -131,19 +140,25 @@ internal enum CogSettleFrame {
   case exit(any CogNode)
 }
 
-/// The context-owned frame buffer reused by every settle walk.
+/// The context-owned traversal storage reused by every settle walk.
 ///
-/// `reset` deliberately clears with retained capacity. Normal completion pops
-/// the buffer empty already, while the clear also makes a later traversal safe
-/// after an early diagnostic path abandoned frames. The final arena core will
-/// replace node references with slots without changing the enter/exit shape.
+/// Nested pulls append frames above their caller's checkpoint and pop only
+/// that suffix, while the active derived path remains shared so either walk
+/// can recognize a cycle through the other. The final arena core will replace
+/// node references with slots without changing the enter/exit/path shape.
 internal struct CogSettleStack {
   private var frames: [CogSettleFrame] = []
+  private var computingPath: [any DerivedCogSettleNode] = []
 
   var count: Int { frames.count }
   var capacity: Int { frames.capacity }
   var isEmpty: Bool { frames.isEmpty }
+  var computingCount: Int { computingPath.count }
+  var isComputingEmpty: Bool { computingPath.isEmpty }
 
+  /// Resets only the raw frame buffer for low-level stack infrastructure tests.
+  /// Production settlement uses checkpoints so a nested pull preserves its
+  /// caller's pending frames and active computation path.
   mutating func reset(startingAt root: any CogNode) {
     frames.removeAll(keepingCapacity: true)
     frames.append(.enter(root))
@@ -159,6 +174,38 @@ internal struct CogSettleStack {
 
   mutating func popLast() -> CogSettleFrame? {
     frames.popLast()
+  }
+
+  /// The cycle that entering `node` would close, or `nil` for a new path step.
+  ///
+  /// Every ordinary check is the node's one Boolean. Only the exceptional
+  /// marked-node path scans the active stack and snapshots the actual cycle
+  /// suffix, so normal reads allocate and render nothing.
+  func cyclePath(ifEntering node: any DerivedCogSettleNode) -> CogCyclePath? {
+    guard node.isComputing else { return nil }
+    guard let first = computingPath.firstIndex(where: { $0 === node }) else {
+      fatalError("A derived Cog was marked computing without an active path entry.")
+    }
+
+    return CogCyclePath(nodes: Array(computingPath[first...]) + [node])
+  }
+
+  /// Marks and appends one derived node after cycle detection has succeeded.
+  mutating func beginComputing(_ node: any DerivedCogSettleNode) {
+    guard cyclePath(ifEntering: node) == nil else {
+      fatalError("Cog tried to enter a derived cycle without reporting it.")
+    }
+    node.isComputing = true
+    computingPath.append(node)
+  }
+
+  /// Clears the last derived path entry, enforcing balanced LIFO traversal.
+  mutating func endComputing(_ node: any DerivedCogSettleNode) {
+    guard let active = computingPath.last, active === node else {
+      fatalError("Cog tried to finish derived computation out of path order.")
+    }
+    computingPath.removeLast()
+    node.isComputing = false
   }
 }
 
@@ -196,9 +243,14 @@ extension Cogtext {
   /// CHECK node must run. A recomputation that lands equal advances only
   /// `checkedAt`, so consumers farther down a CHECK wave stay cached.
   internal func settle(_ root: any DerivedCogSettleNode) {
-    settleStack.reset(startingAt: root)
+    // A selector may discover a dirty dependency while an outer settle still
+    // has sibling and exit frames pending. Appending above a checkpoint keeps
+    // that nested pull from erasing its caller's work; each invocation pops
+    // only the frames it owns.
+    let boundary = settleStack.count
+    settleStack.pushEnter(root)
 
-    while let frame = settleStack.popLast() {
+    while settleStack.count > boundary, let frame = settleStack.popLast() {
       switch frame {
       case .enter(let node):
         guard node.settleState != .clean else { continue }
@@ -209,6 +261,11 @@ extension Cogtext {
           continue
         }
 
+        if let cycle = settleStack.cyclePath(ifEntering: derived) {
+          fatalError(cycle.message)
+        }
+
+        settleStack.beginComputing(derived)
         settleStack.pushExit(derived)
         for dependency in derived.dependencies.reversed()
         where dependency.settleState != .clean {
@@ -217,6 +274,7 @@ extension Cogtext {
 
       case .exit(let node):
         guard let derived = node as? any DerivedCogSettleNode else { continue }
+        defer { settleStack.endComputing(derived) }
 
         let parentChanged = derived.dependencies.contains {
           $0.changedAt > derived.checkedAt

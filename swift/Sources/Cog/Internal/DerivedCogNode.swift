@@ -35,6 +35,15 @@ internal final class DerivedCogNode<Value>:
   /// lookup through the context's storage (§2.4).
   let key: AnyHashable?
 
+  /// The declaration half of this node's stable descriptor-and-key identity.
+  var descriptorIdentity: ObjectIdentifier { descriptor.identity }
+
+  /// Whether this node currently appears on the context's computation path.
+  ///
+  /// The common cycle check is this one bit. The context scans its active path
+  /// only after the bit says a read would close a cycle.
+  var isComputing: Bool
+
   /// What the last run of the selector produced, or `.none` if it has never
   /// run in this context.
   ///
@@ -90,6 +99,7 @@ internal final class DerivedCogNode<Value>:
     self.descriptor = descriptor
     self.key = key
     self.cachedValue = .none
+    self.isComputing = false
     self.settleState = .dirty
     self.changedAt = .initial
     self.checkedAt = .initial
@@ -105,8 +115,8 @@ internal final class DerivedCogNode<Value>:
   /// choke point, which is why it is stated as "settled value" rather than
   /// "cached value or run".
   func settledValue(in cogs: Cogtext) -> Value {
-    guard hasComputed else {
-      return run(in: cogs)
+    if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
+      fatalError(cycle.message)
     }
 
     if settleState != .clean {
@@ -139,6 +149,10 @@ internal final class DerivedCogNode<Value>:
   /// duration of the run, so a nested read of another derived cog computes
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
+    guard isComputing else {
+      fatalError("A derived Cog selector ran outside the settle computation path.")
+    }
+
     #if DEBUG
     // Reader tracking ends before the user-supplied equality check below. Keep
     // debug seed blocked until the node has recorded the result, or a seed from
