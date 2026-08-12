@@ -117,15 +117,15 @@ struct WeatherApp: App {
   var body: some Scene {
     WindowGroup {
       RootScene()
-        .environment(\.cogs, cogs)
+        .cogEnvironment(cogs)
     }
   }
 }
 ```
 
-Every scene receives the same retained object through `\.cogs`. A view reads it
-with `@Environment(\.cogs) private var cogs`; tests and previews inject their
-isolated context through that same boundary.
+Every scene receives the same retained object through `.cogEnvironment(cogs)`.
+A view reads it with `@Environment(\.cogs) private var cogs`; tests and previews
+install their isolated context through the same modifier.
 
 An ordinary test or preview-support target depends on `CogTesting`. Create one
 fresh context for that test or preview runtime and pass it through the same

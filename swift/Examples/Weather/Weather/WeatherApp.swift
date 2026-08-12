@@ -15,7 +15,7 @@ struct WeatherApp: App {
   var body: some Scene {
     WindowGroup {
       WeatherDashboard()
-        .environment(\.cogs, cogs)
+        .cogEnvironment(cogs)
     }
   }
 }

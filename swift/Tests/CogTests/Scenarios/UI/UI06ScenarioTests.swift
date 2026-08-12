@@ -15,13 +15,9 @@ private struct ContextProbe: View {
 @MainActor
 @Test func `UI-06 a view resolves the context installed through the cogs environment key`() {
   let cogs = Cogtext.forTesting()
-  var environment = EnvironmentValues()
+  let renderer = ImageRenderer(content: ContextProbe().cogEnvironment(cogs))
 
-  environment.cogs = cogs
-
-  #expect(environment.cogs === cogs)
-
-  // The exact production composition spelling and @Environment lookup both
-  // type-check through the public API.
-  _ = ContextProbe().environment(\.cogs, cogs)
+  // Rendering exercises the real DynamicProperty update. Merely constructing
+  // the view would not prove the environment arrives before @Environment reads.
+  #expect(renderer.cgImage != nil)
 }

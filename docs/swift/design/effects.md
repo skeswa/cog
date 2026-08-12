@@ -103,7 +103,7 @@ struct WeatherApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { RootView().environment(\.cogs, cogs) }
+        WindowGroup { RootView().cogEnvironment(cogs) }
     }
 }
 ```
