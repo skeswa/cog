@@ -21,17 +21,17 @@
 /// dependencies to a computation that is over.
 ///
 /// `c.read` is the deliberate exception: it returns a settled value without
-/// recording an edge. `c.curr` (this cog's own previous value, `M1-10`) joins
-/// these reads later.
+/// recording an edge. `c.curr` exposes this cog's own previous value without
+/// making the cog depend on itself.
 @MainActor
 public struct Reader<Value> {
   /// The context whose graph this run reads.
   private let cogs: Cogtext
 
   /// The node being computed — the consumer every read of this run links to,
-  /// and, once `M1-10` lands, the holder of the `curr` value this run may fold
-  /// into its result. That second use is why the reader is generic over the
-  /// value its own cog produces rather than being one untyped read handle.
+  /// and the holder of the `curr` value this run may fold into its result.
+  /// That second use is why the reader is generic over the value its own cog
+  /// produces rather than being one untyped read handle.
   private let node: DerivedCogNode<Value>
 
   /// Hands a run its reader. Only a node computing itself may make one.
@@ -115,5 +115,15 @@ public struct Reader<Value> {
   /// - Returns: The value its source holds in the latest completed turn.
   public func read<Read>(_ ref: ReadOnlyCog<Read>) -> Read {
     read(ref.source)
+  }
+
+  /// The value this cog retained after its previous completed run.
+  ///
+  /// The outer optional records whether a previous run exists. If `Value` is
+  /// itself optional, `.none` means there has been no previous run while
+  /// `.some(.none)` means the previous run produced `nil` (§2.4).
+  public var curr: Value? {
+    cogs.requireTracking(node)
+    return node.cachedValue
   }
 }

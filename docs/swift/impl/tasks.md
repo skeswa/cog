@@ -343,7 +343,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter READ-06`._
   _Greens: READ-06._
 - **M1-10** _(Behavior)_ — Add `c.curr`, including the no-previous first run.
-  _Depends: M1-05a._
+  _Depends: M1-06ab._
   _Verify: `mise run test --filter 'READ-04|READ-05'`._
   _Greens: READ-04, READ-05._
 - **M1-11** _(Behavior)_ — Stress the existing explicit stack with a chain
