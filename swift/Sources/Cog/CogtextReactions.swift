@@ -22,10 +22,21 @@ extension Cogtext {
     line: UInt = #line,
     _ body: @escaping @MainActor (ReactionReader) -> Void
   ) -> ReactionToken {
-    let reaction = CogReaction(
-      label: CogLabel(name: nil, fileID: fileID, line: line),
-      body: body
-    )
+    register(label: CogLabel(name: nil, fileID: fileID, line: line), body: body)
+  }
+
+  /// Registers one reaction body under `label` and schedules its first tracking
+  /// run.
+  ///
+  /// The one path every registration spelling takes to the graph, so that a
+  /// watch and a plain reaction cannot drift apart on the two things a
+  /// registration decides: where it lands in call order, and whether its first
+  /// run happens now or joins the active flush's queue.
+  internal func register(
+    label: CogLabel,
+    body: @escaping @MainActor (ReactionReader) -> Void
+  ) -> ReactionToken {
+    let reaction = CogReaction(label: label, body: body)
     reactions.append(reaction)
     if case .flushing = turnPhase {
       reactionRuns.append(.initial(reaction))
