@@ -12,7 +12,7 @@ extension Cogtext {
     name: String = #function,
     set: @escaping @MainActor (Writer, Value) -> Void
   ) -> Binding<Value> {
-    makeBinding(name: name, read: { self.get(valueReference) }, set: set)
+    makeBinding(name: name, read: { self[valueReference] }, set: set)
   }
 
   /// Builds a domain binding whose getter reads a derived cog.
@@ -21,7 +21,7 @@ extension Cogtext {
     name: String = #function,
     set: @escaping @MainActor (Writer, Value) -> Void
   ) -> Binding<Value> {
-    makeBinding(name: name, read: { self.get(valueReference) }, set: set)
+    makeBinding(name: name, read: { self[valueReference] }, set: set)
   }
 
   /// Builds a domain binding without exposing the projection's writable
@@ -31,7 +31,7 @@ extension Cogtext {
     name: String = #function,
     set: @escaping @MainActor (Writer, Value) -> Void
   ) -> Binding<Value> {
-    makeBinding(name: name, read: { self.get(valueReference) }, set: set)
+    makeBinding(name: name, read: { self[valueReference] }, set: set)
   }
 
   private func makeBinding<Value>(
@@ -42,8 +42,8 @@ extension Cogtext {
     Binding(
       get: read,
       set: { value in
-        self.commit(name) { writer in
-          set(writer, value)
+        self.commit(name) { c in
+          set(c, value)
         }
       }
     )

@@ -21,7 +21,7 @@ private actor EffectGroupDropper {
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
   let group = EffectGroup()
-  group.add(cogs.run { reader in seen.append(reader.get(source)) })
+  group.add(cogs.run { c in seen.append(c[source]) })
 
   let (startedEvents, startedContinuation) = AsyncStream.makeStream(
     of: Void.self,
@@ -52,9 +52,9 @@ private actor EffectGroupDropper {
   await #expect(throws: CancellationError.self) {
     try await task.value
   }
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
   #expect(seen == [0])
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
 
   await release.value
   withExtendedLifetime(releaseContinuation) {}

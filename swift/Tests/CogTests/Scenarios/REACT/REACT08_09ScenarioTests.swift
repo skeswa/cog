@@ -11,7 +11,7 @@ import Testing
 @Test func `REACT-08 a skipping watch is quiet at install and then delivers old and new`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
   var deliveries: [String] = []
 
   let token = cogs.watch(doubled, initial: .skip, name: "watch.skipping") { old, new in
@@ -21,13 +21,13 @@ import Testing
   // Installing the watch calls nothing at all.
   #expect(deliveries.isEmpty)
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   // The first real change calls once, with the value from before the change
   // and the value after it.
   #expect(deliveries == ["2->4"])
 
-  cogs.commit { w in w[source] = 3 }
+  cogs.commit { c in c[source] = 3 }
 
   // The old value advances with the watch, so it really is the previous value
   // rather than the one captured at install time.
@@ -50,7 +50,7 @@ import Testing
   // install has no transition to report, so the current value is both halves.
   #expect(deliveries == ["1->1"])
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   // After its install call it is an ordinary watch.
   #expect(deliveries == ["1->1", "1->2"])

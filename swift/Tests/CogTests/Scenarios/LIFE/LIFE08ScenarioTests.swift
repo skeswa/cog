@@ -15,13 +15,13 @@ import Testing
     return 10
   }
 
-  let reaction = cogs.run { reader in _ = reader.get(derived) }
+  let reaction = cogs.run { c in _ = c[derived] }
   #expect(selectorRuns == 1)
 
   reaction.cancel()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.get(derived) == 10)
+  #expect(cogs[derived] == 10)
   #expect(selectorRuns == 1)
 
   let releaseChecked = MainActorCleanupAcknowledgement()
@@ -29,7 +29,7 @@ import Testing
   clock.advance(by: .seconds(10))
   try await releaseChecked.wait()
 
-  #expect(cogs.read(derived) == 10)
+  #expect(cogs.peek(derived) == 10)
   #expect(selectorRuns == 1)
   withExtendedLifetime(reaction) {}
 }

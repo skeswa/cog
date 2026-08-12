@@ -13,7 +13,7 @@ import Testing
 
   let retryLimit = ManualCog<Int>(3)
 
-  #expect(cogs.read(retryLimit) == 3)
+  #expect(cogs.peek(retryLimit) == 3)
 }
 
 @MainActor
@@ -27,8 +27,8 @@ import Testing
 
   let retryLimit = ManualCog<Int>(3)
 
-  #expect(first.read(retryLimit) == 3)
-  #expect(second.read(retryLimit) == 3)
+  #expect(first.peek(retryLimit) == 3)
+  #expect(second.peek(retryLimit) == 3)
 }
 
 @MainActor
@@ -39,6 +39,6 @@ import Testing
 
   for _ in 0..<50 {
     let cogs = Cogtext.forTesting()
-    #expect(cogs.read(declaration) == 3)
+    #expect(cogs.peek(declaration) == 3)
   }
 }

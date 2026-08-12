@@ -12,15 +12,15 @@ import Testing
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(0)
 
-  cogs.commit { w in
-    w[count] = 4
-    #expect(w[count] == 4)
+  cogs.commit { c in
+    c[count] = 4
+    #expect(c[count] == 4)
 
-    w[count] += 1
-    #expect(w[count] == 5)
+    c[count] += 1
+    #expect(c[count] == 5)
   }
 
-  #expect(cogs.read(count) == 5)
+  #expect(cogs.peek(count) == 5)
 }
 
 @MainActor
@@ -30,22 +30,22 @@ import Testing
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(0)
   let doubled = Cog<Int> { c in
-    let value = c.get(source)
+    let value = c[source]
     sourceValuesSeen.append(value)
     return value * 2
   }
 
-  #expect(cogs.read(doubled) == 0)
+  #expect(cogs.peek(doubled) == 0)
 
-  cogs.commit { w in
-    w[source] = 1
-    #expect(w[source] == 1)
+  cogs.commit { c in
+    c[source] = 1
+    #expect(c[source] == 1)
 
-    w[source] = 2
-    #expect(w[source] == 2)
+    c[source] = 2
+    #expect(c[source] == 2)
   }
 
-  #expect(cogs.read(doubled) == 4)
+  #expect(cogs.peek(doubled) == 4)
   #expect(sourceValuesSeen == [0, 2])
 }
 
@@ -55,13 +55,13 @@ import Testing
   let count = ManualCog<Int>(0)
   let note = ManualCog<String>("old")
 
-  cogs.commit { w in
-    w[count] = 3
+  cogs.commit { c in
+    c[count] = 3
   }
 
-  cogs.commit { w in
-    w[note] = "new"
-    #expect(w[count] == 3)
+  cogs.commit { c in
+    c[note] = "new"
+    #expect(c[count] == 3)
   }
 }
 
@@ -70,14 +70,14 @@ import Testing
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(0)
 
-  cogs.commit { w in
-    w[count] = 7
+  cogs.commit { c in
+    c[count] = 7
 
-    #expect(w[count] == 7)
-    #expect(cogs.read(count) == 0)
+    #expect(c[count] == 7)
+    #expect(cogs.peek(count) == 0)
   }
 
-  #expect(cogs.read(count) == 7)
+  #expect(cogs.peek(count) == 7)
 }
 
 @MainActor
@@ -85,13 +85,13 @@ import Testing
   let cogs = Cogtext.forTesting()
   let unreadCounts = ManualCogBox<Int, String>(0)
 
-  cogs.commit { w in
-    w[unreadCounts["inbox"]] += 1
+  cogs.commit { c in
+    c[unreadCounts["inbox"]] += 1
 
-    #expect(w[unreadCounts["inbox"]] == 1)
-    #expect(w[unreadCounts["archive"]] == 0)
+    #expect(c[unreadCounts["inbox"]] == 1)
+    #expect(c[unreadCounts["archive"]] == 0)
   }
 
-  #expect(cogs.read(unreadCounts["inbox"]) == 1)
-  #expect(cogs.read(unreadCounts["archive"]) == 0)
+  #expect(cogs.peek(unreadCounts["inbox"]) == 1)
+  #expect(cogs.peek(unreadCounts["archive"]) == 0)
 }

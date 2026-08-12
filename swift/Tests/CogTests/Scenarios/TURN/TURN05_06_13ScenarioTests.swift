@@ -8,8 +8,8 @@ import Testing
 extension Cogtext {
   /// An op whose body nests a second op, which nests a third.
   fileprivate func transfer(_ amount: Int, from: ManualCog<Int>, to: ManualCog<Int>) {
-    commit { w in
-      w[from] -= amount
+    commit { c in
+      c[from] -= amount
       self.credit(amount, to: to)
     }
   }
@@ -21,24 +21,24 @@ extension Cogtext {
   }
 
   fileprivate func recordCredit(_ amount: Int, to: ManualCog<Int>) {
-    commit("credit.record") { w in w[to] += amount }
+    commit("credit.record") { c in c[to] += amount }
   }
 
   /// An op that lets `#function` name its own turn.
   fileprivate func applyDiscount(_ price: ManualCog<Int>) {
-    commit { w in w[price] -= 1 }
+    commit { c in c[price] -= 1 }
   }
 
   fileprivate func recordFollowup(_ followup: ManualCog<Int>) {
-    commit("followup.record") { w in w[followup] = 1 }
+    commit("followup.record") { c in c[followup] = 1 }
   }
 
   fileprivate func stepOne(_ counter: ManualCog<Int>) {
-    commit { w in w[counter] = 1 }
+    commit { c in c[counter] = 1 }
   }
 
   fileprivate func stepTwo(_ counter: ManualCog<Int>) {
-    commit { w in w[counter] = 2 }
+    commit { c in c[counter] = 2 }
   }
 }
 
@@ -50,14 +50,14 @@ extension Cogtext {
   var selectorRuns = 0
   let total = Cog<Int> { c in
     selectorRuns += 1
-    return c.get(left) + c.get(right)
+    return c[left] + c[right]
   }
   var events: [String] = []
 
   // Registered before the turn under test on purpose: a registration made
   // inside an accumulating body would run immediately and again at that turn's
   // flush, putting a run in `events` that means nothing here.
-  let token = cogs.run { c in events.append("react:\(c.get(total))") }
+  let token = cogs.run { c in events.append("react:\(c[total])") }
   #expect(events == ["react:0"])
   events.removeAll()
   selectorRuns = 0
@@ -65,25 +65,25 @@ extension Cogtext {
   var innerWriterSaw: [Int] = []
   var midBody: [String] = []
 
-  cogs.commit("outer") { w in
-    w[left] = 1
-    cogs.commit("inner") { inner in
+  cogs.commit("outer") { c in
+    c[left] = 1
+    cogs.commit("inner") { c in
       // The inner writer is the outer turn's writer, so it reads back what the
       // outer body staged a line ago.
-      innerWriterSaw.append(inner[left])
-      inner[right] = 2
+      innerWriterSaw.append(c[left])
+      c[right] = 2
     }
     // The inner commit has returned and nothing has crossed the boundary yet:
     // normal reads still see committed values, and no reaction has run.
-    midBody.append("reads:\(cogs.read(left))/\(cogs.read(right))")
+    midBody.append("reads:\(cogs.peek(left))/\(cogs.peek(right))")
     midBody.append("reactions:\(events.count)")
   }
 
   // No await and no polling: the statement after the outer commit already sees
   // the whole flush, and that flush happened exactly once.
-  #expect(cogs.read(left) == 1)
-  #expect(cogs.read(right) == 2)
-  #expect(cogs.read(total) == 3)
+  #expect(cogs.peek(left) == 1)
+  #expect(cogs.peek(right) == 2)
+  #expect(cogs.peek(total) == 3)
 
   #expect(innerWriterSaw == [1])
   #expect(midBody == ["reads:0/0", "reactions:0"])
@@ -99,18 +99,18 @@ extension Cogtext {
   let counter = ManualCog<Int>(0)
   var events: [String] = []
 
-  let token = cogs.run { c in events.append("react:\(c.get(counter))") }
+  let token = cogs.run { c in events.append("react:\(c[counter])") }
   events.removeAll()
 
   // One event handler, two commits back to back, nothing suspended between.
   func handleTap() {
-    cogs.commit("step.one") { w in
+    cogs.commit("step.one") { c in
       events.append("body:1")
-      w[counter] = 1
+      c[counter] = 1
     }
-    cogs.commit("step.two") { w in
+    cogs.commit("step.two") { c in
       events.append("body:2")
-      w[counter] = 2
+      c[counter] = 2
     }
   }
 
@@ -132,8 +132,8 @@ extension Cogtext {
 
   cogs.transfer(2, from: checking, to: savings)
 
-  #expect(cogs.read(checking) == 3)
-  #expect(cogs.read(savings) == 2)
+  #expect(cogs.peek(checking) == 3)
+  #expect(cogs.peek(savings) == 2)
 
   let entries = cogs.debugHistory.entries
   let turns = entries.filter { $0.event == .turn }
@@ -156,7 +156,7 @@ extension Cogtext {
   let price = ManualCog<Int>(10)
 
   cogs.applyDiscount(price)
-  cogs.commit("checkout.submit") { w in w[price] = 0 }
+  cogs.commit("checkout.submit") { c in c[price] = 0 }
 
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.count == 2)
@@ -172,13 +172,13 @@ extension Cogtext {
   let followup = ManualCog<Int>(0)
 
   let token = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
     cogs.recordFollowup(followup)
   }
 
-  cogs.commit("outer") { w in
-    w[trigger] = 1
-    cogs.commit("ignored") { inner in inner[note] = 5 }
+  cogs.commit("outer") { c in
+    c[trigger] = 1
+    cogs.commit("ignored") { c in c[note] = 5 }
   }
 
   // Three names were offered and two turns happened. The joined body's name is

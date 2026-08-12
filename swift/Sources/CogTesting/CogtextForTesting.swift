@@ -15,7 +15,7 @@ extension Cogtext {
   /// @MainActor
   /// @Test func retryLimitDefaultsToThree() {
   ///   let cogs = Cogtext.forTesting()
-  ///   #expect(cogs.read(retryLimit) == 3)
+  ///   #expect(cogs.peek(retryLimit) == 3)
   /// }
   /// ```
   ///

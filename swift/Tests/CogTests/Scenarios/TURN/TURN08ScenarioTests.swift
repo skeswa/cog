@@ -10,28 +10,28 @@ import Testing
   var events: [String] = []
 
   let doubled = Cog<Int> { c in
-    let result = c.get(value) * 2
+    let result = c[value] * 2
     events.append("settle:\(result)")
     return result
   }
 
   let queueingReaction = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
 
     for next in 1...3 {
-      cogs.commit("queued.\(next)") { w in
+      cogs.commit("queued.\(next)") { c in
         events.append("body:\(next)")
-        w[value] = next
+        c[value] = next
       }
     }
   }
 
   let observingReaction = cogs.run { c in
-    events.append("react:\(c.get(doubled))")
+    events.append("react:\(c[doubled])")
   }
 
   events.removeAll()
-  cogs.commit { w in w[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   // No UI boundary is registered in this host test, so the notify phase is
   // empty. Seeing each reaction complete before the next body begins proves

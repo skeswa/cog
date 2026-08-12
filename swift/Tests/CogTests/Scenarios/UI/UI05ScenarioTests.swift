@@ -7,10 +7,10 @@ import Testing
 @Test func `UI-05 only states read through the UI boundary allocate boundary objects`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(2)
-  let interior = Cog<Int> { reader in reader.get(source) * 3 }
-  let displayed = Cog<String> { reader in "value: \(reader.get(interior))" }
+  let interior = Cog<Int> { c in c[source] * 3 }
+  let displayed = Cog<String> { c in "value: \(c[interior])" }
 
-  #expect(cogs.get(displayed) == "value: 6")
+  #expect(cogs[displayed] == "value: 6")
 
   let sourceState = cogs.manualState(for: source)
   let interiorState = cogs.derivedState(for: interior)
@@ -22,7 +22,7 @@ import Testing
   #expect(cogs.observationStates.count == 1)
   #expect(cogs.observationStates[0] === displayedState)
 
-  #expect(cogs.get(source) == 2)
+  #expect(cogs[source] == 2)
   #expect(sourceState.observationBoundary != nil)
   #expect(interiorState.observationBoundary == nil)
   #expect(cogs.observationStates.count == 2)

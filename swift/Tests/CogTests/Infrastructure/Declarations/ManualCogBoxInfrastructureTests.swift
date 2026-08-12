@@ -81,7 +81,7 @@ import Testing
   let there = weather[10001]
   #expect(cogs.states.isEmpty)
 
-  _ = cogs.read(here)
+  _ = cogs.peek(here)
   #expect(cogs.states.count == 1)
   #expect(cogs.states[CogStateIdentity(descriptor: there.descriptor.identity, key: 10001)] == nil)
 }

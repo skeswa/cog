@@ -277,7 +277,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-02, M1-04ab._
   _Verify: `mise run test --filter 'TURN-02|TURN-14'`._
   _Greens: TURN-02, TURN-14._
-- **M1-05a** _(Behavior)_ — Add keyless derived cogs, tracked `c.get`, lazy
+- **M1-05a** _(Behavior)_ — Add keyless derived cogs, tracked `c[...]`, lazy
   first computation, and caching.
   _Depends: M1-04ab._
   _Verify: `mise run test --filter 'DECL-07|DECL-09|READ-02'`._
@@ -323,7 +323,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-06ab._
   _Verify: `mise run test --filter 'GRAPH-07|GRAPH-08'`._
   _Greens: GRAPH-07, GRAPH-08._
-- **M1-08b** _(Behavior)_ — Add subscription-free one-shot `cogs.read` that
+- **M1-08b** _(Behavior)_ — Add subscription-free one-shot `cogs.peek` that
   still settles.
   _Depends: M1-08a._
   _Verify: `mise run test --filter READ-07`._
@@ -338,7 +338,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-04b, M1-05b, M1-09a._
   _Verify: `mise run test --filter 'GRAPH-11|GRAPH-12'`._
   _Greens: GRAPH-11, GRAPH-12._
-- **M1-09c** _(Behavior)_ — Add `c.read` peeks that skip edges but settle.
+- **M1-09c** _(Behavior)_ — Add `c.peek` reads that skip edges but settle.
   _Depends: M1-08b, M1-09a._
   _Verify: `mise run test --filter READ-06`._
   _Greens: READ-06._
@@ -632,13 +632,13 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
-- **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare
-  `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references before boundary call sites
-  multiply.
+- **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare an
+  explicit tracked method, a subscript, and callable value references before
+  boundary call sites multiply.
   _Depends: M1-32._
-  _Verify: checked-in prototype diff and decision rationale._
-- **M2-17b** _(Infrastructure)_ — Apply the winning spelling and record it in
-  §10 and the Swift README snapshot.
+  _Verify: decision rationale in §10 and the Swift README snapshot._
+- **M2-17b** _(Infrastructure)_ — Apply the settled subscript and `peek`
+  spellings and record them in §10 and the Swift README snapshot.
   _Depends: M2-17a._
   _Verify: API call-site search plus `mise run fmt:check`._
 - **M2-01** _(Infrastructure)_ — Add registrar-backed boundary objects,
@@ -679,8 +679,8 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Verify: `mise run test --filter UI-09`._
   _Greens: UI-09._
 - **M2-07** _(Decision)_ — Record that public Observation cannot distinguish
-  a valid automatically tracked UI read from a `get` with no consumer; keep
-  the direct spelling, require `read` in actions, and defer the warning.
+  a valid automatically tracked UI subscript read from one with no consumer;
+  keep the direct spelling, require `peek` in actions, and defer the warning.
   _Depends: M2-02ab._
   _Verify: documentation alignment plus `mise run tasks:check`._
 - **M2-08** _(Behavior)_ — Prove a view reading a changed pair renders only

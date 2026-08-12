@@ -16,9 +16,9 @@ Cog is the library.
   the end of their group. Tests should carry their scenario ID in their name
   or a comment so the suite and this tree stay linked.
 - API spellings in these stories follow the current design sketch. When core
-  §10 settles a provisional spelling such as tracked `cogs.get`, update the
-  story and its test call sites without changing the scenario ID; the ID names
-  the behavior, not the spelling.
+  §10 settles a provisional spelling such as tracked `cogs[valueReference]`,
+  update the story and its test call sites without changing the scenario ID;
+  the ID names the behavior, not the spelling.
 - Each group is tagged with the milestone from [plan.md](./plan.md) that turns
   it green, and points at the design sections it comes from. Every scenario is
   also covered by exactly one task in [tasks.md](./tasks.md); a task's
@@ -212,11 +212,11 @@ Every read I make is correct: the latest committed state, fully settled.
 - **READ-05.** The very first run of a `c.curr` selector has no previous
   value, and the selector can tell.
 - **READ-06.** A selector tracks a trigger and peeks at cog X with
-  `c.read`. Changing X alone does not rerun the selector. When the trigger
+  `c.peek`. Changing X alone does not rerun the selector. When the trigger
   later changes, the selector reruns and the peek returns X's newest
   settled value.
 - **READ-07.** I leave a derived cog cold while its source changes, then
-  use one-shot `cogs.read`. It settles the derived cog and returns its
+  use one-shot `cogs.peek`. It settles the derived cog and returns its
   newest value without creating a subscription.
 
 ## 4. TURN — Writing state and turns
@@ -227,7 +227,7 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ### 4.1 The writer
 
-- **TURN-01.** Inside one commit, `w[count] += 1` works: the writer reads
+- **TURN-01.** Inside one commit, `c[count] += 1` works: the writer reads
   back the value it just staged.
 - **TURN-02.** I write the same source twice in one commit. The last
   write wins, and downstream sees exactly one change.
@@ -264,7 +264,7 @@ _Milestone M1. Design: §3.2, §2.2._
 - **TURN-13.** I run two sibling commits back to back in one event
   handler. Each is its own named turn: two history entries, and reactions
   run after each one.
-- **TURN-14.** Inside one commit, `w[box[k]] += 1` works: the writer
+- **TURN-14.** Inside one commit, `c[box[k]] += 1` works: the writer
   reads back the value staged for that key, and other keys are untouched.
 
 ## 5. GRAPH — Derived values stay right and lazy
@@ -527,8 +527,8 @@ My views update when — and only when — the values they read change. Boundary
 tests assert Observation notices and re-render counters, never pixels or
 wall-clock waits; real rendering is proven once by the Weather example.
 
-- **UI-01.** A view reads a cog with `cogs.get`. When that cog changes,
-  the view re-renders.
+- **UI-01.** A view reads a cog with `cogs[valueReference]`. When that cog
+  changes, the view re-renders.
 - **UI-02.** When a cog the view never read changes, the view does not
   re-render.
 - **UI-03.** A card reads `weather[zipA]`. Writing `weather[zipB]`
@@ -544,7 +544,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
   writes through a named commit that shows up in history.
 - **UI-08.** A text field writes through a binding and immediately reads
   back. It sees its own write — no dropped characters.
-- **UI-09.** A view uses one-shot `cogs.read` in its body. Later changes
+- **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes
   to that cog do not re-render the view.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
   an iOS 26 simulator. (Proof: simulator.)
@@ -563,7 +563,7 @@ _Milestone M3. Design: §5.1, §5.2 (`.latest` only), §5.3._
 Async state is honest: it always says whether it is loading, what it has, and
 what it had.
 
-_Pending (core §10, open question 15): what a one-shot `cogs.read` of a
+_Pending (core §10, open question 15): what a one-shot `cogs.peek` of a
 never-read async cog does — does it create the state, start work, and publish
 a pending turn? — and what `cogs.refresh` of a never-read value reference does._
 
@@ -597,7 +597,7 @@ a pending turn? — and what `cogs.refresh` of a never-read value reference does
   no failure phase.
 - **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
   though no dependency changed, and the phases cycle again.
-- **ASYNC-11.** Only what the selector reads with `c.get` before
+- **ASYNC-11.** Only what the selector reads with `c[...]` before
   returning counts as a dependency. Values the work closure touches after
   an `await` do not retrigger it.
 - **ASYNC-12.** Two keys of an `AsyncCogBox` fetch independently. One can

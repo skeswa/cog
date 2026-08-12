@@ -22,7 +22,7 @@ private actor ReactionTokenDropper {
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
   let cleanup = MainActorCleanupAcknowledgement()
   token.acknowledgeDeinitCleanup(with: cleanup)
@@ -35,8 +35,8 @@ private actor ReactionTokenDropper {
   try await cleanup.wait()
   #expect(cleanup.hasBeenAcknowledged)
 
-  cogs.commit { w in w[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
   #expect(seen == [0])
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
   await release.value
 }

@@ -37,10 +37,10 @@ import os
     notices.withLock { $0 += 1 }
   }
 
-  cogs.commit { writer in writer[count] = 0 }
+  cogs.commit { c in c[count] = 0 }
   #expect(notices.withLock { $0 } == 0)
 
-  cogs.commit { writer in writer[count] = 1 }
+  cogs.commit { c in c[count] = 1 }
   #expect(notices.withLock { $0 } == 1)
 }
 
@@ -49,7 +49,7 @@ import os
 func `ObservationBoundaryInfrastructure settles a derived boundary before change-only mutation`() {
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(0)
-  let isEven = Cog<Bool> { reader in reader.get(count).isMultiple(of: 2) }
+  let isEven = Cog<Bool> { c in c[count].isMultiple(of: 2) }
   let state = cogs.derivedState(for: isEven)
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
@@ -60,11 +60,11 @@ func `ObservationBoundaryInfrastructure settles a derived boundary before change
     notices.withLock { $0 += 1 }
   }
 
-  cogs.commit { writer in writer[count] = 2 }
+  cogs.commit { c in c[count] = 2 }
   #expect(notices.withLock { $0 } == 0)
   #expect(state.cachedValue == true)
 
-  cogs.commit { writer in writer[count] = 3 }
+  cogs.commit { c in c[count] = 3 }
   #expect(notices.withLock { $0 } == 1)
   #expect(state.cachedValue == false)
 }

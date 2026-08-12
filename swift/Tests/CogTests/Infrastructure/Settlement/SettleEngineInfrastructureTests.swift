@@ -10,7 +10,7 @@ import Testing
 @Test func `SettleEngineInfrastructure gives fresh states the right state and versions`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
 
   let sourceState = cogs.manualState(for: source)
   let derivedState = cogs.derivedState(for: doubled)
@@ -138,11 +138,11 @@ import Testing
   weak let releasedContext = cogs
 
   let source = ManualCog<Int>(1)
-  let middle = Cog<Int> { c in c.get(source) + 1 }
-  let root = Cog<Int> { c in c.get(middle) + 1 }
-  #expect(cogs?.read(root) == 3)
+  let middle = Cog<Int> { c in c[source] + 1 }
+  let root = Cog<Int> { c in c[middle] + 1 }
+  #expect(cogs?.peek(root) == 3)
 
-  let token = cogs?.run { c in _ = c.get(root) }
+  let token = cogs?.run { c in _ = c[root] }
   let retainedStates = cogs.map { Array($0.states.values) } ?? []
   let retainedReaction = token?.reaction
 

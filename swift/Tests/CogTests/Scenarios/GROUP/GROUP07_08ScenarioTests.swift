@@ -10,8 +10,8 @@ import Testing
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
     group.add(
-      cogs.run { reader in
-        record(reader.get(screenValue))
+      cogs.run { c in
+        record(c[screenValue])
       })
     return group
   }
@@ -23,14 +23,14 @@ import Testing
   var seen: [Int] = []
   let group = ScreenEffects { seen.append($0) }.install(in: cogs)
 
-  cogs.commit { writer in writer[screenValue] = 1 }
+  cogs.commit { c in c[screenValue] = 1 }
   #expect(seen == [0, 1])
 
   group.cancel()
-  cogs.commit { writer in writer[screenValue] = 2 }
+  cogs.commit { c in c[screenValue] = 2 }
 
   #expect(seen == [0, 1])
-  #expect(cogs.read(screenValue) == 2)
+  #expect(cogs.peek(screenValue) == 2)
 }
 
 @MainActor
@@ -39,13 +39,13 @@ import Testing
   var seen: [Int] = []
   let effects = ScreenEffects { seen.append($0) }
 
-  cogs.commit { writer in writer[screenValue] = 1 }
+  cogs.commit { c in c[screenValue] = 1 }
   #expect(seen.isEmpty)
 
   let group = effects.install(in: cogs)
   #expect(seen == [1])
 
-  cogs.commit { writer in writer[screenValue] = 2 }
+  cogs.commit { c in c[screenValue] = 2 }
   #expect(seen == [1, 2])
   group.cancel()
 }

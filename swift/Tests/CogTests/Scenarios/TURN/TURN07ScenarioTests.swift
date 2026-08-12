@@ -15,8 +15,8 @@ import Testing
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?
-      cogs.commit { w in
-        escaped = w
+      cogs.commit { c in
+        escaped = c
       }
 
       escaped![count] = 1
@@ -34,9 +34,9 @@ import Testing
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?
-      cogs.commit { w in
-        w[count] = 1
-        escaped = w
+      cogs.commit { c in
+        c[count] = 1
+        escaped = c
       }
 
       // A writer read means "what this turn staged." Once the turn is over

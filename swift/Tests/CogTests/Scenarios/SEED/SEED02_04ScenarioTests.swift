@@ -18,7 +18,7 @@ import Testing
   cogs.seed(source, to: 2)
 
   // The value assertion keeps a no-op seed from satisfying the history proof.
-  #expect(cogs.read(source) == 2)
+  #expect(cogs.peek(source) == 2)
   #expect(cogs.debugHistory.count == 0)
   #expect(cogs.debugHistory.entries.filter { $0.event == .turn }.isEmpty)
 }
@@ -30,18 +30,18 @@ import Testing
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
   #expect(seen == [1])
 
   cogs.seed(source, to: 2)
 
-  #expect(cogs.read(source) == 2)
+  #expect(cogs.peek(source) == 2)
   #expect(seen == [1])
 
   // Quietness was not cancellation: the retained registration still wakes on
   // the next real turn and observes the latest value.
-  cogs.commit("seed.followup") { w in w[source] = 3 }
+  cogs.commit("seed.followup") { c in c[source] = 3 }
   #expect(seen == [1, 3])
   _ = token
 }
@@ -74,13 +74,13 @@ import Testing
   var alerts: [String] = []
 
   let isNiceOutsideHere = Cog<Bool> { c in
-    guard let currentZip = c.get(currentZipSource) else { return false }
+    guard let currentZip = c[currentZipSource] else { return false }
     weatherReads += 1
-    return c.get(weatherReportSource[currentZip])?.isNice == true
+    return c[weatherReportSource[currentZip]]?.isNice == true
   }
 
   let token = cogs.run { c in
-    if c.get(isNiceOutsideHere) {
+    if c[isNiceOutsideHere] {
       alerts.append("It is nice outside!")
     }
   }
@@ -95,13 +95,13 @@ import Testing
   // Setup changed both sources without settling the derived cog or running its
   // alert. Do not read the derived cog here: the pending dirty path is the
   // behavior this story is proving.
-  #expect(cogs.read(currentZipSource) == zip)
-  #expect(cogs.read(weatherReportSource[zip]) == .cloudy(60))
+  #expect(cogs.peek(currentZipSource) == zip)
+  #expect(cogs.peek(weatherReportSource[zip]) == .cloudy(60))
   #expect(weatherReads == 0)
   #expect(alerts.isEmpty)
 
-  cogs.commit("weather.stub") { w in
-    w[weatherReportSource[zip]] = .clear(75)
+  cogs.commit("weather.stub") { c in
+    c[weatherReportSource[zip]] = .clear(75)
   }
 
   #expect(weatherReads == 1)

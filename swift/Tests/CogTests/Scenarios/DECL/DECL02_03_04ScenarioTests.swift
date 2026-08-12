@@ -32,9 +32,9 @@ private struct ZipCode: Hashable {
 
   let retryLimit = ManualCogBox<Int, String>(3)
 
-  #expect(cogs.read(retryLimit["upload"]) == 3)
-  #expect(cogs.read(retryLimit["download"]) == 3)
-  #expect(cogs.read(retryLimit["sync"]) == 3)
+  #expect(cogs.peek(retryLimit["upload"]) == 3)
+  #expect(cogs.peek(retryLimit["download"]) == 3)
+  #expect(cogs.peek(retryLimit["sync"]) == 3)
 }
 
 @MainActor
@@ -46,7 +46,7 @@ private struct ZipCode: Hashable {
   let unreadCount = ManualCogBox<Int, Int>(0)
 
   for conversation in 0..<100 {
-    #expect(cogs.read(unreadCount[conversation]) == 0)
+    #expect(cogs.peek(unreadCount[conversation]) == 0)
   }
 }
 
@@ -62,8 +62,8 @@ private struct ZipCode: Hashable {
   let there = ZipCode(digits: "10001")
 
   for _ in 0..<10 {
-    #expect(cogs.read(weatherReport[here]) == nil)
-    #expect(cogs.read(weatherReport[there]) == nil)
+    #expect(cogs.peek(weatherReport[here]) == nil)
+    #expect(cogs.peek(weatherReport[there]) == nil)
   }
 }
 
@@ -77,8 +77,8 @@ private struct ZipCode: Hashable {
   let attempts = ManualCogBox<Int, String>(0)
   let ceiling = ManualCogBox<Int, String>(5)
 
-  #expect(cogs.read(attempts["upload"]) == 0)
-  #expect(cogs.read(ceiling["upload"]) == 5)
+  #expect(cogs.peek(attempts["upload"]) == 0)
+  #expect(cogs.peek(ceiling["upload"]) == 5)
 }
 
 @MainActor
@@ -91,8 +91,8 @@ private struct ZipCode: Hashable {
   let first = Cogtext.forTesting()
   let second = Cogtext.forTesting()
 
-  #expect(first.read(unreadCount[7]) == 0)
-  #expect(second.read(unreadCount[7]) == 0)
+  #expect(first.peek(unreadCount[7]) == 0)
+  #expect(second.peek(unreadCount[7]) == 0)
 }
 
 // MARK: - DECL-03
@@ -103,9 +103,9 @@ private struct ZipCode: Hashable {
 
   let doubled = ManualCogBox<Int, Int> { key in key * 2 }
 
-  #expect(cogs.read(doubled[5]) == 10)
-  #expect(cogs.read(doubled[6]) == 12)
-  #expect(cogs.read(doubled[0]) == 0)
+  #expect(cogs.peek(doubled[5]) == 10)
+  #expect(cogs.peek(doubled[6]) == 12)
+  #expect(cogs.peek(doubled[0]) == 0)
 }
 
 @MainActor
@@ -116,8 +116,8 @@ private struct ZipCode: Hashable {
 
   let greeting = ManualCogBox<String, ZipCode> { zip in "hello, \(zip.digits)" }
 
-  #expect(cogs.read(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
-  #expect(cogs.read(greeting[ZipCode(digits: "10001")]) == "hello, 10001")
+  #expect(cogs.peek(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
+  #expect(cogs.peek(greeting[ZipCode(digits: "10001")]) == "hello, 10001")
 }
 
 @MainActor
@@ -129,7 +129,7 @@ private struct ZipCode: Hashable {
 
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
 
-  #expect(cogs.read(ledgers[5]) !== cogs.read(ledgers[6]))
+  #expect(cogs.peek(ledgers[5]) !== cogs.peek(ledgers[6]))
 }
 
 @MainActor
@@ -146,12 +146,12 @@ private struct ZipCode: Hashable {
     return key * 2
   }
 
-  #expect(cogs.read(doubled[5]) == 10)
-  #expect(cogs.read(doubled[5]) == 10)
-  #expect(cogs.read(doubled[5]) == 10)
+  #expect(cogs.peek(doubled[5]) == 10)
+  #expect(cogs.peek(doubled[5]) == 10)
+  #expect(cogs.peek(doubled[5]) == 10)
   #expect(asked.keys == [5])
 
-  #expect(cogs.read(doubled[6]) == 12)
+  #expect(cogs.peek(doubled[6]) == 12)
   #expect(asked.keys == [5, 6])
 }
 
@@ -165,7 +165,7 @@ private struct ZipCode: Hashable {
   let first = Cogtext.forTesting()
   let second = Cogtext.forTesting()
 
-  #expect(first.read(ledgers[5]) !== second.read(ledgers[5]))
+  #expect(first.peek(ledgers[5]) !== second.peek(ledgers[5]))
 }
 
 // MARK: - DECL-04
@@ -173,7 +173,7 @@ private struct ZipCode: Hashable {
 /// One "place" that builds `box[5]` and changes what it finds there.
 @MainActor
 private func recordAnUpload(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger, Int>) {
-  cogs.read(ledgers[5]).entries.append("upload")
+  cogs.peek(ledgers[5]).entries.append("upload")
 }
 
 /// Another "place" that builds `box[5]` for itself, knowing nothing about the
@@ -181,7 +181,7 @@ private func recordAnUpload(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 @MainActor
 private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger, Int>) -> [String]
 {
-  cogs.read(ledgers[5]).entries
+  cogs.peek(ledgers[5]).entries
 }
 
 @MainActor
@@ -198,11 +198,11 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
   let firstValueReference = ledgers[5]
   let secondValueReference = ledgers[2 + 3]
 
-  cogs.commit { w in w[firstValueReference] = writtenElsewhere }
+  cogs.commit { c in c[firstValueReference] = writtenElsewhere }
 
-  #expect(cogs.read(secondValueReference) === writtenElsewhere)
-  #expect(cogs.read(secondValueReference).entries == ["replacement"])
-  #expect(cogs.read(ledgers[6]).entries.isEmpty)
+  #expect(cogs.peek(secondValueReference) === writtenElsewhere)
+  #expect(cogs.peek(secondValueReference).entries == ["replacement"])
+  #expect(cogs.peek(ledgers[6]).entries.isEmpty)
 }
 
 @MainActor
@@ -212,8 +212,8 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 
   recordAnUpload(in: cogs, using: ledgers)
 
-  #expect(cogs.read(ledgers[6]).entries.isEmpty)
-  #expect(cogs.read(ledgers[5]) !== cogs.read(ledgers[6]))
+  #expect(cogs.peek(ledgers[6]).entries.isEmpty)
+  #expect(cogs.peek(ledgers[5]) !== cogs.peek(ledgers[6]))
 }
 
 @MainActor
@@ -224,9 +224,9 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
   let cogs = Cogtext.forTesting()
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
 
-  let fromALiteral = cogs.read(ledgers[5])
-  let fromArithmetic = cogs.read(ledgers[2 + 3])
-  let fromACount = cogs.read(ledgers["hello".count])
+  let fromALiteral = cogs.peek(ledgers[5])
+  let fromArithmetic = cogs.peek(ledgers[2 + 3])
+  let fromACount = cogs.peek(ledgers["hello".count])
 
   #expect(fromALiteral === fromArithmetic)
   #expect(fromALiteral === fromACount)
@@ -244,8 +244,8 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
   let hereAgain = ZipCode(digits: "902" + "10")
   let there = ZipCode(digits: "10001")
 
-  #expect(cogs.read(ledgers[here]) === cogs.read(ledgers[hereAgain]))
-  #expect(cogs.read(ledgers[here]) !== cogs.read(ledgers[there]))
+  #expect(cogs.peek(ledgers[here]) === cogs.peek(ledgers[hereAgain]))
+  #expect(cogs.peek(ledgers[here]) !== cogs.peek(ledgers[there]))
 }
 
 @MainActor

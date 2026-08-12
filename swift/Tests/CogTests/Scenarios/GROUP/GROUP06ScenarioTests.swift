@@ -7,8 +7,8 @@ import os
 
 @MainActor extension Cogtext {
   fileprivate func refreshCurrentLocation() {
-    commit("location.hourlyRefresh") { writer in
-      writer[hourlyRefreshCount] += 1
+    commit("location.hourlyRefresh") { c in
+      c[hourlyRefreshCount] += 1
     }
   }
 }
@@ -41,7 +41,7 @@ import os
   let group = HourlyEffects(clock: clock, refreshes: refreshContinuation).install(in: cogs)
 
   try await clock.waitForScheduledSleep()
-  #expect(cogs.read(hourlyRefreshCount) == 0)
+  #expect(cogs.peek(hourlyRefreshCount) == 0)
 
   clock.advance(by: .seconds(3_600))
   var refreshIterator = refreshEvents.makeAsyncIterator()
@@ -50,7 +50,7 @@ import os
     return
   }
 
-  #expect(cogs.read(hourlyRefreshCount) == 1)
+  #expect(cogs.peek(hourlyRefreshCount) == 1)
   #if DEBUG
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.map(\.name) == ["location.hourlyRefresh"])

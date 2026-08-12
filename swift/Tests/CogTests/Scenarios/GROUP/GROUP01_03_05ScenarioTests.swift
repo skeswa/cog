@@ -9,14 +9,14 @@ import Testing
   var seen: [Int] = []
   let group = EffectGroup()
 
-  group.add(cogs.run { reader in seen.append(reader.get(source)) })
+  group.add(cogs.run { c in seen.append(c[source]) })
   #expect(seen == [0])
 
   group.cancel()
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(seen == [0])
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
 }
 
 @MainActor
@@ -27,15 +27,15 @@ import Testing
   let group = EffectGroup()
 
   group.add(
-    cogs.run { reader in
-      _ = reader.get(source)
+    cogs.run { c in
+      _ = c[source]
       runs += 1
     })
 
   group.cancel()
   group.cancel()
   group.cancel()
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(runs == 1)
 }
@@ -48,11 +48,11 @@ import Testing
   let group = EffectGroup()
   let copy = group
 
-  group.add(cogs.run { reader in seen.append(reader.get(source)) })
+  group.add(cogs.run { c in seen.append(c[source]) })
   #expect(group === copy)
 
   copy.cancel()
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(seen == [0])
   group.cancel()

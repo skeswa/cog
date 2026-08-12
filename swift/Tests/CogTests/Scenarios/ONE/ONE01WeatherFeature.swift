@@ -7,14 +7,14 @@ import Cog
 extension Cogtext {
   /// The feature op: an ordinary context method beside the source it owns.
   func selectZip(_ zip: String?) {
-    commit { w in
-      w[selectedZipSource] = zip
+    commit { c in
+      c[selectedZipSource] = zip
     }
   }
 
   /// The feature's read path, which another feature can call with the context
   /// it received at its composition boundary.
   func selectedWeatherZip() -> String? {
-    read(selectedZipSource)
+    peek(selectedZipSource)
   }
 }

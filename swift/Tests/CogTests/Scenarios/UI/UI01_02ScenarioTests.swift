@@ -5,24 +5,24 @@ import Testing
 import os
 
 @MainActor
-@Test func `UI-01 a changed cog invalidates a consumer that read it with get`() {
+@Test func `UI-01 a changed cog invalidates a consumer that read it with subscript`() {
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(1)
-  let doubled = Cog<Int> { reader in reader.get(count) * 2 }
+  let doubled = Cog<Int> { c in c[count] * 2 }
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {
-    cogs.get(doubled)
+    cogs[doubled]
   } onChange: {
     notices.withLock { $0 += 1 }
   }
 
   #expect(initial == 2)
 
-  cogs.commit { writer in writer[count] = 2 }
+  cogs.commit { c in c[count] = 2 }
 
   #expect(notices.withLock { $0 } == 1)
-  #expect(cogs.read(doubled) == 4)
+  #expect(cogs.peek(doubled) == 4)
 }
 
 @MainActor
@@ -33,16 +33,16 @@ import os
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {
-    cogs.get(displayed)
+    cogs[displayed]
   } onChange: {
     notices.withLock { $0 += 1 }
   }
 
   #expect(initial == 1)
 
-  cogs.commit { writer in writer[unread] = 11 }
+  cogs.commit { c in c[unread] = 11 }
 
   #expect(notices.withLock { $0 } == 0)
-  #expect(cogs.read(displayed) == 1)
-  #expect(cogs.read(unread) == 11)
+  #expect(cogs.peek(displayed) == 1)
+  #expect(cogs.peek(unread) == 11)
 }

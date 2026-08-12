@@ -20,10 +20,10 @@ struct WeatherCardContent: View {
   #endif
 
   var body: some View {
-    let report = cogs.get(weatherReport[zip])
-    let nice = cogs.get(isNiceOutside[zip])
-    let status = cogs.get(weatherLoadStatus[zip])
-    let receivesUpdates = cogs.get(receivesHourlyUpdates[zip])
+    let report = cogs[weatherReport[zip]]
+    let nice = cogs[isNiceOutside[zip]]
+    let status = cogs[weatherLoadStatus[zip]]
+    let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
     #if DEBUG
     let _ = renderProbe?(WeatherCardSnapshot(zip: zip, report: report, isNice: nice))
     #endif

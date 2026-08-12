@@ -188,7 +188,7 @@ extension Cogtext {
     }
 
     func stubWeather(_ report: Weather?, zip: ZipCode) {
-        commit { w in w[weatherReportSource[zip]] = report }
+        commit { c in c[weatherReportSource[zip]] = report }
     }
 }
 #endif
@@ -214,7 +214,7 @@ instead of exposing all source value references.
     #expect(notifier.alerts == ["It is nice outside!"])
 
     await clock.advance(by: .seconds(3_600))
-    #expect(cogs.read(currentZipCode) != nil)
+    #expect(cogs.peek(currentZipCode) != nil)
 }
 ```
 
@@ -250,10 +250,10 @@ desired state with the engine's actual state:
 
 ```swift
 let episodesToDownload = Cog { c in
-    c.get(subscribedEpisodes)
+    c[subscribedEpisodes]
         .filter { episode in
-            c.get(autoDownloadPolicy).wants(episode)
-                && !c.get(downloadState[episode.id]).isDownloadedOrInFlight
+            c[autoDownloadPolicy].wants(episode)
+                && !c[downloadState[episode.id]].isDownloadedOrInFlight
         }
         .map(\.id)
 }

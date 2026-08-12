@@ -15,12 +15,12 @@ import Testing
         diagnostic = cycle
         return 0
       }
-      return c.get(next)
+      return c[next]
     },
     name: "weather"
   )
 
-  #expect(cogs.read(holder.box["home"]) == 0)
+  #expect(cogs.peek(holder.box["home"]) == 0)
   #expect(diagnostic?.path == ["weather[home]", "weather[work]", "weather[home]"])
   #expect(
     diagnostic?.message
@@ -37,22 +37,22 @@ import Testing
 
   conditional = Cog<Int>(
     { c in
-      guard c.get(closesCycle) else { return 42 }
+      guard c[closesCycle] else { return 42 }
       if let cycle = c.cycleDiagnostic(ifReading: conditional) {
         diagnostic = cycle
         return -1
       }
-      return c.get(conditional)
+      return c[conditional]
     },
     name: "conditional"
   )
 
-  #expect(cogs.read(conditional) == 42)
+  #expect(cogs.peek(conditional) == 42)
   #expect(diagnostic == nil)
 
-  cogs.commit { w in w[closesCycle] = true }
+  cogs.commit { c in c[closesCycle] = true }
 
-  #expect(cogs.read(conditional) == -1)
+  #expect(cogs.peek(conditional) == -1)
   #expect(diagnostic?.path == ["conditional", "conditional"])
 }
 
@@ -70,7 +70,7 @@ import Testing
     name: "safe diagnostic"
   )
 
-  #expect(cogs.read(selfReading) == 2)
+  #expect(cogs.peek(selfReading) == 2)
   #expect(diagnostic?.path == ["safe diagnostic", "safe diagnostic"])
   #expect(diagnostic?.message == "Cog dependency cycle: safe diagnostic -> safe diagnostic.")
 }

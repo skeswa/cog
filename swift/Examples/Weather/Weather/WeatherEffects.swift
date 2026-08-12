@@ -79,7 +79,7 @@ private func runHourlyRefresh<C: Clock>(
   while true {
     try await clock.sleep(until: nextRefresh, tolerance: nil)
     nextRefresh = nextRefresh.advanced(by: interval)
-    guard let zip = cogs.read(currentZipCode) else { continue }
+    guard let zip = cogs.peek(currentZipCode) else { continue }
 
     do {
       try await cogs.checkWeather(zip)

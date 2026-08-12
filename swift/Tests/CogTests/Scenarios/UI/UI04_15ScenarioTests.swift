@@ -9,25 +9,25 @@ import os
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(1)
   var selectorRuns = 0
-  let isOdd = Cog<Bool> { reader in
+  let isOdd = Cog<Bool> { c in
     selectorRuns += 1
-    return !reader.get(count).isMultiple(of: 2)
+    return !c[count].isMultiple(of: 2)
   }
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   #expect(
     withObservationTracking {
-      cogs.get(isOdd)
+      cogs[isOdd]
     } onChange: {
       notices.withLock { $0 += 1 }
     }
   )
   #expect(selectorRuns == 1)
 
-  cogs.commit { writer in writer[count] = 3 }
+  cogs.commit { c in c[count] = 3 }
 
   #expect(selectorRuns == 2)
-  #expect(cogs.read(isOdd))
+  #expect(cogs.peek(isOdd))
   #expect(notices.withLock { $0 } == 0)
 }
 
@@ -38,15 +38,15 @@ import os
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {
-    cogs.get(status)
+    cogs[status]
   } onChange: {
     notices.withLock { $0 += 1 }
   }
 
   #expect(initial == "ready")
 
-  cogs.commit { writer in writer[status] = "ready" }
+  cogs.commit { c in c[status] = "ready" }
 
-  #expect(cogs.read(status) == "ready")
+  #expect(cogs.peek(status) == "ready")
   #expect(notices.withLock { $0 } == 0)
 }

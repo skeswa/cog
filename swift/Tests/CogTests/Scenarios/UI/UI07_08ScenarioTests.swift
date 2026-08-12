@@ -7,15 +7,15 @@ import Testing
   let cogs = Cogtext.forTesting()
   let source = ManualCog<String>("old", name: "binding.value")
   let value = source.readOnly
-  let binding = cogs.binding(for: value, name: "edit binding value") { writer, newValue in
-    writer[source] = newValue
+  let binding = cogs.binding(for: value, name: "edit binding value") { c, newValue in
+    c[source] = newValue
   }
 
   #expect(binding.wrappedValue == "old")
 
   binding.wrappedValue = "new"
 
-  #expect(cogs.read(value) == "new")
+  #expect(cogs.peek(value) == "new")
 
   #if DEBUG
   let entries = cogs.debugHistory.entries
@@ -28,8 +28,8 @@ import Testing
 @Test func `UI-08 a binding reads its write back immediately`() {
   let cogs = Cogtext.forTesting()
   let text = ManualCog<String>("")
-  let binding = cogs.binding(for: text, name: "type character") { writer, newValue in
-    writer[text] = newValue
+  let binding = cogs.binding(for: text, name: "type character") { c, newValue in
+    c[text] = newValue
   }
 
   binding.wrappedValue = "c"

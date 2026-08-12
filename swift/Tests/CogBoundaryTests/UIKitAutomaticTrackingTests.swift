@@ -25,7 +25,7 @@ private final class CogTrackingView: UIView {
 
   override func updateProperties() {
     super.updateProperties()
-    renderedValues.append(cogs.get(count))
+    renderedValues.append(cogs[count])
   }
 }
 
@@ -40,7 +40,7 @@ private final class CogTrackingView: UIView {
   view.updatePropertiesIfNeeded()
   #expect(view.renderedValues == [0])
 
-  cogs.commit { writer in writer[count] = 1 }
+  cogs.commit { c in c[count] = 1 }
   view.updatePropertiesIfNeeded()
 
   #expect(view.renderedValues == [0, 1])

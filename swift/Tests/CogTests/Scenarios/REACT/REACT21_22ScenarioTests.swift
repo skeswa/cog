@@ -14,29 +14,29 @@ import Testing
   var parityRuns = 0
   let isEven = Cog<Bool> { c in
     parityRuns += 1
-    return c.get(count) % 2 == 0
+    return c[count] % 2 == 0
   }
   var reactionRuns = 0
 
   let token = cogs.run { c in
-    _ = c.get(isEven)
+    _ = c[isEven]
     reactionRuns += 1
   }
 
   #expect(parityRuns == 1)
   #expect(reactionRuns == 1)
 
-  cogs.commit { w in w[count] = 4 }
+  cogs.commit { c in c[count] = 4 }
 
   // The source really changed, so the derived cog really recomputed — this is
   // not a turn that quietly did nothing.
   #expect(parityRuns == 2)
-  #expect(cogs.read(isEven) == true)
+  #expect(cogs.peek(isEven) == true)
   // It landed on the value it already had, so nothing downstream changed and
   // the reaction never ran.
   #expect(reactionRuns == 1)
 
-  cogs.commit { w in w[count] = 5 }
+  cogs.commit { c in c[count] = 5 }
 
   // A recomputation that does change the value still wakes it.
   #expect(parityRuns == 3)
@@ -52,18 +52,18 @@ import Testing
   var reactionRuns = 0
 
   let token = cogs.run { c in
-    _ = c.get(source)
+    _ = c[source]
     reactionRuns += 1
   }
 
   #expect(reactionRuns == 1)
 
-  cogs.commit("write the same value") { w in w[source] = 7 }
+  cogs.commit("write the same value") { c in c[source] = 7 }
 
-  #expect(cogs.read(source) == 7)
+  #expect(cogs.peek(source) == 7)
   #expect(reactionRuns == 1)
 
-  cogs.commit("write a different value") { w in w[source] = 8 }
+  cogs.commit("write a different value") { c in c[source] = 8 }
 
   #expect(reactionRuns == 2)
 
@@ -82,10 +82,10 @@ import Testing
     deliveries.append("\(old)->\(new)")
   }
 
-  cogs.commit { w in w[source] = 7 }
+  cogs.commit { c in c[source] = 7 }
   #expect(deliveries.isEmpty)
 
-  cogs.commit { w in w[source] = 8 }
+  cogs.commit { c in c[source] = 8 }
   #expect(deliveries == ["7->8"])
 
   _ = token

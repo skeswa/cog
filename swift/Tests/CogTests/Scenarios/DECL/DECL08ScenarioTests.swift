@@ -18,16 +18,16 @@ private struct Decl08ZipCode: Hashable {
   }
   let summaries = CogBox<String, Decl08ZipCode> { c, zip in
     keysComputed.append(zip)
-    return "\(zip.digits):\(c.get(temperatures[zip]))"
+    return "\(zip.digits):\(c[temperatures[zip]])"
   }
 
-  #expect(cogs.read(summaries[here]) == "90210:72")
+  #expect(cogs.peek(summaries[here]) == "90210:72")
   #expect(keysComputed == [here])
 
-  #expect(cogs.read(summaries[Decl08ZipCode(digits: "90210")]) == "90210:72")
+  #expect(cogs.peek(summaries[Decl08ZipCode(digits: "90210")]) == "90210:72")
   #expect(keysComputed == [here])
 
-  #expect(cogs.read(summaries[there]) == "10001:41")
+  #expect(cogs.peek(summaries[there]) == "10001:41")
   #expect(keysComputed == [here, there])
 }
 
@@ -38,6 +38,6 @@ private struct Decl08ZipCode: Hashable {
     key.map(String.init) ?? "none"
   }
 
-  #expect(cogs.read(descriptions[nil]) == "none")
-  #expect(cogs.read(descriptions[3]) == "3")
+  #expect(cogs.peek(descriptions[nil]) == "none")
+  #expect(cogs.peek(descriptions[3]) == "3")
 }

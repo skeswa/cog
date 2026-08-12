@@ -5,12 +5,12 @@
 ///
 /// ```swift
 /// let isNiceOutsideHere = Cog<Bool> { c in
-///   guard let zip = c.get(currentZipCode) else { return false }
-///   return c.get(isNiceOutside[zip])
+///   guard let zip = c[currentZipCode] else { return false }
+///   return c[isNiceOutside[zip]]
 /// }
 /// ```
 ///
-/// The selector reads through its ``Reader``. Each `c.get` records a
+/// The selector reads through its ``Reader``. Each `c[valueReference]` records a
 /// dependency, so changes can update this value. Reads from captured values,
 /// globals, or stored properties are invisible to Cog.
 ///
@@ -60,7 +60,7 @@ public struct Cog<Value> {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: { reader, _ in selector(reader) },
+        selector: { c, _ in selector(c) },
         equals: nil,
         lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
@@ -96,7 +96,7 @@ public struct Cog<Value> {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: { reader, _ in selector(reader) },
+        selector: { c, _ in selector(c) },
         equals: equals,
         lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
@@ -127,7 +127,7 @@ extension Cog where Value: Equatable {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: { reader, _ in selector(reader) },
+        selector: { c, _ in selector(c) },
         equals: { oldValue, newValue in oldValue == newValue },
         lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)

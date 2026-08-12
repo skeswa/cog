@@ -17,7 +17,7 @@ import Testing
     deliveries.append("\(old)->\(new)")
   }
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   #expect(deliveries == ["1->2"])
   _ = token

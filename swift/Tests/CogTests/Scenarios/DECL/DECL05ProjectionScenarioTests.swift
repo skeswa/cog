@@ -32,13 +32,13 @@ private struct ZipCode: Hashable {
   let greeting = greetingSource.readOnly
   let currentZip = currentZipSource.readOnly
 
-  #expect(cogs.read(retryLimit) == cogs.read(retryLimitSource))
-  #expect(cogs.read(greeting) == cogs.read(greetingSource))
-  #expect(cogs.read(currentZip) == cogs.read(currentZipSource))
+  #expect(cogs.peek(retryLimit) == cogs.peek(retryLimitSource))
+  #expect(cogs.peek(greeting) == cogs.peek(greetingSource))
+  #expect(cogs.peek(currentZip) == cogs.peek(currentZipSource))
 
-  #expect(cogs.read(retryLimit) == 3)
-  #expect(cogs.read(greeting) == "hello")
-  #expect(cogs.read(currentZip) == nil)
+  #expect(cogs.peek(retryLimit) == 3)
+  #expect(cogs.peek(greeting) == "hello")
+  #expect(cogs.peek(currentZip) == nil)
 }
 
 @MainActor
@@ -51,12 +51,12 @@ private struct ZipCode: Hashable {
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
 
-  cogs.commit { w in
-    w[countSource] = 7
+  cogs.commit { c in
+    c[countSource] = 7
   }
 
-  #expect(cogs.read(count) == 7)
-  #expect(cogs.read(count) == cogs.read(countSource))
+  #expect(cogs.peek(count) == 7)
+  #expect(cogs.peek(count) == cogs.peek(countSource))
 }
 
 @MainActor
@@ -69,12 +69,12 @@ private struct ZipCode: Hashable {
   let count = countSource.readOnly
 
   for value in 1...10 {
-    cogs.commit { w in
-      w[countSource] = value
+    cogs.commit { c in
+      c[countSource] = value
     }
 
-    #expect(cogs.read(count) == value)
-    #expect(cogs.read(count) == cogs.read(countSource))
+    #expect(cogs.peek(count) == value)
+    #expect(cogs.peek(count) == cogs.peek(countSource))
   }
 }
 
@@ -89,10 +89,10 @@ private struct ZipCode: Hashable {
   let ledgerSource = ManualCog<Ledger>(Ledger())
   let ledger = ledgerSource.readOnly
 
-  cogs.read(ledger).entries.append("published")
+  cogs.peek(ledger).entries.append("published")
 
-  #expect(cogs.read(ledgerSource).entries == ["published"])
-  #expect(cogs.read(ledger) === cogs.read(ledgerSource))
+  #expect(cogs.peek(ledgerSource).entries == ["published"])
+  #expect(cogs.peek(ledger) === cogs.peek(ledgerSource))
 }
 
 @MainActor
@@ -104,8 +104,8 @@ private struct ZipCode: Hashable {
 
   let ledgerSource = ManualCog<Ledger>(Ledger())
 
-  #expect(cogs.read(ledgerSource.readOnly) === cogs.read(ledgerSource.readOnly))
-  #expect(cogs.read(ledgerSource.readOnly) === cogs.read(ledgerSource))
+  #expect(cogs.peek(ledgerSource.readOnly) === cogs.peek(ledgerSource.readOnly))
+  #expect(cogs.peek(ledgerSource.readOnly) === cogs.peek(ledgerSource))
 }
 
 @MainActor
@@ -120,12 +120,12 @@ private struct ZipCode: Hashable {
   let first = Cogtext.forTesting()
   let second = Cogtext.forTesting()
 
-  first.commit { w in
-    w[countSource] = 7
+  first.commit { c in
+    c[countSource] = 7
   }
 
-  #expect(first.read(count) == 7)
-  #expect(second.read(count) == 0)
+  #expect(first.peek(count) == 7)
+  #expect(second.peek(count) == 0)
 }
 
 // MARK: - DECL-05, keyed
@@ -137,9 +137,9 @@ private struct ZipCode: Hashable {
   let retryLimitSource = ManualCogBox<Int, String>(3)
   let retryLimit = retryLimitSource.readOnly
 
-  #expect(cogs.read(retryLimit["upload"]) == cogs.read(retryLimitSource["upload"]))
-  #expect(cogs.read(retryLimit["upload"]) == 3)
-  #expect(cogs.read(retryLimit["download"]) == 3)
+  #expect(cogs.peek(retryLimit["upload"]) == cogs.peek(retryLimitSource["upload"]))
+  #expect(cogs.peek(retryLimit["upload"]) == 3)
+  #expect(cogs.peek(retryLimit["download"]) == 3)
 }
 
 @MainActor
@@ -153,8 +153,8 @@ private struct ZipCode: Hashable {
   let greetingSource = ManualCogBox<String, ZipCode> { zip in "hello, \(zip.digits)" }
   let greeting = greetingSource.readOnly
 
-  #expect(cogs.read(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
-  #expect(cogs.read(greeting[ZipCode(digits: "10001")]) == "hello, 10001")
+  #expect(cogs.peek(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
+  #expect(cogs.peek(greeting[ZipCode(digits: "10001")]) == "hello, 10001")
 }
 
 @MainActor
@@ -165,10 +165,10 @@ private struct ZipCode: Hashable {
   let ledgers = ledgersSource.readOnly
   let here = ZipCode(digits: "90210")
 
-  cogs.read(ledgers[here]).entries.append("published")
+  cogs.peek(ledgers[here]).entries.append("published")
 
-  #expect(cogs.read(ledgersSource[here]).entries == ["published"])
-  #expect(cogs.read(ledgers[here]) === cogs.read(ledgersSource[here]))
+  #expect(cogs.peek(ledgersSource[here]).entries == ["published"])
+  #expect(cogs.peek(ledgers[here]) === cogs.peek(ledgersSource[here]))
 }
 
 @MainActor
@@ -182,11 +182,11 @@ private struct ZipCode: Hashable {
   let here = ZipCode(digits: "90210")
   let there = ZipCode(digits: "10001")
 
-  cogs.read(ledgers[here]).entries.append("here")
+  cogs.peek(ledgers[here]).entries.append("here")
 
-  #expect(cogs.read(ledgers[there]).entries == [])
-  #expect(cogs.read(ledgers[here]) !== cogs.read(ledgers[there]))
-  #expect(cogs.read(ledgers[there]) === cogs.read(ledgersSource[there]))
+  #expect(cogs.peek(ledgers[there]).entries == [])
+  #expect(cogs.peek(ledgers[here]) !== cogs.peek(ledgers[there]))
+  #expect(cogs.peek(ledgers[there]) === cogs.peek(ledgersSource[there]))
 }
 
 @MainActor
@@ -200,5 +200,5 @@ private struct ZipCode: Hashable {
   let here = ZipCode(digits: "90210")
   let hereAgain = ZipCode(digits: "902" + "10")
 
-  #expect(cogs.read(ledgers[here]) === cogs.read(ledgers[hereAgain]))
+  #expect(cogs.peek(ledgers[here]) === cogs.peek(ledgers[hereAgain]))
 }

@@ -1,6 +1,6 @@
 /// A selector or reaction that records the cogs it reads.
 ///
-/// During a run, each `c.get` links its producer to the tracked consumer.
+/// During a run, each `c[valueReference]` links its producer to the tracked consumer.
 /// SwiftUI will use the same protocol.
 @MainActor
 internal protocol CogConsumer: AnyObject {

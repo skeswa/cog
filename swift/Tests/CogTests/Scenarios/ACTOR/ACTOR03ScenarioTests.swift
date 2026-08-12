@@ -25,8 +25,8 @@ private nonisolated func actor03IsSendable<T: Sendable>(_: T.Type) -> Bool { tru
   let cogs = Cogtext.forTesting()
   let value = Actor03MainActorValue(21)
   let source = ManualCog<Actor03MainActorValue>(value)
-  let doubled = Cog<Int> { c in c.get(source).number * 2 }
+  let doubled = Cog<Int> { c in c[source].number * 2 }
 
-  #expect(cogs.read(source) === value)
-  #expect(cogs.read(doubled) == 42)
+  #expect(cogs.peek(source) === value)
+  #expect(cogs.peek(doubled) == 42)
 }

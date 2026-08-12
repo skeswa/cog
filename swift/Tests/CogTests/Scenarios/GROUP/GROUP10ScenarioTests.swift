@@ -12,8 +12,8 @@ import Testing
   group.cancel()
 
   var firstRuns = 0
-  var firstToken: ReactionToken? = cogs.run { reader in
-    _ = reader.get(source)
+  var firstToken: ReactionToken? = cogs.run { c in
+    _ = c[source]
     firstRuns += 1
   }
   weak let releasedToken = firstToken
@@ -21,26 +21,26 @@ import Testing
   firstToken = nil
 
   #expect(releasedToken == nil)
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
   #expect(firstRuns == 1)
 
   var secondRuns = 0
   let anotherCopy = copy
   anotherCopy.add(
-    cogs.run { reader in
-      _ = reader.get(source)
+    cogs.run { c in
+      _ = c[source]
       secondRuns += 1
     })
-  cogs.commit { writer in writer[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
   #expect(secondRuns == 1)
 
   var cancelledRuns = 0
-  let cancelledToken = cogs.run { reader in
-    _ = reader.get(source)
+  let cancelledToken = cogs.run { c in
+    _ = c[source]
     cancelledRuns += 1
   }
   cancelledToken.cancel()
   group.add(cancelledToken)
-  cogs.commit { writer in writer[source] = 3 }
+  cogs.commit { c in c[source] = 3 }
   #expect(cancelledRuns == 1)
 }

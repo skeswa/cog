@@ -6,5 +6,5 @@ import Testing
 @Test func weatherStateStartsWithoutACurrentLocation() {
   let cogs = Cogtext.forTesting()
 
-  #expect(cogs.read(currentZipCode) == nil)
+  #expect(cogs.peek(currentZipCode) == nil)
 }

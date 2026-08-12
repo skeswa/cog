@@ -16,7 +16,7 @@
 /// `box[10001]`.
 ///
 /// Building `box[key]` creates no graph state or descriptor. It is cheap to use
-/// inline, as in `c.get(weatherReport[zip])`.
+/// inline, as in `c[weatherReport[zip]]`.
 ///
 /// Keys may be any `Hashable` type. Prefer a small domain type such as
 /// `ZipCode` or `Document.ID` over `String` or `Int`. Cog stores keys as

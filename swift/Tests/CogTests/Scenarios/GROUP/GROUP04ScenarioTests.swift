@@ -9,12 +9,12 @@ import Testing
   var seen: [Int] = []
   var group: EffectGroup? = EffectGroup()
 
-  group?.add(cogs.run { reader in seen.append(reader.get(source)) })
+  group?.add(cogs.run { c in seen.append(c[source]) })
   #expect(seen == [0])
 
   group = nil
-  cogs.commit { writer in writer[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(seen == [0])
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
 }

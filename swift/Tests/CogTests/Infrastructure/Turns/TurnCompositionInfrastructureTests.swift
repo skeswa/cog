@@ -27,7 +27,7 @@ import Testing
   var outerTurn: CogTurnID?
   var innerTurn: CogTurnID?
 
-  cogs.commit("outer") { outerWriter in
+  cogs.commit("outer") { c in
     guard case .accumulating(let outer) = cogs.turnPhase else {
       Issue.record("The outer body did not accumulate")
       return
@@ -35,9 +35,9 @@ import Testing
     outerTurn = outer.id
     #expect(outer.name == "outer")
 
-    outerWriter[source] = 1
+    c[source] = 1
 
-    cogs.commit("inner") { innerWriter in
+    cogs.commit("inner") { c in
       guard case .accumulating(let inner) = cogs.turnPhase else {
         Issue.record("The inner body did not join accumulation")
         return
@@ -46,15 +46,15 @@ import Testing
 
       #expect(inner.id === outer.id)
       #expect(inner.name == "outer")
-      #expect(innerWriter[source] == 1)
+      #expect(c[source] == 1)
 
-      innerWriter[source] = 2
-      #expect(cogs.read(source) == 0)
+      c[source] = 2
+      #expect(cogs.peek(source) == 0)
       #expect(cogs.revision == .initial)
     }
 
-    #expect(outerWriter[source] == 2)
-    #expect(cogs.read(source) == 0)
+    #expect(c[source] == 2)
+    #expect(cogs.peek(source) == 0)
     #expect(cogs.revision == .initial)
   }
 
@@ -62,7 +62,7 @@ import Testing
   #expect(innerTurn === outerTurn)
   #expect(flushingTurn === outerTurn)
   #expect(comparisons == 1)
-  #expect(cogs.read(source) == 2)
+  #expect(cogs.peek(source) == 2)
   #expect(cogs.revision > .initial)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The joined turn did not finish idle")
@@ -77,31 +77,31 @@ import Testing
   var turnIDs: [CogTurnID] = []
   var turnNames: [String] = []
 
-  cogs.commit("first") { writer in
+  cogs.commit("first") { c in
     guard case .accumulating(let turn) = cogs.turnPhase else {
       Issue.record("The first sibling did not accumulate")
       return
     }
     turnIDs.append(turn.id)
     turnNames.append(turn.name)
-    writer[source] = 1
+    c[source] = 1
   }
 
   let firstRevision = cogs.revision
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The first sibling did not finish before the second began")
     return
   }
 
-  cogs.commit("second") { writer in
+  cogs.commit("second") { c in
     guard case .accumulating(let turn) = cogs.turnPhase else {
       Issue.record("The second sibling did not accumulate")
       return
     }
     turnIDs.append(turn.id)
     turnNames.append(turn.name)
-    writer[source] = 2
+    c[source] = 2
   }
 
   guard turnIDs.count == 2 else {
@@ -110,7 +110,7 @@ import Testing
   }
   #expect(turnIDs[0] !== turnIDs[1])
   #expect(turnNames == ["first", "second"])
-  #expect(cogs.read(source) == 2)
+  #expect(cogs.peek(source) == 2)
   #expect(cogs.revision > firstRevision)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The second sibling did not finish idle")

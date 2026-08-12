@@ -81,12 +81,12 @@ import os
   .install(in: cogs)
 
   try await clock.waitForScheduledSleep()
-  #expect(cogs.read(weatherReport[.newYork]) == nil)
+  #expect(cogs.peek(weatherReport[.newYork]) == nil)
 
   clock.advance(by: .seconds(3_600))
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.read(weatherReport[.newYork]) == refreshedWeather)
+  #expect(cogs.peek(weatherReport[.newYork]) == refreshedWeather)
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
@@ -127,14 +127,14 @@ import os
   clock.advance(by: .seconds(3_600))
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.read(weatherLoadStatus[.newYork]) == .failed)
-  #expect(cogs.read(weatherReport[.newYork]) == nil)
+  #expect(cogs.peek(weatherLoadStatus[.newYork]) == .failed)
+  #expect(cogs.peek(weatherReport[.newYork]) == nil)
 
   clock.advance(by: .seconds(3_600))
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.read(weatherReport[.newYork]) == refreshedWeather)
-  #expect(cogs.read(weatherLoadStatus[.newYork]) == .idle)
+  #expect(cogs.peek(weatherReport[.newYork]) == refreshedWeather)
+  #expect(cogs.peek(weatherLoadStatus[.newYork]) == .idle)
   #expect(attempts.withLock { $0 } == 2)
 
   group.cancel()

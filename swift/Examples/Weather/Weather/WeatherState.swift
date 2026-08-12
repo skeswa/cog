@@ -29,8 +29,8 @@ import SwiftUI
 @MainActor let weatherLoadStatus = weatherLoadStatusSource.readOnly
 
 @MainActor let isSunny = CogBox<Bool, ZipCode>(
-  { reader, zip in
-    switch reader.get(weatherReport[zip])?.kind {
+  { c, zip in
+    switch c[weatherReport[zip]]?.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
@@ -39,66 +39,66 @@ import SwiftUI
 )
 
 @MainActor let isNiceOutside = CogBox<Bool, ZipCode>(
-  { reader, zip in
-    guard let report = reader.get(weatherReport[zip]) else { return false }
-    guard reader.get(isSunny[zip]) else { return false }
+  { c, zip in
+    guard let report = c[weatherReport[zip]] else { return false }
+    guard c[isSunny[zip]] else { return false }
     return report.temperatureF > 60
       && report.temperatureF < 90
-      && !reader.get(heatAdvisory[zip])
+      && !c[heatAdvisory[zip]]
   },
   name: "weather.isNice"
 )
 
 @MainActor let isNiceOutsideHere = Cog<Bool>(
-  { reader in
-    guard let zip = reader.get(currentZipCode) else { return false }
-    return reader.get(isNiceOutside[zip])
+  { c in
+    guard let zip = c[currentZipCode] else { return false }
+    return c[isNiceOutside[zip]]
   },
   name: "weather.isNiceHere"
 )
 
 @MainActor let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
-  { reader, zip in
-    reader.get(currentZipCode) == zip
+  { c, zip in
+    c[currentZipCode] == zip
   },
   name: "weather.receivesHourlyUpdates"
 )
 
 extension Cogtext {
   func checkWeather(_ zip: ZipCode) async throws {
-    guard read(weatherLoadStatus[zip]) != .refreshing else { return }
+    guard peek(weatherLoadStatus[zip]) != .refreshing else { return }
 
-    commit("weather.refreshStarted") { writer in
-      writer[weatherLoadStatusSource[zip]] = .refreshing
+    commit("weather.refreshStarted") { c in
+      c[weatherLoadStatusSource[zip]] = .refreshing
     }
 
-    let service = read(weatherService)
+    let service = peek(weatherService)
     do {
       async let report = service.weather(for: zip)
       async let advisories = service.advisories(for: zip)
       let (nextReport, nextAdvisories) = try await (report, advisories)
 
-      commit("weather.check") { writer in
-        writer[weatherReportSource[zip]] = nextReport
-        writer[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
-        writer[weatherLoadStatusSource[zip]] = .idle
+      commit("weather.check") { c in
+        c[weatherReportSource[zip]] = nextReport
+        c[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
+        c[weatherLoadStatusSource[zip]] = .idle
       }
     } catch is CancellationError {
-      commit("weather.refreshCancelled") { writer in
-        writer[weatherLoadStatusSource[zip]] = .idle
+      commit("weather.refreshCancelled") { c in
+        c[weatherLoadStatusSource[zip]] = .idle
       }
       throw CancellationError()
     } catch {
-      commit("weather.refreshFailed") { writer in
-        writer[weatherLoadStatusSource[zip]] = .failed
+      commit("weather.refreshFailed") { c in
+        c[weatherLoadStatusSource[zip]] = .failed
       }
       throw error
     }
   }
 
   func useCurrentLocation(_ zip: ZipCode?) {
-    commit("weather.useCurrentLocation") { writer in
-      writer[currentZipSource] = zip
+    commit("weather.useCurrentLocation") { c in
+      c[currentZipSource] = zip
     }
   }
 
@@ -106,8 +106,8 @@ extension Cogtext {
     binding(
       for: currentZipCode,
       name: "weather.useCurrentLocation"
-    ) { writer, zip in
-      writer[currentZipSource] = zip
+    ) { c, zip in
+      c[currentZipSource] = zip
     }
   }
 }
@@ -128,9 +128,9 @@ extension Cogtext {
   }
 
   func stubWeather(_ report: Weather?, heatAdvisory: Bool, zip: ZipCode) {
-    commit("weather.stub") { writer in
-      writer[weatherReportSource[zip]] = report
-      writer[heatAdvisorySource[zip]] = heatAdvisory
+    commit("weather.stub") { c in
+      c[weatherReportSource[zip]] = report
+      c[heatAdvisorySource[zip]] = heatAdvisory
     }
   }
 }

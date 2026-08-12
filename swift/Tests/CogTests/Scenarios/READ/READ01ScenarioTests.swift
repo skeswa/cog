@@ -12,9 +12,9 @@ import Testing
   let cogs = Cogtext.forTesting()
   let count = ManualCog<Int>(0)
 
-  cogs.commit { w in
-    w[count] = 1
+  cogs.commit { c in
+    c[count] = 1
   }
 
-  #expect(cogs.read(count) == 1)
+  #expect(cogs.peek(count) == 1)
 }

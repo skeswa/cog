@@ -299,11 +299,11 @@ The class-state build. Correctness first; no perf tricks.
   `name:` or `fileID:line` labels). Public value references `Cog<T>` and
   `ManualCog<T>`; boxes `CogBox` and `ManualCogBox`; inline `AnyHashable?`
   keys; allocation-free `box[key]`; the `.readOnly` projection.
-- Cogtext: states stored by descriptor plus key, created lazily; `get`,
-  `read`, and `curr` on the tracking controller; a MainActor-confined
-  tracking slot. Untracked reads still settle and return the latest value.
+- Cogtext: states stored by descriptor plus key, created lazily; tracked
+  subscripts, `peek`, and `curr` on the read capability; a MainActor-confined
+  tracking slot. Non-tracking peeks still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
-  `Writer` subscripts read and write, so `w[count] += 1` works; unforgeable
+  `Writer` subscripts read and write, so `c[count] += 1` works; unforgeable
   turn IDs; idle → accumulating → flushing; nested commits join; commits
   during a flush wait in a FIFO queue.
 - Flush: the six normative steps of §3.2. Equality-gate staged writes, push
@@ -368,10 +368,11 @@ isolation; and named effect runs in history.
 - Registrar-backed boundary objects, created lazily on the first UI read: one
   phantom key path, `withMutation` only when the value changes. UI-read states
   stay pinned to the app context (§5.3, perf §6).
-- The `\.cogs` environment key; tracked `cogs.get` in `body`; `binding(for:)`
-  pairs a tracked read with a named commit; untracked one-shot `cogs.read`.
-- Escaping closures use one-shot `cogs.read`. `M2-07` confirmed that public
-  Observation exposes no current-consumer query, so the direct `cogs.get`
+- The `\.cogs` environment key; tracked `cogs[valueReference]` in `body`;
+  `binding(for:)` pairs a tracked read with a named commit; non-tracking
+  one-shot `cogs.peek(valueReference)`.
+- Escaping closures use one-shot `cogs.peek`. `M2-07` confirmed that public
+  Observation exposes no current-consumer query, so the direct subscript
   API cannot diagnose a missing UI consumer without false positives. Ship no
   warning or private-SPI heuristic; §7 and §10 record the deferred diagnostic.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
@@ -388,10 +389,12 @@ isolation; and named effect runs in history.
   task ownership, explicit installation, hourly-clock, and deinit-cleanup
   leaves are green. `M2-16` joins both branches; the example never carries a
   local lifecycle substitute or a partially implemented public group.
-- Read spelling: `M2-17a` compared `cogs.get(valueReference)`,
-  `cogs[valueReference]`, and callable value references in the smallest
-  tracked-view prototype. It selected `cogs.get(valueReference)` on August 12,
-  2026; use only that spelling at the boundary and in Weather.
+- Read spelling: `M2-17a` originally compared an explicit method, a subscript,
+  and callable value references in a small tracked-view prototype. The settled
+  spelling is now `c[valueReference]` for tracked selector and reaction reads,
+  `cogs[valueReference]` for tracked UI reads, and `peek(...)` for
+  non-tracking reads. Selector, reaction, and writer capabilities are all named
+  `c` at their call sites.
 - CI: add `test-simulator`
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
@@ -712,5 +715,5 @@ release gates.
   merge-queue or nightly.
 - A missing-consumer warning for tracked UI reads is unavailable with public
   Observation today. `M2-07` defers it until the framework exposes an exact
-  current-tracking query; the direct read spelling and automatic framework
+  current-tracking query; the direct subscript spelling and automatic framework
   tracking remain unchanged.

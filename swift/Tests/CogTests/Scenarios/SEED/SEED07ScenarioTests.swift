@@ -14,7 +14,7 @@ import os
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {
-    cogs.get(seeded)
+    cogs[seeded]
   } onChange: {
     notices.withLock { $0 += 1 }
   }
@@ -22,11 +22,11 @@ import os
 
   cogs.seed(seeded, to: 1)
 
-  #expect(cogs.read(seeded) == 1)
+  #expect(cogs.peek(seeded) == 1)
   #expect(notices.withLock { $0 } == 0)
   #expect(cogs.debugHistory.entries.filter { $0.event == .notice }.isEmpty)
 
-  cogs.commit("seed.followup") { writer in writer[unrelated] = true }
+  cogs.commit("seed.followup") { c in c[unrelated] = true }
 
   #expect(notices.withLock { $0 } == 1)
   let notice = cogs.debugHistory.entries.filter { $0.event == .notice }.last

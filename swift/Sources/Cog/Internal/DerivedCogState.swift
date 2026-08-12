@@ -36,7 +36,7 @@ internal final class DerivedCogState<Value>:
   /// values, `.some(.none)` is a cached `nil`.
   internal private(set) var cachedValue: Value?
 
-  /// The producers the last run read through `c.get`, in read order.
+  /// The producers the last run read through `c[valueReference]`, in read order.
   ///
   /// Each run rebuilds this list in read order (§2.4). The correctness core
   /// keeps repeats; M6 may replace the layout after benchmarks (perf §3.3).

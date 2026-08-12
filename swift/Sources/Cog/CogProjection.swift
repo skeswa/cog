@@ -47,7 +47,7 @@ extension Cogtext {
   ///
   /// - Parameter valueReference: The read-only value reference to read.
   /// - Returns: The value the source it names holds in this context.
-  public func read<Value>(_ valueReference: CogProjection<Value>) -> Value {
-    read(valueReference.source)
+  public func peek<Value>(_ valueReference: CogProjection<Value>) -> Value {
+    peek(valueReference.source)
   }
 }

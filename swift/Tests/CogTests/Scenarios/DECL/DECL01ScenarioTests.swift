@@ -12,9 +12,9 @@ import Testing
   let greeting = ManualCog<String>("hello")
   let currentZip = ManualCog<String?>(nil)
 
-  #expect(cogs.read(retryLimit) == 3)
-  #expect(cogs.read(greeting) == "hello")
-  #expect(cogs.read(currentZip) == nil)
+  #expect(cogs.peek(retryLimit) == 3)
+  #expect(cogs.peek(greeting) == "hello")
+  #expect(cogs.peek(currentZip) == nil)
 }
 
 @MainActor
@@ -25,7 +25,7 @@ import Testing
   let retryLimit = ManualCog<Int>(3)
 
   for _ in 0..<10 {
-    #expect(cogs.read(retryLimit) == 3)
+    #expect(cogs.peek(retryLimit) == 3)
   }
 }
 
@@ -39,7 +39,7 @@ import Testing
   let failures = ManualCog<Int>(0)
   let ceiling = ManualCog<Int>(5)
 
-  #expect(cogs.read(attempts) == 0)
-  #expect(cogs.read(failures) == 0)
-  #expect(cogs.read(ceiling) == 5)
+  #expect(cogs.peek(attempts) == 0)
+  #expect(cogs.peek(failures) == 0)
+  #expect(cogs.peek(ceiling) == 5)
 }

@@ -12,18 +12,18 @@ import Testing
   let second = ManualCog<Int>(0, name: "pair.second")
 
   _ = withObservationTracking {
-    (cogs.get(first), cogs.get(second))
+    (cogs[first], cogs[second])
   } onChange: {
   }
 
-  let reaction = cogs.run { reader in
-    _ = reader.get(first)
-    _ = reader.get(second)
+  let reaction = cogs.run { c in
+    _ = c[first]
+    _ = c[second]
   }
 
-  cogs.commit("change pair") { writer in
-    writer[first] = 1
-    writer[second] = 1
+  cogs.commit("change pair") { c in
+    c[first] = 1
+    c[second] = 1
   }
 
   let turnEntries = cogs.debugHistory.entries.filter { $0.turn == 1 }
@@ -43,12 +43,12 @@ import Testing
   let zip = "90210"
 
   _ = withObservationTracking {
-    cogs.get(weather[zip])
+    cogs[weather[zip]]
   } onChange: {
   }
 
-  cogs.commit("update weather") { writer in
-    writer[weather[zip]] = "sunny"
+  cogs.commit("update weather") { c in
+    c[weather[zip]] = "sunny"
   }
 
   let notices = cogs.debugHistory.entries.filter { $0.event == .notice }

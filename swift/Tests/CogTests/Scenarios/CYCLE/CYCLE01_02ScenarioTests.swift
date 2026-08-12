@@ -8,8 +8,8 @@ import Testing
     await MainActor.run {
       let cogs = Cogtext.forTesting()
       var accountBalance: Cog<Int>!
-      accountBalance = Cog<Int>({ c in c.get(accountBalance) }, name: "account balance")
-      _ = cogs.read(accountBalance)
+      accountBalance = Cog<Int>({ c in c[accountBalance] }, name: "account balance")
+      _ = cogs.peek(accountBalance)
     }
   }
 
@@ -26,9 +26,9 @@ import Testing
       let cogs = Cogtext.forTesting()
       var subtotal: Cog<Int>!
       var tax: Cog<Int>!
-      subtotal = Cog<Int>({ c in c.get(tax) }, name: "subtotal")
-      tax = Cog<Int>({ c in c.get(subtotal) }, name: "tax")
-      _ = cogs.read(subtotal)
+      subtotal = Cog<Int>({ c in c[tax] }, name: "subtotal")
+      tax = Cog<Int>({ c in c[subtotal] }, name: "tax")
+      _ = cogs.peek(subtotal)
     }
   }
 

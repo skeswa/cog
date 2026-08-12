@@ -286,24 +286,24 @@ extension Cogtext {
   /// Reads a source's current value without creating a dependency edge.
   ///
   /// Use this outside selectors when code needs the value once. Inside a
-  /// selector, use ``Reader/get(_:)`` so changes can rerun the selector.
+  /// selector, use ``Reader/subscript(_:)`` so changes can rerun the selector.
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
-  public func read<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
     manualState(for: valueReference).currentValue
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
   ///
   /// The call computes the cog if needed and settles stale dependencies before
-  /// returning. Inside a selector, use ``Reader/get(_:)`` so changes can rerun
+  /// returning. Inside a selector, use ``Reader/subscript(_:)`` so changes can rerun
   /// the selector.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
-  public func read<Value>(_ valueReference: Cog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     derivedState(for: valueReference).settledValue(in: self)
   }
 }

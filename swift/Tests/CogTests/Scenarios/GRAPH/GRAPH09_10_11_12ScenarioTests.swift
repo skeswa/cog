@@ -15,30 +15,30 @@ import Testing
   let y = ManualCog<Int>(10)
   let selected = Cog<Int> { c in
     runs += 1
-    return c.get(useX) ? c.get(x) : c.get(y)
+    return c[useX] ? c[x] : c[y]
   }
 
-  #expect(cogs.read(selected) == 1)
+  #expect(cogs.peek(selected) == 1)
   #expect(runs == 1)
 
-  cogs.commit { w in w[y] = 11 }
-  #expect(cogs.read(selected) == 1)
+  cogs.commit { c in c[y] = 11 }
+  #expect(cogs.peek(selected) == 1)
   #expect(runs == 1)
 
-  cogs.commit { w in w[x] = 2 }
-  #expect(cogs.read(selected) == 2)
+  cogs.commit { c in c[x] = 2 }
+  #expect(cogs.peek(selected) == 2)
   #expect(runs == 2)
 
-  cogs.commit { w in w[useX] = false }
-  #expect(cogs.read(selected) == 11)
+  cogs.commit { c in c[useX] = false }
+  #expect(cogs.peek(selected) == 11)
   #expect(runs == 3)
 
-  cogs.commit { w in w[y] = 12 }
-  #expect(cogs.read(selected) == 12)
+  cogs.commit { c in c[y] = 12 }
+  #expect(cogs.peek(selected) == 12)
   #expect(runs == 4)
 
-  cogs.commit { w in w[x] = 3 }
-  #expect(cogs.read(selected) == 12)
+  cogs.commit { c in c[x] = 3 }
+  #expect(cogs.peek(selected) == 12)
   #expect(runs == 4)
 }
 
@@ -51,23 +51,23 @@ import Testing
   let z = ManualCog<Int>(1)
   let selected = Cog<Int> { c in
     runs += 1
-    guard c.get(includeZ) else { return -1 }
-    return c.get(z)
+    guard c[includeZ] else { return -1 }
+    return c[z]
   }
 
-  #expect(cogs.read(selected) == -1)
+  #expect(cogs.peek(selected) == -1)
   #expect(runs == 1)
 
-  cogs.commit { w in w[z] = 2 }
-  #expect(cogs.read(selected) == -1)
+  cogs.commit { c in c[z] = 2 }
+  #expect(cogs.peek(selected) == -1)
   #expect(runs == 1)
 
-  cogs.commit { w in w[includeZ] = true }
-  #expect(cogs.read(selected) == 2)
+  cogs.commit { c in c[includeZ] = true }
+  #expect(cogs.peek(selected) == 2)
   #expect(runs == 2)
 
-  cogs.commit { w in w[z] = 3 }
-  #expect(cogs.read(selected) == 3)
+  cogs.commit { c in c[z] = 3 }
+  #expect(cogs.peek(selected) == 3)
   #expect(runs == 3)
 }
 
@@ -80,25 +80,25 @@ import Testing
 
   let totals = CogBox<Int, String> { c, group in
     runs += 1
-    return c.get(members[group]).reduce(into: 0) { total, item in
-      total += c.get(scores[item])
+    return c[members[group]].reduce(into: 0) { total, item in
+      total += c[scores[item]]
     }
   }
 
-  #expect(cogs.read(totals["friends"]) == 60)
+  #expect(cogs.peek(totals["friends"]) == 60)
   #expect(runs == 1)
 
-  cogs.commit { w in w[members["friends"]] = [1, 3] }
-  #expect(cogs.read(totals["friends"]) == 40)
+  cogs.commit { c in c[members["friends"]] = [1, 3] }
+  #expect(cogs.peek(totals["friends"]) == 40)
   #expect(runs == 2)
 
-  cogs.commit { w in w[scores[2]] = 200 }
-  #expect(cogs.read(scores[2]) == 200)
-  #expect(cogs.read(totals["friends"]) == 40)
+  cogs.commit { c in c[scores[2]] = 200 }
+  #expect(cogs.peek(scores[2]) == 200)
+  #expect(cogs.peek(totals["friends"]) == 40)
   #expect(runs == 2)
 
-  cogs.commit { w in w[scores[1]] = 100 }
-  #expect(cogs.read(totals["friends"]) == 130)
+  cogs.commit { c in c[scores[1]] = 100 }
+  #expect(cogs.peek(totals["friends"]) == 130)
   #expect(runs == 3)
 }
 
@@ -116,23 +116,23 @@ func
 
   let currentTemperature = Cog<Int> { c in
     runs += 1
-    let zip = c.get(currentZip)
-    return c.get(weather[zip])
+    let zip = c[currentZip]
+    return c[weather[zip]]
   }
 
-  #expect(cogs.read(currentTemperature) == 72)
+  #expect(cogs.peek(currentTemperature) == 72)
   #expect(runs == 1)
 
-  cogs.commit { w in w[currentZip] = "10001" }
-  #expect(cogs.read(currentTemperature) == 41)
+  cogs.commit { c in c[currentZip] = "10001" }
+  #expect(cogs.peek(currentTemperature) == 41)
   #expect(runs == 2)
 
-  cogs.commit { w in w[weather["10001"]] = 50 }
-  #expect(cogs.read(currentTemperature) == 50)
+  cogs.commit { c in c[weather["10001"]] = 50 }
+  #expect(cogs.peek(currentTemperature) == 50)
   #expect(runs == 3)
 
-  cogs.commit { w in w[weather["90210"]] = 99 }
-  #expect(cogs.read(weather["90210"]) == 99)
-  #expect(cogs.read(currentTemperature) == 50)
+  cogs.commit { c in c[weather["90210"]] = 99 }
+  #expect(cogs.peek(weather["90210"]) == 99)
+  #expect(cogs.peek(currentTemperature) == 50)
   #expect(runs == 3)
 }

@@ -13,18 +13,18 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
   let previewContext = Cogtext.forTesting()
 
   #expect(testContext !== previewContext)
-  #expect(testContext.read(one05State) == 41)
-  #expect(previewContext.read(one05State) == 41)
+  #expect(testContext.peek(one05State) == 41)
+  #expect(previewContext.peek(one05State) == 41)
 
-  testContext.commit("test.write") { w in w[one05State] = 101 }
+  testContext.commit("test.write") { c in c[one05State] = 101 }
 
-  #expect(testContext.read(one05State) == 101)
-  #expect(previewContext.read(one05State) == 41)
+  #expect(testContext.peek(one05State) == 101)
+  #expect(previewContext.peek(one05State) == 41)
 
-  previewContext.commit("preview.write") { w in w[one05State] = 202 }
+  previewContext.commit("preview.write") { c in c[one05State] = 202 }
 
-  #expect(testContext.read(one05State) == 101)
-  #expect(previewContext.read(one05State) == 202)
+  #expect(testContext.peek(one05State) == 101)
+  #expect(previewContext.peek(one05State) == 202)
 }
 
 @MainActor
@@ -36,14 +36,14 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
     if let previous {
       #expect(current !== previous.cogs)
-      #expect(previous.cogs.read(one05State) == previous.written)
+      #expect(previous.cogs.peek(one05State) == previous.written)
     }
-    #expect(current.read(one05State) == 41)
+    #expect(current.peek(one05State) == 41)
 
     let written = 1_000 + index
-    current.commit("sequential.write") { w in w[one05State] = written }
+    current.commit("sequential.write") { c in c[one05State] = written }
 
-    #expect(current.read(one05State) == written)
+    #expect(current.peek(one05State) == written)
     previous = (current, written)
   }
 }
@@ -53,7 +53,7 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
   #expect(Cogtext.hasBootstrappedApp == false)
 
   let beforeInstall = Cogtext.forTesting()
-  #expect(beforeInstall.read(one05State) == 41)
+  #expect(beforeInstall.peek(one05State) == 41)
   #expect(Cogtext.hasBootstrappedApp == false)
 
   Cogtext.withBootstrappedApp { app in
@@ -63,13 +63,13 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
     #expect(Cogtext.isBootstrappedApp(app))
     #expect(Cogtext.isBootstrappedApp(beforeInstall) == false)
     #expect(Cogtext.isBootstrappedApp(duringInstall) == false)
-    #expect(app.read(one05State) == 41)
-    #expect(duringInstall.read(one05State) == 41)
+    #expect(app.peek(one05State) == 41)
+    #expect(duringInstall.peek(one05State) == 41)
 
-    duringInstall.commit("isolated.during-app") { w in w[one05State] = 303 }
+    duringInstall.commit("isolated.during-app") { c in c[one05State] = 303 }
 
-    #expect(duringInstall.read(one05State) == 303)
-    #expect(app.read(one05State) == 41)
+    #expect(duringInstall.peek(one05State) == 303)
+    #expect(app.peek(one05State) == 41)
     #expect(Cogtext.isBootstrappedApp(app))
   }
 
@@ -77,6 +77,6 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
   let afterInstall = Cogtext.forTesting()
   #expect(afterInstall !== beforeInstall)
-  #expect(afterInstall.read(one05State) == 41)
+  #expect(afterInstall.peek(one05State) == 41)
   #expect(Cogtext.hasBootstrappedApp == false)
 }

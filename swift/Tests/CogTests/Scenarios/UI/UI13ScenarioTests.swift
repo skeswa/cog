@@ -17,18 +17,18 @@ private nonisolated struct ObservedPair: Equatable, Sendable {
   let renderedPairs = OSAllocatedUnfairLock(initialState: [ObservedPair]())
 
   let initial = withObservationTracking {
-    ObservedPair(first: cogs.get(first), second: cogs.get(second))
+    ObservedPair(first: cogs[first], second: cogs[second])
   } onChange: {
     MainActor.assumeIsolated {
-      let pair = ObservedPair(first: cogs.read(first), second: cogs.read(second))
+      let pair = ObservedPair(first: cogs.peek(first), second: cogs.peek(second))
       renderedPairs.withLock { $0.append(pair) }
     }
   }
   renderedPairs.withLock { $0.append(initial) }
 
-  cogs.commit("change pair") { writer in
-    writer[first] = 1
-    writer[second] = 1
+  cogs.commit("change pair") { c in
+    c[first] = 1
+    c[second] = 1
   }
 
   #expect(
