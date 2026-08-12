@@ -8,6 +8,9 @@ import Observation
 @MainActor
 internal final class CogObservationBoundary: Observable {
   private let registrar = ObservationRegistrar()
+  #if DEBUG
+  private var hasDeferredChange = false
+  #endif
 
   /// The one key path every boundary reports to Observation.
   private var value: Bool { false }
@@ -21,6 +24,19 @@ internal final class CogObservationBoundary: Observable {
   func notifyChange() {
     registrar.withMutation(of: self, keyPath: \.value) {}
   }
+
+  #if DEBUG
+  /// Remembers a quiet debug seed until the next real turn can notify it.
+  func deferChange() {
+    hasDeferredChange = true
+  }
+
+  /// Consumes the seed change assigned to the next real turn, if any.
+  func consumeDeferredChange() -> Bool {
+    defer { hasDeferredChange = false }
+    return hasDeferredChange
+  }
+  #endif
 }
 
 /// State that may acquire a lazy UI observation boundary.
@@ -62,9 +78,13 @@ extension Cogtext {
         settle(derived)
       }
 
-      guard state.changedAt == revision else { continue }
+      let changedThisTurn = state.changedAt == revision
       #if DEBUG
+      let changedBySeed = state.observationBoundary?.consumeDeferredChange() ?? false
+      guard changedThisTurn || changedBySeed else { continue }
       historyLog.recordNotice(label: state.label, key: state.observationKey)
+      #else
+      guard changedThisTurn else { continue }
       #endif
       state.observationBoundary?.notifyChange()
     }

@@ -28,6 +28,7 @@ extension Cogtext {
     let revision = advanceRevision()
     state.currentValue = value
     state.markChanged(at: revision)
+    state.observationBoundary?.deferChange()
     invalidateSubscribers(of: state)
   }
 }
