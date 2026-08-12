@@ -9,7 +9,7 @@
 /// A writer is also valid only *while* that commit body is running. Stashing
 /// one in a variable, an escaping closure, or a `Task` and using it later is a
 /// programmer error, not a supported way to write outside a turn, and Cog traps
-/// on it in every build configuration (§3.2). The trap covers reads as much as
+/// on it in every build configuration. The trap covers reads as much as
 /// writes: a writer read means "what this turn has staged," which is a question
 /// with no answer once the turn is over, and silently degrading it to a normal
 /// read would hand back a plausible wrong value.

@@ -2,8 +2,7 @@
 ///
 /// Declare one where you would declare a ``ManualCog`` but the state is
 /// per-something — per zip code, per document, per row — and keep it
-/// `fileprivate` (or `private` inside a type) so only that file can write it
-/// (§4):
+/// `fileprivate` (or `private` inside a type) so only that file can write it:
 ///
 /// ```swift
 /// fileprivate let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
@@ -12,34 +11,30 @@
 /// A box is a declaration, not a collection. It holds no values and no keys,
 /// and it never has to be told which keys exist: `box[key]` builds a value reference for
 /// that key, and the app's one context creates a state the first time something
-/// actually reads or writes it (§2.3). Ask for a thousand keys and you get a
-/// thousand pieces of state; ask for none and the box costs one descriptor.
+/// actually reads or writes it. Read or write a thousand keys and the context
+/// creates a thousand states; use none and the box costs one descriptor.
 ///
 /// Each key is its own state. `box[90210]` and `box[10001]` start at the same
 /// starting value and then go their own ways, because identity is the
-/// declaration plus the key (§3.1) — writing one does not touch the other.
+/// declaration plus the key — writing one does not touch the other.
 ///
-/// Building a value reference is free. Every key shares the box's one descriptor, so
-/// `box[key]` allocates nothing: it pairs that existing descriptor with the
-/// key and hands back a value (perf §4, §9). Value references are meant to be built at the
-/// point of use rather than stashed — `c.get(weatherReport[zip])` inside a
-/// selector is the normal spelling, and the key reaches it by ordinary lexical
-/// capture, with no hidden key flow.
+/// Building `box[key]` creates no descriptor or graph state. It pairs the
+/// box's existing descriptor with the key, so value references can be built at
+/// the point of use instead of stored. For example, write
+/// `c.get(weatherReport[zip])` inside a selector.
 ///
 /// A key can be anything `Hashable`. Prefer a domain type — `ZipCode`,
 /// `Document.ID` — over a bare `String` or `Int`, so that two boxes keyed by
 /// different things cannot be confused at a call site. Prefer a small one,
-/// too: the correctness build carries the key inline as an `AnyHashable`,
-/// which is free for a key of up to three words and boxes anything larger. A
-/// key is an identity, so a small identifier is usually the right shape
-/// anyway.
+/// too: Cog stores the key as an `AnyHashable`. Keys up to three words stay
+/// inline; larger keys may allocate. A key is an identity, so a small
+/// identifier is usually the right shape anyway.
 @MainActor
 public struct ManualCogBox<Value, Key: Hashable> {
   /// The one declaration behind every key of this box.
   ///
-  /// One descriptor, not one per key: this is what makes ``subscript(_:)``
-  /// allocation-free, and what lets a box be declared before anyone knows
-  /// which keys an app will use.
+  /// One descriptor, not one per key. A box can therefore be declared before
+  /// anyone knows which keys an app will use.
   internal let descriptor: ManualCogDescriptor<Value>
 
   /// Declares a keyed source whose every key starts at `startingValue`.

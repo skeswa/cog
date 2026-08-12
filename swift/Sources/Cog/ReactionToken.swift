@@ -1,8 +1,15 @@
 /// A handle for one reaction registration.
 ///
-/// The context owns the live registration. Holding this final-class token
-/// keeps one stable identity for the cancellation and lifecycle operations
-/// added by the reaction-token slice.
+/// Keep the token alive for as long as the reaction should run. Releasing the
+/// last reference cancels the registration. Call ``cancel()`` when it must stop
+/// at a specific point.
+///
+/// ```swift
+/// let token = cogs.run { c in
+///   updateBadge(c.get(unreadCount))
+/// }
+/// defer { token.cancel() }
+/// ```
 @MainActor
 public final class ReactionToken {
   internal let reaction: CogReaction
@@ -44,15 +51,9 @@ public final class ReactionToken {
   /// account for. Dropping the last token is therefore a way of ending an
   /// effect, not a way of leaking one.
   ///
-  /// Spelled `isolated`, which is the opposite of what the states and
-  /// descriptors need. A `deinit` is nonisolated unless it says otherwise, and
-  /// a nonisolated one here could not call into the graph at all; those types
-  /// are generic classes, where an isolated `deinit` instead crashes the
-  /// release optimizer. This class is not generic, so it can have the
-  /// isolation, and the isolation is what lets a token released on the
-  /// MainActor cancel synchronously — before the next line of the code that
-  /// dropped it, with nothing to await. A token released anywhere else hops,
-  /// which is why stopping an effect *now* remains ``cancel()``'s job.
+  /// The isolated deinitializer can cancel synchronously when the token is
+  /// released on the MainActor. A release elsewhere may hop to the MainActor,
+  /// so call ``cancel()`` when the reaction must stop immediately.
   isolated deinit {
     reaction.cancel()
     deinitCleanupAcknowledgement?()

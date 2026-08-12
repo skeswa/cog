@@ -1,7 +1,7 @@
 /// A value computed from other cogs.
 ///
 /// Declare one next to the state it summarizes, and write it as a plain
-/// function of the cogs it reads (§3.1):
+/// function of the cogs it reads:
 ///
 /// ```swift
 /// let isNiceOutsideHere = Cog<Bool> { c in
@@ -13,7 +13,7 @@
 /// The `c` handed to the selector is a ``Reader``, and `c.get` is how the
 /// selector reads. Reading through it is what makes the read a *dependency*:
 /// Cog notes which cogs this run actually read, so it knows what this value is
-/// made of (§2.4). Read with `c.get` and the value stays right on its own; read
+/// made of. Read with `c.get` and the value stays right on its own; read
 /// around it — a captured `let`, a global, a stored property — and it will not.
 ///
 /// A `Cog` is a *value reference*, exactly like a ``ManualCog``: a small value naming one
@@ -21,14 +21,14 @@
 /// runs for the first time when something first reads the value reference in a context, and
 /// the value it produced is kept, so reading twice does not compute twice.
 /// Neither the declaration nor the value reference is where the value lives — it lives in
-/// the app's one context (§2.3), so the same declaration is computed
+/// the app's one context, so the same declaration is computed
 /// separately, and cached separately, in a test or preview runtime.
 ///
 /// Selectors are ordinary synchronous functions of their inputs. Keep them
 /// cheap, keep them pure, and let them return early or branch however the logic
 /// reads best — the dependencies are whatever the run read this time. A
 /// synchronous selector cannot `throw` in v1: return a `Result` for fallible
-/// domain work, and reach for an `AsyncCog` when the work has to await (§2.4).
+/// domain work, and reach for an `AsyncCog` when the work has to await.
 ///
 /// Give the declaration a `name:` when the default label — the file and line it
 /// was declared on — would not read well in a cycle diagnostic or in debug

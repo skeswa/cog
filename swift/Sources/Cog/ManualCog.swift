@@ -3,7 +3,7 @@
 /// Declare one at the top of the file that owns the state, and keep the
 /// declaration `fileprivate` (or `private` inside a type) so only that file can
 /// write it. Expose reads to everyone else, and put the ops that write it in
-/// the same file (§4):
+/// the same file:
 ///
 /// ```swift
 /// fileprivate let currentZipSource = ManualCog<ZipCode?>(nil)
@@ -11,10 +11,9 @@
 ///
 /// A `ManualCog` is a *value reference*: a small value naming one piece of
 /// state, not the state itself. The state lives in the app's one context, which
-/// creates a state for this value reference the first time something needs it
-/// (§2.3). Copying a value reference, or building the same value reference
-/// twice, still names the same state — so the value reference is safe to pass
-/// around, and holding one is not holding a value.
+/// creates it when first needed. Copying a value reference, or building the
+/// same value reference twice, still names the same state. The value reference
+/// is therefore safe to pass around, and holding one is not holding a value.
 ///
 /// Give the declaration a `name:` when the default label — the file and line it
 /// was declared on — would not read well in a cycle diagnostic or in debug

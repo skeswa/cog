@@ -15,7 +15,8 @@ extension Cogtext {
   ///     default.
   ///   - body: Synchronous effect code. Read graph state through the
   ///     ``ReactionReader`` it receives.
-  /// - Returns: The stable handle for this registration.
+  /// - Returns: A handle that keeps the registration alive. Releasing its last
+  ///   reference cancels the reaction.
   @discardableResult
   public func run(
     fileID: StaticString = #fileID,

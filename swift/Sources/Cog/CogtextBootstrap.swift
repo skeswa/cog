@@ -5,7 +5,7 @@
 // process-global state, not context state. A `Cogtext` knows nothing about
 // being *the* context — it is the same object whether it was bootstrapped by
 // an app or handed to a test — and keeping the registration out here is what
-// lets an isolated testing context stay an ordinary context (§2.3).
+// lets an isolated testing context stay an ordinary context.
 
 // MARK: - Installing the app's context
 
@@ -18,7 +18,7 @@ extension Cogtext {
   /// than in the class — an extension cannot add storage to an instance, but
   /// process-wide storage is not instance storage.
   ///
-  /// It is MainActor-isolated for free, because `Cogtext` is (§1.2), so
+  /// It is MainActor-isolated because `Cogtext` is, so
   /// reading and writing it needs no lock and no `nonisolated(unsafe)`. That
   /// isolation is also what makes the registration safe to install and remove
   /// inside a synchronous main-actor scope: nothing else can observe the slot
@@ -28,7 +28,7 @@ extension Cogtext {
   /// Creates the app's one context and installs it for the whole process.
   ///
   /// Call this once, at launch, from the app's entry point, and share the
-  /// context it returns with every scene (§6.3):
+  /// context it returns with every scene:
   ///
   /// ```swift
   /// @main
@@ -48,18 +48,13 @@ extension Cogtext {
   ///
   /// The return value is the app's ownership handle. Keep it at the entry
   /// point and pass it to effects, services, and every scene; views receive it
-  /// through the `\.cogs` environment value (§3.4, §6.3). Cog deliberately
+  /// through the `\.cogs` environment value. Cog deliberately
   /// exposes no ambient static accessor: ops are instance methods on this
   /// context, and an isolated test substitutes its own context by passing a
   /// different instance through the same boundary.
   ///
-  /// It reads as a verb because installing the app's context is a
-  /// once-per-process act, where `Cogtext.forTesting()` reads as a noun
-  /// phrase because making a test context is ordinary value creation (§2.3).
-  /// Neither is spelled `install`; that word belongs to effects (§6.3).
-  ///
   /// Calling it a second time is a programmer error and traps, in debug builds
-  /// and in release builds alike (§2.3). A test or preview runtime wants
+  /// and in release builds alike. A test or preview runtime wants
   /// `Cogtext.forTesting()` instead.
   ///
   /// - Returns: The app's context.
@@ -95,7 +90,7 @@ extension Cogtext {
   /// later read is a coin flip over which one holds the fact it wants. So the
   /// guard is unconditional — it fires in release exactly as it does in debug,
   /// because shipping the same mistake to users silently is strictly worse
-  /// than stopping (§2.3).
+  /// than stopping.
   ///
   /// It is spelled `fatalError` rather than `preconditionFailure` for the
   /// message, not the trap. Both trap in a release build, but the standard

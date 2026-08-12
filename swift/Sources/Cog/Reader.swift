@@ -10,8 +10,8 @@
 /// }
 /// ```
 ///
-/// Reading through `c.get` does two things at once, and the second is the point
-/// (§2.4): it returns the value, and it records that this run depended on it.
+/// Reading through `c.get` returns the value and records that this run depended
+/// on it.
 /// Dependencies are exactly the cogs the last run read, so branches and early
 /// returns are fine — an edge not read again is not an edge. Anything the
 /// selector reads *around* the reader is invisible to Cog and will go stale.
@@ -44,7 +44,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in the latest completed turn —
-  ///   never a value another turn has staged but not committed (§2.2).
+  ///   never a value another turn has staged but not committed.
   public func get<Read>(_ valueReference: ManualCog<Read>) -> Read {
     cogs.requireTracking(state)
 
@@ -58,7 +58,7 @@ public struct Reader<Value> {
   /// Reading a derived cog that has not computed yet computes it, right here,
   /// as part of this run. That is what makes a graph of derived values lazy as
   /// a whole rather than one layer at a time: nothing downstream of an unread
-  /// root runs until a read reaches it (§2.2).
+  /// root runs until a read reaches it.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
@@ -72,10 +72,8 @@ public struct Reader<Value> {
 
   /// Reads a source exposed through `.readOnly`, and depends on it.
   ///
-  /// This is how a selector reads state another file owns. §4's rule is that
-  /// a source stays `fileprivate` and is published as a read-only projection,
-  /// so without this overload a derived cog could only ever read state
-  /// declared in its own file — which is the opposite of the intent.
+  /// This lets a selector read a published projection while the writable
+  /// source stays `fileprivate` in its owning file.
   ///
   /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
@@ -86,7 +84,7 @@ public struct Reader<Value> {
   /// Peeks at a source without depending on it.
   ///
   /// Use this when the selector needs the source's current value but only a
-  /// different tracked input should make the selector run again (§2.4).
+  /// different tracked input should make the selector run again.
   ///
   /// - Parameter valueReference: The source to read without recording an edge.
   /// - Returns: The value the source holds in the latest completed turn.
@@ -121,7 +119,7 @@ public struct Reader<Value> {
   ///
   /// The outer optional records whether a previous run exists. If `Value` is
   /// itself optional, `.none` means there has been no previous run while
-  /// `.some(.none)` means the previous run produced `nil` (§2.4).
+  /// `.some(.none)` means the previous run produced `nil`.
   public var curr: Value? {
     cogs.requireTracking(state)
     return state.cachedValue

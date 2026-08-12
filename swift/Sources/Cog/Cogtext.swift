@@ -1,32 +1,11 @@
-/// The one place Cog state lives.
+/// The container for one Cog state graph.
 ///
-/// A declaration is a value reference — a light value naming one piece of state — and the
-/// state itself is a state that lives here. A `Cogtext` stores one state per
-/// descriptor and key, creates each state the first time something needs it,
-/// and never creates one for a declaration nobody uses (§2.3). That split is
-/// what keeps a top-level `let` cheap enough to write freely: an app may
-/// declare a thousand cogs and pay for the handful it actually reads.
+/// A context creates state lazily as declarations are read or written. One
+/// running app uses one context; each test or preview may create its own.
 ///
-/// One running app has one context. Every feature resolves through it, which
-/// is what makes state singular — no screen-local islands, no second copy of a
-/// fact to keep in step — and it gives Cog one owner for the whole app's turn
-/// history. Tests and previews are separate app runtimes rather than exceptions
-/// to that rule: each gets its own isolated context and fragments nothing
-/// inside it.
-///
-/// Construction is therefore guarded. The initializer below is `package`, so
-/// application code cannot name it at all. The app's bootstrap calls
-/// `Cogtext.bootstrapApp()` once at launch, and the `CogTesting` product vends
-/// `Cogtext.forTesting()` for a fresh isolated context as often as a test or
-/// preview asks. Splitting the two by product, rather than by an argument to
-/// one helper, keeps the test factory out of a shipping app target entirely.
-///
-/// The whole graph is confined to the MainActor (§1.2, §2.5). SwiftUI reads are
-/// synchronous and cannot `await`, so a graph on another actor could not serve
-/// them; one execution lane also means a turn is never interleaved with
-/// another. Isolation is stated explicitly here rather than inherited from the
-/// module's default, so the type says the same thing to every consumer whatever
-/// their own default isolation is (§7).
+/// Call ``bootstrapApp()`` once when an app launches. Tests and previews use
+/// `Cogtext.forTesting()` from the `CogTesting` product. All graph operations
+/// run on the MainActor.
 @MainActor
 public final class Cogtext {
   /// The monotonic clock used by context-owned timing work.
@@ -319,17 +298,8 @@ extension Cogtext {
 extension Cogtext {
   /// Reads a source's current value without creating a dependency edge.
   ///
-  /// This is the one-shot untracked read (§2.4): the spelling for an op, a
-  /// test, or any other place outside a selector that needs a value once and is
-  /// not going to be rerun when it changes. Inside a selector, use the tracked
-  /// read on the controller instead — an untracked read that should have been
-  /// tracked is a stale-value bug, so keep this one rare and deliberate.
-  ///
-  /// Untracked never means stale. The rule is that skipping the edge skips only
-  /// the subscription: the value handed back is still the settled value of the
-  /// latest completed turn. A manual source satisfies that for free, because
-  /// nothing computes it — there is no work that could be outstanding. The
-  /// derived read below is where that promise takes work.
+  /// Use this outside selectors when code needs the value once. Inside a
+  /// selector, use ``Reader/get(_:)`` so changes can rerun the selector.
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in this context, which is its
@@ -340,22 +310,9 @@ extension Cogtext {
 
   /// Reads a derived cog's value without creating a dependency edge.
   ///
-  /// The same one-shot untracked read as the one for a source (§2.4), and the
-  /// spelling a test, an op, or any other code outside a selector uses to look
-  /// at a computed value once. Inside a selector, use `c.get` instead, so the
-  /// selector reruns when this value changes.
-  ///
-  /// A derived value can be outstanding work rather than a stored fact, so this
-  /// read is where laziness becomes visible: if nothing has ever read this cog
-  /// in this context, reading it here runs its selector, and running it reads
-  /// whatever *it* depends on, down as far as the first read has to go. What
-  /// comes back is a value, never a promise of one.
-  ///
-  /// Computing is not the same as settling. This path also brings a cog that a
-  /// later turn dirtied back up to date before returning, so that skipping the
-  /// edge never means seeing a stale value. That step belongs here, in the one
-  /// read path every caller shares, rather than at call sites where a caller
-  /// could spell a read that skips it.
+  /// The call computes the cog if needed and settles stale dependencies before
+  /// returning. Inside a selector, use ``Reader/get(_:)`` so changes can rerun
+  /// the selector.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.

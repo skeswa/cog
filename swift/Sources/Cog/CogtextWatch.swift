@@ -7,7 +7,7 @@ extension Cogtext {
   /// Everything a registration promises still holds — the context owns it in
   /// call order, only a real change wakes it, and its body runs inside the
   /// flush of the turn that changed the value, before the op that committed
-  /// that turn returns (§3.2).
+  /// that turn returns.
   ///
   /// Installing always reads the cog, whichever start is asked for. That read
   /// is what subscribes the watch and what captures the old value the first
@@ -25,7 +25,8 @@ extension Cogtext {
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
   ///     the value after it.
-  /// - Returns: The stable handle for this registration.
+  /// - Returns: A handle that keeps the registration alive. Releasing its last
+  ///   reference cancels the watch.
   @discardableResult
   public func watch<Value>(
     _ valueReference: Cog<Value>,
@@ -59,7 +60,8 @@ extension Cogtext {
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
   ///     the value after it.
-  /// - Returns: The stable handle for this registration.
+  /// - Returns: A handle that keeps the registration alive. Releasing its last
+  ///   reference cancels the watch.
   @discardableResult
   public func watch<Value>(
     _ valueReference: ManualCog<Value>,
@@ -93,7 +95,8 @@ extension Cogtext {
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
   ///     the value after it.
-  /// - Returns: The stable handle for this registration.
+  /// - Returns: A handle that keeps the registration alive. Releasing its last
+  ///   reference cancels the watch.
   @discardableResult
   public func watch<Value>(
     _ valueReference: ReadOnlyCog<Value>,

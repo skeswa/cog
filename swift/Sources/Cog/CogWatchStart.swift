@@ -1,9 +1,5 @@
 /// Whether installing a watch calls its body once before anything changes.
 ///
-/// Spelled `nonisolated` for the same reason ``CogHistoryEvent`` is: the module
-/// compiles with `.defaultIsolation(MainActor.self)`, and an option tag is
-/// inert data even though the watch that reads it is not.
-///
 /// This chooses only whether the *body* runs at install time. Either way the
 /// installing run reads the watched cog, because that read is what subscribes
 /// the watch and what captures the value the first change will hand back as

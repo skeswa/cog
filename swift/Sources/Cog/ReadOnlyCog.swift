@@ -1,6 +1,6 @@
 /// A value reference that reads one source's state and cannot write it.
 ///
-/// `.readOnly` is the second half of the write-ownership rule (§4). A source is
+/// `.readOnly` is the second half of the write-ownership rule. A source is
 /// declared `fileprivate` so that only its own file can name it, and that file
 /// then publishes this projection so the rest of the app can read the state
 /// without being able to change it:
@@ -45,7 +45,7 @@ extension ManualCog {
   /// A value reference naming this source's state that cannot be used to write it.
   ///
   /// Publish this next to the source, in the file that owns it, and keep the
-  /// source itself `fileprivate` (§4):
+  /// source itself `fileprivate`:
   ///
   /// ```swift
   /// fileprivate let weatherServiceSource = ManualCog<WeatherService>(.live)
@@ -64,16 +64,9 @@ extension ManualCog {
 extension Cogtext {
   /// Reads a read-only value reference's current value without creating a dependency edge.
   ///
-  /// The same one-shot untracked read as the one for a source (§2.4), on the
+  /// The same one-shot untracked read as the one for a source, on the
   /// same state — projecting a source changes who may write it, never how it is
   /// read or what a read means.
-  ///
-  /// This is an overload rather than one read generic over a "readable value reference"
-  /// protocol. Such a protocol would have to be public to appear in a public
-  /// signature, and so would its witness, which would publish the read
-  /// mechanism as API before §10's open question 1 has even settled the read
-  /// *spelling*. Unifying the readable value-reference kinds belongs with derived cogs
-  /// (`M1-05a`), which is where a second readable kind first exists to unify.
   ///
   /// - Parameter valueReference: The read-only value reference to read.
   /// - Returns: The value the source it names holds in this context.
