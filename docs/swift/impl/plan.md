@@ -382,6 +382,12 @@ isolation; and named effect runs in history.
   runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
+- Weather proceeds in two branches. `M2-14a` creates the app and state layer,
+  allowing `M2-15` UI work to proceed independently. `M2-14b` joins that app
+  to the complete `EffectGroup` contract after M1's terminal cancellation,
+  task ownership, explicit installation, hourly-clock, and deinit-cleanup
+  leaves are green. `M2-16` joins both branches; the example never carries a
+  local lifecycle substitute or a partially implemented public group.
 - Read spelling: `M2-17a` compared `cogs.get(valueReference)`,
   `cogs[valueReference]`, and callable value references in the smallest
   tracked-view prototype. It selected `cogs.get(valueReference)` on August 12,

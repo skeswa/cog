@@ -711,17 +711,23 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   boundary target exists.
   _Depends: M2-11._
   _Verify: `test-simulator` completes only `CogBoundaryTests`._
-- **M2-14** _(Infrastructure)_ — Build Weather's state layer with per-ZIP
-  sources, `fileprivate` access plus ops, and its effects group.
+- **M2-14a** _(Infrastructure)_ — Create Weather's Xcode workspace with a
+  local-path dependency on Cog, then build its state layer with per-ZIP
+  sources, `fileprivate` access, derived values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
+- **M2-14b** _(Infrastructure)_ — Install Weather's nice-weather reaction and
+  injected-clock hourly task through the complete public `EffectGroup`
+  lifecycle.
+  _Depends: M2-14a._
+  _Verify: Weather scheme builds and its effect installation tests pass._
 - **M2-15** _(Infrastructure)_ — Build Weather cards, bindings, and per-ZIP
   tracked reads.
-  _Depends: M2-14._
+  _Depends: M2-14a._
   _Verify: Weather scheme builds and launches in the simulator._
 - **M2-16** _(Gate)_ — Verify Weather with deterministic render counters: one
   ZIP invalidates one card, pairs never tear, and notices precede reactions.
-  _Depends: M2-03, M2-08, M2-09, M2-15._
+  _Depends: M2-03, M2-08, M2-09, M2-14b, M2-15._
   _Verify: Weather integration tests using counters, never log scraping._
 - **M2-13b** _(Infrastructure)_ — Add the Weather build CI job only after the
   example exists.
