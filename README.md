@@ -149,6 +149,36 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   runner user this section still targets, and because it is job-scoped, so
   two concurrent jobs cannot fight over a machine-wide setting.
 
+  **Floor simulator runtime.** `M2-18a` selected iOS **17.5**, build
+  **21F79**, arm64 as the exact floor component. Xcode 26.6 supports iOS 15+
+  simulator runtimes, and Apple's component service still lists this build.
+  The persistent runner does not have it installed as of 2026-08-12, so the
+  floor job remains non-blocking until a one-time import, boot, reboot, and
+  UI-14 run all succeed on `homemac`.
+
+  Provision it as the runner administrator with the pinned Xcode selected for
+  that command only. Keep the exported component outside runner work and temp
+  directories so scrub hooks preserve the recovery copy:
+
+  ```sh
+  COG_RUNTIME_CACHE=/Users/Shared/cog-ci/simulator-runtimes/ios-17.5-21F79-arm64
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+    xcodebuild -downloadPlatform iOS -buildVersion 21F79 \
+      -architectureVariant arm64 -exportPath "$COG_RUNTIME_CACHE"
+  COG_RUNTIME_BUNDLE="$(find "$COG_RUNTIME_CACHE" -maxdepth 1 \
+    \( -name '*.exportedBundle' -o -name '*.dmg' \) -print -quit)"
+  test -n "$COG_RUNTIME_BUNDLE"
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+    xcodebuild -importPlatform "$COG_RUNTIME_BUNDLE"
+  ```
+
+  Do not pin or download the catalog's raw artifact URL; Apple redirects it
+  through authentication. After import, use XcodeBuildMCP's simulator list and
+  boot commands to require an available runtime named exactly `iOS 17.5`, then
+  repeat after reboot before enabling the nightly. If registration disappears,
+  re-import the preserved bundle rather than depending on Apple to continue
+  serving it.
+
 - **Runners.** _Amended 2026-08-11 to match the provisioned host._ One
   runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other
   repository can target it, with its own `_work`. It runs as a launchd
