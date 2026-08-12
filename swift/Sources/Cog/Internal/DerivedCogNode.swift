@@ -28,10 +28,9 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
 
   /// Which node of `descriptor` this is, or `nil` for a keyless declaration.
   ///
-  /// Keyless today; `M1-05b`'s derived boxes are what make it interesting. The
-  /// node knows its own key so a diagnostic can name it — `isNiceOutside[90210]`
-  /// rather than `isNiceOutside` — without a reverse lookup through the
-  /// context's storage (§2.4).
+  /// A box node knows its own key so a diagnostic can name it — for example,
+  /// `isNiceOutside[90210]` rather than `isNiceOutside` — without a reverse
+  /// lookup through the context's storage (§2.4).
   let key: AnyHashable?
 
   /// What the last run of the selector produced, or `.none` if it has never
@@ -154,7 +153,7 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
     dependencies.removeAll(keepingCapacity: true)
 
     let value = cogs.tracking(self) {
-      descriptor.compute(Reader(cogs: cogs, node: self))
+      descriptor.compute(Reader(cogs: cogs, node: self), key: key)
     }
 
     for previousDependency in previousDependencies

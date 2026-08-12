@@ -42,8 +42,7 @@ public struct Cog<Value> {
   /// Which node of `descriptor` this ref names, or `nil` for a keyless
   /// declaration.
   ///
-  /// Always `nil` today. Derived boxes (`M1-05b`) are what fill it in, and the
-  /// slot is here now so a keyless derived cog is the single-node case of one
+  /// A keyless cog is the single-node case of the same descriptor-and-key
   /// storage rule rather than a second mechanism (§2.3). Inline `AnyHashable?`
   /// is the correctness build's key representation and stays an implementation
   /// detail: the ref is deliberately not `@frozen`, so benchmarks can still
@@ -72,7 +71,7 @@ public struct Cog<Value> {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: selector,
+        selector: { reader, _ in selector(reader) },
         equals: nil,
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
@@ -104,7 +103,7 @@ public struct Cog<Value> {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: selector,
+        selector: { reader, _ in selector(reader) },
         equals: equals,
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
@@ -112,8 +111,8 @@ public struct Cog<Value> {
     )
   }
 
-  /// Builds a ref for an existing declaration, which is how a derived box will
-  /// make a ref for one of its keys without allocating a second descriptor.
+  /// Builds a ref for an existing declaration, which is how a derived box
+  /// makes a ref for one of its keys without allocating a second descriptor.
   internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -134,7 +133,7 @@ extension Cog where Value: Equatable {
   ) {
     self.init(
       descriptor: DerivedCogDescriptor(
-        selector: selector,
+        selector: { reader, _ in selector(reader) },
         equals: { oldValue, newValue in oldValue == newValue },
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),

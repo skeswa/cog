@@ -1,8 +1,8 @@
 /// The descriptor behind a derived cog declaration.
 ///
-/// One descriptor stands behind one ``Cog`` declaration, and — once `M1-05b`
-/// lands — one derived box, for the same reason ``ManualCogDescriptor`` stands
-/// behind both manual forms: the correctness build spells keys as an inline
+/// One descriptor stands behind one ``Cog`` declaration or one ``CogBox``,
+/// for the same reason ``ManualCogDescriptor`` stands behind both manual
+/// forms: the correctness build spells keys as an inline
 /// `AnyHashable?` on the ref (perf §4), so the declaration is generic over its
 /// value and knows nothing about a key type.
 ///
@@ -21,7 +21,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// (§7). Not `throws`: synchronous selectors do not throw in v1 (§2.4), and
   /// leaving the throw out of the type is what makes that a compile error at
   /// the declaration site rather than a runtime rule (`DECL-12`).
-  private let selector: @MainActor (Reader<Value>) -> Value
+  private let selector: @MainActor (Reader<Value>, AnyHashable?) -> Value
 
   /// Whether two computed values count as the same state, or `nil` when every
   /// recomputation must conservatively count as a change.
@@ -29,7 +29,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// Declares a derived value computed by `selector`.
   init(
-    selector: @escaping @MainActor (Reader<Value>) -> Value,
+    selector: @escaping @MainActor (Reader<Value>, AnyHashable?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     label: CogLabel
   ) {
@@ -41,10 +41,10 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// Runs the selector once for the node `reader` belongs to.
   ///
   /// A method rather than an exposed closure so the node has one seam to call
-  /// however the declaration was spelled. `M1-05b`'s keyed form passes its key
-  /// through here, and nothing at the call site has to know which form ran.
-  func compute(_ reader: Reader<Value>) -> Value {
-    selector(reader)
+  /// however the declaration was spelled. A keyed form passes its key through
+  /// here, and nothing at the call site has to know which form ran.
+  func compute(_ reader: Reader<Value>, key: AnyHashable?) -> Value {
+    selector(reader, key)
   }
 
   /// Whether a recomputation is equivalent to the node's cached value.
