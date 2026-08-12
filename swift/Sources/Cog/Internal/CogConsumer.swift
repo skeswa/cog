@@ -5,10 +5,10 @@
 /// a consumer runs, it is the context's tracked consumer, and every `c.get`
 /// during that run links the producer it read to it.
 ///
-/// The protocol is deliberately one method wide. Node storage is
-/// heterogeneous and so is the set of things that can consume, so linking has
-/// to be spelled across the existential rather than recovered by casting to a
-/// concrete consumer kind.
+/// The protocol is deliberately narrow. Node storage is heterogeneous and so
+/// is the set of things that can consume, so recording and later releasing
+/// dependencies have to be spelled across the existential rather than
+/// recovered by casting to a concrete consumer kind.
 @MainActor
 internal protocol CogConsumer: AnyObject {
   /// Records that this consumer read `producer` during the run in progress.
@@ -17,6 +17,15 @@ internal protocol CogConsumer: AnyObject {
   /// empty list, appends what it reads, and removes reverse edges for producers
   /// the completed run did not read again.
   func recordDependency(on producer: any CogNode)
+
+  /// Drops strong producer ownership before the context releases its node map.
+  ///
+  /// The correctness core stores dependency edges as node references. A deep
+  /// linear graph therefore also forms a deep strong-ownership chain, which
+  /// ARC could otherwise destroy recursively after the context released its
+  /// dictionary entries. The context calls this for every consumer first, so
+  /// the later property teardown is flat even when graph traversal was deep.
+  func releaseDependenciesForContextTeardown()
 }
 
 // MARK: - The tracking slot

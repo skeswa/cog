@@ -133,3 +133,31 @@ import Testing
   #expect(root === second)
   #expect(cogs.settleStack.isEmpty)
 }
+
+@MainActor
+@Test func `SettleEngineInfrastructure severs strong graph chains before context teardown`() {
+  var cogs: Cogtext? = Cogtext.forTesting()
+  weak let releasedContext = cogs
+
+  let source = ManualCog<Int>(1)
+  let middle = Cog<Int> { c in c.get(source) + 1 }
+  let root = Cog<Int> { c in c.get(middle) + 1 }
+  #expect(cogs?.read(root) == 3)
+
+  let token = cogs?.run { c in _ = c.get(root) }
+  let retainedNodes = cogs.map { Array($0.nodes.values) } ?? []
+  let retainedReaction = token?.reaction
+
+  #expect(retainedNodes.compactMap { $0 as? any DerivedCogSettleNode }.count == 2)
+  #expect(retainedReaction?.dependencies.count == 1)
+
+  cogs = nil
+
+  #expect(releasedContext == nil)
+  #expect(
+    retainedNodes.compactMap { $0 as? any DerivedCogSettleNode }
+      .allSatisfy { $0.dependencies.isEmpty }
+  )
+  #expect(retainedReaction?.dependencies.isEmpty == true)
+  _ = token
+}

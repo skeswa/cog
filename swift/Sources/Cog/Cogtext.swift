@@ -121,6 +121,23 @@ public final class Cogtext {
   /// code that tries to build a plain context does not get a runtime error, it
   /// gets a compile error, because the name is not visible to it.
   package init() {}
+
+  /// Breaks graph-owned dependency chains before stored properties release.
+  ///
+  /// Node dependencies are strong so a producer stays alive for as long as a
+  /// live consumer needs it. Releasing a very deep context without severing
+  /// those links first can make ARC recursively destroy the whole chain and
+  /// exhaust the process stack. The context already owns every node, so one
+  /// flat pass can drop all consumer-to-producer links before its dictionary
+  /// and reaction arrays begin their ordinary teardown.
+  isolated deinit {
+    for node in nodes.values {
+      (node as? any CogConsumer)?.releaseDependenciesForContextTeardown()
+    }
+    for reaction in reactions {
+      reaction.releaseDependenciesForContextTeardown()
+    }
+  }
 }
 
 // MARK: - Node storage

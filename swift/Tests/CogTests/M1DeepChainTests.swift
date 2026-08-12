@@ -14,7 +14,8 @@ private final class Graph03ChainStorage {
 @MainActor
 @Test func `GRAPH-03 a deep changed chain settles source to root without exhausting the stack`() {
   let depth = 20_000
-  let cogs = Cogtext.forTesting()
+  var cogs: Cogtext? = Cogtext.forTesting()
+  weak let releasedContext = cogs
   let source = ManualCog<Int>(0)
   let storage = Graph03ChainStorage()
   storage.refs.reserveCapacity(depth)
@@ -27,7 +28,7 @@ private final class Graph03ChainStorage {
     return c.get(source) + 1
   }
   storage.refs.append(first)
-  _ = cogs.read(first)
+  _ = cogs?.read(first)
 
   for index in 1..<depth {
     let parentIndex = index - 1
@@ -38,15 +39,15 @@ private final class Graph03ChainStorage {
       return c.get(storage.refs[parentIndex]) + 1
     }
     storage.refs.append(next)
-    _ = cogs.read(next)
+    _ = cogs?.read(next)
   }
 
   let root = storage.refs[depth - 1]
-  #expect(cogs.read(root) == depth)
+  #expect(cogs?.read(root) == depth)
 
   storage.recordsSettlement = true
-  cogs.commit { w in w[source] = 1 }
-  let settledValue = cogs.read(root)
+  cogs?.commit { w in w[source] = 1 }
+  let settledValue = cogs?.read(root)
   storage.recordsSettlement = false
 
   #expect(settledValue == depth + 1)
@@ -56,4 +57,10 @@ private final class Graph03ChainStorage {
       storage.settlementOrder[$0] == $0
     }
   )
+
+  // Make destruction part of the public stack-safety proof. Keeping the flat
+  // descriptor storage alive isolates context-owned graph edges from user
+  // closure ownership, while the weak reference proves teardown completed.
+  cogs = nil
+  #expect(releasedContext == nil)
 }

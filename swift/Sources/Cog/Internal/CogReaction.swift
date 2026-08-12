@@ -93,6 +93,10 @@ internal final class CogReaction: CogNode, CogConsumer {
     producer.addSubscriber(self)
   }
 
+  func releaseDependenciesForContextTeardown() {
+    dependencies.removeAll()
+  }
+
   /// Runs once at registration to establish the first dependency set.
   func runInitially(in cogs: Cogtext) {
     run(in: cogs)

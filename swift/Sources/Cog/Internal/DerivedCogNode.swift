@@ -116,6 +116,10 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
     producer.addSubscriber(self)
   }
 
+  func releaseDependenciesForContextTeardown() {
+    dependencies.removeAll()
+  }
+
   /// Reruns the generic selector behind a type-erased settle exit frame.
   func recompute(in cogs: Cogtext) {
     _ = run(in: cogs)
