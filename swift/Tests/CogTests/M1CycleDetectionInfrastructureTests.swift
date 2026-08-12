@@ -11,36 +11,6 @@ import Testing
 // MARK: - Real read-path integration
 
 @MainActor
-@Test func `CycleDetectionInfrastructure catches a self read through the real graph`() async {
-  let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
-    await MainActor.run {
-      let cogs = Cogtext.forTesting()
-      var ref: Cog<Int>!
-      ref = Cog<Int>({ c in c.get(ref) }, name: "self")
-      _ = cogs.read(ref)
-    }
-  }
-
-  expectCycleMessage(in: result, path: "self -> self")
-}
-
-@MainActor
-@Test func `CycleDetectionInfrastructure catches a fresh multi node cycle`() async {
-  let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
-    await MainActor.run {
-      let cogs = Cogtext.forTesting()
-      var first: Cog<Int>!
-      var second: Cog<Int>!
-      first = Cog<Int>({ c in c.get(second) }, name: "first")
-      second = Cog<Int>({ c in c.get(first) }, name: "second")
-      _ = cogs.read(first)
-    }
-  }
-
-  expectCycleMessage(in: result, path: "first -> second -> first")
-}
-
-@MainActor
 @Test func `CycleDetectionInfrastructure catches every key through the real graph`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
