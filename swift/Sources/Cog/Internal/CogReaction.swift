@@ -67,12 +67,6 @@ internal final class CogReaction: CogNode, CogConsumer {
     // file and line it was written on. A run whose watch suppressed its user
     // body — the quiet `.skip` install — is still a run Cog performed, and
     // still says so.
-    // Recorded here, at the one place a reaction body executes, so that every
-    // spelling of a registration lands under its own name: a `watch` given a
-    // `name:` shows that name, and a registration that gave none shows the
-    // file and line it was written on. A run whose watch suppressed its user
-    // body — the quiet `.skip` install — is still a run Cog performed, and
-    // still says so.
     #if DEBUG
     cogs.historyLog.recordEffect(label: label)
     #endif
