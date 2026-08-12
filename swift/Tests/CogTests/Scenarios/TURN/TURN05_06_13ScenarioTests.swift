@@ -2,15 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// Turn composition proved from the outside, through ops, reactions, and debug
-// history. Nothing here reaches for `CogTurnID` or `turnPhase` — that is
-// `TurnCompositionInfrastructureTests`, which greens no scenario and is free
-// to change with a later core.
-//
-// The history halves are gated, because the whole history surface is. The
-// flush-count and reaction-count halves need no debug surface and stay
-// ungated, so the release leg keeps proving that nested commits join and
-// sibling commits do not.
+// Reactions and debug history expose turn composition without inspecting turn
+// internals. Only history assertions require a debug build.
 
 extension Cogtext {
   /// An op whose body nests a second op, which nests a third.

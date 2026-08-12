@@ -2,21 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Derived-value scenarios written against the public `Cog` API and the
-// `CogTesting` product and nothing else — no `@testable`, no state storage, no
-// internal counters. That is scenarios.md constraint 3, and run-count claims
-// are exactly the place it would be tempting to break: the implementation
-// knows them precisely and the public API does not expose them at all.
-//
-// The way to ask "did it run?" without reaching inside is to make the selector
-// itself do the counting. A counter the test owns, incremented in the closure
-// the test wrote, is public-API observable by construction — the library never
-// sees it — and it keeps saying the same thing after the M6 core swap, which is
-// what COUNT-09 through COUNT-11 require of this whole suite.
-//
-// Value references are declared inside each test rather than at file scope,
-// and every test states `@MainActor`, so all four matrix legs say the same
-// thing (§7).
+// Selector-owned counters prove run counts without inspecting graph storage.
 
 // MARK: - GRAPH-01
 

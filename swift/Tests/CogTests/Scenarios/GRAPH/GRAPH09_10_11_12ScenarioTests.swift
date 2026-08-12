@@ -2,9 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// Dependency recapture is observable through selector-owned run counts and
-// public reads. These tests deliberately know nothing about edge storage, so
-// they keep proving the same contract when M6 swaps the correctness core.
+// Selector-owned counters make dependency recapture visible through public
+// reads.
 
 @MainActor
 @Test func `GRAPH-09 a conditional selector follows only its current branch`() {

@@ -3,10 +3,8 @@ import Testing
 
 @testable import Cog
 
-// `M1-04aa`'s turn-state machinery, asserted directly. These tests green no
-// scenario: `M1-04ab` proves the public commit behavior that rests on it.
-// Keeping the phase representation here, away from scenario tests, lets the
-// later data-oriented core replace it without changing a behavior test.
+// Internal phase checks for one commit. Scenario tests cover public commit
+// behavior.
 
 @MainActor
 @Test func `TurnStateInfrastructure advances through one turn and returns to idle`() {

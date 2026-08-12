@@ -2,20 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// `TURN-07`, the escaped writer. Public `Cog` API only — smuggling a writer out
-// of its commit is something ordinary user code can do, so proving that Cog
-// stops it needs no privileged surface at all (scenarios.md constraint 3).
-//
-// These are exit tests because the guard is a trap: it has to hold in shipping
-// builds, so it cannot be an `assert` and it cannot be caught. Each one spawns
-// a child process, which is why there are exactly two — one for each direction
-// the writer's subscript can be used — and no third for the async variant of
-// the same escape, which reaches the identical guard by the identical route
-// (constraint 2).
-//
-// Both run in the debug legs and again in the release-configuration leg, which
-// is where "in every kind of build" is actually proven: `assert` would still
-// pass the debug run here and vanish in release.
+// Child processes prove that escaped writer reads and writes trap with a useful
+// message in debug and release builds.
 
 @MainActor
 @Test func `TURN-07 writing through a writer that outlived its commit traps`() async {

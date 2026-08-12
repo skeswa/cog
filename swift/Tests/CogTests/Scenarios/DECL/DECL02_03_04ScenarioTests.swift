@@ -2,24 +2,6 @@ import Cog
 import CogTesting
 import Testing
 
-// The three scenarios `M1-02` greens. Like `DECL01ScenarioTests.swift`, this
-// file stays on the public `Cog` API and the `CogTesting` product — no
-// `@testable`, no descriptors, no state storage — because COUNT-09 through
-// COUNT-11 require this suite to keep passing unchanged when the value-reference layout
-// and the core underneath it are replaced (scenarios.md constraint 3). The
-// storage invariants boxes rest on are asserted separately, in
-// `ManualCogBoxInfrastructureTests.swift`, which greens no scenario.
-//
-// M1-02 first proved keyed identity with a reference-typed value before turns
-// existed. M1-04b strengthens DECL-04's write clause in place with a real
-// keyed commit, while TURN-14 separately owns the writer read-back behavior.
-//
-// Value references and boxes are declared inside each test rather than at file scope. A
-// `ManualCogBox` is MainActor-isolated, and a file-scope `let` would say
-// different things in the MainActor and nonisolated legs of the matrix; a
-// local says the same thing in all four. Every test states `@MainActor` for
-// the same reason (§7).
-
 // MARK: - Test values
 
 /// A value with an identity and something to change about it.
@@ -89,7 +71,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-02 a key of one box is not a key of another`() {
   // The key is half of the identity; the declaration is the other half. Two
   // boxes that share a key type and differ only in what they start at keep
-  // their own values for the same key (§3.1).
+  // their own values for the same key.
   let cogs = Cogtext.forTesting()
 
   let attempts = ManualCogBox<Int, String>(0)
@@ -101,7 +83,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-02 a box declares state without creating any`() {
-  // A declaration is a name (§2.3). Declaring a box for a key space of
+  // A declaration is a name. Declaring a box for a key space of
   // millions costs one declaration, and a context that is never asked for a
   // key still answers every key correctly when it finally is.
   let unreadCount = ManualCogBox<Int, Int>(0)
@@ -175,7 +157,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-03 every context starts its own keys from the closure`() {
-  // A test or preview runtime is its own world (§2.3): the same key in a
+  // A test or preview runtime is its own world: the same key in a
   // second context is a second piece of state, so it starts fresh from the
   // declaration rather than inheriting anything from the first.
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
@@ -254,7 +236,7 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 @Test func `DECL-04 equal keys of a Hashable type name one piece of state`() {
   // Identity is descriptor plus key, and "the same key" means equal, not
   // identical: two separately built `ZipCode` values that compare equal name
-  // one state (§3.1).
+  // one state.
   let cogs = Cogtext.forTesting()
   let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
 
@@ -270,8 +252,7 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 @Test func `DECL-04 one key is one piece of state per context, not per process`() {
   // The value reference is the same value reference in both contexts; the
   // state is not the same state.
-  // This is the rule that lets tests run in parallel and previews coexist
-  // (§2.3).
+  // This is the rule that lets tests run in parallel and previews coexist.
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
 
   let first = Cogtext.forTesting()

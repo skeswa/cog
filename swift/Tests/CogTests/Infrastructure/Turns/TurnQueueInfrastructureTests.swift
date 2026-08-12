@@ -3,9 +3,8 @@ import Testing
 
 @testable import Cog
 
-// M1-13a proves the structural queue without reactions. Custom equality runs
-// during flush, so it supplies the same phase boundary a reaction will later
-// use while keeping these tests scoped to turn machinery and internal state.
+// Custom equality runs during flush, letting these tests enqueue another turn
+// without depending on reactions.
 
 @MainActor
 @Test func `TurnQueueInfrastructure defers a commit requested during flush`() {

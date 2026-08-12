@@ -2,21 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Derived-value scenarios written against the public `Cog` API and the
-// `CogTesting` product and nothing else — no `@testable`, no state storage, no
-// internal counters. That is scenarios.md constraint 3, and run-count claims
-// are exactly the place it would be tempting to break: the implementation
-// knows them precisely and the public API does not expose them at all.
-//
-// The way to ask "did it run?" without reaching inside is to make the selector
-// itself do the counting. A counter the test owns, incremented in the closure
-// the test wrote, is public-API observable by construction — the library never
-// sees it — and it keeps saying the same thing after the M6 core swap, which is
-// what COUNT-09 through COUNT-11 require of this whole suite.
-//
-// Value references are declared inside each test rather than at file scope,
-// and every test states `@MainActor`, so all four matrix legs say the same
-// thing (§7).
+// Selector-owned counters prove run counts without inspecting graph storage.
 
 // MARK: - DECL-07
 
@@ -51,7 +37,7 @@ import Testing
 @Test func `DECL-07 a derived cog can compute from another derived cog`() {
   // `c.get` reads a derived cog the same way it reads a source, so a chain is
   // written the same way a leaf is — and reading the top computes the whole
-  // chain (§2.2).
+  // chain.
   let cogs = Cogtext.forTesting()
 
   let celsius = ManualCog<Double>(100)
@@ -66,7 +52,7 @@ import Testing
 @MainActor
 @Test func `DECL-07 a derived cog's selector is an ordinary function`() {
   // Branches, early returns, and locals are all fine: a selector is normal
-  // Swift, and the dependencies are whatever the run actually read (§2.4).
+  // Swift, and the dependencies are whatever the run actually read.
   let cogs = Cogtext.forTesting()
 
   let currentZip = ManualCog<String?>(nil)
@@ -190,7 +176,7 @@ import Testing
 
 @MainActor
 @Test func `DECL-09 a context that never sees a declaration runs nothing`() {
-  // The declaration is one thing; the running of it is per context (§2.3). A
+  // The declaration is one thing; the running of it is per context. A
   // second context has run nothing until it is asked.
   var runs = 0
 

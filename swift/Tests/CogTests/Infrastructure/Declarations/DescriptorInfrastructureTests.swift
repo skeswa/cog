@@ -2,17 +2,8 @@ import Testing
 
 @testable import Cog
 
-// `M1-01a` is infrastructure: it greens no scenario in scenarios.md. It puts
-// the naming layer under everything M1 builds next — descriptor-plus-key state
-// storage (`M1-01b`), boxes and allocation-free keyed value references (`M1-02`), and the
-// labels the cycle diagnostic and debug history print (`M1-31b`, which owns
-// DECL-10 and DECL-11). These tests therefore assert the seam itself, and
-// reach through `@testable` to do it: descriptors and labels are internal on
-// purpose, because a public value reference must never expose the graph's storage.
-//
-// Every test states `@MainActor` rather than relying on a default, so it says
-// the same thing in the nonisolated legs of the isolation matrix as in the
-// MainActor ones (§7).
+// Internal identity and label checks. Public scenario tests do not inspect
+// descriptors or graph storage.
 
 // MARK: - Identity
 
@@ -86,7 +77,7 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 
 @MainActor
 @Test func `DescriptorInfrastructure builds a keyed value reference without a second descriptor`() {
-  // The seam `box[key]` uses in M1-02: a new value reference, the same declaration.
+  // `box[key]` builds a new value reference for the same declaration.
   let source = ManualCog<Int>(0)
   let keyed = ManualCog(descriptor: source.descriptor, key: 5)
   let sameKeyAgain = ManualCog(descriptor: source.descriptor, key: 5)

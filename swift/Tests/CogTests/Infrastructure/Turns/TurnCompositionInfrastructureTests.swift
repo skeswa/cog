@@ -3,10 +3,8 @@ import Testing
 
 @testable import Cog
 
-// M1-12a pins the structural turn boundaries without claiming the later
-// reaction and history stories. These tests intentionally inspect phases,
-// turn identities, revisions, and pending storage; they green no scenario and
-// may change with the M6 core.
+// Internal checks for nested-commit phases, identities, revisions, and pending
+// storage.
 
 @MainActor
 @Test func `TurnCompositionInfrastructure nested commits join one outer turn`() {

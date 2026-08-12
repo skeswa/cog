@@ -2,9 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Derived equality is proved through selector-owned run counts and ordinary
-// reads. These scenarios observe the public graph contract, not its versions
-// or settle flags, so the M6 core swap cannot invalidate their evidence.
+// Selector-owned counters make derived equality visible through public reads.
 
 @MainActor
 @Test func `GRAPH-05 an equal middle value stops the downstream wave`() {

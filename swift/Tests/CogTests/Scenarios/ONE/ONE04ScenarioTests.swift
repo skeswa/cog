@@ -2,15 +2,6 @@ import Cog
 import CogTesting
 import Testing
 
-// Public scenario proof only: no `@testable`, state storage, or internal
-// counters. COUNT-09 through COUNT-11 require this suite to pass unchanged
-// when the core underneath it is replaced.
-//
-// Value references are declared inside each test rather than at file scope. A `ManualCog`
-// is MainActor-isolated, and a file-scope `let` would say different things in
-// the MainActor and nonisolated legs of the matrix; a local says the same
-// thing in all four. Every test states `@MainActor` for the same reason (§7).
-
 // MARK: - ONE-04
 
 @MainActor

@@ -1,7 +1,7 @@
 // scenario: ONE-03
 //
-// Feature code cannot build its own `Cogtext`. The initializer is `package`
-// (§2.3), so the guard against a second graph is not a runtime check that
+// Feature code cannot build its own `Cogtext`. The initializer is `package`,
+// so the guard against a second graph is not a runtime check that
 // application code has to remember — the name is simply not visible outside
 // the package, and the mistake never compiles.
 //

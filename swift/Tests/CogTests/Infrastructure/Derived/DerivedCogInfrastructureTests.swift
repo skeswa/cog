@@ -3,21 +3,8 @@ import Testing
 
 @testable import Cog
 
-// `M1-05a`'s machinery, asserted directly. These tests green no scenario: the
-// behavior a user was promised stays in the DECL, GRAPH, and READ scenario
-// directories, where public tests prove laziness and caching by counting
-// selector runs from inside the selector.
-//
-// What is checked here is the part of the mechanism that behavior rests on and
-// that nothing public can see yet: a derived state exists before it has a value,
-// the tracking slot names the consumer that is running, and a tracked read
-// records the edge §2.4 says it records. Dependency edges are invisible from
-// outside even though the settle engine now uses them, and silently failing to
-// capture one would surface later as a stale-value bug.
-//
-// Being implementation tests, they are allowed to reach through `@testable`,
-// and they are expected to change when the data-oriented core (`M6`) replaces
-// dictionary storage and edge lists. The scenario tests are not.
+// Internal checks for state creation, tracking, and dependency edges. Public
+// tests prove laziness and caching with selector-owned counters.
 
 // MARK: - Storage
 
@@ -48,7 +35,7 @@ import Testing
 @MainActor
 @Test func `DerivedCogInfrastructure tells identical declarations apart`() {
   // Same type, same selector shape, same label — two declarations, so two
-  // states and two runs. Identity is the descriptor object (§2.3).
+  // states and two runs. Identity is the descriptor object.
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int>({ c in c.get(source) }, name: "twin")
@@ -188,7 +175,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure keeps an untracked read out of the graph`() {
-  // `cogs.read` is the untracked one-shot (§2.4). Reading a derived cog that
+  // `cogs.read` is an untracked one-shot read. Reading a derived cog that
   // way computes it and records what *it* read, and creates no edge to the
   // caller, because there is no caller in the graph to create one to.
   let cogs = Cogtext.forTesting()

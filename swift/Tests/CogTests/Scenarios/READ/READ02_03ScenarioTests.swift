@@ -2,21 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Derived-value scenarios written against the public `Cog` API and the
-// `CogTesting` product and nothing else — no `@testable`, no state storage, no
-// internal counters. That is scenarios.md constraint 3, and run-count claims
-// are exactly the place it would be tempting to break: the implementation
-// knows them precisely and the public API does not expose them at all.
-//
-// The way to ask "did it run?" without reaching inside is to make the selector
-// itself do the counting. A counter the test owns, incremented in the closure
-// the test wrote, is public-API observable by construction — the library never
-// sees it — and it keeps saying the same thing after the M6 core swap, which is
-// what COUNT-09 through COUNT-11 require of this whole suite.
-//
-// Value references are declared inside each test rather than at file scope,
-// and every test states `@MainActor`, so all four matrix legs say the same
-// thing (§7).
+// Selector-owned counters prove run counts without inspecting graph storage.
 
 // MARK: - READ-02
 
@@ -60,7 +46,7 @@ import Testing
 @Test func `READ-02 a shared derived cog runs once for all its readers`() {
   // The cache belongs to the cog, not to the reader, so a value two consumers
   // both need is computed once — the property that keeps a diamond from
-  // computing its shared parent twice (§2.2).
+  // computing its shared parent twice.
   var sharedRuns = 0
 
   let cogs = Cogtext.forTesting()
@@ -102,7 +88,7 @@ import Testing
 @MainActor
 @Test func `READ-02 each context caches for itself`() {
   // One declaration, two runtimes: a value computed in a test's context is not
-  // a value another test's context can hand back (§2.3).
+  // a value another test's context can hand back.
   var runs = 0
 
   let first = Cogtext.forTesting()

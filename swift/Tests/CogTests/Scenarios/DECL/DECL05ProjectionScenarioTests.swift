@@ -2,29 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// The one scenario `M1-03` greens through tests; DECL-06, the other half of
-// `.readOnly`, is a compile-fail fixture
-// (`swift/CompileFail/Declaring/ReadOnlyWriteRejected.swift`) because "the
-// compiler says no" is not something a running test can observe.
-//
-// Public `Cog` API and the `CogTesting` product only — no `@testable`, no
-// descriptors, no state storage (scenarios.md constraint 3). That matters more
-// here than almost anywhere: the claim is that a projection is the *same* value reference
-// for the same state, and the honest way to show it is that reads through the
-// two value references cannot be told apart, not that they happen to compute the same
-// storage identity today.
-//
-// Keyed cases prove sameness with a reference-typed value rather than with a
-// keyed write, exactly as `ManualCogBoxInfrastructureTests.swift` does: keyed staging is
-// `M1-04b`'s scenario (TURN-14), and this slice must not lean on behavior that
-// has not landed. The keyless cases do write, because keyless staging is
-// already `M1-04ab`'s settled surface, and "always gives the same value as the
-// source" is worth showing across a real change of value.
-//
-// Value references are declared inside each test rather than at file scope, and every test
-// states `@MainActor`, for the reason the sibling suites give: a file-scope
-// `let` would say different things in the MainActor and nonisolated legs of the
-// matrix (§7).
+// Runtime tests prove that a projection and its source read one state. The
+// compile-fail fixture proves the projection cannot be written.
 
 // MARK: - Test values
 
@@ -101,7 +80,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 reading the projection first does not create a second piece of state`() {
-  // A read is what makes a state appear (§2.3), so the projection reading first
+  // A read is what makes a state appear, so the projection reading first
   // is the case where a wrong implementation would quietly make its own state.
   // A reference-typed value makes that visible without any write: one state
   // means one object.
@@ -132,7 +111,7 @@ private struct ZipCode: Hashable {
 @MainActor
 @Test func `DECL-05 each context answers its projection with its own state`() {
   // The projection is a value reference, and a value reference is the same
-  // value reference everywhere; the state is per context (§2.3). A test
+  // value reference everywhere; the state is per context. A test
   // runtime reading a published value reference reads its own world, not the
   // one next door.
   let countSource = ManualCog<Int>(0)
@@ -213,7 +192,7 @@ private struct ZipCode: Hashable {
 @MainActor
 @Test func `DECL-05 equal keys name one piece of state through the projection`() {
   // Identity is descriptor plus key, and the projection changes neither, so
-  // "the same key" still means equal rather than identical (§3.1).
+  // "the same key" still means equal rather than identical.
   let cogs = Cogtext.forTesting()
 
   let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }.readOnly

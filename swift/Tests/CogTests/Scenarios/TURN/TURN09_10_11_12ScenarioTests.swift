@@ -2,9 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Equality behavior is observable through ordinary reads and selector-owned
-// run counts. Nothing here reaches into a descriptor, a state, or settle state,
-// so these scenarios remain valid across the M6 core swap.
+// Selector-owned counters make equality behavior visible through public reads.
 
 @MainActor
 @Test func `TURN-09 an equal source write does not recompute a derived cog`() {

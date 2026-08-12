@@ -3,10 +3,8 @@ import Testing
 
 @testable import Cog
 
-// Computing marks and structured paths are infrastructure in M1-15b. These
-// probes own no CYCLE scenario: later behavior tasks expose the CogTesting
-// diagnostic seam and prove the shipping fatalError contract in child
-// processes.
+// These internal checks cover computation paths. Scenario tests use the
+// CogTesting diagnostic and child processes to cover public failures.
 
 // MARK: - Real read-path integration
 

@@ -2,18 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// `ONE-02`, the second-install guard. Public `Cog` API and the `CogTesting`
-// product only — no `@testable` (scenarios.md constraint 3).
-//
-// These are exit tests because the guard is a trap: an in-process `#expect`
-// cannot survive one, and a trap taken in the suite's own process would take
-// every other test down with it. Each exit test spawns a child process, so
-// there are as few of them as the behavior allows (scenarios.md constraint 2)
-// — one for the scenario, one for the seam it silently governs.
-//
-// The child process runs only the closure body, and the body captures nothing,
-// so every install below happens in a process that has never bootstrapped.
-// That is also why these tests need no cleanup: the polluted process exits.
+// Child processes isolate the fatal bootstrap trap. Their capture-free bodies
+// start without an installed app context.
 
 // MARK: - ONE-02
 

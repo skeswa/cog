@@ -3,18 +3,8 @@ import Testing
 
 @testable import Cog
 
-// `M1-01b`'s storage layer, asserted directly. These tests green no scenario:
-// the behavior a user was promised is in `DECL01ScenarioTests.swift`, which
-// stays on the public surface. What is checked here is the invariant that
-// behavior rests on — one state per descriptor and key, created on first use —
-// and there is no public way to observe it yet, because boxes (`M1-02`) and
-// keyed writes (`M1-04b`) are what make per-key and per-context identity visible
-// from outside. Until they land, this file is the only thing standing between
-// a silent storage bug and the tasks that build on it.
-//
-// Being implementation tests, they are allowed to reach through `@testable`,
-// and they are expected to change when the data-oriented core (`M6`) replaces
-// dictionary storage. The scenario tests are not.
+// Internal checks for one lazily created state per descriptor and key.
+// Scenario tests cover the public behavior.
 
 // MARK: - Laziness
 
@@ -63,7 +53,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure gives every key of a declaration its own state`() {
-  // The seam `box[key]` uses in `M1-02`: one descriptor, one state per key.
+  // A box reuses one descriptor and stores one state per key.
   let cogs = Cogtext.forTesting()
   let weather = ManualCog<Int>(0)
 
@@ -89,7 +79,7 @@ import Testing
 @MainActor
 @Test func `StateStorageInfrastructure tells identical declarations apart`() {
   // Same type, same starting value, same label — two declarations, so two
-  // states. Identity is the descriptor object and nothing else (§2.3).
+  // states. Identity is the descriptor object and nothing else.
   let cogs = Cogtext.forTesting()
   let left = ManualCog<Int>(0, name: "twin")
   let right = ManualCog<Int>(0, name: "twin")

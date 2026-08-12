@@ -3,28 +3,15 @@ import Testing
 
 @testable import Cog
 
-// `M1-02`'s storage and value-reference layout, asserted directly. These tests green no
-// scenario: what a user of the library was promised is in
-// `DECL02_03_04ScenarioTests.swift`, which stays on the public surface. What is
-// checked here is what that behavior rests on and what no public API can see
-// yet — one descriptor for a whole box, one state per key, and a keyed state
-// that knows its own key for diagnostics.
-//
-// Being implementation tests, they reach through `@testable`, and they are
-// expected to change when the value-reference layout is chosen from benchmarks (perf §4,
-// §9) or when the data-oriented core (`M6`) replaces dictionary storage. The
-// scenario tests are not.
-//
-// Every test states `@MainActor` rather than relying on a default, so it says
-// the same thing in all four legs of the isolation matrix (§7).
+// Internal checks for one descriptor per box, lazy per-key storage, and keys
+// retained for diagnostics. Scenario tests cover the public behavior.
 
 // MARK: - One descriptor per box
 
 @MainActor
 @Test func `ManualCogBoxInfrastructure gives a whole box one descriptor`() {
-  // The claim behind "allocation-free `box[key]`" (§2.3, perf §9.1): keys do
-  // not each get a declaration of their own, so building a value reference has nothing to
-  // allocate. It pairs the box's existing descriptor with the key.
+  // Keys reuse the box's descriptor. Erasing a large key to `AnyHashable` may
+  // still allocate.
   let weather = ManualCogBox<Int, Int>(0)
 
   let here = weather[90210]
@@ -59,7 +46,7 @@ import Testing
 @MainActor
 @Test func `ManualCogBoxInfrastructure labels every key with the declaration's label`() {
   // A key is not a declaration, so it does not get a name of its own. The
-  // descriptor-and-key path a cycle diagnostic prints (§2.4) is built from the
+  // descriptor-and-key path a cycle diagnostic prints is built from the
   // box's label plus the state's key, which is why the state keeps the key.
   let named = ManualCogBox<Int, Int>(0, name: "weather")
   let declarationLine = UInt(#line) + 1
@@ -143,10 +130,7 @@ import Testing
 @MainActor
 @Test func `ManualCogBoxInfrastructure builds a value reference out of two inert words of storage`()
 {
-  // Not a benchmark — PERF-06 measures allocations in the benchmark package at
-  // `M5`. This only pins the shape that claim rests on: a value reference is a descriptor
-  // reference plus the inline `AnyHashable?` the correctness build uses for
-  // keys (perf §4), and nothing in `box[key]` builds anything else.
+  // This pins the current storage shape, not its runtime allocation cost.
   #expect(
     MemoryLayout<ManualCog<Int>>.size == MemoryLayout<AnyObject>.size
       + MemoryLayout<AnyHashable?>.size)

@@ -4,11 +4,8 @@ import Cog
 import CogTesting
 import Testing
 
-// Debug history is its own rung on the observation ladder, so these tests read
-// `cogs.debugHistory` and nothing else — no `@testable import Cog`, because the
-// ring is storage and a later core swap must leave these tests untouched.
-// What a label *prints* is `M1-31b`'s claim (DECL-10, DECL-11) and is never
-// asserted here; these tests only ask what happened, and under which turn.
+// These tests use the public debug history. Label rendering has separate
+// coverage.
 
 extension Cogtext {
   fileprivate func bumpTheCounter(_ count: ManualCog<Int>) {
@@ -133,8 +130,7 @@ extension Cogtext {
   let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
   #expect(effects.count == 1)
   // No `name:` was given, so the label falls back to the registration site.
-  // Which file and line that is belongs to M1-31b; that it is not empty and is
-  // not some other effect's name is HIST-05's business.
+  // This test only checks that the fallback belongs to this registration.
   #expect(effects.first?.name.contains("HIST01_02_03_05ScenarioTests.swift") == true)
   _ = token
 }

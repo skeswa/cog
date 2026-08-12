@@ -3,10 +3,8 @@ import Testing
 
 @testable import Cog
 
-// `M1-06aa`'s settle-engine foundation, asserted directly. These tests green
-// no scenario: `M1-06ab`'s behavior test proves that a public read actually
-// settles a chain. Keeping flags, versions, and stack storage here lets the
-// data-oriented core replace all three without changing that test.
+// Internal checks for settle flags, versions, and stack storage. Scenario tests
+// cover settlement through public reads.
 
 @MainActor
 @Test func `SettleEngineInfrastructure gives fresh states the right state and versions`() {
