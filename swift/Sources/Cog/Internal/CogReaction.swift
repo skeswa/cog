@@ -69,9 +69,14 @@ internal final class CogReaction: CogNode, CogConsumer {
   /// `settleState` is deliberately left alone. It belongs to the invalidation
   /// walk, and a cancelled reaction is out of the registration list with no
   /// edges left, so whatever it says is unobservable.
+  ///
+  /// The body is released here too, at this fixed stopping point. `run(in:)`
+  /// binds an executing body to a local before user code can cancel itself, so
+  /// clearing the stored copy cannot invalidate a closure already on stack.
   func cancel() {
     guard !isCancelled else { return }
     isCancelled = true
+    body = nil
 
     for dependency in dependencies {
       dependency.removeSubscriber(self)

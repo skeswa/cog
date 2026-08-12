@@ -6,6 +6,7 @@
 @MainActor
 public final class ReactionToken {
   internal let reaction: CogReaction
+  private var deinitCleanupAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   internal init(reaction: CogReaction) {
     self.reaction = reaction
@@ -29,6 +30,13 @@ public final class ReactionToken {
     reaction.cancel()
   }
 
+  /// Installs the test-only signal emitted after isolated deinit cleanup.
+  package func acknowledgeDeinitCleanup(
+    with body: @escaping @MainActor @Sendable () -> Void
+  ) {
+    deinitCleanupAcknowledgement = body
+  }
+
   /// Cancels the registration once the last handle to it goes away.
   ///
   /// An effect that nobody can still reach is an effect nobody can still stop,
@@ -47,5 +55,6 @@ public final class ReactionToken {
   /// which is why stopping an effect *now* remains ``cancel()``'s job.
   isolated deinit {
     reaction.cancel()
+    deinitCleanupAcknowledgement?()
   }
 }

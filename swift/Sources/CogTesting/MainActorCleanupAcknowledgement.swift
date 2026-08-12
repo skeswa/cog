@@ -14,6 +14,12 @@ public nonisolated final class MainActorCleanupAcknowledgement: Sendable {
   private let events: AsyncStream<Void>
   private let continuation: AsyncStream<Void>.Continuation
 
+  /// Whether cleanup has signalled this acknowledgement.
+  ///
+  /// This is a diagnostic snapshot for assertions, not a synchronization
+  /// primitive. Await ``wait()`` instead of polling it.
+  @MainActor public private(set) var hasBeenAcknowledged = false
+
   public init() {
     (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
   }
@@ -22,6 +28,7 @@ public nonisolated final class MainActorCleanupAcknowledgement: Sendable {
   /// work.
   @MainActor
   public func acknowledge() {
+    hasBeenAcknowledged = true
     continuation.yield()
   }
 
