@@ -18,7 +18,7 @@ import Testing
   let unused = ManualCog<Int>(0)
   #expect(cogs.states.isEmpty)
 
-  _ = cogs.read(retryLimit)
+  _ = cogs.peek(retryLimit)
 
   // The one read made one state, and the declaration nobody read has none.
   #expect(cogs.states.count == 1)

@@ -4,7 +4,7 @@ import Testing
 
 extension Cogtext {
   fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
-    commit("reaction.writeback") { w in w[source] = value }
+    commit("reaction.writeback") { c in c[source] = value }
   }
 }
 
@@ -19,7 +19,7 @@ extension Cogtext {
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
 
   #expect(seen == [1])
@@ -33,10 +33,10 @@ extension Cogtext {
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   #expect(seen == [1, 2])
   _ = token
@@ -50,11 +50,11 @@ extension Cogtext {
   var runs = 0
 
   let token = cogs.run { c in
-    _ = c.get(observed)
+    _ = c[observed]
     runs += 1
   }
 
-  cogs.commit { w in w[unrelated] = 11 }
+  cogs.commit { c in c[unrelated] = 11 }
 
   #expect(runs == 1)
   _ = token
@@ -66,18 +66,18 @@ extension Cogtext {
   let source = ManualCog<Int>(1)
   var events: [String] = []
   let doubled = Cog<Int> { c in
-    let value = c.get(source) * 2
+    let value = c[source] * 2
     events.append("derive:\(value)")
     return value
   }
 
   let token = cogs.run { c in
     events.append("react:begin")
-    events.append("react:value:\(c.get(doubled))")
+    events.append("react:value:\(c[doubled])")
   }
 
   events.removeAll()
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   #expect(events == ["derive:4", "react:begin", "react:value:4"])
   _ = token
@@ -90,20 +90,20 @@ extension Cogtext {
   var order: [Int] = []
 
   let first = cogs.run { c in
-    _ = c.get(source)
+    _ = c[source]
     order.append(1)
   }
   let second = cogs.run { c in
-    _ = c.get(source)
+    _ = c[source]
     order.append(2)
   }
   let third = cogs.run { c in
-    _ = c.get(source)
+    _ = c[source]
     order.append(3)
   }
 
   order.removeAll()
-  cogs.commit { w in w[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(order == [1, 2, 3])
   _ = (first, second, third)
@@ -118,19 +118,19 @@ extension Cogtext {
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(useX) ? c.get(x) : c.get(y))
+    seen.append(c[useX] ? c[x] : c[y])
   }
 
-  cogs.commit { w in w[y] = 11 }
+  cogs.commit { c in c[y] = 11 }
   #expect(seen == [1])
 
-  cogs.commit { w in w[useX] = false }
+  cogs.commit { c in c[useX] = false }
   #expect(seen == [1, 11])
 
-  cogs.commit { w in w[y] = 12 }
+  cogs.commit { c in c[y] = 12 }
   #expect(seen == [1, 11, 12])
 
-  cogs.commit { w in w[x] = 2 }
+  cogs.commit { c in c[x] = 2 }
   #expect(seen == [1, 11, 12])
   _ = token
 }
@@ -142,10 +142,10 @@ extension Cogtext {
   var observed = -1
 
   let token = cogs.run { c in
-    observed = c.get(source)
+    observed = c[source]
   }
 
-  cogs.commit { w in w[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   // No await, polling, or callback: the line immediately after the commit
   // sees the work the reaction completed during that commit's flush.
@@ -162,38 +162,38 @@ extension Cogtext {
   var spawned: [ReactionToken] = []
 
   let first = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
 
     events.append("first:begin")
     spawned.append(
       cogs.run { c in
-        _ = c.get(trigger)
+        _ = c[trigger]
         events.append("third:initial")
-        cogs.commit("third.writeback") { w in w[writeback] = 1 }
+        cogs.commit("third.writeback") { c in c[writeback] = 1 }
       }
     )
     spawned.append(
       cogs.run { c in
-        _ = c.get(trigger)
+        _ = c[trigger]
         events.append("fourth:initial")
-        cogs.commit("fourth.writeback") { w in w[writeback] = 2 }
+        cogs.commit("fourth.writeback") { c in c[writeback] = 2 }
       }
     )
     events.append("first:end")
   }
 
   let second = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
     events.append("second")
   }
 
   let writebackObserver = cogs.run { c in
-    let value = c.get(writeback)
+    let value = c[writeback]
     guard value > 0 else { return }
     events.append("writeback:\(value)")
   }
 
-  cogs.commit { w in w[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   #expect(
     events == [
@@ -218,18 +218,18 @@ extension Cogtext {
   var snapshots: [String] = []
 
   let writer = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
     cogs.setFromReaction(followup, to: 1)
   }
 
   let observer = cogs.run { c in
-    let triggerValue = c.get(trigger)
-    let followupValue = c.get(followup)
+    let triggerValue = c[trigger]
+    let followupValue = c[followup]
     guard triggerValue == 1 else { return }
     snapshots.append("\(triggerValue):\(followupValue)")
   }
 
-  cogs.commit { w in w[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   #expect(snapshots == ["1:0", "1:1"])
   _ = (writer, observer)
@@ -251,34 +251,34 @@ extension Cogtext {
     maximumDepth = max(maximumDepth, reactionDepth)
     defer { reactionDepth -= 1 }
     events.append(
-      "\(name):\(cogs.read(trigger))/\(cogs.read(middle))/\(cogs.read(side))/\(cogs.read(leaf))"
+      "\(name):\(cogs.peek(trigger))/\(cogs.peek(middle))/\(cogs.peek(side))/\(cogs.peek(leaf))"
     )
   }
 
   let first = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
     record("first")
     cogs.setFromReaction(middle, to: 1)
     cogs.setFromReaction(side, to: 1)
   }
 
   let second = cogs.run { c in
-    guard c.get(middle) == 1 else { return }
+    guard c[middle] == 1 else { return }
     record("second")
     cogs.setFromReaction(leaf, to: 1)
   }
 
   let sideObserver = cogs.run { c in
-    guard c.get(side) == 1 else { return }
+    guard c[side] == 1 else { return }
     record("side")
   }
 
   let third = cogs.run { c in
-    guard c.get(leaf) == 1 else { return }
+    guard c[leaf] == 1 else { return }
     record("third")
   }
 
-  cogs.commit { w in w[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   #expect(
     events == [

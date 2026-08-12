@@ -10,10 +10,10 @@ import Testing
   let doubled = Cog<Int> { c in
     MainActor.preconditionIsolated("Cog selector")
     selectorRuns += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
-  #expect(cogs.read(doubled) == 42)
+  #expect(cogs.peek(doubled) == 42)
   #expect(selectorRuns == 1)
 }
 
@@ -23,14 +23,14 @@ import Testing
   let source = ManualCog<Int>(0)
   var bodyRuns = 0
 
-  cogs.commit { w in
+  cogs.commit { c in
     MainActor.preconditionIsolated("Cog commit body")
     bodyRuns += 1
-    w[source] = 1
+    c[source] = 1
   }
 
   #expect(bodyRuns == 1)
-  #expect(cogs.read(source) == 1)
+  #expect(cogs.peek(source) == 1)
 }
 
 @MainActor
@@ -41,12 +41,12 @@ import Testing
 
   let token = cogs.run { c in
     MainActor.preconditionIsolated("Cog reaction")
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
 
   #expect(seen == [0])
 
-  cogs.commit { w in w[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
   #expect(seen == [0, 1])
   _ = token

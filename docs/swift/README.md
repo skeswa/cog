@@ -116,15 +116,16 @@ struct WeatherApp: App {
 
   var body: some Scene {
     WindowGroup {
-      RootScene(cogs: cogs)
+      RootScene()
+        .cogEnvironment(cogs)
     }
   }
 }
 ```
 
-`RootScene(cogs:)` represents the app's own explicit composition boundary, not
-a Cog API. M2 will add the SwiftUI environment boundary; until then, do not copy
-the planned `\.cogs` environment spelling into current code.
+Every scene receives the same retained object through `.cogEnvironment(cogs)`.
+A view reads it with `@Environment(\.cogs) private var cogs`; tests and previews
+install their isolated context through the same modifier.
 
 An ordinary test or preview-support target depends on `CogTesting`. Create one
 fresh context for that test or preview runtime and pass it through the same
@@ -143,9 +144,9 @@ import Testing
   let count = ManualCog<Int>(0)
   let cogs = Cogtext.forTesting()
 
-  #expect(cogs.read(count) == 0)
-  cogs.commit { writer in writer[count] = 1 }
-  #expect(cogs.read(count) == 1)
+  #expect(cogs.peek(count) == 0)
+  cogs.commit { c in c[count] = 1 }
+  #expect(cogs.peek(count) == 1)
 }
 ```
 
@@ -186,6 +187,15 @@ These choices are settled; §10 of the core document has the full record.
   already-scheduled reactions and before queued write-back turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
+- Tracked reads use the active capability's subscript: `c[valueReference]` in
+  selectors and reactions, and `cogs[valueReference]` at the UI boundary. The
+  context owns the tracking operation, while non-tracking reads remain visibly
+  different as `c.peek(valueReference)` or `cogs.peek(valueReference)`.
+  Actions and other escaping closures must use the one-shot spelling. Public
+  Observation cannot tell Cog whether the subscript found an active UI
+  consumer, so Cog does not guess or emit a false-positive missing-consumer
+  warning; that diagnostic is deferred until the framework exposes an exact
+  public query.
 - Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
   is a value; its identity lives in an internal final-class descriptor plus
   key. Boxes create keyed value references without allocating new descriptors. The exact
@@ -224,7 +234,8 @@ These choices are settled; §10 of the core document has the full record.
   have their own retention rules. A `whileObserved` declaration with no
   explicit grace uses the context default: 30 seconds in production, with an
   explicit `CogTesting` override for deterministic timed tests.
-- Untracked reads (`c.read` in a selector, one-shot `cogs.read` outside) skip
+- Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
+  `cogs.peek` outside) skip
   the dependency edge but still settle the value they return; they are never
   stale. Exported streams (`cogs.values(of:)`) start from the current settled
   value and never make a commit wait: `.newest(1)` may skip turns for a slow
@@ -260,14 +271,13 @@ These choices are settled; §10 of the core document has the full record.
   separates its candidate gate, tag, and post-release verification. The
   normative rules are in impl/tasks.md.
 
-Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, debug-history tools, and persistence helpers. Also open
-are several edge behaviors: what a stream's phase does when its sequence ends
-or throws, whether equal stream elements commit distinct turns, whether a
-failed `.queue` run stops the queue, what a one-shot read or refresh of a cold
-async cog does, and debounce/throttle timing modifiers
-(deferred backlog). Value-reference layout, edge layout, and hash tables also remain open
-until benchmarks choose them.
+Still open: how much `Op` support v1 needs, optional deferred reactions,
+debug-history tools, and persistence helpers. Also open are several edge
+behaviors: what a stream's phase does when its sequence ends or throws, whether
+equal stream elements commit distinct turns, whether a failed `.queue` run
+stops the queue, what a one-shot read or refresh of a cold async cog does, and
+debounce/throttle timing modifiers (deferred backlog). Value-reference layout,
+edge layout, and hash tables also remain open until benchmarks choose them.
 
 ## Next steps
 

@@ -14,19 +14,19 @@ import Testing
   var seen: [Int] = []
 
   let token = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
 
   #expect(seen == [1])
 
   token.cancel()
 
-  cogs.commit { w in w[source] = 2 }
-  cogs.commit { w in w[source] = 3 }
+  cogs.commit { c in c[source] = 2 }
+  cogs.commit { c in c[source] = 3 }
 
   #expect(seen == [1])
   // The turns really happened; the reaction simply was not there for them.
-  #expect(cogs.read(source) == 3)
+  #expect(cogs.peek(source) == 3)
 
   _ = token
 }
@@ -40,7 +40,7 @@ import Testing
   var spawned: [ReactionToken] = []
 
   let canceller = cogs.run { c in
-    guard c.get(trigger) == 1 else { return }
+    guard c[trigger] == 1 else { return }
     events.append("canceller")
 
     // Already scanned into this flush's queue as a changed run, at an index the
@@ -49,8 +49,8 @@ import Testing
 
     // Registered inside the flush, so its first run joins the queue's tail, and
     // then cancelled before the drain arrives there.
-    let stillborn = cogs.run { inner in
-      _ = inner.get(trigger)
+    let stillborn = cogs.run { c in
+      _ = c[trigger]
       events.append("stillborn")
     }
     stillborn.cancel()
@@ -58,17 +58,17 @@ import Testing
   }
 
   queued = cogs.run { c in
-    _ = c.get(trigger)
+    _ = c[trigger]
     events.append("queued")
   }
 
   let survivor = cogs.run { c in
-    _ = c.get(trigger)
+    _ = c[trigger]
     events.append("survivor")
   }
 
   events.removeAll()
-  cogs.commit { w in w[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   // Neither cancelled run happened, and the flush carried on around them.
   #expect(events == ["canceller", "survivor"])
@@ -86,10 +86,10 @@ import Testing
   var survivorRuns = 0
 
   let token = cogs.run { c in
-    seen.append(c.get(cancelled))
+    seen.append(c[cancelled])
   }
   let survivor = cogs.run { c in
-    _ = c.get(watched)
+    _ = c[watched]
     survivorRuns += 1
   }
 
@@ -97,8 +97,8 @@ import Testing
   token.cancel()
   token.cancel()
 
-  cogs.commit { w in w[cancelled] = 2 }
-  cogs.commit { w in w[watched] = 2 }
+  cogs.commit { c in c[cancelled] = 2 }
+  cogs.commit { c in c[watched] = 2 }
 
   #expect(seen == [1])
   // The repeats took nothing else with them: a cancellation that removed by
@@ -118,7 +118,7 @@ import Testing
   // than a scope, so the drop happens on a line this test names instead of
   // wherever the compiler decides the last use was.
   var held: ReactionToken? = cogs.run { c in
-    seen.append(c.get(source))
+    seen.append(c[source])
   }
   var copy: ReactionToken? = held
 
@@ -126,19 +126,19 @@ import Testing
 
   copy = nil
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
   // Not the last copy, so the registration is untouched.
   #expect(seen == [1, 2])
 
   held = nil
 
-  cogs.commit { w in w[source] = 3 }
+  cogs.commit { c in c[source] = 3 }
 
   // Now it was, and the reaction stopped — synchronously, with no await and no
   // poll, because the token was released on the actor the graph runs on.
   #expect(seen == [1, 2])
-  #expect(cogs.read(source) == 3)
+  #expect(cogs.peek(source) == 3)
 
   _ = (held, copy)
 }
@@ -152,10 +152,10 @@ import Testing
   var collectedSeen: [Int] = []
 
   let aliasedToken = cogs.run { c in
-    aliasedSeen.append(c.get(aliased))
+    aliasedSeen.append(c[aliased])
   }
   let collectedToken = cogs.run { c in
-    collectedSeen.append(c.get(collected))
+    collectedSeen.append(c[collected])
   }
 
   let alias = aliasedToken
@@ -168,9 +168,9 @@ import Testing
   alias.cancel()
   owned[0].cancel()
 
-  cogs.commit { w in
-    w[aliased] = 2
-    w[collected] = 2
+  cogs.commit { c in
+    c[aliased] = 2
+    c[collected] = 2
   }
 
   #expect(aliasedSeen == [1])
@@ -181,9 +181,9 @@ import Testing
   aliasedToken.cancel()
   collectedToken.cancel()
 
-  cogs.commit { w in
-    w[aliased] = 3
-    w[collected] = 3
+  cogs.commit { c in
+    c[aliased] = 3
+    c[collected] = 3
   }
 
   #expect(aliasedSeen == [1])

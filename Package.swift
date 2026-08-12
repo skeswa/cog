@@ -36,6 +36,10 @@ let librarySettings: [SwiftSetting] = [
 
 let requestedIsolation = Context.environment["COG_TEST_ISOLATION"] ?? "mainactor"
 let requestedNonisolatedNonsending = Context.environment["COG_TEST_NNBD"] ?? "1"
+// Xcode's generated package scheme builds every test target before applying
+// `-only-testing`. Exit tests are unavailable on iOS, so the simulator runner
+// asks the manifest for the one test target that is valid there.
+let simulatorBoundaryOnly = Context.environment["COG_SIMULATOR_BOUNDARY_ONLY"] == "1"
 
 /// Settings applied to every test target, for the leg the environment selects.
 ///
@@ -128,22 +132,26 @@ let package = Package(
       swiftSettings: librarySettings
     ),
     .testTarget(
-      name: "CogTests",
-      dependencies: ["Cog", "CogTesting"],
-      path: "swift/Tests/CogTests",
-      swiftSettings: testSettings
-    ),
-    .testTarget(
-      name: "CogScenarioTests",
-      dependencies: ["Cog", "CogTesting", "CogScenarios"],
-      path: "swift/Tests/CogScenarioTests",
-      swiftSettings: testSettings
-    ),
-    .testTarget(
       name: "CogBoundaryTests",
       dependencies: ["Cog", "CogTesting"],
       path: "swift/Tests/CogBoundaryTests",
       swiftSettings: testSettings
     ),
   ]
+    + (simulatorBoundaryOnly
+      ? []
+      : [
+        .testTarget(
+          name: "CogTests",
+          dependencies: ["Cog", "CogTesting"],
+          path: "swift/Tests/CogTests",
+          swiftSettings: testSettings
+        ),
+        .testTarget(
+          name: "CogScenarioTests",
+          dependencies: ["Cog", "CogTesting", "CogScenarios"],
+          path: "swift/Tests/CogScenarioTests",
+          swiftSettings: testSettings
+        ),
+      ])
 )

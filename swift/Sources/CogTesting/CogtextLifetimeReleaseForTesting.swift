@@ -12,4 +12,14 @@ extension Cogtext {
       acknowledgement.acknowledge()
     }
   }
+
+  /// Signals after the next derived grace-expiry check, even when UI pinning
+  /// correctly prevents removal.
+  public func acknowledgeNextDerivedReleaseCheck(
+    with acknowledgement: MainActorCleanupAcknowledgement
+  ) {
+    acknowledgeNextDerivedReleaseCheck {
+      acknowledgement.acknowledge()
+    }
+  }
 }

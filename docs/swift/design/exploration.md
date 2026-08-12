@@ -54,9 +54,9 @@ Observation does not provide Cog's inner graph:
 
 Two platform rules shape Cog:
 
-- Tracking sees only synchronous reads in the tracked scope. Reads in later
-  closures or on another thread do not count. The synchronous `c.get` API
-  makes this rule visible.
+- Tracking sees only synchronous subscript reads in the tracked scope. Reads
+  in later closures or on another thread do not count. The `c[...]` spelling
+  makes the tracked operation visible.
 - The registrar is thread-safe, but observed storage is not. State still needs
   one owner.
 
@@ -214,17 +214,22 @@ allocation-free. Human labels use an explicit `name:` or the captured
 `fileID:line`; users never see the object identifier. A future optional macro
 could infer names without changing identity.
 
-Reads go through the app context — `c.get(valueReference)` inside a selector,
-`cogs.get(valueReference)` outside. The context tracks dependencies and records one
-history for the whole app.
+Reads go through the active capability: `c[valueReference]` inside a selector
+or reaction, and `cogs[valueReference]` at the Observation boundary. The shared
+subscript is the normal tracked-read spelling. `c.peek(...)` and
+`cogs.peek(...)` make non-tracking reads visibly exceptional. A `Writer`, also
+named `c` at the call site, uses its distinct static type to make that same
+subscript expose and stage the active turn's values. A callable value reference
+would put graph work on what is otherwise an inert name and still need the
+context as an argument.
 
 ### 2.4 Dependencies are captured on every run
 
-Dependencies are exactly the cogs read with `c.get` during the last run.
+Dependencies are exactly the cogs read with `c[...]` during the last run.
 Conditions and early returns are valid; every edge must be read again on the
 next run to stay attached. The runtime places the current consumer in a
-MainActor tracking slot while a selector or reaction runs, and each `get`
-links producer to consumer.[^tracking-storage]
+MainActor tracking slot while a selector or reaction runs, and each tracked
+subscript read links producer to consumer.[^tracking-storage]
 
 Rules:
 
@@ -240,10 +245,10 @@ Rules:
   seam lets tests inspect diagnostics without crashing the test process.
 - Synchronous selectors do not throw in v1. Use `Result` for fallible sync
   domain work and `CogPhase` for async failures.
-- `c.read` returns a cog's current value without creating an edge — the
+- `c.peek` returns a cog's current value without creating an edge — the
   untracked escape hatch for a value the selector uses but must not follow, as
-  in `withLatestFrom` (§5.4). Untracked reads still settle: `c.read` and the
-  one-shot `cogs.read` compute a dirty value before returning it, so skipping
+  in `withLatestFrom` (§5.4). Non-tracking reads still settle: `c.peek` and the
+  one-shot `cogs.peek` compute a dirty value before returning it, so skipping
   the edge never means seeing a stale value. Keep it rare and loud; an
   untracked read that should have been tracked is a stale-value bug.
 - `c.curr` exposes the cog's own prior value so a selector may keep or fold
@@ -295,24 +300,24 @@ let weatherReport = weatherReportSource.readOnly
 let currentZipCode = currentZipSource.readOnly
 
 let isSunny = CogBox<Bool, ZipCode> { c, zip in
-    switch c.get(weatherReport[zip])?.kind {
+    switch c[weatherReport[zip]]?.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
 }
 
 let isNiceOutside = CogBox<Bool, ZipCode> { c, zip in
-    guard let report = c.get(weatherReport[zip]) else { return false }
-    guard c.get(isSunny[zip]) else { return false }
-    let advisory = c.get(heatAdvisorySource[zip])
+    guard let report = c[weatherReport[zip]] else { return false }
+    guard c[isSunny[zip]] else { return false }
+    let advisory = c[heatAdvisorySource[zip]]
     return report.temperatureF > 60
         && report.temperatureF < 90
         && !advisory
 }
 
 let isNiceOutsideHere = Cog { c in
-    guard let zip = c.get(currentZipCode) else { return false }
-    return c.get(isNiceOutside[zip])
+    guard let zip = c[currentZipCode] else { return false }
+    return c[isNiceOutside[zip]]
 }
 ```
 
@@ -320,10 +325,10 @@ The public forms are:
 
 | Declare           | Example                                          | Read                                           |
 | ----------------- | ------------------------------------------------ | ---------------------------------------------- |
-| One derived value | `Cog<Bool> { ... }`                              | `c.get(valueReference)` → `Bool`               |
-| A derived box     | `CogBox<Bool, ZipCode> { ... }`                  | `c.get(box[zip])`                              |
-| One source        | `ManualCog<ZipCode?>(nil)`                       | Read normally; write `w[valueReference] = zip` |
-| A source box      | `ManualCogBox<Weather?, ZipCode>(nil)`           | `w[box[zip]] = report`                         |
+| One derived value | `Cog<Bool> { ... }`                              | `c[valueReference]` → `Bool`                   |
+| A derived box     | `CogBox<Bool, ZipCode> { ... }`                  | `c[box[zip]]`                                  |
+| One source        | `ManualCog<ZipCode?>(nil)`                       | Read normally; write `c[valueReference] = zip` |
+| A source box      | `ManualCogBox<Weather?, ZipCode>(nil)`           | `c[box[zip]] = report`                         |
 | One async value   | `AsyncCog<Forecast>(.latest) { ... }`            | `CogPhase<Forecast>`                           |
 | An async box      | `AsyncCogBox<Weather, ZipCode>(.latest) { ... }` | Full phase or `.latest` value (§5.1)           |
 
@@ -338,9 +343,9 @@ Four rules keep these forms consistent:
 3. **Production kind does not change the read type.** Manual, derived, and
    async describe how a value is made. Async value references are ordinary
    `Cog<CogPhase<T>>` value references with a `.latest` projection.
-4. **Frequent call sites stay short.** `get`, `commit`, `w[...]`, and
-   `box[key]` are common. Longer names such as `ManualCogBox` appear only at
-   declarations.
+4. **Frequent call sites stay short.** `c[...]`, `commit`, and `box[key]` are
+   common. The exceptional non-tracking operation is the explicit `peek`.
+   Longer names such as `ManualCogBox` appear only at declarations.
 
 The semantic shape is settled; the physical value-reference layout is not. The first build
 uses inline `AnyHashable?`. Benchmarks will compare it with interned key
@@ -362,14 +367,14 @@ extension Cogtext {
         async let advisories = service.advisories(for: zip)
         let (r, a) = try await (report, advisories)
 
-        commit { w in
-            w[weatherReportSource[zip]] = r
-            w[heatAdvisorySource[zip]] = a.contains { $0 is HeatAdvisory }
+        commit { c in
+            c[weatherReportSource[zip]] = r
+            c[heatAdvisorySource[zip]] = a.contains { $0 is HeatAdvisory }
         }
     }
 
     func useCurrentLocation(_ zip: ZipCode) {
-        commit { w in w[currentZipSource] = zip }
+        commit { c in c[currentZipSource] = zip }
     }
 }
 ```
@@ -378,7 +383,7 @@ extension Cogtext {
 write primitive.
 
 - Only `Writer` can change a source. It supports read and write, so
-  `w[count] += 1` works.
+  `c[count] += 1` works.
 - Each writer carries an unforgeable turn ID and checks that its context is
   still accumulating that turn. An escaped writer cannot be used later.
 - `#function` names the turn without extra code. An op is just a normal
@@ -413,7 +418,7 @@ give write control and turn names, so v1 does not need them.
 
 ```swift
 let token = cogs.run { c in
-    if c.get(isNiceOutsideHere) {
+    if c[isNiceOutsideHere] {
         notifier.alert("It is nice outside!")
     }
 }
@@ -437,8 +442,8 @@ struct WeatherCard: View {
     let zip: ZipCode
 
     var body: some View {
-        let report = cogs.get(weatherReport[zip])
-        let nice = cogs.get(isNiceOutside[zip])
+        let report = cogs[weatherReport[zip]]
+        let nice = cogs[isNiceOutside[zip]]
 
         VStack {
             Text(report.map { "\(Int($0.temperatureF.rounded()))°F" }
@@ -452,12 +457,12 @@ struct WeatherCard: View {
 }
 ```
 
-`cogs.get` reads through the state's registrar, so SwiftUI tracks that exact
-descriptor and key and updates the view only when one of those values really
-changes. There is no special view, hook, or property wrapper; the app injects
-its one `Cogtext` above every scene through the environment. SwiftUI does not
-tell Cog when it stops watching a registrar object, so any state that reaches
-this UI boundary stays pinned to the app context (§5.3).
+`cogs[valueReference]` reads through the state's registrar, so SwiftUI tracks
+that exact descriptor and key and updates the view only when one of those
+values really changes. There is no special view, hook, or property wrapper;
+the app injects its one `Cogtext` above every scene through the environment.
+SwiftUI does not tell Cog when it stops watching a registrar object, so any
+state that reaches this UI boundary stays pinned to the app context (§5.3).
 
 Sources are `fileprivate`, so views cannot create raw writable bindings. The
 state file exports a domain binding:
@@ -466,8 +471,8 @@ state file exports a domain binding:
 // WeatherState.swift
 extension Cogtext {
     var currentZipBinding: Binding<ZipCode?> {
-        binding(for: currentZipCode) { w, zip in
-            w[currentZipSource] = zip
+        binding(for: currentZipCode) { c, zip in
+            c[currentZipSource] = zip
         }
     }
 }
@@ -478,7 +483,7 @@ TextField("ZIP", value: cogs.currentZipBinding, format: .zipCode)
 
 `binding(for:)` pairs a tracked read with a named commit, so the state file
 still lists every write path. For a one-time untracked read, use
-`cogs.read(...)`.
+`cogs.peek(...)`.
 
 ---
 
@@ -542,7 +547,7 @@ returns a description of async work:
 
 ```swift
 let fetchedWeather = AsyncCogBox<Weather, ZipCode>(.latest) { c, zip in
-    let service = c.get(weatherService)
+    let service = c[weatherService]
     return .run { try await service.weather(for: zip) }
 }
 ```
@@ -554,7 +559,7 @@ only to compare them.
 
 `Work` has two forms: `.run { ... }` returns one value, committed as one turn;
 `.stream(sequence)` commits each sequence element as its own turn. The split
-prevents hidden async tracking bugs: every `c.get` happens before the work
+prevents hidden async tracking bugs: every `c[...]` read happens before the work
 starts, so no read can silently stop tracking after an `await`. Changing a
 dependency reruns the selector and creates new work; the policy in §5.2
 decides what happens to the old work.
@@ -562,8 +567,8 @@ decides what happens to the old work.
 Read either the full phase or its last good value:
 
 ```swift
-c.get(fetchedWeather[zip])
-c.get(fetchedWeather.latest[zip])
+c[fetchedWeather[zip]]
+c[fetchedWeather.latest[zip]]
 ```
 
 The `.latest` projection lets downstream code read a manual `Weather?` and an
@@ -662,8 +667,14 @@ testing, background work, and reconciler rules.
 ## 7. What the SwiftUI boundary must handle
 
 - **Reads in escaping closures are not tracked.** A `Button` action or
-  `Task {}` body is outside the view's tracked read. Debug builds should warn
-  when a tracked `get` has no consumer, like Perception does.
+  `Task {}` body is outside the view's tracked read, so it uses the visibly
+  one-shot `cogs.peek` spelling. Public Observation exposes no query for
+  whether `ObservationRegistrar.access` found a current consumer: a valid
+  SwiftUI, UIKit, or AppKit automatic-tracking read and an accidental
+  `cogs[...]` in an action are indistinguishable to Cog. The direct subscript
+  therefore emits no missing-consumer warning. Do not use private
+  Observation SPI or a heuristic that would warn on valid reads; revisit the
+  diagnostic only if Observation adds a public tracking-presence API.
 - **View-owned model lifetime can be unstable.** Cog state lives in the app
   context, not an `@Observable` object recreated with the view. Truly local UI
   state uses `@State`; shared screen state uses keyed app cogs and explicit
@@ -758,7 +769,8 @@ singular, and does measurement show less runtime work?
 | Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock (§5.3).                                                                                                                                                                                                                                                                                                                                                 |
 | State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Untracked reads?                  | `c.read` and one-shot `cogs.read` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Untracked reads?                  | `c.peek` and one-shot `cogs.peek` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Read spelling?                    | Use `c[valueReference]` for tracked selector and reaction reads, `cogs[valueReference]` for tracked UI reads, and `c.peek(...)` or `cogs.peek(...)` for non-tracking reads. Commit closures also call their `Writer` parameter `c`; its distinct type makes the same subscript expose and stage the active turn's values (§2.3, §3.2, §3.4).                                                                                                                                                                                                                                                                                            |
 | Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Context construction?             | App bootstrap calls `Cogtext.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -775,9 +787,9 @@ singular, and does measurement show less runtime work?
 These numbers are stable identifiers that other documents cite. A settled item
 keeps its slot and points at the table above instead of renumbering the rest.
 
-1. **Read spelling:** `cogs.get(valueReference)`, `cogs[valueReference]`, or callable value references. Current
-   lean: keep `get` because a tracked read creates an edge. Try all three in
-   the weather spike.
+1. **Read spelling:** settled on August 12, 2026 as `c[valueReference]` inside
+   selectors and reactions, `cogs[valueReference]` at the UI boundary, and
+   `peek(...)` for non-tracking reads. See "Read spelling?" above.
 2. **How much `Op` support ships in v1:** plain methods are enough to start.
    `.live` and `.latestFailure` call tracking need a separate design.
 3. **Deferred reactions:** synchronous ordered flush and the write-back queue
@@ -818,13 +830,19 @@ keeps its slot and points at the table above instead of renumbering the rest.
     when a sequence yields consecutive equal elements.
 15. **One-shot reads of cold async cogs:** untracked reads settle (§2.4), and
     an async cog's first read starts work and publishes a pending turn
-    (§5.1). Define what a subscription-free `cogs.read` of a never-read
+    (§5.1). Define what a subscription-free `cogs.peek` of a never-read
     async cog does — and, relatedly, what `cogs.refresh` of a never-read value reference
     does.
 16. **Registration during a flush:** settled on August 11, 2026. The initial
     run joins the current flush's reaction tail without re-entry, after work
     already scheduled for the turn and before queued write-back turns. See
     "Reaction registration in a flush?" above.
+17. **Tracked read without a UI consumer:** deferred on August 12, 2026.
+    Public Observation has no current-consumer query, so the settled direct
+    `cogs[...]` API cannot distinguish valid automatic UI tracking from an
+    accidental action read. M2 ships no warning; actions use `cogs.peek`.
+    Revisit only when a public tracking-presence API can make the diagnostic
+    exact without a wrapper or private SPI. See §7.
 
 ---
 

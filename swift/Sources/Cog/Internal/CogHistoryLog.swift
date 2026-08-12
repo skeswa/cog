@@ -50,6 +50,11 @@ internal struct CogHistoryLog {
     record(CogHistoryEntry(event: .recompute, turn: turn, subject: .cog(label, key)))
   }
 
+  /// Records one changed UI boundary notice.
+  mutating func recordNotice(label: CogLabel, key: AnyHashable?) {
+    record(CogHistoryEntry(event: .notice, turn: turn, subject: .cog(label, key)))
+  }
+
   /// Records one run of a reaction or watch body.
   mutating func recordEffect(label: CogLabel) {
     record(CogHistoryEntry(event: .effect, turn: turn, subject: .effect(label)))

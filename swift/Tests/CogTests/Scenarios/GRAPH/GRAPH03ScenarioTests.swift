@@ -25,10 +25,10 @@ private final class Graph03ChainStorage {
     if storage.recordsSettlement {
       storage.settlementOrder.append(0)
     }
-    return c.get(source) + 1
+    return c[source] + 1
   }
   storage.valueReferences.append(first)
-  _ = cogs?.read(first)
+  _ = cogs?.peek(first)
 
   for index in 1..<depth {
     let parentIndex = index - 1
@@ -36,18 +36,18 @@ private final class Graph03ChainStorage {
       if storage.recordsSettlement {
         storage.settlementOrder.append(index)
       }
-      return c.get(storage.valueReferences[parentIndex]) + 1
+      return c[storage.valueReferences[parentIndex]] + 1
     }
     storage.valueReferences.append(next)
-    _ = cogs?.read(next)
+    _ = cogs?.peek(next)
   }
 
   let root = storage.valueReferences[depth - 1]
-  #expect(cogs?.read(root) == depth)
+  #expect(cogs?.peek(root) == depth)
 
   storage.recordsSettlement = true
-  cogs?.commit { w in w[source] = 1 }
-  let settledValue = cogs?.read(root)
+  cogs?.commit { c in c[source] = 1 }
+  let settledValue = cogs?.peek(root)
   storage.recordsSettlement = false
 
   #expect(settledValue == depth + 1)

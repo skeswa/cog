@@ -24,26 +24,26 @@ import Testing
       outerTurn = turn.id
       events.append("outer flush before enqueue")
 
-      cogs.commit("queued") { writer in
+      cogs.commit("queued") { c in
         guard case .accumulating(let turn) = cogs.turnPhase else {
           Issue.record("The queued body did not run while accumulating")
           return
         }
         queuedTurn = turn.id
         events.append("queued body")
-        #expect(writer[queuedSource] == 0)
-        writer[queuedSource] = 1
+        #expect(c[queuedSource] == 0)
+        c[queuedSource] = 1
       }
 
       events.append("outer flush after enqueue")
-      #expect(cogs.read(queuedSource) == 0)
+      #expect(cogs.peek(queuedSource) == 0)
       return oldValue == newValue
     }
   )
 
-  cogs.commit("outer") { writer in
+  cogs.commit("outer") { c in
     events.append("outer body")
-    writer[trigger] = 1
+    c[trigger] = 1
   }
 
   #expect(
@@ -56,7 +56,7 @@ import Testing
   #expect(outerTurn != nil)
   #expect(queuedTurn != nil)
   #expect(queuedTurn !== outerTurn)
-  #expect(cogs.read(queuedSource) == 1)
+  #expect(cogs.peek(queuedSource) == 1)
   #expect(cogs.queuedTurns.isEmpty)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The queue did not drain back to idle")
@@ -86,11 +86,11 @@ import Testing
     0,
     equals: { oldValue, newValue in
       events.append("first flush")
-      cogs.commit("late") { writer in
+      cogs.commit("late") { c in
         recordQueuedTurn("late")
         events.append("late body")
-        valuesSeen.append(writer[value])
-        writer[value] = 3
+        valuesSeen.append(c[value])
+        c[value] = 3
       }
       return oldValue == newValue
     }
@@ -101,26 +101,26 @@ import Testing
     equals: { oldValue, newValue in
       events.append("outer flush")
 
-      cogs.commit("first") { writer in
+      cogs.commit("first") { c in
         recordQueuedTurn("first")
         events.append("first body")
-        valuesSeen.append(writer[value])
-        writer[firstFlushTrigger] = 1
-        writer[value] = 1
+        valuesSeen.append(c[value])
+        c[firstFlushTrigger] = 1
+        c[value] = 1
       }
 
-      cogs.commit("second") { writer in
+      cogs.commit("second") { c in
         recordQueuedTurn("second")
         events.append("second body")
-        valuesSeen.append(writer[value])
-        writer[value] = 2
+        valuesSeen.append(c[value])
+        c[value] = 2
       }
 
       return oldValue == newValue
     }
   )
 
-  cogs.commit("outer") { writer in writer[outerFlushTrigger] = 1 }
+  cogs.commit("outer") { c in c[outerFlushTrigger] = 1 }
 
   #expect(
     events == [
@@ -133,7 +133,7 @@ import Testing
   #expect(valuesSeen == [0, 1, 2])
   #expect(turnNames == ["first", "second", "late"])
   #expect(Set(turnIDs.map(ObjectIdentifier.init)).count == 3)
-  #expect(cogs.read(value) == 3)
+  #expect(cogs.peek(value) == 3)
   #expect(cogs.queuedTurns.isEmpty)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The growing queue did not drain back to idle")

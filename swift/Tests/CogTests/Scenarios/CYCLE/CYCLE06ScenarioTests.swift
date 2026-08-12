@@ -17,7 +17,7 @@ import Testing
         name: "weather"
       )
 
-      _ = cogs.read(weather["home"])
+      _ = cogs.peek(weather["home"])
     }
   }
 
@@ -36,7 +36,7 @@ import Testing
       let cogs = Cogtext.forTesting()
       let source = ManualCog<Int>(0)
       let weather = CogBox<Int, String>(
-        { c, _ in c.get(source) },
+        { c, _ in c[source] },
         equals: { _, _ in
           cogs.commit("illegal equality turn") { _ in
             fatalError("EQUALITY COMMIT BODY RAN")
@@ -46,9 +46,9 @@ import Testing
         name: "weather"
       )
 
-      _ = cogs.read(weather["home"])
-      cogs.commit { w in w[source] = 1 }
-      _ = cogs.read(weather["home"])
+      _ = cogs.peek(weather["home"])
+      cogs.commit { c in c[source] = 1 }
+      _ = cogs.peek(weather["home"])
     }
   }
 

@@ -4,20 +4,46 @@ import Testing
 @testable import Cog
 
 @MainActor
+@Test func `ReactionReaderInfrastructure peek settles without adding a dependency`() {
+  let cogs = Cogtext.forTesting()
+  let trigger = ManualCog<Int>(0)
+  let source = ManualCog<Int>(1)
+  let projectedSource = source.readOnly
+  let doubled = Cog<Int> { c in c[source] * 2 }
+  var seen: [(Int, Int)] = []
+
+  let token = cogs.run { c in
+    _ = c[trigger]
+    seen.append((c.peek(projectedSource), c.peek(doubled)))
+  }
+  defer { token.cancel() }
+
+  #expect(seen.map { $0.0 } == [1])
+  #expect(seen.map { $0.1 } == [2])
+
+  cogs.commit { c in c[source] = 3 }
+  #expect(seen.count == 1)
+
+  cogs.commit { c in c[trigger] = 1 }
+  #expect(seen.map { $0.0 } == [1, 3])
+  #expect(seen.map { $0.1 } == [2, 6])
+}
+
+@MainActor
 @Test func `ReactionLeaseInfrastructure counts direct derived roots once per reaction`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let inner = Cog<Int> { c in c.get(source) + 1 }
-  let root = Cog<Int> { c in c.get(inner) + 1 }
+  let inner = Cog<Int> { c in c[source] + 1 }
+  let root = Cog<Int> { c in c[inner] + 1 }
   let kept = Cog<Int>(keepAlive: true) { _ in 4 }
 
   let first = cogs.run { c in
-    _ = c.get(root)
-    _ = c.get(root)
-    _ = c.get(source)
-    _ = c.get(kept)
+    _ = c[root]
+    _ = c[root]
+    _ = c[source]
+    _ = c[kept]
   }
-  let second = cogs.run { c in _ = c.get(root) }
+  let second = cogs.run { c in _ = c[root] }
 
   let rootState = cogs.derivedState(for: root)
   let innerState = cogs.derivedState(for: inner)
@@ -51,10 +77,10 @@ import Testing
   let anchor = Cog<Int> { _ in 3 }
 
   let token = cogs.run { c in
-    _ = c.get(anchor)
-    let selected = c.get(chooseLeft) ? left : right
-    _ = c.get(selected)
-    _ = c.get(selected)
+    _ = c[anchor]
+    let selected = c[chooseLeft] ? left : right
+    _ = c[selected]
+    _ = c[selected]
   }
 
   let leftState = cogs.derivedState(for: left)
@@ -65,12 +91,12 @@ import Testing
   #expect(rightState.externalLeaseCount == 0)
   #expect(anchorState.externalLeaseCount == 1)
 
-  cogs.commit { writer in writer[chooseLeft] = false }
+  cogs.commit { c in c[chooseLeft] = false }
   #expect(leftState.externalLeaseCount == 0)
   #expect(rightState.externalLeaseCount == 1)
   #expect(anchorState.externalLeaseCount == 1)
 
-  cogs.commit { writer in writer[chooseLeft] = true }
+  cogs.commit { c in c[chooseLeft] = true }
   #expect(leftState.externalLeaseCount == 1)
   #expect(rightState.externalLeaseCount == 0)
   #expect(anchorState.externalLeaseCount == 1)
@@ -90,11 +116,11 @@ import Testing
   var token: ReactionToken?
 
   token = cogs.run { c in
-    let triggerValue = c.get(trigger)
-    _ = c.get(beforeCancellation)
+    let triggerValue = c[trigger]
+    _ = c[beforeCancellation]
     if triggerValue > 0 {
       token?.cancel()
-      _ = c.get(afterCancellation)
+      _ = c[afterCancellation]
     }
   }
 
@@ -103,7 +129,7 @@ import Testing
   #expect(beforeState.externalLeaseCount == 1)
   #expect(afterState.externalLeaseCount == 0)
 
-  cogs.commit { writer in writer[trigger] = 1 }
+  cogs.commit { c in c[trigger] = 1 }
 
   #expect(token?.reaction.isCancelled == true)
   #expect(beforeState.externalLeaseCount == 0)
@@ -118,7 +144,7 @@ import Testing
   weak let releasedContext = cogs
   let root = Cog<Int> { _ in 1 }
   let rootState = cogs?.derivedState(for: root)
-  let token = cogs?.run { c in _ = c.get(root) }
+  let token = cogs?.run { c in _ = c[root] }
   let reaction = token?.reaction
 
   #expect(rootState?.externalLeaseCount == 1)

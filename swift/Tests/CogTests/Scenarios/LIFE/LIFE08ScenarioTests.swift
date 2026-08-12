@@ -1,0 +1,35 @@
+import Cog
+import CogTesting
+import Testing
+
+@MainActor
+@Test func `LIFE-08 a first UI read pins a derived cog for the context lifetime`() async throws {
+  let clock = DerivedLifetimeTestClock()
+  let cogs = Cogtext.forTesting(
+    clock: clock,
+    whileObservedGrace: .seconds(10)
+  )
+  var selectorRuns = 0
+  let derived = Cog<Int> { _ in
+    selectorRuns += 1
+    return 10
+  }
+
+  let reaction = cogs.run { c in _ = c[derived] }
+  #expect(selectorRuns == 1)
+
+  reaction.cancel()
+  try await clock.waitForScheduledSleep()
+
+  #expect(cogs[derived] == 10)
+  #expect(selectorRuns == 1)
+
+  let releaseChecked = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextDerivedReleaseCheck(with: releaseChecked)
+  clock.advance(by: .seconds(10))
+  try await releaseChecked.wait()
+
+  #expect(cogs.peek(derived) == 10)
+  #expect(selectorRuns == 1)
+  withExtendedLifetime(reaction) {}
+}

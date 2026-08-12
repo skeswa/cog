@@ -12,9 +12,9 @@ import Testing
 
   let width = ManualCog<Int>(3)
   let height = ManualCog<Int>(4)
-  let area = Cog<Int> { c in c.get(width) * c.get(height) }
+  let area = Cog<Int> { c in c[width] * c[height] }
 
-  #expect(cogs.read(area) == 12)
+  #expect(cogs.peek(area) == 12)
 }
 
 @MainActor
@@ -25,28 +25,28 @@ import Testing
   let busy = Cogtext.forTesting()
 
   let attempts = ManualCog<Int>(0)
-  let hasRetried = Cog<Bool> { c in c.get(attempts) > 1 }
+  let hasRetried = Cog<Bool> { c in c[attempts] > 1 }
 
-  busy.commit { w in w[attempts] = 4 }
+  busy.commit { c in c[attempts] = 4 }
 
-  #expect(quiet.read(hasRetried) == false)
-  #expect(busy.read(hasRetried) == true)
+  #expect(quiet.peek(hasRetried) == false)
+  #expect(busy.peek(hasRetried) == true)
 }
 
 @MainActor
 @Test func `DECL-07 a derived cog can compute from another derived cog`() {
-  // `c.get` reads a derived cog the same way it reads a source, so a chain is
+  // `c[valueReference]` reads a derived cog the same way it reads a source, so a chain is
   // written the same way a leaf is — and reading the top computes the whole
   // chain.
   let cogs = Cogtext.forTesting()
 
   let celsius = ManualCog<Double>(100)
-  let fahrenheit = Cog<Double> { c in c.get(celsius) * 9 / 5 + 32 }
-  let isBoiling = Cog<Bool> { c in c.get(fahrenheit) >= 212 }
-  let advice = Cog<String> { c in c.get(isBoiling) ? "wait" : "drink" }
+  let fahrenheit = Cog<Double> { c in c[celsius] * 9 / 5 + 32 }
+  let isBoiling = Cog<Bool> { c in c[fahrenheit] >= 212 }
+  let advice = Cog<String> { c in c[isBoiling] ? "wait" : "drink" }
 
-  #expect(cogs.read(fahrenheit) == 212)
-  #expect(cogs.read(advice) == "wait")
+  #expect(cogs.peek(fahrenheit) == 212)
+  #expect(cogs.peek(advice) == "wait")
 }
 
 @MainActor
@@ -59,11 +59,11 @@ import Testing
   let knownZips = ManualCog<[String]>(["90210"])
 
   let isKnownZip = Cog<Bool> { c in
-    guard let zip = c.get(currentZip) else { return false }
-    return c.get(knownZips).contains(zip)
+    guard let zip = c[currentZip] else { return false }
+    return c[knownZips].contains(zip)
   }
 
-  #expect(cogs.read(isKnownZip) == false)
+  #expect(cogs.peek(isKnownZip) == false)
 }
 
 @MainActor
@@ -74,11 +74,11 @@ import Testing
 
   let rawZip = ManualCog<String>("")
   let currentZip = Cog<String?> { c in
-    let raw = c.get(rawZip)
+    let raw = c[rawZip]
     return raw.isEmpty ? nil : raw
   }
 
-  #expect(cogs.read(currentZip) == nil)
+  #expect(cogs.peek(currentZip) == nil)
 }
 
 // MARK: - DECL-09
@@ -91,7 +91,7 @@ import Testing
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
   // Declaring is the whole of what happened: no context was touched, so
@@ -99,8 +99,8 @@ import Testing
   #expect(runs == 0)
 
   // Nor does using the context for something else wake it.
-  #expect(cogs.read(source) == 1)
-  cogs.commit { w in w[source] = 2 }
+  #expect(cogs.peek(source) == 1)
+  cogs.commit { c in c[source] = 2 }
   #expect(runs == 0)
 
   // Keep the declaration alive to the end of the test so nothing above can be
@@ -116,11 +116,11 @@ import Testing
   let source = ManualCog<Int>(21)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
   #expect(runs == 0)
-  #expect(cogs.read(doubled) == 42)
+  #expect(cogs.peek(doubled) == 42)
   #expect(runs == 1)
 }
 
@@ -133,14 +133,14 @@ import Testing
   let source = ManualCog<Int>(1)
   let read = Cog<Int> { c in
     readRuns += 1
-    return c.get(source)
+    return c[source]
   }
   let unread = Cog<Int> { c in
     unreadRuns += 1
-    return c.get(source)
+    return c[source]
   }
 
-  #expect(cogs.read(read) == 1)
+  #expect(cogs.peek(read) == 1)
 
   #expect(readRuns == 1)
   #expect(unreadRuns == 0)
@@ -157,19 +157,19 @@ import Testing
   let source = ManualCog<Int>(2)
   let inner = Cog<Int> { c in
     innerRuns += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
   let outer = Cog<Int> { c in
     outerRuns += 1
-    return c.get(inner) * 2
+    return c[inner] * 2
   }
 
-  #expect(cogs.read(inner) == 4)
+  #expect(cogs.peek(inner) == 4)
   #expect(innerRuns == 1)
   #expect(outerRuns == 0)
 
   // Reading the outer one now runs it, and does not run the inner one again.
-  #expect(cogs.read(outer) == 8)
+  #expect(cogs.peek(outer) == 8)
   #expect(innerRuns == 1)
   #expect(outerRuns == 1)
 }
@@ -185,12 +185,12 @@ import Testing
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
-  #expect(first.read(doubled) == 2)
+  #expect(first.peek(doubled) == 2)
   #expect(runs == 1)
 
-  _ = second.read(source)
+  _ = second.peek(source)
   #expect(runs == 1)
 }

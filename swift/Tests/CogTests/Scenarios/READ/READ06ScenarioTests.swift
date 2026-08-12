@@ -12,23 +12,23 @@ import Testing
 
   let x = Cog<Int> { c in
     xRuns += 1
-    return c.get(xSource) * 2
+    return c[xSource] * 2
   }
   let snapshot = Cog<String> { c in
     selectorRuns += 1
-    return "\(c.get(trigger)):\(c.read(x))"
+    return "\(c[trigger]):\(c.peek(x))"
   }
 
-  #expect(cogs.read(snapshot) == "0:2")
+  #expect(cogs.peek(snapshot) == "0:2")
   #expect((selectorRuns, xRuns) == (1, 1))
 
-  cogs.commit { w in w[xSource] = 2 }
-  #expect(cogs.read(xSource) == 2)
-  #expect(cogs.read(snapshot) == "0:2")
+  cogs.commit { c in c[xSource] = 2 }
+  #expect(cogs.peek(xSource) == 2)
+  #expect(cogs.peek(snapshot) == "0:2")
   #expect((selectorRuns, xRuns) == (1, 1))
 
-  cogs.commit { w in w[trigger] = 1 }
-  #expect(cogs.read(snapshot) == "1:4")
+  cogs.commit { c in c[trigger] = 1 }
+  #expect(cogs.peek(snapshot) == "1:4")
   #expect((selectorRuns, xRuns) == (2, 2))
 }
 
@@ -42,24 +42,24 @@ import Testing
   var snapshots: [String] = []
 
   let snapshot = Cog<String> { c in
-    let value = "\(c.get(trigger)):\(c.read(manual)):\(c.read(exposed))"
+    let value = "\(c[trigger]):\(c.peek(manual)):\(c.peek(exposed))"
     snapshots.append(value)
     return value
   }
 
-  #expect(cogs.read(snapshot) == "0:1:10")
+  #expect(cogs.peek(snapshot) == "0:1:10")
   #expect(snapshots == ["0:1:10"])
 
-  cogs.commit { w in
-    w[manual] = 2
-    w[owned] = 20
+  cogs.commit { c in
+    c[manual] = 2
+    c[owned] = 20
   }
-  #expect(cogs.read(manual) == 2)
-  #expect(cogs.read(exposed) == 20)
-  #expect(cogs.read(snapshot) == "0:1:10")
+  #expect(cogs.peek(manual) == 2)
+  #expect(cogs.peek(exposed) == 20)
+  #expect(cogs.peek(snapshot) == "0:1:10")
   #expect(snapshots == ["0:1:10"])
 
-  cogs.commit { w in w[trigger] = 1 }
-  #expect(cogs.read(snapshot) == "1:2:20")
+  cogs.commit { c in c[trigger] = 1 }
+  #expect(cogs.peek(snapshot) == "1:2:20")
   #expect(snapshots == ["0:1:10", "1:2:20"])
 }

@@ -16,7 +16,7 @@ import os
     return 10
   }
 
-  let token = cogs.run { c in _ = c.get(derived) }
+  let token = cogs.run { c in _ = c[derived] }
   #expect(selectorRuns == 1)
 
   let released = MainActorCleanupAcknowledgement()
@@ -27,7 +27,7 @@ import os
   try await released.wait()
 
   #expect(released.hasBeenAcknowledged)
-  #expect(cogs.read(derived) == 10)
+  #expect(cogs.peek(derived) == 10)
   #expect(selectorRuns == 2)
   withExtendedLifetime(token) {}
 }
@@ -45,26 +45,26 @@ import os
   var previousValues: [Int?] = []
   let derived = Cog<Int> { c in
     previousValues.append(c.curr)
-    return c.get(source)
+    return c[source]
   }
 
-  let token = cogs.run { c in _ = c.get(derived) }
+  let token = cogs.run { c in _ = c[derived] }
   #expect(previousValues == [nil])
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
   token.cancel()
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
 
-  #expect(cogs.read(derived) == 2)
+  #expect(cogs.peek(derived) == 2)
   #expect(previousValues == [nil, nil])
   withExtendedLifetime(token) {}
 }
 
-private nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
+nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
   private struct Sleeper {
     let deadline: Instant
     let continuation: CheckedContinuation<Void, any Error>

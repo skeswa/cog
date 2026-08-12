@@ -11,10 +11,10 @@ import Testing
 
   let source = ManualCog(7, name: "source")
   let exposed = source.readOnly
-  let doubled = Cog { c in c.get(exposed) * 2 }
+  let doubled = Cog { c in c[exposed] * 2 }
 
-  #expect(cogs.read(doubled) == 14)
-  #expect(cogs.read(exposed) == cogs.read(source))
+  #expect(cogs.peek(doubled) == 14)
+  #expect(cogs.peek(exposed) == cogs.peek(source))
 }
 
 @MainActor
@@ -22,10 +22,10 @@ import Testing
   let cogs = Cogtext.forTesting()
 
   let source = ManualCog("hello", name: "greeting")
-  let viaProjection = Cog { c in c.get(source.readOnly) }
-  let viaSource = Cog { c in c.get(source) }
+  let viaProjection = Cog { c in c[source.readOnly] }
+  let viaSource = Cog { c in c[source] }
 
-  #expect(cogs.read(viaProjection) == cogs.read(viaSource))
+  #expect(cogs.peek(viaProjection) == cogs.peek(viaSource))
 }
 
 @MainActor
@@ -34,8 +34,8 @@ import Testing
 
   let box = ManualCogBox<Int, String>(0, name: "counts")
   let exposed = box.readOnly
-  let forA = Cog { c in c.get(exposed["a"]) }
+  let forA = Cog { c in c[exposed["a"]] }
 
-  #expect(cogs.read(forA) == 0)
-  #expect(cogs.read(exposed["a"]) == cogs.read(box["a"]))
+  #expect(cogs.peek(forA) == 0)
+  #expect(cogs.peek(exposed["a"]) == cogs.peek(box["a"]))
 }

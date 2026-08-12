@@ -53,12 +53,15 @@ testing Swift also needs a full Xcode — the version and the reason are in
 "Continuous integration" below.
 
 ```sh
-mise run fmt          # format Markdown, JSON, YAML, and Swift
-mise run fmt:check    # verify formatting, writing nothing
-mise run test         # Swift tests on the default isolation leg
-mise run test:matrix  # all four isolation legs
-mise run test:release # the default leg in release configuration
-mise run tasks:check  # validate the Swift implementation task ledger
+mise run fmt            # format Markdown, JSON, YAML, and Swift
+mise run fmt:check      # verify formatting, writing nothing
+mise run test           # Swift tests on the default isolation leg
+mise run test:matrix    # all four isolation legs
+mise run test:release   # the default leg in release configuration
+mise run test:simulator # boundary tests on the latest iOS simulator
+mise run build:weather  # build the Weather example for the iOS simulator
+mise run test:weather   # run the Weather example's tests on a simulator
+mise run tasks:check    # validate the Swift implementation task ledger
 ```
 
 `mise run test:compilefail` type-checks the expected-failure fixtures under
@@ -148,6 +151,23 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   needs no privilege, so it keeps working under the dedicated non-admin
   runner user this section still targets, and because it is job-scoped, so
   two concurrent jobs cannot fight over a machine-wide setting.
+
+  **Floor simulator runtime.** `M2-18a` selected iOS **17.5**, build
+  **21F79** as the intended floor component. Xcode 26.6 supports iOS 15+
+  simulator runtimes, and Apple's catalog still lists this build, but that
+  catalog entry does not amount to a reproducible install path. On 2026-08-12,
+  the real runner's pinned Xcode rejected exact-build downloads with both
+  `arm64` and `universal` architecture variants as unavailable. The catalog's
+  raw artifact also redirects unauthenticated requests.
+
+  The project owner therefore retired the floor-runtime requirement on
+  2026-08-12 and accepted the current simulator lane as the compatibility gate
+  for now. There is no iOS 17 nightly. Restoring floor-runtime coverage is new
+  work: first establish a reliable runtime without making CI depend on a
+  personal Apple Account or an unverified artifact URL, then qualify it with
+  an import, boot, reboot, and focused boundary run on `homemac` before
+  enabling a nightly. Preserve any future exported recovery copy outside
+  runner work and temp directories.
 
 - **Runners.** _Amended 2026-08-11 to match the provisioned host._ One
   runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other

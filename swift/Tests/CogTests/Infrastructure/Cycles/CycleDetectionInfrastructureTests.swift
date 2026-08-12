@@ -16,11 +16,11 @@ import Testing
       let holder = CycleBoxHolder()
       holder.box = CogBox<Int, String>(
         { c, key in
-          c.get(holder.box[key == "home" ? "work" : "home"])
+          c[holder.box[key == "home" ? "work" : "home"]]
         },
         name: "weather"
       )
-      _ = cogs.read(holder.box["home"])
+      _ = cogs.peek(holder.box["home"])
     }
   }
 
@@ -39,14 +39,14 @@ import Testing
       var first: Cog<Int>!
       var second: Cog<Int>!
       first = Cog<Int>(
-        { c in c.get(closesCycle) ? c.get(second) : 1 },
+        { c in c[closesCycle] ? c[second] : 1 },
         name: "first"
       )
-      second = Cog<Int>({ c in c.get(first) + 1 }, name: "second")
+      second = Cog<Int>({ c in c[first] + 1 }, name: "second")
 
-      _ = cogs.read(second)
-      cogs.commit { w in w[closesCycle] = true }
-      _ = cogs.read(first)
+      _ = cogs.peek(second)
+      cogs.commit { c in c[closesCycle] = true }
+      _ = cogs.peek(first)
     }
   }
 
@@ -156,7 +156,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   valueReference = Cog<Int>(
     { c in
       selectorMarks.append(cogs.derivedState(for: valueReference).isComputing)
-      return c.get(source)
+      return c[source]
     },
     equals: { old, new in
       equalityMarks.append(cogs.derivedState(for: valueReference).isComputing)
@@ -165,12 +165,12 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
     name: "marked"
   )
 
-  #expect(cogs.read(valueReference) == 1)
+  #expect(cogs.peek(valueReference) == 1)
   #expect(cogs.derivedState(for: valueReference).isComputing == false)
   #expect(cogs.settleStack.isComputingEmpty)
 
-  cogs.commit { w in w[source] = 2 }
-  #expect(cogs.read(valueReference) == 2)
+  cogs.commit { c in c[source] = 2 }
+  #expect(cogs.peek(valueReference) == 2)
   #expect(selectorMarks == [true, true])
   #expect(equalityMarks == [true])
   #expect(cogs.derivedState(for: valueReference).isComputing == false)
@@ -184,17 +184,17 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   var releaseMarks: [Bool] = []
   weak var publicationState: DerivedCogState<CyclePublicationValue>?
   let valueReference = Cog<CyclePublicationValue> { c in
-    CyclePublicationValue(c.get(source)) {
+    CyclePublicationValue(c[source]) {
       releaseMarks.append(publicationState?.isComputing == true)
     }
   }
   publicationState = cogs.derivedState(for: valueReference)
 
-  _ = cogs.read(valueReference)
+  _ = cogs.peek(valueReference)
   #expect(releaseMarks.isEmpty)
 
-  cogs.commit { w in w[source] = 2 }
-  #expect(cogs.read(valueReference).value == 2)
+  cogs.commit { c in c[source] = 2 }
+  #expect(cogs.peek(valueReference).value == 2)
 
   #expect(releaseMarks == [true])
   #expect(publicationState?.isComputing == false)
@@ -211,30 +211,30 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   var rightRuns = 0
   var rootRuns = 0
 
-  let late = Cog<Int> { c in c.get(lateSource) }
+  let late = Cog<Int> { c in c[lateSource] }
   let left = Cog<Int> { c in
     leftRuns += 1
-    return c.get(switcher) ? c.get(late) : 1
+    return c[switcher] ? c[late] : 1
   }
   let right = Cog<Int> { c in
     rightRuns += 1
-    return c.get(rightSource)
+    return c[rightSource]
   }
   let root = Cog<Int> { c in
     rootRuns += 1
-    return c.get(left) + c.get(right)
+    return c[left] + c[right]
   }
 
-  #expect(cogs.read(root) == 11)
-  #expect(cogs.read(late) == 100)
+  #expect(cogs.peek(root) == 11)
+  #expect(cogs.peek(late) == 100)
 
-  cogs.commit { w in
-    w[switcher] = true
-    w[rightSource] = 20
-    w[lateSource] = 200
+  cogs.commit { c in
+    c[switcher] = true
+    c[rightSource] = 20
+    c[lateSource] = 200
   }
 
-  #expect(cogs.read(root) == 220)
+  #expect(cogs.peek(root) == 220)
   #expect(leftRuns == 2)
   #expect(rightRuns == 2)
   #expect(rootRuns == 2)

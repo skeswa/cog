@@ -10,7 +10,7 @@
 /// and the next run replaces the dependency set so branches and early returns
 /// can change it.
 internal final class DerivedCogState<Value>:
-  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState
+  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState, CogObservationState
 {
   /// The declaration this state belongs to.
   let descriptor: DerivedCogDescriptor<Value>
@@ -36,7 +36,7 @@ internal final class DerivedCogState<Value>:
   /// values, `.some(.none)` is a cached `nil`.
   internal private(set) var cachedValue: Value?
 
-  /// The producers the last run read through `c.get`, in read order.
+  /// The producers the last run read through `c[valueReference]`, in read order.
   ///
   /// Each run rebuilds this list in read order (§2.4). The correctness core
   /// keeps repeats; M6 may replace the layout after benchmarks (perf §3.3).
@@ -53,6 +53,11 @@ internal final class DerivedCogState<Value>:
 
   /// Consumers whose last run read this derived value.
   var subscribers: [CogSubscriberEdge]
+
+  /// Created only after this exact descriptor-and-key state reaches the UI.
+  var observationBoundary: CogObservationBoundary?
+
+  var observationKey: AnyHashable? { key }
 
   var label: CogLabel { descriptor.label }
 
@@ -90,6 +95,7 @@ internal final class DerivedCogState<Value>:
     self.changedAt = .initial
     self.checkedAt = .initial
     self.subscribers = []
+    self.observationBoundary = nil
     self.externalLeaseCount = 0
     self.lifetimeReleaseGeneration = 0
   }

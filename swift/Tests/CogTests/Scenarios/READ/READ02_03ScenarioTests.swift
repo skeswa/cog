@@ -15,11 +15,11 @@ import Testing
   let quantity = ManualCog<Int>(3)
   let total = Cog<Int> { c in
     runs += 1
-    return c.get(price) * c.get(quantity)
+    return c[price] * c[quantity]
   }
 
-  #expect(cogs.read(total) == 21)
-  #expect(cogs.read(total) == 21)
+  #expect(cogs.peek(total) == 21)
+  #expect(cogs.peek(total) == 21)
 
   #expect(runs == 1)
 }
@@ -32,11 +32,11 @@ import Testing
   let source = ManualCog<Int>(5)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
   for _ in 0..<50 {
-    #expect(cogs.read(doubled) == 10)
+    #expect(cogs.peek(doubled) == 10)
   }
 
   #expect(runs == 1)
@@ -53,14 +53,14 @@ import Testing
   let source = ManualCog<Int>(4)
   let shared = Cog<Int> { c in
     sharedRuns += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
-  let left = Cog<Int> { c in c.get(shared) + 1 }
-  let right = Cog<Int> { c in c.get(shared) - 1 }
+  let left = Cog<Int> { c in c[shared] + 1 }
+  let right = Cog<Int> { c in c[shared] - 1 }
 
-  #expect(cogs.read(left) == 9)
-  #expect(cogs.read(right) == 7)
-  #expect(cogs.read(shared) == 8)
+  #expect(cogs.peek(left) == 9)
+  #expect(cogs.peek(right) == 7)
+  #expect(cogs.peek(shared) == 8)
 
   #expect(sharedRuns == 1)
 }
@@ -75,12 +75,12 @@ import Testing
   let rawZip = ManualCog<String>("")
   let currentZip = Cog<String?> { c in
     runs += 1
-    let raw = c.get(rawZip)
+    let raw = c[rawZip]
     return raw.isEmpty ? nil : raw
   }
 
-  #expect(cogs.read(currentZip) == nil)
-  #expect(cogs.read(currentZip) == nil)
+  #expect(cogs.peek(currentZip) == nil)
+  #expect(cogs.peek(currentZip) == nil)
 
   #expect(runs == 1)
 }
@@ -96,15 +96,15 @@ import Testing
   let source = ManualCog<Int>(6)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
-  #expect(first.read(doubled) == 12)
-  #expect(second.read(doubled) == 12)
+  #expect(first.peek(doubled) == 12)
+  #expect(second.peek(doubled) == 12)
   #expect(runs == 2)
 
-  #expect(first.read(doubled) == 12)
-  #expect(second.read(doubled) == 12)
+  #expect(first.peek(doubled) == 12)
+  #expect(second.peek(doubled) == 12)
   #expect(runs == 2)
 }
 
@@ -118,20 +118,20 @@ import Testing
   let left = ManualCog<Int>(1)
   let right = ManualCog<Int>(10)
   let pair = Cog<String> { c in
-    let currentLeft = c.get(left)
-    let currentRight = c.get(right)
+    let currentLeft = c[left]
+    let currentRight = c[right]
     let snapshot = "\(currentLeft):\(currentRight)"
     pairsSeen.append(snapshot)
     return snapshot
   }
 
-  #expect(cogs.read(pair) == "1:10")
+  #expect(cogs.peek(pair) == "1:10")
 
-  cogs.commit { w in
-    w[left] = 2
-    w[right] = 20
+  cogs.commit { c in
+    c[left] = 2
+    c[right] = 20
   }
 
-  #expect(cogs.read(pair) == "2:20")
+  #expect(cogs.peek(pair) == "2:20")
   #expect(pairsSeen == ["1:10", "2:20"])
 }

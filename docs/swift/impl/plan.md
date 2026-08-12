@@ -178,16 +178,16 @@ prior milestone is a barrier only where the table below or an explicit
 without weakening a milestone gate. Gates diagnose but never absorb repairs;
 the smallest repair task is inserted before a failed gate is rerun.
 
-| Plan milestone                   | Task ledger                     | Decisions before dependent work                                            | Closing path                                                                                                                   |
-| -------------------------------- | ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                   | `M0-10`                                                                                                                        |
-| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                     | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-18a` floor-runtime policy                      | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when no pinned iOS 17 runtime is available                        |
-| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                         | `M3-11`                                                                                                                        |
-| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
-| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility | `M5-10`                                                                                                                        |
-| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved |
-| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
+| Plan milestone                   | Task ledger                     | Decisions before dependent work                                                    | Closing path                                                                                                                   |
+| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                           | `M0-10`                                                                                                                        |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                             | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available        |
+| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                 | `M3-11`                                                                                                                        |
+| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                        | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
+| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility         | `M5-10`                                                                                                                        |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                     | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved |
+| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
 
 ## Task bookkeeping
 
@@ -299,11 +299,11 @@ The class-state build. Correctness first; no perf tricks.
   `name:` or `fileID:line` labels). Public value references `Cog<T>` and
   `ManualCog<T>`; boxes `CogBox` and `ManualCogBox`; inline `AnyHashable?`
   keys; allocation-free `box[key]`; the `.readOnly` projection.
-- Cogtext: states stored by descriptor plus key, created lazily; `get`,
-  `read`, and `curr` on the tracking controller; a MainActor-confined
-  tracking slot. Untracked reads still settle and return the latest value.
+- Cogtext: states stored by descriptor plus key, created lazily; tracked
+  subscripts, `peek`, and `curr` on the read capability; a MainActor-confined
+  tracking slot. Non-tracking peeks still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
-  `Writer` subscripts read and write, so `w[count] += 1` works; unforgeable
+  `Writer` subscripts read and write, so `c[count] += 1` works; unforgeable
   turn IDs; idle → accumulating → flushing; nested commits join; commits
   during a flush wait in a FIFO queue.
 - Flush: the six normative steps of §3.2. Equality-gate staged writes, push
@@ -368,11 +368,13 @@ isolation; and named effect runs in history.
 - Registrar-backed boundary objects, created lazily on the first UI read: one
   phantom key path, `withMutation` only when the value changes. UI-read states
   stay pinned to the app context (§5.3, perf §6).
-- The `\.cogs` environment key; tracked `cogs.get` in `body`; `binding(for:)`
-  pairs a tracked read with a named commit; untracked one-shot `cogs.read`.
-- A debug warning when a tracked `get` runs with no consumer
-  (escaping-closure misuse, §7), surfaced through the diagnostic seam so
-  tests assert it without scraping logs.
+- The `\.cogs` environment key; tracked `cogs[valueReference]` in `body`;
+  `binding(for:)` pairs a tracked read with a named commit; non-tracking
+  one-shot `cogs.peek(valueReference)`.
+- Escaping closures use one-shot `cogs.peek`. `M2-07` confirmed that public
+  Observation exposes no current-consumer query, so the direct subscript
+  API cannot diagnose a missing UI consumer without false positives. Ship no
+  warning or private-SPI heuristic; §7 and §10 record the deferred diagnostic.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
   `fileprivate` sources plus ops, an effects group, and bindings.
   Verify per-ZIP invalidation, equality-gated derived notices, and a view that
@@ -381,23 +383,35 @@ isolation; and named effect runs in history.
   runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
-- Read spelling: try `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references in the
-  smallest tracked-view prototype before boundary call sites multiply; record
-  the winner in §10 and the README snapshot, then use only that spelling in
-  the Weather example.
+- Weather proceeds in two branches. `M2-14a` creates the app and state layer,
+  allowing `M2-15` UI work to proceed independently. `M2-14b` joins that app
+  to the complete `EffectGroup` contract after M1's terminal cancellation,
+  task ownership, explicit installation, hourly-clock, and deinit-cleanup
+  leaves are green. `M2-16` joins both branches; the example never carries a
+  local lifecycle substitute or a partially implemented public group.
+- Read spelling: `M2-17a` originally compared an explicit method, a subscript,
+  and callable value references in a small tracked-view prototype. The settled
+  spelling is now `c[valueReference]` for tracked selector and reaction reads,
+  `cogs[valueReference]` for tracked UI reads, and `peek(...)` for
+  non-tracking reads. Selector, reaction, and writer capabilities are all named
+  `c` at their call sites.
 - CI: add `test-simulator`
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
   Weather build so the example cannot rot.
-- Optional nightly job once the floor runtime is available: install a pinned
-  iOS 17.x simulator and run the core tracked-read, unrelated-write,
-  equality-gated notice, and immediate-binding boundary scenarios. M7 extends
-  this job with the pre-iOS-26 `c.track` re-arm scenarios. Too slow for per-PR.
-  A time-boxed feasibility task records the exact runtime-install path —
-  now into the self-hosted runner's pinned image, which owning the hardware
-  makes far more tractable than a hosted-runner install — and whether that
-  runtime can be kept reliably available; absent a reliable pinned runtime,
-  the nightly remains explicitly non-blocking.
+- Optional nightly job if a reliable floor runtime becomes available: install
+  an iOS 17.5 (build 21F79) simulator and run the core tracked-read,
+  unrelated-write, equality-gated notice, and immediate-binding boundary
+  scenarios. M7 extends this job with the pre-iOS-26 `c.track` re-arm
+  scenarios. Too slow for per-PR. `M2-18a` identified the intended component
+  and Apple-documented download/import mechanism, but the real runner's pinned
+  Xcode 26.6 rejected exact-build downloads with both `arm64` and `universal`
+  variants on August 12, 2026. The catalog's raw artifact requires
+  authentication, so there is no verified provisioning or recovery path. The
+  project owner retired this requirement on August 12, 2026 and accepted the
+  current simulator lane as the compatibility gate for now. Reintroducing a
+  floor nightly requires a new task after a runtime can pass import, boot,
+  reboot, and a focused boundary run on `homemac`.
 
 <a id="plan-m3"></a>
 
@@ -683,9 +697,13 @@ release gates.
   persistent bare metal, which moots the VM-only questions (orchestrator
   maturity, the Virtualization.framework two-VM limit, simulator
   performance inside a VM) unless the deferred Tart upgrade is ever taken.
-  The remaining live question is whether a pinned iOS 17.x runtime installs
-  cleanly onto the runner host; `M2-18a` owns it. The mini's SSD capacity is
-  still unconfirmed.
+  `M2-18a` selected iOS 17.5 build 21F79 as the intended floor. The runner had
+  83 GiB free but no iOS 17 runtime on August 12, 2026, and Xcode 26.6 then
+  rejected that exact build as unavailable with both CLI architecture
+  selections. Because no reproducible authenticated acquisition path was
+  established, the project owner retired the requirement on August 12, 2026.
+  Import, boot, post-reboot availability, and focused boundary behavior remain
+  prerequisites for any future task that restores floor coverage.
 - VM-versus-bare-metal benchmark noise on the mini (probed at `M5-05bb`
   before baselines are recorded).
 - Benchmark package canonical repository, ARC metric names, minimum version,
@@ -695,4 +713,7 @@ release gates.
   `--manifest-cache none`).
 - Whether the per-PR simulator job is fast enough, or should move to
   merge-queue or nightly.
-- iOS 17 simulator runtime install mechanics for the nightly floor job.
+- A missing-consumer warning for tracked UI reads is unavailable with public
+  Observation today. `M2-07` defers it until the framework exposes an exact
+  current-tracking query; the direct subscript spelling and automatic framework
+  tracking remain unchanged.

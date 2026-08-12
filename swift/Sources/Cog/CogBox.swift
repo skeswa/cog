@@ -5,7 +5,7 @@
 ///
 /// ```swift
 /// let isSunny = CogBox<Bool, ZipCode> { c, zip in
-///   c.get(weatherReport[zip])?.kind == .clear
+///   c[weatherReport[zip]]?.kind == .clear
 /// }
 /// ```
 @MainActor
@@ -78,7 +78,7 @@ public struct CogBox<Value, Key: Hashable> {
     label: CogLabel
   ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
-      selector: { reader, erasedKey in
+      selector: { c, erasedKey in
         guard let key = erasedKey as? Key else {
           fatalError(
             """
@@ -89,7 +89,7 @@ public struct CogBox<Value, Key: Hashable> {
             """
           )
         }
-        return selector(reader, key)
+        return selector(c, key)
       },
       equals: equals,
       lifetime: lifetime,

@@ -108,6 +108,7 @@ extension Cogtext {
     body(turn)
     startFlushing(turn.id)
     turn.flushPendingSources(in: self)
+    flushObservationBoundaries()
     flushReactions()
     finishTurn(turn.id)
 

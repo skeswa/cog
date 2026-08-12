@@ -49,7 +49,7 @@ struct WeatherEffects {
 
         group.task(name: "location.hourlyRefresh") {
             while true {
-                try await clock.sleep(for: .hours(1))
+                try await clock.sleep(for: .seconds(3_600))
                 await cogs.refreshCurrentLocation()
             }
         }
@@ -103,7 +103,7 @@ struct WeatherApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { RootView().environment(\.cogs, cogs) }
+        WindowGroup { RootView().cogEnvironment(cogs) }
     }
 }
 ```
@@ -188,7 +188,7 @@ extension Cogtext {
     }
 
     func stubWeather(_ report: Weather?, zip: ZipCode) {
-        commit { w in w[weatherReportSource[zip]] = report }
+        commit { c in c[weatherReportSource[zip]] = report }
     }
 }
 #endif
@@ -213,8 +213,8 @@ instead of exposing all source value references.
     cogs.stubWeather(.clear(75), zip: zip)
     #expect(notifier.alerts == ["It is nice outside!"])
 
-    await clock.advance(by: .hours(1))
-    #expect(cogs.read(currentZipCode) != nil)
+    await clock.advance(by: .seconds(3_600))
+    #expect(cogs.peek(currentZipCode) != nil)
 }
 ```
 
@@ -250,10 +250,10 @@ desired state with the engine's actual state:
 
 ```swift
 let episodesToDownload = Cog { c in
-    c.get(subscribedEpisodes)
+    c[subscribedEpisodes]
         .filter { episode in
-            c.get(autoDownloadPolicy).wants(episode)
-                && !c.get(downloadState[episode.id]).isDownloadedOrInFlight
+            c[autoDownloadPolicy].wants(episode)
+                && !c[downloadState[episode.id]].isDownloadedOrInFlight
         }
         .map(\.id)
 }

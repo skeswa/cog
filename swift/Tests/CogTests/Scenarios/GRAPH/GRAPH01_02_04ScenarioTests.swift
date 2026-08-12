@@ -15,22 +15,22 @@ import Testing
   let source = ManualCog<Int>(1)
   let middle = Cog<Int> { c in
     middleRuns += 1
-    return c.get(source) + 1
+    return c[source] + 1
   }
   let root = Cog<Int> { c in
     rootRuns += 1
-    return c.get(middle) * 2
+    return c[middle] * 2
   }
 
-  #expect(cogs.read(root) == 4)
+  #expect(cogs.peek(root) == 4)
   #expect(middleRuns == 1)
   #expect(rootRuns == 1)
 
-  cogs.commit { w in w[source] = 10 }
+  cogs.commit { c in c[source] = 10 }
 
   // The read is the pull boundary: it returns only after every dependency it
   // needs has caught up to the newest committed source value.
-  #expect(cogs.read(root) == 22)
+  #expect(cogs.peek(root) == 22)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
 }
@@ -48,25 +48,25 @@ import Testing
   let source = ManualCog<Int>(1)
   let left = Cog<Int> { c in
     leftRuns += 1
-    return c.get(source) + 1
+    return c[source] + 1
   }
   let right = Cog<Int> { c in
     rightRuns += 1
-    return c.get(source) * 10
+    return c[source] * 10
   }
   let root = Cog<Int> { c in
     rootRuns += 1
-    let currentLeft = c.get(left)
-    let currentRight = c.get(right)
+    let currentLeft = c[left]
+    let currentRight = c[right]
     rootPairs.append("\(currentLeft):\(currentRight)")
     return currentLeft + currentRight
   }
 
-  #expect(cogs.read(root) == 12)
+  #expect(cogs.peek(root) == 12)
 
-  cogs.commit { w in w[source] = 3 }
+  cogs.commit { c in c[source] = 3 }
 
-  #expect(cogs.read(root) == 34)
+  #expect(cogs.peek(root) == 34)
   #expect(leftRuns == 2)
   #expect(rightRuns == 2)
   #expect(rootRuns == 2)
@@ -85,24 +85,24 @@ import Testing
   let branches = (0..<breadth).map { branch in
     Cog<Int> { c in
       runs[branch] += 1
-      return c.get(source) + branch
+      return c[source] + branch
     }
   }
 
   // Warm every sibling so the source really feeds a broad live graph before
   // the turn. Never-created branches would prove declaration laziness instead.
   for branch in 0..<breadth {
-    #expect(cogs.read(branches[branch]) == 1 + branch)
+    #expect(cogs.peek(branches[branch]) == 1 + branch)
   }
   #expect(runs == Array(repeating: 1, count: breadth))
 
-  cogs.commit { w in w[source] = 10 }
-  #expect(cogs.read(source) == 10)
+  cogs.commit { c in c[source] = 10 }
+  #expect(cogs.peek(source) == 10)
   #expect(runs == Array(repeating: 1, count: breadth))
 
   let selected = [0, 7, 31, 63]
   for branch in selected {
-    #expect(cogs.read(branches[branch]) == 10 + branch)
+    #expect(cogs.peek(branches[branch]) == 10 + branch)
   }
 
   let expectedRuns = (0..<breadth).map { branch in

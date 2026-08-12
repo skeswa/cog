@@ -11,18 +11,18 @@ import Testing
   let total = Cog<Int> { c in
     let previous = c.curr
     previousValues.append(previous)
-    return (previous ?? 0) + c.get(input)
+    return (previous ?? 0) + c[input]
   }
 
-  #expect(cogs.read(total) == 1)
+  #expect(cogs.peek(total) == 1)
   #expect(previousValues == [nil])
 
-  cogs.commit { w in w[input] = 2 }
-  #expect(cogs.read(total) == 3)
+  cogs.commit { c in c[input] = 2 }
+  #expect(cogs.peek(total) == 3)
   #expect(previousValues == [nil, 1])
 
-  cogs.commit { w in w[input] = 3 }
-  #expect(cogs.read(total) == 6)
+  cogs.commit { c in c[input] = 3 }
+  #expect(cogs.peek(total) == 6)
   #expect(previousValues == [nil, 1, 3])
 }
 
@@ -33,7 +33,7 @@ import Testing
   var previousStates: [String] = []
 
   let value = Cog<Int?> { c in
-    _ = c.get(trigger)
+    _ = c[trigger]
 
     switch c.curr {
     case .none:
@@ -47,10 +47,10 @@ import Testing
     return nil
   }
 
-  #expect(cogs.read(value) == nil)
+  #expect(cogs.peek(value) == nil)
   #expect(previousStates == ["no previous run"])
 
-  cogs.commit { w in w[trigger] = 1 }
-  #expect(cogs.read(value) == nil)
+  cogs.commit { c in c[trigger] = 1 }
+  #expect(cogs.peek(value) == nil)
   #expect(previousStates == ["no previous run", "previous nil"])
 }

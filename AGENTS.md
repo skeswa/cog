@@ -45,14 +45,17 @@ every scenario covered by exactly one task.
   `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
-- `tools/` — pinned Node tooling: `swift-test.mjs`, `check-compile-fail.mjs`,
+- `tools/` — pinned Node tooling: `swift-test.mjs`,
+  `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
   fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
   `fixtures/`.
 - `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
-  matrix, release tests, compile-fail fixtures, and the ledger check, in a
-  self-hosted lane and a GitHub-hosted fork lane) and `markdown.yml` (Oxfmt
-  and the workflow-contract check on GitHub-hosted ubuntu).
+  matrix, simulator tests, the Weather build and tests, release tests,
+  compile-fail
+  fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
+  fork lane) and `markdown.yml` (Oxfmt and the workflow-contract check on
+  GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
   task definitions, formatter configuration, and the license.
 - `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
@@ -95,9 +98,21 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
 - `mise run test:release` — the default leg in release configuration.
+- `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
+  simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
+
+The example app uses the same pinned Xcode as the library:
+
+- `mise run build:weather` — build the Weather app for a generic iOS
+  Simulator destination without launching one.
+- `mise run test:weather` — run `WeatherTests` on an iOS simulator. Set
+  `COG_WEATHER_DESTINATION` to override the destination. This is a separate
+  command because `build:weather` uses xcodebuild's `build` action, which
+  never compiles a target the Weather scheme lists only under its test
+  action.
 
 Extra arguments pass straight through, as in
 `mise run test --filter 'DECL-01|ONE-04' --parallel`. **Never run a filtered

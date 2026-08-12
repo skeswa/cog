@@ -12,10 +12,11 @@ import Testing
     ring: [
       CogHistoryEntry(event: .write, turn: 12, subject: .cog(source, nil)),
       CogHistoryEntry(event: .recompute, turn: 12, subject: .cog(derived, nil)),
+      CogHistoryEntry(event: .notice, turn: 12, subject: .cog(derived, nil)),
       CogHistoryEntry(event: .effect, turn: 11, subject: .effect(effect)),
       CogHistoryEntry(event: .turn, turn: 12, subject: .turn("display\nturn")),
     ],
-    oldest: 2,
+    oldest: 3,
     capacity: 8
   )
   var emitted: [String] = []
@@ -23,11 +24,12 @@ import Testing
 
   #expect(
     emitted == [
-      "Cog history: 4 of 8 entries, oldest first",
+      "Cog history: 5 of 8 entries, oldest first",
       #"[turn 11] effect: "display.effect""#,
       #"[turn 12] turn: "display\nturn""#,
       #"[turn 12] write: "display.source""#,
       #"[turn 12] recompute: "display.derived""#,
+      #"[turn 12] notice: "display.derived""#,
     ]
   )
 

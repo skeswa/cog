@@ -9,7 +9,7 @@ import Testing
 
 extension Cogtext {
   fileprivate func bumpTheCounter(_ count: ManualCog<Int>) {
-    commit { w in w[count] += 1 }
+    commit { c in c[count] += 1 }
   }
 }
 
@@ -20,8 +20,8 @@ extension Cogtext {
 
   #expect(cogs.debugHistory.count == 0)
 
-  cogs.commit("first") { w in w[count] = 1 }
-  cogs.commit("second") { w in w[count] = 2 }
+  cogs.commit("first") { c in c[count] = 1 }
+  cogs.commit("second") { c in c[count] = 2 }
 
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.count == 2)
@@ -48,16 +48,16 @@ extension Cogtext {
 @Test func `HIST-02 history records writes and recomputations`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
 
-  #expect(cogs.read(doubled) == 2)
+  #expect(cogs.peek(doubled) == 2)
 
   let afterFirstRead = cogs.debugHistory.entries
   #expect(afterFirstRead.filter { $0.event == .recompute }.count == 1)
   #expect(afterFirstRead.filter { $0.event == .write }.isEmpty)
 
-  cogs.commit("raise") { w in w[source] = 5 }
-  #expect(cogs.read(doubled) == 10)
+  cogs.commit("raise") { c in c[source] = 5 }
+  #expect(cogs.peek(doubled) == 10)
 
   let afterWrite = cogs.debugHistory.entries
   #expect(afterWrite.filter { $0.event == .write }.count == 1)
@@ -65,8 +65,8 @@ extension Cogtext {
   // The write belongs to the turn that made it, not to the read before it.
   #expect(afterWrite.first { $0.event == .write }?.turn == 1)
 
-  cogs.commit("raise again") { w in w[source] = 5 }
-  #expect(cogs.read(doubled) == 10)
+  cogs.commit("raise again") { c in c[source] = 5 }
+  #expect(cogs.peek(doubled) == 10)
 
   // A write that changed nothing is not a write, and causes no recomputation.
   // The turn it asked for still happened and still says so.
@@ -80,15 +80,15 @@ extension Cogtext {
 @Test func `HIST-02 a diamond records one recomputation for each state that ran`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let left = Cog<Int> { c in c.get(source) + 1 }
-  let right = Cog<Int> { c in c.get(source) + 2 }
-  let sum = Cog<Int> { c in c.get(left) + c.get(right) }
+  let left = Cog<Int> { c in c[source] + 1 }
+  let right = Cog<Int> { c in c[source] + 2 }
+  let sum = Cog<Int> { c in c[left] + c[right] }
 
-  #expect(cogs.read(sum) == 5)
+  #expect(cogs.peek(sum) == 5)
   #expect(cogs.debugHistory.entries.filter { $0.event == .recompute }.count == 3)
 
-  cogs.commit("bump") { w in w[source] = 2 }
-  #expect(cogs.read(sum) == 7)
+  cogs.commit("bump") { c in c[source] = 2 }
+  #expect(cogs.peek(sum) == 7)
 
   let entries = cogs.debugHistory.entries
   #expect(entries.filter { $0.event == .write }.count == 1)
@@ -107,7 +107,7 @@ extension Cogtext {
     alerts += 1
   }
 
-  cogs.commit("warm up") { w in w[temperature] = 80 }
+  cogs.commit("warm up") { c in c[temperature] = 80 }
 
   // The watch really ran, so history has a run to account for.
   #expect(alerts == 1)
@@ -125,7 +125,7 @@ extension Cogtext {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(0)
 
-  let token = cogs.run { c in _ = c.get(source) }
+  let token = cogs.run { c in _ = c[source] }
 
   let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
   #expect(effects.count == 1)

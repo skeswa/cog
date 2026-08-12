@@ -277,7 +277,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-02, M1-04ab._
   _Verify: `mise run test --filter 'TURN-02|TURN-14'`._
   _Greens: TURN-02, TURN-14._
-- **M1-05a** _(Behavior)_ — Add keyless derived cogs, tracked `c.get`, lazy
+- **M1-05a** _(Behavior)_ — Add keyless derived cogs, tracked `c[...]`, lazy
   first computation, and caching.
   _Depends: M1-04ab._
   _Verify: `mise run test --filter 'DECL-07|DECL-09|READ-02'`._
@@ -323,7 +323,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-06ab._
   _Verify: `mise run test --filter 'GRAPH-07|GRAPH-08'`._
   _Greens: GRAPH-07, GRAPH-08._
-- **M1-08b** _(Behavior)_ — Add subscription-free one-shot `cogs.read` that
+- **M1-08b** _(Behavior)_ — Add subscription-free one-shot `cogs.peek` that
   still settles.
   _Depends: M1-08a._
   _Verify: `mise run test --filter READ-07`._
@@ -338,7 +338,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-04b, M1-05b, M1-09a._
   _Verify: `mise run test --filter 'GRAPH-11|GRAPH-12'`._
   _Greens: GRAPH-11, GRAPH-12._
-- **M1-09c** _(Behavior)_ — Add `c.read` peeks that skip edges but settle.
+- **M1-09c** _(Behavior)_ — Add `c.peek` reads that skip edges but settle.
   _Depends: M1-08b, M1-09a._
   _Verify: `mise run test --filter READ-06`._
   _Greens: READ-06._
@@ -632,13 +632,13 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
-- **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare
-  `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references before boundary call sites
-  multiply.
+- **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare an
+  explicit tracked method, a subscript, and callable value references before
+  boundary call sites multiply.
   _Depends: M1-32._
-  _Verify: checked-in prototype diff and decision rationale._
-- **M2-17b** _(Infrastructure)_ — Apply the winning spelling and record it in
-  §10 and the Swift README snapshot.
+  _Verify: decision rationale in §10 and the Swift README snapshot._
+- **M2-17b** _(Infrastructure)_ — Apply the settled subscript and `peek`
+  spellings and record them in §10 and the Swift README snapshot.
   _Depends: M2-17a._
   _Verify: API call-site search plus `mise run fmt:check`._
 - **M2-01** _(Infrastructure)_ — Add registrar-backed boundary objects,
@@ -678,11 +678,11 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-09`._
   _Greens: UI-09._
-- **M2-07** _(Behavior)_ — Warn through the diagnostic seam when a tracked
-  read has no consumer.
+- **M2-07** _(Decision)_ — Record that public Observation cannot distinguish
+  a valid automatically tracked UI subscript read from one with no consumer;
+  keep the direct spelling, require `peek` in actions, and defer the warning.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter UI-10`._
-  _Greens: UI-10._
+  _Verify: documentation alignment plus `mise run tasks:check`._
 - **M2-08** _(Behavior)_ — Prove a view reading a changed pair renders only
   the old or new pair.
   _Depends: M2-02ab._
@@ -711,17 +711,23 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   boundary target exists.
   _Depends: M2-11._
   _Verify: `test-simulator` completes only `CogBoundaryTests`._
-- **M2-14** _(Infrastructure)_ — Build Weather's state layer with per-ZIP
-  sources, `fileprivate` access plus ops, and its effects group.
+- **M2-14a** _(Infrastructure)_ — Create Weather's Xcode workspace with a
+  local-path dependency on Cog, then build its state layer with per-ZIP
+  sources, `fileprivate` access, derived values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
+- **M2-14b** _(Infrastructure)_ — Install Weather's nice-weather reaction and
+  injected-clock hourly task through the complete public `EffectGroup`
+  lifecycle.
+  _Depends: M2-14a._
+  _Verify: Weather scheme builds and its effect installation tests pass._
 - **M2-15** _(Infrastructure)_ — Build Weather cards, bindings, and per-ZIP
   tracked reads.
-  _Depends: M2-14._
+  _Depends: M2-14a._
   _Verify: Weather scheme builds and launches in the simulator._
 - **M2-16** _(Gate)_ — Verify Weather with deterministic render counters: one
   ZIP invalidates one card, pairs never tear, and notices precede reactions.
-  _Depends: M2-03, M2-08, M2-09, M2-15._
+  _Depends: M2-03, M2-08, M2-09, M2-14b, M2-15._
   _Verify: Weather integration tests using counters, never log scraping._
 - **M2-13b** _(Infrastructure)_ — Add the Weather build CI job only after the
   example exists.
@@ -730,16 +736,9 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 - **M2-18a** _(Decision)_ — Time-box investigation of pinned iOS 17 runtime
   installation into the self-hosted runner's pinned image; record exact
   mechanics and whether that runtime can be kept reliably available. The
-  nightly remains non-blocking unless this task records a reliable pinned
+  floor requirement is retired unless a future task records a reliable pinned
   runtime.
   _Verify: reproducible install command or documented non-blocking fallback._
-- **M2-18b** _(Behavior)_ — Add the pinned nightly floor subset when the
-  recorded runtime path is available.
-  _Depends: M2-04, M2-05, M2-18a._
-  _Non-blocking: execute when M2-18a records a reliable pinned runtime;
-  otherwise leave deferred without blocking M2-20 or a release._
-  _Verify: a scheduled or manually dispatched floor job passes UI-14._
-  _Greens: UI-14._
 - **M2-19** _(Behavior)_ — With a real boundary installed, prove debug seed
   sends no UI notice.
   _Depends: M2-02ab._

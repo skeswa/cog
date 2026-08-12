@@ -20,6 +20,9 @@ public final class Cogtext {
   /// One test-only acknowledgement installed through the CogTesting product.
   private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
 
+  /// Signals after the next grace-expiry release check, including a pinned skip.
+  private var nextLifetimeReleaseCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
+
   /// The monotonic version assigned to graph work.
   ///
   /// Each outer turn advances it once, including an empty or all-equal turn. A
@@ -62,6 +65,20 @@ public final class Cogtext {
   /// The correctness core uses a dictionary. The data-oriented core replaces
   /// it with slotted storage (perf §3), so lookups go through the methods below.
   internal private(set) var states: [CogStateIdentity: any CogState] = [:]
+
+  /// States whose exact values have crossed the UI observation boundary.
+  ///
+  /// First UI reads append here in creation order. Flushes walk only these hot
+  /// roots instead of scanning every interior state in the graph.
+  internal private(set) var observationStates: [any CogObservationState] = []
+
+  /// Pins one newly UI-read state in boundary creation order.
+  internal func registerObservationState(_ state: any CogObservationState) {
+    if let lifetimeState = state as? any CogLifetimeLeaseState {
+      lifetimeState.advanceLifetimeReleaseGeneration()
+    }
+    observationStates.append(state)
+  }
 
   /// Whose run is capturing dependencies right now, or `nil` between runs.
   ///
@@ -134,6 +151,7 @@ extension Cogtext {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     state.decrementExternalLeaseCount()
     guard state.externalLeaseCount == 0 else { return }
+    guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
     let generation = state.advanceLifetimeReleaseGeneration()
     let identity = state.stateIdentity
@@ -166,16 +184,31 @@ extension Cogtext {
     nextLifetimeReleaseAcknowledgement = acknowledgement
   }
 
+  /// Installs a one-shot acknowledgement for the next grace-expiry check.
+  package func acknowledgeNextDerivedReleaseCheck(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextLifetimeReleaseCheckAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next release check.")
+    }
+    nextLifetimeReleaseCheckAcknowledgement = acknowledgement
+  }
+
   /// Removes the exact still-unobserved state after its grace task resumes.
   private func releaseDerivedStateIfEligible(
     _ state: any CogLifetimeLeaseState,
     identity: CogStateIdentity,
     generation: UInt64
   ) {
+    let checkAcknowledgement = nextLifetimeReleaseCheckAcknowledgement
+    nextLifetimeReleaseCheckAcknowledgement = nil
+    defer { checkAcknowledgement?() }
+
     guard let stored = states[identity], stored === state else { return }
     guard state.lifetimeReleaseGeneration == generation else { return }
     guard state.externalLeaseCount == 0 else { return }
     guard case .whileObserved = state.lifetime else { return }
+    guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
     // A still-live internal consumer needs this exact producer until the later
     // closure-release slice can collect the whole unobserved dependency graph.
@@ -253,24 +286,24 @@ extension Cogtext {
   /// Reads a source's current value without creating a dependency edge.
   ///
   /// Use this outside selectors when code needs the value once. Inside a
-  /// selector, use ``Reader/get(_:)`` so changes can rerun the selector.
+  /// selector, use ``Reader/subscript(_:)`` so changes can rerun the selector.
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
-  public func read<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
     manualState(for: valueReference).currentValue
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
   ///
   /// The call computes the cog if needed and settles stale dependencies before
-  /// returning. Inside a selector, use ``Reader/get(_:)`` so changes can rerun
+  /// returning. Inside a selector, use ``Reader/subscript(_:)`` so changes can rerun
   /// the selector.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
-  public func read<Value>(_ valueReference: Cog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     derivedState(for: valueReference).settledValue(in: self)
   }
 }

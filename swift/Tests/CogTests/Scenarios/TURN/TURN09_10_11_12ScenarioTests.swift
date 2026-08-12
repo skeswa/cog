@@ -12,15 +12,15 @@ import Testing
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
 
-  #expect(cogs.read(doubled) == 2)
+  #expect(cogs.peek(doubled) == 2)
   #expect(runs == 1)
 
-  cogs.commit { w in w[source] = 1 }
+  cogs.commit { c in c[source] = 1 }
 
-  #expect(cogs.read(doubled) == 2)
+  #expect(cogs.peek(doubled) == 2)
   #expect(runs == 1)
 }
 
@@ -32,14 +32,14 @@ import Testing
   let sources = ManualCogBox<Int, String> { key in key.count }
   let doubled = Cog<Int> { c in
     runs += 1
-    return c.get(sources["one"]) * 2
+    return c[sources["one"]] * 2
   }
 
-  #expect(cogs.read(doubled) == 6)
+  #expect(cogs.peek(doubled) == 6)
 
-  cogs.commit { w in w[sources["one"]] = 3 }
+  cogs.commit { c in c[sources["one"]] = 3 }
 
-  #expect(cogs.read(doubled) == 6)
+  #expect(cogs.peek(doubled) == 6)
   #expect(runs == 1)
 }
 
@@ -51,22 +51,22 @@ import Testing
   let source = ManualCog<Int>(4)
   let squared = Cog<Int> { c in
     runs += 1
-    let value = c.get(source)
+    let value = c[source]
     return value * value
   }
 
-  #expect(cogs.read(squared) == 16)
+  #expect(cogs.peek(squared) == 16)
 
-  cogs.commit { w in
-    w[source] = 5
-    #expect(w[source] == 5)
+  cogs.commit { c in
+    c[source] = 5
+    #expect(c[source] == 5)
 
-    w[source] = 4
-    #expect(w[source] == 4)
+    c[source] = 4
+    #expect(c[source] == 4)
   }
 
-  #expect(cogs.read(source) == 4)
-  #expect(cogs.read(squared) == 16)
+  #expect(cogs.peek(source) == 4)
+  #expect(cogs.peek(squared) == 16)
   #expect(runs == 1)
 }
 
@@ -86,23 +86,23 @@ import Testing
   )
   let note = Cog<String> { c in
     runs += 1
-    return c.get(source).note
+    return c[source].note
   }
 
-  #expect(cogs.read(note) == "first")
+  #expect(cogs.peek(note) == "first")
 
-  cogs.commit { w in
-    w[source] = Reading(sample: 7, note: "equal by the custom rule")
+  cogs.commit { c in
+    c[source] = Reading(sample: 7, note: "equal by the custom rule")
   }
 
-  #expect(cogs.read(note) == "first")
+  #expect(cogs.peek(note) == "first")
   #expect(runs == 1)
 
-  cogs.commit { w in
-    w[source] = Reading(sample: 8, note: "changed by the custom rule")
+  cogs.commit { c in
+    c[source] = Reading(sample: 8, note: "changed by the custom rule")
   }
 
-  #expect(cogs.read(note) == "changed by the custom rule")
+  #expect(cogs.peek(note) == "changed by the custom rule")
   #expect(runs == 2)
 }
 
@@ -123,23 +123,23 @@ import Testing
   )
   let first = Cog<String> { c in
     firstRuns += 1
-    return c.get(sources["one"]).note
+    return c[sources["one"]].note
   }
   let second = Cog<String> { c in
     secondRuns += 1
-    return c.get(sources["four"]).note
+    return c[sources["four"]].note
   }
 
-  #expect(cogs.read(first) == "one")
-  #expect(cogs.read(second) == "four")
+  #expect(cogs.peek(first) == "one")
+  #expect(cogs.peek(second) == "four")
 
-  cogs.commit { w in
-    w[sources["one"]] = Reading(sample: 3, note: "equal")
-    w[sources["four"]] = Reading(sample: 5, note: "changed")
+  cogs.commit { c in
+    c[sources["one"]] = Reading(sample: 3, note: "equal")
+    c[sources["four"]] = Reading(sample: 5, note: "changed")
   }
 
-  #expect(cogs.read(first) == "one")
-  #expect(cogs.read(second) == "changed")
+  #expect(cogs.peek(first) == "one")
+  #expect(cogs.peek(second) == "changed")
   #expect(firstRuns == 1)
   #expect(secondRuns == 2)
 }
@@ -156,14 +156,14 @@ import Testing
   let source = ManualCog<Reading>(Reading(value: 3))
   let value = Cog<Int> { c in
     runs += 1
-    return c.get(source).value
+    return c[source].value
   }
 
-  #expect(cogs.read(value) == 3)
+  #expect(cogs.peek(value) == 3)
   #expect(runs == 1)
 
-  cogs.commit { w in w[source] = Reading(value: 3) }
+  cogs.commit { c in c[source] = Reading(value: 3) }
 
-  #expect(cogs.read(value) == 3)
+  #expect(cogs.peek(value) == 3)
   #expect(runs == 2)
 }

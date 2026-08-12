@@ -13,20 +13,20 @@ import Testing
   let source = ManualCog<Int>(1)
   let isPositive = Cog<Bool> { c in
     middleRuns += 1
-    return c.get(source) > 0
+    return c[source] > 0
   }
   let message = Cog<String> { c in
     leafRuns += 1
-    return c.get(isPositive) ? "positive" : "not positive"
+    return c[isPositive] ? "positive" : "not positive"
   }
 
-  #expect(cogs.read(message) == "positive")
+  #expect(cogs.peek(message) == "positive")
   #expect(middleRuns == 1)
   #expect(leafRuns == 1)
 
-  cogs.commit { w in w[source] = 2 }
+  cogs.commit { c in c[source] = 2 }
 
-  #expect(cogs.read(message) == "positive")
+  #expect(cogs.peek(message) == "positive")
   #expect(middleRuns == 2)
   #expect(leafRuns == 1)
 }
@@ -46,21 +46,21 @@ import Testing
   let summary = Cog<Summary>(
     { c in
       middleRuns += 1
-      let value = c.get(source)
+      let value = c[source]
       return Summary(bucket: value / 10, raw: value)
     },
     equals: { old, new in old.bucket == new.bucket }
   )
   let bucket = Cog<Int> { c in
     leafRuns += 1
-    return c.get(summary).bucket
+    return c[summary].bucket
   }
 
-  #expect(cogs.read(bucket) == 1)
+  #expect(cogs.peek(bucket) == 1)
 
-  cogs.commit { w in w[source] = 12 }
+  cogs.commit { c in c[source] = 12 }
 
-  #expect(cogs.read(bucket) == 1)
+  #expect(cogs.peek(bucket) == 1)
   #expect(middleRuns == 2)
   #expect(leafRuns == 1)
 }
@@ -75,22 +75,22 @@ import Testing
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     middleRuns += 1
-    return c.get(source) * 2
+    return c[source] * 2
   }
   let lower = Cog<Int> { c in
     lowerRuns += 1
-    return c.get(doubled) + 1
+    return c[doubled] + 1
   }
   let leaf = Cog<String> { c in
     leafRuns += 1
-    return "value=\(c.get(lower))"
+    return "value=\(c[lower])"
   }
 
-  #expect(cogs.read(leaf) == "value=3")
+  #expect(cogs.peek(leaf) == "value=3")
 
   for next in 2...4 {
-    cogs.commit { w in w[source] = next }
-    #expect(cogs.read(leaf) == "value=\(next * 2 + 1)")
+    cogs.commit { c in c[source] = next }
+    #expect(cogs.peek(leaf) == "value=\(next * 2 + 1)")
   }
 
   #expect(middleRuns == 4)
@@ -111,18 +111,18 @@ import Testing
   let source = ManualCog<Int>(1)
   let parity = Cog<Parity> { c in
     middleRuns += 1
-    return Parity(isEven: c.get(source).isMultiple(of: 2))
+    return Parity(isEven: c[source].isMultiple(of: 2))
   }
   let message = Cog<String> { c in
     leafRuns += 1
-    return c.get(parity).isEven ? "even" : "odd"
+    return c[parity].isEven ? "even" : "odd"
   }
 
-  #expect(cogs.read(message) == "odd")
+  #expect(cogs.peek(message) == "odd")
 
-  cogs.commit { w in w[source] = 3 }
+  cogs.commit { c in c[source] = 3 }
 
-  #expect(cogs.read(message) == "odd")
+  #expect(cogs.peek(message) == "odd")
   #expect(middleRuns == 2)
   #expect(leafRuns == 2)
 }

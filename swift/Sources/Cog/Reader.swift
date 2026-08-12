@@ -4,18 +4,18 @@
 ///
 /// ```swift
 /// let subtotal = Cog<Money> { c in
-///   c.get(cart).items.reduce(.zero) { $0 + $1.price }
+///   c[cart].items.reduce(.zero) { $0 + $1.price }
 /// }
 /// ```
 ///
-/// `c.get` returns a value and records its dependency. Each run replaces the
-/// dependency set, so branches and early returns work as expected. Reads made
-/// outside this reader are invisible to Cog.
+/// `c[valueReference]` returns a value and records its dependency. Each run
+/// replaces the dependency set, so branches and early returns work as expected.
+/// Reads made outside this reader are invisible to Cog.
 ///
 /// A reader is valid only during its selector run. Using a saved reader later
 /// traps.
 ///
-/// `c.read` skips dependency tracking. `c.curr` returns this cog's previous
+/// `c.peek` skips dependency tracking. `c.curr` returns this cog's previous
 /// value without creating a self-dependency.
 @MainActor
 public struct Reader<Value> {
@@ -35,7 +35,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value from the latest completed turn.
-  public func get<Read>(_ valueReference: ManualCog<Read>) -> Read {
+  public subscript<Read>(_ valueReference: ManualCog<Read>) -> Read {
     cogs.requireTracking(state)
 
     let producer = cogs.manualState(for: valueReference)
@@ -49,7 +49,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
-  public func get<Read>(_ valueReference: Cog<Read>) -> Read {
+  public subscript<Read>(_ valueReference: Cog<Read>) -> Read {
     cogs.requireTracking(state)
 
     let producer = cogs.derivedState(for: valueReference)
@@ -64,8 +64,8 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func get<Read>(_ valueReference: CogProjection<Read>) -> Read {
-    get(valueReference.source)
+  public subscript<Read>(_ valueReference: CogProjection<Read>) -> Read {
+    self[valueReference.source]
   }
 
   /// Peeks at a source without depending on it.
@@ -75,9 +75,9 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The source to read without recording an edge.
   /// - Returns: The value the source holds in the latest completed turn.
-  public func read<Read>(_ valueReference: ManualCog<Read>) -> Read {
+  public func peek<Read>(_ valueReference: ManualCog<Read>) -> Read {
     cogs.requireTracking(state)
-    return cogs.read(valueReference)
+    return cogs.peek(valueReference)
   }
 
   /// Peeks at a derived cog without depending on it.
@@ -88,9 +88,9 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The derived cog to read without recording an edge.
   /// - Returns: Its newest settled value in this context.
-  public func read<Read>(_ valueReference: Cog<Read>) -> Read {
+  public func peek<Read>(_ valueReference: Cog<Read>) -> Read {
     cogs.requireTracking(state)
-    return cogs.read(valueReference)
+    return cogs.peek(valueReference)
   }
 
   /// Peeks at a source exposed through `.readOnly` without depending on it.
@@ -98,8 +98,8 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The read-only projection to read without recording an
   ///   edge.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func read<Read>(_ valueReference: CogProjection<Read>) -> Read {
-    read(valueReference.source)
+  public func peek<Read>(_ valueReference: CogProjection<Read>) -> Read {
+    peek(valueReference.source)
   }
 
   /// The value this cog retained after its previous completed run.

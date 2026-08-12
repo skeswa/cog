@@ -9,13 +9,13 @@ import Cog
 enum OffActorGraphAccessRejected {
   @MainActor
   static func readsOnGraphExecutor(cogs: Cogtext, source: ManualCog<Int>) -> Int {
-    cogs.read(source)
+    cogs.peek(source)
   }
 
   actor OtherExecutor {
     func readsWithoutHop(cogs: Cogtext, source: ManualCog<Int>) -> Int {
-      // expect-error: call to main actor-isolated instance method 'read'
-      cogs.read(source)
+      // expect-error: call to main actor-isolated instance method 'peek'
+      cogs.peek(source)
     }
   }
 }

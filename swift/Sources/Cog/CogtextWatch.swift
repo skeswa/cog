@@ -33,7 +33,7 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(valueReference) },
+      read: { c in c[valueReference] },
       body: body
     )
   }
@@ -68,7 +68,7 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(valueReference) },
+      read: { c in c[valueReference] },
       body: body
     )
   }
@@ -102,7 +102,7 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(valueReference) },
+      read: { c in c[valueReference] },
       body: body
     )
   }

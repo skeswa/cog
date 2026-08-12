@@ -36,6 +36,8 @@ extension CogHistoryEvent {
       return "write"
     case .recompute:
       return "recompute"
+    case .notice:
+      return "notice"
     case .effect:
       return "effect"
     }

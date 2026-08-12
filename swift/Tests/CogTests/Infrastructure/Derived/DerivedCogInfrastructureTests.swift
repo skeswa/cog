@@ -13,10 +13,10 @@ import Testing
   let cogs = Cogtext.forTesting()
 
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
   #expect(cogs.states.isEmpty)
 
-  _ = cogs.read(doubled)
+  _ = cogs.peek(doubled)
 
   // The derived state and the source state it read, and nothing else.
   #expect(cogs.states.count == 2)
@@ -26,7 +26,7 @@ import Testing
 @Test func `DerivedCogInfrastructure reuses one state for one declaration`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
 
   #expect(cogs.derivedState(for: doubled) === cogs.derivedState(for: doubled))
   #expect(cogs.states.count == 1)
@@ -38,8 +38,8 @@ import Testing
   // states and two runs. Identity is the descriptor object.
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let left = Cog<Int>({ c in c.get(source) }, name: "twin")
-  let right = Cog<Int>({ c in c.get(source) }, name: "twin")
+  let left = Cog<Int>({ c in c[source] }, name: "twin")
+  let right = Cog<Int>({ c in c[source] }, name: "twin")
 
   #expect(cogs.derivedState(for: left) !== cogs.derivedState(for: right))
   #expect(cogs.states.count == 2)
@@ -64,7 +64,7 @@ import Testing
   // nothing until something asks it for a value.
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
 
   let state = cogs.derivedState(for: doubled)
 
@@ -106,7 +106,7 @@ import Testing
   }
 
   #expect(cogs.trackedConsumer == nil)
-  _ = cogs.read(observing)
+  _ = cogs.peek(observing)
 
   #expect(consumerDuringRun === cogs.derivedState(for: observing))
   #expect(cogs.trackedConsumer == nil)
@@ -127,12 +127,12 @@ import Testing
     return 1
   }
   let outer = Cog<Int> { c in
-    let value = c.get(inner)
+    let value = c[inner]
     slotAfterInnerRead = cogs.trackedConsumer
     return value + 1
   }
 
-  #expect(cogs.read(outer) == 2)
+  #expect(cogs.peek(outer) == 2)
 
   #expect(slotDuringInnerRun === cogs.derivedState(for: inner))
   #expect(slotAfterInnerRead === cogs.derivedState(for: outer))
@@ -147,10 +147,10 @@ import Testing
 
   let width = ManualCog<Int>(3)
   let height = ManualCog<Int>(4)
-  let area = Cog<Int> { c in c.get(width) * c.get(height) }
-  let label = Cog<String> { c in "\(c.get(area)) sq ft, \(c.get(width)) wide" }
+  let area = Cog<Int> { c in c[width] * c[height] }
+  let label = Cog<String> { c in "\(c[area]) sq ft, \(c[width]) wide" }
 
-  #expect(cogs.read(label) == "12 sq ft, 3 wide")
+  #expect(cogs.peek(label) == "12 sq ft, 3 wide")
 
   let areaState = cogs.derivedState(for: area)
   #expect(areaState.dependencies.count == 2)
@@ -169,21 +169,21 @@ import Testing
   let cogs = Cogtext.forTesting()
   let constant = Cog<Int> { _ in 7 }
 
-  #expect(cogs.read(constant) == 7)
+  #expect(cogs.peek(constant) == 7)
   #expect(cogs.derivedState(for: constant).dependencies.isEmpty)
 }
 
 @MainActor
-@Test func `DerivedCogInfrastructure keeps an untracked read out of the graph`() {
-  // `cogs.read` is an untracked one-shot read. Reading a derived cog that
+@Test func `DerivedCogInfrastructure keeps a peek out of the graph`() {
+  // `cogs.peek` is an untracked one-shot read. Peeking at a derived cog that
   // way computes it and records what *it* read, and creates no edge to the
   // caller, because there is no caller in the graph to create one to.
   let cogs = Cogtext.forTesting()
 
   let source = ManualCog<Int>(1)
-  let doubled = Cog<Int> { c in c.get(source) * 2 }
+  let doubled = Cog<Int> { c in c[source] * 2 }
 
-  #expect(cogs.read(doubled) == 2)
+  #expect(cogs.peek(doubled) == 2)
 
   #expect(cogs.derivedState(for: doubled).dependencies.count == 1)
   #expect(cogs.trackedConsumer == nil)

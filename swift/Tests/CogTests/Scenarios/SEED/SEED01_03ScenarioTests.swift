@@ -15,7 +15,7 @@ import Testing
 
   cogs.seed(source, to: 7)
 
-  #expect(cogs.read(source) == 7)
+  #expect(cogs.peek(source) == 7)
 }
 
 @MainActor
@@ -27,14 +27,14 @@ import Testing
   let source = ManualCog<Int>(2)
   let middle = Cog<Int> { c in
     middleRuns += 1
-    return c.get(source) + 1
+    return c[source] + 1
   }
   let root = Cog<Int> { c in
     rootRuns += 1
-    return c.get(middle) * 2
+    return c[middle] * 2
   }
 
-  #expect(cogs.read(root) == 6)
+  #expect(cogs.peek(root) == 6)
   #expect(middleRuns == 1)
   #expect(rootRuns == 1)
 
@@ -44,12 +44,12 @@ import Testing
   #expect(middleRuns == 1)
   #expect(rootRuns == 1)
 
-  #expect(cogs.read(root) == 12)
+  #expect(cogs.peek(root) == 12)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
 
   // The settled result is cached like any other derived value.
-  #expect(cogs.read(root) == 12)
+  #expect(cogs.peek(root) == 12)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
 }
@@ -69,20 +69,20 @@ import Testing
   )
   let note = Cog<String> { c in
     runs += 1
-    return c.get(source).note
+    return c[source].note
   }
 
-  #expect(cogs.read(note) == "first")
+  #expect(cogs.peek(note) == "first")
   #expect(runs == 1)
 
   cogs.seed(source, to: Reading(sample: 1, note: "equal"))
 
-  #expect(cogs.read(note) == "first")
+  #expect(cogs.peek(note) == "first")
   #expect(runs == 1)
 
   cogs.seed(source, to: Reading(sample: 2, note: "changed"))
 
-  #expect(cogs.read(note) == "changed")
+  #expect(cogs.peek(note) == "changed")
   #expect(runs == 2)
 }
 
