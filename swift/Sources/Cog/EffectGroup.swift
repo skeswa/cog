@@ -7,6 +7,7 @@
 @MainActor
 public final class EffectGroup {
   private var reactionTokens: [ReactionToken] = []
+  private var tasks: [Task<Void, any Error>] = []
   private var isCancelled = false
 
   /// Creates an empty live group.
@@ -25,6 +26,27 @@ public final class EffectGroup {
     reactionTokens.append(token)
   }
 
+  /// Starts a named task and gives this group ownership of its lifetime.
+  ///
+  /// A task requested after cancellation is cancelled before this method
+  /// returns and is not retained.
+  @discardableResult
+  public func task(
+    name: String,
+    _ operation: @escaping @MainActor () async throws -> Void
+  ) -> Task<Void, any Error> {
+    let task = Task(name: name) { @MainActor in
+      try Task.checkCancellation()
+      try await operation()
+    }
+    guard !isCancelled else {
+      task.cancel()
+      return task
+    }
+    tasks.append(task)
+    return task
+  }
+
   /// Cancels every owned effect and leaves this group terminal.
   ///
   /// Repeated calls do nothing. Every reference to this final-class handle
@@ -35,8 +57,13 @@ public final class EffectGroup {
 
     let tokens = reactionTokens
     reactionTokens.removeAll()
+    let ownedTasks = tasks
+    tasks.removeAll()
     for token in tokens {
       token.cancel()
+    }
+    for task in ownedTasks {
+      task.cancel()
     }
   }
 }
