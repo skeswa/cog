@@ -29,6 +29,9 @@ internal final class AsyncCogState<Value>:
   /// The phase returned to readers after its publication turn.
   private var phase: CogPhase<Value>?
 
+  /// The last value work completed successfully, including an optional nil.
+  private var lastSuccess: Previous<Value> = .none
+
   /// Work started by the first read.
   private var activeTask: Task<Void, Never>?
 
@@ -71,14 +74,10 @@ internal final class AsyncCogState<Value>:
   }
 
   func recompute(in cogs: Cogtext) {
-    guard phase == nil else {
-      markChecked(at: cogs.revision)
-      return
-    }
-    startInitialWork(in: cogs)
+    startWork(in: cogs)
   }
 
-  private func startInitialWork(in cogs: Cogtext) {
+  private func startWork(in cogs: Cogtext) {
     guard isComputing else {
       fatalError("An async Cog selector ran outside the settle computation path.")
     }
@@ -94,21 +93,34 @@ internal final class AsyncCogState<Value>:
       previousDependency.removeSubscriber(self)
     }
 
-    let turnName = "\(renderedName) pending"
-    switch cogs.turnPhase {
-    case .idle:
-      cogs.withSystemTurn(turnName) { turn in
-        self.pendingPhase = .pending(previous: .none)
-        turn.touch(self)
+    let pending = CogPhase<Value>.pending(previous: lastSuccess)
+    if phase == nil {
+      switch cogs.turnPhase {
+      case .idle:
+        stage(pending, named: "pending", in: cogs)
+      case .accumulating, .flushing:
+        // A first read must synchronously return honest pending state. Nothing
+        // can already subscribe to a state with no phase, so install it now and
+        // queue the named, otherwise-empty publication turn behind the active
+        // turn without invalidating the reader that is establishing its baseline.
+        phase = pending
+        markChanged(at: cogs.revision)
+        cogs.withSystemTurn("\(renderedName) pending") { _ in }
       }
-    case .accumulating, .flushing:
-      // A first read must synchronously return honest pending state. Nothing
-      // can already subscribe to a state with no phase, so install it now and
-      // queue the named, otherwise-empty publication turn behind the active
-      // turn without invalidating the reader that is establishing its baseline.
-      phase = .pending(previous: .none)
-      markChanged(at: cogs.revision)
-      cogs.withSystemTurn(turnName) { _ in }
+    } else {
+      // A dependency-triggered reload starts as a later turn. While the source
+      // turn is still flushing, readers continue to see its last completed
+      // phase; the queued pending turn invalidates them in turn order.
+      let publishesSynchronously: Bool
+      if case .idle = cogs.turnPhase {
+        publishesSynchronously = true
+      } else {
+        publishesSynchronously = false
+      }
+      stage(pending, named: "pending", in: cogs)
+      if !publishesSynchronously {
+        markChecked(at: cogs.revision)
+      }
     }
 
     let operation = work.operation
@@ -116,6 +128,7 @@ internal final class AsyncCogState<Value>:
       do {
         let value = try await operation()
         guard let self, let cogs else { return }
+        self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
       } catch {
         guard let self, let cogs else { return }
@@ -127,6 +140,11 @@ internal final class AsyncCogState<Value>:
   /// Publishes one completed work result as its own named turn.
   private func publish(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
     activeTask = nil
+    stage(phase, named: phaseName, in: cogs)
+  }
+
+  /// Stages one phase into a named graph-owned turn.
+  private func stage(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
     cogs.withSystemTurn("\(renderedName) \(phaseName)") { turn in
       self.pendingPhase = phase
       turn.touch(self)
