@@ -186,6 +186,9 @@ These choices are settled; §10 of the core document has the full record.
   already-scheduled reactions and before queued write-back turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
+- Tracked reads at the UI boundary use `cogs.get(valueReference)`. The context
+  owns the tracking operation, the spelling matches `Reader.get` in selectors,
+  and one-shot reads remain visibly different as `cogs.read(valueReference)`.
 - Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
   is a value; its identity lives in an internal final-class descriptor plus
   key. Boxes create keyed value references without allocating new descriptors. The exact
@@ -260,14 +263,13 @@ These choices are settled; §10 of the core document has the full record.
   separates its candidate gate, tag, and post-release verification. The
   normative rules are in impl/tasks.md.
 
-Still open: the read API spelling, how much `Op` support v1 needs, optional
-deferred reactions, debug-history tools, and persistence helpers. Also open
-are several edge behaviors: what a stream's phase does when its sequence ends
-or throws, whether equal stream elements commit distinct turns, whether a
-failed `.queue` run stops the queue, what a one-shot read or refresh of a cold
-async cog does, and debounce/throttle timing modifiers
-(deferred backlog). Value-reference layout, edge layout, and hash tables also remain open
-until benchmarks choose them.
+Still open: how much `Op` support v1 needs, optional deferred reactions,
+debug-history tools, and persistence helpers. Also open are several edge
+behaviors: what a stream's phase does when its sequence ends or throws, whether
+equal stream elements commit distinct turns, whether a failed `.queue` run
+stops the queue, what a one-shot read or refresh of a cold async cog does, and
+debounce/throttle timing modifiers (deferred backlog). Value-reference layout,
+edge layout, and hash tables also remain open until benchmarks choose them.
 
 ## Next steps
 

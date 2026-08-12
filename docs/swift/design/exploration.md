@@ -218,6 +218,12 @@ Reads go through the app context — `c.get(valueReference)` inside a selector,
 `cogs.get(valueReference)` outside. The context tracks dependencies and records one
 history for the whole app.
 
+The explicit `get` is deliberate at both boundaries. It says that a read adds
+an edge, keeps the one-shot escape hatch visibly different as `read`, and
+leaves subscript syntax to a `Writer` whose getter and setter use the active
+turn. A callable value reference would put graph work on what is otherwise an
+inert name and still need the context as an argument.
+
 ### 2.4 Dependencies are captured on every run
 
 Dependencies are exactly the cogs read with `c.get` during the last run.
@@ -759,6 +765,7 @@ singular, and does measurement show less runtime work?
 | State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock (§5.3).                                                                                                                                                                                                                                                                                                                                                 |
 | State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Untracked reads?                  | `c.read` and one-shot `cogs.read` skip the dependency edge but still settle the value they return; an untracked read is never stale (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| UI read spelling?                 | `cogs.get(valueReference)`. Tracking belongs to the context, the spelling matches selector reads through `Reader.get`, it contrasts with one-shot `cogs.read`, and it leaves subscripts to staged `Writer` reads and writes (§2.3, §3.2, §3.4).                                                                                                                                                                                                                                                                                                                                                                                         |
 | Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Context construction?             | App bootstrap calls `Cogtext.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -775,9 +782,8 @@ singular, and does measurement show less runtime work?
 These numbers are stable identifiers that other documents cite. A settled item
 keeps its slot and points at the table above instead of renumbering the rest.
 
-1. **Read spelling:** `cogs.get(valueReference)`, `cogs[valueReference]`, or callable value references. Current
-   lean: keep `get` because a tracked read creates an edge. Try all three in
-   the weather spike.
+1. **Read spelling:** settled on August 12, 2026 as
+   `cogs.get(valueReference)`. See "UI read spelling?" above.
 2. **How much `Op` support ships in v1:** plain methods are enough to start.
    `.live` and `.latestFailure` call tracking need a separate design.
 3. **Deferred reactions:** synchronous ordered flush and the write-back queue

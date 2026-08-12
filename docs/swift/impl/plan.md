@@ -381,10 +381,10 @@ isolation; and named effect runs in history.
   runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
-- Read spelling: try `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references in the
-  smallest tracked-view prototype before boundary call sites multiply; record
-  the winner in §10 and the README snapshot, then use only that spelling in
-  the Weather example.
+- Read spelling: `M2-17a` compared `cogs.get(valueReference)`,
+  `cogs[valueReference]`, and callable value references in the smallest
+  tracked-view prototype. It selected `cogs.get(valueReference)` on August 12,
+  2026; use only that spelling at the boundary and in Weather.
 - CI: add `test-simulator`
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
