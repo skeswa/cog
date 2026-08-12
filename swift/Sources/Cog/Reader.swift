@@ -20,8 +20,9 @@
 /// reading through it later fails immediately rather than attaching
 /// dependencies to a computation that is over.
 ///
-/// `c.read` (an untracked peek, `M1-09c`) and `c.curr` (this cog's own previous
-/// value, `M1-10`) join `get` here later.
+/// `c.read` is the deliberate exception: it returns a settled value without
+/// recording an edge. `c.curr` (this cog's own previous value, `M1-10`) joins
+/// these reads later.
 @MainActor
 public struct Reader<Value> {
   /// The context whose graph this run reads.
@@ -80,5 +81,39 @@ public struct Reader<Value> {
   /// - Returns: The value its source holds in the latest completed turn.
   public func get<Read>(_ ref: ReadOnlyCog<Read>) -> Read {
     get(ref.source)
+  }
+
+  /// Peeks at a source without depending on it.
+  ///
+  /// Use this when the selector needs the source's current value but only a
+  /// different tracked input should make the selector run again (§2.4).
+  ///
+  /// - Parameter ref: The source to read without recording an edge.
+  /// - Returns: The value the source holds in the latest completed turn.
+  public func read<Read>(_ ref: ManualCog<Read>) -> Read {
+    cogs.requireTracking(node)
+    return cogs.read(ref)
+  }
+
+  /// Peeks at a derived cog without depending on it.
+  ///
+  /// Skipping the edge never returns stale data. If the derived cog is dirty,
+  /// this call settles it before returning, but its later changes do not make
+  /// this selector run again.
+  ///
+  /// - Parameter ref: The derived cog to read without recording an edge.
+  /// - Returns: Its newest settled value in this context.
+  public func read<Read>(_ ref: Cog<Read>) -> Read {
+    cogs.requireTracking(node)
+    return cogs.read(ref)
+  }
+
+  /// Peeks at a source exposed through `.readOnly` without depending on it.
+  ///
+  /// - Parameter ref: The read-only projection to read without recording an
+  ///   edge.
+  /// - Returns: The value its source holds in the latest completed turn.
+  public func read<Read>(_ ref: ReadOnlyCog<Read>) -> Read {
+    read(ref.source)
   }
 }
