@@ -5,7 +5,7 @@
 ///
 /// A context creates it on first use from
 /// ``ManualCogDescriptor/startingValue(forKey:)``.
-internal final class ManualCogState<Value>: CogState, PendingCogSource {
+internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObservationState {
   /// The declaration this state belongs to.
   ///
   /// Provides the label, equality rule, and lifetime.
@@ -40,6 +40,9 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource {
 
   /// Derived states whose last run read this source.
   var subscribers: [CogSubscriberEdge]
+
+  /// Created only after this exact descriptor-and-key state reaches the UI.
+  var observationBoundary: CogObservationBoundary?
 
   var label: CogLabel { descriptor.label }
 
@@ -76,6 +79,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource {
     self.changedAt = .initial
     self.checkedAt = .initial
     self.subscribers = []
+    self.observationBoundary = nil
   }
 
   // Written out, and `nonisolated`, per the rule at the top of

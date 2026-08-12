@@ -10,7 +10,7 @@
 /// and the next run replaces the dependency set so branches and early returns
 /// can change it.
 internal final class DerivedCogState<Value>:
-  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState
+  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState, CogObservationState
 {
   /// The declaration this state belongs to.
   let descriptor: DerivedCogDescriptor<Value>
@@ -54,6 +54,9 @@ internal final class DerivedCogState<Value>:
   /// Consumers whose last run read this derived value.
   var subscribers: [CogSubscriberEdge]
 
+  /// Created only after this exact descriptor-and-key state reaches the UI.
+  var observationBoundary: CogObservationBoundary?
+
   var label: CogLabel { descriptor.label }
 
   /// The declaration's lifetime policy, shared by every key of a box.
@@ -90,6 +93,7 @@ internal final class DerivedCogState<Value>:
     self.changedAt = .initial
     self.checkedAt = .initial
     self.subscribers = []
+    self.observationBoundary = nil
     self.externalLeaseCount = 0
     self.lifetimeReleaseGeneration = 0
   }
