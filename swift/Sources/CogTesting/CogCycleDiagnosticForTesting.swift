@@ -2,9 +2,8 @@ public import Cog
 
 /// A derived dependency cycle observed without terminating the test process.
 ///
-/// This is a narrow behavior contract for scenario tests. It contains only the
-/// rendered path and failure message, never graph states, edges, stack frames,
-/// descriptor identities, or another core-specific representation.
+/// Scenario tests receive the rendered path and failure message without access
+/// to graph storage.
 public nonisolated struct CogCycleDiagnostic: Sendable, Equatable {
   /// The exact closed path, including the repeated final cog.
   public let path: [String]

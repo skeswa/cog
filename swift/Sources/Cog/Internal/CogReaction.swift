@@ -1,34 +1,24 @@
 /// One reaction registration owned by a context.
 ///
-/// A reaction is a graph consumer but not readable graph state. The simple
-/// correctness core nevertheless uses the narrow `CogState` invalidation shape
-/// for it: producers can hold the same weak reverse edge, and the reaction's
-/// CLEAN/CHECK/DIRTY state says whether the end-of-turn pass may skip it, must
-/// verify its derived dependencies, or knows a direct dependency changed.
+/// A reaction is a consumer, not readable state. It conforms to `CogState` so
+/// producers can use the same reverse edges and invalidation marks.
 internal final class CogReaction: CogState, CogConsumer {
   let label: CogLabel
 
   /// The context that owns this registration, or `nil` once it is gone.
   ///
-  /// Weak because ownership runs the other way: the context holds its
-  /// registrations, so a strong link here would let one stored handle pin a
-  /// whole graph. A token held past its context — one that outlived an
-  /// isolated test runtime — must be able to cancel into nothing rather than
-  /// keep that runtime alive or trap.
+  /// Weak because the context owns its registrations. A token may outlive an
+  /// isolated test context without keeping that graph alive.
   private weak var cogs: Cogtext?
 
   /// What this registration runs, until cancellation releases it.
   ///
-  /// Optional so that cancelling stops the reaction holding whatever its body
-  /// captured — routinely the context itself — at the fixed stopping point
-  /// rather than whenever the last handle happens to die.
+  /// Cancellation clears the body and releases its captures immediately.
   private var body: (@MainActor (ReactionReader) -> Void)?
 
   /// Whether this registration has been stopped.
   ///
-  /// Its own flag rather than a value of `settleState`, because that state is
-  /// written by the invalidation walk and again by `markChecked` at the end of
-  /// every run: a cancellation encoded there would be erased by the next mark.
+  /// Separate from `settleState`, which invalidation and settlement overwrite.
   private(set) var isCancelled = false
 
   /// Producers read by the last completed run, in read order.
@@ -36,17 +26,14 @@ internal final class CogReaction: CogState, CogConsumer {
 
   /// Unique directly read derived roots this registration keeps observed.
   ///
-  /// Kept separate from `dependencies`: that list preserves read order and
-  /// repeats for graph recapture, while one reaction owns at most one lifetime
-  /// lease for any state no matter how often its body reads it.
+  /// Separate from `dependencies` because repeated reads still own one lease.
   private(set) var leasedDependencies: [any CogLifetimeLeaseState] = []
 
   var settleState: CogSettleState = .clean
   var changedAt: CogVersion = .initial
   var checkedAt: CogVersion = .initial
 
-  /// Reactions are terminal consumers. Keeping the standard slot empty lets
-  /// the invalidation walk stop naturally when it reaches one.
+  /// Reactions are terminal consumers, so invalidation stops here.
   var subscribers: [CogSubscriberEdge] = []
 
   init(
@@ -61,25 +48,15 @@ internal final class CogReaction: CogState, CogConsumer {
 
   /// Stops this registration and takes it out of the graph.
   ///
-  /// Two doors, and both have to shut. Dropping the reverse edges takes the
-  /// reaction out of reach of the invalidation walk that would mark it, and
-  /// removing the registration takes it out of the end-of-flush scan that turns
-  /// a marked reaction into a queued run. Shutting only the first leaves a
-  /// registration every later flush still walks; shutting only the second
-  /// leaves a permanently dirty state pinning its producers.
+  /// Remove both dependency edges and the context registration. Leaving either
+  /// would retain graph state or keep later flushes scanning the reaction.
   ///
-  /// Neither door reaches a run this flush has already queued, which is what
-  /// the flag is for: the queue holds its entries by value and a live cursor
-  /// walks it, so entries are never removed from under that cursor. Every way
-  /// into a run checks the flag instead.
+  /// Queued runs remain in the array, so every run checks `isCancelled`.
   ///
-  /// `settleState` is deliberately left alone. It belongs to the invalidation
-  /// walk, and a cancelled reaction is out of the registration list with no
-  /// edges left, so whatever it says is unobservable.
+  /// `settleState` is irrelevant after the reaction leaves the graph.
   ///
-  /// The body is released here too, at this fixed stopping point. `run(in:)`
-  /// binds an executing body to a local before user code can cancel itself, so
-  /// clearing the stored copy cannot invalidate a closure already on stack.
+  /// `run(in:)` keeps an executing body in a local, so self-cancellation cannot
+  /// release the closure on the stack.
   func cancel() {
     guard !isCancelled else { return }
     isCancelled = true
@@ -91,9 +68,8 @@ internal final class CogReaction: CogState, CogConsumer {
     }
     dependencies.removeAll()
 
-    // A predicate removal rather than an index: the registration may already be
-    // gone, and matching nothing is the no-op an index would not be. Survivors
-    // keep their relative order, so registration order is undisturbed.
+    // Predicate removal also handles an already-removed registration and keeps
+    // survivor order.
     cogs?.reactions.removeAll { $0 === self }
   }
 
@@ -122,7 +98,7 @@ internal final class CogReaction: CogState, CogConsumer {
   }
 
   /// Settles the hot dependencies of a reachable reaction and reruns it only
-  /// when at least one value really changed since its last completed run.
+  /// when at least one value changed since its last completed run.
   func runIfNeeded(in cogs: Cogtext) {
     guard !isCancelled, settleState != .clean else { return }
 
@@ -146,17 +122,11 @@ internal final class CogReaction: CogState, CogConsumer {
 
   /// Captures a fresh dependency set around one synchronous body run.
   private func run(in cogs: Cogtext) {
-    // The one gate every path into a run passes, including a run this flush
-    // queued before the cancellation. Bound to a local first, so a body that
-    // cancels itself cannot release the closure it is executing inside.
+    // Every run checks cancellation. The local keeps the closure alive through
+    // self-cancellation.
     guard !isCancelled, let body = self.body else { return }
 
-    // Recorded here, at the one place a reaction body executes, so that every
-    // spelling of a registration lands under its own name: a `watch` given a
-    // `name:` shows that name, and a registration that gave none shows the
-    // file and line it was written on. A run whose watch suppressed its user
-    // body — the quiet `.skip` install — is still a run Cog performed, and
-    // still says so.
+    // Record every reaction run, including a watch's quiet `.skip` install.
     #if DEBUG
     cogs.historyLog.recordEffect(label: label)
     cogs.turnChainTracker.recordReaction(label: label)
@@ -196,8 +166,7 @@ internal final class CogReaction: CogState, CogConsumer {
       nextLeasedDependencies.append(leaseState)
     }
 
-    // Acquire additions before releasing removals so a retracking run swaps
-    // ownership without an artificial zero-lease gap.
+    // Acquire additions first to avoid a false zero-lease gap.
     for dependency in nextLeasedDependencies
     where !leasedDependencies.contains(where: { $0 === dependency }) {
       cogs.acquireExternalLease(on: dependency)

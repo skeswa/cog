@@ -1,9 +1,6 @@
 /// A read-only facade for a ``ManualCog``.
 ///
-/// `.readOnly` is the second half of the write-ownership rule. A source is
-/// declared `fileprivate` so that only its own file can name it, and that file
-/// then publishes this projection so the rest of the app can read the state
-/// without being able to change it:
+/// Keep a source `fileprivate`, then publish its `.readOnly` projection:
 ///
 /// ```swift
 /// // WeatherState.swift
@@ -20,15 +17,7 @@
 public struct CogProjection<Value> {
   /// The source this value reference reads.
   ///
-  /// Deliberately the only stored property, and deliberately internal. Storing
-  /// the source rather than re-deriving a descriptor and key is what makes the
-  /// projection free and keeps "same value reference, same state" true by construction;
-  /// keeping it internal is what makes the projection one-way.
-  ///
-  /// Its memberwise initializer is internal for the same reason: the spelling
-  /// users get is ``ManualCog/readOnly``, which reads as a property of the
-  /// source rather than as a wrapper someone could also build around a source
-  /// they were handed.
+  /// Internal so callers cannot recover or construct a writable source.
   internal let source: ManualCog<Value>
 }
 
@@ -45,8 +34,7 @@ extension ManualCog {
   /// let weatherService = weatherServiceSource.readOnly
   /// ```
   ///
-  /// Both value references name one state, so a write made through the source in that file
-  /// is immediately what every reader of the projection sees.
+  /// The source and projection name the same state.
   public var readOnly: CogProjection<Value> {
     CogProjection(source: self)
   }
@@ -56,10 +44,6 @@ extension ManualCog {
 
 extension Cogtext {
   /// Reads a read-only value reference's current value without creating a dependency edge.
-  ///
-  /// The same one-shot untracked read as the one for a source, on the
-  /// same state — projecting a source changes who may write it, never how it is
-  /// read or what a read means.
   ///
   /// - Parameter valueReference: The read-only value reference to read.
   /// - Returns: The value the source it names holds in this context.

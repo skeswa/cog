@@ -1,8 +1,6 @@
 /// The read capability inside one run of a selector.
 ///
-/// This is the `c` in `Cog { c in ... }`. It is the read-side counterpart of
-/// ``Writer``: a writer is the only way to change a source inside a turn, and a
-/// reader is the only way to read inside a computation.
+/// This is the `c` in `Cog { c in ... }`.
 ///
 /// ```swift
 /// let subtotal = Cog<Money> { c in
@@ -10,28 +8,21 @@
 /// }
 /// ```
 ///
-/// Reading through `c.get` returns the value and records that this run depended
-/// on it.
-/// Dependencies are exactly the cogs the last run read, so branches and early
-/// returns are fine — an edge not read again is not an edge. Anything the
-/// selector reads *around* the reader is invisible to Cog and will go stale.
+/// `c.get` returns a value and records its dependency. Each run replaces the
+/// dependency set, so branches and early returns work as expected. Reads made
+/// outside this reader are invisible to Cog.
 ///
-/// A reader is valid only during the run it was handed to. Saving one and
-/// reading through it later fails immediately rather than attaching
-/// dependencies to a computation that is over.
+/// A reader is valid only during its selector run. Using a saved reader later
+/// traps.
 ///
-/// `c.read` is the deliberate exception: it returns a settled value without
-/// recording an edge. `c.curr` exposes this cog's own previous value without
-/// making the cog depend on itself.
+/// `c.read` skips dependency tracking. `c.curr` returns this cog's previous
+/// value without creating a self-dependency.
 @MainActor
 public struct Reader<Value> {
   /// The context whose graph this run reads.
   private let cogs: Cogtext
 
-  /// The state being computed — the consumer every read of this run links to,
-  /// and the holder of the `curr` value this run may fold into its result.
-  /// That second use is why the reader is generic over the value its own cog
-  /// produces rather than being one untyped read handle.
+  /// The state receiving dependencies and providing `curr`.
   private let state: DerivedCogState<Value>
 
   /// Hands a run its reader. Only a state computing itself may make one.
@@ -43,8 +34,7 @@ public struct Reader<Value> {
   /// Reads a source, and depends on it.
   ///
   /// - Parameter valueReference: The source to read.
-  /// - Returns: The value the source holds in the latest completed turn —
-  ///   never a value another turn has staged but not committed.
+  /// - Returns: The value from the latest completed turn.
   public func get<Read>(_ valueReference: ManualCog<Read>) -> Read {
     cogs.requireTracking(state)
 
@@ -55,10 +45,7 @@ public struct Reader<Value> {
 
   /// Reads another derived cog, and depends on it.
   ///
-  /// Reading a derived cog that has not computed yet computes it, right here,
-  /// as part of this run. That is what makes a graph of derived values lazy as
-  /// a whole rather than one layer at a time: nothing downstream of an unread
-  /// root runs until a read reaches it.
+  /// The first read computes the derived cog. Unread branches remain lazy.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.

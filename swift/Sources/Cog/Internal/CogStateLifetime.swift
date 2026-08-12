@@ -1,9 +1,8 @@
 /// How long a declaration asks its context to retain each of its states.
 ///
-/// The policy belongs to the descriptor so every copied value reference and every key of a
-/// box agrees. This is deliberately not the complete public lifetime surface:
-/// Manual opt-in also has to say whether recreation resets to the starting
-/// value, which remains a later slice.
+/// The descriptor shares this policy across copied references and box keys.
+/// A later manual-state API will also choose whether recreation resets to the
+/// starting value.
 internal nonisolated enum CogStateLifetime: Equatable {
   /// Retain the state until its app or isolated testing context ends.
   case app

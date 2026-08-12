@@ -1,47 +1,37 @@
 /// A writable source of state, one value per key.
 ///
-/// Declare one where you would declare a ``ManualCog`` but the state is
-/// per-something — per zip code, per document, per row — and keep it
-/// `fileprivate` (or `private` inside a type) so only that file can write it:
+/// Use a box when a source has one value per key, such as a zip code or
+/// document ID. Keep the box `fileprivate` (or `private` inside a type) so only
+/// its owner can write it:
 ///
 /// ```swift
 /// fileprivate let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
 /// ```
 ///
-/// A box is a declaration, not a collection. It holds no values and no keys,
-/// and it never has to be told which keys exist: `box[key]` builds a value reference for
-/// that key, and the app's one context creates a state the first time something
-/// actually reads or writes it. Read or write a thousand keys and the context
-/// creates a thousand states; use none and the box costs one descriptor.
+/// The box holds no keys or values. `box[key]` builds a value reference, and
+/// the context creates that key's state on first use. If an app uses 1,000
+/// keys, the context creates 1,000 states. An unused box costs one descriptor.
 ///
-/// Each key is its own state. `box[90210]` and `box[10001]` start at the same
-/// starting value and then go their own ways, because identity is the
-/// declaration plus the key — writing one does not touch the other.
+/// Each key has separate state. Writing `box[90210]` does not change
+/// `box[10001]`.
 ///
-/// Building `box[key]` creates no descriptor or graph state. It pairs the
-/// box's existing descriptor with the key, so value references can be built at
-/// the point of use instead of stored. For example, write
-/// `c.get(weatherReport[zip])` inside a selector.
+/// Building `box[key]` creates no graph state or descriptor. It is cheap to use
+/// inline, as in `c.get(weatherReport[zip])`.
 ///
-/// A key can be anything `Hashable`. Prefer a domain type — `ZipCode`,
-/// `Document.ID` — over a bare `String` or `Int`, so that two boxes keyed by
-/// different things cannot be confused at a call site. Prefer a small one,
-/// too: Cog stores the key as an `AnyHashable`. Keys up to three words stay
-/// inline; larger keys may allocate. A key is an identity, so a small
-/// identifier is usually the right shape anyway.
+/// Keys may be any `Hashable` type. Prefer a small domain type such as
+/// `ZipCode` or `Document.ID` over `String` or `Int`. Cog stores keys as
+/// `AnyHashable`; keys larger than three words may allocate.
 @MainActor
 public struct ManualCogBox<Value, Key: Hashable> {
   /// The one declaration behind every key of this box.
   ///
-  /// One descriptor, not one per key. A box can therefore be declared before
-  /// anyone knows which keys an app will use.
+  /// The box shares this descriptor across all keys.
   internal let descriptor: ManualCogDescriptor<Value>
 
   /// Declares a keyed source whose every key starts at `startingValue`.
   ///
-  /// Declaring allocates one descriptor and nothing else. It creates no states
-  /// and touches no context; the starting value is only what a key's state
-  /// begins at, whenever one is first needed.
+  /// This allocates one descriptor. A context creates each key's state on
+  /// first use.
   ///
   /// ```swift
   /// fileprivate let heatAdvisorySource = ManualCogBox<Bool, ZipCode>(false)
@@ -99,20 +89,14 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// }
   /// ```
   ///
-  /// The closure runs once per key per context — when that key's state first
-  /// appears — and never again for that key. It is a *starting* value, so a
-  /// write replaces it permanently; nothing recomputes it, and it is not a
-  /// derived cog. Reach for `CogBox` when the value should keep tracking
-  /// something else.
+  /// The closure runs once for each key used in a context. A write replaces
+  /// its result. Use `CogBox` when the value should track other state.
   ///
-  /// Keep the closure cheap and free of side effects. Which keys are asked
-  /// for, and when, is up to the app, so a starting-value closure is not a
-  /// place to load, log, or count anything.
+  /// Keep the closure cheap and free of side effects. The app controls when
+  /// each key first appears.
   ///
-  /// When `Value` is itself a function type taking `Key`, a closure literal
-  /// could satisfy either initializer. Say which you mean by naming the
-  /// constant form's type — `ManualCogBox<(UserID) -> Cart, UserID>(makeCart)`
-  /// — rather than passing a bare literal.
+  /// If `Value` is a function from `Key`, disambiguate the constant form with
+  /// its type: `ManualCogBox<(UserID) -> Cart, UserID>(makeCart)`.
   ///
   /// - Parameters:
   ///   - startingValue: What a key's reads see until something writes that
@@ -154,14 +138,8 @@ public struct ManualCogBox<Value, Key: Hashable> {
 
   /// The value reference naming this box's state for one key.
   ///
-  /// Building the same key twice gives two equivalent value references, not two pieces of
-  /// state: `box[5]` here and `box[5]` in another file resolve to one state, so
-  /// a write through either is a write both can see. `box[6]` is a different
-  /// state entirely.
-  ///
-  /// This is a value, and building it is not a lookup — nothing is searched,
-  /// created, or registered until a context is asked to resolve the value reference. That
-  /// is why it is safe to write `box[key]` inline at every call site.
+  /// Equal keys name the same state. A context resolves or creates that state
+  /// when the reference is first read or written.
   ///
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A value reference for that key, usable anywhere a ``ManualCog`` is.

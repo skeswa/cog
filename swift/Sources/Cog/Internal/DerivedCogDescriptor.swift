@@ -1,16 +1,9 @@
 /// The descriptor behind a derived cog declaration.
 ///
-/// One descriptor stands behind one ``Cog`` declaration or one ``CogBox``,
-/// for the same reason ``ManualCogDescriptor`` stands behind both manual
-/// forms: the correctness build spells keys as an inline
-/// `AnyHashable?` on the value reference (perf §4), so the declaration is generic over its
-/// value and knows nothing about a key type.
+/// ``Cog`` and ``CogBox`` share this descriptor type. It is generic over the
+/// value; the reference carries an erased key (perf §4).
 ///
-/// What a derived declaration owns that a manual one does not is the selector.
-/// It lives here rather than on the state because it belongs to the
-/// declaration: every state of this declaration, in every context, computes
-/// with the same closure, and a context that has never been asked for the
-/// declaration holds nothing at all.
+/// Every state for the declaration uses the selector stored here.
 internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
@@ -23,11 +16,9 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// How a state of this declaration computes its value.
   ///
-  /// `@MainActor` because the graph is (§1.2, §2.5), stated explicitly so the
-  /// closure type says the same thing whatever a caller's default isolation is
-  /// (§7). Not `throws`: synchronous selectors do not throw in v1 (§2.4), and
-  /// leaving the throw out of the type is what makes that a compile error at
-  /// the declaration site rather than a runtime rule (`DECL-12`).
+  /// Explicit `@MainActor` keeps the closure isolated under any caller default
+  /// (§1.2, §2.5, §7). Synchronous selectors cannot throw in v1, which makes a
+  /// throwing declaration fail to compile (`DECL-12`).
   private let selector: @MainActor (Reader<Value>, AnyHashable?) -> Value
 
   /// Whether two computed values count as the same state, or `nil` when every
@@ -49,9 +40,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// Runs the selector once for the state `reader` belongs to.
   ///
-  /// A method rather than an exposed closure so the state has one seam to call
-  /// however the declaration was spelled. A keyed form passes its key through
-  /// here, and nothing at the call site has to know which form ran.
+  /// Keyless and keyed declarations share this call site.
   func compute(_ reader: Reader<Value>, key: AnyHashable?) -> Value {
     selector(reader, key)
   }

@@ -1,10 +1,8 @@
 /// One monotonic graph revision in the simple correctness core.
 ///
-/// A state's `changedAt` records the last revision in which its value really
-/// changed. Its `checkedAt` records the last revision through which Cog proved
-/// the value current, including a recomputation that landed equal. Keeping the
-/// two separate is what lets an equal middle state stop a downstream
-/// wave (§2.4, perf §3.4).
+/// `changedAt` records the last value change. `checkedAt` records the last
+/// revision proved current, including an equal recomputation. Their difference
+/// lets an equal middle state stop downstream work (§2.4, perf §3.4).
 ///
 /// The class-state core uses a wide scalar and leaves the compact integer
 /// layout to M6's measured arena. The type itself is nonisolated because a
@@ -19,8 +17,7 @@ internal nonisolated struct CogVersion: Comparable, Sendable {
     lhs.rawValue < rhs.rawValue
   }
 
-  /// The next revision, failing loudly instead of silently wrapping and
-  /// making ancient values look newer than current ones.
+  /// The next revision. Wraparound traps before old values appear current.
   func advanced() -> CogVersion {
     guard rawValue < UInt64.max else {
       fatalError("Cog exhausted its graph revision counter.")
@@ -110,9 +107,8 @@ extension CogState {
 
 /// The type-erased capabilities only a derived state needs during settlement.
 ///
-/// The explicit stack holds heterogeneous states. This protocol lets its exit
-/// frame inspect a derived state's parents and rerun a generic selector without
-/// erasing the selector's value at each graph edge.
+/// This protocol lets an erased exit frame inspect dependencies and rerun a
+/// generic selector.
 @MainActor
 internal protocol DerivedCogSettleState: CogState {
   /// The declaration half of this state's stable descriptor-and-key identity.
@@ -128,13 +124,11 @@ internal protocol DerivedCogSettleState: CogState {
   func recompute(in cogs: Cogtext)
 }
 
-/// One half of the iterative pull walk.
+/// One frame in the iterative pull walk.
 ///
-/// Enter frames inspect a state and schedule its parents. The matching exit
-/// frame runs after those parents, compares versions, and recomputes the state
-/// when needed. Using one erased frame type lets the class-state core walk
-/// arbitrarily
-/// typed states without recursive Swift calls.
+/// Enter frames schedule dependencies. Exit frames compare versions and
+/// recompute after those dependencies settle. Type erasure avoids recursive
+/// generic calls.
 internal enum CogSettleFrame {
   case enter(any CogState)
   case exit(any CogState)
@@ -142,10 +136,9 @@ internal enum CogSettleFrame {
 
 /// The context-owned traversal storage reused by every settle walk.
 ///
-/// Nested pulls append frames above their caller's checkpoint and pop only
-/// that suffix, while the active derived path remains shared so either walk
-/// can recognize a cycle through the other. The final arena core will replace
-/// state references with slots without changing the enter/exit/path shape.
+/// Nested pulls append above a checkpoint and pop their own suffix. They share
+/// the active computation path for cycle detection. The arena core will replace
+/// references with slots but keep this traversal shape.
 internal struct CogSettleStack {
   private var frames: [CogSettleFrame] = []
   private var computingPath: [any DerivedCogSettleState] = []
@@ -158,8 +151,7 @@ internal struct CogSettleStack {
 
   /// The innermost cog whose derived computation has not published yet.
   ///
-  /// Commit rejection uses only this exceptional-path lookup. Ordinary reads
-  /// and turns continue to pay the per-state Boolean check alone.
+  /// Used by commit rejection. Ordinary reads use the per-state Boolean.
   var innermostComputingState: (any DerivedCogSettleState)? {
     computingPath.last
   }
@@ -186,9 +178,8 @@ internal struct CogSettleStack {
 
   /// The cycle that entering `state` would close, or `nil` for a new path step.
   ///
-  /// Every ordinary check is the state's one Boolean. Only the exceptional
-  /// marked-state path scans the active stack and snapshots the actual cycle
-  /// suffix, so normal reads allocate and render nothing.
+  /// The common path checks one Boolean. A detected cycle scans and copies the
+  /// active suffix.
   func cyclePath(ifEntering state: any DerivedCogSettleState) -> CogCyclePath? {
     guard state.isComputing else { return nil }
     guard let first = computingPath.firstIndex(where: { $0 === state }) else {
@@ -218,7 +209,7 @@ internal struct CogSettleStack {
 }
 
 extension Cogtext {
-  /// Pushes invalidation away from a state whose value really changed.
+  /// Pushes invalidation from a changed state to its consumers.
   ///
   /// Direct consumers become DIRTY because one of their own inputs changed.
   /// States farther downstream become CHECK because equality may stop the wave
@@ -251,10 +242,7 @@ extension Cogtext {
   /// CHECK state must run. A recomputation that lands equal advances only
   /// `checkedAt`, so consumers farther down a CHECK wave stay cached.
   internal func settle(_ root: any DerivedCogSettleState) {
-    // A selector may discover a dirty dependency while an outer settle still
-    // has sibling and exit frames pending. Appending above a checkpoint keeps
-    // that nested pull from erasing its caller's work; each invocation pops
-    // only the frames it owns.
+    // A nested pull appends above this checkpoint and pops only its own frames.
     let boundary = settleStack.count
     settleStack.pushEnter(root)
 

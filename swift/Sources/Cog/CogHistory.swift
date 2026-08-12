@@ -5,7 +5,7 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
   /// One outer turn began, under the name its `commit` was given.
   case turn
 
-  /// A staged source value crossed the commit boundary and really changed.
+  /// A staged source value changed at the commit boundary.
   case write
 
   /// A derived cog's selector ran.
@@ -15,30 +15,23 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
   case effect
 }
 
-/// One thing Cog did, as the debug history remembers it.
+/// One debug-history entry.
 ///
-/// An entry keeps what the recording site already had — a turn's name, or a
-/// declaration's ``CogLabel`` and key — and renders a `String` only when
-/// something asks for ``name``. Recording does no string work because it sits
-/// on the turn path, while display happens rarely.
+/// Entries keep raw labels and keys. ``name`` renders them on demand, so the
+/// turn path does no string work.
 public struct CogHistoryEntry {
   /// Which kind of work this entry records.
   public let event: CogHistoryEvent
 
   /// The ordinal of the turn this entry belongs to, counting from one.
   ///
-  /// Work done outside a turn — the lazy first computation behind a read —
-  /// carries the ordinal of the most recently started turn, or zero when no
-  /// turn has run yet.
+  /// Work outside a turn uses the latest turn number, or zero before any turn.
   public let turn: UInt64
 
   /// What Cog calls the subject of this entry.
   ///
-  /// For a turn, the name its `commit` was given, which by default is the op
-  /// method that called it. For a write or a recomputation, the declaration's
-  /// label, subscripted by key when the declaration is keyed. For an effect,
-  /// the name its registration was given. Rendered here, at display time,
-  /// never at record time.
+  /// Turns use their commit name. Writes and recomputations use the
+  /// declaration label and optional key. Effects use the registration label.
   public var name: String {
     switch subject {
     case .turn(let name):
@@ -63,9 +56,7 @@ public struct CogHistoryEntry {
 
 /// A snapshot of one context's debug history, oldest entry first.
 ///
-/// Taking a snapshot is cheap: it shares the ring's storage and rotates it
-/// only when ``entries`` is actually asked for, so a loop that watches
-/// ``count`` across many turns does not rebuild the ring on every turn.
+/// A snapshot shares the ring's storage. ``entries`` rotates it on demand.
 public struct CogHistory {
   /// The most entries this history will ever hold at once.
   public let capacity: Int
@@ -79,7 +70,7 @@ public struct CogHistory {
     return Array(ring[oldest...]) + Array(ring[..<oldest])
   }
 
-  /// The ring exactly as the log holds it, which is only sorted once it wraps.
+  /// The ring in storage order.
   private let ring: [CogHistoryEntry]
 
   /// Where the oldest entry sits in `ring`, which is zero until it wraps.
@@ -93,12 +84,9 @@ public struct CogHistory {
 }
 
 extension Cogtext {
-  /// What this context has done lately, for a person trying to understand it.
+  /// This context's recent debug history.
   ///
-  /// Debug builds only. A release build has no history to read and paid
-  /// nothing to record one, which is why this whole file — the
-  /// record types, this accessor, and every call site behind it — compiles
-  /// out rather than becoming an empty log.
+  /// History types, storage, and recording compile out of release builds.
   public var debugHistory: CogHistory { historyLog.snapshot }
 }
 

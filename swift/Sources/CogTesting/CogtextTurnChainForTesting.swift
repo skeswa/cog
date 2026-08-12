@@ -44,9 +44,8 @@ public nonisolated struct CogTurnChainDiagnostic: Sendable, Equatable {
 extension Cogtext {
   /// The latest long turn chain and whether the context is idle now.
   ///
-  /// This is a narrow behavior contract for tests. It exposes no turn phase,
-  /// queue, state, edge, or graph representation, and it is absent from release
-  /// builds along with the guard it observes.
+  /// Tests can inspect the warning without accessing graph storage. The API and
+  /// guard compile out of release builds.
   public var turnChainDiagnostic: CogTurnChainDiagnostic {
     CogTurnChainDiagnostic(turnChainDiagnosticSnapshot)
   }

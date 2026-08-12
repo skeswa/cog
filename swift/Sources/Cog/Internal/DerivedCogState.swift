@@ -1,19 +1,10 @@
 /// The live state behind one ``Cog`` value reference, in one context.
 ///
-/// A derived state is the other half of ``ManualCogState``: nothing writes it,
-/// and everything about it comes from running its declaration's selector. That
-/// run is what makes it lazy and what makes it cacheable — the two behaviors
-/// this state exists to provide (§2.2).
+/// A derived state gets its value by running its declaration's selector (§2.2).
 ///
-/// **Lazy.** The state computes nothing when it is created. The first read runs
-/// the selector; a state that is never read never runs.
-///
-/// **Cached.** A run's value is kept, so a second read is a lookup rather than
-/// a second run. CLEAN/CHECK/DIRTY state and versions make that
-/// cache valid across source writes: a read pulls every dirty dependency it
-/// needs current before returning. Equality backdating stops downstream work
-/// when a rerun lands equal. Each run also removes dependencies it no longer
-/// reads.
+/// Creation does not compute. The first read runs the selector, and later reads
+/// use the cached value. CLEAN/CHECK/DIRTY state and versions keep that cache
+/// current after writes. An equal rerun stops downstream work.
 ///
 /// Each run records the dependencies it reads. Settlement walks those parents,
 /// and the next run replaces the dependency set so branches and early returns
@@ -26,9 +17,7 @@ internal final class DerivedCogState<Value>:
 
   /// Which state of `descriptor` this is, or `nil` for a keyless declaration.
   ///
-  /// A box state knows its own key so a diagnostic can name it — for example,
-  /// `isNiceOutside[90210]` rather than `isNiceOutside` — without a reverse
-  /// lookup through the context's storage (§2.4).
+  /// Used to print names such as `isNiceOutside[90210]` (§2.4).
   let key: AnyHashable?
 
   /// The declaration half of this state's stable descriptor-and-key identity.
@@ -43,26 +32,20 @@ internal final class DerivedCogState<Value>:
   /// What the last run of the selector produced, or `.none` if it has never
   /// run in this context.
   ///
-  /// This optional is storage presence, not value optionality, the same
-  /// distinction ``ManualCogState/pendingValue`` makes. When `Value` is itself
-  /// optional, `.some(.none)` means a run really did produce nil — which must
-  /// hit the cache, not run the selector a second time.
+  /// The outer optional records whether the selector has run. For optional
+  /// values, `.some(.none)` is a cached `nil`.
   internal private(set) var cachedValue: Value?
 
   /// The producers the last run read through `c.get`, in read order.
   ///
-  /// Rebuilt from empty on every run, because dependencies are exactly what
-  /// this run read (§2.4) and an edge that is not read again is not an edge.
-  /// A list, with repeats left in, is the correctness build's answer. Reverse
-  /// edges are reused for producers that remain and removed from producers the
-  /// next run drops. The physical layout remains benchmark-gated for `M6`
-  /// (perf §3.3).
+  /// Each run rebuilds this list in read order (§2.4). The correctness core
+  /// keeps repeats; M6 may replace the layout after benchmarks (perf §3.3).
   internal private(set) var dependencies: [any CogState] = []
 
   /// Fresh derived states are DIRTY because they have no value to return yet.
   var settleState: CogSettleState
 
-  /// The revision in which the cached value last really changed.
+  /// The revision in which the cached value last changed.
   var changedAt: CogVersion
 
   /// The revision through which the cached value was last proved current.
@@ -89,8 +72,7 @@ internal final class DerivedCogState<Value>:
 
   /// Whether the selector has run in this context yet.
   ///
-  /// Named separately from the cache so that a caller asking the lazy question
-  /// does not have to know how the answer is stored.
+  /// Exposes cache presence without exposing its representation.
   var hasComputed: Bool {
     if case .some = cachedValue {
       return true
@@ -170,12 +152,8 @@ internal final class DerivedCogState<Value>:
     defer { cogs.seedBarrierDepth -= 1 }
     #endif
 
-    // Recorded here rather than in `recompute(in:)`, because this is the one
-    // place the selector actually runs: recording at the settle-driven entry
-    // would miss every lazy first computation, which is a large part of what a
-    // person wants history to explain. Recorded on the way in rather than at
-    // either exit, so a rerun that lands on an equal value still shows the run
-    // it really did.
+    // Record at the selector call so lazy first runs and equal reruns appear in
+    // history.
     #if DEBUG
     cogs.historyLog.recordRecompute(label: label, key: key)
     #endif
@@ -196,10 +174,8 @@ internal final class DerivedCogState<Value>:
     if case .some(let previousValue) = previousValue,
       descriptor.valuesAreEqual(previousValue, value)
     {
-      // Equality backdates the recomputation: dependencies were recaptured and
-      // the state is current through this revision, but its value did not
-      // change in it. Keeping `changedAt` old is what lets a CHECK consumer
-      // stop without running.
+      // The state is current, but its value did not change. Preserve
+      // `changedAt` so CHECK consumers can stay cached.
       markChecked(at: cogs.revision)
       return previousValue
     }

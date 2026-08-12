@@ -19,9 +19,8 @@ extension Cogtext {
   /// }
   /// ```
   ///
-  /// This lives in `CogTesting` rather than `Cog` on purpose. An app target
-  /// that depends only on `Cog` has no way to name this function, so a test
-  /// helper cannot drift into shipping code by accident.
+  /// This factory lives in `CogTesting`, so an app that imports only `Cog`
+  /// cannot call it.
   ///
   /// - Parameters:
   ///   - clock: The monotonic clock context-owned timing work uses. Keep the

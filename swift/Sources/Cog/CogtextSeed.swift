@@ -6,10 +6,9 @@ extension Cogtext {
   /// Seeding is the debug-only exception to ordinary turn-based writes. It
   /// applies the source's equality rule and marks dependent cogs for later
   /// settlement, but opens no turn and computes nothing eagerly. Feature state
-  /// files wrap their `fileprivate` sources in narrow helpers rather than
-  /// publishing those value references to tests. Use it only between graph runs; changing
-  /// state during a turn, selector, reaction, or equality check cannot preserve
-  /// that operation's consistent snapshot.
+  /// files should wrap `fileprivate` sources in narrow test helpers. Seed only
+  /// while the context is idle; seeding during graph work would break its
+  /// snapshot.
   ///
   /// - Parameters:
   ///   - valueReference: The manual source to seed.

@@ -9,34 +9,26 @@
 /// fileprivate let currentZipSource = ManualCog<ZipCode?>(nil)
 /// ```
 ///
-/// A `ManualCog` is a *value reference*: a small value naming one piece of
-/// state, not the state itself. The state lives in the app's one context, which
-/// creates it when first needed. Copying a value reference, or building the
-/// same value reference twice, still names the same state. The value reference
-/// is therefore safe to pass around, and holding one is not holding a value.
+/// A `ManualCog` names state stored in a ``Cogtext``. Copying the reference
+/// still names the same state. A test or preview uses separate state in its own
+/// context.
 ///
-/// Give the declaration a `name:` when the default label — the file and line it
-/// was declared on — would not read well in a cycle diagnostic or in debug
-/// history. The name is a label only: two cogs declared with the same name are
-/// still two different cogs.
+/// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
+/// Names do not define identity.
 @MainActor
 public struct ManualCog<Value> {
   /// The declaration this value reference names.
   internal let descriptor: ManualCogDescriptor<Value>
 
-  /// Which state of `descriptor` this value reference names, or `nil` for a keyless
-  /// declaration.
+  /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// Inline `AnyHashable?` is the correctness build's key representation and
-  /// stays an implementation detail: the value reference is deliberately not `@frozen`, so
-  /// benchmarks can still choose a different layout (perf §4, §9).
+  /// The correctness core stores an inline `AnyHashable?`. The type is not
+  /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
   internal let key: AnyHashable?
 
   /// Declares a source of state that starts at `startingValue`.
   ///
-  /// Declaring allocates one descriptor and returns a value reference already bound to it.
-  /// It creates no state and touches no context; the starting value is only what
-  /// a state begins at, whenever one is first needed.
+  /// This allocates one descriptor. A context creates the state on first use.
   ///
   /// - Parameters:
   ///   - startingValue: The value reads see until something writes.
@@ -92,9 +84,7 @@ public struct ManualCog<Value> {
     )
   }
 
-  /// Builds a value reference for an existing declaration, which is how a box
-  /// makes a value reference for one of its keys without allocating a second
-  /// descriptor.
+  /// Builds a keyed reference without allocating another descriptor.
   internal init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key

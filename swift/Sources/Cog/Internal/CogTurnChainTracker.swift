@@ -13,7 +13,7 @@ package nonisolated struct CogTurnChainWarningSnapshot: Sendable, Equatable {
   package let causalChainIsTruncated: Bool
 }
 
-/// The narrow behavior snapshot exposed to the `CogTesting` product.
+/// The behavior snapshot exposed to `CogTesting`.
 package nonisolated struct CogTurnChainDiagnosticSnapshot: Sendable, Equatable {
   package let warningCount: Int
   package let lastWarning: CogTurnChainWarningSnapshot?

@@ -12,21 +12,14 @@
 
 /// The shape every declaration's descriptor shares.
 ///
-/// A descriptor names state; it does not hold it. The app's one `Cogtext`
-/// stores a state per descriptor and key, created lazily, and a test or preview
-/// runtime has its own isolated context (§2.3). That split is what makes a
-/// top-level `let` a light declaration rather than a live global value.
+/// A descriptor names state but does not store it. Each `Cogtext` creates its
+/// own state for a descriptor and key (§2.3).
 ///
-/// Descriptors are internal `final` classes and **identity is the object**:
-/// `ObjectIdentifier` gives a distinct, stable name for every declaration
-/// without a registry, a counter, or any coordination between files. Two
-/// declarations with identical labels, starting values, and types are still two
-/// different cogs. Users never see the object identifier — they see
-/// ``CogLabel``.
+/// Descriptor object identity distinguishes declarations without a registry.
+/// Two declarations remain distinct even if their labels, types, and starting
+/// values match. Diagnostics show their ``CogLabel``.
 ///
-/// The protocol carries only what code that does not know a descriptor's value
-/// type still needs: its identity and its label. State storage keys on the
-/// former; cycle diagnostics and debug history print the latter.
+/// Type-erased code needs only the descriptor's identity and label.
 @MainActor
 internal protocol CogDescriptor: AnyObject {
   /// What Cog calls this declaration when it prints about it.
@@ -36,10 +29,8 @@ internal protocol CogDescriptor: AnyObject {
 extension CogDescriptor {
   /// Stable process identity for this declaration.
   ///
-  /// `ObjectIdentifier` is only guaranteed unique among live objects, which is
-  /// exactly enough here: a descriptor is owned by the declaration that created
-  /// it — normally a top-level `let` — so it outlives every state, edge, and
-  /// history entry that refers to it.
+  /// The declaration owns its descriptor, so the object outlives every state,
+  /// edge, and history entry that refers to it.
   var identity: ObjectIdentifier {
     ObjectIdentifier(self)
   }

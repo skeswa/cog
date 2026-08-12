@@ -29,10 +29,8 @@ extension Cogtext {
   /// Registers one reaction body under `label` and schedules its first tracking
   /// run.
   ///
-  /// The one path every registration spelling takes to the graph, so that a
-  /// watch and a plain reaction cannot drift apart on the two things a
-  /// registration decides: where it lands in call order, and whether its first
-  /// run happens now or joins the active flush's queue.
+  /// Shared by reactions and watches to preserve registration order and initial
+  /// run scheduling.
   internal func register(
     label: CogLabel,
     body: @escaping @MainActor (ReactionReader) -> Void

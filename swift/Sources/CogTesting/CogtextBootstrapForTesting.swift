@@ -42,10 +42,7 @@ extension Cogtext {
 
   /// Whether an app context is installed right now.
   ///
-  /// The narrow seam that lets a test check the process it is running in was
-  /// left clean, without giving anything a way to reach into a context or to
-  /// learn how contexts are stored. It answers one question — is there an app
-  /// install in effect — which is the same question the production guard asks.
+  /// This exposes install state without exposing the installed context.
   public static var hasBootstrappedApp: Bool {
     Cogtext.installedApp != nil
   }

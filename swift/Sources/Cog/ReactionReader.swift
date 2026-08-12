@@ -5,10 +5,8 @@
 /// reaction run in progress. A later turn reruns the reaction only when one of
 /// those dependencies changes.
 ///
-/// A reaction reader deliberately exposes no write operation. A reaction that
-/// needs to change graph state calls an op on its context, which opens a new
-/// turn after the active flush rather than mutating the turn being observed.
-/// Like ``Reader``, this value is valid only for the run that handed it out.
+/// To write, call an op on the context. Its commit runs as a new turn after the
+/// active flush. Like ``Reader``, this value is valid only during its run.
 @MainActor
 public struct ReactionReader {
   private let cogs: Cogtext

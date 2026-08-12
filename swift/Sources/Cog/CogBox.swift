@@ -1,9 +1,7 @@
 /// A derived value computed separately for every key.
 ///
-/// A box is one declaration with one selector. Subscript it at the point of
-/// use to make a ``Cog`` value reference for a key; the context creates and caches one state
-/// per descriptor-and-key pair. The selector receives that key as an ordinary
-/// argument, so keyed dependencies flow through normal lexical capture:
+/// A box has one selector and one state per key used in a context. Subscript it
+/// to get a ``Cog`` for that key:
 ///
 /// ```swift
 /// let isSunny = CogBox<Bool, ZipCode> { c, zip in

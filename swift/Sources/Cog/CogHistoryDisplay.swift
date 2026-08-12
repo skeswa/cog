@@ -7,10 +7,8 @@ private let cogHistoryOSLog = OSLog(subsystem: "dev.skeswa.cog", category: "hist
 extension CogHistory {
   /// Writes this bounded snapshot to Apple's unified log, oldest entry first.
   ///
-  /// Display is explicit: recording history never logs by itself. Names and
-  /// keyed identities are emitted as public debug-log data so the result is
-  /// useful in Console. Do not call this method when those identifiers are
-  /// sensitive.
+  /// Recording does not log by itself. Names and keys are public log data, so
+  /// do not call this when they contain sensitive information.
   public func log() {
     log { line in
       os_log("%{public}@", log: cogHistoryOSLog, type: .debug, line)
@@ -19,9 +17,8 @@ extension CogHistory {
 
   /// The synchronous formatting seam used by the display smoke test.
   ///
-  /// Keeping it beside the real emitter proves formatting without making
-  /// unified-log persistence, delivery timing, or Console part of graph
-  /// correctness.
+  /// Tests use this to verify formatting without relying on unified-log
+  /// delivery.
   internal func log(to emit: (String) -> Void) {
     emit("Cog history: \(count) of \(capacity) entries, oldest first")
     for entry in entries {

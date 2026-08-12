@@ -1,28 +1,18 @@
 /// The write capability for one accumulating turn.
 ///
-/// A writer exists only inside ``Cogtext/commit(_:_:)``. Its subscripts
-/// are the only way to change a manual source: reads prefer what this turn has
-/// already staged, and writes stay pending until the outer commit body exits.
-/// Application code cannot construct a writer because its initializer and
-/// turn identity are internal to Cog.
+/// A writer exists inside ``Cogtext/commit(_:_:)``. Its subscript reads staged
+/// values and stages writes until the outer commit body returns. Application
+/// code cannot construct one.
 ///
-/// A writer is also valid only *while* that commit body is running. Stashing
-/// one in a variable, an escaping closure, or a `Task` and using it later is a
-/// programmer error, not a supported way to write outside a turn, and Cog traps
-/// on it in every build configuration. The trap covers reads as much as
-/// writes: a writer read means "what this turn has staged," which is a question
-/// with no answer once the turn is over, and silently degrading it to a normal
-/// read would hand back a plausible wrong value.
+/// Do not save a writer in an escaping closure or `Task`. Reads and writes trap
+/// after the commit body ends because the staged view no longer exists.
 @MainActor
 public struct Writer {
   private let cogs: Cogtext
 
   /// The turn this writer may act on.
   ///
-  /// Strongly held on purpose. The check downstream is object identity, so the
-  /// token has to stay alive for exactly as long as some writer could still
-  /// name it; a freed token could otherwise let a later turn's allocation land
-  /// on the same address and make an escaped writer look current.
+  /// Held strongly so object identity cannot be reused while a writer exists.
   private let turnID: CogTurnID
 
   internal init(cogs: Cogtext, turnID: CogTurnID) {
@@ -40,22 +30,16 @@ public struct Writer {
 extension Cogtext {
   /// Starts or schedules one named, synchronous state transition.
   ///
-  /// From idle, `body` starts a new outer turn. Inside an accumulating turn it
-  /// joins that turn immediately. During a flush it waits in the context's
-  /// FIFO queue and runs as a later turn, after the active turn is completely
-  /// settled. Queuing is non-reentrant: this particular call returns before a
-  /// queued body runs, while the active outer `commit` drains all arrivals
-  /// before *its* call returns.
+  /// From idle, `body` starts a turn. A nested commit joins an accumulating
+  /// turn. During a flush, it enters the FIFO queue as a later turn. That
+  /// queued call returns immediately; the outer commit drains the queue before
+  /// returning.
   ///
-  /// Writes made through `body`'s ``Writer`` remain staged until the outer
-  /// accumulating body returns, then cross the commit boundary together. Ops
-  /// are ordinary `Cogtext` methods that wrap this primitive.
+  /// The writer's changes cross the commit boundary together. Ops are
+  /// `Cogtext` methods that wrap this primitive.
   ///
-  /// A derived computation is read-only through selector execution, custom
-  /// equality, dependency reconciliation, and result publication. Calling
-  /// `commit` in that region is a programmer error: Cog fails before `body`
-  /// runs or the attempted turn changes graph state, and names both the active
-  /// derived cog and this attempted turn.
+  /// Calling `commit` during a derived computation traps before `body` runs.
+  /// The error names the active cog and attempted turn.
   ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. By default,
@@ -94,29 +78,13 @@ extension Cogtext {
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.
   ///
-  /// The token is unforgeable (``CogTurnID``), so this is the whole capability
-  /// check: a writer is live exactly while its own token is the context's
-  /// accumulating turn. Everything else is an escaped writer — the context is
-  /// idle, or flushing this very turn, or already accumulating a later one —
-  /// and all three mean the same thing to the caller, that the commit which
-  /// handed out this writer has ended.
+  /// A writer is valid while its ``CogTurnID`` matches the accumulating turn.
   ///
-  /// Failing is a trap, not an `assert`, because the check has to hold in
-  /// shipping builds too. There is no correct behavior to fall back on: a stale
-  /// write would mutate state outside every turn, so nothing would settle or
-  /// notify against it, and a stale read would answer a question about a turn
-  /// that is over. Both are silent wrong state, which costs more than a crash.
+  /// The check runs in every build. A stale write would bypass settlement and
+  /// notification; a stale read has no valid staged value to return.
   ///
-  /// It is `fatalError` rather than `preconditionFailure` specifically so the
-  /// message survives optimization. An optimized `preconditionFailure` lowers
-  /// to `Builtin.condfail_message`, which wants a static string; hand it a
-  /// composed one and the release binary prints raw bytes where the sentence
-  /// should be. `fatalError` always goes through the runtime's reporting path,
-  /// so the same words reach a release crash report as a debug console — and
-  /// this message is worth more than most, because the file and line the trap
-  /// reports are Cog's, not the caller's. Naming their cog is the only locating
-  /// information they get. Being un-strippable under `-Ounchecked` is the right
-  /// posture for a capability check besides.
+  /// `fatalError` keeps the composed message under optimization, including
+  /// `-Ounchecked`. `preconditionFailure` does not.
   @discardableResult
   private func requireWriterTurn<Value>(
     _ turnID: CogTurnID,
@@ -148,11 +116,7 @@ private enum WriterUsage {
 
 /// What Cog says when a writer is used after its commit ended.
 ///
-/// The message has one job beyond stopping the program: telling whoever reads
-/// the crash the two things they cannot see from the trap's own file and line,
-/// which point into Cog rather than into their code. Those are what went wrong
-/// — the writer outlived its commit — and what to do instead, which is to call
-/// `commit` again rather than to look for a way to write without a turn.
+/// Names the escaped writer's target and tells the caller to open a new commit.
 @MainActor
 private func escapedWriterMessage<Value>(
   usage: WriterUsage,

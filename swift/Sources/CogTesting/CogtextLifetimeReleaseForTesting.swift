@@ -3,9 +3,8 @@ public import Cog
 extension Cogtext {
   /// Signals after the next derived state finishes grace expiry and graph removal.
   ///
-  /// Lifetime tests install this before removing the last lease, advance their
-  /// injected clock, and await the acknowledgement instead of yielding,
-  /// polling, sleeping, or racing an unstructured cleanup task.
+  /// A lifetime test installs this before removing the last lease, advances its
+  /// injected clock, then awaits the acknowledgement.
   public func acknowledgeNextDerivedRelease(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {

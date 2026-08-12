@@ -1,4 +1,4 @@
-/// A value computed from other cogs.
+/// A value derived from other cogs.
 ///
 /// Declare one next to the state it summarizes, and write it as a plain
 /// function of the cogs it reads:
@@ -10,51 +10,37 @@
 /// }
 /// ```
 ///
-/// The `c` handed to the selector is a ``Reader``, and `c.get` is how the
-/// selector reads. Reading through it is what makes the read a *dependency*:
-/// Cog notes which cogs this run actually read, so it knows what this value is
-/// made of. Read with `c.get` and the value stays right on its own; read
-/// around it — a captured `let`, a global, a stored property — and it will not.
+/// The selector reads through its ``Reader``. Each `c.get` records a
+/// dependency, so changes can update this value. Reads from captured values,
+/// globals, or stored properties are invisible to Cog.
 ///
-/// A `Cog` is a *value reference*, exactly like a ``ManualCog``: a small value naming one
-/// derived value, not the value itself. Declaring runs nothing. The selector
-/// runs for the first time when something first reads the value reference in a context, and
-/// the value it produced is kept, so reading twice does not compute twice.
-/// Neither the declaration nor the value reference is where the value lives — it lives in
-/// the app's one context, so the same declaration is computed
-/// separately, and cached separately, in a test or preview runtime.
+/// A `Cog` names a derived value. The value lives in a ``Cogtext``. Its first
+/// read in a context runs the selector, and later reads use the cached result
+/// until a dependency changes. Tests and previews compute their own values in
+/// their own contexts.
 ///
-/// Selectors are ordinary synchronous functions of their inputs. Keep them
-/// cheap, keep them pure, and let them return early or branch however the logic
-/// reads best — the dependencies are whatever the run read this time. A
-/// synchronous selector cannot `throw` in v1: return a `Result` for fallible
-/// domain work, and reach for an `AsyncCog` when the work has to await.
+/// Keep selectors synchronous, cheap, and free of side effects. They may
+/// branch or return early; each run replaces the dependency set. A selector
+/// cannot `throw` in v1. Return `Result` for fallible domain work, or use an
+/// `AsyncCog` when the work must await.
 ///
-/// Give the declaration a `name:` when the default label — the file and line it
-/// was declared on — would not read well in a cycle diagnostic or in debug
-/// history. The name is a label only: two cogs declared with the same name are
-/// still two different cogs.
+/// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
+/// Names do not define identity.
 @MainActor
 public struct Cog<Value> {
   /// The declaration this value reference names.
   internal let descriptor: DerivedCogDescriptor<Value>
 
-  /// Which state of `descriptor` this value reference names, or `nil` for a keyless
-  /// declaration.
+  /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// A keyless cog is the single-state case of the same descriptor-and-key
-  /// storage rule rather than a second mechanism (§2.3). Inline `AnyHashable?`
-  /// is the correctness build's key representation and stays an implementation
-  /// detail: the value reference is deliberately not `@frozen`, so benchmarks can still
-  /// choose a different layout (perf §4, §9).
+  /// The correctness core stores an inline `AnyHashable?`. The type is not
+  /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
   internal let key: AnyHashable?
 
   /// Declares a value computed by `selector`.
   ///
-  /// Declaring allocates one descriptor and returns a value reference already bound to it.
-  /// It creates no state, touches no context, and — the part worth saying out
-  /// loud — does not run `selector`. Nothing about a declaration is work
-  /// (§2.3).
+  /// This allocates one descriptor. It creates no state and does not run
+  /// `selector` (§2.3).
   ///
   /// - Parameters:
   ///   - keepAlive: Whether this declaration has app lifetime instead of the
@@ -119,8 +105,7 @@ public struct Cog<Value> {
     )
   }
 
-  /// Builds a value reference for an existing declaration, which is how a derived box
-  /// makes a value reference for one of its keys without allocating a second descriptor.
+  /// Builds a keyed reference without allocating another descriptor.
   internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key

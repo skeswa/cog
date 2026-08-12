@@ -2,18 +2,13 @@
 
 /// What Cog remembers about recent turns, in a ring that never grows.
 ///
-/// Modeled on ``CogSettleStack``: a context-owned struct with a private array,
-/// reused for the life of the context. perf §8 asks for a fixed-size ring of
-/// records whose labels are resolved only at display, and this is the
-/// class-state core's version of that. When the measured arena lands, the
-/// records become integer slots and the recording sites do not change.
+/// The context owns and reuses this fixed-size ring. Labels render only for
+/// display (perf §8). The arena core will replace records with integer slots
+/// without changing call sites.
 internal struct CogHistoryLog {
   /// How many entries the ring holds.
   ///
-  /// 256 is a working number, not a measured one — perf §8 fixes the shape of
-  /// this log, not its size. It is long enough to hold the burst of turns
-  /// behind one user gesture along with the turns that led up to it, and short
-  /// enough to stay small in a debug build.
+  /// 256 is a working value. Benchmarks will choose the final size (perf §8).
   static let capacity = 256
 
   /// Filled to `capacity`, then written in place, oldest slot first.
@@ -45,7 +40,7 @@ internal struct CogHistoryLog {
     record(CogHistoryEntry(event: .turn, turn: turn, subject: .turn(name)))
   }
 
-  /// Records a staged value that really changed at the commit boundary.
+  /// Records a staged value that changed at the commit boundary.
   mutating func recordWrite(label: CogLabel, key: AnyHashable?) {
     record(CogHistoryEntry(event: .write, turn: turn, subject: .cog(label, key)))
   }
@@ -75,10 +70,7 @@ internal struct CogHistoryLog {
 
 /// The unrendered identity behind one history entry.
 ///
-/// A turn is named by its caller; a cog and an effect are each named by their
-/// own declaration. Keeping all three unrendered is what lets
-/// ``CogHistoryEntry/name`` do the string work at display time instead of on
-/// the turn path.
+/// ``CogHistoryEntry/name`` renders these values at display time.
 internal enum CogHistorySubject {
   case turn(String)
   case cog(CogLabel, AnyHashable?)

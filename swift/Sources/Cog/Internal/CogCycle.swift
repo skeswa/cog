@@ -1,8 +1,7 @@
 /// One declaration-and-key step in a derived dependency cycle.
 ///
-/// The descriptor identity preserves which declaration participated even when
-/// two declarations share a human label. The label and key remain unrendered
-/// until the rare failure path needs a message.
+/// Descriptor identity distinguishes declarations that share a label. The
+/// failure path renders the label and key on demand.
 internal struct CogCycleStep {
   let descriptor: ObjectIdentifier
   let label: CogLabel
@@ -22,10 +21,8 @@ internal struct CogCycleStep {
 
 /// The exact active-path suffix closed by one repeated derived read.
 ///
-/// The closing state appears twice: `A -> A` is a self-cycle, while an active
-/// path `[prefix, A, B]` that reads A reports only `A -> B -> A`. Keeping the
-/// structure internal lets CogTesting expose the path without leaking state or
-/// stack representation.
+/// The closing state appears twice. `A -> A` is a self-cycle; an active path
+/// `[prefix, A, B]` that reads A reports `A -> B -> A`.
 internal struct CogCyclePath {
   let steps: [CogCycleStep]
 
@@ -47,8 +44,7 @@ internal struct CogCyclePath {
 
 /// The rendered behavior that crosses from Cog into its testing product.
 ///
-/// Descriptor identities and states stay inside Cog. Tests need only the exact
-/// human path and the message a real cycle failure would present.
+/// Tests receive the rendered path and failure message, not internal states.
 package nonisolated struct CogCycleDiagnosticSnapshot: Sendable, Equatable {
   package let path: [String]
   package let message: String

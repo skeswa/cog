@@ -21,18 +21,12 @@ public final class ReactionToken {
 
   /// Stops this registration for good.
   ///
-  /// The reaction does not run again: not on a later turn, and not from a run
-  /// the flush in progress had already queued for it. This is the fixed
-  /// stopping point a lifecycle owner or a test can name, rather than whenever
-  /// the last handle happens to die.
+  /// Cancellation blocks later turns and runs already queued by the current
+  /// flush.
   ///
-  /// Safe to call as often as you like. The first call cancels and every later
-  /// one returns without doing anything, so two cleanup paths that overlap do
-  /// not have to coordinate.
+  /// Repeated calls do nothing.
   ///
-  /// Cancellation belongs to the registration rather than to this handle.
-  /// Copying a token copies a reference to the same registration, so
-  /// cancelling through any copy stops the one reaction all of them name.
+  /// Token copies share one registration. Cancelling any copy stops it.
   public func cancel() {
     reaction.cancel()
   }
@@ -45,11 +39,6 @@ public final class ReactionToken {
   }
 
   /// Cancels the registration once the last handle to it goes away.
-  ///
-  /// An effect that nobody can still reach is an effect nobody can still stop,
-  /// so letting the registration run on would leak work no caller could
-  /// account for. Dropping the last token is therefore a way of ending an
-  /// effect, not a way of leaking one.
   ///
   /// The isolated deinitializer can cancel synchronously when the token is
   /// released on the MainActor. A release elsewhere may hop to the MainActor,

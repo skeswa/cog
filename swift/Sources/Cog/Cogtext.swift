@@ -10,9 +10,8 @@
 public final class Cogtext {
   /// The monotonic clock used by context-owned timing work.
   ///
-  /// Production injects a ``ContinuousClock``. `CogTesting` can instead
-  /// retain a clock the test controls, so grace periods and other timed work
-  /// wait for a definite signal rather than wall-clock time.
+  /// Production uses ``ContinuousClock``. `CogTesting` can supply a controlled
+  /// clock for deterministic waits.
   internal let clock: any Clock<Duration>
 
   /// Grace used when a descriptor selects the context default.
@@ -23,10 +22,8 @@ public final class Cogtext {
 
   /// The monotonic version assigned to graph work.
   ///
-  /// Every outer turn advances it once at its commit boundary, including an
-  /// empty or all-equal turn. A changed debug seed advances it without a turn.
-  /// The settle engine compares state versions while pulling a derived root
-  /// current.
+  /// Each outer turn advances it once, including an empty or all-equal turn. A
+  /// changed debug seed also advances it.
   internal private(set) var revision: CogVersion = .initial
 
   /// One enter/exit buffer reused by iterative settle walks.
@@ -40,84 +37,62 @@ public final class Cogtext {
 
   /// Commits requested while a turn is flushing, in arrival order.
   ///
-  /// The outer `withTurn` call drains this buffer only after its active turn
-  /// returns to idle. Bodies added by a queued turn's own flush extend the same
-  /// buffer, so no write-back re-enters a flush and FIFO order is preserved.
+  /// The outer `withTurn` drains this FIFO after its active turn returns to
+  /// idle. New arrivals join the same queue.
   internal var queuedTurns: [QueuedCogTurn] = []
 
   /// Reactions this context owns, in registration order.
   ///
-  /// The simple core walks this array at the end of a flush. Invalidations
-  /// leave clean reactions alone and mark only reachable ones, so an unrelated
-  /// turn pays the scan but never runs user code. M6 replaces the scan with its
-  /// measured flat queue without changing ordering or behavior.
+  /// The simple core scans this array after each flush and runs marked
+  /// reactions. M6 replaces the scan with a measured flat queue without
+  /// changing order or behavior.
   internal var reactions: [CogReaction] = []
 
   /// Work still to run in the active flush's reaction phase.
   ///
-  /// Changed registrations are scheduled first. A registration made anywhere
-  /// in the flush appends an initial run to the tail, so it cannot re-enter its
-  /// caller and still completes before queued write-back turns begin.
+  /// Changed reactions run first. Registrations made during the flush append
+  /// their initial run and finish before queued write-back turns.
   internal var reactionRuns: [CogReactionRun] = []
 
   /// Every state this context has been asked for, filed by descriptor and key.
   ///
-  /// Heterogeneous on purpose: a context holds states of every value type an app
-  /// declares, and nothing about storing them needs to know those types.
-  /// ``CogState`` is the narrow view across them, and the concrete type comes
-  /// back at the point of use, where the value reference's own `Value` names it.
+  /// ``CogState`` erases each value type for storage. The value reference
+  /// restores the concrete type at lookup.
   ///
-  /// A dictionary is the correctness build's answer, not the final one. The
-  /// data-oriented core (perf §3) replaces it with slotted storage; nothing
-  /// outside this file may depend on the shape, which is why lookup goes
-  /// through ``manualState(for:)`` rather than the dictionary directly.
+  /// The correctness core uses a dictionary. The data-oriented core replaces
+  /// it with slotted storage (perf §3), so lookups go through the methods below.
   internal private(set) var states: [CogStateIdentity: any CogState] = [:]
 
   /// Whose run is capturing dependencies right now, or `nil` between runs.
   ///
-  /// §2.4 puts the current consumer in a MainActor tracking slot while a
-  /// selector or reaction runs, and that is what this is. One slot is enough
-  /// because the graph has one execution lane (§1.2): runs nest, but they
-  /// never interleave, so ``Cogtext/tracking(_:_:)`` can save and restore this
-  /// like a stack frame.
-  ///
-  /// A stored property rather than something an extension could add, which is
-  /// why the slot lives in this file with the rest of the context's state.
+  /// Runs may nest but cannot interleave on the MainActor. ``tracking(_:_:)``
+  /// saves and restores this slot around nested runs (§1.2, §2.4).
   internal var trackedConsumer: (any CogConsumer)?
 
   #if DEBUG
   /// How many graph operations currently make a quiet seed unsafe.
   ///
-  /// Reader tracking covers selector and reaction bodies, but a derived
-  /// declaration's equality closure runs after tracking ends and before its
-  /// state is marked current. This debug-only barrier spans that whole derived
-  /// run, and seed itself, so test setup cannot re-enter either operation and
-  /// have a later state mark erase the seed's invalidation.
+  /// This barrier also covers derived equality checks and seed itself. It
+  /// prevents a seed from being overwritten by the state mark that ends a run.
   internal var seedBarrierDepth = 0
 
   /// One synchronous root turn and the FIFO write-back turns it causes.
   ///
-  /// The tracker warns once after a long uninterrupted drain and retains only
-  /// the last structured warning for the `CogTesting` diagnostic seam.
+  /// The tracker warns once after a long chain and keeps its latest warning
+  /// for `CogTesting`.
   internal var turnChainTracker = CogTurnChainTracker()
 
   /// What this context has done lately (§2.3, perf §8).
   ///
-  /// Debug builds only, so a release build carries no ring, records nothing,
-  /// and compiles no recording call (`HIST-04`). This is the library's first
-  /// `#if DEBUG`, and the pattern it sets is to gate the storage, the record
-  /// types, the reader, and every call site together — release never has to
-  /// compile around a hole.
+  /// All history storage, types, and call sites compile out of release builds
+  /// (`HIST-04`).
   internal var historyLog = CogHistoryLog()
   #endif
 
   /// Creates an empty context.
   ///
-  /// `package` rather than `public` so that the only ways to make a context
-  /// from outside are the two deliberate ones: `Cogtext.bootstrapApp()` for the
-  /// app, and `Cogtext.forTesting()` for a test or preview runtime. Feature
-  /// code that tries to build a plain context does not get a runtime error, it
-  /// gets a compile error, because the name is not visible to it.
+  /// Package access limits construction to `bootstrapApp()` and the
+  /// `CogTesting` factory.
   package init(
     clock: any Clock<Duration> = ContinuousClock(),
     defaultWhileObservedGrace: Duration = .seconds(30)
@@ -128,12 +103,8 @@ public final class Cogtext {
 
   /// Breaks graph-owned dependency chains before stored properties release.
   ///
-  /// State dependencies are strong so a producer stays alive for as long as a
-  /// live consumer needs it. Releasing a very deep context without severing
-  /// those links first can make ARC recursively destroy the whole chain and
-  /// exhaust the process stack. The context already owns every state, so one
-  /// flat pass can drop all consumer-to-producer links before its dictionary
-  /// and reaction arrays begin their ordinary teardown.
+  /// Strong dependency chains can make ARC recurse during teardown. This flat
+  /// pass breaks them before stored properties are released.
   isolated deinit {
     for state in states.values {
       (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
@@ -149,8 +120,7 @@ public final class Cogtext {
 extension Cogtext {
   /// Adds one reaction-owned lease when this state uses observed lifetime.
   ///
-  /// Invalidating an earlier release generation makes reacquisition safe even
-  /// when its clock sleep has already begun.
+  /// Advancing the release generation invalidates an earlier grace task.
   internal func acquireExternalLease(on state: any CogLifetimeLeaseState) {
     guard case .whileObserved = state.lifetime else { return }
     state.advanceLifetimeReleaseGeneration()
@@ -159,8 +129,7 @@ extension Cogtext {
 
   /// Removes one reaction-owned lease when this state uses observed lifetime.
   ///
-  /// Context teardown bypasses this normal path because no release work should
-  /// be scheduled while the whole graph is already being destroyed.
+  /// Context teardown bypasses this path to avoid scheduling grace work.
   internal func releaseExternalLease(on state: any CogLifetimeLeaseState) {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     state.decrementExternalLeaseCount()
@@ -227,14 +196,10 @@ extension Cogtext {
     return revision
   }
 
-  /// The state this value reference names in this context, created if this is its first use.
+  /// Gets this source's state, creating it on first use in this context.
   ///
-  /// Lazy creation is not a memory optimization bolted onto declarations; it is
-  /// what a declaration means. A `ManualCog` is a name, and a name costs
-  /// nothing until something asks this context to resolve it. It is also what
-  /// lets a keyed box be declared once and used for any number of keys: the key
-  /// is half of the storage identity, so `box[90210]` and `box[10001]` resolve
-  /// to two states of the same declaration.
+  /// The descriptor and key form the storage identity. For example,
+  /// `box[90210]` and `box[10001]` resolve to separate states.
   internal func manualState<Value>(for valueReference: ManualCog<Value>) -> ManualCogState<Value> {
     state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
     {
@@ -242,14 +207,9 @@ extension Cogtext {
     }
   }
 
-  /// The state this derived value reference names in this context, created if this is its
-  /// first use.
+  /// Gets this derived state, creating it on first use in this context.
   ///
-  /// Creating a derived state still computes nothing: the state arrives without a
-  /// value and runs its selector when something first reads it (§2.2). The
-  /// filing rule is the same one manual sources use, which is the point — a
-  /// derived cog is another declaration with another kind of state behind it,
-  /// not another kind of storage.
+  /// Creation does not run the selector. The first read does (§2.2).
   internal func derivedState<Value>(for valueReference: Cog<Value>) -> DerivedCogState<Value> {
     state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
     {
@@ -257,16 +217,10 @@ extension Cogtext {
     }
   }
 
-  /// Finds the state filed under `identity`, filing what `create` makes if there
-  /// is none.
+  /// Gets the state for `identity`, or files the result of `create`.
   ///
-  /// The cast back to a concrete state type cannot fail in a correct build. The
-  /// identity contains the descriptor, the descriptor is generic over the
-  /// value, and only this method ever files a state — so a hit means a state
-  /// built from this very descriptor, by the one value-reference kind that owns that
-  /// descriptor kind. The check stays anyway, and fails loudly rather than
-  /// silently reinterpreting memory, because it is the kind of invariant a
-  /// future storage change could break quietly.
+  /// Each descriptor identity maps to one concrete state type. Keep the cast
+  /// check because a future storage implementation could break that invariant.
   private func state<State: CogState>(
     _ identity: CogStateIdentity,
     create: () -> State

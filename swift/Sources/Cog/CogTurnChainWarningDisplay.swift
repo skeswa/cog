@@ -9,8 +9,8 @@ private let cogTurnChainOSLog = OSLog(
 
 /// Logs a readable warning for a long turn chain.
 ///
-/// Tests inspect the stored structured snapshot through `CogTesting`; unified
-/// log delivery and retention are deliberately not part of graph correctness.
+/// Tests inspect the stored snapshot through `CogTesting` instead of relying
+/// on unified-log delivery.
 internal func logCogTurnChainWarning(_ warning: CogTurnChainWarningSnapshot) {
   let chain = warning.causalChain.map { cause in
     switch cause {

@@ -1,9 +1,7 @@
 /// A derived state whose context may release it when no external consumer holds it.
 ///
-/// External leases are deliberately separate from dependency edges. A reaction
-/// reading a derived root leases that root, while the root's own dependencies
-/// remain ordinary graph edges. The release engine can therefore keep the
-/// reachable path correct without mistaking every internal edge for a watcher.
+/// Reactions lease the derived roots they read. Internal dependency edges do
+/// not count as external observation.
 @MainActor
 internal protocol CogLifetimeLeaseState: CogState {
   /// The declaration policy that decides whether external leases apply.

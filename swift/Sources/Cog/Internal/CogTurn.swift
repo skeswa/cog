@@ -14,10 +14,8 @@
 
 /// An identity only Cog can mint for one turn.
 ///
-/// Writers carry this object rather than an integer supplied by a caller. Its
-/// object identity is the capability: a writer is valid only while its exact
-/// token is the context's accumulating turn. The type and initializer are
-/// internal, so application code cannot manufacture a matching token.
+/// Object identity ties a writer to the context's accumulating turn.
+/// Application code cannot construct a matching token.
 internal final class CogTurnID {}
 
 /// The writes and identity collected while one turn runs.
@@ -61,20 +59,15 @@ internal enum CogTurnPhase {
   case flushing(CogTurn)
 }
 
-// Every trap below is `fatalError` rather than `preconditionFailure` for the
-// reason spelled out at `Cogtext.requireWriterTurn` in `Writer.swift`: an
-// optimized `preconditionFailure` drops its message, and a guard that stops the
-// program without saying why is barely a guard. Keep them `fatalError`.
+// Keep these as `fatalError`; `preconditionFailure` drops its message under
+// optimization. See `Cogtext.requireWriterTurn` in `Writer.swift`.
 
 extension Cogtext {
   /// Joins an accumulating turn, or runs one new outer turn through its flush.
   ///
-  /// A nested commit receives the existing turn and returns without changing
-  /// phase, so only the outermost body closes the structural write boundary.
-  /// A sibling call arrives after that flush returned the context to idle and
-  /// therefore mints its own turn. A call made while flushing appends its body
-  /// to the non-reentrant FIFO drained by the active outer call. A call made
-  /// during derived computation is rejected before any of those paths can run.
+  /// Nested commits join the turn. Sibling commits start separate turns.
+  /// Commits during flush enter the FIFO queue. Derived computation rejects a
+  /// commit before any of these paths run.
   internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
     if let computing = settleStack.innermostComputingState {
       let cogName = CogCycleStep(state: computing).name
@@ -109,7 +102,7 @@ extension Cogtext {
     drainQueuedTurns()
   }
 
-  /// Runs exactly one idle → accumulating → flushing → idle transition.
+  /// Runs one idle → accumulating → flushing → idle transition.
   private func runOuterTurn(named name: String, _ body: (CogTurn) -> Void) {
     let turn = startTurn(named: name)
     body(turn)
@@ -144,12 +137,8 @@ extension Cogtext {
     let turn = CogTurn(id: CogTurnID(), name: name)
     turnPhase = .accumulating(turn)
 
-    // Recorded here, at the one place a turn is minted, so that every path
-    // reaching a turn records exactly one entry: the outer commit, and the
-    // FIFO drain's replay of a queued body. A nested commit returns from
-    // `withTurn` above without arriving here, which is what makes a joined
-    // commit one turn in history rather than two. Recorded at the start, so a
-    // turn precedes the writes and recomputations it caused.
+    // Record when the turn is created. Nested commits do not reach this point,
+    // and the entry precedes the work it caused.
     #if DEBUG
     historyLog.recordTurn(named: name)
     turnChainTracker.recordTurn(named: name)
