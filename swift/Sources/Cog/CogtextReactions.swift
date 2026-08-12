@@ -36,7 +36,7 @@ extension Cogtext {
     label: CogLabel,
     body: @escaping @MainActor (ReactionReader) -> Void
   ) -> ReactionToken {
-    let reaction = CogReaction(label: label, body: body)
+    let reaction = CogReaction(cogs: self, label: label, body: body)
     reactions.append(reaction)
     if case .flushing = turnPhase {
       reactionRuns.append(.initial(reaction))
