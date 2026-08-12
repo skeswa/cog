@@ -101,6 +101,45 @@ extension Cogtext {
 }
 
 @MainActor
+@Test func `HIST-05 a named watch's run lands in history under its effect name`() {
+  let cogs = Cogtext.forTesting()
+  let temperature = ManualCog<Int>(60)
+  var alerts = 0
+
+  let token = cogs.watch(temperature, initial: .skip, name: "weather.niceAlert") { _, _ in
+    alerts += 1
+  }
+
+  cogs.commit("warm up") { w in w[temperature] = 80 }
+
+  // The watch really ran, so history has a run to account for.
+  #expect(alerts == 1)
+
+  let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
+  #expect(effects.contains { $0.name == "weather.niceAlert" })
+  // The run belongs to the turn that woke it, not to the install before it.
+  #expect(effects.last?.name == "weather.niceAlert")
+  #expect(effects.last?.turn == 1)
+  _ = token
+}
+
+@MainActor
+@Test func `HIST-05 an unnamed registration lands under its file and line`() {
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(0)
+
+  let token = cogs.run { c in _ = c.get(source) }
+
+  let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
+  #expect(effects.count == 1)
+  // No `name:` was given, so the label falls back to the registration site.
+  // Which file and line that is belongs to M1-31b; that it is not empty and is
+  // not some other effect's name is HIST-05's business.
+  #expect(effects.first?.name.contains("M1DebugHistoryTests.swift") == true)
+  _ = token
+}
+
+@MainActor
 @Test func `HIST-03 history is bounded and drops its oldest entries`() {
   let cogs = Cogtext.forTesting()
   let capacity = cogs.debugHistory.capacity

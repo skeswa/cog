@@ -14,6 +14,9 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
 
   /// A derived cog's selector ran.
   case recompute
+
+  /// A reaction or watch ran.
+  case effect
 }
 
 /// One thing Cog did, as the debug history remembers it.
@@ -40,8 +43,9 @@ public struct CogHistoryEntry {
   ///
   /// For a turn, the name its `commit` was given, which by default is the op
   /// method that called it. For a write or a recomputation, the declaration's
-  /// label, subscripted by key when the declaration is keyed. Rendered here,
-  /// at display time, never at record time.
+  /// label, subscripted by key when the declaration is keyed. For an effect,
+  /// the name its registration was given. Rendered here, at display time,
+  /// never at record time.
   public var name: String {
     switch subject {
     case .turn(let name):
@@ -49,6 +53,8 @@ public struct CogHistoryEntry {
     case .cog(let label, let key):
       guard let key else { return "\(label)" }
       return "\(label)[\(key.base)]"
+    case .effect(let label):
+      return "\(label)"
     }
   }
 

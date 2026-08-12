@@ -56,6 +56,11 @@ internal struct CogHistoryLog {
   }
 
   /// Appends until the ring is full, then overwrites its oldest slot.
+  /// Records one run of a reaction or watch body.
+  mutating func recordEffect(label: CogLabel) {
+    record(CogHistoryEntry(event: .effect, turn: turn, subject: .effect(label)))
+  }
+
   private mutating func record(_ entry: CogHistoryEntry) {
     guard ring.count == Self.capacity else {
       ring.reserveCapacity(Self.capacity)
@@ -70,12 +75,14 @@ internal struct CogHistoryLog {
 
 /// The unrendered identity behind one history entry.
 ///
-/// A turn is named by its caller; a cog is named by its declaration. Keeping
-/// both unrendered is what lets ``CogHistoryEntry/name`` do the string work at
-/// display time instead of on the turn path.
+/// A turn is named by its caller; a cog and an effect are each named by their
+/// own declaration. Keeping all three unrendered is what lets
+/// ``CogHistoryEntry/name`` do the string work at display time instead of on
+/// the turn path.
 internal enum CogHistorySubject {
   case turn(String)
   case cog(CogLabel, AnyHashable?)
+  case effect(CogLabel)
 }
 
 #endif
