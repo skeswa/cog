@@ -192,6 +192,15 @@ that runtime.
   optimizer on it in release configuration. Debug builds are fine, so
   `mise run test:matrix` will not catch it — only `mise run test:release`
   will. This applies to nodes, boxes, descriptors, and async state alike.
+- **A `deinit` that must touch the graph is spelled `isolated deinit`, and
+  its class must not be generic.** A written `deinit` is nonisolated unless it
+  says otherwise, so it cannot call a MainActor-isolated method at all — the
+  compiler rejects it outright, which is the opposite failure from the
+  synthesized case above and is caught at build time rather than in release.
+  `ReactionToken` is the worked example: non-generic, so it can take the
+  isolation, and the isolation is what lets a handle released on the MainActor
+  clean up synchronously instead of hopping. Do not "fix" one of these two
+  spellings into the other; they solve opposite problems.
 - **Keep platform designs separate.** Shared principles apply to both
   libraries, but Swift decisions are normative only for Swift. Do not assume
   an API or implementation choice also applies to Android without recording an
