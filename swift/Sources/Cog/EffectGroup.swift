@@ -17,10 +17,11 @@ public final class EffectGroup {
   }
 
   /// Gives this group ownership of one reaction registration.
-  ///
-  /// The terminal add-after-cancel rule is completed by M1-23da. Until then,
-  /// callers add effects only to a live group.
   public func add(_ token: ReactionToken) {
+    guard !isCancelled else {
+      token.cancel()
+      return
+    }
     reactionTokens.append(token)
   }
 
