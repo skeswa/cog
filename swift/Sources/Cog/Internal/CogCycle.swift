@@ -36,4 +36,34 @@ internal struct CogCyclePath {
   var message: String {
     "Cog dependency cycle: \(steps.map(\.name).joined(separator: " -> "))."
   }
+
+  var snapshot: CogCycleDiagnosticSnapshot {
+    CogCycleDiagnosticSnapshot(
+      path: steps.map(\.name),
+      message: message
+    )
+  }
+}
+
+/// The rendered behavior that crosses from Cog into its testing product.
+///
+/// Descriptor identities and nodes stay inside Cog. Tests need only the exact
+/// human path and the message a real cycle failure would present.
+package nonisolated struct CogCycleDiagnosticSnapshot: Sendable, Equatable {
+  package let path: [String]
+  package let message: String
+}
+
+extension Cogtext {
+  /// Diagnoses whether reading `ref` now would close the active computation
+  /// path, without creating a node, recording an edge, or taking the trap.
+  package func cycleDiagnosticSnapshot<Value>(
+    ifReading ref: Cog<Value>
+  ) -> CogCycleDiagnosticSnapshot? {
+    let identity = CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)
+    guard let node = nodes[identity] as? any DerivedCogSettleNode else {
+      return nil
+    }
+    return settleStack.cyclePath(ifEntering: node)?.snapshot
+  }
 }

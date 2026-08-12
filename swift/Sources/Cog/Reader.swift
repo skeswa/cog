@@ -126,4 +126,15 @@ public struct Reader<Value> {
     cogs.requireTracking(node)
     return node.cachedValue
   }
+
+  /// The cycle a read of `ref` would close during this selector run.
+  ///
+  /// Package-only so the shipping Cog product exposes no diagnostic API.
+  /// CogTesting wraps the rendered snapshot as its narrow public test seam.
+  package func cycleDiagnosticSnapshot<Read>(
+    ifReading ref: Cog<Read>
+  ) -> CogCycleDiagnosticSnapshot? {
+    cogs.requireTracking(node)
+    return cogs.cycleDiagnosticSnapshot(ifReading: ref)
+  }
 }
