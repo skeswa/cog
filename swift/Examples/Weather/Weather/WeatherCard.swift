@@ -15,10 +15,16 @@ struct WeatherCard: View {
 struct WeatherCardContent: View {
   let cogs: Cogtext
   let zip: ZipCode
+  #if DEBUG
+  var renderProbe: (@MainActor (WeatherCardSnapshot) -> Void)? = nil
+  #endif
 
   var body: some View {
     let report = cogs.get(weatherReport[zip])
     let nice = cogs.get(isNiceOutside[zip])
+    #if DEBUG
+    let _ = renderProbe?(WeatherCardSnapshot(zip: zip, report: report, isNice: nice))
+    #endif
 
     VStack(alignment: .leading, spacing: 16) {
       HStack(alignment: .firstTextBaseline) {
@@ -62,6 +68,14 @@ struct WeatherCardContent: View {
     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
   }
 }
+
+#if DEBUG
+nonisolated struct WeatherCardSnapshot: Equatable, Sendable {
+  let zip: ZipCode
+  let report: Weather?
+  let isNice: Bool
+}
+#endif
 
 extension Weather.Kind {
   fileprivate var label: String {
