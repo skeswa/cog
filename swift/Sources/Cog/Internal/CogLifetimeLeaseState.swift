@@ -2,7 +2,7 @@
 ///
 /// External leases are deliberately separate from dependency edges. A reaction
 /// reading a derived root leases that root, while the root's own dependencies
-/// remain ordinary graph edges. The later release engine can therefore keep the
+/// remain ordinary graph edges. The release engine can therefore keep the
 /// reachable path correct without mistaking every internal edge for a watcher.
 @MainActor
 internal protocol CogLifetimeLeaseState: CogState {

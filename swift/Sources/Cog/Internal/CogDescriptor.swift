@@ -1,24 +1,14 @@
-// Module-wide rule: every generic class in `Cog` writes its `deinit`
-// explicitly, and writes it `nonisolated`.
+// Every generic class in Cog writes an explicit `nonisolated deinit`.
 //
 // The package compiles with `.defaultIsolation(MainActor.self)`, which makes a
 // class's *synthesized* `deinit` main-actor-isolated. On the pinned toolchain
 // (Apple Swift 6.3, swiftlang-6.3.0.123.5) an isolated synthesized `deinit` on
-// a **generic** class crashes the optimizer: `swift build -c release` dies with
-// SIGSEGV in the `EarlyPerfInliner` SIL pass, which takes down
-// `mise run test:release` and every release build a consumer would make.
-// Debug builds are unaffected, so the matrix alone would not catch it. Writing
-// the `deinit` explicitly avoids the crash.
+// a generic class crashes the release optimizer in `EarlyPerfInliner`. Debug
+// builds are unaffected, so the test matrix does not catch it.
 //
-// Spelling that explicit `deinit` `nonisolated` is also right on its own terms:
-// these deinits only release their own stored properties, so there is nothing
-// to hop to the main actor for. None of these classes is `Sendable`, so an
-// instance never leaves the domain that owns it and its last release is on the
-// main actor regardless.
-//
-// This applies to the generic classes M1 adds next — states, boxes, async
-// state — not only to descriptors. Delete the lines together once the toolchain
-// is fixed, and prove it with a release build.
+// These deinitializers only release their stored properties and must not touch
+// MainActor-isolated graph state. Remove them together only after the
+// toolchain is fixed and a release build proves the workaround unnecessary.
 
 /// The shape every declaration's descriptor shares.
 ///

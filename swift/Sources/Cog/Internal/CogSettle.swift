@@ -131,9 +131,9 @@ internal protocol DerivedCogSettleState: CogState {
 /// One half of the iterative pull walk.
 ///
 /// Enter frames inspect a state and schedule its parents. The matching exit
-/// frame runs only after those parents, which is where the later settle task
-/// compares versions and, when needed, recomputes the state. Keeping both
-/// actions in one erased frame type lets the class-state core walk arbitrarily
+/// frame runs after those parents, compares versions, and recomputes the state
+/// when needed. Using one erased frame type lets the class-state core walk
+/// arbitrarily
 /// typed states without recursive Swift calls.
 internal enum CogSettleFrame {
   case enter(any CogState)

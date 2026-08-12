@@ -5,23 +5,19 @@
 /// run is what makes it lazy and what makes it cacheable — the two behaviors
 /// this state exists to provide (§2.2).
 ///
-/// **Lazy.** The state computes nothing when it is created. A declaration is a
-/// name, and an app that declares a hundred derived values and reads three
-/// should run three selectors. The first read is what runs the selector, and
-/// a state that is never read never runs at all (`DECL-09`).
+/// **Lazy.** The state computes nothing when it is created. The first read runs
+/// the selector; a state that is never read never runs.
 ///
 /// **Cached.** A run's value is kept, so a second read is a lookup rather than
-/// a second run (`READ-02`). CLEAN/CHECK/DIRTY state and versions make that
+/// a second run. CLEAN/CHECK/DIRTY state and versions make that
 /// cache valid across source writes: a read pulls every dirty dependency it
 /// needs current before returning. Equality backdating stops downstream work
-/// when a rerun lands equal; dynamic edge removal remains the separately
-/// tested recapture slice.
+/// when a rerun lands equal. Each run also removes dependencies it no longer
+/// reads.
 ///
-/// The dependencies a run captured are recorded even though nothing consumes
-/// them yet, because they are captured *by the run* (§2.4) and there is no
-/// second chance to collect them later. `M1-06aa` reads them to walk parents,
-/// and `M1-09a` makes recapture across conditionals and early returns
-/// observable.
+/// Each run records the dependencies it reads. Settlement walks those parents,
+/// and the next run replaces the dependency set so branches and early returns
+/// can change it.
 internal final class DerivedCogState<Value>:
   CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState
 {
@@ -118,11 +114,8 @@ internal final class DerivedCogState<Value>:
 
   /// The state's value, running the selector if this is its first read.
   ///
-  /// Every read of a derived cog goes through here — tracked or untracked,
-  /// from a selector or from outside one — so that no caller can spell a read
-  /// that skips the computation. `M1-06aa` adds the settle check to the same
-  /// choke point, which is why it is stated as "settled value" rather than
-  /// "cached value or run".
+  /// Every tracked or untracked read goes through this method, so no caller can
+  /// skip first computation or settlement.
   func settledValue(in cogs: Cogtext) -> Value {
     if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
       fatalError(cycle.message)

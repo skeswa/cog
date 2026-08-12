@@ -24,8 +24,8 @@ internal struct CogCycleStep {
 ///
 /// The closing state appears twice: `A -> A` is a self-cycle, while an active
 /// path `[prefix, A, B]` that reads A reports only `A -> B -> A`. Keeping the
-/// structure internal lets later CogTesting diagnostics expose behavior
-/// without leaking state or stack representation.
+/// structure internal lets CogTesting expose the path without leaking state or
+/// stack representation.
 internal struct CogCyclePath {
   let steps: [CogCycleStep]
 

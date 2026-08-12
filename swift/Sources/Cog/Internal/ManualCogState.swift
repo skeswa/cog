@@ -3,8 +3,8 @@
 /// A manual source is the simplest state there is: it holds a value, and that
 /// value changes only when a turn writes it. Nothing computes it, so it is
 /// always settled — a read of a source can hand back what it holds without
-/// doing any graph work first. Derived states, which are not always settled,
-/// arrive with `M1-05a`.
+/// doing any graph work first. A derived state may need settlement before a
+/// read can return.
 ///
 /// The state is created the first time a context is asked for this descriptor
 /// and key, and it starts at the declaration's starting value because there is
@@ -12,11 +12,8 @@
 internal final class ManualCogState<Value>: CogState, PendingCogSource {
   /// The declaration this state belongs to.
   ///
-  /// Holding the descriptor rather than copying pieces out of it keeps the
-  /// state able to answer questions the declaration owns — its label now, its
-  /// equality rule and lifetime kind later — and costs nothing, since a
-  /// descriptor is normally owned by a top-level `let` that outlives every
-  /// context anyway.
+  /// Holding the descriptor gives the state its label, equality rule, and
+  /// lifetime without copying them.
   let descriptor: ManualCogDescriptor<Value>
 
   /// Which state of `descriptor` this is, or `nil` for a keyless declaration.

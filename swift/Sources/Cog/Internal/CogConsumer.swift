@@ -1,9 +1,8 @@
 /// Something whose run reads cogs, and so accumulates dependencies.
 ///
-/// A derived cog's selector is the first consumer; reactions and the SwiftUI
-/// boundary join it later. What they share is the shape §2.4 describes: while
-/// a consumer runs, it is the context's tracked consumer, and every `c.get`
-/// during that run links the producer it read to it.
+/// Derived selectors and reactions are consumers; the SwiftUI boundary uses
+/// the same shape. While a consumer runs, it is the context's tracked consumer,
+/// and every `c.get` links the producer it read to it.
 ///
 /// The protocol is deliberately narrow. State storage is heterogeneous and so
 /// is the set of things that can consume, so recording and later releasing

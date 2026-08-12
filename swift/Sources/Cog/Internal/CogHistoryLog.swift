@@ -55,12 +55,12 @@ internal struct CogHistoryLog {
     record(CogHistoryEntry(event: .recompute, turn: turn, subject: .cog(label, key)))
   }
 
-  /// Appends until the ring is full, then overwrites its oldest slot.
   /// Records one run of a reaction or watch body.
   mutating func recordEffect(label: CogLabel) {
     record(CogHistoryEntry(event: .effect, turn: turn, subject: .effect(label)))
   }
 
+  /// Appends until the ring is full, then overwrites its oldest slot.
   private mutating func record(_ entry: CogHistoryEntry) {
     guard ring.count == Self.capacity else {
       ring.reserveCapacity(Self.capacity)
