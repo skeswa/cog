@@ -26,7 +26,7 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// storage (§2.4).
   let key: AnyHashable?
 
-  /// What this source holds in the latest completed turn.
+  /// What this source holds in the latest completed turn or changed debug seed.
   ///
   /// Normal reads use only this slot, including while another turn is still
   /// accumulating. That is what prevents a staged value from leaking across

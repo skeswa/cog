@@ -29,10 +29,12 @@
 /// their own default isolation is (§7).
 @MainActor
 public final class Cogtext {
-  /// The monotonic version assigned to graph work as turns are flushed.
+  /// The monotonic version assigned to graph work.
   ///
-  /// The source commit boundary advances it, and the settle engine compares
-  /// node versions while pulling a derived root current.
+  /// Every outer turn advances it once at its commit boundary, including an
+  /// empty or all-equal turn. A changed debug seed advances it without a turn.
+  /// The settle engine compares node versions while pulling a derived root
+  /// current.
   internal private(set) var revision: CogVersion = .initial
 
   /// One enter/exit buffer reused by iterative settle walks.
@@ -92,6 +94,15 @@ public final class Cogtext {
   internal var trackedConsumer: (any CogConsumer)?
 
   #if DEBUG
+  /// How many graph operations currently make a quiet seed unsafe.
+  ///
+  /// Reader tracking covers selector and reaction bodies, but a derived
+  /// declaration's equality closure runs after tracking ends and before its
+  /// node is marked current. This debug-only barrier spans that whole derived
+  /// run, and seed itself, so test setup cannot re-enter either operation and
+  /// have a later state mark erase the seed's invalidation.
+  internal var seedBarrierDepth = 0
+
   /// What this context has done lately (§2.3, perf §8).
   ///
   /// Debug builds only, so a release build carries no ring, records nothing,
@@ -115,7 +126,7 @@ public final class Cogtext {
 // MARK: - Node storage
 
 extension Cogtext {
-  /// Advances the global graph revision once for a later flush.
+  /// Advances the graph revision for one turn flush or changed debug seed.
   @discardableResult
   internal func advanceRevision() -> CogVersion {
     revision = revision.advanced()

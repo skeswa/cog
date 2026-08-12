@@ -127,6 +127,14 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
   /// duration of the run, so a nested read of another derived cog computes
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
+    #if DEBUG
+    // Reader tracking ends before the user-supplied equality check below. Keep
+    // debug seed blocked until the node has recorded the result, or a seed from
+    // that equality closure could be cleaned over and leave this cache stale.
+    cogs.seedBarrierDepth += 1
+    defer { cogs.seedBarrierDepth -= 1 }
+    #endif
+
     // Recorded here rather than in `recompute(in:)`, because this is the one
     // place the selector actually runs: recording at the settle-driven entry
     // would miss every lazy first computation, which is a large part of what a
