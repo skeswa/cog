@@ -313,9 +313,6 @@ _Milestone M1. Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
 
-_Pending (core §10, open question 11): the failure mode for a selector that
-calls an op which commits mid-computation._
-
 - **CYCLE-01.** A cog reads itself. Cog fails and names the cog. (Proof:
   exit test.)
 - **CYCLE-02.** Cog A reads cog B, and B reads A. Cog fails and shows the
@@ -326,6 +323,12 @@ calls an op which commits mid-computation._
   works until the condition flips; then Cog catches it.
 - **CYCLE-05.** My test can look at the cycle diagnostic through an
   internal seam without crashing the test process.
+- **CYCLE-06.** A keyed selector or its custom equality rule calls a named op
+  that commits while the derived cog is computing. Cog rejects both paths
+  before the attempted commit body runs or that attempt mutates graph state,
+  in debug and release. The message names the cog, key, and attempted turn and
+  tells me to invoke the op outside derived computation, from event handling
+  or a reaction. (Proof: exit test.)
 
 ## 7. REACT — Reactions
 

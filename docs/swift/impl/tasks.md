@@ -392,6 +392,12 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter 'CYCLE-01|CYCLE-02'` and
   `mise run test:release --filter 'CYCLE-01|CYCLE-02'`._
   _Greens: CYCLE-01, CYCLE-02._
+- **M1-15ea** _(Behavior)_ — Reject a commit throughout derived computation,
+  including custom equality, before its body or attempted graph mutation.
+  _Depends: M1-07b, M1-15b._
+  _Verify: `mise run test --filter CYCLE-06` and
+  `mise run test:release --filter CYCLE-06`._
+  _Greens: CYCLE-06._
 - **M1-31b** _(Behavior)_ — Show explicit and `fileID:line` labels in both
   cycle diagnostics and debug history.
   _Depends: M1-15c, M1-31a._
@@ -602,7 +608,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-33c** _(Gate)_ — Run the complete host-runnable M1 suite in all four
   build-settings legs.
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
-  M1-14, M1-15d, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-24b, M1-25,
+  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-24b, M1-25,
   M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
   M1-31b, M1-31d, M1-33b, M1-34b._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
@@ -1105,7 +1111,8 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'READ|GRAPH|DECL-0[7-9]'`._
 - **M6-10bb** _(Infrastructure)_ — Pass public self, multi-node, conditional,
-  and keyed cycle behavior through the arena selector.
+  keyed, and commit-during-derived-computation failure behavior through the
+  arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter CYCLE` and
   `COG_TEST_CORE=arena mise run test:release --filter CYCLE`._

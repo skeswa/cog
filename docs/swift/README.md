@@ -234,6 +234,11 @@ These choices are settled; §10 of the core document has the full record.
   after effects install; the next real turn settles what the seed dirtied.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.
+- Derived computation is read-only through selector execution, dependency
+  reconciliation, custom equality, and result publication. A commit attempted
+  in that region fails immediately in every build, names the cog/key and turn,
+  and tells the caller to invoke the op outside derived computation, from event
+  handling or a reaction.
 - The runtime will use a data-oriented arena. Public refs remain names, never
   arena slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
@@ -254,9 +259,9 @@ Still open: the read API spelling, how much `Op` support v1 needs, optional
 deferred reactions, debug-history tools, and persistence helpers. Also open
 are several edge behaviors: what a stream's phase does when its sequence ends
 or throws, whether equal stream elements commit distinct turns, whether a
-failed `.queue` run stops the queue, the failure mode for a selector that
-commits, adding to an already-cancelled `EffectGroup`, what a one-shot read or
-refresh of a cold async cog does, and debounce/throttle timing modifiers
+failed `.queue` run stops the queue, adding to an already-cancelled
+`EffectGroup`, what a one-shot read or refresh of a cold async cog does, and
+debounce/throttle timing modifiers
 (deferred backlog). Ref layout, edge layout, and hash tables also remain open
 until benchmarks choose them.
 

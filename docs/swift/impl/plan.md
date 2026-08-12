@@ -338,10 +338,10 @@ The class-node build. Correctness first; no perf tricks.
   no-consumer warning, and cross-executor cleanup acknowledgements are named
   diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
   never peeks at node storage or graph representation. Trap guarantees (a
-  second production context, an escaped writer) are proven with Swift
-  Testing exit tests in the debug and release legs, so no trap check crashes
-  the suite process and no guard needs a test-only failure hook in the
-  library.
+  second production context, an escaped writer, a commit during derived
+  computation) are proven with Swift Testing exit tests in the debug and
+  release legs, so no trap check crashes the suite process and no guard needs
+  a test-only failure hook in the library.
 
 Tests use Swift Testing on the host in all four legs, under the scenarios.md
 testing constraints. Cover the union of §11.1
