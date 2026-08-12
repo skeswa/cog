@@ -50,34 +50,32 @@ private struct BackgroundUpdatesCard: View {
           .background(.tint.opacity(0.12), in: Circle())
 
         VStack(alignment: .leading, spacing: 2) {
-          Text("Background updates")
+          Text("Hourly refresh demo")
             .font(.headline)
-          Text("Keep one city's forecast fresh every hour.")
+          Text("Each simulated hour passes in 5 seconds.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }
       }
 
-      HStack {
-        Text("Hourly city")
-          .font(.subheadline.weight(.semibold))
+      Text("City to refresh")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
 
-        Spacer()
+      Picker("City to refresh", selection: cogs.currentZipBinding) {
+        Text("Off")
+          .tag(ZipCode?.none)
 
-        Picker("Hourly city", selection: cogs.currentZipBinding) {
-          Text("Off")
-            .tag(ZipCode?.none)
-
-          ForEach(ZipCode.examples) { zip in
-            Text(zip.displayName)
-              .tag(Optional(zip))
-          }
+        ForEach(ZipCode.examples) { zip in
+          Text(zip.shortName)
+            .accessibilityLabel(zip.city)
+            .tag(Optional(zip))
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .accessibilityLabel("Hourly forecast location")
-        .accessibilityHint("Choose one city to refresh automatically every hour")
       }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .accessibilityLabel("City to refresh")
+      .accessibilityHint("Choose one city to update every five seconds")
     }
     .padding(16)
     .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 20))

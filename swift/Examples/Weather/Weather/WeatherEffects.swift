@@ -28,6 +28,7 @@ struct WeatherEffects {
   let notifier: Notifier
   var clock: any Clock<Duration> = ContinuousClock()
   var initialZipCodes = ZipCode.examples
+  var hourlyRefreshInterval: Duration = .seconds(3_600)
 
   @discardableResult
   func install(in cogs: Cogtext) -> EffectGroup {
@@ -52,14 +53,29 @@ struct WeatherEffects {
     )
 
     let clock = clock
+    let hourlyRefreshInterval = hourlyRefreshInterval
     group.task(name: "weather.hourlyRefresh") {
-      while true {
-        try await clock.sleep(for: .seconds(3_600))
-        guard let zip = await cogs.read(currentZipCode) else { continue }
-        try await cogs.checkWeather(zip)
-      }
+      try await runHourlyRefresh(
+        on: clock,
+        every: hourlyRefreshInterval,
+        in: cogs
+      )
     }
 
     return group
+  }
+}
+
+private func runHourlyRefresh<C: Clock>(
+  on clock: C,
+  every interval: Duration,
+  in cogs: Cogtext
+) async throws where C.Duration == Duration {
+  var nextRefresh = clock.now.advanced(by: interval)
+  while true {
+    try await clock.sleep(until: nextRefresh, tolerance: nil)
+    nextRefresh = nextRefresh.advanced(by: interval)
+    guard let zip = cogs.read(currentZipCode) else { continue }
+    try await cogs.checkWeather(zip)
   }
 }

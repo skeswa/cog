@@ -82,6 +82,11 @@ extension Cogtext {
         writer[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
         writer[weatherLoadStatusSource[zip]] = .idle
       }
+    } catch is CancellationError {
+      commit("weather.refreshCancelled") { writer in
+        writer[weatherLoadStatusSource[zip]] = .idle
+      }
+      throw CancellationError()
     } catch {
       commit("weather.refreshFailed") { writer in
         writer[weatherLoadStatusSource[zip]] = .failed

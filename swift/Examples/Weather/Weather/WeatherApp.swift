@@ -8,8 +8,14 @@ struct WeatherApp: App {
 
   init() {
     let cogs = Cogtext.bootstrapApp()
+    cogs.useCurrentLocation(.newYork)
     _cogs = State(initialValue: cogs)
-    _effects = State(initialValue: WeatherEffects(notifier: .live).install(in: cogs))
+    _effects = State(
+      initialValue: WeatherEffects(
+        notifier: .live,
+        hourlyRefreshInterval: .seconds(5)
+      ).install(in: cogs)
+    )
   }
 
   var body: some Scene {

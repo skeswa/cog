@@ -42,7 +42,7 @@ struct WeatherCardContent: View {
         Spacer()
 
         if receivesUpdates {
-          Label("Hourly updates", systemImage: "clock.arrow.circlepath")
+          Label("Every 5 sec", systemImage: "timer")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tint)
             .padding(.horizontal, 9)

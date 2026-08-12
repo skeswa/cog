@@ -29,8 +29,13 @@ nonisolated struct ZipCode: RawRepresentable, Hashable, Identifiable, Sendable {
     }
   }
 
-  var displayName: String {
-    state.isEmpty ? city : "\(city), \(state) · \(rawValue)"
+  var shortName: String {
+    switch self {
+    case .newYork: "NYC"
+    case .sanFrancisco: "SF"
+    case .seattle: "SEA"
+    default: rawValue
+    }
   }
 }
 
@@ -81,15 +86,54 @@ nonisolated struct WeatherService: Sendable {
     try await advisoryRequest(zip)
   }
 
-  static let live = Self(
-    weather: { zip in
-      switch zip {
-      case .newYork: Weather(kind: .clear, temperatureF: 75)
-      case .sanFrancisco: Weather(kind: .partlyCloudy, temperatureF: 68)
-      case .seattle: Weather(kind: .cloudy, temperatureF: 60)
-      default: Weather(kind: .clear, temperatureF: 72)
+  static let live: Self = {
+    let feed = DemoWeatherFeed()
+    return Self(
+      weather: { zip in
+        try await Task.sleep(for: .seconds(1))
+        return await feed.nextWeather(for: zip)
+      },
+      advisories: { _ in
+        try await Task.sleep(for: .seconds(1))
+        return []
       }
-    },
-    advisories: { _ in [] }
-  )
+    )
+  }()
+}
+
+private actor DemoWeatherFeed {
+  private var nextIndexByZip: [ZipCode: Int] = [:]
+
+  func nextWeather(for zip: ZipCode) -> Weather {
+    let reports: [Weather] =
+      switch zip {
+      case .newYork:
+        [
+          Weather(kind: .clear, temperatureF: 75),
+          Weather(kind: .partlyCloudy, temperatureF: 72),
+          Weather(kind: .rain, temperatureF: 64),
+          Weather(kind: .clear, temperatureF: 78),
+        ]
+      case .sanFrancisco:
+        [
+          Weather(kind: .partlyCloudy, temperatureF: 68),
+          Weather(kind: .cloudy, temperatureF: 63),
+          Weather(kind: .clear, temperatureF: 65),
+          Weather(kind: .rain, temperatureF: 59),
+        ]
+      case .seattle:
+        [
+          Weather(kind: .cloudy, temperatureF: 60),
+          Weather(kind: .rain, temperatureF: 57),
+          Weather(kind: .partlyCloudy, temperatureF: 62),
+          Weather(kind: .rain, temperatureF: 55),
+        ]
+      default:
+        [Weather(kind: .clear, temperatureF: 72)]
+      }
+
+    let index = nextIndexByZip[zip, default: 0]
+    nextIndexByZip[zip] = index + 1
+    return reports[index % reports.count]
+  }
 }
