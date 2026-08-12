@@ -159,13 +159,14 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   `arm64` and `universal` architecture variants as unavailable. The catalog's
   raw artifact also redirects unauthenticated requests.
 
-  The project owner therefore deferred the floor-runtime requirement. There
-  is no iOS 17 nightly, and `M2-18b` remains non-blocking and in To Do until a
-  reliable runtime becomes available without making CI depend on a personal
-  Apple Account or an unverified artifact URL. If one does become available,
-  qualify it with an import, boot, reboot, and UI-14 run on `homemac` before
-  enabling the nightly, and preserve an exported recovery copy outside runner
-  work and temp directories.
+  The project owner therefore retired the floor-runtime requirement on
+  2026-08-12 and accepted the current simulator lane as the compatibility gate
+  for now. There is no iOS 17 nightly. Restoring floor-runtime coverage is new
+  work: first establish a reliable runtime without making CI depend on a
+  personal Apple Account or an unverified artifact URL, then qualify it with
+  an import, boot, reboot, and focused boundary run on `homemac` before
+  enabling a nightly. Preserve any future exported recovery copy outside
+  runner work and temp directories.
 
 - **Runners.** _Amended 2026-08-11 to match the provisioned host._ One
   runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other

@@ -182,7 +182,7 @@ the smallest repair task is inserted before a failed gate is rerun.
 | -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                           | `M0-10`                                                                                                                        |
 | M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                             | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when no pinned iOS 17 runtime is available                        |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available        |
 | M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                 | `M3-11`                                                                                                                        |
 | M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                        | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
 | M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility         | `M5-10`                                                                                                                        |
@@ -405,9 +405,10 @@ isolation; and named effect runs in history.
   Xcode 26.6 rejected exact-build downloads with both `arm64` and `universal`
   variants on August 12, 2026. The catalog's raw artifact requires
   authentication, so there is no verified provisioning or recovery path. The
-  project owner chose to defer this requirement; `M2-18b` remains explicitly
-  non-blocking until a runtime can pass import, boot, reboot, and UI-14 on
-  `homemac`.
+  project owner retired this requirement on August 12, 2026 and accepted the
+  current simulator lane as the compatibility gate for now. Reintroducing a
+  floor nightly requires a new task after a runtime can pass import, boot,
+  reboot, and a focused boundary run on `homemac`.
 
 <a id="plan-m3"></a>
 
@@ -697,9 +698,9 @@ release gates.
   83 GiB free but no iOS 17 runtime on August 12, 2026, and Xcode 26.6 then
   rejected that exact build as unavailable with both CLI architecture
   selections. Because no reproducible authenticated acquisition path was
-  established, the project owner deferred the requirement. Import, boot,
-  post-reboot availability, and UI-14 remain empirical checks; until all four
-  pass, `M2-18b` stays in To Do and non-blocking.
+  established, the project owner retired the requirement on August 12, 2026.
+  Import, boot, post-reboot availability, and focused boundary behavior remain
+  prerequisites for any future task that restores floor coverage.
 - VM-versus-bare-metal benchmark noise on the mini (probed at `M5-05bb`
   before baselines are recorded).
 - Benchmark package canonical repository, ARC metric names, minimum version,

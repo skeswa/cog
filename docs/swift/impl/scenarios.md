@@ -72,8 +72,7 @@ justifies a slow, flaky, or core-coupled test.
    is a library bug for the test to expose, not a reason to wait longer.
 2. **As fast and cheap as possible.** The default home for every test is
    host-side `swift test`. Simulators appear only where the promise is about
-   a device runtime, and only in `CogBoundaryTests`; the iOS 17 floor subset
-   runs nightly, never per PR. Time is always injected — including
+   a device runtime, and only in `CogBoundaryTests`. Time is always injected — including
    `whileObserved` grace periods, which elapse on the testing context's
    injected clock — so no test spends wall-clock time waiting. Graphs are as
    small as the behavior allows. Compile-fail checks batch into one
@@ -554,11 +553,6 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
   render sees either the old pair before the commit or the new pair after
   it — never one old value and one new value.
-- **UI-14.** On an iOS 17 simulator, the tracked-read, unrelated-write,
-  equality-gated notice, and immediate binding scenarios (UI-01, UI-02,
-  UI-04, and UI-08) have the same behavior through the floor-runtime
-  Observation boundary. This may run in the pinned nightly floor job.
-  (Proof: floor runtime.)
 - **UI-15.** A view reads a manual source. I write that source to an equal
   value. Cog sends no Observation notice, and the view does not re-render.
 

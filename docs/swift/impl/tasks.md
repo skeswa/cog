@@ -736,16 +736,9 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 - **M2-18a** _(Decision)_ — Time-box investigation of pinned iOS 17 runtime
   installation into the self-hosted runner's pinned image; record exact
   mechanics and whether that runtime can be kept reliably available. The
-  nightly remains non-blocking unless this task records a reliable pinned
+  floor requirement is retired unless a future task records a reliable pinned
   runtime.
   _Verify: reproducible install command or documented non-blocking fallback._
-- **M2-18b** _(Behavior)_ — Add the pinned nightly floor subset when the
-  recorded runtime path is available.
-  _Depends: M2-04, M2-05, M2-18a._
-  _Non-blocking: execute when M2-18a records a reliable pinned runtime;
-  otherwise leave deferred without blocking M2-20 or a release._
-  _Verify: a scheduled or manually dispatched floor job passes UI-14._
-  _Greens: UI-14._
 - **M2-19** _(Behavior)_ — With a real boundary installed, prove debug seed
   sends no UI notice.
   _Depends: M2-02ab._
