@@ -152,6 +152,24 @@ public final class Cogtext {
 // MARK: - Node storage
 
 extension Cogtext {
+  /// Adds one reaction-owned lease when this node uses observed lifetime.
+  ///
+  /// This is the normal transition choke point. The later grace-period engine
+  /// extends it without making reactions know how release is scheduled.
+  internal func acquireExternalLease(on node: any CogLifetimeLeaseNode) {
+    guard node.lifetime == .whileObserved else { return }
+    node.incrementExternalLeaseCount()
+  }
+
+  /// Removes one reaction-owned lease when this node uses observed lifetime.
+  ///
+  /// Context teardown bypasses this normal path because no release work should
+  /// be scheduled while the whole graph is already being destroyed.
+  internal func releaseExternalLease(on node: any CogLifetimeLeaseNode) {
+    guard node.lifetime == .whileObserved else { return }
+    node.decrementExternalLeaseCount()
+  }
+
   /// Advances the graph revision for one turn flush or changed debug seed.
   @discardableResult
   internal func advanceRevision() -> CogVersion {

@@ -22,7 +22,9 @@
 /// second chance to collect them later. `M1-06aa` reads them to walk parents,
 /// and `M1-09a` makes recapture across conditionals and early returns
 /// observable.
-internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSettleNode {
+internal final class DerivedCogNode<Value>:
+  CogNode, CogConsumer, DerivedCogSettleNode, CogLifetimeLeaseNode
+{
   /// The declaration this node belongs to.
   let descriptor: DerivedCogDescriptor<Value>
 
@@ -66,6 +68,12 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
 
   var label: CogLabel { descriptor.label }
 
+  /// The declaration's lifetime policy, shared by every key of a box.
+  var lifetime: CogNodeLifetime { descriptor.lifetime }
+
+  /// External consumers currently keeping this derived root observed.
+  var externalLeaseCount: Int
+
   /// Whether the selector has run in this context yet.
   ///
   /// Named separately from the cache so that a caller asking the lazy question
@@ -86,6 +94,7 @@ internal final class DerivedCogNode<Value>: CogNode, CogConsumer, DerivedCogSett
     self.changedAt = .initial
     self.checkedAt = .initial
     self.subscribers = []
+    self.externalLeaseCount = 0
   }
 
   /// The node's value, running the selector if this is its first read.

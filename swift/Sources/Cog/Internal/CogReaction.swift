@@ -34,6 +34,13 @@ internal final class CogReaction: CogNode, CogConsumer {
   /// Producers read by the last completed run, in read order.
   private(set) var dependencies: [any CogNode] = []
 
+  /// Unique directly read derived roots this registration keeps observed.
+  ///
+  /// Kept separate from `dependencies`: that list preserves read order and
+  /// repeats for graph recapture, while one reaction owns at most one lifetime
+  /// lease for any node no matter how often its body reads it.
+  private(set) var leasedDependencies: [any CogLifetimeLeaseNode] = []
+
   var settleState: CogSettleState = .clean
   var changedAt: CogVersion = .initial
   var checkedAt: CogVersion = .initial
@@ -76,6 +83,7 @@ internal final class CogReaction: CogNode, CogConsumer {
   func cancel() {
     guard !isCancelled else { return }
     isCancelled = true
+    releaseExternalLeases()
     body = nil
 
     for dependency in dependencies {
@@ -99,6 +107,12 @@ internal final class CogReaction: CogNode, CogConsumer {
   }
 
   func releaseDependenciesForContextTeardown() {
+    // The context is already ending, so balance the inert counts directly and
+    // never enter the normal release path that later schedules grace work.
+    for dependency in leasedDependencies {
+      dependency.decrementExternalLeaseCount()
+    }
+    leasedDependencies.removeAll()
     dependencies.removeAll()
   }
 
@@ -159,7 +173,57 @@ internal final class CogReaction: CogNode, CogConsumer {
       previousDependency.removeSubscriber(self)
     }
 
+    reconcileExternalLeases(in: cogs)
+
     markChecked(at: cogs.revision)
+  }
+
+  /// Replaces this registration's lease set after one completed tracking run.
+  private func reconcileExternalLeases(in cogs: Cogtext) {
+    // Self-cancellation releases the old set immediately. Reads after that
+    // point are ignored, and finishing the now-cancelled run must not acquire
+    // anything again.
+    guard !isCancelled else { return }
+
+    var nextLeasedDependencies: [any CogLifetimeLeaseNode] = []
+    for dependency in dependencies {
+      guard
+        let leaseNode = dependency as? any CogLifetimeLeaseNode,
+        leaseNode.lifetime == .whileObserved,
+        !nextLeasedDependencies.contains(where: { $0 === leaseNode })
+      else { continue }
+      nextLeasedDependencies.append(leaseNode)
+    }
+
+    // Acquire additions before releasing removals so a retracking run swaps
+    // ownership without an artificial zero-lease gap.
+    for dependency in nextLeasedDependencies
+    where !leasedDependencies.contains(where: { $0 === dependency }) {
+      cogs.acquireExternalLease(on: dependency)
+    }
+    for dependency in leasedDependencies
+    where !nextLeasedDependencies.contains(where: { $0 === dependency }) {
+      cogs.releaseExternalLease(on: dependency)
+    }
+
+    leasedDependencies = nextLeasedDependencies
+  }
+
+  /// Releases every lease at explicit cancellation or final token cleanup.
+  private func releaseExternalLeases() {
+    if let cogs {
+      for dependency in leasedDependencies {
+        cogs.releaseExternalLease(on: dependency)
+      }
+    } else {
+      // A context normally clears this list during its isolated deinit. Keep a
+      // raw balancing fallback so a retained token cannot hide an invariant if
+      // its weak owner has already disappeared.
+      for dependency in leasedDependencies {
+        dependency.decrementExternalLeaseCount()
+      }
+    }
+    leasedDependencies.removeAll()
   }
 }
 
