@@ -5,18 +5,24 @@ import os
 
 @MainActor private let hourlyRefreshCount = ManualCog<Int>(0)
 
+@MainActor extension Cogtext {
+  fileprivate func refreshCurrentLocation() {
+    commit("location.hourlyRefresh") { writer in
+      writer[hourlyRefreshCount] += 1
+    }
+  }
+}
+
 @MainActor private struct HourlyEffects {
   let clock: HourlyTestClock
   let refreshes: AsyncStream<Void>.Continuation
 
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
-    group.task(name: "location.hourlyRefresh.timer") { @MainActor in
+    group.task(name: "location.hourlyRefresh.timer") {
       while true {
         try await clock.sleep(for: .seconds(3_600))
-        cogs.commit("location.hourlyRefresh") { writer in
-          writer[hourlyRefreshCount] += 1
-        }
+        await cogs.refreshCurrentLocation()
         refreshes.yield()
       }
     }
