@@ -3,26 +3,26 @@
 /// One descriptor stands behind one ``Cog`` declaration or one ``CogBox``,
 /// for the same reason ``ManualCogDescriptor`` stands behind both manual
 /// forms: the correctness build spells keys as an inline
-/// `AnyHashable?` on the ref (perf §4), so the declaration is generic over its
+/// `AnyHashable?` on the value reference (perf §4), so the declaration is generic over its
 /// value and knows nothing about a key type.
 ///
 /// What a derived declaration owns that a manual one does not is the selector.
-/// It lives here rather than on the node because it belongs to the
-/// declaration: every node of this declaration, in every context, computes
+/// It lives here rather than on the state because it belongs to the
+/// declaration: every state of this declaration, in every context, computes
 /// with the same closure, and a context that has never been asked for the
 /// declaration holds nothing at all.
 internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
-  /// Whether nodes of this declaration are releasable when unobserved.
+  /// Whether states of this declaration are releasable when unobserved.
   ///
   /// Synchronous derived values default to `whileObserved` because Cog can
   /// recompute them. The public `keepAlive` declaration sugar instead stores
   /// `app`; the later lifetime engine consumes this policy when it schedules
   /// release.
-  let lifetime: CogNodeLifetime
+  let lifetime: CogStateLifetime
 
-  /// How a node of this declaration computes its value.
+  /// How a state of this declaration computes its value.
   ///
   /// `@MainActor` because the graph is (§1.2, §2.5), stated explicitly so the
   /// closure type says the same thing whatever a caller's default isolation is
@@ -39,7 +39,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   init(
     selector: @escaping @MainActor (Reader<Value>, AnyHashable?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
-    lifetime: CogNodeLifetime = .whileObserved(grace: nil),
+    lifetime: CogStateLifetime = .whileObserved(grace: nil),
     label: CogLabel
   ) {
     self.label = label
@@ -48,16 +48,16 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
     self.equals = equals
   }
 
-  /// Runs the selector once for the node `reader` belongs to.
+  /// Runs the selector once for the state `reader` belongs to.
   ///
-  /// A method rather than an exposed closure so the node has one seam to call
+  /// A method rather than an exposed closure so the state has one seam to call
   /// however the declaration was spelled. A keyed form passes its key through
   /// here, and nothing at the call site has to know which form ran.
   func compute(_ reader: Reader<Value>, key: AnyHashable?) -> Value {
     selector(reader, key)
   }
 
-  /// Whether a recomputation is equivalent to the node's cached value.
+  /// Whether a recomputation is equivalent to the state's cached value.
   ///
   /// The public declaration overloads install `==`, preserve a custom rule,
   /// or leave the comparator absent so an opaque value assumes change.

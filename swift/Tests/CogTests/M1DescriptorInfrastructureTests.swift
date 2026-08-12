@@ -3,12 +3,12 @@ import Testing
 @testable import Cog
 
 // `M1-01a` is infrastructure: it greens no scenario in scenarios.md. It puts
-// the naming layer under everything M1 builds next — descriptor-plus-key node
-// storage (`M1-01b`), boxes and allocation-free keyed refs (`M1-02`), and the
+// the naming layer under everything M1 builds next — descriptor-plus-key state
+// storage (`M1-01b`), boxes and allocation-free keyed value references (`M1-02`), and the
 // labels the cycle diagnostic and debug history print (`M1-31b`, which owns
 // DECL-10 and DECL-11). These tests therefore assert the seam itself, and
 // reach through `@testable` to do it: descriptors and labels are internal on
-// purpose, because a public ref must never expose the graph's storage.
+// purpose, because a public value reference must never expose the graph's storage.
 //
 // Every test states `@MainActor` rather than relying on a default, so it says
 // the same thing in the nonisolated legs of the isolation matrix as in the
@@ -38,11 +38,11 @@ import Testing
   #expect(returned.descriptor.identity == declared.descriptor.identity)
 }
 
-/// Copies a ref through a call boundary, so the test above compares identities
+/// Copies a value reference through a call boundary, so the test above compares identities
 /// the optimizer cannot have folded into one another.
 @MainActor
-private func passedThrough(_ ref: ManualCog<Int>) -> ManualCog<Int> {
-  ref
+private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
+  valueReference
 }
 
 // MARK: - Labels
@@ -75,18 +75,20 @@ private func passedThrough(_ ref: ManualCog<Int>) -> ManualCog<Int> {
   #expect(Set(descriptors.map { $0.identity }).count == 2)
 }
 
-// MARK: - Refs
+// MARK: - Value references
 
 @MainActor
-@Test func `M1DescriptorInfrastructure declares a keyless ref bound to its descriptor`() {
+@Test func `M1DescriptorInfrastructure declares a keyless value reference bound to its descriptor`()
+{
   let source = ManualCog<Int>(0)
 
   #expect(source.key == nil)
 }
 
 @MainActor
-@Test func `M1DescriptorInfrastructure builds a keyed ref without a second descriptor`() {
-  // The seam `box[key]` uses in M1-02: a new ref, the same declaration.
+@Test func `M1DescriptorInfrastructure builds a keyed value reference without a second descriptor`()
+{
+  // The seam `box[key]` uses in M1-02: a new value reference, the same declaration.
   let source = ManualCog<Int>(0)
   let keyed = ManualCog(descriptor: source.descriptor, key: 5)
   let sameKeyAgain = ManualCog(descriptor: source.descriptor, key: 5)

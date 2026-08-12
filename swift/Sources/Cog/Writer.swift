@@ -31,9 +31,9 @@ public struct Writer {
   }
 
   /// Reads or stages one manual source in this turn.
-  public subscript<Value>(_ ref: ManualCog<Value>) -> Value {
-    get { cogs.writerRead(ref, turnID: turnID) }
-    nonmutating set { cogs.writerStage(ref, value: newValue, turnID: turnID) }
+  public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
+    get { cogs.writerRead(valueReference, turnID: turnID) }
+    nonmutating set { cogs.writerStage(valueReference, value: newValue, turnID: turnID) }
   }
 }
 
@@ -69,27 +69,27 @@ extension Cogtext {
   }
 
   /// Reads through a writer after proving it belongs to the active turn.
-  internal func writerRead<Value>(_ ref: ManualCog<Value>, turnID: CogTurnID) -> Value {
-    requireWriterTurn(turnID, usage: .reading, target: ref)
+  internal func writerRead<Value>(_ valueReference: ManualCog<Value>, turnID: CogTurnID) -> Value {
+    requireWriterTurn(turnID, usage: .reading, target: valueReference)
 
-    let node = manualNode(for: ref)
-    guard case .some(let pending) = node.pendingValue else {
-      return node.currentValue
+    let state = manualState(for: valueReference)
+    guard case .some(let pending) = state.pendingValue else {
+      return state.currentValue
     }
     return pending
   }
 
   /// Stages a value after proving the writer belongs to the active turn.
   internal func writerStage<Value>(
-    _ ref: ManualCog<Value>,
+    _ valueReference: ManualCog<Value>,
     value: Value,
     turnID: CogTurnID
   ) {
-    let turn = requireWriterTurn(turnID, usage: .writing, target: ref)
+    let turn = requireWriterTurn(turnID, usage: .writing, target: valueReference)
 
-    let node = manualNode(for: ref)
-    node.pendingValue = .some(value)
-    turn.touch(node)
+    let state = manualState(for: valueReference)
+    state.pendingValue = .some(value)
+    turn.touch(state)
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.
@@ -121,12 +121,12 @@ extension Cogtext {
   private func requireWriterTurn<Value>(
     _ turnID: CogTurnID,
     usage: WriterUsage,
-    target ref: ManualCog<Value>
+    target valueReference: ManualCog<Value>
   ) -> CogTurn {
     guard case .accumulating(let turn) = turnPhase, turn.id === turnID else {
       // Composed inside the autoclosure, so a live write pays nothing to build
       // a message it never prints.
-      fatalError(escapedWriterMessage(usage: usage, target: ref))
+      fatalError(escapedWriterMessage(usage: usage, target: valueReference))
     }
     return turn
   }
@@ -156,11 +156,11 @@ private enum WriterUsage {
 @MainActor
 private func escapedWriterMessage<Value>(
   usage: WriterUsage,
-  target ref: ManualCog<Value>
+  target valueReference: ManualCog<Value>
 ) -> String {
   """
   This Cog writer outlived the commit that created it, so \(usage.attempt) \
-  \(escapedWriterTargetName(ref)) through it is not part of any turn. A writer \
+  \(escapedWriterTargetName(valueReference)) through it is not part of any turn. A writer \
   is valid only while the body of the commit that made it is still running, so \
   never stash one in a variable, capture it in an escaping closure, or carry \
   it into a Task. To write state now, call commit again and use the writer it \
@@ -170,7 +170,7 @@ private func escapedWriterMessage<Value>(
 
 /// The source the escaped writer reached for, as a person would name it.
 @MainActor
-private func escapedWriterTargetName<Value>(_ ref: ManualCog<Value>) -> String {
-  guard let key = ref.key else { return "\(ref.descriptor.label)" }
-  return "\(ref.descriptor.label)[\(key.base)]"
+private func escapedWriterTargetName<Value>(_ valueReference: ManualCog<Value>) -> String {
+  guard let key = valueReference.key else { return "\(valueReference.descriptor.label)" }
+  return "\(valueReference.descriptor.label)[\(key.base)]"
 }

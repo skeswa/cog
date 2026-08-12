@@ -9,24 +9,24 @@ import Testing
 // data-oriented core replace all three without changing that test.
 
 @MainActor
-@Test func `SettleEngineInfrastructure gives fresh nodes the right state and versions`() {
+@Test func `SettleEngineInfrastructure gives fresh states the right state and versions`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c.get(source) * 2 }
 
-  let sourceNode = cogs.manualNode(for: source)
-  let derivedNode = cogs.derivedNode(for: doubled)
+  let sourceState = cogs.manualState(for: source)
+  let derivedState = cogs.derivedState(for: doubled)
 
-  // A source is current from birth. A derived node has no value yet, so its
+  // A source is current from birth. A derived state has no value yet, so its
   // first read must take the compute path rather than mistake it for clean.
-  #expect(sourceNode.settleState == .clean)
-  #expect(derivedNode.settleState == .dirty)
+  #expect(sourceState.settleState == .clean)
+  #expect(derivedState.settleState == .dirty)
 
   #expect(cogs.revision == .initial)
-  #expect(sourceNode.changedAt == .initial)
-  #expect(sourceNode.checkedAt == .initial)
-  #expect(derivedNode.changedAt == .initial)
-  #expect(derivedNode.checkedAt == .initial)
+  #expect(sourceState.changedAt == .initial)
+  #expect(sourceState.checkedAt == .initial)
+  #expect(derivedState.changedAt == .initial)
+  #expect(derivedState.checkedAt == .initial)
 }
 
 @MainActor
@@ -44,7 +44,7 @@ import Testing
 @MainActor
 @Test func `SettleEngineInfrastructure never weakens an invalidation`() {
   let cogs = Cogtext.forTesting()
-  let source = cogs.manualNode(for: ManualCog<Int>(1))
+  let source = cogs.manualState(for: ManualCog<Int>(1))
 
   source.markForCheck()
   #expect(source.settleState == .check)
@@ -52,7 +52,7 @@ import Testing
   source.markDirty()
   #expect(source.settleState == .dirty)
 
-  // A farther-away propagation path may ask a node to CHECK after a direct
+  // A farther-away propagation path may ask a state to CHECK after a direct
   // parent already made it DIRTY. That must not lose the stronger state.
   source.markForCheck()
   #expect(source.settleState == .dirty)
@@ -61,7 +61,7 @@ import Testing
 @MainActor
 @Test func `SettleEngineInfrastructure distinguishes change from verification`() {
   let cogs = Cogtext.forTesting()
-  let source = cogs.manualNode(for: ManualCog<Int>(1))
+  let source = cogs.manualState(for: ManualCog<Int>(1))
 
   let changed = cogs.advanceRevision()
   source.markChanged(at: changed)
@@ -82,8 +82,8 @@ import Testing
 @MainActor
 @Test func `SettleEngineInfrastructure stores enter and exit frames in LIFO order`() {
   let cogs = Cogtext.forTesting()
-  let source = cogs.manualNode(for: ManualCog<Int>(1))
-  let derived = cogs.derivedNode(for: Cog<Int> { _ in 2 })
+  let source = cogs.manualState(for: ManualCog<Int>(1))
+  let derived = cogs.derivedState(for: Cog<Int> { _ in 2 })
 
   cogs.settleStack.reset(startingAt: derived)
   cogs.settleStack.pushExit(derived)
@@ -112,8 +112,8 @@ import Testing
 @MainActor
 @Test func `SettleEngineInfrastructure reuses one stack and clears abandoned frames`() {
   let cogs = Cogtext.forTesting()
-  let first = cogs.derivedNode(for: Cog<Int> { _ in 1 })
-  let second = cogs.derivedNode(for: Cog<Int> { _ in 2 })
+  let first = cogs.derivedState(for: Cog<Int> { _ in 1 })
+  let second = cogs.derivedState(for: Cog<Int> { _ in 2 })
 
   cogs.settleStack.reset(startingAt: first)
   cogs.settleStack.pushExit(first)
@@ -145,17 +145,17 @@ import Testing
   #expect(cogs?.read(root) == 3)
 
   let token = cogs?.run { c in _ = c.get(root) }
-  let retainedNodes = cogs.map { Array($0.nodes.values) } ?? []
+  let retainedStates = cogs.map { Array($0.states.values) } ?? []
   let retainedReaction = token?.reaction
 
-  #expect(retainedNodes.compactMap { $0 as? any DerivedCogSettleNode }.count == 2)
+  #expect(retainedStates.compactMap { $0 as? any DerivedCogSettleState }.count == 2)
   #expect(retainedReaction?.dependencies.count == 1)
 
   cogs = nil
 
   #expect(releasedContext == nil)
   #expect(
-    retainedNodes.compactMap { $0 as? any DerivedCogSettleNode }
+    retainedStates.compactMap { $0 as? any DerivedCogSettleState }
       .allSatisfy { $0.dependencies.isEmpty }
   )
   #expect(retainedReaction?.dependencies.isEmpty == true)

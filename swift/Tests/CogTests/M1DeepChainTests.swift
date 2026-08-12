@@ -6,7 +6,7 @@ import Testing
 /// release of a descriptor-closure chain after the assertion has passed.
 @MainActor
 private final class Graph03ChainStorage {
-  var refs: [Cog<Int>] = []
+  var valueReferences: [Cog<Int>] = []
   var recordsSettlement = false
   var settlementOrder: [Int] = []
 }
@@ -18,7 +18,7 @@ private final class Graph03ChainStorage {
   weak let releasedContext = cogs
   let source = ManualCog<Int>(0)
   let storage = Graph03ChainStorage()
-  storage.refs.reserveCapacity(depth)
+  storage.valueReferences.reserveCapacity(depth)
   storage.settlementOrder.reserveCapacity(depth)
 
   let first = Cog<Int> { [unowned storage] c in
@@ -27,7 +27,7 @@ private final class Graph03ChainStorage {
     }
     return c.get(source) + 1
   }
-  storage.refs.append(first)
+  storage.valueReferences.append(first)
   _ = cogs?.read(first)
 
   for index in 1..<depth {
@@ -36,13 +36,13 @@ private final class Graph03ChainStorage {
       if storage.recordsSettlement {
         storage.settlementOrder.append(index)
       }
-      return c.get(storage.refs[parentIndex]) + 1
+      return c.get(storage.valueReferences[parentIndex]) + 1
     }
-    storage.refs.append(next)
+    storage.valueReferences.append(next)
     _ = cogs?.read(next)
   }
 
-  let root = storage.refs[depth - 1]
+  let root = storage.valueReferences[depth - 1]
   #expect(cogs?.read(root) == depth)
 
   storage.recordsSettlement = true

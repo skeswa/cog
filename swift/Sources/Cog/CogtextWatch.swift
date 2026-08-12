@@ -15,7 +15,7 @@ extension Cogtext {
   /// not the read: a quiet install never costs a later wake-up.
   ///
   /// - Parameters:
-  ///   - ref: The cog to watch.
+  ///   - valueReference: The cog to watch.
   ///   - initial: Whether installing calls `body` once.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
@@ -28,7 +28,7 @@ extension Cogtext {
   /// - Returns: The stable handle for this registration.
   @discardableResult
   public func watch<Value>(
-    _ ref: Cog<Value>,
+    _ valueReference: Cog<Value>,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -38,7 +38,7 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(ref) },
+      read: { c in c.get(valueReference) },
       body: body
     )
   }
@@ -49,7 +49,7 @@ extension Cogtext {
   /// The same watch the derived overload above documents, on a source.
   ///
   /// - Parameters:
-  ///   - ref: The source to watch.
+  ///   - valueReference: The source to watch.
   ///   - initial: Whether installing calls `body` once.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
@@ -62,7 +62,7 @@ extension Cogtext {
   /// - Returns: The stable handle for this registration.
   @discardableResult
   public func watch<Value>(
-    _ ref: ManualCog<Value>,
+    _ valueReference: ManualCog<Value>,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -72,18 +72,18 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(ref) },
+      read: { c in c.get(valueReference) },
       body: body
     )
   }
 
   /// Registers a watch on a source's read-only projection.
   ///
-  /// A read-only ref names the same one node its source does, so this is the
-  /// source's watch under the ref the rest of the app is allowed to hold.
+  /// A read-only value reference names the same one state its source does, so this is the
+  /// source's watch under the value reference the rest of the app is allowed to hold.
   ///
   /// - Parameters:
-  ///   - ref: The read-only ref to watch.
+  ///   - valueReference: The read-only value reference to watch.
   ///   - initial: Whether installing calls `body` once.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
@@ -96,7 +96,7 @@ extension Cogtext {
   /// - Returns: The stable handle for this registration.
   @discardableResult
   public func watch<Value>(
-    _ ref: ReadOnlyCog<Value>,
+    _ valueReference: ReadOnlyCog<Value>,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -106,12 +106,12 @@ extension Cogtext {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.get(ref) },
+      read: { c in c.get(valueReference) },
       body: body
     )
   }
 
-  /// The one watch implementation, with the ref kind reduced to a read.
+  /// The one watch implementation, with the value-reference kind reduced to a read.
   ///
   /// The previously delivered value lives in this function's own `previous`
   /// local, captured by the reaction body. That is deliberate: a watch is
@@ -122,7 +122,7 @@ extension Cogtext {
   ///
   /// The optional is storage presence, not value optionality. A watch on an
   /// optional value keeps "nothing delivered yet" distinct from "delivered
-  /// nil", the same way ``ManualCogNode`` keeps a staged nil distinct from no
+  /// nil", the same way ``ManualCogState`` keeps a staged nil distinct from no
   /// staged write at all.
   private func watchTracked<Value>(
     label: CogLabel,

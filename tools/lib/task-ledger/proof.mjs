@@ -63,7 +63,7 @@ export const SCENARIO_FILTER_COMMANDS = new Set([
   "test",
   "test:matrix",
   "test:release",
-  "test:refs",
+  "test:value-references",
   "test:cores",
 ]);
 

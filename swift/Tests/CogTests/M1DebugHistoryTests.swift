@@ -80,7 +80,7 @@ extension Cogtext {
 }
 
 @MainActor
-@Test func `HIST-02 a diamond records one recomputation for each node that ran`() {
+@Test func `HIST-02 a diamond records one recomputation for each state that ran`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int> { c in c.get(source) + 1 }

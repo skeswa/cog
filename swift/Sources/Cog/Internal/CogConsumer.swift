@@ -5,7 +5,7 @@
 /// a consumer runs, it is the context's tracked consumer, and every `c.get`
 /// during that run links the producer it read to it.
 ///
-/// The protocol is deliberately narrow. Node storage is heterogeneous and so
+/// The protocol is deliberately narrow. State storage is heterogeneous and so
 /// is the set of things that can consume, so recording and later releasing
 /// dependencies have to be spelled across the existential rather than
 /// recovered by casting to a concrete consumer kind.
@@ -16,11 +16,11 @@ internal protocol CogConsumer: AnyObject {
   /// Called once per tracked read, in read order. Every run starts from an
   /// empty list, appends what it reads, and removes reverse edges for producers
   /// the completed run did not read again.
-  func recordDependency(on producer: any CogNode)
+  func recordDependency(on producer: any CogState)
 
-  /// Drops strong producer ownership before the context releases its node map.
+  /// Drops strong producer ownership before the context releases its state map.
   ///
-  /// The correctness core stores dependency edges as node references. A deep
+  /// The correctness core stores dependency edges as state references. A deep
   /// linear graph therefore also forms a deep strong-ownership chain, which
   /// ARC could otherwise destroy recursively after the context released its
   /// dictionary entries. The context calls this for every consumer first, so
@@ -56,7 +56,7 @@ extension Cogtext {
   /// from stashing the one it was handed and using it after its run is over —
   /// the read equivalent of the escaped writer ``Writer`` guards against with a
   /// turn ID. An escaped reader is worse than useless: its reads would attach
-  /// dependencies to a node that is not computing, quietly corrupting the graph
+  /// dependencies to a state that is not computing, quietly corrupting the graph
   /// in a way that shows up much later as a value that stopped updating. The
   /// tracking slot already knows who is running, so the check is one identity
   /// comparison, and it fails loudly instead.

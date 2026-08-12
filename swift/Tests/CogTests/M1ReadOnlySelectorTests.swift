@@ -10,7 +10,7 @@ import Testing
 // M1-03 landed `.readOnly` and M1-05a landed derived cogs concurrently, so
 // neither wired them together; without the overload a derived cog could only
 // read state declared in its own file. These extend DECL-05's promise
-// ("reading the read-only ref always gives the same value as the source") to
+// ("reading the read-only value reference always gives the same value as the source") to
 // the selector position.
 //
 // Public API and `CogTesting` only, per scenarios.md constraint 3.

@@ -104,7 +104,10 @@ import Testing
 }
 
 @MainActor
-@Test func `GRAPH-12 a ref through ref follows the new key and drops the old one`() {
+@Test
+func
+  `GRAPH-12 a selector follows the new keyed value reference and drops the old one`()
+{
   let cogs = Cogtext.forTesting()
   let currentZip = ManualCog<String>("90210")
   let weather = ManualCogBox<Int, String> { zip in

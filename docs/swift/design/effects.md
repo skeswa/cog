@@ -196,7 +196,7 @@ extension Cogtext {
 
 `seed` is quiet: no turn, history record, UI notice, or reaction. `commit` is
 loud and runs a real named turn. The feature chooses its exact test surface
-instead of exposing all source refs.
+instead of exposing all source value references.
 
 ```swift
 @Test func alertsWhenTheWeatherTurnsNice() async {
@@ -345,7 +345,7 @@ of too many turns.
 
 [^seed]:
     `seed` stages its value and pushes dirty flags exactly like a real write,
-    so dependent nodes and reaction roots recheck it on the next read or turn.
+    so dependent states and reaction roots recheck it on the next read or turn.
     It skips the rest of the flush: no turn record, `withMutation` notice, or
     reaction run. The dirty push is required, not an optimization. Without it,
     a reaction registered before the seed would keep the dependency set from

@@ -1,7 +1,7 @@
 /// A derived value computed separately for every key.
 ///
 /// A box is one declaration with one selector. Subscript it at the point of
-/// use to make a ``Cog`` ref for a key; the context creates and caches one node
+/// use to make a ``Cog`` value reference for a key; the context creates and caches one state
 /// per descriptor-and-key pair. The selector receives that key as an ordinary
 /// argument, so keyed dependencies flow through normal lexical capture:
 ///
@@ -36,7 +36,7 @@ public struct CogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: nil,
-      lifetime: CogNodeLifetime(keepAlive: keepAlive),
+      lifetime: CogStateLifetime(keepAlive: keepAlive),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -63,12 +63,12 @@ public struct CogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: equals,
-      lifetime: CogNodeLifetime(keepAlive: keepAlive),
+      lifetime: CogStateLifetime(keepAlive: keepAlive),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
 
-  /// The ref naming this box's derived value for one key.
+  /// The value reference naming this box's derived value for one key.
   public subscript(key: Key) -> Cog<Value> {
     Cog(descriptor: descriptor, key: key)
   }
@@ -76,7 +76,7 @@ public struct CogBox<Value, Key: Hashable> {
   private static func makeDescriptor(
     selector: @escaping @MainActor (Reader<Value>, Key) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
-    lifetime: CogNodeLifetime,
+    lifetime: CogStateLifetime,
     label: CogLabel
   ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
@@ -84,10 +84,10 @@ public struct CogBox<Value, Key: Hashable> {
         guard let key = erasedKey as? Key else {
           fatalError(
             """
-            A node of \(label) was asked to compute for \
+            A state of \(label) was asked to compute for \
             \(String(describing: erasedKey)), which is not a \(Key.self). \
-            Only this box builds refs for its own declaration, so this \
-            context's node storage is corrupt.
+            Only this box builds value references for its own declaration, so this \
+            context's state storage is corrupt.
             """
           )
         }
@@ -116,7 +116,7 @@ extension CogBox where Value: Equatable {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: { oldValue, newValue in oldValue == newValue },
-      lifetime: CogNodeLifetime(keepAlive: keepAlive),
+      lifetime: CogStateLifetime(keepAlive: keepAlive),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }

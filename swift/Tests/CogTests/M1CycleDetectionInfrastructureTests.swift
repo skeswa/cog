@@ -69,17 +69,20 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 @MainActor
 @Test func `CycleDetectionInfrastructure builds a closed self path`() {
   let cogs = Cogtext.forTesting()
-  let ref = Cog<Int>({ _ in 1 }, name: "self")
-  let node = cogs.derivedNode(for: ref)
+  let valueReference = Cog<Int>({ _ in 1 }, name: "self")
+  let state = cogs.derivedState(for: valueReference)
 
-  cogs.settleStack.beginComputing(node)
-  defer { cogs.settleStack.endComputing(node) }
+  cogs.settleStack.beginComputing(state)
+  defer { cogs.settleStack.endComputing(state) }
 
-  let cycle = cogs.settleStack.cyclePath(ifEntering: node)
-  #expect(node.isComputing)
+  let cycle = cogs.settleStack.cyclePath(ifEntering: state)
+  #expect(state.isComputing)
   #expect(cogs.settleStack.computingCount == 1)
   #expect(cycle?.steps.count == 2)
-  #expect(cycle?.steps.map(\.descriptor) == [ref.descriptor.identity, ref.descriptor.identity])
+  #expect(
+    cycle?.steps.map(\.descriptor) == [
+      valueReference.descriptor.identity, valueReference.descriptor.identity,
+    ])
   #expect(cycle?.steps.allSatisfy { $0.key == nil } == true)
   #expect(cycle?.message == "Cog dependency cycle: self -> self.")
 }
@@ -87,12 +90,12 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 @MainActor
 @Test func `CycleDetectionInfrastructure keeps only the ordered cycle suffix`() {
   let cogs = Cogtext.forTesting()
-  let prefixRef = Cog<Int>({ _ in 0 }, name: "same label")
-  let firstRef = Cog<Int>({ _ in 1 }, name: "same label")
-  let secondRef = Cog<Int>({ _ in 2 }, name: "second")
-  let prefix = cogs.derivedNode(for: prefixRef)
-  let first = cogs.derivedNode(for: firstRef)
-  let second = cogs.derivedNode(for: secondRef)
+  let prefixValueReference = Cog<Int>({ _ in 0 }, name: "same label")
+  let firstValueReference = Cog<Int>({ _ in 1 }, name: "same label")
+  let secondValueReference = Cog<Int>({ _ in 2 }, name: "second")
+  let prefix = cogs.derivedState(for: prefixValueReference)
+  let first = cogs.derivedState(for: firstValueReference)
+  let second = cogs.derivedState(for: secondValueReference)
 
   cogs.settleStack.beginComputing(prefix)
   cogs.settleStack.beginComputing(first)
@@ -101,7 +104,9 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   let cycle = cogs.settleStack.cyclePath(ifEntering: first)
   #expect(
     cycle?.steps.map(\.descriptor)
-      == [firstRef, secondRef, firstRef].map { $0.descriptor.identity })
+      == [firstValueReference, secondValueReference, firstValueReference].map {
+        $0.descriptor.identity
+      })
   #expect(cycle?.message == "Cog dependency cycle: same label -> second -> same label.")
 
   cogs.settleStack.endComputing(second)
@@ -120,10 +125,10 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 @Test func `CycleDetectionInfrastructure preserves every keyed path step`() {
   let cogs = Cogtext.forTesting()
   let box = CogBox<Int, Int?>({ _, key in key ?? -1 }, name: "weather")
-  let homeRef = box[Optional<Int>.none]
-  let workRef = box[10001]
-  let home = cogs.derivedNode(for: homeRef)
-  let work = cogs.derivedNode(for: workRef)
+  let homeValueReference = box[Optional<Int>.none]
+  let workValueReference = box[10001]
+  let home = cogs.derivedState(for: homeValueReference)
+  let work = cogs.derivedState(for: workValueReference)
 
   cogs.settleStack.beginComputing(home)
   #expect(cogs.settleStack.cyclePath(ifEntering: work) == nil)
@@ -131,7 +136,10 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
   let cycle = cogs.settleStack.cyclePath(ifEntering: home)
   #expect(cycle?.steps.map(\.descriptor).allSatisfy { $0 == box.descriptor.identity } == true)
-  #expect(cycle?.steps.map(\.key) == [homeRef.key, workRef.key, homeRef.key])
+  #expect(
+    cycle?.steps.map(\.key) == [
+      homeValueReference.key, workValueReference.key, homeValueReference.key,
+    ])
   #expect(cycle?.message == "Cog dependency cycle: weather[nil] -> weather[10001] -> weather[nil].")
 
   cogs.settleStack.endComputing(work)
@@ -145,29 +153,29 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   let source = ManualCog<Int>(1)
   var selectorMarks: [Bool] = []
   var equalityMarks: [Bool] = []
-  var ref: Cog<Int>!
+  var valueReference: Cog<Int>!
 
-  ref = Cog<Int>(
+  valueReference = Cog<Int>(
     { c in
-      selectorMarks.append(cogs.derivedNode(for: ref).isComputing)
+      selectorMarks.append(cogs.derivedState(for: valueReference).isComputing)
       return c.get(source)
     },
     equals: { old, new in
-      equalityMarks.append(cogs.derivedNode(for: ref).isComputing)
+      equalityMarks.append(cogs.derivedState(for: valueReference).isComputing)
       return old == new
     },
     name: "marked"
   )
 
-  #expect(cogs.read(ref) == 1)
-  #expect(cogs.derivedNode(for: ref).isComputing == false)
+  #expect(cogs.read(valueReference) == 1)
+  #expect(cogs.derivedState(for: valueReference).isComputing == false)
   #expect(cogs.settleStack.isComputingEmpty)
 
   cogs.commit { w in w[source] = 2 }
-  #expect(cogs.read(ref) == 2)
+  #expect(cogs.read(valueReference) == 2)
   #expect(selectorMarks == [true, true])
   #expect(equalityMarks == [true])
-  #expect(cogs.derivedNode(for: ref).isComputing == false)
+  #expect(cogs.derivedState(for: valueReference).isComputing == false)
   #expect(cogs.settleStack.isComputingEmpty)
 }
 
@@ -176,22 +184,22 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   var releaseMarks: [Bool] = []
-  weak var publicationNode: DerivedCogNode<CyclePublicationValue>?
-  let ref = Cog<CyclePublicationValue> { c in
+  weak var publicationState: DerivedCogState<CyclePublicationValue>?
+  let valueReference = Cog<CyclePublicationValue> { c in
     CyclePublicationValue(c.get(source)) {
-      releaseMarks.append(publicationNode?.isComputing == true)
+      releaseMarks.append(publicationState?.isComputing == true)
     }
   }
-  publicationNode = cogs.derivedNode(for: ref)
+  publicationState = cogs.derivedState(for: valueReference)
 
-  _ = cogs.read(ref)
+  _ = cogs.read(valueReference)
   #expect(releaseMarks.isEmpty)
 
   cogs.commit { w in w[source] = 2 }
-  #expect(cogs.read(ref).value == 2)
+  #expect(cogs.read(valueReference).value == 2)
 
   #expect(releaseMarks == [true])
-  #expect(publicationNode?.isComputing == false)
+  #expect(publicationState?.isComputing == false)
   #expect(cogs.settleStack.isComputingEmpty)
 }
 

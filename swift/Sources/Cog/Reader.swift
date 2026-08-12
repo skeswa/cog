@@ -28,28 +28,28 @@ public struct Reader<Value> {
   /// The context whose graph this run reads.
   private let cogs: Cogtext
 
-  /// The node being computed — the consumer every read of this run links to,
+  /// The state being computed — the consumer every read of this run links to,
   /// and the holder of the `curr` value this run may fold into its result.
   /// That second use is why the reader is generic over the value its own cog
   /// produces rather than being one untyped read handle.
-  private let node: DerivedCogNode<Value>
+  private let state: DerivedCogState<Value>
 
-  /// Hands a run its reader. Only a node computing itself may make one.
-  internal init(cogs: Cogtext, node: DerivedCogNode<Value>) {
+  /// Hands a run its reader. Only a state computing itself may make one.
+  internal init(cogs: Cogtext, state: DerivedCogState<Value>) {
     self.cogs = cogs
-    self.node = node
+    self.state = state
   }
 
   /// Reads a source, and depends on it.
   ///
-  /// - Parameter ref: The source to read.
+  /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in the latest completed turn —
   ///   never a value another turn has staged but not committed (§2.2).
-  public func get<Read>(_ ref: ManualCog<Read>) -> Read {
-    cogs.requireTracking(node)
+  public func get<Read>(_ valueReference: ManualCog<Read>) -> Read {
+    cogs.requireTracking(state)
 
-    let producer = cogs.manualNode(for: ref)
-    node.recordDependency(on: producer)
+    let producer = cogs.manualState(for: valueReference)
+    state.recordDependency(on: producer)
     return producer.currentValue
   }
 
@@ -60,13 +60,13 @@ public struct Reader<Value> {
   /// a whole rather than one layer at a time: nothing downstream of an unread
   /// root runs until a read reaches it (§2.2).
   ///
-  /// - Parameter ref: The derived cog to read.
+  /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
-  public func get<Read>(_ ref: Cog<Read>) -> Read {
-    cogs.requireTracking(node)
+  public func get<Read>(_ valueReference: Cog<Read>) -> Read {
+    cogs.requireTracking(state)
 
-    let producer = cogs.derivedNode(for: ref)
-    node.recordDependency(on: producer)
+    let producer = cogs.derivedState(for: valueReference)
+    state.recordDependency(on: producer)
     return producer.settledValue(in: cogs)
   }
 
@@ -77,10 +77,10 @@ public struct Reader<Value> {
   /// so without this overload a derived cog could only ever read state
   /// declared in its own file — which is the opposite of the intent.
   ///
-  /// - Parameter ref: The read-only projection to read.
+  /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func get<Read>(_ ref: ReadOnlyCog<Read>) -> Read {
-    get(ref.source)
+  public func get<Read>(_ valueReference: ReadOnlyCog<Read>) -> Read {
+    get(valueReference.source)
   }
 
   /// Peeks at a source without depending on it.
@@ -88,11 +88,11 @@ public struct Reader<Value> {
   /// Use this when the selector needs the source's current value but only a
   /// different tracked input should make the selector run again (§2.4).
   ///
-  /// - Parameter ref: The source to read without recording an edge.
+  /// - Parameter valueReference: The source to read without recording an edge.
   /// - Returns: The value the source holds in the latest completed turn.
-  public func read<Read>(_ ref: ManualCog<Read>) -> Read {
-    cogs.requireTracking(node)
-    return cogs.read(ref)
+  public func read<Read>(_ valueReference: ManualCog<Read>) -> Read {
+    cogs.requireTracking(state)
+    return cogs.read(valueReference)
   }
 
   /// Peeks at a derived cog without depending on it.
@@ -101,20 +101,20 @@ public struct Reader<Value> {
   /// this call settles it before returning, but its later changes do not make
   /// this selector run again.
   ///
-  /// - Parameter ref: The derived cog to read without recording an edge.
+  /// - Parameter valueReference: The derived cog to read without recording an edge.
   /// - Returns: Its newest settled value in this context.
-  public func read<Read>(_ ref: Cog<Read>) -> Read {
-    cogs.requireTracking(node)
-    return cogs.read(ref)
+  public func read<Read>(_ valueReference: Cog<Read>) -> Read {
+    cogs.requireTracking(state)
+    return cogs.read(valueReference)
   }
 
   /// Peeks at a source exposed through `.readOnly` without depending on it.
   ///
-  /// - Parameter ref: The read-only projection to read without recording an
+  /// - Parameter valueReference: The read-only projection to read without recording an
   ///   edge.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func read<Read>(_ ref: ReadOnlyCog<Read>) -> Read {
-    read(ref.source)
+  public func read<Read>(_ valueReference: ReadOnlyCog<Read>) -> Read {
+    read(valueReference.source)
   }
 
   /// The value this cog retained after its previous completed run.
@@ -123,18 +123,18 @@ public struct Reader<Value> {
   /// itself optional, `.none` means there has been no previous run while
   /// `.some(.none)` means the previous run produced `nil` (§2.4).
   public var curr: Value? {
-    cogs.requireTracking(node)
-    return node.cachedValue
+    cogs.requireTracking(state)
+    return state.cachedValue
   }
 
-  /// The cycle a read of `ref` would close during this selector run.
+  /// The cycle a read of `valueReference` would close during this selector run.
   ///
   /// Package-only so the shipping Cog product exposes no diagnostic API.
   /// CogTesting wraps the rendered snapshot as its narrow public test seam.
   package func cycleDiagnosticSnapshot<Read>(
-    ifReading ref: Cog<Read>
+    ifReading valueReference: Cog<Read>
   ) -> CogCycleDiagnosticSnapshot? {
-    cogs.requireTracking(node)
-    return cogs.cycleDiagnosticSnapshot(ifReading: ref)
+    cogs.requireTracking(state)
+    return cogs.cycleDiagnosticSnapshot(ifReading: valueReference)
   }
 }

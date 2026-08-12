@@ -4,8 +4,8 @@ import Testing
 
 // The three scenarios `M1-02` greens. Like `M1CogtextReadTests.swift`, this
 // file stays on the public `Cog` API and the `CogTesting` product — no
-// `@testable`, no descriptors, no node storage — because COUNT-09 through
-// COUNT-11 require this suite to keep passing unchanged when the ref layout
+// `@testable`, no descriptors, no state storage — because COUNT-09 through
+// COUNT-11 require this suite to keep passing unchanged when the value-reference layout
 // and the core underneath it are replaced (scenarios.md constraint 3). The
 // storage invariants boxes rest on are asserted separately, in
 // `M1ManualCogBoxInfrastructureTests.swift`, which greens no scenario.
@@ -14,7 +14,7 @@ import Testing
 // existed. M1-04b strengthens DECL-04's write clause in place with a real
 // keyed commit, while TURN-14 separately owns the writer read-back behavior.
 //
-// Refs and boxes are declared inside each test rather than at file scope. A
+// Value references and boxes are declared inside each test rather than at file scope. A
 // `ManualCogBox` is MainActor-isolated, and a file-scope `let` would say
 // different things in the MainActor and nonisolated legs of the matrix; a
 // local says the same thing in all four. Every test states `@MainActor` for
@@ -203,7 +203,7 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 }
 
 @MainActor
-@Test func `DECL-04 refs built in two places name one piece of state`() {
+@Test func `DECL-04 value references built in two places name one piece of state`() {
   let cogs = Cogtext.forTesting()
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
 
@@ -213,13 +213,13 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 
   let writtenElsewhere = Ledger()
   writtenElsewhere.entries.append("replacement")
-  let firstRef = ledgers[5]
-  let secondRef = ledgers[2 + 3]
+  let firstValueReference = ledgers[5]
+  let secondValueReference = ledgers[2 + 3]
 
-  cogs.commit { w in w[firstRef] = writtenElsewhere }
+  cogs.commit { w in w[firstValueReference] = writtenElsewhere }
 
-  #expect(cogs.read(secondRef) === writtenElsewhere)
-  #expect(cogs.read(secondRef).entries == ["replacement"])
+  #expect(cogs.read(secondValueReference) === writtenElsewhere)
+  #expect(cogs.read(secondValueReference).entries == ["replacement"])
   #expect(cogs.read(ledgers[6]).entries.isEmpty)
 }
 
@@ -236,7 +236,7 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 
 @MainActor
 @Test func `DECL-04 building the same key again reaches the same state`() {
-  // Refs are values built at the point of use, not handles to keep. Building
+  // Value references are values built at the point of use, not handles to keep. Building
   // one twice — or a hundred times, from a key computed a different way each
   // time — is not a way to end up with a second piece of state.
   let cogs = Cogtext.forTesting()
@@ -254,7 +254,7 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 @Test func `DECL-04 equal keys of a Hashable type name one piece of state`() {
   // Identity is descriptor plus key, and "the same key" means equal, not
   // identical: two separately built `ZipCode` values that compare equal name
-  // one node (§3.1).
+  // one state (§3.1).
   let cogs = Cogtext.forTesting()
   let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
 
@@ -268,7 +268,8 @@ private func entriesForFive(in cogs: Cogtext, using ledgers: ManualCogBox<Ledger
 
 @MainActor
 @Test func `DECL-04 one key is one piece of state per context, not per process`() {
-  // The ref is the same ref in both contexts; the state is not the same state.
+  // The value reference is the same value reference in both contexts; the
+  // state is not the same state.
   // This is the rule that lets tests run in parallel and previews coexist
   // (§2.3).
   let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }

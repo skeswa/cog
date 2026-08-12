@@ -44,7 +44,7 @@ public final class ReactionToken {
   /// account for. Dropping the last token is therefore a way of ending an
   /// effect, not a way of leaking one.
   ///
-  /// Spelled `isolated`, which is the opposite of what the nodes and
+  /// Spelled `isolated`, which is the opposite of what the states and
   /// descriptors need. A `deinit` is nonisolated unless it says otherwise, and
   /// a nonisolated one here could not call into the graph at all; those types
   /// are generic classes, where an isolated `deinit` instead crashes the

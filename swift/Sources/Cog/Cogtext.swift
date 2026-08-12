@@ -1,8 +1,8 @@
 /// The one place Cog state lives.
 ///
-/// A declaration is a ref — a light value naming one piece of state — and the
-/// state itself is a node that lives here. A `Cogtext` stores one node per
-/// descriptor and key, creates each node the first time something needs it,
+/// A declaration is a value reference — a light value naming one piece of state — and the
+/// state itself is a state that lives here. A `Cogtext` stores one state per
+/// descriptor and key, creates each state the first time something needs it,
 /// and never creates one for a declaration nobody uses (§2.3). That split is
 /// what keeps a top-level `let` cheap enough to write freely: an app may
 /// declare a thousand cogs and pay for the handful it actually reads.
@@ -46,7 +46,7 @@ public final class Cogtext {
   ///
   /// Every outer turn advances it once at its commit boundary, including an
   /// empty or all-equal turn. A changed debug seed advances it without a turn.
-  /// The settle engine compares node versions while pulling a derived root
+  /// The settle engine compares state versions while pulling a derived root
   /// current.
   internal private(set) var revision: CogVersion = .initial
 
@@ -81,18 +81,18 @@ public final class Cogtext {
   /// caller and still completes before queued write-back turns begin.
   internal var reactionRuns: [CogReactionRun] = []
 
-  /// Every node this context has been asked for, filed by descriptor and key.
+  /// Every state this context has been asked for, filed by descriptor and key.
   ///
-  /// Heterogeneous on purpose: a context holds nodes of every value type an app
+  /// Heterogeneous on purpose: a context holds states of every value type an app
   /// declares, and nothing about storing them needs to know those types.
-  /// ``CogNode`` is the narrow view across them, and the concrete type comes
-  /// back at the point of use, where the ref's own `Value` names it.
+  /// ``CogState`` is the narrow view across them, and the concrete type comes
+  /// back at the point of use, where the value reference's own `Value` names it.
   ///
   /// A dictionary is the correctness build's answer, not the final one. The
   /// data-oriented core (perf §3) replaces it with slotted storage; nothing
   /// outside this file may depend on the shape, which is why lookup goes
-  /// through ``manualNode(for:)`` rather than the dictionary directly.
-  internal private(set) var nodes: [CogNodeIdentity: any CogNode] = [:]
+  /// through ``manualState(for:)`` rather than the dictionary directly.
+  internal private(set) var states: [CogStateIdentity: any CogState] = [:]
 
   /// Whose run is capturing dependencies right now, or `nil` between runs.
   ///
@@ -111,7 +111,7 @@ public final class Cogtext {
   ///
   /// Reader tracking covers selector and reaction bodies, but a derived
   /// declaration's equality closure runs after tracking ends and before its
-  /// node is marked current. This debug-only barrier spans that whole derived
+  /// state is marked current. This debug-only barrier spans that whole derived
   /// run, and seed itself, so test setup cannot re-enter either operation and
   /// have a later state mark erase the seed's invalidation.
   internal var seedBarrierDepth = 0
@@ -149,15 +149,15 @@ public final class Cogtext {
 
   /// Breaks graph-owned dependency chains before stored properties release.
   ///
-  /// Node dependencies are strong so a producer stays alive for as long as a
+  /// State dependencies are strong so a producer stays alive for as long as a
   /// live consumer needs it. Releasing a very deep context without severing
   /// those links first can make ARC recursively destroy the whole chain and
-  /// exhaust the process stack. The context already owns every node, so one
+  /// exhaust the process stack. The context already owns every state, so one
   /// flat pass can drop all consumer-to-producer links before its dictionary
   /// and reaction arrays begin their ordinary teardown.
   isolated deinit {
-    for node in nodes.values {
-      (node as? any CogConsumer)?.releaseDependenciesForContextTeardown()
+    for state in states.values {
+      (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
     }
     for reaction in reactions {
       reaction.releaseDependenciesForContextTeardown()
@@ -165,43 +165,43 @@ public final class Cogtext {
   }
 }
 
-// MARK: - Node storage
+// MARK: - State storage
 
 extension Cogtext {
-  /// Adds one reaction-owned lease when this node uses observed lifetime.
+  /// Adds one reaction-owned lease when this state uses observed lifetime.
   ///
   /// Invalidating an earlier release generation makes reacquisition safe even
   /// when its clock sleep has already begun.
-  internal func acquireExternalLease(on node: any CogLifetimeLeaseNode) {
-    guard case .whileObserved = node.lifetime else { return }
-    node.advanceLifetimeReleaseGeneration()
-    node.incrementExternalLeaseCount()
+  internal func acquireExternalLease(on state: any CogLifetimeLeaseState) {
+    guard case .whileObserved = state.lifetime else { return }
+    state.advanceLifetimeReleaseGeneration()
+    state.incrementExternalLeaseCount()
   }
 
-  /// Removes one reaction-owned lease when this node uses observed lifetime.
+  /// Removes one reaction-owned lease when this state uses observed lifetime.
   ///
   /// Context teardown bypasses this normal path because no release work should
   /// be scheduled while the whole graph is already being destroyed.
-  internal func releaseExternalLease(on node: any CogLifetimeLeaseNode) {
-    guard case .whileObserved(let declaredGrace) = node.lifetime else { return }
-    node.decrementExternalLeaseCount()
-    guard node.externalLeaseCount == 0 else { return }
+  internal func releaseExternalLease(on state: any CogLifetimeLeaseState) {
+    guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
+    state.decrementExternalLeaseCount()
+    guard state.externalLeaseCount == 0 else { return }
 
-    let generation = node.advanceLifetimeReleaseGeneration()
-    let identity = node.nodeIdentity
+    let generation = state.advanceLifetimeReleaseGeneration()
+    let identity = state.stateIdentity
     let grace = declaredGrace ?? defaultWhileObservedGrace
     let clock = clock
 
-    Task { @MainActor [weak self, weak node] in
+    Task { @MainActor [weak self, weak state] in
       do {
         try await clock.sleep(for: grace)
       } catch {
         return
       }
 
-      guard let self, let node else { return }
-      self.releaseDerivedNodeIfEligible(
-        node,
+      guard let self, let state else { return }
+      self.releaseDerivedStateIfEligible(
+        state,
         identity: identity,
         generation: generation
       )
@@ -218,23 +218,23 @@ extension Cogtext {
     nextLifetimeReleaseAcknowledgement = acknowledgement
   }
 
-  /// Removes the exact still-unobserved node after its grace task resumes.
-  private func releaseDerivedNodeIfEligible(
-    _ node: any CogLifetimeLeaseNode,
-    identity: CogNodeIdentity,
+  /// Removes the exact still-unobserved state after its grace task resumes.
+  private func releaseDerivedStateIfEligible(
+    _ state: any CogLifetimeLeaseState,
+    identity: CogStateIdentity,
     generation: UInt64
   ) {
-    guard let stored = nodes[identity], stored === node else { return }
-    guard node.lifetimeReleaseGeneration == generation else { return }
-    guard node.externalLeaseCount == 0 else { return }
-    guard case .whileObserved = node.lifetime else { return }
+    guard let stored = states[identity], stored === state else { return }
+    guard state.lifetimeReleaseGeneration == generation else { return }
+    guard state.externalLeaseCount == 0 else { return }
+    guard case .whileObserved = state.lifetime else { return }
 
     // A still-live internal consumer needs this exact producer until the later
     // closure-release slice can collect the whole unobserved dependency graph.
-    guard node.subscribers.isEmpty else { return }
+    guard state.subscribers.isEmpty else { return }
 
-    nodes.removeValue(forKey: identity)
-    node.releaseDependenciesForLifetime()
+    states.removeValue(forKey: identity)
+    state.releaseDependenciesForLifetime()
 
     let acknowledgement = nextLifetimeReleaseAcknowledgement
     nextLifetimeReleaseAcknowledgement = nil
@@ -248,66 +248,68 @@ extension Cogtext {
     return revision
   }
 
-  /// The node this ref names in this context, created if this is its first use.
+  /// The state this value reference names in this context, created if this is its first use.
   ///
   /// Lazy creation is not a memory optimization bolted onto declarations; it is
   /// what a declaration means. A `ManualCog` is a name, and a name costs
   /// nothing until something asks this context to resolve it. It is also what
   /// lets a keyed box be declared once and used for any number of keys: the key
   /// is half of the storage identity, so `box[90210]` and `box[10001]` resolve
-  /// to two nodes of the same declaration.
-  internal func manualNode<Value>(for ref: ManualCog<Value>) -> ManualCogNode<Value> {
-    node(CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)) {
-      ManualCogNode(descriptor: ref.descriptor, key: ref.key)
+  /// to two states of the same declaration.
+  internal func manualState<Value>(for valueReference: ManualCog<Value>) -> ManualCogState<Value> {
+    state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
+    {
+      ManualCogState(descriptor: valueReference.descriptor, key: valueReference.key)
     }
   }
 
-  /// The node this derived ref names in this context, created if this is its
+  /// The state this derived value reference names in this context, created if this is its
   /// first use.
   ///
-  /// Creating a derived node still computes nothing: the node arrives without a
+  /// Creating a derived state still computes nothing: the state arrives without a
   /// value and runs its selector when something first reads it (§2.2). The
   /// filing rule is the same one manual sources use, which is the point — a
-  /// derived cog is another declaration with another kind of node behind it,
+  /// derived cog is another declaration with another kind of state behind it,
   /// not another kind of storage.
-  internal func derivedNode<Value>(for ref: Cog<Value>) -> DerivedCogNode<Value> {
-    node(CogNodeIdentity(descriptor: ref.descriptor.identity, key: ref.key)) {
-      DerivedCogNode(descriptor: ref.descriptor, key: ref.key)
+  internal func derivedState<Value>(for valueReference: Cog<Value>) -> DerivedCogState<Value> {
+    state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
+    {
+      DerivedCogState(descriptor: valueReference.descriptor, key: valueReference.key)
     }
   }
 
-  /// Finds the node filed under `identity`, filing what `create` makes if there
+  /// Finds the state filed under `identity`, filing what `create` makes if there
   /// is none.
   ///
-  /// The cast back to a concrete node type cannot fail in a correct build. The
+  /// The cast back to a concrete state type cannot fail in a correct build. The
   /// identity contains the descriptor, the descriptor is generic over the
-  /// value, and only this method ever files a node — so a hit means a node
-  /// built from this very descriptor, by the one ref kind that owns that
+  /// value, and only this method ever files a state — so a hit means a state
+  /// built from this very descriptor, by the one value-reference kind that owns that
   /// descriptor kind. The check stays anyway, and fails loudly rather than
   /// silently reinterpreting memory, because it is the kind of invariant a
   /// future storage change could break quietly.
-  private func node<Node: CogNode>(
-    _ identity: CogNodeIdentity,
-    create: () -> Node
-  ) -> Node {
-    if let existing = nodes[identity] {
-      guard let node = existing as? Node else {
+  private func state<State: CogState>(
+    _ identity: CogStateIdentity,
+    create: () -> State
+  ) -> State {
+    if let existing = states[identity] {
+      guard let state = existing as? State else {
         // `fatalError`, not `preconditionFailure`: this message is composed,
         // and an optimized `preconditionFailure` drops composed messages, so
         // a release crash here would say nothing at all.
         fatalError(
           """
-          The node for \(existing.label) is a \(type(of: existing)), not a \
-          \(Node.self). Two declarations cannot share one descriptor identity, \
-          so this context's node storage is corrupt.
+          The state for \(existing.label) is a \(type(of: existing)), not a \
+          \(State.self). Two declarations cannot share one descriptor identity, \
+          so this context's state storage is corrupt.
           """
         )
       }
-      return node
+      return state
     }
 
     let created = create()
-    nodes[identity] = created
+    states[identity] = created
     return created
   }
 }
@@ -329,11 +331,11 @@ extension Cogtext {
   /// nothing computes it — there is no work that could be outstanding. The
   /// derived read below is where that promise takes work.
   ///
-  /// - Parameter ref: The source to read.
+  /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
-  public func read<Value>(_ ref: ManualCog<Value>) -> Value {
-    manualNode(for: ref).currentValue
+  public func read<Value>(_ valueReference: ManualCog<Value>) -> Value {
+    manualState(for: valueReference).currentValue
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
@@ -355,9 +357,9 @@ extension Cogtext {
   /// read path every caller shares, rather than at call sites where a caller
   /// could spell a read that skips it.
   ///
-  /// - Parameter ref: The derived cog to read.
+  /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
-  public func read<Value>(_ ref: Cog<Value>) -> Value {
-    derivedNode(for: ref).settledValue(in: self)
+  public func read<Value>(_ valueReference: Cog<Value>) -> Value {
+    derivedState(for: valueReference).settledValue(in: self)
   }
 }

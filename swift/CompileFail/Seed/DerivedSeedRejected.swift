@@ -5,8 +5,8 @@
 // fail in the type checker rather than becoming a runtime convention.
 //
 // The valid first call proves this fixture resolved the real debug `seed`
-// surface before the second call tests its ref restriction. The context and
-// refs are parameters so no bootstrap or construction rule is involved.
+// surface before the second call tests its value-reference restriction. The context and
+// value references are parameters so no bootstrap or construction rule is involved.
 //
 // The harness imports Cog's debug build, where `seed` exists. This fixture is
 // deliberately not wrapped in `#if DEBUG`: its separate frontend is not passed

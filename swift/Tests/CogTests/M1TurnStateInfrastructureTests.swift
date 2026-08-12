@@ -87,18 +87,18 @@ private func defaultTurnName(in cogs: Cogtext) -> String {
 @Test func `TurnStateInfrastructure keeps keyless pending state apart from committed state`() {
   let cogs = Cogtext.forTesting()
   let selectedZip = ManualCog<String?>("10001")
-  let node = cogs.manualNode(for: selectedZip)
+  let state = cogs.manualState(for: selectedZip)
 
-  #expect(node.key == nil)
-  #expect(node.currentValue == "10001")
-  #expect(node.pendingValue == nil)
+  #expect(state.key == nil)
+  #expect(state.currentValue == "10001")
+  #expect(state.pendingValue == nil)
 
   // The outer optional means "a write is staged"; the inner one is the
   // source's value. A staged nil must not look like no staged write.
-  node.pendingValue = .some(nil)
+  state.pendingValue = .some(nil)
 
-  #expect(node.currentValue == "10001")
-  guard case .some(.none) = node.pendingValue else {
+  #expect(state.currentValue == "10001")
+  guard case .some(.none) = state.pendingValue else {
     Issue.record("A staged nil was lost")
     return
   }

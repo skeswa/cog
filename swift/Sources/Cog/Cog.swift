@@ -16,11 +16,11 @@
 /// made of (§2.4). Read with `c.get` and the value stays right on its own; read
 /// around it — a captured `let`, a global, a stored property — and it will not.
 ///
-/// A `Cog` is a *ref*, exactly like a ``ManualCog``: a small value naming one
+/// A `Cog` is a *value reference*, exactly like a ``ManualCog``: a small value naming one
 /// derived value, not the value itself. Declaring runs nothing. The selector
-/// runs for the first time when something first reads the ref in a context, and
+/// runs for the first time when something first reads the value reference in a context, and
 /// the value it produced is kept, so reading twice does not compute twice.
-/// Neither the declaration nor the ref is where the value lives — it lives in
+/// Neither the declaration nor the value reference is where the value lives — it lives in
 /// the app's one context (§2.3), so the same declaration is computed
 /// separately, and cached separately, in a test or preview runtime.
 ///
@@ -36,23 +36,23 @@
 /// still two different cogs.
 @MainActor
 public struct Cog<Value> {
-  /// The declaration this ref names.
+  /// The declaration this value reference names.
   internal let descriptor: DerivedCogDescriptor<Value>
 
-  /// Which node of `descriptor` this ref names, or `nil` for a keyless
+  /// Which state of `descriptor` this value reference names, or `nil` for a keyless
   /// declaration.
   ///
-  /// A keyless cog is the single-node case of the same descriptor-and-key
+  /// A keyless cog is the single-state case of the same descriptor-and-key
   /// storage rule rather than a second mechanism (§2.3). Inline `AnyHashable?`
   /// is the correctness build's key representation and stays an implementation
-  /// detail: the ref is deliberately not `@frozen`, so benchmarks can still
+  /// detail: the value reference is deliberately not `@frozen`, so benchmarks can still
   /// choose a different layout (perf §4, §9).
   internal let key: AnyHashable?
 
   /// Declares a value computed by `selector`.
   ///
-  /// Declaring allocates one descriptor and returns a ref already bound to it.
-  /// It creates no node, touches no context, and — the part worth saying out
+  /// Declaring allocates one descriptor and returns a value reference already bound to it.
+  /// It creates no state, touches no context, and — the part worth saying out
   /// loud — does not run `selector`. Nothing about a declaration is work
   /// (§2.3).
   ///
@@ -76,7 +76,7 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: nil,
-        lifetime: CogNodeLifetime(keepAlive: keepAlive),
+        lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -112,15 +112,15 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: equals,
-        lifetime: CogNodeLifetime(keepAlive: keepAlive),
+        lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
     )
   }
 
-  /// Builds a ref for an existing declaration, which is how a derived box
-  /// makes a ref for one of its keys without allocating a second descriptor.
+  /// Builds a value reference for an existing declaration, which is how a derived box
+  /// makes a value reference for one of its keys without allocating a second descriptor.
   internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -144,7 +144,7 @@ extension Cog where Value: Equatable {
       descriptor: DerivedCogDescriptor(
         selector: { reader, _ in selector(reader) },
         equals: { oldValue, newValue in oldValue == newValue },
-        lifetime: CogNodeLifetime(keepAlive: keepAlive),
+        lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil

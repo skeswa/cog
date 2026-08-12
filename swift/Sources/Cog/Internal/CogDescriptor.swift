@@ -16,14 +16,14 @@
 // instance never leaves the domain that owns it and its last release is on the
 // main actor regardless.
 //
-// This applies to the generic classes M1 adds next — nodes, boxes, async
+// This applies to the generic classes M1 adds next — states, boxes, async
 // state — not only to descriptors. Delete the lines together once the toolchain
 // is fixed, and prove it with a release build.
 
 /// The shape every declaration's descriptor shares.
 ///
 /// A descriptor names state; it does not hold it. The app's one `Cogtext`
-/// stores a node per descriptor and key, created lazily, and a test or preview
+/// stores a state per descriptor and key, created lazily, and a test or preview
 /// runtime has its own isolated context (§2.3). That split is what makes a
 /// top-level `let` a light declaration rather than a live global value.
 ///
@@ -35,7 +35,7 @@
 /// ``CogLabel``.
 ///
 /// The protocol carries only what code that does not know a descriptor's value
-/// type still needs: its identity and its label. Node storage keys on the
+/// type still needs: its identity and its label. State storage keys on the
 /// former; cycle diagnostics and debug history print the latter.
 @MainActor
 internal protocol CogDescriptor: AnyObject {
@@ -48,7 +48,7 @@ extension CogDescriptor {
   ///
   /// `ObjectIdentifier` is only guaranteed unique among live objects, which is
   /// exactly enough here: a descriptor is owned by the declaration that created
-  /// it — normally a top-level `let` — so it outlives every node, edge, and
+  /// it — normally a top-level `let` — so it outlives every state, edge, and
   /// history entry that refers to it.
   var identity: ObjectIdentifier {
     ObjectIdentifier(self)

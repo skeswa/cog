@@ -186,11 +186,11 @@ These choices are settled; §10 of the core document has the full record.
   already-scheduled reactions and before queued write-back turns.
 - Before notifying the UI, Cog settles every changed path that has a live
   consumer. Unused paths stay lazy.
-- Refs (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A ref
+- Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
   is a value; its identity lives in an internal final-class descriptor plus
-  key. Boxes create keyed refs without allocating new descriptors. The exact
-  in-memory ref layout is not settled; benchmarks will compare inline keys,
-  interned keys, and generic keyed refs.
+  key. Boxes create keyed value references without allocating new descriptors. The exact
+  in-memory value-reference layout is not settled; benchmarks will compare inline keys,
+  interned keys, and generic keyed value references.
 - Async selectors read dependencies synchronously, then return `Work.run` or
   `Work.stream`. The first read starts work and publicly begins at
   `pending(previous: .none)`; there is no observable `initial` phase. Values
@@ -219,8 +219,8 @@ These choices are settled; §10 of the core document has the full record.
   `Cogtext.app`. Tests of production installation use a synchronous scoped
   fixture from `CogTesting`, so they cannot leak global install state across
   the suite.
-- Manual state and nodes seen by the UI live for the app context by default.
-  Graph-only derived and async nodes may be released when unused. Query caches
+- Manual state and states seen by the UI live for the app context by default.
+  Graph-only derived and async states may be released when unused. Query caches
   have their own retention rules. A `whileObserved` declaration with no
   explicit grace uses the context default: 30 seconds in production, with an
   explicit `CogTesting` override for deterministic timed tests.
@@ -244,7 +244,7 @@ These choices are settled; §10 of the core document has the full record.
   in that region fails immediately in every build, names the cog/key and turn,
   and tells the caller to invoke the op outside derived computation, from event
   handling or a reaction.
-- The runtime will use a data-oriented arena. Public refs remain names, never
+- The runtime will use a data-oriented arena. Public value references remain names, never
   arena slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
@@ -266,7 +266,7 @@ are several edge behaviors: what a stream's phase does when its sequence ends
 or throws, whether equal stream elements commit distinct turns, whether a
 failed `.queue` run stops the queue, what a one-shot read or refresh of a cold
 async cog does, and debounce/throttle timing modifiers
-(deferred backlog). Ref layout, edge layout, and hash tables also remain open
+(deferred backlog). Value-reference layout, edge layout, and hash tables also remain open
 until benchmarks choose them.
 
 ## Next steps
@@ -275,6 +275,6 @@ until benchmarks choose them.
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. Build the
 simple correctness version first, then the SwiftUI boundary, then a first
-async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare ref layouts before
+async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare value-reference layouts before
 building the data-oriented core, and measure that core against the simple
 version, swift-state-graph, and raw `@Observable`.

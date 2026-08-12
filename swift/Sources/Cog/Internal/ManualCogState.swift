@@ -1,27 +1,27 @@
-/// The live state behind one ``ManualCog`` ref, in one context.
+/// The live state behind one ``ManualCog`` value reference, in one context.
 ///
-/// A manual source is the simplest node there is: it holds a value, and that
+/// A manual source is the simplest state there is: it holds a value, and that
 /// value changes only when a turn writes it. Nothing computes it, so it is
 /// always settled — a read of a source can hand back what it holds without
-/// doing any graph work first. Derived nodes, which are not always settled,
+/// doing any graph work first. Derived states, which are not always settled,
 /// arrive with `M1-05a`.
 ///
-/// The node is created the first time a context is asked for this descriptor
+/// The state is created the first time a context is asked for this descriptor
 /// and key, and it starts at the declaration's starting value because there is
 /// no earlier turn to ask (see ``ManualCogDescriptor/startingValue``).
-internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
-  /// The declaration this node belongs to.
+internal final class ManualCogState<Value>: CogState, PendingCogSource {
+  /// The declaration this state belongs to.
   ///
   /// Holding the descriptor rather than copying pieces out of it keeps the
-  /// node able to answer questions the declaration owns — its label now, its
+  /// state able to answer questions the declaration owns — its label now, its
   /// equality rule and lifetime kind later — and costs nothing, since a
   /// descriptor is normally owned by a top-level `let` that outlives every
   /// context anyway.
   let descriptor: ManualCogDescriptor<Value>
 
-  /// Which node of `descriptor` this is, or `nil` for a keyless declaration.
+  /// Which state of `descriptor` this is, or `nil` for a keyless declaration.
   ///
-  /// The node knows its own key so a diagnostic can name it — `weather[90210]`
+  /// The state knows its own key so a diagnostic can name it — `weather[90210]`
   /// rather than `weather` — without a reverse lookup through the context's
   /// storage (§2.4).
   let key: AnyHashable?
@@ -49,7 +49,7 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
   /// The revision through which the current slot was last verified.
   var checkedAt: CogVersion
 
-  /// Derived nodes whose last run read this source.
+  /// Derived states whose last run read this source.
   var subscribers: [CogSubscriberEdge]
 
   var label: CogLabel { descriptor.label }
@@ -61,7 +61,7 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
 
     // Equality is decided against the final staged value, once, at flush.
     // That makes repeated writes cheap and makes a change followed by a
-    // reversion disappear without ever dirtying downstream nodes.
+    // reversion disappear without ever dirtying downstream states.
     guard !descriptor.valuesAreEqual(currentValue, value) else { return }
 
     currentValue = value
@@ -79,12 +79,12 @@ internal final class ManualCogNode<Value>: CogNode, PendingCogSource {
     cogs.invalidateSubscribers(of: self)
   }
 
-  /// Creates the node at its declaration's starting value for this key.
+  /// Creates the state at its declaration's starting value for this key.
   ///
   /// The key is part of the question, not just part of the filing: a keyed
   /// declaration may start each key at its own value (`ManualCogBox<Int,
   /// ZipCode> { zip in ... }`), and that closure runs here — once, when this
-  /// node first appears — rather than on every read. Whatever it returns is a
+  /// state first appears — rather than on every read. Whatever it returns is a
   /// starting value like any other, so a later write replaces it and the
   /// closure is never consulted again for this key in this context.
   init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {

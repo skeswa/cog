@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 // The two scenarios `M1-01b` greens. Both are written against the public `Cog`
-// API and the `CogTesting` product and nothing else — no `@testable`, no node
+// API and the `CogTesting` product and nothing else — no `@testable`, no state
 // storage, no counts of anything internal. That is scenarios.md constraint 3,
 // and it has teeth: COUNT-09 through COUNT-11 require this suite to keep
 // passing unchanged when the core underneath it is replaced, so a test that
@@ -12,7 +12,7 @@ import Testing
 // promised: a declaration reads back its starting value, and a test can get a
 // context by asking for one.
 //
-// Refs are declared inside each test rather than at file scope. A `ManualCog`
+// Value references are declared inside each test rather than at file scope. A `ManualCog`
 // is MainActor-isolated, and a file-scope `let` would say different things in
 // the MainActor and nonisolated legs of the matrix; a local says the same
 // thing in all four. Every test states `@MainActor` for the same reason (§7).

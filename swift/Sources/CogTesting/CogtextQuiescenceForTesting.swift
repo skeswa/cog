@@ -46,7 +46,7 @@ extension Cogtext {
   /// the synchronous graph lane is idle now.
   ///
   /// This is a narrow behavior contract for tests. It exposes no turn phase,
-  /// queue, node, edge, or graph representation, and it is absent from release
+  /// queue, state, edge, or graph representation, and it is absent from release
   /// builds along with the guard it observes.
   public var quiescenceDiagnostic: CogQuiescenceDiagnostic {
     CogQuiescenceDiagnostic(quiescenceDiagnosticSnapshot)

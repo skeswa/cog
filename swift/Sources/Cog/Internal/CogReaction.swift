@@ -1,11 +1,11 @@
 /// One reaction registration owned by a context.
 ///
 /// A reaction is a graph consumer but not readable graph state. The simple
-/// correctness core nevertheless uses the narrow `CogNode` invalidation shape
+/// correctness core nevertheless uses the narrow `CogState` invalidation shape
 /// for it: producers can hold the same weak reverse edge, and the reaction's
 /// CLEAN/CHECK/DIRTY state says whether the end-of-turn pass may skip it, must
 /// verify its derived dependencies, or knows a direct dependency changed.
-internal final class CogReaction: CogNode, CogConsumer {
+internal final class CogReaction: CogState, CogConsumer {
   let label: CogLabel
 
   /// The context that owns this registration, or `nil` once it is gone.
@@ -32,14 +32,14 @@ internal final class CogReaction: CogNode, CogConsumer {
   private(set) var isCancelled = false
 
   /// Producers read by the last completed run, in read order.
-  private(set) var dependencies: [any CogNode] = []
+  private(set) var dependencies: [any CogState] = []
 
   /// Unique directly read derived roots this registration keeps observed.
   ///
   /// Kept separate from `dependencies`: that list preserves read order and
   /// repeats for graph recapture, while one reaction owns at most one lifetime
-  /// lease for any node no matter how often its body reads it.
-  private(set) var leasedDependencies: [any CogLifetimeLeaseNode] = []
+  /// lease for any state no matter how often its body reads it.
+  private(set) var leasedDependencies: [any CogLifetimeLeaseState] = []
 
   var settleState: CogSettleState = .clean
   var changedAt: CogVersion = .initial
@@ -66,7 +66,7 @@ internal final class CogReaction: CogNode, CogConsumer {
   /// removing the registration takes it out of the end-of-flush scan that turns
   /// a marked reaction into a queued run. Shutting only the first leaves a
   /// registration every later flush still walks; shutting only the second
-  /// leaves a permanently dirty node pinning its producers.
+  /// leaves a permanently dirty state pinning its producers.
   ///
   /// Neither door reaches a run this flush has already queued, which is what
   /// the flag is for: the queue holds its entries by value and a live cursor
@@ -97,7 +97,7 @@ internal final class CogReaction: CogNode, CogConsumer {
     cogs?.reactions.removeAll { $0 === self }
   }
 
-  func recordDependency(on producer: any CogNode) {
+  func recordDependency(on producer: any CogState) {
     // A body that cancels itself and then keeps reading must not attach a new
     // edge to a registration that is already out of the graph.
     guard !isCancelled else { return }
@@ -128,7 +128,7 @@ internal final class CogReaction: CogNode, CogConsumer {
 
     for dependency in dependencies {
       guard dependency.settleState != .clean,
-        let derived = dependency as? any DerivedCogSettleNode
+        let derived = dependency as? any DerivedCogSettleState
       else { continue }
       cogs.settle(derived)
     }
@@ -186,14 +186,14 @@ internal final class CogReaction: CogNode, CogConsumer {
     // anything again.
     guard !isCancelled else { return }
 
-    var nextLeasedDependencies: [any CogLifetimeLeaseNode] = []
+    var nextLeasedDependencies: [any CogLifetimeLeaseState] = []
     for dependency in dependencies {
       guard
-        let leaseNode = dependency as? any CogLifetimeLeaseNode,
-        case .whileObserved = leaseNode.lifetime,
-        !nextLeasedDependencies.contains(where: { $0 === leaseNode })
+        let leaseState = dependency as? any CogLifetimeLeaseState,
+        case .whileObserved = leaseState.lifetime,
+        !nextLeasedDependencies.contains(where: { $0 === leaseState })
       else { continue }
-      nextLeasedDependencies.append(leaseNode)
+      nextLeasedDependencies.append(leaseState)
     }
 
     // Acquire additions before releasing removals so a retracking run swaps

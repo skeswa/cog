@@ -10,8 +10,8 @@
 /// ```
 ///
 /// A box is a declaration, not a collection. It holds no values and no keys,
-/// and it never has to be told which keys exist: `box[key]` builds a ref for
-/// that key, and the app's one context creates a node the first time something
+/// and it never has to be told which keys exist: `box[key]` builds a value reference for
+/// that key, and the app's one context creates a state the first time something
 /// actually reads or writes it (§2.3). Ask for a thousand keys and you get a
 /// thousand pieces of state; ask for none and the box costs one descriptor.
 ///
@@ -19,9 +19,9 @@
 /// starting value and then go their own ways, because identity is the
 /// declaration plus the key (§3.1) — writing one does not touch the other.
 ///
-/// Building a ref is free. Every key shares the box's one descriptor, so
+/// Building a value reference is free. Every key shares the box's one descriptor, so
 /// `box[key]` allocates nothing: it pairs that existing descriptor with the
-/// key and hands back a value (perf §4, §9). Refs are meant to be built at the
+/// key and hands back a value (perf §4, §9). Value references are meant to be built at the
 /// point of use rather than stashed — `c.get(weatherReport[zip])` inside a
 /// selector is the normal spelling, and the key reaches it by ordinary lexical
 /// capture, with no hidden key flow.
@@ -44,8 +44,8 @@ public struct ManualCogBox<Value, Key: Hashable> {
 
   /// Declares a keyed source whose every key starts at `startingValue`.
   ///
-  /// Declaring allocates one descriptor and nothing else. It creates no nodes
-  /// and touches no context; the starting value is only what a key's node
+  /// Declaring allocates one descriptor and nothing else. It creates no states
+  /// and touches no context; the starting value is only what a key's state
   /// begins at, whenever one is first needed.
   ///
   /// ```swift
@@ -104,7 +104,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// }
   /// ```
   ///
-  /// The closure runs once per key per context — when that key's node first
+  /// The closure runs once per key per context — when that key's state first
   /// appears — and never again for that key. It is a *starting* value, so a
   /// write replaces it permanently; nothing recomputes it, and it is not a
   /// derived cog. Reach for `CogBox` when the value should keep tracking
@@ -157,19 +157,19 @@ public struct ManualCogBox<Value, Key: Hashable> {
     )
   }
 
-  /// The ref naming this box's state for one key.
+  /// The value reference naming this box's state for one key.
   ///
-  /// Building the same key twice gives two equivalent refs, not two pieces of
-  /// state: `box[5]` here and `box[5]` in another file resolve to one node, so
+  /// Building the same key twice gives two equivalent value references, not two pieces of
+  /// state: `box[5]` here and `box[5]` in another file resolve to one state, so
   /// a write through either is a write both can see. `box[6]` is a different
-  /// node entirely.
+  /// state entirely.
   ///
   /// This is a value, and building it is not a lookup — nothing is searched,
-  /// created, or registered until a context is asked to resolve the ref. That
+  /// created, or registered until a context is asked to resolve the value reference. That
   /// is why it is safe to write `box[key]` inline at every call site.
   ///
   /// - Parameter key: Which of this declaration's values to name.
-  /// - Returns: A ref for that key, usable anywhere a ``ManualCog`` is.
+  /// - Returns: A value reference for that key, usable anywhere a ``ManualCog`` is.
   public subscript(key: Key) -> ManualCog<Value> {
     ManualCog(descriptor: descriptor, key: key)
   }
@@ -187,9 +187,9 @@ public struct ManualCogBox<Value, Key: Hashable> {
           // and an optimized `preconditionFailure` drops composed messages.
           fatalError(
             """
-            A node of \(label) was asked to start at a value for \
+            A state of \(label) was asked to start at a value for \
             \(String(describing: key)), which is not a \(Key.self). Only this \
-            box builds refs for its own declaration, so this context's node \
+            box builds value references for its own declaration, so this context's state \
             storage is corrupt.
             """
           )

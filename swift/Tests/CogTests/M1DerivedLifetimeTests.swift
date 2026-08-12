@@ -33,7 +33,9 @@ import os
 }
 
 @MainActor
-@Test func `LIFE-03 the same ref recreates from current state after release`() async throws {
+@Test func `LIFE-03 the same value reference recreates from current state after release`()
+  async throws
+{
   let clock = DerivedLifetimeTestClock()
   let cogs = Cogtext.forTesting(
     clock: clock,

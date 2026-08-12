@@ -8,10 +8,10 @@ import Testing
 // compiler says no" is not something a running test can observe.
 //
 // Public `Cog` API and the `CogTesting` product only — no `@testable`, no
-// descriptors, no node storage (scenarios.md constraint 3). That matters more
-// here than almost anywhere: the claim is that a projection is the *same* ref
+// descriptors, no state storage (scenarios.md constraint 3). That matters more
+// here than almost anywhere: the claim is that a projection is the *same* value reference
 // for the same state, and the honest way to show it is that reads through the
-// two refs cannot be told apart, not that they happen to compute the same
+// two value references cannot be told apart, not that they happen to compute the same
 // storage identity today.
 //
 // Keyed cases prove sameness with a reference-typed value rather than with a
@@ -21,7 +21,7 @@ import Testing
 // already `M1-04ab`'s settled surface, and "always gives the same value as the
 // source" is worth showing across a real change of value.
 //
-// Refs are declared inside each test rather than at file scope, and every test
+// Value references are declared inside each test rather than at file scope, and every test
 // states `@MainActor`, for the reason the sibling suites give: a file-scope
 // `let` would say different things in the MainActor and nonisolated legs of the
 // matrix (§7).
@@ -42,7 +42,7 @@ private struct ZipCode: Hashable {
 // MARK: - DECL-05, keyless
 
 @MainActor
-@Test func `DECL-05 a read-only ref reads what its source reads`() {
+@Test func `DECL-05 a read-only value reference reads what its source reads`() {
   let cogs = Cogtext.forTesting()
 
   let retryLimitSource = ManualCog<Int>(3)
@@ -63,10 +63,10 @@ private struct ZipCode: Hashable {
 }
 
 @MainActor
-@Test func `DECL-05 a write through the source is what the read-only ref reads`() {
+@Test func `DECL-05 a write through the source is what the read-only value reference reads`() {
   // The point of the projection: the owning file writes the source, and
-  // everyone holding the published ref sees it. No copy to refresh, no second
-  // node to keep in step.
+  // everyone holding the published value reference sees it. No copy to refresh, no second
+  // state to keep in step.
   let cogs = Cogtext.forTesting()
 
   let countSource = ManualCog<Int>(0)
@@ -81,8 +81,8 @@ private struct ZipCode: Hashable {
 }
 
 @MainActor
-@Test func `DECL-05 the read-only ref agrees with its source after every write`() {
-  // "Always," not "once": the two refs stay indistinguishable across a run of
+@Test func `DECL-05 the read-only value reference agrees with its source after every write`() {
+  // "Always," not "once": the two value references stay indistinguishable across a run of
   // turns, whichever of them is read first.
   let cogs = Cogtext.forTesting()
 
@@ -101,9 +101,9 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 reading the projection first does not create a second piece of state`() {
-  // A read is what makes a node appear (§2.3), so the projection reading first
-  // is the case where a wrong implementation would quietly make its own node.
-  // A reference-typed value makes that visible without any write: one node
+  // A read is what makes a state appear (§2.3), so the projection reading first
+  // is the case where a wrong implementation would quietly make its own state.
+  // A reference-typed value makes that visible without any write: one state
   // means one object.
   let cogs = Cogtext.forTesting()
 
@@ -118,7 +118,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 projecting a source twice names one piece of state`() {
-  // Projecting is not declaring. `.readOnly` builds a ref, the way `box[key]`
+  // Projecting is not declaring. `.readOnly` builds a value reference, the way `box[key]`
   // does, so asking for it in two places is not a way to end up with two
   // pieces of state.
   let cogs = Cogtext.forTesting()
@@ -131,9 +131,10 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 each context answers its projection with its own state`() {
-  // The projection is a ref, and a ref is the same ref everywhere; the state
-  // is per context (§2.3). A test runtime reading a published ref reads its
-  // own world, not the one next door.
+  // The projection is a value reference, and a value reference is the same
+  // value reference everywhere; the state is per context (§2.3). A test
+  // runtime reading a published value reference reads its own world, not the
+  // one next door.
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
 

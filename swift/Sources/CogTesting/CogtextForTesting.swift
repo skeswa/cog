@@ -4,7 +4,7 @@ extension Cogtext {
   /// A fresh, isolated context for one test or preview runtime.
   ///
   /// A test is its own little app: it starts with nothing in the graph, does
-  /// its work, and ends. So this hands back a context with no nodes in it,
+  /// its work, and ends. So this hands back a context with no states in it,
   /// where every declaration in the process starts again at its starting value.
   /// Nothing has to be installed, reset, or torn down first, and nothing a
   /// previous test did can reach this one — the state a test can see is exactly

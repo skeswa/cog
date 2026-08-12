@@ -9,7 +9,7 @@ import Testing
 // from inside the selector.
 //
 // What is checked here is the part of the mechanism that behavior rests on and
-// that nothing public can see yet: a derived node exists before it has a value,
+// that nothing public can see yet: a derived state exists before it has a value,
 // the tracking slot names the consumer that is running, and a tracked read
 // records the edge §2.4 says it records. Dependency edges are invisible from
 // outside even though the settle engine now uses them, and silently failing to
@@ -27,89 +27,89 @@ import Testing
 
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c.get(source) * 2 }
-  #expect(cogs.nodes.isEmpty)
+  #expect(cogs.states.isEmpty)
 
   _ = cogs.read(doubled)
 
-  // The derived node and the source node it read, and nothing else.
-  #expect(cogs.nodes.count == 2)
+  // The derived state and the source state it read, and nothing else.
+  #expect(cogs.states.count == 2)
 }
 
 @MainActor
-@Test func `DerivedCogInfrastructure reuses one node for one declaration`() {
+@Test func `DerivedCogInfrastructure reuses one state for one declaration`() {
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c.get(source) * 2 }
 
-  #expect(cogs.derivedNode(for: doubled) === cogs.derivedNode(for: doubled))
-  #expect(cogs.nodes.count == 1)
+  #expect(cogs.derivedState(for: doubled) === cogs.derivedState(for: doubled))
+  #expect(cogs.states.count == 1)
 }
 
 @MainActor
 @Test func `DerivedCogInfrastructure tells identical declarations apart`() {
   // Same type, same selector shape, same label — two declarations, so two
-  // nodes and two runs. Identity is the descriptor object (§2.3).
+  // states and two runs. Identity is the descriptor object (§2.3).
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int>({ c in c.get(source) }, name: "twin")
   let right = Cog<Int>({ c in c.get(source) }, name: "twin")
 
-  #expect(cogs.derivedNode(for: left) !== cogs.derivedNode(for: right))
-  #expect(cogs.nodes.count == 2)
+  #expect(cogs.derivedState(for: left) !== cogs.derivedState(for: right))
+  #expect(cogs.states.count == 2)
 }
 
 @MainActor
-@Test func `DerivedCogInfrastructure keeps a node's label for diagnostics`() {
+@Test func `DerivedCogInfrastructure keeps a state's label for diagnostics`() {
   let cogs = Cogtext.forTesting()
   let named = Cog<Int>({ _ in 1 }, name: "retry budget")
   let unnamed = Cog<Int> { _ in 1 }
 
-  #expect("\(cogs.derivedNode(for: named).label)" == "retry budget")
-  #expect("\(cogs.derivedNode(for: unnamed).label)".contains("M1DerivedCogInfrastructureTests"))
-  #expect(cogs.derivedNode(for: named).key == nil)
+  #expect("\(cogs.derivedState(for: named).label)" == "retry budget")
+  #expect("\(cogs.derivedState(for: unnamed).label)".contains("M1DerivedCogInfrastructureTests"))
+  #expect(cogs.derivedState(for: named).key == nil)
 }
 
 // MARK: - Lazy first computation
 
 @MainActor
-@Test func `DerivedCogInfrastructure gives a fresh node no value at all`() {
-  // Resolving a node is not reading it. The node is filed, and it holds
+@Test func `DerivedCogInfrastructure gives a fresh state no value at all`() {
+  // Resolving a state is not reading it. The state is filed, and it holds
   // nothing until something asks it for a value.
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c.get(source) * 2 }
 
-  let node = cogs.derivedNode(for: doubled)
+  let state = cogs.derivedState(for: doubled)
 
-  #expect(node.hasComputed == false)
-  #expect(node.cachedValue == nil)
-  #expect(node.dependencies.isEmpty)
+  #expect(state.hasComputed == false)
+  #expect(state.cachedValue == nil)
+  #expect(state.dependencies.isEmpty)
 
-  #expect(node.settledValue(in: cogs) == 2)
+  #expect(state.settledValue(in: cogs) == 2)
 
-  #expect(node.hasComputed)
-  #expect(node.cachedValue == 2)
+  #expect(state.hasComputed)
+  #expect(state.cachedValue == 2)
 }
 
 @MainActor
 @Test func `DerivedCogInfrastructure records a run that produced nil as a run`() {
-  // The cache is storage presence, not value optionality: a node that computed
+  // The cache is storage presence, not value optionality: a state that computed
   // `nil` has computed, so the next read must not run the selector again.
   let cogs = Cogtext.forTesting()
   let nothing = Cog<Int?> { _ in nil }
 
-  let node = cogs.derivedNode(for: nothing)
-  #expect(node.hasComputed == false)
+  let state = cogs.derivedState(for: nothing)
+  #expect(state.hasComputed == false)
 
-  #expect(node.settledValue(in: cogs) == nil)
+  #expect(state.settledValue(in: cogs) == nil)
 
-  #expect(node.hasComputed)
+  #expect(state.hasComputed)
 }
 
 // MARK: - The tracking slot
 
 @MainActor
-@Test func `DerivedCogInfrastructure tracks the node whose selector is running`() {
+@Test func `DerivedCogInfrastructure tracks the state whose selector is running`() {
   let cogs = Cogtext.forTesting()
 
   var consumerDuringRun: (any CogConsumer)?
@@ -121,7 +121,7 @@ import Testing
   #expect(cogs.trackedConsumer == nil)
   _ = cogs.read(observing)
 
-  #expect(consumerDuringRun === cogs.derivedNode(for: observing))
+  #expect(consumerDuringRun === cogs.derivedState(for: observing))
   #expect(cogs.trackedConsumer == nil)
 }
 
@@ -129,7 +129,7 @@ import Testing
 @Test func `DerivedCogInfrastructure hands tracking back after a nested run`() {
   // Runs nest whenever a selector reads a derived cog that has not computed.
   // The inner run must own the slot while it runs and give it back afterwards,
-  // or the outer selector's later reads would attach to the wrong node.
+  // or the outer selector's later reads would attach to the wrong state.
   let cogs = Cogtext.forTesting()
 
   var slotDuringInnerRun: (any CogConsumer)?
@@ -147,8 +147,8 @@ import Testing
 
   #expect(cogs.read(outer) == 2)
 
-  #expect(slotDuringInnerRun === cogs.derivedNode(for: inner))
-  #expect(slotAfterInnerRead === cogs.derivedNode(for: outer))
+  #expect(slotDuringInnerRun === cogs.derivedState(for: inner))
+  #expect(slotAfterInnerRead === cogs.derivedState(for: outer))
   #expect(cogs.trackedConsumer == nil)
 }
 
@@ -165,16 +165,16 @@ import Testing
 
   #expect(cogs.read(label) == "12 sq ft, 3 wide")
 
-  let areaNode = cogs.derivedNode(for: area)
-  #expect(areaNode.dependencies.count == 2)
-  #expect(areaNode.dependencies[0] === cogs.manualNode(for: width))
-  #expect(areaNode.dependencies[1] === cogs.manualNode(for: height))
+  let areaState = cogs.derivedState(for: area)
+  #expect(areaState.dependencies.count == 2)
+  #expect(areaState.dependencies[0] === cogs.manualState(for: width))
+  #expect(areaState.dependencies[1] === cogs.manualState(for: height))
 
   // A derived parent is recorded the same way a source is: an edge is an edge.
-  let labelNode = cogs.derivedNode(for: label)
-  #expect(labelNode.dependencies.count == 2)
-  #expect(labelNode.dependencies[0] === areaNode)
-  #expect(labelNode.dependencies[1] === cogs.manualNode(for: width))
+  let labelState = cogs.derivedState(for: label)
+  #expect(labelState.dependencies.count == 2)
+  #expect(labelState.dependencies[0] === areaState)
+  #expect(labelState.dependencies[1] === cogs.manualState(for: width))
 }
 
 @MainActor
@@ -183,7 +183,7 @@ import Testing
   let constant = Cog<Int> { _ in 7 }
 
   #expect(cogs.read(constant) == 7)
-  #expect(cogs.derivedNode(for: constant).dependencies.isEmpty)
+  #expect(cogs.derivedState(for: constant).dependencies.isEmpty)
 }
 
 @MainActor
@@ -198,6 +198,6 @@ import Testing
 
   #expect(cogs.read(doubled) == 2)
 
-  #expect(cogs.derivedNode(for: doubled).dependencies.count == 1)
+  #expect(cogs.derivedState(for: doubled).dependencies.count == 1)
   #expect(cogs.trackedConsumer == nil)
 }

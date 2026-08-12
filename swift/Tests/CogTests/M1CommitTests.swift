@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 // Public API only. These are the first user-visible turn stories, so nothing
-// here may observe phase objects, pending storage, or node layout.
+// here may observe phase objects, pending storage, or state layout.
 
 @MainActor
 @Test func `READ-01 a read after commit sees the written value`() {

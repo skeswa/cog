@@ -1,4 +1,4 @@
-/// A keyed declaration whose refs can be read and not written.
+/// A keyed declaration whose value references can be read and not written.
 ///
 /// What ``ReadOnlyCog`` is to a ``ManualCog``, this is to a ``ManualCogBox``:
 /// the projection a file publishes so that everyone can read per-key state
@@ -16,7 +16,7 @@
 ///
 /// Like the box it projects, this is a declaration and not a collection: it
 /// holds no keys and no values, it never has to be told which keys exist, and
-/// `box[key]` builds a ref rather than looking anything up (§2.3). Projecting
+/// `box[key]` builds a value reference rather than looking anything up (§2.3). Projecting
 /// costs nothing and allocates nothing — the box's one descriptor is still the
 /// one descriptor behind every key.
 @MainActor
@@ -30,14 +30,14 @@ public struct ReadOnlyCogBox<Value, Key: Hashable> {
   /// users get is ``ManualCogBox/readOnly``.
   internal let source: ManualCogBox<Value, Key>
 
-  /// The read-only ref naming this box's state for one key.
+  /// The read-only value reference naming this box's state for one key.
   ///
-  /// The same ref the source box's subscript would build for that key, in the
+  /// The same value reference the source box's subscript would build for that key, in the
   /// type that cannot be written: `readOnlyBox[5]` and `sourceBox[5]` name one
-  /// node, so a write through the source shows up through the projection.
+  /// state, so a write through the source shows up through the projection.
   ///
   /// - Parameter key: Which of this declaration's values to name.
-  /// - Returns: A read-only ref for that key.
+  /// - Returns: A read-only value reference for that key.
   public subscript(key: Key) -> ReadOnlyCog<Value> {
     ReadOnlyCog(source: source[key])
   }
@@ -46,10 +46,10 @@ public struct ReadOnlyCogBox<Value, Key: Hashable> {
 // MARK: - Projecting a source box
 
 extension ManualCogBox {
-  /// A keyed declaration naming this box's state whose refs cannot be written.
+  /// A keyed declaration naming this box's state whose value references cannot be written.
   ///
   /// Publish this next to the box, in the file that owns it, and keep the box
-  /// itself `fileprivate` (§4). Every key of the projection names the node that
+  /// itself `fileprivate` (§4). Every key of the projection names the state that
   /// key names in the source, so nothing about which keys exist, or what they
   /// start at, changes.
   public var readOnly: ReadOnlyCogBox<Value, Key> {

@@ -5,7 +5,7 @@
 /// Modeled on ``CogSettleStack``: a context-owned struct with a private array,
 /// reused for the life of the context. perf §8 asks for a fixed-size ring of
 /// records whose labels are resolved only at display, and this is the
-/// class-node core's version of that. When the measured arena lands, the
+/// class-state core's version of that. When the measured arena lands, the
 /// records become integer slots and the recording sites do not change.
 internal struct CogHistoryLog {
   /// How many entries the ring holds.

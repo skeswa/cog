@@ -7,7 +7,7 @@
 // `Cogtext` becomes an uncovered `cannot find ... in scope`.
 //
 // It used to ask the *module* for a missing member, as `Cog.NoSuchSymbol`.
-// `M1-05a` added the public derived-cog ref `Cog<Value>`, and a type shadows
+// `M1-05a` added the public derived-cog value reference `Cog<Value>`, and a type shadows
 // its own module in qualified lookup, so that spelling now asks the type and
 // reports a generic-inference error instead. Naming a distinct type keeps this
 // fixture proving module resolution rather than name shadowing.

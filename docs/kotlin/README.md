@@ -53,10 +53,10 @@ Cog builds policy around those parts:
 
 ```mermaid
 flowchart LR
-    UI["Composable"] -->|"read"| Node["Cog node<br/>Compose State"]
+    UI["Composable"] -->|"read"| State["Cog state<br/>Compose State"]
     Event["Event handler"] -->|"commit"| Store["CogStore"]
-    Store -->|"snapshot write"| Node
-    Node --> Derived["derivedStateOf"]
+    Store -->|"snapshot write"| State
+    State --> Derived["derivedStateOf"]
     Derived --> UI
     Store -.-> Policy["names · lifetime · async · debug"]
 ```
@@ -100,7 +100,7 @@ The first design is ready for a prototype. The prototype must prove:
 - dynamic derived dependencies;
 - exact Compose invalidation;
 - ordered reactions;
-- keyed node cleanup;
+- keyed state cleanup;
 - async cancellation and stale-result guards;
 - acceptable cost beside raw Compose state.
 

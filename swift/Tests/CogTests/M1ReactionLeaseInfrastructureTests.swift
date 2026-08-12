@@ -19,27 +19,27 @@ import Testing
   }
   let second = cogs.run { c in _ = c.get(root) }
 
-  let rootNode = cogs.derivedNode(for: root)
-  let innerNode = cogs.derivedNode(for: inner)
-  let keptNode = cogs.derivedNode(for: kept)
+  let rootState = cogs.derivedState(for: root)
+  let innerState = cogs.derivedState(for: inner)
+  let keptState = cogs.derivedState(for: kept)
 
-  #expect(rootNode.externalLeaseCount == 2)
-  #expect(innerNode.externalLeaseCount == 0)
-  #expect(keptNode.externalLeaseCount == 0)
-  #expect(cogs.manualNode(for: source).descriptor.lifetime == .app)
+  #expect(rootState.externalLeaseCount == 2)
+  #expect(innerState.externalLeaseCount == 0)
+  #expect(keptState.externalLeaseCount == 0)
+  #expect(cogs.manualState(for: source).descriptor.lifetime == .app)
   #expect(first.reaction.leasedDependencies.count == 1)
-  #expect(first.reaction.leasedDependencies.first === rootNode)
+  #expect(first.reaction.leasedDependencies.first === rootState)
   #expect(second.reaction.leasedDependencies.count == 1)
-  #expect(second.reaction.leasedDependencies.first === rootNode)
+  #expect(second.reaction.leasedDependencies.first === rootState)
 
   first.cancel()
-  #expect(rootNode.externalLeaseCount == 1)
+  #expect(rootState.externalLeaseCount == 1)
 
   first.cancel()
-  #expect(rootNode.externalLeaseCount == 1)
+  #expect(rootState.externalLeaseCount == 1)
 
   second.cancel()
-  #expect(rootNode.externalLeaseCount == 0)
+  #expect(rootState.externalLeaseCount == 0)
 }
 
 @MainActor
@@ -57,28 +57,28 @@ import Testing
     _ = c.get(selected)
   }
 
-  let leftNode = cogs.derivedNode(for: left)
-  let rightNode = cogs.derivedNode(for: right)
-  let anchorNode = cogs.derivedNode(for: anchor)
+  let leftState = cogs.derivedState(for: left)
+  let rightState = cogs.derivedState(for: right)
+  let anchorState = cogs.derivedState(for: anchor)
 
-  #expect(leftNode.externalLeaseCount == 1)
-  #expect(rightNode.externalLeaseCount == 0)
-  #expect(anchorNode.externalLeaseCount == 1)
+  #expect(leftState.externalLeaseCount == 1)
+  #expect(rightState.externalLeaseCount == 0)
+  #expect(anchorState.externalLeaseCount == 1)
 
   cogs.commit { writer in writer[chooseLeft] = false }
-  #expect(leftNode.externalLeaseCount == 0)
-  #expect(rightNode.externalLeaseCount == 1)
-  #expect(anchorNode.externalLeaseCount == 1)
+  #expect(leftState.externalLeaseCount == 0)
+  #expect(rightState.externalLeaseCount == 1)
+  #expect(anchorState.externalLeaseCount == 1)
 
   cogs.commit { writer in writer[chooseLeft] = true }
-  #expect(leftNode.externalLeaseCount == 1)
-  #expect(rightNode.externalLeaseCount == 0)
-  #expect(anchorNode.externalLeaseCount == 1)
+  #expect(leftState.externalLeaseCount == 1)
+  #expect(rightState.externalLeaseCount == 0)
+  #expect(anchorState.externalLeaseCount == 1)
 
   token.cancel()
-  #expect(leftNode.externalLeaseCount == 0)
-  #expect(rightNode.externalLeaseCount == 0)
-  #expect(anchorNode.externalLeaseCount == 0)
+  #expect(leftState.externalLeaseCount == 0)
+  #expect(rightState.externalLeaseCount == 0)
+  #expect(anchorState.externalLeaseCount == 0)
 }
 
 @MainActor
@@ -98,16 +98,16 @@ import Testing
     }
   }
 
-  let beforeNode = cogs.derivedNode(for: beforeCancellation)
-  let afterNode = cogs.derivedNode(for: afterCancellation)
-  #expect(beforeNode.externalLeaseCount == 1)
-  #expect(afterNode.externalLeaseCount == 0)
+  let beforeState = cogs.derivedState(for: beforeCancellation)
+  let afterState = cogs.derivedState(for: afterCancellation)
+  #expect(beforeState.externalLeaseCount == 1)
+  #expect(afterState.externalLeaseCount == 0)
 
   cogs.commit { writer in writer[trigger] = 1 }
 
   #expect(token?.reaction.isCancelled == true)
-  #expect(beforeNode.externalLeaseCount == 0)
-  #expect(afterNode.externalLeaseCount == 0)
+  #expect(beforeState.externalLeaseCount == 0)
+  #expect(afterState.externalLeaseCount == 0)
   #expect(token?.reaction.dependencies.isEmpty == true)
   #expect(token?.reaction.leasedDependencies.isEmpty == true)
 }
@@ -117,19 +117,19 @@ import Testing
   var cogs: Cogtext? = Cogtext.forTesting()
   weak let releasedContext = cogs
   let root = Cog<Int> { _ in 1 }
-  let rootNode = cogs?.derivedNode(for: root)
+  let rootState = cogs?.derivedState(for: root)
   let token = cogs?.run { c in _ = c.get(root) }
   let reaction = token?.reaction
 
-  #expect(rootNode?.externalLeaseCount == 1)
+  #expect(rootState?.externalLeaseCount == 1)
   #expect(reaction?.leasedDependencies.count == 1)
 
   cogs = nil
 
   #expect(releasedContext == nil)
-  #expect(rootNode?.externalLeaseCount == 0)
+  #expect(rootState?.externalLeaseCount == 0)
   #expect(reaction?.leasedDependencies.isEmpty == true)
 
   token?.cancel()
-  #expect(rootNode?.externalLeaseCount == 0)
+  #expect(rootState?.externalLeaseCount == 0)
 }

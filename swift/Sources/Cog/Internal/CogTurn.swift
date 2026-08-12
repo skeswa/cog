@@ -62,8 +62,8 @@ extension Cogtext {
   /// to the non-reentrant FIFO drained by the active outer call. A call made
   /// during derived computation is rejected before any of those paths can run.
   internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
-    if let computing = settleStack.innermostComputingNode {
-      let cogName = CogCycleStep(node: computing).name
+    if let computing = settleStack.innermostComputingState {
+      let cogName = CogCycleStep(state: computing).name
       fatalError(
         """
         Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \

@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 // Equality behavior is observable through ordinary reads and selector-owned
-// run counts. Nothing here reaches into a descriptor, a node, or settle state,
+// run counts. Nothing here reaches into a descriptor, a state, or settle state,
 // so these scenarios remain valid across the M6 core swap.
 
 @MainActor

@@ -85,9 +85,9 @@ justifies a slow, flaky, or core-coupled test.
    diagnostic seam. Wherever a scenario says "internal seam," it means such a
    seam: a narrow behavior contract exposed through the testing product —
    "the last cycle diagnostic," "deinit cleanup reached the MainActor" —
-   never a peek at node storage, edge layout, or any other representation.
+   never a peek at state storage, edge layout, or any other representation.
    COUNT-09 through COUNT-11 are the enforcement: the whole behavior suite
-   must pass unchanged across ref layouts and the M6 core swap, so a test
+   must pass unchanged across value-reference layouts and the M6 core swap, so a test
    that could notice the swap is wrong. Group 18 (PERF) is the one declared
    exception; it gates the implementation itself and lives in the benchmark
    package.
@@ -158,12 +158,12 @@ I declare state at the top of a file and it just works.
   I look up starts at that value, and each key holds its own value.
 - **DECL-03.** I give a box a starting-value closure instead. Each key
   starts at what the closure returns for that key.
-- **DECL-04.** I build `box[5]` in two different places. Both refs point
+- **DECL-04.** I build `box[5]` in two different places. Both value references point
   at the same state: writing through one shows up when reading the other,
   and `box[6]` does not change.
 - **DECL-05.** I expose a source through `.readOnly`. Reading the
-  read-only ref always gives the same value as the source.
-- **DECL-06.** I try to write through a `.readOnly` ref. The compiler says
+  read-only value reference always gives the same value as the source.
+- **DECL-06.** I try to write through a `.readOnly` value reference. The compiler says
   no. (Proof: compile-fail.)
 
 ### 2.2 Derived cogs
@@ -453,7 +453,7 @@ test waits wall-clock time.
 - **LIFE-02.** A derived cog defaults to `whileObserved`. After its last
   watcher leaves and the grace period passes, Cog lets it go. The next
   read simply computes it fresh.
-- **LIFE-03.** A released derived cog is read again through the same ref.
+- **LIFE-03.** A released derived cog is read again through the same value reference.
   It comes back with the correct current value, as if it never left.
 - **LIFE-04.** A watcher leaves and comes back within the grace period.
   The cog was never released and did not recompute.
@@ -468,7 +468,7 @@ test waits wall-clock time.
   life of the app context. It is never released behind SwiftUI's back.
 - **LIFE-09.** Derived cog B reads derived cog A, then both lose their last
   external consumer. Their internal graph edge does not keep them alive.
-  After the grace period, reading either ref recreates the needed nodes
+  After the grace period, reading either value reference recreates the needed states
   with the correct current values.
 
 ## 10. SEED — Test helpers: seed and stub
@@ -529,7 +529,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-04.** A derived cog recomputes but lands on an equal value. Views
   reading it do not re-render.
 - **UI-05.** Only cogs that a view actually read get an Observation
-  boundary object. Interior graph nodes never do. (Checked through an
+  boundary object. Interior graph states never do. (Checked through an
   internal seam.)
 - **UI-06.** Views find the one app context through the `\.cogs`
   environment key.
@@ -565,8 +565,8 @@ Async state is honest: it always says whether it is loading, what it has, and
 what it had.
 
 _Pending (core §10, open question 15): what a one-shot `cogs.read` of a
-never-read async cog does — does it create the node, start work, and publish
-a pending turn? — and what `cogs.refresh` of a never-read ref does._
+never-read async cog does — does it create the state, start work, and publish
+a pending turn? — and what `cogs.refresh` of a never-read value reference does._
 
 ### 13.1 Phases
 
@@ -596,7 +596,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
   result is thrown away. Only the newest run may commit.
 - **ASYNC-09.** Work that was cancelled because it was replaced publishes
   no failure phase.
-- **ASYNC-10.** I call `cogs.refresh(ref)`. The work runs again even
+- **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
   though no dependency changed, and the phases cycle again.
 - **ASYNC-11.** Only what the selector reads with `c.get` before
   returning counts as a dependency. Values the work closure touches after
@@ -609,7 +609,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
 - **ASYNC-13.** An unwatched async cog is released while its work is
   pending. The work is cancelled, and if a late result sneaks through, it
   commits nothing.
-- **ASYNC-14.** After a release, reading the ref again starts fresh work
+- **ASYNC-14.** After a release, reading the value reference again starts fresh work
   and fresh phases, unpolluted by anything from before.
 
 ### 13.4 Work isolation and previous values
@@ -634,7 +634,7 @@ a pending turn? — and what `cogs.refresh` of a never-read ref does._
   Watchers of the full phase see the pending and success turns, but
   consumers of the `.latest` projection see no change: no recompute, no
   re-render.
-- **ASYNC-21.** I call `cogs.refresh(ref)` while work is already in
+- **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
   newest run may commit — a refresh replaces work the same way a
   dependency change does.
@@ -758,12 +758,12 @@ since expected counts derive from the parameters.
 - **COUNT-08.** Key churn (keys added and removed over and over): runs
   match exactly, and dropped keys stop running.
 - **COUNT-09.** Every behavior scenario implemented through M5 passes
-  unchanged over every ref layout under test. (Proof: suite.)
+  unchanged over every value-reference layout under test. (Proof: suite.)
 - **COUNT-10.** Every behavior scenario implemented through M6 passes
   unchanged with the data-oriented core selected in place of the simple
   core, before any default switch. (Proof: suite.)
 - **COUNT-11.** After M7, the complete behavior suite passes unchanged on
-  the selected ref layout and data-oriented core. (Proof: suite.)
+  the selected value-reference layout and data-oriented core. (Proof: suite.)
 
 ## 18. PERF — Performance guarantees
 
@@ -779,22 +779,22 @@ is needed.
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
   nothing (`mallocCountTotal == 0`).
 - **PERF-02.** Propagation does no retain or release traffic.
-- **PERF-03.** Peak memory for a 1,000-node graph stays within the
+- **PERF-03.** Peak memory for a 1,000-state graph stays within the
   baseline threshold recorded in perf.md. While no baseline exists, this
   check is red, never skipped.
-- **PERF-04.** A graph with 1,000 nodes and 12 UI-read values owns 12
+- **PERF-04.** A graph with 1,000 states and 12 UI-read values owns 12
   boundary objects, not 1,000.
-- **PERF-05.** A released node's slot is reused safely: its generation
+- **PERF-05.** A released state's slot is reused safely: its generation
   changes, and stale internal access is caught in debug builds.
-- **PERF-06.** Building a ref with `box[key]` allocates nothing.
-- **PERF-07.** Notice traffic for pinned keyed nodes — old keys the UI
+- **PERF-06.** Building a value reference with `box[key]` allocates nothing.
+- **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
   perf.md. While no baseline exists, this check is red, never skipped.
 - **PERF-08.** Keyed diamonds and key churn run under inline `AnyHashable`,
-  interned-token, and generic-keyed ref layouts in one pinned environment.
-  Results land in perf.md before the ref layout is selected.
+  interned-token, and generic-keyed value-reference layouts in one pinned environment.
+  Results land in perf.md before the value-reference layout is selected.
 - **PERF-09.** Mostly static and high-churn graphs run under the shared
-  edge pool, per-node prefix arrays, and inline-plus-overflow edge layouts
+  edge pool, per-state prefix arrays, and inline-plus-overflow edge layouts
   in one pinned environment. Results land in perf.md before the edge layout
   is selected.
 - **PERF-10.** The selected core is measured against the simple core,

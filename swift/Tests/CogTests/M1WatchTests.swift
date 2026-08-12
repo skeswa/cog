@@ -60,8 +60,8 @@ import Testing
 
 @MainActor
 @Test func `M1Watch watches a source through its read-only projection`() {
-  // API-surface coverage rather than a scenario claim: a read-only ref names
-  // the same node its source does, so watching it must be watching the source.
+  // API-surface coverage rather than a scenario claim: a read-only value reference names
+  // the same state its source does, so watching it must be watching the source.
   let cogs = Cogtext.forTesting()
   let source = ManualCog<Int>(1)
   let projection = source.readOnly

@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 // Derived-value scenarios written against the public `Cog` API and the
-// `CogTesting` product and nothing else — no `@testable`, no node storage, no
+// `CogTesting` product and nothing else — no `@testable`, no state storage, no
 // internal counters. That is scenarios.md constraint 3, and run-count claims
 // are exactly the place it would be tempting to break: the implementation
 // knows them precisely and the public API does not expose them at all.
@@ -14,14 +14,14 @@ import Testing
 // sees it — and it keeps saying the same thing after the M6 core swap, which is
 // what COUNT-09 through COUNT-11 require of this whole suite.
 //
-// Refs are declared inside each test rather than at file scope, and every test
+// Value references are declared inside each test rather than at file scope, and every test
 // states `@MainActor`, for the reason `M1CogtextReadTests.swift` gives: a
 // file-scope `let` would say different things in the MainActor and nonisolated
 // legs of the matrix (§7).
 //
 // The GRAPH and READ-03 sections add write-after-compute behavior on the same
 // public surface: selector-owned counters and snapshots show which cached
-// nodes ran and what they saw, without exposing settle flags, versions, or the
+// states ran and what they saw, without exposing settle flags, versions, or the
 // explicit stack.
 
 // MARK: - DECL-07
@@ -124,7 +124,7 @@ import Testing
   #expect(runs == 0)
 
   // Keep the declaration alive to the end of the test so nothing above can be
-  // explained away by the ref going out of scope.
+  // explained away by the value reference going out of scope.
   _ = doubled
 }
 

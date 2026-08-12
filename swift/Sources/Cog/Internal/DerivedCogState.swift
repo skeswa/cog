@@ -1,14 +1,14 @@
-/// The live state behind one ``Cog`` ref, in one context.
+/// The live state behind one ``Cog`` value reference, in one context.
 ///
-/// A derived node is the other half of ``ManualCogNode``: nothing writes it,
+/// A derived state is the other half of ``ManualCogState``: nothing writes it,
 /// and everything about it comes from running its declaration's selector. That
 /// run is what makes it lazy and what makes it cacheable — the two behaviors
-/// this node exists to provide (§2.2).
+/// this state exists to provide (§2.2).
 ///
-/// **Lazy.** The node computes nothing when it is created. A declaration is a
+/// **Lazy.** The state computes nothing when it is created. A declaration is a
 /// name, and an app that declares a hundred derived values and reads three
 /// should run three selectors. The first read is what runs the selector, and
-/// a node that is never read never runs at all (`DECL-09`).
+/// a state that is never read never runs at all (`DECL-09`).
 ///
 /// **Cached.** A run's value is kept, so a second read is a lookup rather than
 /// a second run (`READ-02`). CLEAN/CHECK/DIRTY state and versions make that
@@ -22,23 +22,23 @@
 /// second chance to collect them later. `M1-06aa` reads them to walk parents,
 /// and `M1-09a` makes recapture across conditionals and early returns
 /// observable.
-internal final class DerivedCogNode<Value>:
-  CogNode, CogConsumer, DerivedCogSettleNode, CogLifetimeLeaseNode
+internal final class DerivedCogState<Value>:
+  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState
 {
-  /// The declaration this node belongs to.
+  /// The declaration this state belongs to.
   let descriptor: DerivedCogDescriptor<Value>
 
-  /// Which node of `descriptor` this is, or `nil` for a keyless declaration.
+  /// Which state of `descriptor` this is, or `nil` for a keyless declaration.
   ///
-  /// A box node knows its own key so a diagnostic can name it — for example,
+  /// A box state knows its own key so a diagnostic can name it — for example,
   /// `isNiceOutside[90210]` rather than `isNiceOutside` — without a reverse
   /// lookup through the context's storage (§2.4).
   let key: AnyHashable?
 
-  /// The declaration half of this node's stable descriptor-and-key identity.
+  /// The declaration half of this state's stable descriptor-and-key identity.
   var descriptorIdentity: ObjectIdentifier { descriptor.identity }
 
-  /// Whether this node currently appears on the context's computation path.
+  /// Whether this state currently appears on the context's computation path.
   ///
   /// The common cycle check is this one bit. The context scans its active path
   /// only after the bit says a read would close a cycle.
@@ -48,7 +48,7 @@ internal final class DerivedCogNode<Value>:
   /// run in this context.
   ///
   /// This optional is storage presence, not value optionality, the same
-  /// distinction ``ManualCogNode/pendingValue`` makes. When `Value` is itself
+  /// distinction ``ManualCogState/pendingValue`` makes. When `Value` is itself
   /// optional, `.some(.none)` means a run really did produce nil — which must
   /// hit the cache, not run the selector a second time.
   internal private(set) var cachedValue: Value?
@@ -61,9 +61,9 @@ internal final class DerivedCogNode<Value>:
   /// edges are reused for producers that remain and removed from producers the
   /// next run drops. The physical layout remains benchmark-gated for `M6`
   /// (perf §3.3).
-  internal private(set) var dependencies: [any CogNode] = []
+  internal private(set) var dependencies: [any CogState] = []
 
-  /// Fresh derived nodes are DIRTY because they have no value to return yet.
+  /// Fresh derived states are DIRTY because they have no value to return yet.
   var settleState: CogSettleState
 
   /// The revision in which the cached value last really changed.
@@ -78,14 +78,14 @@ internal final class DerivedCogNode<Value>:
   var label: CogLabel { descriptor.label }
 
   /// The declaration's lifetime policy, shared by every key of a box.
-  var lifetime: CogNodeLifetime { descriptor.lifetime }
+  var lifetime: CogStateLifetime { descriptor.lifetime }
 
   /// External consumers currently keeping this derived root observed.
   var externalLeaseCount: Int
 
-  /// The descriptor-and-key identity this context files the node under.
-  var nodeIdentity: CogNodeIdentity {
-    CogNodeIdentity(descriptor: descriptorIdentity, key: key)
+  /// The descriptor-and-key identity this context files the state under.
+  var stateIdentity: CogStateIdentity {
+    CogStateIdentity(descriptor: descriptorIdentity, key: key)
   }
 
   /// Invalidates a pending grace completion when observation changes.
@@ -102,7 +102,7 @@ internal final class DerivedCogNode<Value>:
     return false
   }
 
-  /// Creates the node without computing anything.
+  /// Creates the state without computing anything.
   init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -116,7 +116,7 @@ internal final class DerivedCogNode<Value>:
     self.lifetimeReleaseGeneration = 0
   }
 
-  /// The node's value, running the selector if this is its first read.
+  /// The state's value, running the selector if this is its first read.
   ///
   /// Every read of a derived cog goes through here — tracked or untracked,
   /// from a selector or from outside one — so that no caller can spell a read
@@ -138,7 +138,7 @@ internal final class DerivedCogNode<Value>:
     return cached
   }
 
-  func recordDependency(on producer: any CogNode) {
+  func recordDependency(on producer: any CogState) {
     dependencies.append(producer)
     producer.addSubscriber(self)
   }
@@ -161,7 +161,7 @@ internal final class DerivedCogNode<Value>:
 
   /// Runs the selector once, tracking what it reads, and keeps the result.
   ///
-  /// The node installs itself as the context's tracked consumer for the
+  /// The state installs itself as the context's tracked consumer for the
   /// duration of the run, so a nested read of another derived cog computes
   /// that cog against *itself* and hands tracking back on the way out.
   private func run(in cogs: Cogtext) -> Value {
@@ -171,7 +171,7 @@ internal final class DerivedCogNode<Value>:
 
     #if DEBUG
     // Reader tracking ends before the user-supplied equality check below. Keep
-    // debug seed blocked until the node has recorded the result, or a seed from
+    // debug seed blocked until the state has recorded the result, or a seed from
     // that equality closure could be cleaned over and leave this cache stale.
     cogs.seedBarrierDepth += 1
     defer { cogs.seedBarrierDepth -= 1 }
@@ -192,7 +192,7 @@ internal final class DerivedCogNode<Value>:
     dependencies.removeAll(keepingCapacity: true)
 
     let value = cogs.tracking(self) {
-      descriptor.compute(Reader(cogs: cogs, node: self), key: key)
+      descriptor.compute(Reader(cogs: cogs, state: self), key: key)
     }
 
     for previousDependency in previousDependencies
@@ -204,7 +204,7 @@ internal final class DerivedCogNode<Value>:
       descriptor.valuesAreEqual(previousValue, value)
     {
       // Equality backdates the recomputation: dependencies were recaptured and
-      // the node is current through this revision, but its value did not
+      // the state is current through this revision, but its value did not
       // change in it. Keeping `changedAt` old is what lets a CHECK consumer
       // stop without running.
       markChecked(at: cogs.revision)

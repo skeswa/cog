@@ -232,7 +232,7 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
 _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
-  `ObjectIdentifier` identity, human labels, and `ManualCog<T>` ref values.
+  `ObjectIdentifier` identity, human labels, and `ManualCog<T>` value references.
   _Depends: M0-10._
   _Verify: `mise run test --filter M1DescriptorInfrastructure`._
 - **M1-34a** _(Decision)_ — Settle production-install and testing-factory
@@ -240,7 +240,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   choice in §10 and the Swift README snapshot.
   _Depends: M0-10._
   _Verify: recorded decision, API sketch, and call-site vocabulary search._
-- **M1-01b** _(Behavior)_ — Add descriptor-plus-key node storage, the
+- **M1-01b** _(Behavior)_ — Add descriptor-plus-key state storage, the
   `CogTesting` isolated-context factory, and untracked manual reads.
   _Depends: M1-01a, M1-34a._
   _Verify: `mise run test --filter 'DECL-01|ONE-04'`._
@@ -254,7 +254,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-01b._
   _Verify: `mise run test --filter CogTestingAcknowledgementInfrastructure`._
 - **M1-02** _(Behavior)_ — Add `ManualCogBox`, constant and closure starting
-  values, allocation-free `box[key]` refs, and per-key state identity.
+  values, allocation-free `box[key]` value references, and per-key state identity.
   _Depends: M1-01b._
   _Verify: `mise run test --filter 'DECL-02|DECL-03|DECL-04'`._
   _Greens: DECL-02, DECL-03, DECL-04._
@@ -334,7 +334,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter 'GRAPH-09|GRAPH-10'`._
   _Greens: GRAPH-09, GRAPH-10._
 - **M1-09b** _(Behavior)_ — Remove dropped keyed dependencies and recapture
-  ref-through-ref indirection.
+  value-reference indirection.
   _Depends: M1-04b, M1-05b, M1-09a._
   _Verify: `mise run test --filter 'GRAPH-11|GRAPH-12'`._
   _Greens: GRAPH-11, GRAPH-12._
@@ -380,13 +380,13 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-15b** _(Infrastructure)_ — Add computing marks and full
   descriptor-and-key cycle paths over the explicit stack.
   _Depends: M1-09b, M1-15a._
-  _Verify: internal self, multi-node, and keyed cycle probes._
+  _Verify: internal self, multi-state, and keyed cycle probes._
 - **M1-15c** _(Behavior)_ — Add conditional/keyed cycle reporting and the
   narrow `CogTesting` diagnostic seam.
   _Depends: M1-15b._
   _Verify: `mise run test --filter 'CYCLE-03|CYCLE-04|CYCLE-05'`._
   _Greens: CYCLE-03, CYCLE-04, CYCLE-05._
-- **M1-15d** _(Behavior)_ — Prove self and multi-node cycle failure in debug
+- **M1-15d** _(Behavior)_ — Prove self and multi-state cycle failure in debug
   and release with exit tests.
   _Depends: M1-15c._
   _Verify: `mise run test --filter 'CYCLE-01|CYCLE-02'` and
@@ -632,7 +632,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
 - **M2-17a** _(Decision)_ — In the smallest tracked-view prototype, compare
-  `cogs.get(ref)`, `cogs[ref]`, and callable refs before boundary call sites
+  `cogs.get(valueReference)`, `cogs[valueReference]`, and callable value references before boundary call sites
   multiply.
   _Depends: M1-32._
   _Verify: checked-in prototype diff and decision rationale._
@@ -641,7 +641,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-17a._
   _Verify: API call-site search plus `mise run fmt:check`._
 - **M2-01** _(Infrastructure)_ — Add registrar-backed boundary objects,
-  one phantom key path, lazy per-node storage, and change-only mutation.
+  one phantom key path, lazy per-state storage, and change-only mutation.
   _Depends: M2-17b._
   _Verify: focused registrar infrastructure tests._
 - **M2-02aa** _(Behavior)_ — Add the `\.cogs` environment key and prove views
@@ -654,8 +654,8 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02aa._
   _Verify: `mise run test --filter 'UI-01|UI-02'`._
   _Greens: UI-01, UI-02._
-- **M2-02b** _(Behavior)_ — Prove only UI-read nodes receive boundary objects
-  and interior nodes never do.
+- **M2-02b** _(Behavior)_ — Prove only UI-read states receive boundary objects
+  and interior states never do.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-05`._
   _Greens: UI-05._
@@ -692,7 +692,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter 'REACT-19|HIST-06'`._
   _Greens: REACT-19, HIST-06._
-- **M2-10** _(Behavior)_ — Pin a node after its first UI read for the app
+- **M2-10** _(Behavior)_ — Pin a state after its first UI read for the app
   context's lifetime.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter LIFE-08`._
@@ -810,7 +810,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter ASYNC-12`._
   _Greens: ASYNC-12._
 - **M3-08a** _(Decision)_ — Settle one-shot reads and refreshes of never-read
-  async refs; update §10, snapshot, scenarios, and tasks before implementing
+  async value references; update §10, snapshot, scenarios, and tasks before implementing
   refresh, using the `M3-08c*` branch for any additional behavior tasks.
   _Depends: M3-02._
   _Verify: recorded decision, any `M3-08c*` terminal added to M3-11, and
@@ -906,7 +906,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 - **M5-01a** _(Infrastructure)_ — Scaffold `CogScenarios` graph builders,
-  in-selector counters, expected counts, and ref-layout parameterization.
+  in-selector counters, expected counts, and value-reference layout parameterization.
   Start after the approved tag exists; Pages and GitHub Release verification
   may finish in parallel because later commits cannot change that tag.
   _Depends: M4-05c._
@@ -962,7 +962,7 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-05bb._
   _Verify: one MainActor benchmark builds and runs in the pinned environment._
 - **M5-06** _(Behavior)_ — Add zero-allocation steady-turn and `box[key]`
-  ref-creation benchmarks.
+  value-reference creation benchmarks.
   _Depends: M5-05c, M5-02a, M5-04a._
   _Verify: benchmark filters for PERF-01 and PERF-06 report zero mallocs._
   _Greens: PERF-01, PERF-06._
@@ -975,7 +975,7 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-08a._
   _Verify: benchmark filter for PERF-02 plus recorded result._
   _Greens: PERF-02._
-- **M5-07b** _(Behavior)_ — Measure 1,000-node peak memory, record its initial
+- **M5-07b** _(Behavior)_ — Measure 1,000-state peak memory, record its initial
   threshold, and turn the check green.
   _Depends: M5-08a._
   _Verify: benchmark filter for PERF-03 plus `perf.md` threshold._
@@ -993,30 +993,30 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   `bench-build` CI job.
   _Depends: M5-07a, M5-07b, M5-07c, M5-07d._
   _Verify: local bench command and CI release build._
-- **M5-09a** _(Infrastructure)_ — Put ref layout behind a test/benchmark
-  candidate seam selected by `COG_TEST_REF_LAYOUT`; record inline
+- **M5-09a** _(Infrastructure)_ — Put value-reference layout behind a test/benchmark
+  candidate seam selected by `COG_TEST_VALUE_REFERENCE_LAYOUT`; record inline
   `AnyHashable` as the baseline candidate.
   _Depends: M5-04b, M5-08b._
-  _Verify: `COG_TEST_REF_LAYOUT=inline mise run test` and the keyed benchmark
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline mise run test` and the keyed benchmark
   slice run through the seam._
 - **M5-09b** _(Infrastructure)_ — Implement the interned-token candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_REF_LAYOUT=interned mise run test --filter COUNT-07`._
-- **M5-09c** _(Infrastructure)_ — Implement the generic-keyed-ref candidate.
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=interned mise run test --filter COUNT-07`._
+- **M5-09c** _(Infrastructure)_ — Implement the generic-keyed-value-reference candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_REF_LAYOUT=generic mise run test --filter COUNT-07`._
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=generic mise run test --filter COUNT-07`._
 - **M5-09d** _(Behavior)_ — Run every behavior scenario through M5 unchanged
-  under all three ref layouts; expose the loop as `mise run test:refs`.
+  under all three value-reference layouts; expose the loop as `mise run test:value-references`.
   _Depends: M5-02b, M5-03a, M5-03b, M5-09b, M5-09c._
-  _Verify: `mise run test:refs`._
+  _Verify: `mise run test:value-references`._
   _Greens: COUNT-09._
 - **M5-09e** _(Behavior)_ — Benchmark keyed diamonds and churn under every
-  ref layout, record results, and settle the layout in `perf.md` and §10.
+  value-reference layout, record results, and settle the layout in `perf.md` and §10.
   _Depends: M5-09d._
   _Verify: recorded comparison and selected-layout rationale._
   _Greens: PERF-08._
 - **M5-10** _(Gate)_ — Close M5 with scenario tests, benchmark build,
-  baselines, records, and the selected ref layout green.
+  baselines, records, and the selected value-reference layout green.
   _Depends: M4-05e, M5-09e._
   _Verify: `mise run test:matrix`, `mise run bench`, and baseline check._
 
@@ -1065,7 +1065,7 @@ ArenaDirtyPropagationInfrastructure`._
   paths.
   _Depends: M6-07ac._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter CYCLE`._
-- **M6-03** _(Infrastructure)_ — Implement Reactively-style per-node prefix
+- **M6-03** _(Infrastructure)_ — Implement Reactively-style per-state prefix
   arrays behind the runnable edge seam.
   _Depends: M6-07ac._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=prefix mise run test --filter
@@ -1118,7 +1118,7 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10ab._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'READ|GRAPH|DECL-0[7-9]'`._
-- **M6-10bb** _(Infrastructure)_ — Pass public self, multi-node, conditional,
+- **M6-10bb** _(Infrastructure)_ — Pass public self, multi-state, conditional,
   keyed, and commit-during-derived-computation failure behavior through the
   arena selector.
   _Depends: M6-10ba._
@@ -1374,7 +1374,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-13b, M7-14b._
   _Verify: modern simulator and legacy host tests for EXPORT-13._
   _Greens: EXPORT-13._
-- **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected ref,
+- **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
   _Depends: M7-03b, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
   M7-12, M7-15._

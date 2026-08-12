@@ -20,25 +20,25 @@ public struct ReactionReader {
   }
 
   /// Reads a source and records it as a dependency of this reaction run.
-  public func get<Value>(_ ref: ManualCog<Value>) -> Value {
+  public func get<Value>(_ valueReference: ManualCog<Value>) -> Value {
     cogs.requireTracking(reaction)
 
-    let producer = cogs.manualNode(for: ref)
+    let producer = cogs.manualState(for: valueReference)
     reaction.recordDependency(on: producer)
     return producer.currentValue
   }
 
   /// Reads a derived cog and records it as a dependency of this reaction run.
-  public func get<Value>(_ ref: Cog<Value>) -> Value {
+  public func get<Value>(_ valueReference: Cog<Value>) -> Value {
     cogs.requireTracking(reaction)
 
-    let producer = cogs.derivedNode(for: ref)
+    let producer = cogs.derivedState(for: valueReference)
     reaction.recordDependency(on: producer)
     return producer.settledValue(in: cogs)
   }
 
   /// Reads a source's read-only projection and records the source dependency.
-  public func get<Value>(_ ref: ReadOnlyCog<Value>) -> Value {
-    get(ref.source)
+  public func get<Value>(_ valueReference: ReadOnlyCog<Value>) -> Value {
+    get(valueReference.source)
   }
 }
