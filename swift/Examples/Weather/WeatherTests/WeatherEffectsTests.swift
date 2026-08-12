@@ -96,7 +96,65 @@ import os
   clock.finish()
 }
 
+@MainActor
+@Test func aFailedHourlyRefreshDoesNotStopLaterOnes() async throws {
+  let clock = WeatherTestClock()
+  let cogs = Cogtext.forTesting()
+  let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
+  let attempts = OSAllocatedUnfairLock(initialState: 0)
+  let service = WeatherService(
+    weather: { _ in
+      let attempt = attempts.withLock { count in
+        count += 1
+        return count
+      }
+      if attempt == 1 { throw WeatherRequestFailure() }
+      return refreshedWeather
+    },
+    advisories: { _ in [] }
+  )
+
+  cogs.seedWeatherService(service)
+  cogs.seedCurrentZip(.newYork)
+  let group = WeatherEffects(
+    notifier: Notifier { _ in },
+    clock: clock,
+    initialZipCodes: []
+  )
+  .install(in: cogs)
+
+  try await clock.waitForScheduledSleep()
+  clock.advance(by: .seconds(3_600))
+  try await clock.waitForScheduledSleep()
+
+  #expect(cogs.read(weatherLoadStatus[.newYork]) == .failed)
+  #expect(cogs.read(weatherReport[.newYork]) == nil)
+
+  clock.advance(by: .seconds(3_600))
+  try await clock.waitForScheduledSleep()
+
+  #expect(cogs.read(weatherReport[.newYork]) == refreshedWeather)
+  #expect(cogs.read(weatherLoadStatus[.newYork]) == .idle)
+  #expect(attempts.withLock { $0 } == 2)
+
+  group.cancel()
+  clock.finish()
+}
+
+private nonisolated struct WeatherRequestFailure: Error {}
+
+/// A clock whose time only moves when a test moves it.
+///
+/// The two streams are a strict ping-pong between exactly two consumers: the
+/// effect task alone awaits `ticks` inside `sleep(until:tolerance:)`, and the
+/// test task alone awaits `scheduledEvents` through `waitForScheduledSleep`.
+/// Nothing here may grow a second consumer of either stream.
 private nonisolated final class WeatherTestClock: Clock, @unchecked Sendable {
+  /// Fails a wait rather than hanging it when the awaited signal never lands.
+  struct SignalTimeout: Error, CustomStringConvertible {
+    let description = "the effect task scheduled no sleep before the deadline"
+  }
+
   struct Instant: InstantProtocol, Hashable, Sendable {
     let offset: Swift.Duration
 
@@ -149,11 +207,27 @@ private nonisolated final class WeatherTestClock: Clock, @unchecked Sendable {
     }
   }
 
-  func waitForScheduledSleep() async throws {
-    var iterator = scheduledEvents.makeAsyncIterator()
-    guard await iterator.next() != nil else {
-      throw CancellationError()
+  /// Waits until the effect task is asleep on this clock again.
+  ///
+  /// The wait is bounded on the real clock. An effect task that has died —
+  /// which is exactly what a refresh loop does when it lets an error escape —
+  /// will never schedule another sleep, and an unbounded wait would hang the
+  /// suite instead of reporting the regression.
+  func waitForScheduledSleep(within budget: Swift.Duration = .seconds(5)) async throws {
+    let scheduled = try await withThrowingTaskGroup(of: Bool.self) { group in
+      group.addTask {
+        var iterator = self.scheduledEvents.makeAsyncIterator()
+        return await iterator.next() != nil
+      }
+      group.addTask {
+        try await Task.sleep(for: budget)
+        return false
+      }
+      let first = try await group.next() ?? false
+      group.cancelAll()
+      return first
     }
+    guard scheduled else { throw SignalTimeout() }
   }
 
   func advance(by duration: Swift.Duration) {

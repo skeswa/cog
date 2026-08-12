@@ -71,11 +71,25 @@ private func runHourlyRefresh<C: Clock>(
   every interval: Duration,
   in cogs: Cogtext
 ) async throws where C.Duration == Duration {
+  // The deadline advances from the previous deadline rather than from "now",
+  // so a slow refresh does not make the schedule drift. A refresh that outlasts
+  // the interval leaves the next deadline already past, and that tick fires
+  // immediately instead of being skipped.
   var nextRefresh = clock.now.advanced(by: interval)
   while true {
     try await clock.sleep(until: nextRefresh, tolerance: nil)
     nextRefresh = nextRefresh.advanced(by: interval)
     guard let zip = cogs.read(currentZipCode) else { continue }
-    try await cogs.checkWeather(zip)
+
+    do {
+      try await cogs.checkWeather(zip)
+    } catch let cancellation as CancellationError {
+      throw cancellation
+    } catch {
+      // A failed refresh is a modelled state, not a reason to stop refreshing.
+      // `checkWeather` has already recorded `.failed`, which the card surfaces
+      // alongside a retry. Rethrowing would end this task, silently disabling
+      // background refresh for the rest of the process after one bad hour.
+    }
   }
 }
