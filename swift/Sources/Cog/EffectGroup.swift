@@ -12,6 +12,10 @@ public final class EffectGroup {
   /// Creates an empty live group.
   public init() {}
 
+  isolated deinit {
+    cancel()
+  }
+
   /// Gives this group ownership of one reaction registration.
   ///
   /// The terminal add-after-cancel rule is completed by M1-23da. Until then,
