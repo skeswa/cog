@@ -28,4 +28,24 @@ public final class ReactionToken {
   public func cancel() {
     reaction.cancel()
   }
+
+  /// Cancels the registration once the last handle to it goes away.
+  ///
+  /// An effect that nobody can still reach is an effect nobody can still stop,
+  /// so letting the registration run on would leak work no caller could
+  /// account for. Dropping the last token is therefore a way of ending an
+  /// effect, not a way of leaking one.
+  ///
+  /// Spelled `isolated`, which is the opposite of what the nodes and
+  /// descriptors need. A `deinit` is nonisolated unless it says otherwise, and
+  /// a nonisolated one here could not call into the graph at all; those types
+  /// are generic classes, where an isolated `deinit` instead crashes the
+  /// release optimizer. This class is not generic, so it can have the
+  /// isolation, and the isolation is what lets a token released on the
+  /// MainActor cancel synchronously — before the next line of the code that
+  /// dropped it, with nothing to await. A token released anywhere else hops,
+  /// which is why stopping an effect *now* remains ``cancel()``'s job.
+  isolated deinit {
+    reaction.cancel()
+  }
 }

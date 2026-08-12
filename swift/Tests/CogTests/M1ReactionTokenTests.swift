@@ -109,6 +109,41 @@ import Testing
 }
 
 @MainActor
+@Test func `REACT-12 dropping the last token copy cancels the reaction`() {
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(1)
+  var seen: [Int] = []
+
+  // Two copies of one registration, released one at a time. Optionals rather
+  // than a scope, so the drop happens on a line this test names instead of
+  // wherever the compiler decides the last use was.
+  var held: ReactionToken? = cogs.run { c in
+    seen.append(c.get(source))
+  }
+  var copy: ReactionToken? = held
+
+  #expect(seen == [1])
+
+  copy = nil
+
+  cogs.commit { w in w[source] = 2 }
+
+  // Not the last copy, so the registration is untouched.
+  #expect(seen == [1, 2])
+
+  held = nil
+
+  cogs.commit { w in w[source] = 3 }
+
+  // Now it was, and the reaction stopped — synchronously, with no await and no
+  // poll, because the token was released on the actor the graph runs on.
+  #expect(seen == [1, 2])
+  #expect(cogs.read(source) == 3)
+
+  _ = (held, copy)
+}
+
+@MainActor
 @Test func `REACT-13 token copies name one registration`() {
   let cogs = Cogtext.forTesting()
   let aliased = ManualCog<Int>(1)
