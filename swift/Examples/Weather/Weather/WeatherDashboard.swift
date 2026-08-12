@@ -32,7 +32,7 @@ struct WeatherDashboard: View {
         .padding()
       }
       .background(Color(uiColor: .systemGroupedBackground))
-      .navigationTitle("Weather")
+      .navigationTitle("Cog Weather")
     }
   }
 }
