@@ -29,7 +29,7 @@ internal final class AsyncCogState<Value>:
   /// The phase returned to readers after its publication turn.
   private var phase: CogPhase<Value>?
 
-  /// Work started by the first read. Result publication lands in M3-03a.
+  /// Work started by the first read.
   private var activeTask: Task<Void, Never>?
 
   var readerCurrentValue: CogPhase<Value>? { phase }
@@ -112,8 +112,24 @@ internal final class AsyncCogState<Value>:
     }
 
     let operation = work.operation
-    activeTask = Task(name: renderedName) { @MainActor in
-      _ = try? await operation()
+    activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
+      do {
+        let value = try await operation()
+        guard let self, let cogs else { return }
+        self.publish(.success(value), named: "success", in: cogs)
+      } catch {
+        guard let self, let cogs else { return }
+        self.publish(.failure(error, previous: .none), named: "failure", in: cogs)
+      }
+    }
+  }
+
+  /// Publishes one completed work result as its own named turn.
+  private func publish(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
+    activeTask = nil
+    cogs.withSystemTurn("\(renderedName) \(phaseName)") { turn in
+      self.pendingPhase = phase
+      turn.touch(self)
     }
   }
 
