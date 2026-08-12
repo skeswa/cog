@@ -90,10 +90,34 @@ import os
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
-  #expect(turnNames == ["weather.refreshStarted", "weather.check"])
+  #expect(turnNames == ["weather.useRefreshInterval", "weather.refreshStarted", "weather.check"])
 
   group.cancel()
   clock.finish()
+}
+
+@MainActor
+@Test func installingEffectsPublishesTheCadenceTheLoopActuallyKeeps() {
+  let cogs = Cogtext.forTesting()
+  cogs.seedCurrentZip(.newYork)
+
+  #expect(cogs.peek(refreshInterval) == nil)
+  #expect(cogs.peek(receivesHourlyUpdates[.newYork]) == false)
+
+  let group = WeatherEffects(
+    notifier: Notifier { _ in },
+    initialZipCodes: [],
+    hourlyRefreshInterval: .seconds(5)
+  )
+  .install(in: cogs)
+
+  #expect(cogs.peek(refreshInterval) == .seconds(5))
+  #expect(cogs.peek(refreshInterval)?.cadenceDescription == "5 seconds")
+  #expect(cogs.peek(refreshInterval)?.shortCadenceDescription == "5 sec")
+  #expect(cogs.peek(receivesHourlyUpdates[.newYork]) == true)
+  #expect(cogs.peek(receivesHourlyUpdates[.seattle]) == false)
+
+  group.cancel()
 }
 
 @MainActor

@@ -41,6 +41,8 @@ private struct BackgroundUpdatesCard: View {
   let cogs: Cogtext
 
   var body: some View {
+    let cadence = cogs[refreshInterval]?.cadenceDescription
+
     VStack(alignment: .leading, spacing: 14) {
       HStack(spacing: 12) {
         Image(systemName: "clock.arrow.circlepath")
@@ -52,9 +54,12 @@ private struct BackgroundUpdatesCard: View {
         VStack(alignment: .leading, spacing: 2) {
           Text("Hourly refresh demo")
             .font(.headline)
-          Text("Each simulated hour passes in 5 seconds.")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+          Text(
+            cadence.map { "Each simulated hour passes in \($0)." }
+              ?? "Background refresh is not running."
+          )
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
         }
       }
 
@@ -75,7 +80,10 @@ private struct BackgroundUpdatesCard: View {
       .pickerStyle(.segmented)
       .labelsHidden()
       .accessibilityLabel("City to refresh")
-      .accessibilityHint("Choose one city to update every five seconds")
+      .accessibilityHint(
+        cadence.map { "Choose one city to update every \($0)" }
+          ?? "Choose one city to update in the background"
+      )
     }
     .padding(16)
     .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 20))

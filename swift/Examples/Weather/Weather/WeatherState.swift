@@ -21,12 +21,23 @@ import SwiftUI
   .idle,
   name: "weather.loadStatus"
 )
+/// How often background refresh runs, or `nil` while none is installed.
+///
+/// `WeatherEffects.install` publishes its own interval here. The cadence is
+/// configuration rather than weather, but the cards describe it, and a screen
+/// that repeats the literal instead is a second source of the same fact — one
+/// that goes quietly wrong the moment the interval changes.
+@MainActor private let refreshIntervalSource = ManualCog<Duration?>(
+  nil,
+  name: "weather.refreshInterval"
+)
 
 @MainActor let weatherService = weatherServiceSource.readOnly
 @MainActor let weatherReport = weatherReportSource.readOnly
 @MainActor let heatAdvisory = heatAdvisorySource.readOnly
 @MainActor let currentZipCode = currentZipSource.readOnly
 @MainActor let weatherLoadStatus = weatherLoadStatusSource.readOnly
+@MainActor let refreshInterval = refreshIntervalSource.readOnly
 
 @MainActor let isSunny = CogBox<Bool, ZipCode>(
   { c, zip in
@@ -59,7 +70,7 @@ import SwiftUI
 
 @MainActor let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
   { c, zip in
-    c[currentZipCode] == zip
+    c[refreshInterval] != nil && c[currentZipCode] == zip
   },
   name: "weather.receivesHourlyUpdates"
 )
@@ -108,6 +119,12 @@ extension Cogtext {
       name: "weather.useCurrentLocation"
     ) { c, zip in
       c[currentZipSource] = zip
+    }
+  }
+
+  func useRefreshInterval(_ interval: Duration?) {
+    commit("weather.useRefreshInterval") { c in
+      c[refreshIntervalSource] = interval
     }
   }
 }

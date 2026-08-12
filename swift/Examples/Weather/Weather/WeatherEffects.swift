@@ -34,6 +34,10 @@ struct WeatherEffects {
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
 
+    // Publish the cadence the loop below will actually keep, so the cards can
+    // describe it instead of repeating a literal that drifts.
+    cogs.useRefreshInterval(hourlyRefreshInterval)
+
     for zip in initialZipCodes {
       group.task(name: "weather.initialRefresh[\(zip)]") {
         try await cogs.checkWeather(zip)

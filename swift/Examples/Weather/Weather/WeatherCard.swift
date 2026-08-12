@@ -24,6 +24,7 @@ struct WeatherCardContent: View {
     let nice = cogs[isNiceOutside[zip]]
     let status = cogs[weatherLoadStatus[zip]]
     let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
+    let cadence = cogs[refreshInterval]?.shortCadenceDescription
     #if DEBUG
     let _ = renderProbe?(WeatherCardSnapshot(zip: zip, report: report, isNice: nice))
     #endif
@@ -41,8 +42,8 @@ struct WeatherCardContent: View {
 
         Spacer()
 
-        if receivesUpdates {
-          Label("Every 5 sec", systemImage: "timer")
+        if receivesUpdates, let cadence {
+          Label("Every \(cadence)", systemImage: "timer")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tint)
             .padding(.horizontal, 9)
