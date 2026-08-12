@@ -396,18 +396,18 @@ isolation; and named effect runs in history.
   (`xcodebuild test -scheme cog-Package -destination
 'platform=iOS Simulator,…' -only-testing:CogBoundaryTests`), plus a
   Weather build so the example cannot rot.
-- Optional nightly job once the floor runtime is available: install a pinned
-  iOS 17.5 (build 21F79, arm64) simulator and run the core tracked-read, unrelated-write,
-  equality-gated notice, and immediate-binding boundary scenarios. M7 extends
-  this job with the pre-iOS-26 `c.track` re-arm scenarios. Too slow for per-PR.
-  A time-boxed feasibility task records the exact runtime-install path —
-  now into the self-hosted runner's pinned image, which owning the hardware
-  makes far more tractable than a hosted-runner install — and whether that
-  runtime can be kept reliably available. `M2-18a` found the exact
-  Apple-supported download/import path but no installed runtime on the runner
-  on August 12, 2026. The root README records the provisioning and recovery
-  commands. Until import, boot, reboot, and UI-14 all pass on `homemac`, the
-  nightly remains explicitly non-blocking.
+- Optional nightly job if a reliable floor runtime becomes available: install
+  an iOS 17.5 (build 21F79) simulator and run the core tracked-read,
+  unrelated-write, equality-gated notice, and immediate-binding boundary
+  scenarios. M7 extends this job with the pre-iOS-26 `c.track` re-arm
+  scenarios. Too slow for per-PR. `M2-18a` identified the intended component
+  and Apple-documented download/import mechanism, but the real runner's pinned
+  Xcode 26.6 rejected exact-build downloads with both `arm64` and `universal`
+  variants on August 12, 2026. The catalog's raw artifact requires
+  authentication, so there is no verified provisioning or recovery path. The
+  project owner chose to defer this requirement; `M2-18b` remains explicitly
+  non-blocking until a runtime can pass import, boot, reboot, and UI-14 on
+  `homemac`.
 
 <a id="plan-m3"></a>
 
@@ -693,11 +693,13 @@ release gates.
   persistent bare metal, which moots the VM-only questions (orchestrator
   maturity, the Virtualization.framework two-VM limit, simulator
   performance inside a VM) unless the deferred Tart upgrade is ever taken.
-  `M2-18a` selected iOS 17.5 build 21F79 and recorded Apple's reproducible
-  download/import mechanism plus a persistent recovery cache. The runner had
-  83 GiB free but no iOS 17 runtime on August 12, 2026. Import, boot,
+  `M2-18a` selected iOS 17.5 build 21F79 as the intended floor. The runner had
+  83 GiB free but no iOS 17 runtime on August 12, 2026, and Xcode 26.6 then
+  rejected that exact build as unavailable with both CLI architecture
+  selections. Because no reproducible authenticated acquisition path was
+  established, the project owner deferred the requirement. Import, boot,
   post-reboot availability, and UI-14 remain empirical checks; until all four
-  pass, `M2-18b` stays deferred and non-blocking.
+  pass, `M2-18b` stays in To Do and non-blocking.
 - VM-versus-bare-metal benchmark noise on the mini (probed at `M5-05bb`
   before baselines are recorded).
 - Benchmark package canonical repository, ARC metric names, minimum version,

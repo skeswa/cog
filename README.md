@@ -152,34 +152,20 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
   two concurrent jobs cannot fight over a machine-wide setting.
 
   **Floor simulator runtime.** `M2-18a` selected iOS **17.5**, build
-  **21F79**, arm64 as the exact floor component. Xcode 26.6 supports iOS 15+
-  simulator runtimes, and Apple's component service still lists this build.
-  The persistent runner does not have it installed as of 2026-08-12, so the
-  floor job remains non-blocking until a one-time import, boot, reboot, and
-  UI-14 run all succeed on `homemac`.
+  **21F79** as the intended floor component. Xcode 26.6 supports iOS 15+
+  simulator runtimes, and Apple's catalog still lists this build, but that
+  catalog entry does not amount to a reproducible install path. On 2026-08-12,
+  the real runner's pinned Xcode rejected exact-build downloads with both
+  `arm64` and `universal` architecture variants as unavailable. The catalog's
+  raw artifact also redirects unauthenticated requests.
 
-  Provision it as the runner administrator with the pinned Xcode selected for
-  that command only. Keep the exported component outside runner work and temp
-  directories so scrub hooks preserve the recovery copy:
-
-  ```sh
-  COG_RUNTIME_CACHE=/Users/Shared/cog-ci/simulator-runtimes/ios-17.5-21F79-arm64
-  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-    xcodebuild -downloadPlatform iOS -buildVersion 21F79 \
-      -architectureVariant arm64 -exportPath "$COG_RUNTIME_CACHE"
-  COG_RUNTIME_BUNDLE="$(find "$COG_RUNTIME_CACHE" -maxdepth 1 \
-    \( -name '*.exportedBundle' -o -name '*.dmg' \) -print -quit)"
-  test -n "$COG_RUNTIME_BUNDLE"
-  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-    xcodebuild -importPlatform "$COG_RUNTIME_BUNDLE"
-  ```
-
-  Do not pin or download the catalog's raw artifact URL; Apple redirects it
-  through authentication. After import, use XcodeBuildMCP's simulator list and
-  boot commands to require an available runtime named exactly `iOS 17.5`, then
-  repeat after reboot before enabling the nightly. If registration disappears,
-  re-import the preserved bundle rather than depending on Apple to continue
-  serving it.
+  The project owner therefore deferred the floor-runtime requirement. There
+  is no iOS 17 nightly, and `M2-18b` remains non-blocking and in To Do until a
+  reliable runtime becomes available without making CI depend on a personal
+  Apple Account or an unverified artifact URL. If one does become available,
+  qualify it with an import, boot, reboot, and UI-14 run on `homemac` before
+  enabling the nightly, and preserve an exported recovery copy outside runner
+  work and temp directories.
 
 - **Runners.** _Amended 2026-08-11 to match the provisioned host._ One
   runner, `homemac`, **repository-scoped to `skeswa/cog`** so no other
