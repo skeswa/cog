@@ -94,11 +94,11 @@ extension Cogtext {
         c[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
         c[weatherLoadStatusSource[zip]] = .idle
       }
-    } catch is CancellationError {
+    } catch let cancellation as CancellationError {
       commit("weather.refreshCancelled") { c in
         c[weatherLoadStatusSource[zip]] = .idle
       }
-      throw CancellationError()
+      throw cancellation
     } catch {
       commit("weather.refreshFailed") { c in
         c[weatherLoadStatusSource[zip]] = .failed
