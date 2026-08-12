@@ -29,6 +29,13 @@
 /// their own default isolation is (§7).
 @MainActor
 public final class Cogtext {
+  /// The monotonic clock used by context-owned timing work.
+  ///
+  /// Production injects a ``ContinuousClock``. `CogTesting` can instead
+  /// retain a clock the test controls, so grace periods and other timed work
+  /// wait for a definite signal rather than wall-clock time.
+  internal let clock: any Clock<Duration>
+
   /// The monotonic version assigned to graph work.
   ///
   /// Every outer turn advances it once at its commit boundary, including an
@@ -120,7 +127,9 @@ public final class Cogtext {
   /// app, and `Cogtext.forTesting()` for a test or preview runtime. Feature
   /// code that tries to build a plain context does not get a runtime error, it
   /// gets a compile error, because the name is not visible to it.
-  package init() {}
+  package init(clock: any Clock<Duration> = ContinuousClock()) {
+    self.clock = clock
+  }
 
   /// Breaks graph-owned dependency chains before stored properties release.
   ///

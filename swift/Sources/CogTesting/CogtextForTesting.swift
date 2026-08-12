@@ -35,7 +35,13 @@ extension Cogtext {
   /// This lives in `CogTesting` rather than `Cog` on purpose. An app target
   /// that depends only on `Cog` has no way to name this function, so a test
   /// helper cannot drift into shipping code by accident.
-  public static func forTesting() -> Cogtext {
-    Cogtext()
+  ///
+  /// - Parameter clock: The monotonic clock context-owned timing work uses.
+  ///   Keep the concrete clock in a timed test so the test can advance it
+  ///   without waiting for wall-clock time.
+  public static func forTesting(
+    clock: any Clock<Duration> = ContinuousClock()
+  ) -> Cogtext {
+    Cogtext(clock: clock)
   }
 }
