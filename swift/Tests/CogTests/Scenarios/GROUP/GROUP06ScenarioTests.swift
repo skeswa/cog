@@ -11,7 +11,7 @@ import os
 
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
-    group.task(name: "location.hourlyRefresh.timer") {
+    group.task(name: "location.hourlyRefresh.timer") { @MainActor in
       while true {
         try await clock.sleep(for: .seconds(3_600))
         cogs.commit("location.hourlyRefresh") { writer in

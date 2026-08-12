@@ -33,7 +33,7 @@ public final class EffectGroup {
   @discardableResult
   public func task(
     name: String,
-    _ operation: @escaping @MainActor () async throws -> Void
+    _ operation: sending @escaping @isolated(any) () async throws -> Void
   ) -> Task<Void, any Error> {
     let task = Task(name: name) { @MainActor in
       try Task.checkCancellation()
