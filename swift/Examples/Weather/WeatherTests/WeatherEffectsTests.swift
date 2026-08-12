@@ -18,7 +18,7 @@ import os
     zip: .newYork
   )
 
-  let group = WeatherEffects(notifier: notifier).install(in: cogs)
+  let group = WeatherEffects(notifier: notifier, initialZipCodes: []).install(in: cogs)
   #expect(alerts.isEmpty)
 
   cogs.stubWeather(
@@ -73,8 +73,12 @@ import os
 
   cogs.seedWeatherService(service)
   cogs.seedCurrentZip(.newYork)
-  let group = WeatherEffects(notifier: Notifier { _ in }, clock: clock)
-    .install(in: cogs)
+  let group = WeatherEffects(
+    notifier: Notifier { _ in },
+    clock: clock,
+    initialZipCodes: []
+  )
+  .install(in: cogs)
 
   try await clock.waitForScheduledSleep()
   #expect(cogs.read(weatherReport[.newYork]) == nil)
@@ -86,7 +90,7 @@ import os
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
-  #expect(turnNames == ["weather.check"])
+  #expect(turnNames == ["weather.refreshStarted", "weather.check"])
 
   group.cancel()
   clock.finish()

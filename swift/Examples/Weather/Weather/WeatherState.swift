@@ -17,10 +17,15 @@ import SwiftUI
   nil,
   name: "weather.currentZip"
 )
+@MainActor private let weatherLoadStatusSource = ManualCogBox<WeatherLoadStatus, ZipCode>(
+  .idle,
+  name: "weather.loadStatus"
+)
 
 @MainActor let weatherService = weatherServiceSource.readOnly
 @MainActor let weatherReport = weatherReportSource.readOnly
 @MainActor let currentZipCode = currentZipSource.readOnly
+@MainActor let weatherLoadStatus = weatherLoadStatusSource.readOnly
 
 @MainActor let isSunny = CogBox<Bool, ZipCode>(
   { reader, zip in
@@ -51,16 +56,37 @@ import SwiftUI
   name: "weather.isNiceHere"
 )
 
+@MainActor let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
+  { reader, zip in
+    reader.get(currentZipCode) == zip
+  },
+  name: "weather.receivesHourlyUpdates"
+)
+
 extension Cogtext {
   func checkWeather(_ zip: ZipCode) async throws {
-    let service = read(weatherService)
-    async let report = service.weather(for: zip)
-    async let advisories = service.advisories(for: zip)
-    let (nextReport, nextAdvisories) = try await (report, advisories)
+    guard read(weatherLoadStatus[zip]) != .refreshing else { return }
 
-    commit("weather.check") { writer in
-      writer[weatherReportSource[zip]] = nextReport
-      writer[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
+    commit("weather.refreshStarted") { writer in
+      writer[weatherLoadStatusSource[zip]] = .refreshing
+    }
+
+    let service = read(weatherService)
+    do {
+      async let report = service.weather(for: zip)
+      async let advisories = service.advisories(for: zip)
+      let (nextReport, nextAdvisories) = try await (report, advisories)
+
+      commit("weather.check") { writer in
+        writer[weatherReportSource[zip]] = nextReport
+        writer[heatAdvisorySource[zip]] = nextAdvisories.contains(.heat)
+        writer[weatherLoadStatusSource[zip]] = .idle
+      }
+    } catch {
+      commit("weather.refreshFailed") { writer in
+        writer[weatherLoadStatusSource[zip]] = .failed
+      }
+      throw error
     }
   }
 

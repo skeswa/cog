@@ -27,10 +27,17 @@ struct Notifier {
 struct WeatherEffects {
   let notifier: Notifier
   var clock: any Clock<Duration> = ContinuousClock()
+  var initialZipCodes = ZipCode.examples
 
   @discardableResult
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
+
+    for zip in initialZipCodes {
+      group.task(name: "weather.initialRefresh[\(zip)]") {
+        try await cogs.checkWeather(zip)
+      }
+    }
 
     group.add(
       cogs.watch(

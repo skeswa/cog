@@ -82,7 +82,10 @@ private final class TrackedWeatherCard {
     zip: .newYork
   )
   var alerts: [String] = []
-  let effects = WeatherEffects(notifier: Notifier { alerts.append($0) }).install(in: cogs)
+  let effects = WeatherEffects(
+    notifier: Notifier { alerts.append($0) },
+    initialZipCodes: []
+  ).install(in: cogs)
   let firstRender = TrackedWeatherCard(cogs: cogs, zip: .newYork)
   firstRender.renderOnce()
 

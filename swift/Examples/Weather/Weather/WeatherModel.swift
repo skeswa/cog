@@ -8,6 +8,30 @@ nonisolated struct ZipCode: RawRepresentable, Hashable, Identifiable, Sendable {
   static let newYork = Self(rawValue: "10001")
   static let sanFrancisco = Self(rawValue: "94105")
   static let seattle = Self(rawValue: "98101")
+
+  static let examples: [Self] = [.newYork, .sanFrancisco, .seattle]
+
+  var city: String {
+    switch self {
+    case .newYork: "New York"
+    case .sanFrancisco: "San Francisco"
+    case .seattle: "Seattle"
+    default: "ZIP \(rawValue)"
+    }
+  }
+
+  var state: String {
+    switch self {
+    case .newYork: "NY"
+    case .sanFrancisco: "CA"
+    case .seattle: "WA"
+    default: ""
+    }
+  }
+
+  var displayName: String {
+    state.isEmpty ? city : "\(city), \(state) · \(rawValue)"
+  }
 }
 
 extension ZipCode: CustomStringConvertible {
@@ -29,6 +53,12 @@ nonisolated struct Weather: Equatable, Sendable {
 
 nonisolated enum WeatherAdvisory: Equatable, Sendable {
   case heat
+}
+
+nonisolated enum WeatherLoadStatus: Equatable, Sendable {
+  case idle
+  case refreshing
+  case failed
 }
 
 nonisolated struct WeatherService: Sendable {
