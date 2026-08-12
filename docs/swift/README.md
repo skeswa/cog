@@ -61,10 +61,10 @@ The design lives in [design/](./design/); the implementation effort lives in
 
 ## Building and testing
 
-The library is not implemented — `swift/Sources/Cog` is an M0 stub with no Cog
-API — but the package and its commands are real. The repository is a SwiftPM
-package rooted at the git root, with every Swift target under `swift/`.
-Commands are mise tasks; `mise tasks` lists them all.
+The package and its M1 simple correctness core are being implemented now. The
+SwiftUI boundary and later async slices have not landed yet. The repository is
+a SwiftPM package rooted at the git root, with every Swift target under
+`swift/`. Commands are mise tasks; `mise tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
@@ -92,7 +92,85 @@ the tests needs a full Xcode; the Command Line Tools alone fail with
 `no such module 'Testing'`. The root [README.md](../../README.md) records the
 pinned version and the runner topology.
 
-## Where things stand (2026-08-11)
+## Production, tests, and previews
+
+Production depends on `Cog` only. Call `Cogtext.bootstrapApp()` exactly once,
+at app launch, and retain the context it returns as the app's ownership handle.
+Pass that same object into services, effects, and every scene. A rebuilt scene
+receives the existing context; it never bootstraps another one. Features cannot
+construct a `Cogtext` directly, and there is deliberately no ambient
+`Cogtext.app` lookup.
+
+```swift
+import Cog
+import SwiftUI
+
+@main
+@MainActor
+struct WeatherApp: App {
+  private let cogs: Cogtext
+
+  init() {
+    cogs = Cogtext.bootstrapApp()
+  }
+
+  var body: some Scene {
+    WindowGroup {
+      RootScene(cogs: cogs)
+    }
+  }
+}
+```
+
+`RootScene(cogs:)` represents the app's own explicit composition boundary, not
+a Cog API. M2 will add the SwiftUI environment boundary; until then, do not copy
+the planned `\.cogs` environment spelling into current code.
+
+An ordinary test or preview-support target depends on `CogTesting`. Create one
+fresh context for that test or preview runtime and pass it through the same
+composition boundaries as production. It starts isolated, never occupies the
+production-install slot, and needs no reset or uninstall. Multiple tests and
+previews may each create a context, but creating a second one partway through a
+single runtime would split the state under test.
+
+```swift
+import Cog
+import CogTesting
+import Testing
+
+@MainActor
+@Test func counterStartsClean() {
+  let count = ManualCog<Int>(0)
+  let cogs = Cogtext.forTesting()
+
+  #expect(cogs.read(count) == 0)
+  cogs.commit { writer in writer[count] = 1 }
+  #expect(cogs.read(count) == 1)
+}
+```
+
+Keep `CogTesting` in test or preview-support targets rather than the shipping
+app target. A timed test retains its own controllable `Clock<Duration>` and
+passes it as `Cogtext.forTesting(clock:)`; CogTesting does not ship a separate
+test-clock type. Untimed tests use the default continuous clock.
+
+Only a test whose subject is the production install uses the scoped fixture:
+
+```swift
+@MainActor
+@Test func appBootstrapIsTheSubject() {
+  Cogtext.withBootstrappedApp { cogs in
+    #expect(Cogtext.isBootstrappedApp(cogs))
+  }
+}
+```
+
+`withBootstrappedApp` calls the real guarded bootstrap and removes its temporary
+registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
+and non-nestable: do not put `await` in it, and do not use it as general test or
+preview setup.
+
+## Where things stand (2026-08-12)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -133,7 +211,8 @@ These choices are settled; §10 of the core document has the full record.
   as the production context.
 - The context returned by `bootstrapApp()` is the app's ownership handle. The
   app passes it to effects, services, and scenes; views receive it through the
-  environment, and ops are instance methods on it. There is no ambient
+  planned M2 environment boundary, and ops are instance methods on it. Current
+  M1 composition passes the same object explicitly. There is no ambient
   `Cogtext.app`. Tests of production installation use a synchronous scoped
   fixture from `CogTesting`, so they cannot leak global install state across
   the suite.

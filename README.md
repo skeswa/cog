@@ -33,13 +33,14 @@ should also keep the common API simple.
 
 ## Status
 
-Cog is in the design phase. The Swift and Android designs are detailed enough
-to begin their correctness and performance spikes.
+Swift implementation is underway. Its M0 scaffolding is complete and the M1
+simple correctness core is being built now; the SwiftUI boundary, async work,
+and later performance core remain ahead. The Android library has not been
+started.
 
-Swift scaffolding has landed. The repository is a SwiftPM package rooted at
-the git root, with the package layout, formatter, test matrix, compile-fail
-harness, document checkers, and CI in place. The `Cog` library itself is a
-stub: no Cog API exists yet, and the Android library has not been started.
+The Swift package, tooling, test matrix, and CI are live. The
+[Swift context guide](./docs/swift/README.md#production-tests-and-previews)
+shows the current production-bootstrap and isolated-test call sites.
 
 The earlier Dart and Flutter experiment has been removed from the current
 tree. It remains available in the repository history.
