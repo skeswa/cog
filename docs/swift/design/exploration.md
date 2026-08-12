@@ -668,8 +668,14 @@ testing, background work, and reconciler rules.
 ## 7. What the SwiftUI boundary must handle
 
 - **Reads in escaping closures are not tracked.** A `Button` action or
-  `Task {}` body is outside the view's tracked read. Debug builds should warn
-  when a tracked `get` has no consumer, like Perception does.
+  `Task {}` body is outside the view's tracked read, so it uses the visibly
+  one-shot `cogs.read` spelling. Public Observation exposes no query for
+  whether `ObservationRegistrar.access` found a current consumer: a valid
+  SwiftUI, UIKit, or AppKit automatic-tracking read and an accidental
+  `cogs.get` in an action are indistinguishable to Cog. The direct `cogs.get`
+  API therefore emits no missing-consumer warning. Do not use private
+  Observation SPI or a heuristic that would warn on valid reads; revisit the
+  diagnostic only if Observation adds a public tracking-presence API.
 - **View-owned model lifetime can be unstable.** Cog state lives in the app
   context, not an `@Observable` object recreated with the view. Truly local UI
   state uses `@State`; shared screen state uses keyed app cogs and explicit
@@ -831,6 +837,12 @@ keeps its slot and points at the table above instead of renumbering the rest.
     run joins the current flush's reaction tail without re-entry, after work
     already scheduled for the turn and before queued write-back turns. See
     "Reaction registration in a flush?" above.
+17. **Tracked read without a UI consumer:** deferred on August 12, 2026.
+    Public Observation has no current-consumer query, so the settled direct
+    `cogs.get` API cannot distinguish valid automatic UI tracking from an
+    accidental action read. M2 ships no warning; actions use `cogs.read`.
+    Revisit only when a public tracking-presence API can make the diagnostic
+    exact without a wrapper or private SPI. See §7.
 
 ---
 

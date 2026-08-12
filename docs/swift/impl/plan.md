@@ -178,16 +178,16 @@ prior milestone is a barrier only where the table below or an explicit
 without weakening a milestone gate. Gates diagnose but never absorb repairs;
 the smallest repair task is inserted before a failed gate is rerun.
 
-| Plan milestone                   | Task ledger                     | Decisions before dependent work                                            | Closing path                                                                                                                   |
-| -------------------------------- | ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                   | `M0-10`                                                                                                                        |
-| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                     | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-18a` floor-runtime policy                      | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when no pinned iOS 17 runtime is available                        |
-| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                         | `M3-11`                                                                                                                        |
-| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
-| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility | `M5-10`                                                                                                                        |
-| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved |
-| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
+| Plan milestone                   | Task ledger                     | Decisions before dependent work                                                    | Closing path                                                                                                                   |
+| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                           | `M0-10`                                                                                                                        |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                             | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; `M2-18b` is non-blocking when no pinned iOS 17 runtime is available                        |
+| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                 | `M3-11`                                                                                                                        |
+| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review                                                        | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
+| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility         | `M5-10`                                                                                                                        |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                     | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved |
+| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking |
 
 ## Task bookkeeping
 
@@ -370,9 +370,10 @@ isolation; and named effect runs in history.
   stay pinned to the app context (§5.3, perf §6).
 - The `\.cogs` environment key; tracked `cogs.get` in `body`; `binding(for:)`
   pairs a tracked read with a named commit; untracked one-shot `cogs.read`.
-- A debug warning when a tracked `get` runs with no consumer
-  (escaping-closure misuse, §7), surfaced through the diagnostic seam so
-  tests assert it without scraping logs.
+- Escaping closures use one-shot `cogs.read`. `M2-07` confirmed that public
+  Observation exposes no current-consumer query, so the direct `cogs.get`
+  API cannot diagnose a missing UI consumer without false positives. Ship no
+  warning or private-SPI heuristic; §7 and §10 record the deferred diagnostic.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
   `fileprivate` sources plus ops, an effects group, and bindings.
   Verify per-ZIP invalidation, equality-gated derived notices, and a view that
@@ -700,3 +701,7 @@ release gates.
   `--manifest-cache none`).
 - Whether the per-PR simulator job is fast enough, or should move to
   merge-queue or nightly.
+- A missing-consumer warning for tracked UI reads is unavailable with public
+  Observation today. `M2-07` defers it until the framework exposes an exact
+  current-tracking query; the direct read spelling and automatic framework
+  tracking remain unchanged.

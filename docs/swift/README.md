@@ -190,6 +190,10 @@ These choices are settled; §10 of the core document has the full record.
 - Tracked reads at the UI boundary use `cogs.get(valueReference)`. The context
   owns the tracking operation, the spelling matches `Reader.get` in selectors,
   and one-shot reads remain visibly different as `cogs.read(valueReference)`.
+  Actions and other escaping closures must use the one-shot spelling. Public
+  Observation cannot tell Cog whether `get` found an active UI consumer, so
+  Cog does not guess or emit a false-positive missing-consumer warning; that
+  diagnostic is deferred until the framework exposes an exact public query.
 - Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
   is a value; its identity lives in an internal final-class descriptor plus
   key. Boxes create keyed value references without allocating new descriptors. The exact

@@ -547,9 +547,6 @@ wall-clock waits; real rendering is proven once by the Weather example.
   back. It sees its own write — no dropped characters.
 - **UI-09.** A view uses one-shot `cogs.read` in its body. Later changes
   to that cog do not re-render the view.
-- **UI-10.** In debug, reading with tracked `get` from a place with no
-  consumer — like a `Button` action — surfaces a warning through the
-  diagnostic seam that points at the mistake.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
   an iOS 26 simulator. (Proof: simulator.)
 - **UI-12.** AppKit automatic tracking works through the same boundary on

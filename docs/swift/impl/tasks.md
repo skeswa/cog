@@ -678,11 +678,11 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-09`._
   _Greens: UI-09._
-- **M2-07** _(Behavior)_ — Warn through the diagnostic seam when a tracked
-  read has no consumer.
+- **M2-07** _(Decision)_ — Record that public Observation cannot distinguish
+  a valid automatically tracked UI read from a `get` with no consumer; keep
+  the direct spelling, require `read` in actions, and defer the warning.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter UI-10`._
-  _Greens: UI-10._
+  _Verify: documentation alignment plus `mise run tasks:check`._
 - **M2-08** _(Behavior)_ — Prove a view reading a changed pair renders only
   the old or new pair.
   _Depends: M2-02ab._
