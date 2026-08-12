@@ -77,7 +77,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func get<Read>(_ valueReference: ReadOnlyCog<Read>) -> Read {
+  public func get<Read>(_ valueReference: CogProjection<Read>) -> Read {
     get(valueReference.source)
   }
 
@@ -111,7 +111,7 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The read-only projection to read without recording an
   ///   edge.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func read<Read>(_ valueReference: ReadOnlyCog<Read>) -> Read {
+  public func read<Read>(_ valueReference: CogProjection<Read>) -> Read {
     read(valueReference.source)
   }
 

@@ -99,7 +99,7 @@ extension Cogtext {
   ///   reference cancels the watch.
   @discardableResult
   public func watch<Value>(
-    _ valueReference: ReadOnlyCog<Value>,
+    _ valueReference: CogProjection<Value>,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,

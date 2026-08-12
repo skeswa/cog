@@ -38,7 +38,7 @@ public struct ReactionReader {
   }
 
   /// Reads a source's read-only projection and records the source dependency.
-  public func get<Value>(_ valueReference: ReadOnlyCog<Value>) -> Value {
+  public func get<Value>(_ valueReference: CogProjection<Value>) -> Value {
     get(valueReference.source)
   }
 }

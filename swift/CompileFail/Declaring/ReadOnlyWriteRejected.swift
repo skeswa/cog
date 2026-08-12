@@ -7,7 +7,7 @@
 // sources `fileprivate` so only it can name them, and publishes `.readOnly`
 // projections for everyone else. That buys nothing unless the projection is
 // genuinely inert: ``Writer``'s subscript takes a `ManualCog`, and a
-// `ReadOnlyCog` is a different type, so every spelling of a write below is a
+// `CogProjection` is a different type, so every spelling of a write below is a
 // type error at the argument, before any turn exists to reject it.
 //
 // The fixture takes its context and its value reference as parameters. It never builds
@@ -19,19 +19,20 @@ import Cog
 
 enum ReadOnlyWriteRejected {
   /// The plain case: stage a value through a published read-only value reference.
-  static func stagesThroughAReadOnlyValueReference(cogs: Cogtext, currentZipCode: ReadOnlyCog<Int>)
-  {
+  static func stagesThroughAReadOnlyValueReference(
+    cogs: Cogtext, currentZipCode: CogProjection<Int>
+  ) {
     cogs.commit { w in
-      // expect-error: cannot convert value of type 'ReadOnlyCog<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       w[currentZipCode] = 90210
     }
   }
 
   /// Read-modify-write, which the writer's subscript supports for a real
   /// source (`w[count] += 1`) and must not offer here.
-  static func mutatesThroughAReadOnlyValueReference(cogs: Cogtext, retryLimit: ReadOnlyCog<Int>) {
+  static func mutatesThroughAReadOnlyValueReference(cogs: Cogtext, retryLimit: CogProjection<Int>) {
     cogs.commit { w in
-      // expect-error: cannot convert value of type 'ReadOnlyCog<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       w[retryLimit] += 1
     }
   }
@@ -41,10 +42,10 @@ enum ReadOnlyWriteRejected {
   /// error as the keyless one.
   static func stagesThroughAReadOnlyBoxKey(
     cogs: Cogtext,
-    weatherReport: ReadOnlyCogBox<Int, String>
+    weatherReport: CogBoxProjection<Int, String>
   ) {
     cogs.commit { w in
-      // expect-error: cannot convert value of type 'ReadOnlyCog<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       w[weatherReport["90210"]] = 72
     }
   }

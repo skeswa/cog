@@ -1,4 +1,4 @@
-/// A value reference that reads one source's state and cannot write it.
+/// A read-only facade for a ``ManualCog``.
 ///
 /// `.readOnly` is the second half of the write-ownership rule. A source is
 /// declared `fileprivate` so that only its own file can name it, and that file
@@ -11,20 +11,13 @@
 /// let currentZipCode = currentZipSource.readOnly
 /// ```
 ///
-/// A read-only value reference is still a value reference, and still names the
-/// same one piece of state: it creates no second state, holds no copy of the
-/// value, and reading it in a context always gives exactly what reading the
-/// source in that context would give. Projecting is free — the same descriptor
-/// and key wearing a different type — so a file may publish one at declaration
-/// time and never think about it again.
+/// The projection creates no state and stores no copy of the value. Reading it
+/// is the same as reading its source.
 ///
-/// What a read-only value reference does not have is a way back. It stores the source
-/// internally, so no code outside Cog can recover a writable value reference from one, and
-/// ``Writer``'s subscript takes a ``ManualCog``. Handing it a `ReadOnlyCog` is a
-/// type error, not a runtime trap: a write nobody can spell is a write nobody
-/// can ship.
+/// The source stays hidden inside Cog, and ``Writer`` only accepts a
+/// ``ManualCog``. Passing a `CogProjection` to a writer is a compile-time error.
 @MainActor
-public struct ReadOnlyCog<Value> {
+public struct CogProjection<Value> {
   /// The source this value reference reads.
   ///
   /// Deliberately the only stored property, and deliberately internal. Storing
@@ -54,8 +47,8 @@ extension ManualCog {
   ///
   /// Both value references name one state, so a write made through the source in that file
   /// is immediately what every reader of the projection sees.
-  public var readOnly: ReadOnlyCog<Value> {
-    ReadOnlyCog(source: self)
+  public var readOnly: CogProjection<Value> {
+    CogProjection(source: self)
   }
 }
 
@@ -70,7 +63,7 @@ extension Cogtext {
   ///
   /// - Parameter valueReference: The read-only value reference to read.
   /// - Returns: The value the source it names holds in this context.
-  public func read<Value>(_ valueReference: ReadOnlyCog<Value>) -> Value {
+  public func read<Value>(_ valueReference: CogProjection<Value>) -> Value {
     read(valueReference.source)
   }
 }
