@@ -58,6 +58,7 @@ mise run fmt:check    # verify formatting, writing nothing
 mise run test         # Swift tests on the default isolation leg
 mise run test:matrix  # all four isolation legs
 mise run test:release # the default leg in release configuration
+mise run test:simulator # boundary tests on the latest iOS simulator
 mise run tasks:check  # validate the Swift implementation task ledger
 ```
 

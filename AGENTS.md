@@ -45,7 +45,8 @@ every scenario covered by exactly one task.
   `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
-- `tools/` — pinned Node tooling: `swift-test.mjs`, `check-compile-fail.mjs`,
+- `tools/` — pinned Node tooling: `swift-test.mjs`,
+  `swift-simulator-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
   fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
   `fixtures/`.
@@ -95,6 +96,8 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
 - `mise run test:release` — the default leg in release configuration.
+- `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
+  simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.

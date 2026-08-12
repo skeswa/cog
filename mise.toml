@@ -51,6 +51,10 @@ run = "node {{config_root}}/tools/swift-test.mjs matrix"
 description = "Run the Swift tests on the default leg in release configuration"
 run = "node {{config_root}}/tools/swift-test.mjs release"
 
+[tasks."test:simulator"]
+description = "Run only the boundary tests on the latest iOS simulator"
+run = "node {{config_root}}/tools/swift-simulator-test.mjs"
+
 # Compile-fail fixtures live outside every SwiftPM target and are type-checked
 # in one batched `swiftc` pass, never one compiler invocation per test. The
 # runner derives its flags from `Package.swift` rather than duplicating them,
