@@ -103,7 +103,7 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   regular expression selects no test.
   _Depends: M0-01._
   _Verify: `mise run test`, `mise run test:release`,
-  `mise run test --filter M0Sentinel`, and
+  `mise run test --filter HarnessSentinelInfrastructure`, and
   `! mise run test --filter DOES-NOT-EXIST`._
 - **M0-04** _(Behavior)_ — Select test isolation and NNBD legs from
   `COG_TEST_ISOLATION` and `COG_TEST_NNBD`, mirror them into `.define()`s,
@@ -234,7 +234,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
   `ObjectIdentifier` identity, human labels, and `ManualCog<T>` value references.
   _Depends: M0-10._
-  _Verify: `mise run test --filter M1DescriptorInfrastructure`._
+  _Verify: `mise run test --filter DescriptorInfrastructure`._
 - **M1-34a** _(Decision)_ — Settle production-install and testing-factory
   helper spellings before either helper or its call sites exist; record the
   choice in §10 and the Swift README snapshot.
@@ -491,7 +491,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-31d** _(Infrastructure)_ — Display bounded debug history through
   `os_log` without making display part of graph correctness.
   _Depends: M1-31c._
-  _Verify: focused debug smoke test plus `mise run fmt:check`._
+  _Verify: `mise run test --filter DebugHistoryDisplayInfrastructure` plus
+  `mise run fmt:check`._
 - **M1-23a** _(Decision)_ — Settle adding a token to an already-cancelled
   `EffectGroup`; update §10, snapshot, scenarios, and tasks, using the
   `M1-23d*` branch for any new behavior tasks.
@@ -539,11 +540,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   manual `.app` and synchronous-derived `.whileObserved` defaults, plus
   derived `keepAlive` sugar for `.app`.
   _Depends: M1-05b, M1-08a._
-  _Verify: `mise run test --filter M1LifetimePolicyInfrastructure`._
+  _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
 - **M1-27b** _(Infrastructure)_ — Track registered reactions as external
   lifetime leases, including dependency retracking and cancellation.
   _Depends: M1-16c, M1-18a, M1-27a._
-  _Verify: `mise run test --filter M1ReactionLeaseInfrastructure`._
+  _Verify: `mise run test --filter ReactionLeaseInfrastructure`._
 - **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
   testing override, then release an unobserved derived cog after injected
   grace and recreate it correctly.

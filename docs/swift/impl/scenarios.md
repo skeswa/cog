@@ -91,6 +91,14 @@ justifies a slow, flaky, or core-coupled test.
    that could notice the swap is wrong. Group 18 (PERF) is the one declared
    exception; it gates the implementation itself and lives in the benchmark
    package.
+4. **Physically separated by proof kind.** Public behavior proofs in
+   `CogTests` live under `Scenarios/<PREFIX>/`, and each
+   `<PREFIX><IDs>ScenarioTests.swift` file contains only raw IDs from that
+   scenario family. Scenario fixtures live beside that family without a
+   `Tests` suffix. Proofs that green no scenario live under
+   `Infrastructure/<seam>/`, use the `...InfrastructureTests.swift` suffix,
+   and never put a raw scenario ID in a test name. Only infrastructure tests
+   may use `@testable import Cog`.
 
 ## The tree
 

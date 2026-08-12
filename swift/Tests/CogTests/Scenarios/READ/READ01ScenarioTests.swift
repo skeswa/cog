@@ -1,0 +1,20 @@
+import Cog
+import CogTesting
+import Testing
+
+// Public API only. These are the first user-visible turn stories, so nothing
+// here may observe phase objects, pending storage, or state layout.
+
+// MARK: - READ-01
+
+@MainActor
+@Test func `READ-01 a read after commit sees the written value`() {
+  let cogs = Cogtext.forTesting()
+  let count = ManualCog<Int>(0)
+
+  cogs.commit { w in
+    w[count] = 1
+  }
+
+  #expect(cogs.read(count) == 1)
+}

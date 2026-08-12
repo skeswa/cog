@@ -38,7 +38,11 @@ every scenario covered by exactly one task.
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
 - `swift/Tests/` — `CogTests` (correctness), `CogScenarioTests` (run counts),
-  and `CogBoundaryTests` (the Observation and SwiftUI boundary).
+  and `CogBoundaryTests` (the Observation and SwiftUI boundary). Inside
+  `CogTests`, public behavior proofs live under `Scenarios/<PREFIX>/` in
+  `...ScenarioTests.swift` files named for their raw IDs; internal proofs live
+  separately under `Infrastructure/<seam>/` in
+  `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `check-compile-fail.mjs`,
