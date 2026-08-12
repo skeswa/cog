@@ -1,7 +1,6 @@
 import Cog
 import os
 
-@MainActor
 struct Notifier {
   private static let logger = Logger(
     subsystem: "com.skeswa.cog.weather",
@@ -23,7 +22,6 @@ struct Notifier {
   }
 }
 
-@MainActor
 struct WeatherEffects {
   let notifier: Notifier
   var clock: any Clock<Duration> = ContinuousClock()

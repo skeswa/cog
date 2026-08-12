@@ -1,23 +1,31 @@
 import Cog
 import SwiftUI
 
-@MainActor private let weatherServiceSource = ManualCog<WeatherService>(
+// Weather's whole state layer: the sources, the values derived from them, and
+// the ops that write them.
+//
+// Everything here is main-actor-isolated without saying so. The target builds
+// with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (Config/Shared.xcconfig),
+// which is what makes an unannotated global safe to hold a `ManualCog`, and
+// what puts these declarations on the same actor as the graph they name.
+
+private let weatherServiceSource = ManualCog<WeatherService>(
   .live,
   name: "weather.service"
 )
-@MainActor private let weatherReportSource = ManualCogBox<Weather?, ZipCode>(
+private let weatherReportSource = ManualCogBox<Weather?, ZipCode>(
   nil,
   name: "weather.report"
 )
-@MainActor private let heatAdvisorySource = ManualCogBox<Bool, ZipCode>(
+private let heatAdvisorySource = ManualCogBox<Bool, ZipCode>(
   false,
   name: "weather.heatAdvisory"
 )
-@MainActor private let currentZipSource = ManualCog<ZipCode?>(
+private let currentZipSource = ManualCog<ZipCode?>(
   nil,
   name: "weather.currentZip"
 )
-@MainActor private let weatherLoadStatusSource = ManualCogBox<WeatherLoadStatus, ZipCode>(
+private let weatherLoadStatusSource = ManualCogBox<WeatherLoadStatus, ZipCode>(
   .idle,
   name: "weather.loadStatus"
 )
@@ -27,19 +35,19 @@ import SwiftUI
 /// configuration rather than weather, but the cards describe it, and a screen
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
-@MainActor private let refreshIntervalSource = ManualCog<Duration?>(
+private let refreshIntervalSource = ManualCog<Duration?>(
   nil,
   name: "weather.refreshInterval"
 )
 
-@MainActor let weatherService = weatherServiceSource.readOnly
-@MainActor let weatherReport = weatherReportSource.readOnly
-@MainActor let heatAdvisory = heatAdvisorySource.readOnly
-@MainActor let currentZipCode = currentZipSource.readOnly
-@MainActor let weatherLoadStatus = weatherLoadStatusSource.readOnly
-@MainActor let refreshInterval = refreshIntervalSource.readOnly
+let weatherService = weatherServiceSource.readOnly
+let weatherReport = weatherReportSource.readOnly
+let heatAdvisory = heatAdvisorySource.readOnly
+let currentZipCode = currentZipSource.readOnly
+let weatherLoadStatus = weatherLoadStatusSource.readOnly
+let refreshInterval = refreshIntervalSource.readOnly
 
-@MainActor let isSunny = CogBox<Bool, ZipCode>(
+let isSunny = CogBox<Bool, ZipCode>(
   { c, zip in
     switch c[weatherReport[zip]]?.kind {
     case .clear, .partlyCloudy: true
@@ -49,7 +57,7 @@ import SwiftUI
   name: "weather.isSunny"
 )
 
-@MainActor let isNiceOutside = CogBox<Bool, ZipCode>(
+let isNiceOutside = CogBox<Bool, ZipCode>(
   { c, zip in
     guard let report = c[weatherReport[zip]] else { return false }
     guard c[isSunny[zip]] else { return false }
@@ -60,7 +68,7 @@ import SwiftUI
   name: "weather.isNice"
 )
 
-@MainActor let isNiceOutsideHere = Cog<Bool>(
+let isNiceOutsideHere = Cog<Bool>(
   { c in
     guard let zip = c[currentZipCode] else { return false }
     return c[isNiceOutside[zip]]
@@ -68,7 +76,7 @@ import SwiftUI
   name: "weather.isNiceHere"
 )
 
-@MainActor let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
+let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
   { c, zip in
     c[refreshInterval] != nil && c[currentZipCode] == zip
   },
