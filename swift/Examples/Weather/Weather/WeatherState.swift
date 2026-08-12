@@ -24,6 +24,7 @@ import SwiftUI
 
 @MainActor let weatherService = weatherServiceSource.readOnly
 @MainActor let weatherReport = weatherReportSource.readOnly
+@MainActor let heatAdvisory = heatAdvisorySource.readOnly
 @MainActor let currentZipCode = currentZipSource.readOnly
 @MainActor let weatherLoadStatus = weatherLoadStatusSource.readOnly
 
@@ -43,7 +44,7 @@ import SwiftUI
     guard reader.get(isSunny[zip]) else { return false }
     return report.temperatureF > 60
       && report.temperatureF < 90
-      && !reader.get(heatAdvisorySource[zip])
+      && !reader.get(heatAdvisory[zip])
   },
   name: "weather.isNice"
 )
