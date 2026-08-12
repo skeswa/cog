@@ -1,3 +1,17 @@
+// A turn is one synchronous, atomic state change started by `Cogtext.commit`.
+//
+// For example, if a commit writes `firstName` and `lastName`, its body stages
+// both values. The flush then publishes both together, settles affected cogs,
+// and runs reactions. Normal readers see the old pair before the flush and the
+// new pair after it, never half of the update.
+//
+// A turn moves through two phases:
+//
+//   idle → accumulating writes → flushing changes and reactions → idle
+//
+// A nested commit joins the accumulating turn. A commit opened by a reaction
+// waits in a FIFO queue because the current turn is already flushing.
+
 /// An identity only Cog can mint for one turn.
 ///
 /// Writers carry this object rather than an integer supplied by a caller. Its
@@ -6,7 +20,7 @@
 /// internal, so application code cannot manufacture a matching token.
 internal final class CogTurnID {}
 
-/// The state of one turn while the context advances through it.
+/// The writes and identity collected while one turn runs.
 internal final class CogTurn {
   let id: CogTurnID
   let name: String
@@ -40,7 +54,7 @@ internal struct QueuedCogTurn {
   let body: (CogTurn) -> Void
 }
 
-/// Where a context is in the structural commit boundary (§3.2).
+/// Where a context is in its turn lifecycle.
 internal enum CogTurnPhase {
   case idle
   case accumulating(CogTurn)
