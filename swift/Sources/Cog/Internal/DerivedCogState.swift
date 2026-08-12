@@ -10,7 +10,8 @@
 /// and the next run replaces the dependency set so branches and early returns
 /// can change it.
 internal final class DerivedCogState<Value>:
-  CogState, CogConsumer, DerivedCogSettleState, CogLifetimeLeaseState, CogObservationState
+  CogState, CogConsumer, CogReaderState, DerivedCogSettleState, CogLifetimeLeaseState,
+  CogObservationState
 {
   /// The declaration this state belongs to.
   let descriptor: DerivedCogDescriptor<Value>
@@ -35,6 +36,8 @@ internal final class DerivedCogState<Value>:
   /// The outer optional records whether the selector has run. For optional
   /// values, `.some(.none)` is a cached `nil`.
   internal private(set) var cachedValue: Value?
+
+  var readerCurrentValue: Value? { cachedValue }
 
   /// The producers the last run read through `c[valueReference]`, in read order.
   ///

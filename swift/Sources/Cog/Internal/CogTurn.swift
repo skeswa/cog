@@ -63,6 +63,27 @@ internal enum CogTurnPhase {
 // optimization. See `Cogtext.requireWriterTurn` in `Writer.swift`.
 
 extension Cogtext {
+  /// Runs one graph-owned turn without applying the public commit guard.
+  ///
+  /// Async phase publication originates from derived computation itself. It is
+  /// still a named turn, but it is not an application write and therefore may
+  /// be requested while the async selector is on the computation path.
+  internal func withSystemTurn(_ name: String, _ body: @escaping (CogTurn) -> Void) {
+    switch turnPhase {
+    case .idle:
+      #if DEBUG
+      turnChainTracker.beginChain()
+      defer { turnChainTracker.endChain() }
+      #endif
+
+      runOuterTurn(named: name, body)
+      drainQueuedTurns()
+
+    case .accumulating, .flushing:
+      queuedTurns.append(QueuedCogTurn(name: name, body: body))
+    }
+  }
+
   /// Joins an accumulating turn, or runs one new outer turn through its flush.
   ///
   /// Nested commits join the turn. Sibling commits start separate turns.

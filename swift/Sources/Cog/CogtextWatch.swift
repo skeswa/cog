@@ -1,4 +1,22 @@
 extension Cogtext {
+  /// Registers a watch on an async cog's full phase.
+  @discardableResult
+  public func watch<Value>(
+    _ valueReference: AsyncCog<Value>,
+    initial: CogWatchStart,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ body: @escaping @MainActor (CogPhase<Value>, CogPhase<Value>) -> Void
+  ) -> ReactionToken {
+    watchTracked(
+      label: CogLabel(name: name, fileID: fileID, line: line),
+      initial: initial,
+      read: { c in c[valueReference] },
+      body: body
+    )
+  }
+
   /// Registers a reaction that watches one derived cog and receives its old and
   /// new values.
   ///

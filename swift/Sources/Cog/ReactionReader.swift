@@ -38,6 +38,16 @@ public struct ReactionReader {
     return producer.settledValue(in: cogs)
   }
 
+  /// Reads an async cog's full phase and records it as a dependency.
+  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+    cogs.requireTracking(reaction)
+
+    let producer = cogs.asyncState(for: valueReference)
+    let phase = producer.settledPhase(in: cogs)
+    reaction.recordDependency(on: producer)
+    return phase
+  }
+
   /// Reads a source's read-only projection and records the source dependency.
   public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
     self[valueReference.source]
@@ -53,6 +63,12 @@ public struct ReactionReader {
   ///
   /// A dirty value is settled before it is returned.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
+    cogs.requireTracking(reaction)
+    return cogs.peek(valueReference)
+  }
+
+  /// Peeks at an async cog without recording a dependency.
+  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
     cogs.requireTracking(reaction)
     return cogs.peek(valueReference)
   }

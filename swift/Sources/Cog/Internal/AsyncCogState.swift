@@ -1,0 +1,135 @@
+/// The live state behind one ``AsyncCog`` value reference in one context.
+internal final class AsyncCogState<Value>:
+  CogState, CogConsumer, CogReaderState, DerivedCogSettleState, CogLifetimeLeaseState,
+  CogObservationState, PendingCogSource
+{
+  let descriptor: AsyncCogDescriptor<Value>
+  let key: AnyHashable?
+
+  var descriptorIdentity: ObjectIdentifier { descriptor.identity }
+  var isComputing = false
+  internal private(set) var dependencies: [any CogState] = []
+  var settleState: CogSettleState = .dirty
+  var changedAt: CogVersion = .initial
+  var checkedAt: CogVersion = .initial
+  var subscribers: [CogSubscriberEdge] = []
+  var observationBoundary: CogObservationBoundary?
+  var observationKey: AnyHashable? { key }
+  var label: CogLabel { descriptor.label }
+  var lifetime: CogStateLifetime { descriptor.lifetime }
+  var externalLeaseCount = 0
+  var lifetimeReleaseGeneration: UInt64 = 0
+  var stateIdentity: CogStateIdentity {
+    CogStateIdentity(descriptor: descriptorIdentity, key: key)
+  }
+
+  /// The first pending phase is staged through a normal named turn.
+  private var pendingPhase: CogPhase<Value>?
+
+  /// The phase returned to readers after its publication turn.
+  private var phase: CogPhase<Value>?
+
+  /// Work started by the first read. Result publication lands in M3-03a.
+  private var activeTask: Task<Void, Never>?
+
+  var readerCurrentValue: CogPhase<Value>? { phase }
+
+  init(descriptor: AsyncCogDescriptor<Value>, key: AnyHashable?) {
+    self.descriptor = descriptor
+    self.key = key
+  }
+
+  func settledPhase(in cogs: Cogtext) -> CogPhase<Value> {
+    if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
+      fatalError(cycle.message)
+    }
+
+    if settleState != .clean {
+      cogs.settle(self)
+    }
+
+    guard let phase else {
+      fatalError("A settled async Cog lost its phase.")
+    }
+    return phase
+  }
+
+  func recordDependency(on producer: any CogState) {
+    dependencies.append(producer)
+    producer.addSubscriber(self)
+  }
+
+  func releaseDependenciesForContextTeardown() {
+    dependencies.removeAll()
+  }
+
+  func releaseDependenciesForLifetime() {
+    for dependency in dependencies {
+      dependency.removeSubscriber(self)
+    }
+    dependencies.removeAll()
+  }
+
+  func recompute(in cogs: Cogtext) {
+    guard phase == nil else {
+      markChecked(at: cogs.revision)
+      return
+    }
+    startInitialWork(in: cogs)
+  }
+
+  private func startInitialWork(in cogs: Cogtext) {
+    guard isComputing else {
+      fatalError("An async Cog selector ran outside the settle computation path.")
+    }
+
+    let previousDependencies = dependencies
+    dependencies.removeAll(keepingCapacity: true)
+    let work = cogs.tracking(self) {
+      descriptor.makeWork(Reader(cogs: cogs, state: self), key: key)
+    }
+
+    for previousDependency in previousDependencies
+    where !dependencies.contains(where: { $0 === previousDependency }) {
+      previousDependency.removeSubscriber(self)
+    }
+
+    let turnName = "\(renderedName) pending"
+    switch cogs.turnPhase {
+    case .idle:
+      cogs.withSystemTurn(turnName) { turn in
+        self.pendingPhase = .pending(previous: .none)
+        turn.touch(self)
+      }
+    case .accumulating, .flushing:
+      // A first read must synchronously return honest pending state. Nothing
+      // can already subscribe to a state with no phase, so install it now and
+      // queue the named, otherwise-empty publication turn behind the active
+      // turn without invalidating the reader that is establishing its baseline.
+      phase = .pending(previous: .none)
+      markChanged(at: cogs.revision)
+      cogs.withSystemTurn(turnName) { _ in }
+    }
+
+    let operation = work.operation
+    activeTask = Task(name: renderedName) { @MainActor in
+      _ = try? await operation()
+    }
+  }
+
+  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion) {
+    guard let pendingPhase else { return }
+    self.pendingPhase = nil
+    phase = pendingPhase
+    markChanged(at: revision)
+    cogs.invalidateSubscribers(of: self)
+  }
+
+  private var renderedName: String {
+    guard let key else { return "\(label)" }
+    return "\(label)[\(key.base)]"
+  }
+
+  // Written out, and `nonisolated`, per the generic-class release rule.
+  nonisolated deinit {}
+}

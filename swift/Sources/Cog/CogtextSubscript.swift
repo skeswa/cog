@@ -20,6 +20,14 @@ extension Cogtext {
     return state.settledValue(in: self)
   }
 
+  /// Reads an async cog's phase and registers its exact state with the UI.
+  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+    let state = asyncState(for: valueReference)
+    let phase = state.settledPhase(in: self)
+    state.accessObservationBoundary(in: self)
+    return phase
+  }
+
   /// Reads a source's read-only projection through the UI boundary.
   public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
     self[valueReference.source]

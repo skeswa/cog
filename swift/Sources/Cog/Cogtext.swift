@@ -250,6 +250,14 @@ extension Cogtext {
     }
   }
 
+  /// Gets this async state, creating it without starting work on first use.
+  internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
+    state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
+    {
+      AsyncCogState(descriptor: valueReference.descriptor, key: valueReference.key)
+    }
+  }
+
   /// Gets the state for `identity`, or files the result of `create`.
   ///
   /// Each descriptor identity maps to one concrete state type. Keep the cast
@@ -305,5 +313,10 @@ extension Cogtext {
   /// - Returns: Its value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     derivedState(for: valueReference).settledValue(in: self)
+  }
+
+  /// Reads an async cog's current phase without creating a dependency edge.
+  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+    asyncState(for: valueReference).settledPhase(in: self)
   }
 }

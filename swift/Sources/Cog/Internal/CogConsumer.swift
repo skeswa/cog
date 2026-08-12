@@ -21,6 +21,13 @@ internal protocol CogConsumer: AnyObject {
   func releaseDependenciesForContextTeardown()
 }
 
+/// A tracked state that can hand ``Reader`` its previous typed value.
+@MainActor
+internal protocol CogReaderState<Value>: CogConsumer {
+  associatedtype Value
+  var readerCurrentValue: Value? { get }
+}
+
 // MARK: - The tracking slot
 
 extension Cogtext {

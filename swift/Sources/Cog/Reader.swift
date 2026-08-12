@@ -23,10 +23,10 @@ public struct Reader<Value> {
   private let cogs: Cogtext
 
   /// The state receiving dependencies and providing `curr`.
-  private let state: DerivedCogState<Value>
+  private let state: any CogReaderState<Value>
 
   /// Hands a run its reader. Only a state computing itself may make one.
-  internal init(cogs: Cogtext, state: DerivedCogState<Value>) {
+  internal init(cogs: Cogtext, state: some CogReaderState<Value>) {
     self.cogs = cogs
     self.state = state
   }
@@ -55,6 +55,16 @@ public struct Reader<Value> {
     let producer = cogs.derivedState(for: valueReference)
     state.recordDependency(on: producer)
     return producer.settledValue(in: cogs)
+  }
+
+  /// Reads an async cog's full phase and depends on it.
+  public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
+    cogs.requireTracking(state)
+
+    let producer = cogs.asyncState(for: valueReference)
+    let phase = producer.settledPhase(in: cogs)
+    state.recordDependency(on: producer)
+    return phase
   }
 
   /// Reads a source exposed through `.readOnly`, and depends on it.
@@ -93,6 +103,12 @@ public struct Reader<Value> {
     return cogs.peek(valueReference)
   }
 
+  /// Peeks at an async cog without depending on it.
+  public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
+    cogs.requireTracking(state)
+    return cogs.peek(valueReference)
+  }
+
   /// Peeks at a source exposed through `.readOnly` without depending on it.
   ///
   /// - Parameter valueReference: The read-only projection to read without recording an
@@ -109,7 +125,7 @@ public struct Reader<Value> {
   /// `.some(.none)` means the previous run produced `nil`.
   public var curr: Value? {
     cogs.requireTracking(state)
-    return state.cachedValue
+    return state.readerCurrentValue
   }
 
   /// The cycle a read of `valueReference` would close during this selector run.
