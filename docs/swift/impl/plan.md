@@ -431,9 +431,12 @@ Limit this milestone to the async pieces needed for 0.1.0:
   (§5.3).
 - A `cogs.refresh(valueReference)` op; task names from descriptor labels for
   Instruments.
-- Settle the still-open behavior of a one-shot read or refresh of a never-read
-  async value reference before implementing refresh, then add the resulting scenarios and
-  tasks in the same change.
+- A one-shot peek or refresh of a never-read async value reference creates its
+  state and starts exactly one initial run at `pending(previous: .none)`. It
+  installs no durable consumer: the call renews ordinary `whileObserved`
+  grace, after which release cancels the work and rejects late results if no
+  consumer arrived. Refresh does not initialize and then replace the first
+  run.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure

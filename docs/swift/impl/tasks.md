@@ -825,6 +825,12 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-05b._
   _Verify: `mise run test --filter 'ASYNC-13|ASYNC-14'`._
   _Greens: ASYNC-13, ASYNC-14._
+- **M3-08ca** _(Behavior)_ — Start a never-read async state exactly once from
+  one-shot `peek` or `refresh`, publish initial pending without a durable
+  consumer, and apply renewable `whileObserved` grace and safe release.
+  _Depends: M3-08b, M3-09._
+  _Verify: `mise run test --filter 'ASYNC-22|ASYNC-23'`._
+  _Greens: ASYNC-22, ASYNC-23._
 - **M3-10a** _(Behavior)_ — Run work on the MainActor by default in every
   build-settings leg.
   _Depends: M3-02._
@@ -842,8 +848,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Greens: ASYNC-17._
 - **M3-11** _(Gate)_ — Close the deterministic async slice in every host leg
   and release configuration.
-  _Depends: M3-03c, M3-04, M3-05c, M3-06, M3-07, M3-08b, M3-09,
-  M3-10b, M3-10c._
+  _Depends: M3-03c, M3-04, M3-05c, M3-06, M3-07, M3-08ca, M3-10b,
+  M3-10c._
   _Verify: `mise run test:matrix` and `mise run test:release`._
 
 ## M4 tasks
@@ -1175,11 +1181,11 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'ASYNC-(0[1-6]|1[125678]|20)'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
-  generation rejection, previous-value carry, and release/recreation through
-  arena generations.
+  generation rejection, previous-value carry, cold one-shot demand, and
+  release/recreation through arena generations.
   _Depends: M6-10eb, M6-10ha._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[7-9]|10|1[349]|21)'`._
+'ASYNC-(0[7-9]|10|1[349]|2[1-3])'`._
 - **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
   the arena core selected in place of the simple one, leaving the default
   core untouched; expose simple-versus-arena checking as

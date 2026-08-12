@@ -563,10 +563,6 @@ _Milestone M3. Design: §5.1, §5.2 (`.latest` only), §5.3._
 Async state is honest: it always says whether it is loading, what it has, and
 what it had.
 
-_Pending (core §10, open question 15): what a one-shot `cogs.peek` of a
-never-read async cog does — does it create the state, start work, and publish
-a pending turn? — and what `cogs.refresh` of a never-read value reference does._
-
 ### 13.1 Phases
 
 - **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
@@ -637,6 +633,22 @@ a pending turn? — and what `cogs.refresh` of a never-read value reference does
   flight. Under `.latest`, the in-flight run is cancelled and only the
   newest run may commit — a refresh replaces work the same way a
   dependency change does.
+
+### 13.5 Cold one-shot demand
+
+- **ASYNC-22.** I use one-shot `cogs.peek` on a never-read async cog. It
+  starts one suspended run, publishes and returns
+  `.pending(previous: .none)`, and installs no durable consumer. Another
+  peek sees that same generation instead of starting a second run and renews
+  its grace window. With no durable consumer, injected grace expiry cancels
+  and releases the state; a late result commits nothing, and a later read
+  starts fresh work.
+- **ASYNC-23.** I refresh a never-read async value reference. Refresh is one
+  initial load, not a no-op or an initialize-then-replace sequence: the
+  selector and work run once, one pending-with-no-previous turn lands, and no
+  cancellation occurs. The call installs no durable consumer and follows the
+  same renewable grace and safe-release rule. A later refresh while that work
+  is in flight still follows ASYNC-21.
 
 ## 14. POLICY — Ordered async policies
 

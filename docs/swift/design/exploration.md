@@ -535,6 +535,15 @@ state, starts its work, publishes `.pending(previous: .none)` as a turn, and
 returns that pending phase. This keeps the first observable state honest: work
 has begun and no value has completed yet.
 
+Every read spelling follows that rule. A non-tracking `c.peek` or one-shot
+`cogs.peek` of a never-read async value reference creates its state, runs its
+synchronous selector, starts exactly one generation, publishes the initial
+pending turn, and returns that phase. It records no dependency, subscription,
+or Observation boundary. Refreshing a never-read value reference is the same
+single initial load: it is not a no-op, and it does not create the state only
+to replace and cancel that first run. Once a state exists, refresh follows the
+replacement policy in §5.2.
+
 `Previous` keeps “no previous value” distinct from “the previous value was
 nil.” With a plain `Value?`, that distinction would hide in a nested optional
 whenever `Value` is itself optional, and a bare `nil` would be ambiguous at
@@ -649,6 +658,16 @@ effectively app-lifetime. `CogTesting` accepts a context override so lifetime
 tests can inject both a controllable clock and an explicit duration; no test
 waits for the production interval or wall-clock time.
 
+A non-tracking async read or refresh is transient demand, not a durable lease.
+It invalidates an older pending expiry while it runs, then starts a full grace
+window when the call returns. Another one-shot demand renews that window; a UI,
+reaction, or stream consumer that arrives during it keeps the same state and
+run. If no durable consumer arrives, ordinary `whileObserved` expiry cancels
+the work, advances its generation, and releases the state, so a late result
+cannot commit. The work does not retain itself until completion: code that
+must finish with no consumer beyond the grace window belongs in an imperative
+op or an app-lifetime declaration.
+
 ### 5.4 Where the Rx operators went
 
 See [rx.md](./rx.md). It maps Rx behavior to dynamic dependencies, async
@@ -757,6 +776,7 @@ singular, and does measurement show less runtime work?
 | Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Async value shape?                | `CogPhase` begins publicly at `pending`—there is no observable `initial` phase—and uses an explicit `Previous` case to distinguish “no previous value” from “previous value was nil,” plus a `.latest` projection (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Never-read async demand?          | A non-tracking peek or refresh creates the state and starts exactly one initial generation at `pending(previous: .none)` without installing a dependency, subscription, or Observation boundary. The call is transient demand: it renews the ordinary `whileObserved` grace window but does not retain work through completion, and expiry cancels, advances the generation, releases, and rejects late results (§5.1, §5.3).                                                                                                                                                                                                           |
 | Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -828,11 +848,10 @@ keeps its slot and points at the table above instead of renumbering the rest.
 14. **Equal stream elements:** §5.2 commits each `.stream` element as its own
     turn, while §3.2 discards equal writes at flush. Decide which rule wins
     when a sequence yields consecutive equal elements.
-15. **One-shot reads of cold async cogs:** untracked reads settle (§2.4), and
-    an async cog's first read starts work and publishes a pending turn
-    (§5.1). Define what a subscription-free `cogs.peek` of a never-read
-    async cog does — and, relatedly, what `cogs.refresh` of a never-read value reference
-    does.
+15. **One-shot reads of cold async cogs:** settled on August 12, 2026. A
+    non-tracking peek or refresh is transient initial demand: it starts one
+    run at pending without a durable lease, and ordinary `whileObserved`
+    grace and release apply. See "Never-read async demand?" above.
 16. **Registration during a flush:** settled on August 11, 2026. The initial
     run joins the current flush's reaction tail without re-entry, after work
     already scheduled for the turn and before queued write-back turns. See

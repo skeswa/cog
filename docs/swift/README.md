@@ -237,10 +237,15 @@ These choices are settled; §10 of the core document has the full record.
 - Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
   `cogs.peek` outside) skip
   the dependency edge but still settle the value they return; they are never
-  stale. Exported streams (`cogs.values(of:)`) start from the current settled
-  value and never make a commit wait: `.newest(1)` may skip turns for a slow
-  reader, `.oldest(n)` delivers the oldest n in order and drops newer while
-  full, and `.unbounded` delivers everything.
+  stale. Peeking or refreshing a never-read async value starts exactly one
+  initial run at `pending(previous: .none)` without a dependency,
+  subscription, or Observation boundary. That one-shot demand renews the
+  normal `whileObserved` grace window but does not retain work through
+  completion; expiry cancels, releases, and rejects late results. Exported
+  streams (`cogs.values(of:)`) start from the current settled value and never
+  make a commit wait: `.newest(1)` may skip turns for a slow reader,
+  `.oldest(n)` delivers the oldest n in order and drops newer while full, and
+  `.unbounded` delivers everything.
 - External `@Observable` inputs publish the newest post-mutation value at each
   propagation boundary; several mutations may coalesce. The pre-iOS-26
   one-shot shim internally acknowledges re-arming for deterministic tests, but
@@ -275,9 +280,9 @@ Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, and persistence helpers. Also open are several edge
 behaviors: what a stream's phase does when its sequence ends or throws, whether
 equal stream elements commit distinct turns, whether a failed `.queue` run
-stops the queue, what a one-shot read or refresh of a cold async cog does, and
-debounce/throttle timing modifiers (deferred backlog). Value-reference layout,
-edge layout, and hash tables also remain open until benchmarks choose them.
+stops the queue, and debounce/throttle timing modifiers (deferred backlog).
+Value-reference layout, edge layout, and hash tables also remain open until
+benchmarks choose them.
 
 ## Next steps
 
