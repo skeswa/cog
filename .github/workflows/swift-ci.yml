@@ -293,7 +293,7 @@ jobs:
         run: mise run test:simulator
 
   build-weather:
-    name: Weather build (self-hosted)
+    name: Weather build and tests (self-hosted)
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
@@ -339,6 +339,9 @@ jobs:
 
       - name: Build the Weather example
         run: mise run build:weather
+
+      - name: Run the Weather example tests
+        run: mise run test:weather
 
   # The release-configuration leg. The guardrails that promise every-build
   # behaviour — the second-context guard, escaped writers, cycle detection, the
@@ -682,7 +685,7 @@ jobs:
         run: mise run test:simulator
 
   fork-build-weather:
-    name: Weather build (fork, GitHub-hosted)
+    name: Weather build and tests (fork, GitHub-hosted)
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -727,3 +730,6 @@ jobs:
 
       - name: Build the Weather example
         run: mise run build:weather
+
+      - name: Run the Weather example tests
+        run: mise run test:weather

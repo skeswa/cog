@@ -60,6 +60,7 @@ mise run test:matrix    # all four isolation legs
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
 mise run build:weather  # build the Weather example for the iOS simulator
+mise run test:weather   # run the Weather example's tests on a simulator
 mise run tasks:check    # validate the Swift implementation task ledger
 ```
 

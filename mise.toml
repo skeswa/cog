@@ -59,6 +59,17 @@ run = "node {{config_root}}/tools/swift-simulator-test.mjs"
 description = "Build the Weather example for the iOS simulator"
 run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weather.xcodeproj" -scheme Weather -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/weather-derived-data" CODE_SIGNING_ALLOWED=NO build"""
 
+# `build:weather` uses xcodebuild's `build` action, which builds only the
+# scheme's build-action entries — and the Weather scheme lists just
+# `Weather.app` there. It therefore never compiles `WeatherTests`, so the
+# example's behaviour proofs need their own command. Like the Swift test
+# wrappers, `tools/weather-test.mjs` checks the executed-test count afterwards
+# rather than trusting the exit status.
+
+[tasks."test:weather"]
+description = "Run the Weather example's tests on an iOS simulator"
+run = "node {{config_root}}/tools/weather-test.mjs"
+
 # Compile-fail fixtures live outside every SwiftPM target and are type-checked
 # in one batched `swiftc` pass, never one compiler invocation per test. The
 # runner derives its flags from `Package.swift` rather than duplicating them,

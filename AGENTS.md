@@ -46,12 +46,13 @@ every scenario covered by exactly one task.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
 - `tools/` — pinned Node tooling: `swift-test.mjs`,
-  `swift-simulator-test.mjs`, `check-compile-fail.mjs`,
+  `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
   fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
   `fixtures/`.
 - `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
-  matrix, simulator tests, the Weather build, release tests, compile-fail
+  matrix, simulator tests, the Weather build and tests, release tests,
+  compile-fail
   fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
   fork lane) and `markdown.yml` (Oxfmt and the workflow-contract check on
   GitHub-hosted ubuntu).
@@ -103,10 +104,15 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
 
-Example builds use the same pinned Xcode as tests:
+The example app uses the same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS
   Simulator destination without launching one.
+- `mise run test:weather` — run `WeatherTests` on an iOS simulator. Set
+  `COG_WEATHER_DESTINATION` to override the destination. This is a separate
+  command because `build:weather` uses xcodebuild's `build` action, which
+  never compiles a target the Weather scheme lists only under its test
+  action.
 
 Extra arguments pass straight through, as in
 `mise run test --filter 'DECL-01|ONE-04' --parallel`. **Never run a filtered
