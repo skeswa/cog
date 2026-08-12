@@ -415,3 +415,41 @@ import Testing
   #expect(rootRuns == 2)
   #expect(rootPairs == ["2:10", "4:30"])
 }
+
+// MARK: - GRAPH-04
+
+@MainActor
+@Test func `GRAPH-04 a broad pull recomputes only the branches it reads`() {
+  let cogs = Cogtext.forTesting()
+  let source = ManualCog<Int>(1)
+  let breadth = 64
+  var runs = Array(repeating: 0, count: breadth)
+
+  let branches = (0..<breadth).map { branch in
+    Cog<Int> { c in
+      runs[branch] += 1
+      return c.get(source) + branch
+    }
+  }
+
+  // Warm every sibling so the source really feeds a broad live graph before
+  // the turn. Never-created branches would prove declaration laziness instead.
+  for branch in 0..<breadth {
+    #expect(cogs.read(branches[branch]) == 1 + branch)
+  }
+  #expect(runs == Array(repeating: 1, count: breadth))
+
+  cogs.commit { w in w[source] = 10 }
+  #expect(cogs.read(source) == 10)
+  #expect(runs == Array(repeating: 1, count: breadth))
+
+  let selected = [0, 7, 31, 63]
+  for branch in selected {
+    #expect(cogs.read(branches[branch]) == 10 + branch)
+  }
+
+  let expectedRuns = (0..<breadth).map { branch in
+    selected.contains(branch) ? 2 : 1
+  }
+  #expect(runs == expectedRuns)
+}
