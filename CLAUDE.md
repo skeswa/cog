@@ -51,9 +51,10 @@ every scenario covered by exactly one task.
   fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
   `fixtures/`.
 - `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
-  matrix, release tests, compile-fail fixtures, and the ledger check, in a
-  self-hosted lane and a GitHub-hosted fork lane) and `markdown.yml` (Oxfmt
-  and the workflow-contract check on GitHub-hosted ubuntu).
+  matrix, simulator tests, the Weather build, release tests, compile-fail
+  fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
+  fork lane) and `markdown.yml` (Oxfmt and the workflow-contract check on
+  GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
   task definitions, formatter configuration, and the license.
 - `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
@@ -101,6 +102,11 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
+
+Example builds use the same pinned Xcode as tests:
+
+- `mise run build:weather` — build the Weather app for a generic iOS
+  Simulator destination without launching one.
 
 Extra arguments pass straight through, as in
 `mise run test --filter 'DECL-01|ONE-04' --parallel`. **Never run a filtered

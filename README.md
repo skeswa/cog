@@ -53,13 +53,14 @@ testing Swift also needs a full Xcode — the version and the reason are in
 "Continuous integration" below.
 
 ```sh
-mise run fmt          # format Markdown, JSON, YAML, and Swift
-mise run fmt:check    # verify formatting, writing nothing
-mise run test         # Swift tests on the default isolation leg
-mise run test:matrix  # all four isolation legs
-mise run test:release # the default leg in release configuration
+mise run fmt            # format Markdown, JSON, YAML, and Swift
+mise run fmt:check      # verify formatting, writing nothing
+mise run test           # Swift tests on the default isolation leg
+mise run test:matrix    # all four isolation legs
+mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
-mise run tasks:check  # validate the Swift implementation task ledger
+mise run build:weather  # build the Weather example for the iOS simulator
+mise run tasks:check    # validate the Swift implementation task ledger
 ```
 
 `mise run test:compilefail` type-checks the expected-failure fixtures under

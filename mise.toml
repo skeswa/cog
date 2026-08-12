@@ -55,6 +55,10 @@ run = "node {{config_root}}/tools/swift-test.mjs release"
 description = "Run only the boundary tests on the latest iOS simulator"
 run = "node {{config_root}}/tools/swift-simulator-test.mjs"
 
+[tasks."build:weather"]
+description = "Build the Weather example for the iOS simulator"
+run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weather.xcodeproj" -scheme Weather -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/weather-derived-data" CODE_SIGNING_ALLOWED=NO build"""
+
 # Compile-fail fixtures live outside every SwiftPM target and are type-checked
 # in one batched `swiftc` pass, never one compiler invocation per test. The
 # runner derives its flags from `Package.swift` rather than duplicating them,

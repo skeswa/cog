@@ -40,9 +40,10 @@ name: Swift CI
 #
 # Jobs land here as the milestones that need them land: `M0-05c` adds the
 # release-configuration and compile-fail jobs, `M0-09b` adds the task-ledger
-# check and widens the path filters below, M2 adds `test-simulator`, and M5
-# adds `bench-build` (which must also serialize against the rest of the mini
-# through its own `concurrency:` group, or its numbers carry contention noise).
+# check and widens the path filters below, M2 adds `test-simulator` and the
+# Weather build, and M5 adds `bench-build` (which must also serialize against
+# the rest of the mini through its own `concurrency:` group, or its numbers
+# carry contention noise).
 
 # The two path lists are deliberately duplicated rather than shared through a
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
@@ -290,6 +291,54 @@ jobs:
 
       - name: Run the simulator boundary tests
         run: mise run test:simulator
+
+  build-weather:
+    name: Weather build (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s)."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Build the Weather example
+        run: mise run build:weather
 
   # The release-configuration leg. The guardrails that promise every-build
   # behaviour — the second-context guard, escaped writers, cycle detection, the
@@ -631,3 +680,50 @@ jobs:
 
       - name: Run the simulator boundary tests
         run: mise run test:simulator
+
+  fork-build-weather:
+    name: Weather build (fork, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Build the Weather example
+        run: mise run build:weather
