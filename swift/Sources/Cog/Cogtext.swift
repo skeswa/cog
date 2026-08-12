@@ -20,6 +20,9 @@ public final class Cogtext {
   /// One test-only acknowledgement installed through the CogTesting product.
   private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
 
+  /// Signals after the next grace-expiry release check, including a pinned skip.
+  private var nextLifetimeReleaseCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
+
   /// The monotonic version assigned to graph work.
   ///
   /// Each outer turn advances it once, including an empty or all-equal turn. A
@@ -71,6 +74,9 @@ public final class Cogtext {
 
   /// Pins one newly UI-read state in boundary creation order.
   internal func registerObservationState(_ state: any CogObservationState) {
+    if let lifetimeState = state as? any CogLifetimeLeaseState {
+      lifetimeState.advanceLifetimeReleaseGeneration()
+    }
     observationStates.append(state)
   }
 
@@ -145,6 +151,7 @@ extension Cogtext {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     state.decrementExternalLeaseCount()
     guard state.externalLeaseCount == 0 else { return }
+    guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
     let generation = state.advanceLifetimeReleaseGeneration()
     let identity = state.stateIdentity
@@ -177,16 +184,31 @@ extension Cogtext {
     nextLifetimeReleaseAcknowledgement = acknowledgement
   }
 
+  /// Installs a one-shot acknowledgement for the next grace-expiry check.
+  package func acknowledgeNextDerivedReleaseCheck(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextLifetimeReleaseCheckAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next release check.")
+    }
+    nextLifetimeReleaseCheckAcknowledgement = acknowledgement
+  }
+
   /// Removes the exact still-unobserved state after its grace task resumes.
   private func releaseDerivedStateIfEligible(
     _ state: any CogLifetimeLeaseState,
     identity: CogStateIdentity,
     generation: UInt64
   ) {
+    let checkAcknowledgement = nextLifetimeReleaseCheckAcknowledgement
+    nextLifetimeReleaseCheckAcknowledgement = nil
+    defer { checkAcknowledgement?() }
+
     guard let stored = states[identity], stored === state else { return }
     guard state.lifetimeReleaseGeneration == generation else { return }
     guard state.externalLeaseCount == 0 else { return }
     guard case .whileObserved = state.lifetime else { return }
+    guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
     // A still-live internal consumer needs this exact producer until the later
     // closure-release slice can collect the whole unobserved dependency graph.

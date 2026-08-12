@@ -64,7 +64,7 @@ import os
   withExtendedLifetime(token) {}
 }
 
-private nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
+nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
   private struct Sleeper {
     let deadline: Instant
     let continuation: CheckedContinuation<Void, any Error>
