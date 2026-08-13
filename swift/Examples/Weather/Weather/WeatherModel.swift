@@ -90,8 +90,8 @@ nonisolated enum WeatherAdvisory: Equatable, Sendable {
 /// The presentation state derived from a forecast's full async phase.
 ///
 /// This is deliberately not Cog state. The authoritative request lifecycle is
-/// `CogPhase<WeatherReading>`; the enum only gives buttons and empty-state views
-/// concise labels for those three cases.
+/// `CogPhase<WeatherReading?>`, read through the `phase` lens; the enum only
+/// gives buttons and empty-state views concise labels for those three cases.
 nonisolated enum WeatherLoadStatus: Equatable, Sendable {
   /// The latest generation succeeded.
   case idle
@@ -101,7 +101,7 @@ nonisolated enum WeatherLoadStatus: Equatable, Sendable {
   case failed
 
   /// Maps the authoritative async phase to the card's smaller display vocabulary.
-  init(_ phase: CogPhase<WeatherReading>) {
+  init(_ phase: CogPhase<WeatherReading?>) {
     switch phase {
     case .pending: self = .refreshing
     case .success: self = .idle

@@ -36,13 +36,15 @@ struct WeatherCardContent: View {
 
   /// Renders pending, success, and failure without discarding a prior success.
   ///
-  /// The full phase drives progress and failure chrome. `latestValue` keeps the
-  /// accepted forecast on screen during a reload or failed replacement, while
-  /// `isNiceOutside` demonstrates a separately equality-gated `.latest`
-  /// derivation. Both reads settle within the same completed graph turn.
+  /// The plain value read keeps the accepted forecast on screen during a
+  /// reload or failed replacement — it is total, resting at `nil` before the
+  /// first success — while the `phase` lens drives progress and failure
+  /// chrome only. `isNiceOutside` demonstrates a separately equality-gated
+  /// derivation over the same value read. All reads settle within the same
+  /// completed graph turn.
   var body: some View {
-    let phase = cogs[weatherForecast[zip]]
-    let report = phase.latestValue?.weather
+    let report = cogs[weatherForecast[zip]]?.weather
+    let phase = cogs.phase[weatherForecast[zip]]
     let nice = cogs[isNiceOutside[zip]]
     let status = WeatherLoadStatus(phase)
     let receivesUpdates = cogs[receivesHourlyUpdates[zip]]

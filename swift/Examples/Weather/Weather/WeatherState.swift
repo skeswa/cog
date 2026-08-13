@@ -41,14 +41,19 @@ let currentZipCode = currentZipSource.readOnly
 /// The cadence actually installed by ``WeatherEffects``.
 let refreshInterval = refreshIntervalSource.readOnly
 
-/// The complete request state for every forecast card.
+/// The keyed forecast every card reads, resting at `nil` until a ZIP's first
+/// accepted reading.
 ///
 /// Each ZIP code gets an independent phase, dependency set, generation, and
-/// task. The selector synchronously captures the current service as a Cog
-/// dependency; replacing that service in a test invalidates every demanded
-/// forecast. The returned work runs away from the MainActor, while Cog brings
-/// its pending, success, and failure phases back to the graph as ordered turns.
-let weatherForecast = AsyncCogBox<WeatherReading, ZipCode>(
+/// task. The optional value is the whole default spelling: a value read
+/// (`cogs[weatherForecast[zip]]`) is total, returning `nil` before the first
+/// success and the last accepted reading afterward, while request chrome opts
+/// into `cogs.phase[weatherForecast[zip]]`. The selector synchronously
+/// captures the current service as a Cog dependency; replacing that service
+/// in a test invalidates every demanded forecast. The returned work runs away
+/// from the MainActor, while Cog brings its pending, success, and failure
+/// phases back to the graph as ordered turns.
+let weatherForecast = AsyncCogBox<WeatherReading?, ZipCode>(
   name: "weather.forecast"
 ) { c, zip in
   let service = c[weatherService]
@@ -59,11 +64,11 @@ let weatherForecast = AsyncCogBox<WeatherReading, ZipCode>(
 
 /// Whether the latest successful reading for a ZIP depicts a sunny condition.
 ///
-/// Reading `weatherForecast.latest` keeps this derivation stable across reload
-/// pending and failure phases; it changes only when the accepted reading does.
+/// The plain value read keeps this derivation stable across reload pending
+/// and failure phases; it changes only when the accepted reading does.
 let isSunny = CogBox<Bool, ZipCode>(
   { c, zip in
-    switch c[weatherForecast.latest[zip]]?.weather.kind {
+    switch c[weatherForecast[zip]]?.weather.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
@@ -77,7 +82,7 @@ let isSunny = CogBox<Bool, ZipCode>(
 /// so the app has one definition of "nice" and equality gates both consumers.
 let isNiceOutside = CogBox<Bool, ZipCode>(
   { c, zip in
-    guard let reading = c[weatherForecast.latest[zip]] else { return false }
+    guard let reading = c[weatherForecast[zip]] else { return false }
     guard c[isSunny[zip]] else { return false }
     return reading.weather.temperatureF > 60
       && reading.weather.temperatureF < 90

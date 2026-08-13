@@ -89,7 +89,7 @@ import os
   try await completed.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherForecast.latest[.newYork])?.weather == refreshedWeather)
+  #expect(cogs.peek(weatherForecast[.newYork])?.weather == refreshedWeather)
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
@@ -155,7 +155,7 @@ import os
   try await failed.wait()
   try await clock.waitForScheduledSleep()
 
-  if case .failure(_, previous: .some(let reading)) = cogs.peek(weatherForecast[.newYork]) {
+  if case .failure(_, previous: .some(let reading)) = cogs.phase.peek(weatherForecast[.newYork]) {
     #expect(reading == initialReading)
   } else {
     Issue.record("The failed hourly refresh should retain the previous reading")
@@ -169,7 +169,7 @@ import os
   try await succeeded.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherForecast.latest[.newYork])?.weather == refreshedWeather)
+  #expect(cogs.peek(weatherForecast[.newYork])?.weather == refreshedWeather)
 
   group.cancel()
   clock.finish()

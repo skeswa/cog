@@ -69,14 +69,17 @@ private final class TrackedWeatherCard {
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(newYorkRun, with: newYorkReading)
   }
-  #expect(newYorkCard.invalidations == 1)
+  // The card reads the forecast value and its phase through separate
+  // Observation boundaries, and this direct harness re-arms between their
+  // notices, so one success turn invalidates twice.
+  #expect(newYorkCard.invalidations == 2)
   #expect(sanFranciscoCard.invalidations == 0)
 
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(sanFranciscoRun, with: sanFranciscoReading)
   }
-  #expect(newYorkCard.invalidations == 1)
-  #expect(sanFranciscoCard.invalidations == 1)
+  #expect(newYorkCard.invalidations == 2)
+  #expect(sanFranciscoCard.invalidations == 2)
 
   cogs.refresh(weatherForecast[.sanFrancisco])
   let changedRun = try #require(await starts.next())
@@ -86,14 +89,17 @@ private final class TrackedWeatherCard {
     await requests.succeed(changedRun, with: changedReading)
   }
 
-  #expect(newYorkCard.invalidations == 1)
+  #expect(newYorkCard.invalidations == 2)
   #expect(
     newYorkCard.snapshots == [
       WeatherCardSnapshot(zip: .newYork, report: nil, isNice: false),
+      // The value and phase boundaries notify separately; each re-render must
+      // see the same settled turn rather than a mixed pair.
+      WeatherCardSnapshot(zip: .newYork, report: newYorkReading.weather, isNice: false),
       WeatherCardSnapshot(zip: .newYork, report: newYorkReading.weather, isNice: false),
     ]
   )
-  #expect(sanFranciscoCard.invalidations == 4)
+  #expect(sanFranciscoCard.invalidations == 6)
   #expect(
     sanFranciscoCard.snapshots == [
       WeatherCardSnapshot(zip: .sanFrancisco, report: nil, isNice: false),
@@ -102,20 +108,31 @@ private final class TrackedWeatherCard {
         report: sanFranciscoReading.weather,
         isNice: false
       ),
-      // Reload pending retains the prior success as one atomic reading.
       WeatherCardSnapshot(
         zip: .sanFrancisco,
         report: sanFranciscoReading.weather,
         isNice: false
+      ),
+      // Reload pending retains the prior success as one atomic reading, and
+      // the equality-gated value read stays quiet: only the phase notices.
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: sanFranciscoReading.weather,
+        isNice: false
+      ),
+      // The value, full phase, and `isNice` boundaries notice separately.
+      // This direct harness re-arms between them, so every render must see
+      // the same settled turn rather than a mixed pair.
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: changedReading.weather,
+        isNice: true
       ),
       WeatherCardSnapshot(
         zip: .sanFrancisco,
         report: changedReading.weather,
         isNice: true
       ),
-      // The full phase and `isNice` have separate boundary notices. This
-      // direct harness re-arms between them, so both renders must see the same
-      // settled turn rather than a mixed pair.
       WeatherCardSnapshot(
         zip: .sanFrancisco,
         report: changedReading.weather,
