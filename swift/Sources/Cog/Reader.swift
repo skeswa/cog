@@ -157,7 +157,8 @@ public struct Reader<Value> {
   ///
   /// Skipping the edge never returns stale data. If the derived cog is dirty,
   /// this call settles it before returning, but its later changes do not make
-  /// this selector run again.
+  /// this selector run again. Because no durable consumer is installed, a
+  /// default `whileObserved` state starts or renews its ordinary grace window.
   ///
   /// - Parameter valueReference: The derived cog to read without recording an edge.
   /// - Returns: Its newest settled value in this context.

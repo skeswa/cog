@@ -23,11 +23,9 @@ import Testing
 
   #expect(cogs[derived] == 10)
   #expect(selectorRuns == 1)
+  #expect(clock.activeSleeperCount == 0)
 
-  let releaseChecked = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedReleaseCheck(with: releaseChecked)
   clock.advance(by: .seconds(10))
-  try await releaseChecked.wait()
 
   #expect(cogs.peek(derived) == 10)
   #expect(selectorRuns == 1)

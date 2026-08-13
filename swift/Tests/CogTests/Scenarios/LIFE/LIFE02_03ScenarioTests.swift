@@ -3,6 +3,12 @@ import CogTesting
 import Testing
 import os
 
+private nonisolated enum DerivedLifetimeSleepOutcome {
+  case cancelled
+  case due
+  case scheduled
+}
+
 @MainActor
 @Test func `LIFE-02 an unobserved derived cog is released after injected grace`() async throws {
   let clock = DerivedLifetimeTestClock()
@@ -64,8 +70,52 @@ import os
   withExtendedLifetime(token) {}
 }
 
+@MainActor
+@Test func `LIFE-10 one-shot derived peek renews grace then releases and recreates`()
+  async throws
+{
+  let clock = DerivedLifetimeTestClock()
+  let cogs = Cogtext.forTesting(
+    clock: clock,
+    whileObservedGrace: .seconds(10)
+  )
+  let source = ManualCog<Int>(1)
+  var previousValues: [Int?] = []
+  let derived = Cog<Int> { c in
+    previousValues.append(c.curr)
+    return c[source]
+  }
+
+  #expect(cogs.peek(derived) == 1)
+  try await clock.waitForScheduledSleep()
+  #expect(clock.activeSleeperCount == 1)
+
+  clock.advance(by: .seconds(4))
+  for _ in 0..<32 {
+    #expect(cogs.peek(derived) == 1)
+    try await clock.waitForScheduledSleep()
+    #expect(clock.activeSleeperCount == 1)
+  }
+  #expect(previousValues == [nil])
+  #expect(clock.maximumActiveSleeperCount == 1)
+
+  clock.advance(by: .seconds(6))
+  #expect(clock.activeSleeperCount == 1)
+
+  let released = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextDerivedRelease(with: released)
+  clock.advance(by: .seconds(4))
+  try await released.wait()
+  #expect(clock.activeSleeperCount == 0)
+
+  cogs.commit { c in c[source] = 2 }
+  #expect(cogs.peek(derived) == 2)
+  #expect(previousValues == [nil, nil])
+}
+
 nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
   private struct Sleeper {
+    let id: UInt64
     let deadline: Instant
     let continuation: CheckedContinuation<Void, any Error>
   }
@@ -73,6 +123,9 @@ nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
   private struct State {
     var now = Instant(offset: .zero)
     var sleepers: [Sleeper] = []
+    var cancelledSleeperIDs: Set<UInt64> = []
+    var nextSleeperID: UInt64 = 0
+    var maximumActiveSleeperCount = 0
   }
 
   struct Instant: InstantProtocol, Hashable, Sendable {
@@ -109,24 +162,61 @@ nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
 
   var minimumResolution: Swift.Duration { .nanoseconds(1) }
 
+  var activeSleeperCount: Int {
+    state.withLock { $0.sleepers.count }
+  }
+
+  var maximumActiveSleeperCount: Int {
+    state.withLock { $0.maximumActiveSleeperCount }
+  }
+
   func sleep(
     until deadline: Instant,
     tolerance: Swift.Duration?
   ) async throws {
     try Task.checkCancellation()
-    try await withCheckedThrowingContinuation {
-      (continuation: CheckedContinuation<Void, any Error>) in
-      let isAlreadyDue = state.withLock { state in
-        guard deadline > state.now else { return true }
-        state.sleepers.append(Sleeper(deadline: deadline, continuation: continuation))
-        return false
-      }
+    let sleeperID = state.withLock { state in
+      let sleeperID = state.nextSleeperID
+      state.nextSleeperID += 1
+      return sleeperID
+    }
 
-      if isAlreadyDue {
-        continuation.resume()
-      } else {
-        scheduledContinuation.yield()
+    try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<Void, any Error>) in
+        let outcome = state.withLock { state in
+          if state.cancelledSleeperIDs.remove(sleeperID) != nil || Task.isCancelled {
+            return DerivedLifetimeSleepOutcome.cancelled
+          }
+          guard deadline > state.now else { return .due }
+          state.sleepers.append(
+            Sleeper(id: sleeperID, deadline: deadline, continuation: continuation)
+          )
+          state.maximumActiveSleeperCount = max(
+            state.maximumActiveSleeperCount,
+            state.sleepers.count
+          )
+          return .scheduled
+        }
+
+        switch outcome {
+        case .cancelled:
+          continuation.resume(throwing: CancellationError())
+        case .due:
+          continuation.resume()
+        case .scheduled:
+          scheduledContinuation.yield()
+        }
       }
+    } onCancel: {
+      let continuation: CheckedContinuation<Void, any Error>? = state.withLock { state in
+        guard let index = state.sleepers.firstIndex(where: { $0.id == sleeperID }) else {
+          state.cancelledSleeperIDs.insert(sleeperID)
+          return nil
+        }
+        return state.sleepers.remove(at: index).continuation
+      }
+      continuation?.resume(throwing: CancellationError())
     }
   }
 

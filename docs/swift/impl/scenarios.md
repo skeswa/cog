@@ -477,6 +477,10 @@ test waits wall-clock time.
   external consumer. Their internal graph edge does not keep them alive.
   After the grace period, reading either value reference recreates the needed states
   with the correct current values.
+- **LIFE-10.** I use one-shot `cogs.peek` on a default `whileObserved` derived
+  cog. It settles current state without a durable consumer, starts or renews
+  one ordinary grace window, and releases after expiry. A later peek recreates
+  it from current dependencies.
 
 ## 10. SEED — Test helpers: seed and stub
 

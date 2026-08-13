@@ -227,12 +227,12 @@ extension Cogtext {
 
   /// Starts grace for a state that became demanded without acquiring a lease.
   ///
-  /// A one-shot async `peek` or cold `refresh` creates real demand and starts
-  /// work, but intentionally installs no reaction or UI consumer. This overload
-  /// gives that state the same renewable grace as a state whose final durable
-  /// lease disappeared. App-lifetime, reaction-leased, and UI-pinned states are
-  /// no-ops; an internal subscriber can defer removal when the deadline arrives
-  /// but does not count as observation or renew grace.
+  /// A one-shot synchronous or async `peek`, or a cold async `refresh`, creates
+  /// real demand but intentionally installs no reaction or UI consumer. This
+  /// overload gives that state the same renewable grace as a state whose final
+  /// durable lease disappeared. App-lifetime, reaction-leased, and UI-pinned
+  /// states are no-ops; an internal subscriber can defer removal when the
+  /// deadline arrives but does not count as observation or renew grace.
   internal func scheduleLifetimeReleaseIfUnobserved(_ state: any CogLifetimeLeaseState) {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)
@@ -504,14 +504,19 @@ extension Cogtext {
   ///
   /// The call computes the cog if needed and settles stale dependencies before
   /// returning, so non-tracking never means stale. It neither registers an
-  /// Observation boundary nor attaches the caller as a graph consumer. Inside a
-  /// selector or reaction, use that reader's subscript when future changes must
-  /// rerun the body.
+  /// Observation boundary nor attaches the caller as a graph consumer. For a
+  /// default `whileObserved` cog, this transient demand starts or renews ordinary
+  /// grace; repeated peeks share one state and one owned grace sleeper, while
+  /// expiry releases the unobserved state. Inside a selector or reaction, use
+  /// that reader's subscript when future changes must rerun the body.
   ///
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its fully settled value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
-    derivedState(for: valueReference).settledValue(in: self)
+    let state = derivedState(for: valueReference)
+    let value = state.settledValue(in: self)
+    scheduleLifetimeReleaseIfUnobserved(state)
+    return value
   }
 
   /// Reads an async cog's current phase without creating a dependency edge.

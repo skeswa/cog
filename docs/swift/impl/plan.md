@@ -437,6 +437,9 @@ Limit this milestone to the async pieces needed for 0.1.0:
   grace, after which release cancels the work and rejects late results if no
   consumer arrived. Refresh does not initialize and then replace the first
   run.
+- A one-shot peek of synchronous derived state is the same kind of transient
+  demand: it installs no durable consumer, renews ordinary `whileObserved`
+  grace, and releases and recreates from current dependencies after expiry.
 - Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure
@@ -444,8 +447,9 @@ Limit this milestone to the async pieces needed for 0.1.0:
   work isolation, task naming, invalidation during unobserved grace, one-grace
   release through `.latest`, keyed `.latest` spelling, refresh rejection
   during selector computation, non-reentrant UI reads through async-derived
-  values, and bounded grace scheduling under repeated one-shot demand. Use
-  injected clocks and continuations; do not sleep.
+  values, bounded grace scheduling under repeated one-shot demand, and release
+  of one-shot synchronous derived demand. Use injected clocks and
+  continuations; do not sleep.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.

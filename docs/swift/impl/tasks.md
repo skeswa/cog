@@ -879,10 +879,17 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-08ca._
   _Verify: `mise run test --filter ASYNC-29`._
   _Greens: ASYNC-29._
+- **M3-10j** _(Behavior)_ — Treat a one-shot synchronous derived peek as
+  transient demand: renew ordinary `whileObserved` grace without a durable
+  lease or Observation boundary, then release and recreate the state after
+  expiry.
+  _Depends: M1-08b, M1-28a._
+  _Verify: `mise run test --filter LIFE-10`._
+  _Greens: LIFE-10._
 - **M3-11** _(Gate)_ — Close the deterministic async slice in every host leg
   and release configuration.
   _Depends: M3-03c, M3-05c, M3-10b, M3-10c, M3-10d, M3-10e, M3-10f,
-  M3-10g, M3-10h, M3-10i._
+  M3-10g, M3-10h, M3-10i, M3-10j._
   _Verify: `mise run test:matrix` and `mise run test:release`._
 
 ## M4 tasks

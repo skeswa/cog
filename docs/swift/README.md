@@ -237,11 +237,12 @@ These choices are settled; §10 of the core document has the full record.
 - Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
   `cogs.peek` outside) skip
   the dependency edge but still settle the value they return; they are never
-  stale. Peeking or refreshing a never-read async value starts exactly one
+  stale. A synchronous derived or async peek is transient demand: without a
+  durable consumer it renews normal `whileObserved` grace, and expiry releases
+  the state. Peeking or refreshing a never-read async value starts exactly one
   initial run at `pending(previous: .none)` without a dependency,
-  subscription, or Observation boundary. That one-shot demand renews the
-  normal `whileObserved` grace window but does not retain work through
-  completion; expiry cancels, releases, and rejects late results. Exported
+  subscription, or Observation boundary; expiry also cancels its work and
+  rejects late results. Exported
   streams (`cogs.values(of:)`) start from the current settled value and never
   make a commit wait: `.newest(1)` may skip turns for a slow reader,
   `.oldest(n)` delivers the oldest n in order and drops newer while full, and

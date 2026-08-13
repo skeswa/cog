@@ -121,7 +121,9 @@ public struct ReactionReader {
   /// Peeks at a derived cog without recording it as a reaction dependency.
   ///
   /// A dirty value is settled before it is returned, but later changes do not
-  /// schedule this reaction and no lifetime lease is acquired.
+  /// schedule this reaction and no lifetime lease is acquired. If nothing else
+  /// observes the default `whileObserved` state, the peek starts or renews its
+  /// ordinary grace window.
   ///
   /// - Parameter valueReference: The derived identity to settle and read once.
   /// - Returns: Its newest fully settled value.
