@@ -1,14 +1,19 @@
-/// A selector or reaction that records the cogs it reads.
+/// A synchronous selector or reaction that records the cogs it reads.
 ///
-/// During a run, each `c[valueReference]` links its producer to the tracked consumer.
-/// SwiftUI will use the same protocol.
+/// During a run, each `c[valueReference]` links its producer to the tracked
+/// consumer. Async selectors leave this protocol's tracking scope when they
+/// return ``Work``; the later work body cannot silently add dependencies after
+/// suspension. SwiftUI uses observation boundaries rather than extending this
+/// synchronous tracking interval.
 @MainActor
 internal protocol CogConsumer: AnyObject {
   /// Records that this consumer read `producer` during the run in progress.
   ///
-  /// Called once per tracked read, in read order. Every run starts from an
-  /// empty list, appends what it reads, and removes reverse edges for producers
-  /// the completed run did not read again.
+  /// Called once per tracked read, in read order. Every run starts from an empty
+  /// list, appends what it reads, and removes reverse edges for producers the
+  /// completed run did not read again. This replacement model makes branches
+  /// dynamic: only the path taken by the latest completed selector can
+  /// invalidate the consumer.
   func recordDependency(on producer: any CogState)
 
   /// Drops strong producer ownership before the context releases its state map.
@@ -17,11 +22,17 @@ internal protocol CogConsumer: AnyObject {
   /// linear graph therefore also forms a deep strong-ownership chain, which
   /// ARC could otherwise destroy recursively after the context released its
   /// dictionary entries. The context calls this for every consumer first, so
-  /// the later property teardown is flat even when graph traversal was deep.
+  /// later property teardown is flat even when graph traversal was deep.
+  /// Because the entire graph is ending, implementations do not need to repair
+  /// reverse edges as they do for one state's lifetime release.
   func releaseDependenciesForContextTeardown()
 }
 
 /// A tracked state that can hand ``Reader`` its previous typed value.
+///
+/// The outer optional records whether a previous value exists; it must not
+/// collapse a real optional `nil`. Async state uses the same contract to expose
+/// its previously published phase to `Reader.curr` machinery.
 @MainActor
 internal protocol CogReaderState<Value>: CogConsumer {
   associatedtype Value
@@ -34,7 +45,9 @@ extension Cogtext {
   /// Runs `body` with `consumer` installed as this context's tracked consumer.
   ///
   /// Nested selectors replace the slot for their run, then restore the outer
-  /// consumer in `defer`. The SwiftUI boundary will use the same slot (§2.4).
+  /// consumer in `defer`. Saving and restoring instead of using one global
+  /// collector ensures a nested derived read attaches its own producers to
+  /// itself, while the outer selector records only the nested derived state.
   internal func tracking<Result>(_ consumer: any CogConsumer, _ body: () -> Result) -> Result {
     let enclosing = trackedConsumer
     trackedConsumer = consumer
@@ -44,9 +57,10 @@ extension Cogtext {
 
   /// Fails unless `consumer` is the one whose run is in progress right now.
   ///
-  /// A saved reader could attach dependencies after its selector ends. Compare
-  /// object identity with the tracking slot and trap before corrupting the
-  /// graph.
+  /// A saved reader or an async work body could otherwise attach dependencies
+  /// after synchronous selection ends. Compare object identity with the
+  /// tracking slot and trap before corrupting the graph or making dependency
+  /// capture depend on suspension timing.
   ///
   /// `fatalError` preserves the message under `-O` and `-Ounchecked`.
   internal func requireTracking(_ consumer: any CogConsumer) {

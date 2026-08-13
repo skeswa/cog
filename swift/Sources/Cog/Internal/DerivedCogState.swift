@@ -8,7 +8,8 @@
 ///
 /// Each run records the dependencies it reads. Settlement walks those parents,
 /// and the next run replaces the dependency set so branches and early returns
-/// can change it.
+/// can change it. Lifetime release removes a whole unobserved dependency closure
+/// without treating its internal graph edges as durable observation.
 internal final class DerivedCogState<Value>:
   CogState, CogConsumer, CogReaderState, DerivedCogSettleState, CogLifetimeLeaseState,
   CogObservationState
@@ -67,7 +68,10 @@ internal final class DerivedCogState<Value>:
   /// The declaration's lifetime policy, shared by every key of a box.
   var lifetime: CogStateLifetime { descriptor.lifetime }
 
-  /// External consumers currently keeping this derived root observed.
+  /// Exact reaction-owned consumers currently keeping this derived root observed.
+  ///
+  /// A UI boundary pins separately, and internal subscribers never increment
+  /// this count.
   var externalLeaseCount: Int
 
   /// The descriptor-and-key identity this context files the state under.
@@ -76,9 +80,16 @@ internal final class DerivedCogState<Value>:
   }
 
   /// Invalidates a pending grace completion when observation changes.
+  ///
+  /// The sleeping task captures one generation and must still match before it
+  /// can remove this exact state.
   var lifetimeReleaseGeneration: UInt64
 
   /// The scheduled grace generation whose deadline has not arrived yet.
+  ///
+  /// The expiry task clears this marker before testing subscribers. If an
+  /// internal consumer kept the state alive past that point, removing that
+  /// consumer may cascade release immediately instead of scheduling fresh grace.
   var pendingLifetimeReleaseGeneration: UInt64?
 
   /// Whether the selector has run in this context yet.
@@ -126,15 +137,25 @@ internal final class DerivedCogState<Value>:
     return cached
   }
 
+  /// Records one selector read and installs its reverse invalidation edge.
   func recordDependency(on producer: any CogState) {
     dependencies.append(producer)
     producer.addSubscriber(self)
   }
 
+  /// Breaks strong forward edges before the entire context is deallocated.
+  ///
+  /// Every producer is ending too, so reverse-edge repair is unnecessary. This
+  /// flat prepass prevents ARC from recursively destroying a deep derived chain.
   func releaseDependenciesForContextTeardown() {
     dependencies.removeAll()
   }
 
+  /// Severs both sides of dependency edges before this one state is removed.
+  ///
+  /// Producers survive ordinary lifetime release. Removing their reverse edge
+  /// keeps invalidation correct and can make an already-expired, unobserved
+  /// producer eligible for the same release cascade.
   func releaseDependenciesForLifetime() {
     for dependency in dependencies {
       dependency.removeSubscriber(self)
@@ -143,6 +164,9 @@ internal final class DerivedCogState<Value>:
   }
 
   /// Reruns the generic selector behind a type-erased settle exit frame.
+  ///
+  /// By the time the exit frame calls this, dirty parents have settled and this
+  /// state is on the active computation path for cycle and write rejection.
   func recompute(in cogs: Cogtext) {
     _ = run(in: cogs)
   }
@@ -150,8 +174,10 @@ internal final class DerivedCogState<Value>:
   /// Runs the selector once, tracking what it reads, and keeps the result.
   ///
   /// The state installs itself as the context's tracked consumer for the
-  /// duration of the run, so a nested read of another derived cog computes
-  /// that cog against *itself* and hands tracking back on the way out.
+  /// duration of the run, so a nested read of another derived cog computes that
+  /// cog against *itself* and hands tracking back on the way out. The completed
+  /// run then removes reverse edges for abandoned branches before equality can
+  /// stop the downstream wave.
   private func run(in cogs: Cogtext) -> Value {
     guard isComputing else {
       fatalError("A derived Cog selector ran outside the settle computation path.")
