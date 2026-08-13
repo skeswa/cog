@@ -171,7 +171,7 @@ registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
 and non-nestable: do not put `await` in it, and do not use it as general test or
 preview setup.
 
-## Where things stand (2026-08-12)
+## Where things stand (2026-08-13)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -205,8 +205,10 @@ These choices are settled; §10 of the core document has the full record.
   `Work.stream`. The first read starts work and publicly begins at
   `pending(previous: .none)`; there is no observable `initial` phase. Values
   use `CogPhase` and its `.latest` view; an explicit `Previous` case keeps “no
-  previous value” distinct from “previous value was nil.” `.latest` is the
-  default policy. Streams allow only `.latest`.
+  previous value” distinct from “previous value was nil.” A complete accessor
+  set — `latestValue`, `value`, `error`, `isLoading`, `isInitialLoading`,
+  `isReloading` — narrows one fact without matching through `Previous`.
+  `.latest` is the default policy. Streams allow only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and

@@ -525,7 +525,11 @@ enum CogPhase<Value> {
     case failure(any Error, previous: Previous<Value>)
 
     var latestValue: Value? { ... }
+    var value: Value? { ... }
+    var error: (any Error)? { ... }
     var isLoading: Bool { ... }
+    var isInitialLoading: Bool { ... }
+    var isReloading: Bool { ... }
 }
 ```
 
@@ -550,6 +554,21 @@ whenever `Value` is itself optional, and a bare `nil` would be ambiguous at
 use sites. `latestValue` still returns `Value?`; its outer layer answers “is
 there a latest value at all.” There is no failure type parameter in v1; typed
 throws may add one once the required Swift and OS versions are practical.
+
+The accessors form a deliberately complete narrowing surface, so code that
+needs one fact reads it with `if let` or a boolean instead of matching through
+`Previous`. `latestValue` answers “what should be on screen”: the current or
+retained success, through pending and failure alike. `value` and `error`
+answer “how did the current generation end”: `value` is that generation’s
+success and nothing else, `error` is its failure and nothing else, so a reload
+retrying after a failure reports neither. `isInitialLoading` and `isReloading`
+split `isLoading` by retained success — a first load with nothing to show
+versus a reload still showing the last good value — the same distinction Solid
+(`pending`/`refreshing`) and Angular (`loading`/`reloading`) promote to whole
+states. When `Value` is itself optional, `value` nests exactly like
+`latestValue`: the outer optional reports whether the current generation
+succeeded. A full `switch` remains the tool for rendering the whole process;
+the accessors remove ceremony only where one case matters.
 
 An async selector is synchronous and tracked. It reads dependencies, then
 returns a description of async work:
@@ -776,7 +795,7 @@ singular, and does measurement show less runtime work?
 | Writes from derived computation?  | A derived computation is read-only from selector entry through dependency reconciliation, custom equality, and result publication. Any commit attempted in that region fails immediately in every build, before the commit body runs or that attempt mutates graph state, and names the derived cog/key plus the attempted turn. Invoke the op outside derived computation, from event handling or a reaction (§2.4, §3.2).                                                                                                                                                                                                             |
 | Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Async value shape?                | `CogPhase` begins publicly at `pending`—there is no observable `initial` phase—and uses an explicit `Previous` case to distinguish “no previous value” from “previous value was nil,” plus a `.latest` projection (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Async value shape?                | `CogPhase` begins publicly at `pending`—there is no observable `initial` phase—and uses an explicit `Previous` case to distinguish “no previous value” from “previous value was nil,” plus a `.latest` projection. A complete accessor set — `latestValue`, `value`, `error`, `isLoading`, `isInitialLoading`, `isReloading` — narrows one fact with `if let` or a boolean instead of a `switch` through `Previous` (§5.1).                                                                                                                                                                                                             |
 | Never-read async demand?          | A non-tracking peek or refresh creates the state and starts exactly one initial generation at `pending(previous: .none)` without installing a dependency, subscription, or Observation boundary. The call is transient demand: it renews the ordinary `whileObserved` grace window but does not retain work through completion, and expiry cancels, advances the generation, releases, and rejects late results (§5.1, §5.3).                                                                                                                                                                                                           |
 | Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |

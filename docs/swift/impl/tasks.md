@@ -940,7 +940,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 - **M4-05b** _(Gate)_ — Prepare the 0.1.0 release candidate without mutating
   remote state: format, ledgers, matrices, release, simulator, Weather, floor,
   docs, changelog, and revision-based scratch consumption.
-  _Depends: M4-04c, M4-05a._
+  _Depends: M4-04c, M4-05a, M4-06._
   _Verify: the complete 0.1.0 checklist with immutable CI links._
 - **M4-05c** _(Release)_ — Create and push the bare annotated `0.1.0` tag.
   _Depends: M4-05b._
@@ -953,6 +953,12 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   changelog excerpt.
   _Depends: M4-05d._
   _Verify: published GitHub Release points at the approved tag._
+- **M4-06** _(Behavior)_ — Complete the `CogPhase` accessor set with `value`,
+  `error`, `isInitialLoading`, and `isReloading`, documented and proven right
+  in every phase.
+  _Depends: M3-11._
+  _Verify: `mise run test --filter ASYNC-30`._
+  _Greens: ASYNC-30._
 
 ## M5 tasks
 
@@ -1226,7 +1232,7 @@ ArenaDirtyPropagationInfrastructure`._
   through arena values.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[1-6]|1[125678]|20|26)'`._
+'ASYNC-(0[1-6]|1[125678]|20|26|30)'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
   generation rejection, previous-value carry, cold one-shot demand,
   non-reentrant system turns, bounded grace scheduling, and release/recreation

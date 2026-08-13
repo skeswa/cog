@@ -562,7 +562,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
 
 ## 13. ASYNC — Async values, first slice
 
-_Milestone M3. Design: §5.1, §5.2 (`.latest` only), §5.3._
+_Milestone M3, except ASYNC-30 (M4). Design: §5.1, §5.2 (`.latest` only),
+§5.3._
 
 Async state is honest: it always says whether it is loading, what it has, and
 what it had.
@@ -585,6 +586,13 @@ what it had.
   plain optional value, the same shape as a manual cog.
 - **ASYNC-06.** A watcher sees each visible phase change as its own turn:
   first pending, then success, two separate turns.
+- **ASYNC-30.** `value`, `error`, `isInitialLoading`, and `isReloading`
+  complete the accessor set: `value` is the current generation's success
+  and nothing else; `error` is its failure and nothing else, so a reload
+  retrying after a failure reports neither; the two loading accessors
+  split pending by whether a previous success is retained. Each is right
+  in every phase, and a successful `nil` stays distinct from "never
+  succeeded" through `value`, exactly as it does through `latestValue`.
 
 ### 13.2 Latest wins
 

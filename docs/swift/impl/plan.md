@@ -467,6 +467,9 @@ query caching.
 - Read swift-state-graph source before freezing public names; credit prior
   art; compare tracked reads with capture lists. Adjust names if warranted;
   update §10.
+- Complete the `CogPhase` accessor surface — `value`, `error`,
+  `isInitialLoading`, `isReloading` (§5.1) — so the public-name review and
+  0.1.0 freeze cover the whole phase-reading surface (ASYNC-30).
 - `Cog.docc`: landing page, Getting Started, and an article on the
   one-context rule and testing with `CogTesting`. Start `CHANGELOG.md`.
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that
