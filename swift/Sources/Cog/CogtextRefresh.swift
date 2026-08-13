@@ -10,9 +10,11 @@ extension Cogtext {
   ///
   /// A never-read reference performs one initial load; it is not initialized
   /// and then immediately replaced. Refresh itself is one-shot demand: it adds
-  /// neither a dependency edge nor an Observation boundary. If no reaction,
-  /// selector, or UI boundary already keeps the state observed, the call starts
-  /// or renews its ordinary `whileObserved` grace after selecting the work.
+  /// neither a dependency edge nor an Observation boundary. If no reaction
+  /// lease or UI boundary already keeps the exact state observed, the call
+  /// starts or renews its ordinary `whileObserved` grace after selecting the
+  /// work. An internal selector edge may defer removal at expiry, but it is not
+  /// durable observation and does not earn another grace window.
   ///
   /// Call refresh from event handling or a reaction. Calling it while any
   /// derived or async selector is computing traps before the target state is

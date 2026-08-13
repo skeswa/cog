@@ -7,12 +7,12 @@
 /// state in separate contexts.
 ///
 /// Demand may come from a tracked read, one-shot `peek`, or `refresh`. Initial
-/// demand synchronously publishes and returns
-/// ``CogPhase/pending(previous:)`` with ``Previous/none``, then runs the
-/// selected work. Each later pending, success, or failure is a separate graph
-/// turn. The default `whileObserved` lifetime releases unobserved state after
-/// the context's grace period and cancels pending work; `keepAlive` retains it
-/// for the context lifetime.
+/// demand synchronously publishes ``CogPhase/pending(previous:)`` with
+/// ``Previous/none`` and starts the selected work; a read also returns that
+/// phase, while `refresh` returns no value. Each later pending, success, or
+/// failure is a separate graph turn. The default `whileObserved` lifetime
+/// releases unobserved state after the context's grace period and cancels
+/// pending work; `keepAlive` retains it for the context lifetime.
 ///
 /// The selector itself is synchronous and MainActor-isolated. Reads made with
 /// its ``Reader`` become dependencies before the selector returns ``Work``;

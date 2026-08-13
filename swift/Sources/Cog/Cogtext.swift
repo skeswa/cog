@@ -199,7 +199,9 @@ extension Cogtext {
   /// A one-shot async `peek` or cold `refresh` creates real demand and starts
   /// work, but intentionally installs no reaction or UI consumer. This overload
   /// gives that state the same renewable grace as a state whose final durable
-  /// lease disappeared. App-lifetime and still-observed states are no-ops.
+  /// lease disappeared. App-lifetime, reaction-leased, and UI-pinned states are
+  /// no-ops; an internal subscriber can defer removal when the deadline arrives
+  /// but does not count as observation or renew grace.
   internal func scheduleLifetimeReleaseIfUnobserved(_ state: any CogLifetimeLeaseState) {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)

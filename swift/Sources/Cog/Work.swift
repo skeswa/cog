@@ -17,9 +17,9 @@ public struct Work<Value> {
   ///
   /// The body does not run during this call. An unannotated body inherits the
   /// surrounding actor, normally the MainActor of an async selector, which is
-  /// useful for async APIs isolated there. CPU-intensive or blocking work
-  /// should not occupy the MainActor; an explicitly `@concurrent` body opts
-  /// into the generic executor instead.
+  /// useful for async APIs isolated there. Executor-independent work can use an
+  /// explicitly `@concurrent` body to opt into the generic executor instead;
+  /// blocking a cooperative Swift executor remains inappropriate on either.
   ///
   /// Regardless of operation isolation, Cog observes completion and publishes
   /// success or failure on the MainActor. If newer work or lifetime release has
