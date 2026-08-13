@@ -90,6 +90,17 @@ internal enum CogTurnPhase {
 // optimization. See `Cogtext.requireWriterTurn` in `Writer.swift`.
 
 extension Cogtext {
+  /// Whether a graph-owned turn can flush without reentering graph evaluation.
+  ///
+  /// An idle context is not sufficient: a selector or reaction may be tracking
+  /// outside a turn. System publication waits until both tracking and settlement
+  /// have completed, so Observation and reactions never run through an active
+  /// consumer.
+  internal var canRunSystemTurnImmediately: Bool {
+    guard case .idle = turnPhase else { return false }
+    return settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil
+  }
+
   /// Rejects an application operation before it can open a turn during derivation.
   ///
   /// The guard happens before state lookup or body execution. That keeps the
@@ -120,19 +131,33 @@ extension Cogtext {
   /// completed-turn reads and ensures pending, success, and failure each occupy
   /// their own visible revision.
   internal func withSystemTurn(_ name: String, _ body: @escaping (CogTurn) -> Void) {
-    switch turnPhase {
-    case .idle:
-      #if DEBUG
-      turnChainTracker.beginChain()
-      defer { turnChainTracker.endChain() }
-      #endif
-
-      runOuterTurn(named: name, body)
-      drainQueuedTurns()
-
-    case .accumulating, .flushing:
+    guard canRunSystemTurnImmediately else {
       queuedTurns.append(QueuedCogTurn(name: name, body: body))
+      return
     }
+
+    #if DEBUG
+    turnChainTracker.beginChain()
+    defer { turnChainTracker.endChain() }
+    #endif
+
+    runOuterTurn(named: name, body)
+    drainQueuedTurns()
+  }
+
+  /// Drains deferred system publication at the first safe graph boundary.
+  ///
+  /// The queue also carries turns requested during an active flush; those stay
+  /// owned by that outer turn and fail this guard until it returns to idle.
+  internal func drainQueuedTurnsIfPossible() {
+    guard !queuedTurns.isEmpty, canRunSystemTurnImmediately else { return }
+
+    #if DEBUG
+    turnChainTracker.beginChain()
+    defer { turnChainTracker.endChain() }
+    #endif
+
+    drainQueuedTurns()
   }
 
   /// Joins an accumulating turn, or runs one new outer turn through its flush.

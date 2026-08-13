@@ -147,6 +147,7 @@ internal final class CogReaction: CogState, CogConsumer {
     reconcileExternalLeases(in: cogs)
 
     markChecked(at: cogs.revision)
+    cogs.drainQueuedTurnsIfPossible()
   }
 
   /// Replaces this registration's lease set after one completed tracking run.

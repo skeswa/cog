@@ -242,6 +242,8 @@ extension Cogtext {
   /// CHECK state must run. A recomputation that lands equal advances only
   /// `checkedAt`, so consumers farther down a CHECK wave stay cached.
   internal func settle(_ root: any DerivedCogSettleState) {
+    defer { drainQueuedTurnsIfPossible() }
+
     // A nested pull appends above this checkpoint and pops only its own frames.
     let boundary = settleStack.count
     settleStack.pushEnter(root)
