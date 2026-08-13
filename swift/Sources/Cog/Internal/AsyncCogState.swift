@@ -141,7 +141,7 @@ internal final class AsyncCogState<Value>:
         guard let self, let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
         guard !Task.isCancelled, self.generation == runGeneration else { return }
-        self.publish(.failure(error, previous: .none), named: "failure", in: cogs)
+        self.publish(.failure(error, previous: self.lastSuccess), named: "failure", in: cogs)
       }
     }
   }
