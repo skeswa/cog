@@ -251,29 +251,23 @@ internal final class AsyncCogState<Value>:
       pendingPhase = pending
       pendingTurn.touch(self)
     } else if phase == nil {
-      if cogs.canRunSystemTurnImmediately {
-        stage(pending, named: "pending", in: cogs)
-      } else {
-        // A first read must synchronously return honest pending state. Nothing
-        // can already subscribe to a state with no phase, so install it now and
-        // queue the named, otherwise-empty publication turn behind the active
-        // graph operation without invalidating the reader that is establishing
-        // its baseline.
-        phase = pending
-        markChanged(at: cogs.revision)
-        cogs.withSystemTurn("\(renderedName) pending") { _ in }
-      }
+      // A first read must synchronously return honest pending state. Nothing
+      // can already subscribe to a state with no phase, so install it now and
+      // queue the named, otherwise-empty publication turn behind the active
+      // graph operation without invalidating the reader that is establishing
+      // its baseline.
+      phase = pending
+      markChanged(at: cogs.revision)
+      cogs.withSystemTurn("\(renderedName) pending") { _ in }
     } else {
       switch cogs.turnPhase {
-      case .idle where !cogs.canRunSystemTurnImmediately:
+      case .idle:
         // A cold state can be pulled while a new consumer is establishing its
         // baseline. Install pending for that read and defer only its named turn;
         // invalidating afterward would deliver the same pending phase twice.
         phase = pending
         markChanged(at: cogs.revision)
         cogs.withSystemTurn("\(renderedName) pending") { _ in }
-      case .idle:
-        stage(pending, named: "pending", in: cogs)
       case .accumulating, .flushing:
         // A dependency-triggered reload starts as a later turn. While the
         // source turn is still flushing, readers continue to see its last

@@ -33,8 +33,9 @@ extension Cogtext {
   /// - Returns: Its newest fully settled value.
   public subscript<Value>(_ valueReference: Cog<Value>) -> Value {
     let state = derivedState(for: valueReference)
+    let value = state.settledValue(in: self)
     state.accessObservationBoundary(in: self)
-    return state.settledValue(in: self)
+    return value
   }
 
   /// Reads an async cog's full phase through the Observation boundary.
