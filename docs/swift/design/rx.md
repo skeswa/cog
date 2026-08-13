@@ -53,7 +53,7 @@ true drop or exhaust behavior belongs to imperative ops, whose inputs are
 events.
 
 ```swift
-let forecast = AsyncCog<Forecast>(.latest) { c in
+let forecast = AsyncCog<Forecast?>(.latest) { c in
     let zip = c[currentZipCode]
     return .run { try await api.forecast(for: zip) }
 }
@@ -67,7 +67,7 @@ Some sources really are streams: location updates, websockets, database
 observations.
 
 ```swift
-let locationFix = AsyncCog<CLLocation>(.latest) { c in
+let locationFix = AsyncCog<CLLocation?>(.latest) { c in
     let accuracy = c[desiredAccuracy]
     return .stream(locationService.updates(accuracy: accuracy))
 }

@@ -562,8 +562,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
 
 ## 13. ASYNC — Async values, first slice
 
-_Milestone M3, except ASYNC-30 (M4). Design: §5.1, §5.2 (`.latest` only),
-§5.3._
+_Milestone M3, except ASYNC-30 through ASYNC-34 (M4). Design: §5.1, §5.2
+(`.latest` only), §5.3._
 
 Async state is honest: it always says whether it is loading, what it has, and
 what it had.
@@ -571,8 +571,9 @@ what it had.
 ### 13.1 Phases
 
 - **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
-  work, publishes a pending turn, and returns
-  `.pending(previous: .none)`. There is no observable `initial` phase.
+  work and publishes a pending turn; a `phase` read returns
+  `.pending(previous: .none)`, while a value read returns the declared
+  resting default. There is no observable `initial` phase.
 - **ASYNC-02.** The work throws. The phase becomes failure holding the
   error — and the previous value, if there was one.
 - **ASYNC-03.** An async cog whose value is optional succeeded with
@@ -582,10 +583,11 @@ what it had.
   nothing and loading at first; the old value and loading while
   reloading; the value and not loading on success; the last good value
   and not loading on failure.
-- **ASYNC-05.** The `.latest` projection lets me read an async cog as a
-  plain optional value, the same shape as a manual cog.
-- **ASYNC-06.** A watcher sees each visible phase change as its own turn:
-  first pending, then success, two separate turns.
+- **ASYNC-05.** The plain value read lets me read an async cog in the same
+  shape as a manual cog: the resting default before the first success, then
+  the last accepted success.
+- **ASYNC-06.** A phase watcher sees each visible phase change as its own
+  turn: first pending, then success, two separate turns.
 - **ASYNC-30.** `value`, `error`, `isInitialLoading`, and `isReloading`
   complete the accessor set: `value` is the current generation's success
   and nothing else; `error` is its failure and nothing else, so a reload
@@ -593,6 +595,25 @@ what it had.
   split pending by whether a previous success is retained. Each is right
   in every phase, and a successful `nil` stays distinct from "never
   succeeded" through `value`, exactly as it does through `latestValue`.
+- **ASYNC-31.** Every async cog rests on a declared default, and value reads
+  are total. `default:` states the resting value explicitly; an `Optional`
+  value may omit it and rests at `nil`. In every value spelling — `c[...]`,
+  `cogs[...]`, and their peeks — the read returns the default before any
+  success and the last accepted success afterward, through reload pending
+  and failure alike.
+- **ASYNC-32.** The `phase` lens carries the same read family as the value
+  spelling beside it: tracked `c.phase[...]` and `cogs.phase[...]` reads,
+  `phase.peek` one-shots, and `cogs.phase.watch`, with identical demand,
+  tracking, and lifetime rules. While an equal-success reload leaves a value
+  consumer quiet, the lens still shows its consumers every pending, success,
+  and failure turn.
+- **ASYNC-33.** The `phase` lens refuses synchronous state: asking
+  `cogs.phase` or a selector's `c.phase` for a manual or derived cog does
+  not compile. (Proof: compile-fail.)
+- **ASYNC-34.** An async declaration without a resting value does not
+  compile unless its `Value` supplies one: a non-`CogDefaultable` value
+  without `default:` fails with a diagnostic naming both ways out, while
+  `default:` and `Optional` spellings compile. (Proof: compile-fail.)
 
 ### 13.2 Latest wins
 
@@ -629,18 +650,17 @@ what it had.
 - **ASYNC-17.** The internal task that runs an async cog's work carries
   the descriptor's name and key, so Instruments can show it. (Checked
   through an internal seam.)
-- **ASYNC-18.** Initial work throws. A watcher and history see pending with
-  no previous value, then failure with no previous value, as two distinct
-  turns.
+- **ASYNC-18.** Initial work throws. A phase watcher and history see pending
+  with no previous value, then failure with no previous value, as two
+  distinct turns.
 - **ASYNC-19.** Work succeeds, then a dependency change starts a reload
-  that fails. A watcher and history see success, pending with that success
-  as the previous value, then failure with the same previous value, each as
-  its own turn. A further reload's pending still carries that success —
-  the last good value, never the failure.
+  that fails. A phase watcher and history see success, pending with that
+  success as the previous value, then failure with the same previous value,
+  each as its own turn. A further reload's pending still carries that
+  success — the last good value, never the failure.
 - **ASYNC-20.** A reload succeeds with a value equal to the one it had.
-  Watchers of the full phase see the pending and success turns, but
-  consumers of the `.latest` projection see no change: no recompute, no
-  re-render.
+  Phase watchers see the pending and success turns, but value consumers see
+  no change: no recompute, no re-render.
 - **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
   newest run may commit — a refresh replaces work the same way a
@@ -649,8 +669,9 @@ what it had.
 ### 13.5 Cold one-shot demand
 
 - **ASYNC-22.** I use one-shot `cogs.peek` on a never-read async cog. It
-  starts one suspended run, publishes and returns
-  `.pending(previous: .none)`, and installs no durable consumer. Another
+  starts one suspended run, publishes `.pending(previous: .none)`, returns
+  its spelling's view — the resting default from a value peek, that pending
+  phase from `cogs.phase.peek` — and installs no durable consumer. Another
   peek sees that same generation instead of starting a second run and renews
   its grace window. With no durable consumer, injected grace expiry cancels
   and releases the state; a late result commits nothing, and a later read
@@ -666,23 +687,23 @@ what it had.
   before that work finishes. Its now-stale result cannot clear the dependency
   invalidation; a consumer returning during grace starts work from the newest
   source value, and only that result may commit.
-- **ASYNC-25.** A consumer reads only an async cog's `.latest` projection and
-  then leaves. One injected grace window releases the projection and its now-
-  unobserved async dependency together, cancelling pending work without a
+- **ASYNC-25.** A consumer reads only an async cog's value and then leaves.
+  One injected grace window releases the internal value projection and its
+  now-unobserved async dependency together, cancelling pending work without a
   second grace window.
-- **ASYNC-26.** A keyed async box exposes the documented
-  `c[forecast.latest[zip]]` spelling. Equal keys share one latest projection
-  state, different keys stay independent, and an equal success does not notify
-  that key's latest consumer.
+- **ASYNC-26.** A keyed async box exposes the documented `c[forecast[zip]]`
+  value spelling. Equal keys share one value-projection state, different keys
+  stay independent, and an equal success does not notify that key's value
+  consumer.
 - **ASYNC-27.** An async or derived selector calls `cogs.refresh` while it is
   computing. Cog traps with the same clear commit-during-derivation error in
   debug and release instead of starting a nested system turn. (Proof: exit
   test.)
 - **ASYNC-28.** I read a derived cog backed by an async cog through the UI
-  boundary, including the documented `cogs[forecast.latest]` spelling. Its
+  boundary, including the documented `cogs[forecast]` value spelling. Its
   initial pending publication does not re-enter the derived computation or
-  flush reactions mid-derivation: the read returns the projection's current
-  value, records one named pending turn, and later work completion updates it.
+  flush reactions mid-derivation: the read returns the current value, records
+  one named pending turn, and later work completion updates it.
 - **ASYNC-29.** Repeated one-shot `peek` or `refresh` demand renews an async
   state's grace while keeping at most one scheduled grace sleeper for that
   exact state. An obsolete deadline cannot release it; the latest

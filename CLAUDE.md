@@ -175,8 +175,10 @@ Every design and implementation choice should preserve four rules:
 
 For Swift, a correct normal read uses the latest completed turn and settles
 every dependency needed for that value. A `Writer` read during a commit sees
-that turn's staged source values. Async uncertainty stays explicit in
-`CogPhase`. Production uses one app-wide `Cogtext`.
+that turn's staged source values. Async value reads are total: they return
+the last accepted success, resting on the declaration's default until one
+exists. Async uncertainty stays explicit in `CogPhase`, read through the
+opt-in `phase` lens. Production uses one app-wide `Cogtext`.
 
 For Kotlin, a correct normal read also uses the latest completed turn and
 settles every dependency it needs. A writer read sees its turn's staged source

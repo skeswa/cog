@@ -201,14 +201,21 @@ These choices are settled; §10 of the core document has the full record.
   key. Boxes create keyed value references without allocating new descriptors. The exact
   in-memory value-reference layout is not settled; benchmarks will compare inline keys,
   interned keys, and generic keyed value references.
+- Async reads are total and value-first: `c[valueReference]` returns the last
+  accepted success, resting on the declaration's default until one exists, and
+  the request lifecycle reads through the `phase` lens (`c.phase[...]`,
+  `cogs.phase[...]`), which exists only for async references. The default is a
+  required invariant but an omittable argument — `init(default:)` states it,
+  or `Value: CogDefaultable` supplies it, and the library conforms only
+  `Optional`, resting at `nil`.
 - Async selectors read dependencies synchronously, then return `Work.run` or
   `Work.stream`. The first read starts work and publicly begins at
-  `pending(previous: .none)`; there is no observable `initial` phase. Values
-  use `CogPhase` and its `.latest` view; an explicit `Previous` case keeps “no
-  previous value” distinct from “previous value was nil.” A complete accessor
-  set — `latestValue`, `value`, `error`, `isLoading`, `isInitialLoading`,
-  `isReloading` — narrows one fact without matching through `Previous`.
-  `.latest` is the default policy. Streams allow only `.latest`.
+  `pending(previous: .none)`; there is no observable `initial` phase. An
+  explicit `Previous` case keeps “no previous value” distinct from “previous
+  value was nil.” A complete accessor set — `latestValue`, `value`, `error`,
+  `isLoading`, `isInitialLoading`, `isReloading` — narrows one fact without
+  matching through `Previous`. `.latest` is the default policy. Streams allow
+  only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - `Cogtext` owns state and reactions. Final-class `ReactionToken` and

@@ -154,7 +154,7 @@ struct WeatherMapScreen: View {
     var body: some View {
         Map(position: $camera)
             .task {
-                for await fix in cogs.values(of: locationFix.latest) {
+                for await fix in cogs.values(of: locationFix) {
                     guard let fix else { continue }
                     withAnimation { camera = .region(.around(fix)) }
                 }

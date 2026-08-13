@@ -940,7 +940,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 - **M4-05b** _(Gate)_ — Prepare the 0.1.0 release candidate without mutating
   remote state: format, ledgers, matrices, release, simulator, Weather, floor,
   docs, changelog, and revision-based scratch consumption.
-  _Depends: M4-04c, M4-05a, M4-06._
+  _Depends: M4-04c, M4-05a, M4-06, M4-07e._
   _Verify: the complete 0.1.0 checklist with immutable CI links._
 - **M4-05c** _(Release)_ — Create and push the bare annotated `0.1.0` tag.
   _Depends: M4-05b._
@@ -959,6 +959,34 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M3-11._
   _Verify: `mise run test --filter ASYNC-30`._
   _Greens: ASYNC-30._
+- **M4-07a** _(Decision)_ — Record the value-first async read model: total
+  value reads over declaration defaults, the `phase` lens on every read
+  capability, and conformance-gated default omission; land the §5.1 and §10
+  amendments with the scenario and task deltas they require.
+  _Depends: M3-11._
+  _Verify: updated design ledger, scenario tree, and task graph pass
+  `mise run tasks:check` and `mise run fmt:check`._
+- **M4-07b** _(Behavior)_ — Store declaration defaults with conformance-gated
+  omission (`CogDefaultable`, `Optional` only) and make every value spelling
+  total.
+  _Depends: M4-07a._
+  _Verify: `mise run test --filter ASYNC-31` and `mise run test:compilefail`._
+  _Greens: ASYNC-31, ASYNC-34._
+- **M4-07c** _(Behavior)_ — Add the `phase` lens to every read capability
+  with value-spelling parity, refusing synchronous state at compile time.
+  _Depends: M4-07a._
+  _Verify: `mise run test --filter ASYNC-32` and `mise run test:compilefail`._
+  _Greens: ASYNC-32, ASYNC-33._
+- **M4-07d** _(Infrastructure)_ — Flip async `c[...]`, `cogs[...]`, peek, and
+  watch to the value projection, remove the public `.latest` projection, and
+  respell the existing behavior suite to the value-first spellings.
+  _Depends: M4-07b, M4-07c._
+  _Verify: `mise run test`, `mise run test:compilefail`, and
+  `mise run fmt:check`._
+- **M4-07e** _(Infrastructure)_ — Adopt value-first reads and the `phase`
+  lens in the Weather example and its tests.
+  _Depends: M4-07d._
+  _Verify: `mise run build:weather` and `mise run test:weather`._
 
 ## M5 tasks
 
@@ -1232,7 +1260,7 @@ ArenaDirtyPropagationInfrastructure`._
   through arena values.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[1-6]|1[125678]|20|26|30)'`._
+'ASYNC-(0[1-6]|1[125678]|20|26|3[012])'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
   generation rejection, previous-value carry, cold one-shot demand,
   non-reentrant system turns, bounded grace scheduling, and release/recreation
