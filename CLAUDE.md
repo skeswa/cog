@@ -192,6 +192,16 @@ that runtime.
 
 ## Conventions
 
+- **Make Swift source explain its contracts.** Every Swift source file and
+  every internal-or-higher declaration needs substantive documentation
+  comments. Explain the semantics a maintainer cannot infer from a signature:
+  identity and storage, ownership and lifetime, actor or executor isolation,
+  turn and settlement ordering, observation and dependency tracking, and
+  cancellation or race invariants where they apply. Document private helpers
+  and fields when correctness depends on a non-obvious invariant. Explain why;
+  do not restate syntax or add boilerplate to obvious locals. A broad comment
+  audit must use emitted symbol graphs to find declaration gaps and
+  mechanically confirm that the resulting source diff is comment-only.
 - **Spell a fail-fast trap `fatalError`, never `preconditionFailure`.** The
   standard library drops `preconditionFailure`'s message under `-O`: the
   process still traps, but with no explanation, so a scenario promising "a
