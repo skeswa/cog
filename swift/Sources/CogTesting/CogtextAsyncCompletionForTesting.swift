@@ -1,6 +1,6 @@
 public import Cog
 
-extension Cogtext {
+extension Cogs {
   /// Signals after the next async work completion reaches its generation check.
   ///
   /// The acknowledgement runs on the MainActor after one success or failure
@@ -12,7 +12,7 @@ extension Cogtext {
   ///
   /// This one-shot seam makes a negative public behavior deterministic. A test
   /// can resume controlled stale work, await the acknowledgement, and then
-  /// inspect public phase state knowing no publication is still racing, without
+  /// inspect public metadata knowing no publication is still racing, without
   /// sleeps, polling, or access to the generation counter. Install at most one
   /// acknowledgement at a time. The seam consumes it after one eligibility
   /// decision; a later result needs a new acknowledgement and a new call.

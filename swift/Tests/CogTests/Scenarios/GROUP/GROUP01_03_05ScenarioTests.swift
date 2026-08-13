@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `GROUP-01 cancelling a group stops its watch`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
   let group = EffectGroup()
@@ -21,7 +21,7 @@ import Testing
 
 @MainActor
 @Test func `GROUP-03 cancelling a group twice is harmless`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var runs = 0
   let group = EffectGroup()
@@ -42,7 +42,7 @@ import Testing
 
 @MainActor
 @Test func `GROUP-05 copies share one terminal group`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
   let group = EffectGroup()

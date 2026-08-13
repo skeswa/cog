@@ -70,7 +70,7 @@ extension CogObservationState {
   /// cancels any grace deadline through context registration and enters the
   /// state into deterministic boundary-flush order.
   @discardableResult
-  func accessObservationBoundary(in cogs: Cogtext) -> CogObservationBoundary {
+  func accessObservationBoundary(in cogs: Cogs) -> CogObservationBoundary {
     let boundary: CogObservationBoundary
     if let existing = observationBoundary {
       boundary = existing
@@ -85,7 +85,7 @@ extension CogObservationState {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// Settles UI-read roots and notifies only values changed in this revision.
   ///
   /// Snapshot the count before settlement because a selector may lazily create

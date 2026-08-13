@@ -16,17 +16,16 @@
 ///
 /// Constructing or copying a `Cog` does not create graph state or run its
 /// selector. The declaration carries stable descriptor identity; each
-/// ``Cogtext`` lazily creates its own cached state for that identity on first
+/// ``Cogs`` lazily creates its own cached state for that identity on first
 /// read. Copies therefore name one state inside a context and independent state
 /// in tests, previews, or other contexts. A diagnostic `name` labels the
 /// declaration but never defines identity.
 ///
 /// Later reads reuse the cached result until a dependency may have changed.
 /// Cog settles those dependencies first, then reruns the selector only when
-/// required. A tracked reaction keeps a default `whileObserved` cog alive and
-/// its final lease begins the context's grace period; `keepAlive` instead gives
-/// demanded state context lifetime. Internal graph edges are dependencies, not
-/// lifetime leases.
+/// required. A tracked reaction keeps the `whileObserved` cog alive and its
+/// final lease begins the context's grace period. Internal graph edges are
+/// dependencies, not lifetime leases.
 ///
 /// Keep selectors synchronous, cheap, and free of side effects. They may
 /// branch or return early; each run replaces the dependency set. A selector
@@ -52,8 +51,6 @@ public struct Cog<Value> {
   /// `selector` (§2.3).
   ///
   /// - Parameters:
-  ///   - keepAlive: Pass `true` to retain demanded state until its context ends.
-  ///     The default follows `whileObserved` reaction leases and grace.
   ///   - selector: MainActor computation for the value. Reads through the
   ///     supplied ``Reader`` replace the dependency set on every run; other
   ///     reads are invisible to Cog.
@@ -62,7 +59,6 @@ public struct Cog<Value> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -72,7 +68,7 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: nil,
-        lifetime: CogStateLifetime(keepAlive: keepAlive),
+        lifetime: .whileObserved(grace: nil),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -88,8 +84,6 @@ public struct Cog<Value> {
   /// dependency settlement already required.
   ///
   /// - Parameters:
-  ///   - keepAlive: Pass `true` to retain demanded state until its context ends
-  ///     instead of following `whileObserved` grace.
   ///   - selector: MainActor computation whose tracked reads become the next
   ///     dependency set.
   ///   - equals: MainActor comparison of the cached and newly computed values.
@@ -99,7 +93,6 @@ public struct Cog<Value> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     equals: @escaping @MainActor (Value, Value) -> Bool,
     name: String? = nil,
@@ -110,7 +103,7 @@ public struct Cog<Value> {
       descriptor: DerivedCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: equals,
-        lifetime: CogStateLifetime(keepAlive: keepAlive),
+        lifetime: .whileObserved(grace: nil),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil
@@ -131,20 +124,17 @@ extension Cog where Value: Equatable {
   /// Declares an `Equatable` derived value whose equal reruns stop the wave.
   ///
   /// This overload is selected automatically when `Value` conforms to
-  /// `Equatable`. Use ``init(keepAlive:_:equals:name:fileID:line:)`` to
+  /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to
   /// substitute a domain-specific equality rule. Equality affects downstream
   /// propagation after a required rerun; it does not change dependency
   /// tracking, identity, lifetime, or MainActor execution.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether demanded state survives without a reaction lease
-  ///     until the context ends.
   ///   - selector: MainActor computation and dependency selection for the value.
   ///   - name: The diagnostic and history label for this declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -154,7 +144,7 @@ extension Cog where Value: Equatable {
       descriptor: DerivedCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: { oldValue, newValue in oldValue == newValue },
-        lifetime: CogStateLifetime(keepAlive: keepAlive),
+        lifetime: .whileObserved(grace: nil),
         label: CogLabel(name: name, fileID: fileID, line: line)
       ),
       key: nil

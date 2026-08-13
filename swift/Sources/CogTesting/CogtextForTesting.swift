@@ -1,6 +1,6 @@
 public import Cog
 
-extension Cogtext {
+extension Cogs {
   /// A fresh, isolated context for one test or preview runtime.
   ///
   /// Each call creates separate Cog state. A write in one context does not
@@ -14,7 +14,7 @@ extension Cogtext {
   /// ```swift
   /// @MainActor
   /// @Test func retryLimitDefaultsToThree() {
-  ///   let cogs = Cogtext.forTesting()
+  ///   let cogs = Cogs.forTesting()
   ///   #expect(cogs.peek(retryLimit) == 3)
   /// }
   /// ```
@@ -33,7 +33,7 @@ extension Cogtext {
   public static func forTesting(
     clock: any Clock<Duration> = ContinuousClock(),
     whileObservedGrace: Duration = .seconds(30)
-  ) -> Cogtext {
-    Cogtext(clock: clock, defaultWhileObservedGrace: whileObservedGrace)
+  ) -> Cogs {
+    Cogs(clock: clock, defaultWhileObservedGrace: whileObservedGrace)
   }
 }

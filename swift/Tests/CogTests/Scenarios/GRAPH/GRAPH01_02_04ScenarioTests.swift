@@ -11,7 +11,7 @@ import Testing
   var middleRuns = 0
   var rootRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let middle = Cog<Int> { c in
     middleRuns += 1
@@ -44,7 +44,7 @@ import Testing
   var rootRuns = 0
   var rootPairs: [String] = []
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int> { c in
     leftRuns += 1
@@ -77,7 +77,7 @@ import Testing
 
 @MainActor
 @Test func `GRAPH-04 a broad pull recomputes only the branches it reads`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let breadth = 64
   var runs = Array(repeating: 0, count: breadth)

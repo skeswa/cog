@@ -59,7 +59,7 @@ public nonisolated struct CogTurnChainDiagnostic: Sendable, Equatable {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// The accumulated long-chain warnings and current quiescence of this context.
   ///
   /// Tests can inspect the warning without accessing graph storage. The API and

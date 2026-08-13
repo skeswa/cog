@@ -26,15 +26,15 @@ private final class Async03ControlledWork {
 
 @MainActor
 @Test func `ASYNC-03 reload preserves an explicit previous nil`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async03ControlledWork()
-  let forecast = AsyncCog<Int?>(name: "forecast") { c in
+  let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int?>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int?>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -59,7 +59,7 @@ private final class Async03ControlledWork {
     return
   }
   switch reload {
-  case .pending(previous: .some(let value)):
+  case .pending(let value, hasSucceeded: true):
     #expect(value == nil)
   default:
     Issue.record("Expected reload pending with an explicit previous nil")

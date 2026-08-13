@@ -5,7 +5,7 @@ import Testing
 // Reactions and debug history expose turn composition without inspecting turn
 // internals. Only history assertions require a debug build.
 
-extension Cogtext {
+extension Cogs {
   /// An op whose body nests a second op, which nests a third.
   fileprivate func transfer(_ amount: Int, from: ManualCog<Int>, to: ManualCog<Int>) {
     commit { c in
@@ -44,7 +44,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-05 a commit inside a commit flushes once when the outer body ends`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let left = ManualCog<Int>(0)
   let right = ManualCog<Int>(0)
   var selectorRuns = 0
@@ -95,7 +95,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-13 sibling commits each flush and react before the next begins`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let counter = ManualCog<Int>(0)
   var events: [String] = []
 
@@ -126,7 +126,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-05 nested commits are one turn in history`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let checking = ManualCog<Int>(5)
   let savings = ManualCog<Int>(0)
 
@@ -152,7 +152,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-06 a turn is named by its op or by the name I pass`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let price = ManualCog<Int>(10)
 
   cogs.applyDiscount(price)
@@ -166,7 +166,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-06 a joined commit contributes no name and a queued one keeps its own`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let note = ManualCog<Int>(0)
   let followup = ManualCog<Int>(0)
@@ -191,7 +191,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `TURN-13 sibling commits are two named turns in history`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let counter = ManualCog<Int>(0)
 
   cogs.stepOne(counter)

@@ -17,8 +17,4 @@ internal nonisolated enum CogStateLifetime: Equatable {
   /// delays removal but neither renews nor restarts grace.
   case whileObserved(grace: Duration?)
 
-  /// The lifetime selected by synchronous-derived `keepAlive` sugar.
-  init(keepAlive: Bool) {
-    self = keepAlive ? .app : .whileObserved(grace: nil)
-  }
 }

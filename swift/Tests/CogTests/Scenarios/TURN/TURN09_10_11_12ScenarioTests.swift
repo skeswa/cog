@@ -8,7 +8,7 @@ import Testing
 @Test func `TURN-09 an equal source write does not recompute a derived cog`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1
@@ -28,7 +28,7 @@ import Testing
 @Test func `TURN-09 an equal keyed write uses the box equality rule`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let sources = ManualCogBox<Int, String> { key in key.count }
   let doubled = Cog<Int> { c in
     runs += 1
@@ -47,7 +47,7 @@ import Testing
 @Test func `TURN-10 changing and reverting in one commit is no change`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(4)
   let squared = Cog<Int> { c in
     runs += 1
@@ -79,7 +79,7 @@ import Testing
 
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Reading>(
     Reading(sample: 7, note: "first"),
     equals: { old, new in old.sample == new.sample }
@@ -116,7 +116,7 @@ import Testing
   var firstRuns = 0
   var secondRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let sources = ManualCogBox<Reading, String>(
     { key in Reading(sample: key.count, note: key) },
     equals: { old, new in old.sample == new.sample }
@@ -152,7 +152,7 @@ import Testing
 
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Reading>(Reading(value: 3))
   let value = Cog<Int> { c in
     runs += 1

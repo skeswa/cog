@@ -37,20 +37,21 @@ private final class Async02ControlledWork {
 
 @MainActor
 @Test func `ASYNC-02 thrown work publishes a failure holding its error`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let work = Async02ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let refresh = cogs.refresh(forecast)
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var iterator = phases.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {
     Issue.record("The phase stream ended before pending")
     return
   }
-  if case .pending(previous: .none) = pending {
+  if case .pending(_, hasSucceeded: false) = pending {
   } else {
     Issue.record("Expected initial pending without a previous value")
   }
@@ -63,10 +64,16 @@ private final class Async02ControlledWork {
     return
   }
   switch failure {
-  case .failure(let error, previous: .none):
+  case .failure(let error, _, hasSucceeded: false):
     #expect(error as? Async02Error == .offline)
   default:
     Issue.record("Expected failure without a previous value")
+  }
+  switch await refresh.outcome {
+  case .failure(let error):
+    #expect(error as? Async02Error == .offline)
+  default:
+    Issue.record("The exact refresh handle did not retain its failure")
   }
 
   #if DEBUG
@@ -80,20 +87,20 @@ private final class Async02ControlledWork {
 
 @MainActor
 @Test func `ASYNC-06 watcher sees pending and success in separate named turns`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let work = Async02ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var iterator = phases.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {
     Issue.record("The phase stream ended before pending")
     return
   }
-  if case .pending(previous: .none) = pending {
+  if case .pending(_, hasSucceeded: false) = pending {
   } else {
     Issue.record("Expected initial pending without a previous value")
   }

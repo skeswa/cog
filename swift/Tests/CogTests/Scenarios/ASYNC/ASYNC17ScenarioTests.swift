@@ -4,12 +4,12 @@ import Testing
 
 @MainActor
 @Test func `ASYNC-17 async task name includes its descriptor and key`() async {
-  let cogs = Cogtext.forTesting()
-  let forecast = AsyncCogBox<String?, Int>(name: "forecast") { _, _ in
+  let cogs = Cogs.forTesting()
+  let forecast = AsyncCogBox<String?, Int>(default: nil, name: "forecast") { _, _ in
     .run { CogTaskDiagnostic.currentTaskName }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<String?>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast[90_210]]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<String?>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast[90_210]]) }
   var iterator = phases.makeAsyncIterator()
 
   guard await iterator.next() != nil else {

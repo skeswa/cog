@@ -7,7 +7,7 @@ import Testing
 // These tests use the public debug history. Label rendering has separate
 // coverage.
 
-extension Cogtext {
+extension Cogs {
   fileprivate func bumpTheCounter(_ count: ManualCog<Int>) {
     commit { c in c[count] += 1 }
   }
@@ -15,7 +15,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-01 every turn lands in history under the name it was given`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
   #expect(cogs.debugHistory.count == 0)
@@ -31,7 +31,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-01 an unnamed turn lands under the op that committed it`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
   cogs.bumpTheCounter(count)
@@ -46,7 +46,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-02 history records writes and recomputations`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
 
@@ -78,7 +78,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-02 a diamond records one recomputation for each state that ran`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int> { c in c[source] + 1 }
   let right = Cog<Int> { c in c[source] + 2 }
@@ -99,7 +99,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-05 a named watch's run lands in history under its effect name`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let temperature = ManualCog<Int>(60)
   var alerts = 0
 
@@ -122,7 +122,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-05 an unnamed registration lands under its file and line`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
 
   let token = cogs.run { c in _ = c[source] }
@@ -137,7 +137,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `HIST-03 history is bounded and drops its oldest entries`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let capacity = cogs.debugHistory.capacity
   let extra = 8
   var highWaterMark = 0

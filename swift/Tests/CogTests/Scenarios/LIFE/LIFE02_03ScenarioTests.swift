@@ -12,7 +12,7 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
 @MainActor
 @Test func `LIFE-02 an unobserved derived cog is released after injected grace`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(
+  let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
@@ -43,7 +43,7 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
   async throws
 {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(
+  let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
@@ -75,7 +75,7 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
   async throws
 {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(
+  let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

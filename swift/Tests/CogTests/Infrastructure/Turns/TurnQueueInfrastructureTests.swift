@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `TurnQueueInfrastructure defers a commit requested during flush`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let queuedSource = ManualCog<Int>(0)
   var events: [String] = []
   var outerTurn: CogTurnID?
@@ -66,7 +66,7 @@ import Testing
 
 @MainActor
 @Test func `TurnQueueInfrastructure drains arrivals in FIFO order without reentry`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let value = ManualCog<Int>(0)
   var events: [String] = []
   var valuesSeen: [Int] = []

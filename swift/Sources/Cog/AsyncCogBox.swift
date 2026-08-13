@@ -2,11 +2,14 @@
 ///
 /// A box owns one declaration descriptor and builds lightweight ``AsyncCog``
 /// value references for its keys. Each descriptor-and-key pair has its own
-/// phase, dependencies, generation, lifetime state, and work task in a
-/// ``Cogtext``:
+/// metadata, dependencies, generation, lifetime state, and work task in a
+/// ``Cogs``:
 ///
 /// ```swift
-/// let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(name: "weather.fetch") {
+/// let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(
+///   default: nil,
+///   name: "weather.fetch"
+/// ) {
 ///   c, zip in
 ///   let service = c[weatherService]
 ///   return .run { try await service.weather(for: zip) }
@@ -14,10 +17,10 @@
 /// ```
 ///
 /// Value reads of a key are total: `c[fetchedWeather[zip]]` returns the last
-/// accepted success for that key, resting on the declaration's default — for
-/// an omitted default on an optional value, `nil` — until one exists. Each
-/// key's full request lifecycle reads through the `phase` lens,
-/// `c.phase[fetchedWeather[zip]]`.
+/// accepted success for that key, resting on the declaration's explicit
+/// default until one exists. Each
+/// key's full request lifecycle reads through the `meta` lens,
+/// `c.meta[fetchedWeather[zip]]`.
 ///
 /// Building `box[key]` creates no state and allocates no new descriptor. Equal
 /// keys produce the same declaration-and-key identity, while unequal keys are
@@ -49,8 +52,9 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// replace one another unless the selector explicitly makes them share a
   /// dependency.
   ///
-  /// Initial demand for a key publishes pending with no previous value; that
-  /// key's value read rests on `default` until its first success. Under
+  /// Initial demand for a key publishes pending with `default` and
+  /// `hasSucceeded == false`; that key's value read rests on the same default
+  /// until its first success. Under
   /// `.latest`, a reload cancels and supersedes only that key's prior task, and
   /// a stale completion cannot commit. By default, each unobserved key is
   /// released independently after grace and pending work is cancelled.
@@ -62,10 +66,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   ///   - default: The honest resting value every key's value read returns
   ///     before that key's first success. Choose one that renders truthfully
   ///     while work is in flight; when no such value exists, make `Value`
-  ///     optional and omit this argument instead.
-  ///   - keepAlive: Pass `true` to retain every demanded key until the context
-  ///     ends. The default applies `whileObserved` grace independently to each
-  ///     key.
+  ///     optional and pass `nil` explicitly.
   ///   - name: What Cog should call this declaration in turns, diagnostics,
   ///     and task tools. A rendered keyed name includes the key.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -75,16 +76,16 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   public init(
     _ policy: LatestPolicy = .latest,
     default defaultValue: Value,
-    keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
-    let lifetime = CogStateLifetime(keepAlive: keepAlive)
+    let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
       policy: policy,
+      default: defaultValue,
       lifetime: lifetime,
       label: label,
       selector: selector
@@ -92,7 +93,6 @@ public struct AsyncCogBox<Value, Key: Hashable> {
     self.descriptor = descriptor
     self.valueDescriptor = AsyncCog.makeValueDescriptor(
       for: descriptor,
-      default: defaultValue,
       equals: nil,
       lifetime: lifetime,
       label: label
@@ -102,7 +102,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// The value reference naming this box's async value for one key.
   ///
   /// Equal keys name the same state. Different keys fetch and advance their
-  /// phases independently while sharing this box's declaration descriptors.
+  /// metadata independently while sharing this box's declaration descriptors.
   /// Subscripting is inert: the returned reference creates state and starts
   /// work only when a context reads, peeks, or refreshes it.
   ///
@@ -126,12 +126,14 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// would run the selector against an impossible identity.
   internal static func makeDescriptor(
     policy: LatestPolicy,
+    default defaultValue: Value,
     lifetime: CogStateLifetime,
     label: CogLabel,
-    selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
+    selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
   ) -> AsyncCogDescriptor<Value> {
     AsyncCogDescriptor(
       policy: policy,
+      default: defaultValue,
       selector: { c, erasedKey in
         guard let key = erasedKey as? Key else {
           fatalError(
@@ -157,7 +159,7 @@ extension AsyncCogBox where Value: Equatable {
   ///
   /// Scheduling, cancellation, state identity, actor execution, and lifetime
   /// are identical to the unconstrained initializer. Equality affects only
-  /// each key's value projection: `phase` consumers still observe pending and
+  /// each key's value projection: metadata consumers still observe pending and
   /// success turns even when the successful value is unchanged.
   ///
   /// - Parameters:
@@ -165,8 +167,6 @@ extension AsyncCogBox where Value: Equatable {
   ///     same key. Only `.latest` is currently available.
   ///   - default: The honest resting value every key returns before its first
   ///     success.
-  ///   - keepAlive: Whether demanded keys remain until the context ends instead
-  ///     of following independent `whileObserved` grace.
   ///   - name: A stable declaration label; rendered keyed labels include the key.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
@@ -175,16 +175,16 @@ extension AsyncCogBox where Value: Equatable {
   public init(
     _ policy: LatestPolicy = .latest,
     default defaultValue: Value,
-    keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
-    let lifetime = CogStateLifetime(keepAlive: keepAlive)
+    let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
       policy: policy,
+      default: defaultValue,
       lifetime: lifetime,
       label: label,
       selector: selector
@@ -192,112 +192,9 @@ extension AsyncCogBox where Value: Equatable {
     self.descriptor = descriptor
     self.valueDescriptor = AsyncCog.makeValueDescriptor(
       for: descriptor,
-      default: defaultValue,
       equals: { oldValue, newValue in oldValue == newValue },
       lifetime: lifetime,
       label: label
     )
-  }
-}
-
-extension AsyncCogBox where Value: CogDefaultable {
-  /// Declares keyed async values resting on `Value`'s own default.
-  ///
-  /// Identical to the explicit-`default:` initializer except that the resting
-  /// value comes from ``CogDefaultable/cogDefault`` — for an optional value,
-  /// `nil`. Every key rests on the same default until its own first success.
-  ///
-  /// - Parameters:
-  ///   - policy: How replacement work interacts with an in-flight run for the
-  ///     same key.
-  ///   - keepAlive: Whether demanded keys remain until the context ends instead
-  ///     of following independent `whileObserved` grace.
-  ///   - name: A stable declaration label; rendered keyed labels include the key.
-  ///   - fileID: The declaration's file. Leave this at its default.
-  ///   - line: The declaration's line. Leave this at its default.
-  ///   - selector: MainActor dependency selection returning one operation for
-  ///     the requested key and generation.
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
-  ) {
-    self.init(
-      policy,
-      default: Value.cogDefault,
-      keepAlive: keepAlive,
-      name: name,
-      fileID: fileID,
-      line: line,
-      selector
-    )
-  }
-}
-
-extension AsyncCogBox where Value: CogDefaultable & Equatable {
-  /// Declares keyed async values resting on `Value`'s own default, with
-  /// equality-gated value reads.
-  ///
-  /// The most common keyed spelling for optional `Equatable` values:
-  /// `AsyncCogBox<Weather?, ZipCode> { ... }` rests every key at `nil` and
-  /// keeps value consumers quiet across equal-success reloads.
-  ///
-  /// - Parameters:
-  ///   - policy: How replacement work interacts with an in-flight run for the
-  ///     same key.
-  ///   - keepAlive: Whether demanded keys remain until the context ends instead
-  ///     of following independent `whileObserved` grace.
-  ///   - name: A stable declaration label; rendered keyed labels include the key.
-  ///   - fileID: The declaration's file. Leave this at its default.
-  ///   - line: The declaration's line. Leave this at its default.
-  ///   - selector: MainActor dependency selection returning one operation for
-  ///     the requested key and generation.
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
-  ) {
-    self.init(
-      policy,
-      default: Value.cogDefault,
-      keepAlive: keepAlive,
-      name: name,
-      fileID: fileID,
-      line: line,
-      selector
-    )
-  }
-}
-
-extension AsyncCogBox {
-  /// Unavailable: a keyed async declaration always has a resting value.
-  ///
-  /// This overload exists only to turn the missing-default mistake into a
-  /// diagnostic that names both ways out, instead of an opaque
-  /// no-matching-initializer error. It is chosen only when no available
-  /// initializer applies — a non-`CogDefaultable` `Value` with no `default:`
-  /// argument.
-  @available(
-    *, unavailable,
-    message: """
-      an async cog needs a resting value: pass `default:`, or make Value \
-      Optional so it rests at nil
-      """
-  )
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>, Key) -> Work<Value>
-  ) {
-    fatalError("unavailable")
   }
 }

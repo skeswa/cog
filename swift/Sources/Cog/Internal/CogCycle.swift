@@ -66,7 +66,7 @@ package nonisolated struct CogCycleDiagnosticSnapshot: Sendable, Equatable {
   package let message: String
 }
 
-extension Cogtext {
+extension Cogs {
   /// Diagnoses whether reading `valueReference` now would close the active computation
   /// path, without creating a state, recording an edge, or taking the trap.
   ///

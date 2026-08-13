@@ -6,7 +6,7 @@ import os
 
 @MainActor
 @Test func `UI-09 a peek in an Observation scope stays unsubscribed`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(1)
   let notices = OSAllocatedUnfairLock(initialState: 0)
 

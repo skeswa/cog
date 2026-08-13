@@ -5,7 +5,7 @@ import Cog
 // the environment, then reads the weather feature through that same graph.
 @MainActor
 enum SettingsFeature {
-  static func selectedWeatherZip(in cogs: Cogtext) -> String? {
+  static func selectedWeatherZip(in cogs: Cogs) -> String? {
     cogs.selectedWeatherZip()
   }
 }

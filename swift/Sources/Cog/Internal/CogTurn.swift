@@ -1,5 +1,5 @@
 // A turn is one synchronous, atomic state publication. Application turns begin
-// at `Cogtext.commit`; graph-owned system turns publish async phases through the
+// at `Cogs.commit`; graph-owned system turns publish async metadata through the
 // same flush machinery without pretending to be application writes.
 //
 // For example, if a commit writes `firstName` and `lastName`, its body stages
@@ -24,7 +24,7 @@ internal final class CogTurnID {}
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
-/// Manual values and async phases both conform to the pending-source contract,
+/// Manual values and async metadata both conform to the pending-source contract,
 /// so one ordered flush can assign a single revision before invalidation reaches
 /// Observation boundaries and reactions.
 internal final class CogTurn {
@@ -59,7 +59,7 @@ internal final class CogTurn {
   /// Revision advances even for an empty system turn because the named pending
   /// transition remains part of global turn order. Each source decides whether
   /// its staged value changes and which consumers to invalidate.
-  func flushPendingSources(in cogs: Cogtext) {
+  func flushPendingSources(in cogs: Cogs) {
     let revision = cogs.advanceRevision()
     for source in touchedSources {
       source.flushPendingValue(in: cogs, at: revision)
@@ -93,9 +93,9 @@ internal enum CogTurnPhase {
 }
 
 // Keep these as `fatalError`; `preconditionFailure` drops its message under
-// optimization. See `Cogtext.requireWriterTurn` in `Writer.swift`.
+// optimization. See `Cogs.requireWriterTurn` in `Writer.swift`.
 
-extension Cogtext {
+extension Cogs {
   /// Whether a graph-owned turn can flush without reentering graph evaluation.
   ///
   /// An idle context is not sufficient: a selector or reaction may be tracking
@@ -128,10 +128,10 @@ extension Cogtext {
 
   /// Runs one graph-owned turn without applying the public commit guard.
   ///
-  /// Async phase publication originates from derived computation itself. It is
+  /// Async metadata publication originates from derived computation itself. It is
   /// still a named turn, but it is not an application write and therefore may
   /// be requested while the async selector is on the computation path. This
-  /// exception is internal-only: it must stage runtime-owned phase state, never
+  /// exception is internal-only: it must stage runtime-owned metadata, never
   /// invoke an application operation or expose a writer.
   ///
   /// If another turn is active, queue rather than nest a flush. That preserves

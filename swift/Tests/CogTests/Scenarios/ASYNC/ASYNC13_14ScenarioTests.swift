@@ -1,7 +1,6 @@
 import Cog
 import CogTesting
 import Testing
-import os
 
 @MainActor
 private final class Async13ControlledWork {
@@ -41,10 +40,11 @@ private final class Async13ControlledWork {
 
 @MainActor
 @Test func `ASYNC-13 release cancels pending work and rejects its late result`() async throws {
-  let clock = Async13TestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let clock = TestClock()
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let refresh = cogs.refresh(forecast)
   let token = cogs.run { c in _ = c[forecast] }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
@@ -54,9 +54,14 @@ private final class Async13ControlledWork {
   cogs.acknowledgeNextDerivedRelease(with: released)
   token.cancel()
   try await clock.waitForScheduledSleep()
+  try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
   #expect(await cancellationIterator.next() == 0)
+  if case .released = await refresh.outcome {
+  } else {
+    Issue.record("Lifetime release did not resolve the exact refresh handle")
+  }
 
   let lateChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: lateChecked)
@@ -74,8 +79,8 @@ private final class Async13ControlledWork {
 
 @MainActor
 @Test func `ASYNC-14 reading after release starts fresh unpolluted work`() async throws {
-  let clock = Async13TestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let clock = TestClock()
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let firstToken = cogs.run { c in _ = c[forecast] }
@@ -96,14 +101,14 @@ private final class Async13ControlledWork {
   work.finish(0, with: 100)
   try await lateChecked.wait()
 
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let secondToken = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let secondToken = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   guard let freshPending = await phaseIterator.next() else {
     Issue.record("The recreated phase stream ended before pending")
     return
   }
-  if case .pending(previous: .none) = freshPending {
+  if case .pending(_, hasSucceeded: false) = freshPending {
   } else {
     Issue.record("Recreated work did not start from fresh pending state")
   }
@@ -120,67 +125,4 @@ private final class Async13ControlledWork {
     Issue.record("Expected only the recreated work's result")
   }
   withExtendedLifetime((firstToken, secondToken)) {}
-}
-
-private nonisolated final class Async13TestClock: Clock, @unchecked Sendable {
-  struct Instant: InstantProtocol, Hashable, Sendable {
-    let offset: Swift.Duration
-
-    static func < (lhs: Self, rhs: Self) -> Bool {
-      lhs.offset < rhs.offset
-    }
-
-    func advanced(by duration: Swift.Duration) -> Self {
-      Self(offset: offset + duration)
-    }
-
-    func duration(to other: Self) -> Swift.Duration {
-      other.offset - offset
-    }
-  }
-
-  typealias Duration = Swift.Duration
-
-  private let nowState = OSAllocatedUnfairLock(initialState: Instant(offset: .zero))
-  private let ticks: AsyncStream<Void>
-  private let tickContinuation: AsyncStream<Void>.Continuation
-  private let scheduledEvents: AsyncStream<Void>
-  private let scheduledContinuation: AsyncStream<Void>.Continuation
-
-  init() {
-    (ticks, tickContinuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
-    (scheduledEvents, scheduledContinuation) = AsyncStream.makeStream(
-      bufferingPolicy: .unbounded
-    )
-  }
-
-  var now: Instant {
-    nowState.withLock { $0 }
-  }
-
-  var minimumResolution: Swift.Duration { .nanoseconds(1) }
-
-  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
-    try Task.checkCancellation()
-    while now < deadline {
-      scheduledContinuation.yield()
-      var iterator = ticks.makeAsyncIterator()
-      guard await iterator.next() != nil else { throw CancellationError() }
-      try Task.checkCancellation()
-    }
-  }
-
-  func waitForScheduledSleep() async throws {
-    var iterator = scheduledEvents.makeAsyncIterator()
-    guard await iterator.next() != nil else { throw CancellationError() }
-  }
-
-  func advance(by duration: Swift.Duration) {
-    nowState.withLock { instant in
-      instant = instant.advanced(by: duration)
-    }
-    tickContinuation.yield()
-  }
-
-  nonisolated deinit {}
 }

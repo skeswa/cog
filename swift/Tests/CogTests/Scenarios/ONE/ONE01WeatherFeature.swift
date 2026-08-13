@@ -4,7 +4,7 @@ import Cog
 // matching an app's ownership boundary.
 @MainActor private let selectedZipSource = ManualCog<String?>(nil, name: "selectedZip")
 
-extension Cogtext {
+extension Cogs {
   /// The feature op: an ordinary context method beside the source it owns.
   func selectZip(_ zip: String?) {
     commit { c in

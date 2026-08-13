@@ -58,20 +58,18 @@ struct WeatherEffects {
   /// observation; if no consumer arrives, normal async grace releases it.
   ///
   /// - Parameter cogs: The app's singular graph and owner of forecast work.
-  /// - Returns: A group whose cancellation removes the reaction and loop task.
-  @discardableResult
-  func install(in cogs: Cogtext) -> EffectGroup {
-    let group = EffectGroup()
-
+  /// The app's `Cogs` owns both effects, so the entry point needs no parallel
+  /// lifecycle property.
+  func install(in cogs: Cogs) {
     // Publish the cadence the loop below will actually keep, so the cards can
     // describe it instead of repeating a literal that drifts.
-    cogs.useRefreshInterval(hourlyRefreshInterval)
+    cogs.setRefreshInterval(hourlyRefreshInterval)
 
     for zip in initialZipCodes {
       cogs.refresh(weatherForecast[zip])
     }
 
-    group.add(
+    cogs.effects.add(
       cogs.watch(
         isNiceOutsideHere,
         initial: .skip,
@@ -85,26 +83,26 @@ struct WeatherEffects {
 
     let clock = clock
     let hourlyRefreshInterval = hourlyRefreshInterval
-    group.task(name: "weather.hourlyRefresh") {
+    cogs.effects.task(name: "weather.hourlyRefresh") { [weak cogs] in
       try await runHourlyRefresh(
         on: clock,
         every: hourlyRefreshInterval,
-        in: cogs
+        cogs: { cogs }
       )
     }
-
-    return group
   }
 }
 
 /// Sleeps on deadline-based cadence and refreshes the currently selected key.
 ///
-/// Refresh is synchronous graph demand, so service failures become phase data
-/// and never throw out of this loop. Only clock cancellation ends it.
+/// Refresh is synchronous graph demand, so service failures become metadata
+/// and never throw out of this loop. The weak runtime lookup also lets an
+/// isolated test or preview release its `Cogs`; clock cancellation and runtime
+/// release are the loop's only terminal paths.
 private func runHourlyRefresh<C: Clock>(
   on clock: C,
   every interval: Duration,
-  in cogs: Cogtext
+  cogs: @escaping @MainActor () -> Cogs?
 ) async throws where C.Duration == Duration {
   // The deadline advances from the previous deadline rather than from "now",
   // so a slow refresh does not make the schedule drift. A refresh that outlasts
@@ -114,10 +112,11 @@ private func runHourlyRefresh<C: Clock>(
   while true {
     try await clock.sleep(until: nextRefresh, tolerance: nil)
     nextRefresh = nextRefresh.advanced(by: interval)
+    guard let cogs = cogs() else { return }
     guard let zip = cogs.peek(currentZipCode) else { continue }
 
     // Refresh starts graph-owned work and returns immediately. A request
-    // failure becomes the forecast's `.failure` phase, so it cannot terminate
+    // failure becomes the forecast's `.failure` metadata, so it cannot terminate
     // this scheduling loop and silently disable later ticks.
     cogs.refresh(weatherForecast[zip])
   }

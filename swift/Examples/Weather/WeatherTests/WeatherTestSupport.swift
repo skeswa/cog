@@ -3,6 +3,18 @@
 import Cog
 import CogTesting
 
+extension Cogs {
+  /// Installs a deterministic request service before a test first demands it.
+  func seedWeatherService(_ service: WeatherService) {
+    seed(weatherServiceSeedTarget, to: service)
+  }
+
+  /// Selects a current ZIP before a test installs effects or renders a picker.
+  func seedCurrentZip(_ zip: ZipCode?) {
+    seed(currentZipSeedTarget, to: zip)
+  }
+}
+
 /// One request selected by the example's keyed async cog.
 nonisolated struct WeatherRequestRun: Equatable, Sendable {
   /// Monotonic request identity, independent of the ZIP key.
@@ -54,7 +66,7 @@ actor WeatherRequestController {
     continuations.removeValue(forKey: run.id)?.resume(returning: reading)
   }
 
-  /// Resumes one selected run with the error Cog should phase.
+  /// Resumes one selected run with the error Cog should publish as metadata.
   func fail(_ run: WeatherRequestRun, with error: any Error) {
     continuations.removeValue(forKey: run.id)?.resume(throwing: error)
   }
@@ -63,17 +75,30 @@ actor WeatherRequestController {
 /// Resolves controlled work and waits until Cog has accepted or rejected it.
 ///
 /// The acknowledgement closes the race between an operation returning and its
-/// phase publication. Callers can inspect public graph state immediately after
+/// metadata publication. Callers can inspect public graph state immediately after
 /// this function returns without yielding or polling.
 @MainActor
 func resolveWeatherRequest(
-  in cogs: Cogtext,
+  in cogs: Cogs,
   _ resolution: () async -> Void
 ) async throws {
   let checked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: checked)
   await resolution()
   try await checked.wait()
+}
+
+/// Resolves controlled work and returns the exact public refresh outcome.
+///
+/// Unlike the internal acknowledgement helper above, this is the normal app
+/// contract: the handle cannot complete for a replacement generation.
+@MainActor
+func resolveWeatherRefresh<Value>(
+  _ refresh: CogRefresh<Value>,
+  _ resolution: () async -> Void
+) async -> CogRefresh<Value>.Outcome {
+  await resolution()
+  return await refresh.outcome
 }
 
 #endif

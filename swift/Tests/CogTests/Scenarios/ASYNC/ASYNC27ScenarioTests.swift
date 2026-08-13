@@ -6,7 +6,7 @@ import Testing
 @Test func `ASYNC-27 refresh cannot run during an async selector`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let target = AsyncCog<Int>(default: 0, name: "target") { _ in
         fatalError("REFRESH TARGET SELECTOR RAN")
       }

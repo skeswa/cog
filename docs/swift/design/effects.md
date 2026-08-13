@@ -19,7 +19,8 @@ that boundary clear makes application behavior easier to read.
 | Compute state from other state        | `AsyncCog` (§5.1), or an op that writes manual cogs |
 | Send something outside the graph      | Reaction                                            |
 | Respond to a user action              | Op (§3.2)                                           |
-| Run on a clock                        | Task owned by an `EffectGroup`                      |
+| Run for the app lifetime              | Reaction or task owned by `cogs.effects`            |
+| Run for a shorter domain lifetime     | Task owned by that domain's `EffectGroup`           |
 | Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)        |
 | Continue after process death          | Durable state, an engine, and a reconciler (§6.7)   |
 
@@ -27,7 +28,7 @@ For example, “check the weather when the ZIP changes” produces state, so it
 belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the
 weather becomes nice” leaves the graph, so it is a reaction.
 
-### 6.2 A complete effect group
+### 6.2 App-lifetime and scoped effect groups
 
 ```swift
 // WeatherEffects.swift
@@ -36,25 +37,21 @@ struct WeatherEffects {
     var notifier: Notifier
     var clock: any Clock<Duration> = ContinuousClock()
 
-    @discardableResult
-    func install(in cogs: Cogtext) -> EffectGroup {
-        let group = EffectGroup()
-
-        group.add(cogs.watch(isNiceOutsideHere, initial: .skip,
-                             name: "weather.niceAlert") { was, nice in
+    func install(in cogs: Cogs) {
+        cogs.effects.add(cogs.watch(isNiceOutsideHere, initial: .skip,
+                                    name: "weather.niceAlert") { was, nice in
             if nice && !was {
                 notifier.alert("It is nice outside!")
             }
         })
 
-        group.task(name: "location.hourlyRefresh") {
+        cogs.effects.task(name: "location.hourlyRefresh") { [weak cogs] in
             while true {
                 try await clock.sleep(for: .seconds(3_600))
+                guard let cogs else { return }
                 await cogs.refreshCurrentLocation()
             }
         }
-
-        return group
     }
 }
 ```
@@ -67,14 +64,20 @@ The pieces have narrow jobs:
 - Time-based effects are normal structured tasks. An injected `Clock` makes
   them testable. Their bodies call ops, so writes keep useful names in debug
   history.
-- `EffectGroup` owns reaction tokens and tasks. `cancel()` and deinit both
-  cancel the group; copies point to the same terminal cancellation
-  resource.[^group]
+- `Cogs.effects` is the `EffectGroup` already owned by the app runtime. A
+  shorter-lived screen or domain creates and owns a separate group. A
+  long-running root task captures `cogs` weakly so isolated test and preview
+  runtimes can still deinitialize; each iteration promotes it only while
+  performing graph work.
+- `EffectGroup.cancel()` and deinit both cancel the group; copies point to the
+  same terminal cancellation resource.[^group]
 - Effect names appear in debug history and task names for Instruments.
 
-The ownership rule: **`Cogtext` owns state and reactions; `EffectGroup` owns
-their lifetimes.** `watch` and `run` register with the graph, so they stay on
-`Cogtext`. A plain task does not, so `task` belongs on `EffectGroup`.
+The ownership rule: **`Cogs` owns app state and app-lifetime effects; a scoped
+`EffectGroup` owns effects that end sooner.** `watch` and `run` still register
+with the graph, while the retained token controls their lifetime. Tasks remain
+on `EffectGroup`; `cogs.effects` simply supplies the root group without a
+second app-level property.
 
 ### 6.3 Registration and lifecycle
 
@@ -92,14 +95,12 @@ copy observes the same terminal state.
 ```swift
 @main
 struct WeatherApp: App {
-    @State private var cogs: Cogtext
-    @State private var effects: EffectGroup
+    @State private var cogs: Cogs
 
     init() {
-        let cogs = Cogtext.bootstrapApp()
+        let cogs = Cogs.bootstrapApp()
         _cogs = State(initialValue: cogs)
-        _effects = State(initialValue:
-            WeatherEffects(notifier: .live).install(in: cogs))
+        WeatherEffects(notifier: .live).install(in: cogs)
     }
 
     var body: some Scene {
@@ -108,10 +109,11 @@ struct WeatherApp: App {
 }
 ```
 
-The `App` creates this context once and shares it across every scene. A screen
-may own an `EffectGroup` in `@State`, but it borrows the app context and never
-creates a child `Cogtext`. Closing the screen group stops its effects without
-fragmenting or erasing state.
+The `App` creates this runtime once and shares it across every scene. Its root
+effects need no parallel `@State`. A screen may own an `EffectGroup` in
+`@State`, but it borrows the app runtime and never creates child `Cogs`.
+Closing the screen group stops its effects without fragmenting or erasing
+state.
 
 ### 6.4 Writing back into the graph
 
@@ -175,36 +177,47 @@ group. One effect should not use both.
 ### 6.6 Testing effects
 
 Writable sources are `fileprivate`, so even `@testable import` cannot reach
-them. The owning state file exposes narrow, debug-only test helpers:
+them. The owning state file exposes only narrow, debug-only seed capabilities
+and any loud domain helpers:
 
 ```swift
 // WeatherState.swift
 #if DEBUG
-extension Cogtext {
-    func seedCurrentZip(_ zip: ZipCode?) { seed(currentZipSource, to: zip) }
+let currentZipSeedTarget = currentZipSource
+let weatherSeedTargets = weatherReportSource
 
-    func seedWeather(_ report: Weather?, zip: ZipCode) {
-        seed(weatherReportSource[zip], to: report)
-    }
-
+extension Cogs {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
         commit { c in c[weatherReportSource[zip]] = report }
     }
 }
 #endif
+
+// WeatherTestSupport.swift
+import CogTesting
+
+extension Cogs {
+    func seedCurrentZip(_ zip: ZipCode?) {
+        seed(currentZipSeedTarget, to: zip)
+    }
+
+    func seedWeather(_ report: Weather?, zip: ZipCode) {
+        seed(weatherSeedTargets[zip], to: report)
+    }
+}
 ```
 
-`seed` is quiet: no turn, history record, UI notice, or reaction. `commit` is
-loud and runs a real named turn. The feature chooses its exact test surface
-instead of exposing all source value references.
+`seed` comes from `CogTesting` and is quiet: no turn, history record, UI
+notice, or reaction. `commit` is loud and runs a real named turn. The feature
+chooses its exact test surface instead of exposing all source value references
+or linking test setup into the app target.
 
 ```swift
 @Test func alertsWhenTheWeatherTurnsNice() async {
-    let cogs = Cogtext.forTesting()
+    let cogs = Cogs.forTesting()
     let notifier = Notifier.recording()
     let clock = TestClock()
-    let effects = WeatherEffects(notifier: notifier, clock: clock)
-        .install(in: cogs)
+    WeatherEffects(notifier: notifier, clock: clock).install(in: cogs)
 
     cogs.seedCurrentZip(zip)
     cogs.seedWeather(.cloudy(60), zip: zip)
@@ -213,14 +226,16 @@ instead of exposing all source value references.
     cogs.stubWeather(.clear(75), zip: zip)
     #expect(notifier.alerts == ["It is nice outside!"])
 
-    await clock.advance(by: .seconds(3_600))
+    clock.advance(by: .seconds(3_600))
     #expect(cogs.peek(currentZipCode) != nil)
+    clock.finish()
 }
 ```
 
-The runtime and helpers both place `seed` behind `#if DEBUG`. Seeding after
-effects install is safe: a seed marks its dependents dirty, and the next real
-turn settles them before reactions run.[^seed]
+`CogTesting` publishes `seed` only behind `#if DEBUG`; an app importing only
+`Cog` has no such operation. Seeding after effects install is safe: a seed
+marks its dependents dirty, and the next real turn settles them before
+reactions run.[^seed]
 
 ### 6.7 Background work that outlives the process
 
@@ -233,8 +248,8 @@ rules follow:
    op writes the store first, then its manual cog; a crash between those
    writes loses only the in-memory update. A GRDB `ValueObservation` may
    instead feed the graph as an external input (§8).
-2. **A headless app runtime uses its one normal `Cogtext`.** App bootstrap
-   installs and seeds it once, then installs app effects even when no scene
+2. **A headless app runtime uses its one normal `Cogs`.** App bootstrap
+   installs and configures it once, then installs app effects even when no scene
    appears. UI-only work stays safe because it lives in views. A background
    task owns its deadline; expiration cancels its op, while a cancellation
    shield can protect the final commit (`withTaskCancellationShield` in Swift

@@ -8,7 +8,7 @@ private struct Decl08ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-08 each derived box key computes from its matching keyed source`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let here = Decl08ZipCode(digits: "90210")
   let there = Decl08ZipCode(digits: "10001")
   var keysComputed: [Decl08ZipCode] = []
@@ -33,7 +33,7 @@ private struct Decl08ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-08 a derived box delivers optional keys without losing nil`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let descriptions = CogBox<String, Int?> { _, key in
     key.map(String.init) ?? "none"
   }

@@ -11,7 +11,7 @@ private nonisolated struct ObservedPair: Equatable, Sendable {
 
 @MainActor
 @Test func `UI-13 one commit never exposes a torn pair to an observed consumer`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let first = ManualCog<Int>(0)
   let second = ManualCog<Int>(0)
   let renderedPairs = OSAllocatedUnfairLock(initialState: [ObservedPair]())

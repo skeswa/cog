@@ -3,19 +3,16 @@ import SwiftUI
 
 @main
 struct WeatherApp: App {
-  @State private var cogs: Cogtext
-  @State private var effects: EffectGroup
+  @State private var cogs: Cogs
 
   init() {
-    let cogs = Cogtext.bootstrapApp()
-    cogs.useCurrentLocation(.newYork)
+    let cogs = Cogs.bootstrapApp()
+    cogs.selectCurrentLocation(.newYork)
     _cogs = State(initialValue: cogs)
-    _effects = State(
-      initialValue: WeatherEffects(
-        notifier: .live,
-        hourlyRefreshInterval: .seconds(5)
-      ).install(in: cogs)
-    )
+    WeatherEffects(
+      notifier: .live,
+      hourlyRefreshInterval: .seconds(5)
+    ).install(in: cogs)
   }
 
   var body: some Scene {

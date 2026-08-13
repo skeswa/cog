@@ -12,7 +12,7 @@ import Testing
 @Test func `CycleDetectionInfrastructure catches every key through the real graph`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let holder = CycleBoxHolder()
       holder.box = CogBox<Int, String>(
         { c, key in
@@ -34,7 +34,7 @@ import Testing
 @Test func `CycleDetectionInfrastructure catches a warm cycle at explicit stack entry`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let closesCycle = ManualCog<Bool>(false)
       var first: Cog<Int>!
       var second: Cog<Int>!
@@ -66,7 +66,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure builds a closed self path`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let valueReference = Cog<Int>({ _ in 1 }, name: "self")
   let state = cogs.derivedState(for: valueReference)
 
@@ -87,7 +87,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure keeps only the ordered cycle suffix`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let prefixValueReference = Cog<Int>({ _ in 0 }, name: "same label")
   let firstValueReference = Cog<Int>({ _ in 1 }, name: "same label")
   let secondValueReference = Cog<Int>({ _ in 2 }, name: "second")
@@ -121,7 +121,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure preserves every keyed path step`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let box = CogBox<Int, Int?>({ _, key in key ?? -1 }, name: "weather")
   let homeValueReference = box[Optional<Int>.none]
   let workValueReference = box[10001]
@@ -147,7 +147,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure spans selectors equality and publication`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var selectorMarks: [Bool] = []
   var equalityMarks: [Bool] = []
@@ -179,7 +179,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure stays marked while publishing a replacement`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var releaseMarks: [Bool] = []
   weak var publicationState: DerivedCogState<CyclePublicationValue>?
@@ -203,7 +203,7 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
 @MainActor
 @Test func `CycleDetectionInfrastructure nested settlement preserves outer frames`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let switcher = ManualCog<Bool>(false)
   let rightSource = ManualCog<Int>(10)
   let lateSource = ManualCog<Int>(100)

@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 derived selectors execute on the MainActor`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(21)
   var selectorRuns = 0
   let doubled = Cog<Int> { c in
@@ -19,7 +19,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 commit bodies execute on the MainActor`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var bodyRuns = 0
 
@@ -35,7 +35,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 reactions execute on the MainActor`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
 

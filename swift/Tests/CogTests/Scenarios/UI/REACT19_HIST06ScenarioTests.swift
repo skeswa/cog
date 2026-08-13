@@ -7,7 +7,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-19 every changed UI boundary is noticed before any reaction runs`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let first = ManualCog<Int>(0, name: "pair.first")
   let second = ManualCog<Int>(0, name: "pair.second")
 
@@ -38,7 +38,7 @@ import Testing
 
 @MainActor
 @Test func `HIST-06 history names each changed keyed UI notice`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let weather = ManualCogBox<String?, String>(nil, name: "weather")
   let zip = "90210"
 

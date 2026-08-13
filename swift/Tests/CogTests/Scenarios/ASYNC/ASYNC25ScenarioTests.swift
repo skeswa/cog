@@ -49,7 +49,7 @@ private final class Async25ControlledWork {
 @MainActor
 @Test func `ASYNC-25 value-only demand releases its pending chain after one grace`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in

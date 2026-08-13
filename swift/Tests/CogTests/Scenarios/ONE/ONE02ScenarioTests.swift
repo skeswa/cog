@@ -14,8 +14,8 @@ import Testing
   // is about stopping, not about how the CPU spells stopping.
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      Cogtext.bootstrapApp()
-      Cogtext.bootstrapApp()
+      Cogs.bootstrapApp()
+      Cogs.bootstrapApp()
     }
   }
 
@@ -25,5 +25,5 @@ import Testing
   // what makes this test fail if the guard ever regresses to a silent trap.
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
   #expect(stderr.contains("Cog is already bootstrapped"))
-  #expect(stderr.contains("Cogtext.forTesting()"))
+  #expect(stderr.contains("Cogs.forTesting()"))
 }

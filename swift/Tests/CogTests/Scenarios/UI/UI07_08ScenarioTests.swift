@@ -1,15 +1,17 @@
 import Cog
 import CogTesting
+import SwiftUI
 import Testing
 
 @MainActor
 @Test func `UI-07 a binding reads current state and writes through its named turn`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<String>("old", name: "binding.value")
   let value = source.readOnly
-  let binding = cogs.binding(for: value, name: "edit binding value") { c, newValue in
-    c[source] = newValue
-  }
+  let binding = Binding(
+    get: { cogs[value] },
+    set: { cogs.commit(source, to: $0, name: "edit binding value") }
+  )
 
   #expect(binding.wrappedValue == "old")
 
@@ -26,11 +28,12 @@ import Testing
 
 @MainActor
 @Test func `UI-08 a binding reads its write back immediately`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let text = ManualCog<String>("")
-  let binding = cogs.binding(for: text, name: "type character") { c, newValue in
-    c[text] = newValue
-  }
+  let binding = Binding(
+    get: { cogs[text] },
+    set: { cogs.commit(text, to: $0, name: "type character") }
+  )
 
   binding.wrappedValue = "c"
   #expect(binding.wrappedValue == "c")

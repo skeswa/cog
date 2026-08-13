@@ -56,7 +56,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
   /// A turn may touch this source repeatedly, but only the first flush that sees
   /// the shared pending slot can consume it. Publication precedes subscriber
   /// invalidation; Observation and reactions are flushed afterward by the turn.
-  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion) {
+  func flushPendingValue(in cogs: Cogs, at revision: CogVersion) {
     guard case .some(let value) = pendingValue else { return }
     pendingValue = .none
 
@@ -104,5 +104,5 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
 @MainActor
 internal protocol PendingCogSource: AnyObject {
   /// Publishes the source's staged slot, if present, in the active flush.
-  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion)
+  func flushPendingValue(in cogs: Cogs, at revision: CogVersion)
 }

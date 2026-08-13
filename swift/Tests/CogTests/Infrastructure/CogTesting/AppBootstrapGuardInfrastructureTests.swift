@@ -15,8 +15,8 @@ import Testing
 @Test func `AppBootstrapGuardInfrastructure nesting the scoped bootstrap seam traps`() async {
   await #expect(processExitsWith: .failure) {
     await MainActor.run {
-      Cogtext.withBootstrappedApp { _ in
-        Cogtext.withBootstrappedApp { _ in }
+      Cogs.withBootstrappedApp { _ in
+        Cogs.withBootstrappedApp { _ in }
       }
     }
   }

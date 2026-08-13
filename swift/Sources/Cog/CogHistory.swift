@@ -119,7 +119,7 @@ public struct CogHistory {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// This context's recent debug history.
   ///
   /// The returned value is a snapshot: subsequent turns do not mutate it.

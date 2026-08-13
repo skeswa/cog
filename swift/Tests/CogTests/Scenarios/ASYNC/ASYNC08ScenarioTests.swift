@@ -25,15 +25,15 @@ private final class Async08ControlledWork {
 
 @MainActor
 @Test func `ASYNC-08 stale cancellation-ignoring result is rejected`() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async08ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -48,8 +48,8 @@ private final class Async08ControlledWork {
   work.finish(0, with: 100)
   try await staleChecked.wait()
 
-  let afterStale = cogs.phase.peek(forecast)
-  if case .pending(previous: .none) = afterStale {
+  let afterStale = cogs.meta.peek(forecast)
+  if case .pending(_, hasSucceeded: false) = afterStale {
   } else {
     Issue.record("A stale result changed the newest run's pending phase")
   }

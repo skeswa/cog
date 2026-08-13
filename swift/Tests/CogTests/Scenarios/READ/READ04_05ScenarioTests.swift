@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `READ-04 curr folds each input into a running total`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let input = ManualCog<Int>(1)
   var previousValues: [Int?] = []
 
@@ -28,7 +28,7 @@ import Testing
 
 @MainActor
 @Test func `READ-05 an optional result distinguishes no previous run from previous nil`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   var previousStates: [String] = []
 

@@ -33,15 +33,15 @@ private final class Async19ControlledWork {
 
 @MainActor
 @Test func `ASYNC-19 failures and repeated reloads retain the last success`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async19ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -64,7 +64,7 @@ private final class Async19ControlledWork {
     Issue.record("The phase stream ended before reload pending")
     return
   }
-  if case .pending(previous: .some(let value)) = failedReloadPending {
+  if case .pending(value: let value, hasSucceeded: true) = failedReloadPending {
     #expect(value == 10)
   } else {
     Issue.record("Expected reload pending to retain the last success")
@@ -77,7 +77,7 @@ private final class Async19ControlledWork {
     return
   }
   switch failure {
-  case .failure(let error, previous: .some(let value)):
+  case .failure(let error, let value, hasSucceeded: true):
     #expect(error as? Async19Error == .offline)
     #expect(value == 10)
   default:
@@ -89,7 +89,7 @@ private final class Async19ControlledWork {
     Issue.record("The phase stream ended before repeated reload pending")
     return
   }
-  if case .pending(previous: .some(let value)) = repeatedReload {
+  if case .pending(value: let value, hasSucceeded: true) = repeatedReload {
     #expect(value == 10)
   } else {
     Issue.record("Expected a later reload to retain success rather than failure")

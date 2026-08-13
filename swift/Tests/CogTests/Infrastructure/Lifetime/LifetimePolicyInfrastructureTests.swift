@@ -77,36 +77,4 @@ private nonisolated struct LifetimeOpaqueValue {
     keyedEquatableDefault.descriptor.lifetime,
   ]
   #expect(defaults.allSatisfy { $0 == .whileObserved(grace: nil) })
-
-  let keylessKept = Cog<LifetimeOpaqueValue>(keepAlive: true) {
-    _ in LifetimeOpaqueValue(rawValue: 0)
-  }
-  let keylessCustomKept = Cog<LifetimeOpaqueValue>(
-    keepAlive: true,
-    { _ in LifetimeOpaqueValue(rawValue: 0) },
-    equals: { $0.rawValue == $1.rawValue }
-  )
-  let keylessEquatableKept = Cog<Int>(keepAlive: true) { _ in 0 }
-  let keyedKept = CogBox<LifetimeOpaqueValue, Int>(keepAlive: true) { _, key in
-    LifetimeOpaqueValue(rawValue: key)
-  }
-  let keyedCustomKept = CogBox<LifetimeOpaqueValue, Int>(
-    keepAlive: true,
-    { _, key in LifetimeOpaqueValue(rawValue: key) },
-    equals: { $0.rawValue == $1.rawValue }
-  )
-  let keyedEquatableKept = CogBox<Int, Int>(keepAlive: true) { _, key in key }
-
-  let kept = [
-    keylessKept.descriptor.lifetime,
-    keylessCustomKept.descriptor.lifetime,
-    keylessEquatableKept.descriptor.lifetime,
-    keyedKept.descriptor.lifetime,
-    keyedCustomKept.descriptor.lifetime,
-    keyedEquatableKept.descriptor.lifetime,
-  ]
-  #expect(kept.allSatisfy { $0 == .app })
-
-  #expect(keyedKept[1].descriptor === keyedKept[2].descriptor)
-  #expect(keyedKept[1].descriptor.lifetime == .app)
 }

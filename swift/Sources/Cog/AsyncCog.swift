@@ -1,7 +1,7 @@
 /// A declaration and value reference for asynchronously derived state.
 ///
 /// Constructing or copying an `AsyncCog` does not create graph state or start
-/// work. The declaration carries stable descriptor identity; each ``Cogtext``
+/// work. The declaration carries stable descriptor identity; each ``Cogs``
 /// lazily creates its own state for that identity when the value is first
 /// demanded. Copies therefore name the same state in one context and separate
 /// state in separate contexts.
@@ -10,24 +10,24 @@
 /// returns `Value` — the last accepted success, or the declaration's resting
 /// default before one exists — so async state reads in the same shape as a
 /// manual or derived cog wherever only the value matters. The request
-/// lifecycle is read through the `phase` lens on the same capability
-/// (`c.phase[valueReference]`), which returns the full ``CogPhase``.
+/// lifecycle is read through the `meta` lens on the same capability
+/// (`c.meta[valueReference]`), which returns the full ``CogMeta``.
 ///
-/// Demand may come from a tracked value or phase read, one-shot `peek`, or
-/// `refresh`. Initial demand establishes ``CogPhase/pending(previous:)`` with
-/// ``Previous/none`` synchronously and starts the selected work; a value read
-/// returns the resting default, a phase read returns that pending phase, and
-/// `refresh` returns no value. Cog records pending as a graph-owned turn, but
+/// Demand may come from a tracked value or metadata read, one-shot `peek`, or
+/// `refresh`. Initial demand establishes
+/// ``CogMeta/pending(value:hasSucceeded:)`` with the resting default and
+/// `hasSucceeded == false`, then starts the selected work. A value read returns
+/// that default, a metadata read returns pending, and `refresh` returns an
+/// exact-generation ``CogRefresh``. Cog records pending as a graph-owned turn, but
 /// if demand occurs while a selector or reaction is being evaluated, it
 /// defers that turn's flush until evaluation exits. Observation and reactions
 /// therefore cannot reenter the consumer that caused initial demand. Each later
 /// pending, success, or failure is likewise a separate, ordered graph turn.
 ///
-/// The default `whileObserved` lifetime releases unobserved state after the
+/// The `whileObserved` lifetime releases unobserved state after the
 /// context's renewable grace period and cancels pending work. Each transient
 /// demand replaces the state's one outstanding grace sleeper; it does not retain
-/// work until completion. `keepAlive` instead retains the state for the context
-/// lifetime.
+/// work until completion.
 ///
 /// The selector itself is synchronous and MainActor-isolated. Reads made with
 /// its ``Reader`` become dependencies before the selector returns ``Work``;
@@ -41,8 +41,8 @@ public struct AsyncCog<Value> {
   /// Stable derived-declaration identity for the total value projection.
   ///
   /// Value reads of this reference resolve through this derived declaration:
-  /// its selector reads the async state's phase and extracts the last accepted
-  /// success, falling back to the resting default captured at declaration.
+  /// its selector reads the async state's metadata and extracts its total
+  /// value, which already rests on the declaration default before success.
   /// One projection descriptor is shared by every copy and — through boxes —
   /// every key, exactly like `descriptor` itself.
   internal let valueDescriptor: DerivedCogDescriptor<Value>
@@ -57,7 +57,7 @@ public struct AsyncCog<Value> {
   /// advances the state's generation, and accepts a completion only from the
   /// newest generation. Cancellation is advisory: even if old work ignores
   /// it and finishes, its value cannot overwrite newer state, and replacement
-  /// cancellation does not become a failure phase.
+  /// cancellation does not become failure metadata.
   ///
   /// The selector runs on the MainActor whenever Cog needs a fresh operation.
   /// Returning ``Work`` closes dependency capture before that operation can
@@ -70,11 +70,8 @@ public struct AsyncCog<Value> {
   ///     currently the only policy and is therefore the default.
   ///   - default: The honest resting value a value read returns before any
   ///     generation succeeds. Choose one that renders truthfully while work is
-  ///     in flight; when no such value exists, make `Value` optional and omit
-  ///     this argument instead.
-  ///   - keepAlive: Pass `true` to retain this state until its context ends.
-  ///     The default releases it after its last durable consumer and grace
-  ///     period. A one-shot demand renews grace without becoming a consumer.
+  ///     in flight; when no such value exists, make `Value` optional and pass
+  ///     `nil` explicitly.
   ///   - name: A stable label for turns, diagnostics, and task tools. When
   ///     omitted, Cog derives one from the declaration site.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -84,26 +81,25 @@ public struct AsyncCog<Value> {
   public init(
     _ policy: LatestPolicy = .latest,
     default defaultValue: Value,
-    keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
       policy: policy,
+      default: defaultValue,
       selector: { c, _ in selector(c) },
-      lifetime: CogStateLifetime(keepAlive: keepAlive),
+      lifetime: .whileObserved(grace: nil),
       label: label
     )
     self.init(
       descriptor: descriptor,
       valueDescriptor: Self.makeValueDescriptor(
         for: descriptor,
-        default: defaultValue,
         equals: nil,
-        lifetime: CogStateLifetime(keepAlive: keepAlive),
+        lifetime: .whileObserved(grace: nil),
         label: label
       ),
       key: nil
@@ -140,22 +136,20 @@ public struct AsyncCog<Value> {
   /// value reference.
   ///
   /// The projection retains the async descriptor so its selector can resolve
-  /// the same key in each context, and captures the resting default chosen at
-  /// declaration. When `Value` is itself optional, a retained successful `nil`
-  /// still reads as `nil` — `latestValue`'s inner optional — rather than
-  /// falling back to the default, so "succeeded with nothing" is preserved.
-  /// `equals` applies only to the projected value; the async state's phase
+  /// the same key in each context. When `Value` is itself optional, a retained
+  /// successful `nil` still reads as `nil`, while the metadata's
+  /// `hasSucceeded` flag preserves "succeeded with nothing" distinctly from
+  /// the resting default. `equals` applies only to the projected value; the async state's metadata
   /// publication remains independent.
   internal static func makeValueDescriptor(
     for descriptor: AsyncCogDescriptor<Value>,
-    default defaultValue: Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
     label: CogLabel
   ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
       selector: { c, key in
-        c.asyncPhase(from: descriptor, key: key).latestValue ?? defaultValue
+        c.asyncMeta(from: descriptor, key: key).value
       },
       equals: equals,
       lifetime: lifetime,
@@ -175,15 +169,13 @@ extension AsyncCog where Value: Equatable {
   /// This overload has the same scheduling, cancellation, actor, and lifetime
   /// behavior as the unconstrained initializer. The added `Equatable` rule is
   /// intentionally narrow: when work succeeds with an equal value, value
-  /// consumers remain quiet, while `phase` consumers still observe pending
+  /// consumers remain quiet, while metadata consumers still observe pending
   /// and success as distinct turns.
   ///
   /// - Parameters:
   ///   - policy: The replacement policy for in-flight work. Only `.latest` is
   ///     currently available.
   ///   - default: The honest resting value returned before the first success.
-  ///   - keepAlive: Whether state survives without a consumer until the
-  ///     context ends instead of following `whileObserved` grace.
   ///   - name: A stable label for turns, diagnostics, and task tools.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
@@ -192,130 +184,28 @@ extension AsyncCog where Value: Equatable {
   public init(
     _ policy: LatestPolicy = .latest,
     default defaultValue: Value,
-    keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
       policy: policy,
+      default: defaultValue,
       selector: { c, _ in selector(c) },
-      lifetime: CogStateLifetime(keepAlive: keepAlive),
+      lifetime: .whileObserved(grace: nil),
       label: label
     )
     self.init(
       descriptor: descriptor,
       valueDescriptor: Self.makeValueDescriptor(
         for: descriptor,
-        default: defaultValue,
         equals: { oldValue, newValue in oldValue == newValue },
-        lifetime: CogStateLifetime(keepAlive: keepAlive),
+        lifetime: .whileObserved(grace: nil),
         label: label
       ),
       key: nil
     )
-  }
-}
-
-extension AsyncCog where Value: CogDefaultable {
-  /// Declares one keyless async value resting on `Value`'s own default.
-  ///
-  /// Identical to the explicit-`default:` initializer except that the resting
-  /// value comes from ``CogDefaultable/cogDefault`` — for an optional value,
-  /// `nil`. This is the omitted-argument spelling of the same invariant, not
-  /// a defaultless declaration: value reads are total either way.
-  ///
-  /// - Parameters:
-  ///   - policy: The replacement policy for in-flight work.
-  ///   - keepAlive: Whether state survives without a consumer until the
-  ///     context ends instead of following `whileObserved` grace.
-  ///   - name: A stable label for turns, diagnostics, and task tools.
-  ///   - fileID: The declaration's file. Leave this at its default.
-  ///   - line: The declaration's line. Leave this at its default.
-  ///   - selector: MainActor dependency selection that returns one async
-  ///     operation per generation.
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
-  ) {
-    self.init(
-      policy,
-      default: Value.cogDefault,
-      keepAlive: keepAlive,
-      name: name,
-      fileID: fileID,
-      line: line,
-      selector
-    )
-  }
-}
-
-extension AsyncCog where Value: CogDefaultable & Equatable {
-  /// Declares one keyless async value resting on `Value`'s own default, with
-  /// equality-gated value reads.
-  ///
-  /// The most common spelling for optional `Equatable` values:
-  /// `AsyncCog<Weather?> { ... }` rests at `nil` and keeps value consumers
-  /// quiet across equal-success reloads.
-  ///
-  /// - Parameters:
-  ///   - policy: The replacement policy for in-flight work.
-  ///   - keepAlive: Whether state survives without a consumer until the
-  ///     context ends instead of following `whileObserved` grace.
-  ///   - name: A stable label for turns, diagnostics, and task tools.
-  ///   - fileID: The declaration's file. Leave this at its default.
-  ///   - line: The declaration's line. Leave this at its default.
-  ///   - selector: MainActor dependency selection that returns one async
-  ///     operation per generation.
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
-  ) {
-    self.init(
-      policy,
-      default: Value.cogDefault,
-      keepAlive: keepAlive,
-      name: name,
-      fileID: fileID,
-      line: line,
-      selector
-    )
-  }
-}
-
-extension AsyncCog {
-  /// Unavailable: an async cog always has a resting value.
-  ///
-  /// This overload exists only to turn the missing-default mistake into a
-  /// diagnostic that names both ways out, instead of an opaque
-  /// no-matching-initializer error. It is chosen only when no available
-  /// initializer applies — a non-`CogDefaultable` `Value` with no `default:`
-  /// argument.
-  @available(
-    *, unavailable,
-    message: """
-      an async cog needs a resting value: pass `default:`, or make Value \
-      Optional so it rests at nil
-      """
-  )
-  public init(
-    _ policy: LatestPolicy = .latest,
-    keepAlive: Bool = false,
-    name: String? = nil,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
-  ) {
-    fatalError("unavailable")
   }
 }

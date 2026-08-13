@@ -59,7 +59,7 @@ private final class AsyncColdDemandControlledWork {
   async throws
 {
   let clock = AsyncColdDemandTestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
@@ -69,8 +69,8 @@ private final class AsyncColdDemandControlledWork {
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let initial = cogs.phase.peek(forecast)
-  if case .pending(previous: .none) = initial {
+  let initial = cogs.meta.peek(forecast)
+  if case .pending(_, hasSucceeded: false) = initial {
   } else {
     Issue.record("A cold one-shot peek did not return pending without a previous value")
   }
@@ -82,8 +82,8 @@ private final class AsyncColdDemandControlledWork {
 
   clock.advance(by: .seconds(4))
   for _ in 0..<32 {
-    let repeated = cogs.phase.peek(forecast)
-    if case .pending(previous: .none) = repeated {
+    let repeated = cogs.meta.peek(forecast)
+    if case .pending(_, hasSucceeded: false) = repeated {
     } else {
       Issue.record("A repeated peek did not retain the current pending generation")
     }
@@ -118,8 +118,8 @@ private final class AsyncColdDemandControlledWork {
   #expect(staleResultTurns.isEmpty)
   #endif
 
-  let fresh = cogs.phase.peek(forecast)
-  if case .pending(previous: .none) = fresh {
+  let fresh = cogs.meta.peek(forecast)
+  if case .pending(_, hasSucceeded: false) = fresh {
   } else {
     Issue.record("A later read did not recreate fresh pending work")
   }
@@ -135,7 +135,7 @@ private final class AsyncColdDemandControlledWork {
   work.finish(1, with: 200)
   try await freshChecked.wait()
 
-  if case .success(let value) = cogs.phase.peek(forecast) {
+  if case .success(let value) = cogs.meta.peek(forecast) {
     #expect(value == 200)
   } else {
     Issue.record("The recreated work did not publish its fresh result")
@@ -147,7 +147,7 @@ private final class AsyncColdDemandControlledWork {
   async throws
 {
   let clock = AsyncColdDemandTestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in

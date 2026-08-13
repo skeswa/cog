@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `ASYNC-15 async work runs on the MainActor by default`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let (started, startedContinuation) = AsyncStream.makeStream(
     of: Void.self,
     bufferingPolicy: .bufferingNewest(1)

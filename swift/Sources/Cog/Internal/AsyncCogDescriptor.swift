@@ -2,13 +2,13 @@
 ///
 /// ``AsyncCog`` and ``AsyncCogBox`` are lightweight value references. They
 /// retain one descriptor like this and, for a boxed declaration, pair it with
-/// an erased key. A ``Cogtext`` uses the descriptor's object identity plus that
+/// an erased key. A ``Cogs`` uses the descriptor's object identity plus that
 /// key to find or create an ``AsyncCogState``. Consequently, every context and
-/// every key gets independent mutable phase, dependency, task, and generation
+/// every key gets independent mutable metadata, dependency, task, and generation
 /// state while all of them share the declaration written by the caller.
 ///
 /// The descriptor stores only declaration metadata and the synchronous half of
-/// the async selector. It never stores a current phase or a running `Task`.
+/// the async selector. It never stores current metadata or a running `Task`.
 /// Those belong to ``AsyncCogState`` so one declaration can be used safely in
 /// multiple isolated contexts and, for ``AsyncCogBox``, at multiple keys.
 /// All descriptor access remains MainActor-confined; `Work` is the explicit
@@ -36,7 +36,6 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   ///
   /// Async derived state defaults to `whileObserved`: after grace expires the
   /// context cancels its task, advances its generation, and removes the state.
-  /// Public `keepAlive` declaration sugar selects `app` instead.
   let lifetime: CogStateLifetime
 
   /// How a new selection interacts with work already in flight.
@@ -47,27 +46,36 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// all contexts and keys.
   let policy: LatestPolicy
 
+  /// The total value exposed before this declaration accepts a success.
+  ///
+  /// Metadata carries this value through initial loading and initial failure.
+  /// Keeping it on the async descriptor gives every context and key the same
+  /// declaration-level resting contract without consulting the value projection.
+  let defaultValue: Value
+
   /// Selects one piece of async work while dependency tracking is active.
   ///
   /// The optional erased key lets keyless and boxed declarations share the
   /// runtime call path. ``AsyncCogBox`` installs the adapter that restores its
   /// concrete `Key` before user code runs. Explicit `@MainActor` keeps selector
   /// execution on the graph's actor under every client isolation default.
-  private let selector: @MainActor (Reader<CogPhase<Value>>, AnyHashable?) -> Work<Value>
+  private let selector: @MainActor (Reader<CogMeta<Value>>, AnyHashable?) -> Work<Value>
 
   /// Records the declaration choices shared by every state created from it.
   ///
   /// Construction stores no context and starts no work. State creation remains
-  /// lazy in each context and key, preserving independent phase and task life.
+  /// lazy in each context and key, preserving independent metadata and task life.
   init(
     policy: LatestPolicy,
-    selector: @escaping @MainActor (Reader<CogPhase<Value>>, AnyHashable?) -> Work<Value>,
+    default defaultValue: Value,
+    selector: @escaping @MainActor (Reader<CogMeta<Value>>, AnyHashable?) -> Work<Value>,
     lifetime: CogStateLifetime = .whileObserved(grace: nil),
     label: CogLabel
   ) {
     self.label = label
     self.lifetime = lifetime
     self.policy = policy
+    self.defaultValue = defaultValue
     self.selector = selector
   }
 
@@ -75,9 +83,9 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   ///
   /// The caller is responsible for opening the tracking scope. This method
   /// returns the description of work to start; it does not launch a task,
-  /// publish pending, or mutate a phase. ``AsyncCogState`` performs those steps
+  /// publish pending, or mutate metadata. ``AsyncCogState`` performs those steps
   /// after the selector has returned and its dependency set is complete.
-  func makeWork(_ reader: Reader<CogPhase<Value>>, key: AnyHashable?) -> Work<Value> {
+  func makeWork(_ reader: Reader<CogMeta<Value>>, key: AnyHashable?) -> Work<Value> {
     selector(reader, key)
   }
 

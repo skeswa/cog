@@ -8,7 +8,7 @@ import os
 
 @MainActor
 @Test func `SEED-07 seed stays quiet until the next real turn`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let seeded = ManualCog<Int>(0, name: "seeded")
   let unrelated = ManualCog<Bool>(false, name: "unrelated")
   let notices = OSAllocatedUnfairLock(initialState: 0)

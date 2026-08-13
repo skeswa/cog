@@ -8,15 +8,16 @@
 // surface before the second call tests its value-reference restriction. The context and
 // value references are parameters so no bootstrap or construction rule is involved.
 //
-// The harness imports Cog's debug build, where `seed` exists. This fixture is
-// deliberately not wrapped in `#if DEBUG`: its separate frontend is not passed
-// that define, and gating it would compile the proof away.
+// The harness imports CogTesting's debug build, where `seed` exists. This
+// fixture is deliberately not wrapped in `#if DEBUG`: its separate frontend is
+// not passed that define, and gating it would compile the proof away.
 
 import Cog
+import CogTesting
 
 enum DerivedSeedRejected {
   static func seedsOnlyManualSources(
-    cogs: Cogtext,
+    cogs: Cogs,
     source: ManualCog<Int>,
     derived: Cog<Int>
   ) {

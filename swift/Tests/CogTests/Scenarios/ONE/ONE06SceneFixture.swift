@@ -7,9 +7,9 @@ import Cog
 /// owner cannot preserve state by copying or mirroring it locally.
 @MainActor
 final class ONE06SceneFixture {
-  let cogs: Cogtext
+  let cogs: Cogs
 
-  init(cogs: Cogtext) {
+  init(cogs: Cogs) {
     self.cogs = cogs
   }
 

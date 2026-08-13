@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `ONE-06 rebuilding a scene preserves manual state in the app context`() {
-  Cogtext.withBootstrappedApp { app in
+  Cogs.withBootstrappedApp { app in
     weak var discardedScene: ONE06SceneFixture?
 
     do {
@@ -20,7 +20,7 @@ import Testing
 
     // The transient owner is really gone before its replacement is built.
     #expect(discardedScene == nil)
-    #expect(Cogtext.isBootstrappedApp(app))
+    #expect(Cogs.isBootstrappedApp(app))
 
     let rebuiltScene = ONE06SceneFixture(cogs: app)
     #expect(rebuiltScene.cogs === app)

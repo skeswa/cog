@@ -12,7 +12,7 @@
 
 /// The shape every declaration's descriptor shares.
 ///
-/// A descriptor names state but does not store it. Each `Cogtext` creates its
+/// A descriptor names state but does not store it. Each `Cogs` creates its
 /// own state for a descriptor and key (§2.3). The descriptor and all mutable
 /// state it names are MainActor-confined; copied public value references share
 /// this declaration identity rather than copying graph state.

@@ -20,7 +20,7 @@ import Cog
 enum ReadOnlyWriteRejected {
   /// The plain case: stage a value through a published read-only value reference.
   static func stagesThroughAReadOnlyValueReference(
-    cogs: Cogtext, currentZipCode: CogProjection<Int>
+    cogs: Cogs, currentZipCode: CogProjection<Int>
   ) {
     cogs.commit { c in
       // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
@@ -30,7 +30,7 @@ enum ReadOnlyWriteRejected {
 
   /// Read-modify-write, which the writer's subscript supports for a real
   /// source (`c[count] += 1`) and must not offer here.
-  static func mutatesThroughAReadOnlyValueReference(cogs: Cogtext, retryLimit: CogProjection<Int>) {
+  static func mutatesThroughAReadOnlyValueReference(cogs: Cogs, retryLimit: CogProjection<Int>) {
     cogs.commit { c in
       // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       c[retryLimit] += 1
@@ -41,7 +41,7 @@ enum ReadOnlyWriteRejected {
   /// read-only value reference like every other, so the keyed write is the same type
   /// error as the keyless one.
   static func stagesThroughAReadOnlyBoxKey(
-    cogs: Cogtext,
+    cogs: Cogs,
     weatherReport: CogBoxProjection<Int, String>
   ) {
     cogs.commit { c in

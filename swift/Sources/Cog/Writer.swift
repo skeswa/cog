@@ -1,6 +1,6 @@
 /// The write capability for one accumulating turn.
 ///
-/// A writer exists inside ``Cogtext/commit(_:_:)``. Its subscript reads staged
+/// A writer exists inside ``Cogs/commit(_:_:)``. Its subscript reads staged
 /// values and stages writes until the outer commit body returns. Application
 /// code cannot construct one.
 ///
@@ -15,7 +15,7 @@
 @MainActor
 public struct Writer {
   /// The graph that owns the accumulating turn and source states.
-  private let cogs: Cogtext
+  private let cogs: Cogs
 
   /// The turn this writer may act on.
   ///
@@ -31,7 +31,7 @@ public struct Writer {
   /// - Parameters:
   ///   - cogs: The graph that owns the active turn and manual state.
   ///   - turnID: The retained identity that must still match that active turn.
-  internal init(cogs: Cogtext, turnID: CogTurnID) {
+  internal init(cogs: Cogs, turnID: CogTurnID) {
     self.cogs = cogs
     self.turnID = turnID
   }
@@ -52,7 +52,7 @@ public struct Writer {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// Starts or schedules one named, synchronous state transition.
   ///
   /// From idle, `body` starts a turn. A nested commit joins an accumulating
@@ -61,14 +61,14 @@ extension Cogtext {
   /// returning.
   ///
   /// The writer's changes cross the commit boundary together. Ops are
-  /// `Cogtext` methods that wrap this primitive. Normal reads made before the
+  /// `Cogs` methods that wrap this primitive. Normal reads made before the
   /// boundary still see the prior completed snapshot; reactions, derived
   /// settlement, Observation notices, and debug history run only as the turn
   /// flushes.
   ///
   /// Calling `commit` during a derived computation traps before `body` runs.
   /// The error names the active cog and attempted turn. The method is
-  /// MainActor-isolated through `Cogtext`; `body` is synchronous even though
+  /// MainActor-isolated through `Cogs`; `body` is synchronous even though
   /// it is escaping for queued-turn storage.
   ///
   /// - Parameters:
@@ -79,6 +79,27 @@ extension Cogtext {
   public func commit(_ name: String = #function, _ body: @escaping (Writer) -> Void) {
     withTurn(name) { turn in
       body(Writer(cogs: self, turnID: turn.id))
+    }
+  }
+
+  /// Commits one value to one manual source.
+  ///
+  /// This is the compact form for the common single-write operation. It keeps
+  /// ``commit(_:_:)`` as Cog's sole application write boundary while avoiding
+  /// a one-line writer closure at every domain setter. Multi-source and
+  /// read-modify-write operations continue to use the writer form.
+  ///
+  /// - Parameters:
+  ///   - valueReference: The state-owned source to update.
+  ///   - value: The value to publish at the commit boundary.
+  ///   - name: The turn name recorded for diagnostics and history.
+  public func commit<Value>(
+    _ valueReference: ManualCog<Value>,
+    to value: Value,
+    name: String = #function
+  ) {
+    commit(name) { writer in
+      writer[valueReference] = value
     }
   }
 

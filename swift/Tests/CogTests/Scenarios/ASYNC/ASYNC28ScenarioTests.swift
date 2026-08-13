@@ -33,9 +33,9 @@ private final class Async28ControlledWork {
 @Test func `ASYNC-28 an initial UI value read does not reenter derived computation`()
   async throws
 {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let work = Async28ControlledWork()
-  let forecast = AsyncCog<Int?>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { _ in
     .run { await work.run() }
   }
   let notices = OSAllocatedUnfairLock(initialState: 0)

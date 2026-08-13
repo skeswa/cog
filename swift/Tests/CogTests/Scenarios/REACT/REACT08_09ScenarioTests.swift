@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-08 a skipping watch is quiet at install and then delivers old and new`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
   var deliveries: [String] = []
@@ -38,7 +38,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-09 a running watch calls the body once at install time`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var deliveries: [String] = []
 

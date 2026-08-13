@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `CYCLE-03 a keyed cycle diagnostic includes every key`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let holder = CycleDiagnosticBoxHolder()
   var diagnostic: CogCycleDiagnostic?
 
@@ -30,7 +30,7 @@ import Testing
 
 @MainActor
 @Test func `CYCLE-04 a conditional cycle is caught only after its condition flips`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let closesCycle = ManualCog<Bool>(false)
   var diagnostic: CogCycleDiagnostic?
   var conditional: Cog<Int>!
@@ -58,7 +58,7 @@ import Testing
 
 @MainActor
 @Test func `CYCLE-05 the testing seam diagnoses a cycle without crashing`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   var diagnostic: CogCycleDiagnostic?
   var selfReading: Cog<Int>!
 

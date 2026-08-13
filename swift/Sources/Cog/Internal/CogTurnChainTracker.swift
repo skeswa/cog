@@ -141,7 +141,7 @@ internal struct CogTurnChainTracker {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// The turn-chain behavior a test may observe without seeing graph storage.
   ///
   /// Idle is deliberately stronger than `turnPhase == .idle`: queued system

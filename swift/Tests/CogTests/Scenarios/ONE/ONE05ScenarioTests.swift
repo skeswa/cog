@@ -9,8 +9,8 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 test and preview contexts coexist without sharing state`() {
-  let testContext = Cogtext.forTesting()
-  let previewContext = Cogtext.forTesting()
+  let testContext = Cogs.forTesting()
+  let previewContext = Cogs.forTesting()
 
   #expect(testContext !== previewContext)
   #expect(testContext.peek(one05State) == 41)
@@ -29,10 +29,10 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 many sequential contexts each start clean`() {
-  var previous: (cogs: Cogtext, written: Int)?
+  var previous: (cogs: Cogs, written: Int)?
 
   for index in 0..<50 {
-    let current = Cogtext.forTesting()
+    let current = Cogs.forTesting()
 
     if let previous {
       #expect(current !== previous.cogs)
@@ -50,19 +50,19 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 isolated contexts never occupy or disturb the app install slot`() {
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 
-  let beforeInstall = Cogtext.forTesting()
+  let beforeInstall = Cogs.forTesting()
   #expect(beforeInstall.peek(one05State) == 41)
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 
-  Cogtext.withBootstrappedApp { app in
-    #expect(Cogtext.isBootstrappedApp(app))
+  Cogs.withBootstrappedApp { app in
+    #expect(Cogs.isBootstrappedApp(app))
 
-    let duringInstall = Cogtext.forTesting()
-    #expect(Cogtext.isBootstrappedApp(app))
-    #expect(Cogtext.isBootstrappedApp(beforeInstall) == false)
-    #expect(Cogtext.isBootstrappedApp(duringInstall) == false)
+    let duringInstall = Cogs.forTesting()
+    #expect(Cogs.isBootstrappedApp(app))
+    #expect(Cogs.isBootstrappedApp(beforeInstall) == false)
+    #expect(Cogs.isBootstrappedApp(duringInstall) == false)
     #expect(app.peek(one05State) == 41)
     #expect(duringInstall.peek(one05State) == 41)
 
@@ -70,13 +70,13 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
     #expect(duringInstall.peek(one05State) == 303)
     #expect(app.peek(one05State) == 41)
-    #expect(Cogtext.isBootstrappedApp(app))
+    #expect(Cogs.isBootstrappedApp(app))
   }
 
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 
-  let afterInstall = Cogtext.forTesting()
+  let afterInstall = Cogs.forTesting()
   #expect(afterInstall !== beforeInstall)
   #expect(afterInstall.peek(one05State) == 41)
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 }

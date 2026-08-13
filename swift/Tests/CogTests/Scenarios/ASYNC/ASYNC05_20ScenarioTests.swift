@@ -27,9 +27,9 @@ private final class Async05_20ControlledWork {
 
 @MainActor
 @Test func `ASYNC-05 value read reads as a plain value like a manual cog`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let work = Async05_20ControlledWork()
-  let forecast = AsyncCog<Int?> { _ in
+  let forecast = AsyncCog<Int?>(default: nil) { _ in
     .run { await work.run(0) }
   }
   let (values, continuation) = AsyncStream.makeStream(of: Int?.self)
@@ -55,8 +55,8 @@ private final class Async05_20ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-20 equal reload changes full phase but not value consumers`() async {
-  let cogs = Cogtext.forTesting()
+@Test func `ASYNC-20 equal reload changes metadata but not value consumers`() async {
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async05_20ControlledWork()
   let forecast = AsyncCog<Int>(default: 0) { c in
@@ -68,13 +68,13 @@ private final class Async05_20ControlledWork {
     valueConsumerRuns += 1
     return c[forecast]
   }
-  let (phases, phaseContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let fullPhaseToken = cogs.run { c in phaseContinuation.yield(c.phase[forecast]) }
+  let (phases, phaseContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let fullPhaseToken = cogs.run { c in phaseContinuation.yield(c.meta[forecast]) }
   let valueConsumerToken = cogs.run { c in _ = c[valueConsumer] }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(previous: .none)) = await phaseIterator.next() else {
+  guard case .some(.pending(_, hasSucceeded: false)) = await phaseIterator.next() else {
     Issue.record("Expected initial pending without a previous value")
     return
   }
@@ -89,7 +89,7 @@ private final class Async05_20ControlledWork {
   #expect(valueConsumerRuns == 2)
 
   cogs.commit { c in c[request] = 1 }
-  guard case .some(.pending(previous: .some(42))) = await phaseIterator.next() else {
+  guard case .some(.pending(value: 42, hasSucceeded: true)) = await phaseIterator.next() else {
     Issue.record("Expected reload pending with the last successful value")
     return
   }

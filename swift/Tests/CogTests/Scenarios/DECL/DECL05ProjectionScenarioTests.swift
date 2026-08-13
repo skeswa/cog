@@ -22,7 +22,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 a read-only value reference reads what its source reads`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let retryLimitSource = ManualCog<Int>(3)
   let greetingSource = ManualCog<String>("hello")
@@ -46,7 +46,7 @@ private struct ZipCode: Hashable {
   // The point of the projection: the owning file writes the source, and
   // everyone holding the published value reference sees it. No copy to refresh, no second
   // state to keep in step.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
@@ -63,7 +63,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-05 the read-only value reference agrees with its source after every write`() {
   // "Always," not "once": the two value references stay indistinguishable across a run of
   // turns, whichever of them is read first.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
@@ -84,7 +84,7 @@ private struct ZipCode: Hashable {
   // is the case where a wrong implementation would quietly make its own state.
   // A reference-typed value makes that visible without any write: one state
   // means one object.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let ledgerSource = ManualCog<Ledger>(Ledger())
   let ledger = ledgerSource.readOnly
@@ -100,7 +100,7 @@ private struct ZipCode: Hashable {
   // Projecting is not declaring. `.readOnly` builds a value reference, the way `box[key]`
   // does, so asking for it in two places is not a way to end up with two
   // pieces of state.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let ledgerSource = ManualCog<Ledger>(Ledger())
 
@@ -117,8 +117,8 @@ private struct ZipCode: Hashable {
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
 
-  let first = Cogtext.forTesting()
-  let second = Cogtext.forTesting()
+  let first = Cogs.forTesting()
+  let second = Cogs.forTesting()
 
   first.commit { c in
     c[countSource] = 7
@@ -132,7 +132,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 a read-only box key reads what that key of the source reads`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let retryLimitSource = ManualCogBox<Int, String>(3)
   let retryLimit = retryLimitSource.readOnly
@@ -148,7 +148,7 @@ private struct ZipCode: Hashable {
   // the projection is the same declaration, so the starting-value closure runs
   // for a key reached through the projection exactly as it would for the
   // source.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let greetingSource = ManualCogBox<String, ZipCode> { zip in "hello, \(zip.digits)" }
   let greeting = greetingSource.readOnly
@@ -159,7 +159,7 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 a projected key names the same state as that key of the source`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let ledgersSource = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
   let ledgers = ledgersSource.readOnly
@@ -175,7 +175,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-05 keys stay separate through a read-only box`() {
   // A projection is not a flattening. Each key of the projected box is still
   // its own state, and still the same state as that key of the source.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let ledgersSource = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
   let ledgers = ledgersSource.readOnly
@@ -193,7 +193,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-05 equal keys name one piece of state through the projection`() {
   // Identity is descriptor plus key, and the projection changes neither, so
   // "the same key" still means equal rather than identical.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }.readOnly
 

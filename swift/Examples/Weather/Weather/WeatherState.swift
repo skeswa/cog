@@ -44,16 +44,17 @@ let refreshInterval = refreshIntervalSource.readOnly
 /// The keyed forecast every card reads, resting at `nil` until a ZIP's first
 /// accepted reading.
 ///
-/// Each ZIP code gets an independent phase, dependency set, generation, and
-/// task. The optional value is the whole default spelling: a value read
+/// Each ZIP code gets independent metadata, a dependency set, generation, and
+/// task. The declaration explicitly rests at `nil`: a value read
 /// (`cogs[weatherForecast[zip]]`) is total, returning `nil` before the first
 /// success and the last accepted reading afterward, while request chrome opts
-/// into `cogs.phase[weatherForecast[zip]]`. The selector synchronously
+/// into `cogs.meta[weatherForecast[zip]]`. The selector synchronously
 /// captures the current service as a Cog dependency; replacing that service
 /// in a test invalidates every demanded forecast. The returned work runs away
 /// from the MainActor, while Cog brings its pending, success, and failure
-/// phases back to the graph as ordered turns.
+/// metadata back to the graph as ordered turns.
 let weatherForecast = AsyncCogBox<WeatherReading?, ZipCode>(
+  default: nil,
   name: "weather.forecast"
 ) { c, zip in
   let service = c[weatherService]
@@ -65,7 +66,7 @@ let weatherForecast = AsyncCogBox<WeatherReading?, ZipCode>(
 /// Whether the latest successful reading for a ZIP depicts a sunny condition.
 ///
 /// The plain value read keeps this derivation stable across reload pending
-/// and failure phases; it changes only when the accepted reading does.
+/// and failure metadata; it changes only when the accepted reading does.
 let isSunny = CogBox<Bool, ZipCode>(
   { c, zip in
     switch c[weatherForecast[zip]]?.weather.kind {
@@ -111,42 +112,29 @@ let receivesHourlyUpdates = CogBox<Bool, ZipCode>(
   name: "weather.receivesHourlyUpdates"
 )
 
-extension Cogtext {
+extension Cogs {
   /// Selects the ZIP used by the alert reaction and periodic refresh loop.
-  func useCurrentLocation(_ zip: ZipCode?) {
-    commit("weather.useCurrentLocation") { c in
-      c[currentZipSource] = zip
-    }
+  func selectCurrentLocation(_ zip: ZipCode?) {
+    commit(currentZipSource, to: zip)
   }
 
   /// A tracked SwiftUI binding to the singular current-location source.
   var currentZipBinding: Binding<ZipCode?> {
-    binding(
-      for: currentZipCode,
-      name: "weather.useCurrentLocation"
-    ) { c, zip in
-      c[currentZipSource] = zip
-    }
+    Binding(
+      get: { self[currentZipCode] },
+      set: { self.selectCurrentLocation($0) }
+    )
   }
 
   /// Publishes the cadence owned by the installed effects group.
-  func useRefreshInterval(_ interval: Duration?) {
-    commit("weather.useRefreshInterval") { c in
-      c[refreshIntervalSource] = interval
-    }
+  func setRefreshInterval(_ interval: Duration?) {
+    commit(refreshIntervalSource, to: interval)
   }
 }
 
 #if DEBUG
-extension Cogtext {
-  /// Installs a deterministic request service before a test first demands it.
-  func seedWeatherService(_ service: WeatherService) {
-    seed(weatherServiceSource, to: service)
-  }
-
-  /// Selects a current ZIP before a test installs effects or renders a picker.
-  func seedCurrentZip(_ zip: ZipCode?) {
-    seed(currentZipSource, to: zip)
-  }
-}
+/// The narrow source capability Weather tests may seed through `CogTesting`.
+let weatherServiceSeedTarget = weatherServiceSource
+/// The narrow selection capability Weather tests may seed through `CogTesting`.
+let currentZipSeedTarget = currentZipSource
 #endif

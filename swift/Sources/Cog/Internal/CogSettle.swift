@@ -142,7 +142,7 @@ internal protocol DerivedCogSettleState: CogState {
   var dependencies: [any CogState] { get }
 
   /// Recomputes after dirty parents are current, while this state is computing.
-  func recompute(in cogs: Cogtext)
+  func recompute(in cogs: Cogs)
 }
 
 /// One frame in the iterative pull walk.
@@ -248,7 +248,7 @@ internal struct CogSettleStack {
   }
 }
 
-extension Cogtext {
+extension Cogs {
   /// Pushes invalidation from a changed state to its consumers.
   ///
   /// Direct consumers become DIRTY because one of their own inputs changed.

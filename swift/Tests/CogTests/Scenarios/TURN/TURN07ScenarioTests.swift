@@ -11,7 +11,7 @@ import Testing
   // not about how a given CPU spells a trap.
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?
@@ -30,7 +30,7 @@ import Testing
 @Test func `TURN-07 reading through a writer that outlived its commit traps`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?

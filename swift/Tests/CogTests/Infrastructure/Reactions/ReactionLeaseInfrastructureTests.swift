@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 @Test func `ReactionReaderInfrastructure peek settles without adding a dependency`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let source = ManualCog<Int>(1)
   let projectedSource = source.readOnly
@@ -31,27 +31,23 @@ import Testing
 
 @MainActor
 @Test func `ReactionLeaseInfrastructure counts direct derived roots once per reaction`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let inner = Cog<Int> { c in c[source] + 1 }
   let root = Cog<Int> { c in c[inner] + 1 }
-  let kept = Cog<Int>(keepAlive: true) { _ in 4 }
 
   let first = cogs.run { c in
     _ = c[root]
     _ = c[root]
     _ = c[source]
-    _ = c[kept]
   }
   let second = cogs.run { c in _ = c[root] }
 
   let rootState = cogs.derivedState(for: root)
   let innerState = cogs.derivedState(for: inner)
-  let keptState = cogs.derivedState(for: kept)
 
   #expect(rootState.externalLeaseCount == 2)
   #expect(innerState.externalLeaseCount == 0)
-  #expect(keptState.externalLeaseCount == 0)
   #expect(cogs.manualState(for: source).descriptor.lifetime == .app)
   #expect(first.reaction.leasedDependencies.count == 1)
   #expect(first.reaction.leasedDependencies.first === rootState)
@@ -70,7 +66,7 @@ import Testing
 
 @MainActor
 @Test func `ReactionLeaseInfrastructure moves leases when a reaction retracks`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let chooseLeft = ManualCog<Bool>(true)
   let left = Cog<Int> { _ in 1 }
   let right = Cog<Int> { _ in 2 }
@@ -109,7 +105,7 @@ import Testing
 
 @MainActor
 @Test func `ReactionLeaseInfrastructure self cancellation cannot reacquire leases`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let beforeCancellation = Cog<Int> { _ in 1 }
   let afterCancellation = Cog<Int> { _ in 2 }
@@ -140,7 +136,7 @@ import Testing
 
 @MainActor
 @Test func `ReactionLeaseInfrastructure balances leases during context teardown`() {
-  var cogs: Cogtext? = Cogtext.forTesting()
+  var cogs: Cogs? = Cogs.forTesting()
   weak let releasedContext = cogs
   let root = Cog<Int> { _ in 1 }
   let rootState = cogs?.derivedState(for: root)

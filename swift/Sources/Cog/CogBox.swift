@@ -42,8 +42,6 @@ public struct CogBox<Value, Key: Hashable> {
   /// stop that wave.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether each demanded key has context lifetime instead of
-  ///     the synchronous-derived `whileObserved` default.
   ///   - selector: MainActor computation for one key. The key is an ordinary
   ///     lexical value; pass it to inner keyed reads explicitly. Reads through
   ///     `c[...]` replace this key's dependency set on every run.
@@ -52,7 +50,6 @@ public struct CogBox<Value, Key: Hashable> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>, Key) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -61,7 +58,7 @@ public struct CogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: nil,
-      lifetime: CogStateLifetime(keepAlive: keepAlive),
+      lifetime: .whileObserved(grace: nil),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -74,8 +71,6 @@ public struct CogBox<Value, Key: Hashable> {
   /// maintains its own cache and applies the rule independently.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether each demanded key has context lifetime instead of
-  ///     the synchronous-derived `whileObserved` default.
   ///   - selector: MainActor computation for one key and its current tracked
   ///     dependencies.
   ///   - equals: MainActor comparison of the cached value and fresh result.
@@ -85,7 +80,6 @@ public struct CogBox<Value, Key: Hashable> {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>, Key) -> Value,
     equals: @escaping @MainActor (Value, Value) -> Bool,
     name: String? = nil,
@@ -95,7 +89,7 @@ public struct CogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: equals,
-      lifetime: CogStateLifetime(keepAlive: keepAlive),
+      lifetime: .whileObserved(grace: nil),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -150,19 +144,14 @@ extension CogBox where Value: Equatable {
   ///
   /// The synthesized equality rule affects only propagation after the selector
   /// reruns; dependencies still settle and the selector still recomputes when
-  /// required. Set `keepAlive` when every demanded key should remain for the
-  /// context's lifetime instead of following the synchronous-derived
-  /// `whileObserved` default.
+  /// required.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether demanded keys survive without consumers until the
-  ///     context ends.
   ///   - selector: MainActor computation and dependency selection for one key.
   ///   - name: The declaration label used in diagnostics and debug history.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>, Key) -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -171,7 +160,7 @@ extension CogBox where Value: Equatable {
     self.descriptor = Self.makeDescriptor(
       selector: selector,
       equals: { oldValue, newValue in oldValue == newValue },
-      lifetime: CogStateLifetime(keepAlive: keepAlive),
+      lifetime: .whileObserved(grace: nil),
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }

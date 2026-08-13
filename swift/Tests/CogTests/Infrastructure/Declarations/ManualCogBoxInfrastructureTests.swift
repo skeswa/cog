@@ -60,7 +60,7 @@ import Testing
 
 @MainActor
 @Test func `ManualCogBoxInfrastructure gives every key its own state`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let weather = ManualCogBox<Int, Int>(0)
 
   #expect(cogs.manualState(for: weather[90210]) === cogs.manualState(for: weather[90210]))
@@ -70,7 +70,7 @@ import Testing
 
 @MainActor
 @Test func `ManualCogBoxInfrastructure creates a key's state only when it is used`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let weather = ManualCogBox<Int, Int>(0)
   #expect(cogs.states.isEmpty)
@@ -88,7 +88,7 @@ import Testing
 
 @MainActor
 @Test func `ManualCogBoxInfrastructure keeps a state's key for diagnostics`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let weather = ManualCogBox<Int, Int>(0, name: "weather")
 
   let state = cogs.manualState(for: weather[90210])

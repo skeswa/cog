@@ -8,11 +8,11 @@ import Testing
 @available(macOS 26.0, *)
 @MainActor
 private final class CogTrackingNSView: NSView {
-  let cogs: Cogtext
+  let cogs: Cogs
   let count: ManualCog<Int>
   var renderedValues: [Int] = []
 
-  init(cogs: Cogtext, count: ManualCog<Int>) {
+  init(cogs: Cogs, count: ManualCog<Int>) {
     self.cogs = cogs
     self.count = count
     super.init(frame: .zero)
@@ -32,7 +32,7 @@ private final class CogTrackingNSView: NSView {
 @available(macOS 26.0, *)
 @MainActor
 @Test func `UI-12 AppKit automatically retracks a Cog boundary`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
   let view = CogTrackingNSView(cogs: cogs, count: count)
 

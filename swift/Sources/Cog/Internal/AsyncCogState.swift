@@ -4,7 +4,7 @@
 /// captures graph dependencies, then its returned ``Work`` runs outside
 /// dependency tracking. The state publishes pending, success, and failure as
 /// separate system turns so readers and push consumers observe only completed
-/// phase transitions. Initial demand is the exception: it must install an honest
+/// metadata transitions. Initial demand is the exception: it must install honest
 /// pending baseline synchronously, then preserves ordering with a deferred named
 /// turn once its computing path unwinds. The context is the sole owner of the
 /// descriptor-and-key slot; work and grace tasks hold it weakly and must pass
@@ -41,7 +41,7 @@ internal final class AsyncCogState<Value>:
   /// Fresh state is DIRTY so its first read selects and starts work.
   var settleState: CogSettleState = .dirty
 
-  /// The revision of the last phase publication visible to readers.
+  /// The revision of the last metadata publication visible to readers.
   ///
   /// The exceptional synchronous pending baseline uses the current revision and
   /// queues an empty named turn; it has no pre-existing consumers to invalidate.
@@ -53,10 +53,10 @@ internal final class AsyncCogState<Value>:
   /// publishing pending early; its later system turn advances both timestamps.
   var checkedAt: CogVersion = .initial
 
-  /// Weak reverse edges to phase or projection consumers.
+  /// Weak reverse edges to metadata or projection consumers.
   var subscribers: [CogSubscriberEdge] = []
 
-  /// Created only when this exact async phase crosses the UI boundary.
+  /// Created only when this exact async metadata crosses the UI boundary.
   var observationBoundary: CogObservationBoundary?
 
   /// The erased key rendered with UI notices for this boundary.
@@ -91,24 +91,24 @@ internal final class AsyncCogState<Value>:
     CogStateIdentity(descriptor: descriptorIdentity, key: key)
   }
 
-  /// The phase staged by a system turn but not yet published to readers.
+  /// The metadata staged by a system turn but not yet published to readers.
   ///
   /// Like a manual source's pending value, this slot is consumed exactly once by
-  /// ``flushPendingValue(in:at:)``. Keeping staging separate from `phase` makes
+  /// ``flushPendingValue(in:at:)``. Keeping staging separate from `meta` makes
   /// each async transition atomic with the rest of its named turn.
-  private var pendingPhase: CogPhase<Value>?
+  private var pendingMeta: CogMeta<Value>?
 
-  /// The phase from the latest completed publication turn.
+  /// The metadata from the latest completed publication turn.
   ///
   /// Absence means this state has never settled. A successful settlement always
   /// gives the first caller honest pending rather than exposing an initial case.
-  private var phase: CogPhase<Value>?
+  private var meta: CogMeta<Value>?
 
-  /// The last accepted success, retained through pending and failure phases.
+  /// The last accepted success, retained through pending and failure metadata.
   ///
-  /// ``Previous`` preserves a successful optional `nil` distinctly from no
-  /// accepted success.
-  private var lastSuccess: Previous<Value> = .none
+  /// The outer optional preserves a successful optional `nil` distinctly from
+  /// no accepted success.
+  private var lastSuccess: Value?
 
   /// The cancellation handle for the newest requested `.latest` generation.
   ///
@@ -122,8 +122,15 @@ internal final class AsyncCogState<Value>:
   /// so cancellation is never the correctness boundary for late completion.
   private var generation: UInt64 = 0
 
-  /// The last completed phase available to `Reader.curr`, preserving initial absence.
-  var readerCurrentValue: CogPhase<Value>? { phase }
+  /// Awaitable explicit-refresh handles, filed by their exact generation.
+  ///
+  /// Ordinary read- or dependency-started generations need no cell. Starting
+  /// replacement work resolves every older cell as superseded; lifetime
+  /// release resolves the remaining cells as released.
+  private var refreshWaiters: [UInt64: CogRefreshWaiter<Value>] = [:]
+
+  /// The last completed metadata available to `Reader.curr`, preserving initial absence.
+  var readerCurrentValue: CogMeta<Value>? { meta }
 
   /// Creates an uncomputed, task-free state for one context storage identity.
   init(descriptor: AsyncCogDescriptor<Value>, key: AnyHashable?) {
@@ -132,11 +139,11 @@ internal final class AsyncCogState<Value>:
   }
 
   /// Settles dependencies and starts work when needed, then returns the latest
-  /// completed phase publication.
+  /// completed metadata publication.
   ///
   /// Both tracked and one-shot reads enter here. Therefore no read can bypass a
   /// dependency invalidation or observe state before initial pending exists.
-  func settledPhase(in cogs: Cogtext) -> CogPhase<Value> {
+  func settledMeta(in cogs: Cogs) -> CogMeta<Value> {
     if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
       fatalError(cycle.message)
     }
@@ -145,10 +152,10 @@ internal final class AsyncCogState<Value>:
       cogs.settle(self)
     }
 
-    guard let phase else {
-      fatalError("A settled async Cog lost its phase.")
+    guard let meta else {
+      fatalError("A settled async Cog lost its metadata.")
     }
-    return phase
+    return meta
   }
 
   /// Forces the selector and work to run again under the normal settle path.
@@ -157,10 +164,13 @@ internal final class AsyncCogState<Value>:
   /// replace the work it just started. Later refreshes use a named pending
   /// system turn, recapture dependencies, and follow the same generation rules
   /// as dependency-triggered replacement.
-  func refresh(in cogs: Cogtext) {
-    guard phase != nil else {
-      _ = settledPhase(in: cogs)
-      return
+  func refresh(in cogs: Cogs) -> CogRefresh<Value> {
+    let waiter = CogRefreshWaiter<Value>()
+    let refresh = CogRefresh(waiter: waiter)
+    guard meta != nil else {
+      _ = settledMeta(in: cogs)
+      register(waiter, for: generation)
+      return refresh
     }
 
     cogs.withSystemTurn("\(renderedName) pending") { turn in
@@ -169,8 +179,13 @@ internal final class AsyncCogState<Value>:
       }
       cogs.settleStack.beginComputing(self)
       defer { cogs.settleStack.endComputing(self) }
-      self.startWork(in: cogs, publishingPendingIn: turn)
+      self.startWork(
+        in: cogs,
+        publishingPendingIn: turn,
+        refreshWaiter: waiter
+      )
     }
+    return refresh
   }
 
   /// Records one synchronous selector read and installs its reverse invalidation edge.
@@ -207,6 +222,7 @@ internal final class AsyncCogState<Value>:
   /// a second guard against a fresh state reusing the descriptor-and-key slot.
   func prepareForLifetimeRelease() {
     cancelPendingLifetimeRelease()
+    resolveRefreshes(as: .released)
     _ = advanceGeneration()
     activeTask?.cancel()
     activeTask = nil
@@ -216,7 +232,7 @@ internal final class AsyncCogState<Value>:
   ///
   /// Settlement calls this only after dirty parents are current and while the
   /// state is marked as computing.
-  func recompute(in cogs: Cogtext) {
+  func recompute(in cogs: Cogs) {
     startWork(in: cogs)
   }
 
@@ -230,7 +246,12 @@ internal final class AsyncCogState<Value>:
   /// synchronous read installs its pending baseline immediately but queues the
   /// named turn until both paths unwind. This avoids reentrant Observation or
   /// reaction flushing while preserving diagnostic turn order.
-  private func startWork(in cogs: Cogtext, publishingPendingIn pendingTurn: CogTurn? = nil) {
+  @discardableResult
+  private func startWork(
+    in cogs: Cogs,
+    publishingPendingIn pendingTurn: CogTurn? = nil,
+    refreshWaiter: CogRefreshWaiter<Value>? = nil
+  ) -> UInt64 {
     guard isComputing else {
       fatalError("An async Cog selector ran outside the settle computation path.")
     }
@@ -246,17 +267,20 @@ internal final class AsyncCogState<Value>:
       previousDependency.removeSubscriber(self)
     }
 
-    let pending = CogPhase<Value>.pending(previous: lastSuccess)
+    let pending = CogMeta<Value>.pending(
+      value: lastSuccess ?? descriptor.defaultValue,
+      hasSucceeded: lastSuccess != nil
+    )
     if let pendingTurn {
-      pendingPhase = pending
+      pendingMeta = pending
       pendingTurn.touch(self)
-    } else if phase == nil {
+    } else if meta == nil {
       // A first read must synchronously return honest pending state. Nothing
-      // can already subscribe to a state with no phase, so install it now and
+      // can already subscribe to a state with no metadata, so install it now and
       // queue the named, otherwise-empty publication turn behind the active
       // graph operation without invalidating the reader that is establishing
       // its baseline.
-      phase = pending
+      meta = pending
       markChanged(at: cogs.revision)
       cogs.withSystemTurn("\(renderedName) pending") { _ in }
     } else {
@@ -264,39 +288,88 @@ internal final class AsyncCogState<Value>:
       case .idle:
         // A cold state can be pulled while a new consumer is establishing its
         // baseline. Install pending for that read and defer only its named turn;
-        // invalidating afterward would deliver the same pending phase twice.
-        phase = pending
+        // invalidating afterward would deliver the same pending metadata twice.
+        meta = pending
         markChanged(at: cogs.revision)
         cogs.withSystemTurn("\(renderedName) pending") { _ in }
       case .accumulating, .flushing:
         // A dependency-triggered reload starts as a later turn. While the
         // source turn is still flushing, readers continue to see its last
-        // completed phase; the queued pending turn invalidates them in order.
+        // completed metadata; the queued pending turn invalidates them in order.
         stage(pending, named: "pending", in: cogs)
         markChecked(at: cogs.revision)
       }
     }
 
     let operation = work.operation
+    resolveRefreshes(as: .superseded)
     let runGeneration = advanceGeneration()
+    if let refreshWaiter {
+      register(refreshWaiter, for: runGeneration)
+    }
     activeTask?.cancel()
     activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
         guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard let self, self.acceptsResult(for: runGeneration, in: cogs)
-        else { return }
+        guard let self else { return }
+        guard self.acceptsResult(for: runGeneration, in: cogs) else {
+          self.resolveRefresh(for: runGeneration, as: .superseded)
+          return
+        }
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
+        self.resolveRefresh(for: runGeneration, as: .success(value))
       } catch {
         guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard let self, !Task.isCancelled,
-          self.acceptsResult(for: runGeneration, in: cogs)
-        else { return }
-        self.publish(.failure(error, previous: self.lastSuccess), named: "failure", in: cogs)
+        guard let self else { return }
+        guard !Task.isCancelled, self.acceptsResult(for: runGeneration, in: cogs)
+        else {
+          self.resolveRefresh(for: runGeneration, as: .superseded)
+          return
+        }
+        self.publish(
+          .failure(
+            error,
+            value: self.lastSuccess ?? self.descriptor.defaultValue,
+            hasSucceeded: self.lastSuccess != nil
+          ),
+          named: "failure",
+          in: cogs
+        )
+        self.resolveRefresh(for: runGeneration, as: .failure(error))
       }
+    }
+    return runGeneration
+  }
+
+  /// Files one explicit refresh cell under the generation it must follow.
+  private func register(
+    _ waiter: CogRefreshWaiter<Value>,
+    for runGeneration: UInt64
+  ) {
+    guard refreshWaiters[runGeneration] == nil else {
+      fatalError("An async Cog created two refresh handles for one generation.")
+    }
+    refreshWaiters[runGeneration] = waiter
+  }
+
+  /// Resolves and removes the explicit handle for one generation, if present.
+  private func resolveRefresh(
+    for runGeneration: UInt64,
+    as outcome: CogRefresh<Value>.Outcome
+  ) {
+    refreshWaiters.removeValue(forKey: runGeneration)?.resolve(outcome)
+  }
+
+  /// Resolves and removes every explicit generation still awaiting a result.
+  private func resolveRefreshes(as outcome: CogRefresh<Value>.Outcome) {
+    let waiters = Array(refreshWaiters.values)
+    refreshWaiters.removeAll(keepingCapacity: false)
+    for waiter in waiters {
+      waiter.resolve(outcome)
     }
   }
 
@@ -307,9 +380,9 @@ internal final class AsyncCogState<Value>:
   /// invalidated the selector inputs since work selection. An unobserved state
   /// stays lazy when a dependency changes, so old work can finish while it is
   /// DIRTY or CHECK. Rejecting that result and preserving DIRTY forces the next
-  /// consumer to select fresh work instead of letting phase publication erase
+  /// consumer to select fresh work instead of letting metadata publication erase
   /// the pending invalidation.
-  private func acceptsResult(for runGeneration: UInt64, in cogs: Cogtext) -> Bool {
+  private func acceptsResult(for runGeneration: UInt64, in cogs: Cogs) -> Bool {
     guard generation == runGeneration, cogs.stillStoresAsyncState(self) else { return false }
     guard settleState == .clean else {
       activeTask = nil
@@ -337,32 +410,32 @@ internal final class AsyncCogState<Value>:
   /// guards any older task that outlived replacement cancellation. If graph
   /// evaluation is active, `stage` queues publication; completion never nests a
   /// turn into selector or reaction tracking.
-  private func publish(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
+  private func publish(_ metadata: CogMeta<Value>, named metadataName: String, in cogs: Cogs) {
     activeTask = nil
-    stage(phase, named: phaseName, in: cogs)
+    stage(metadata, named: metadataName, in: cogs)
   }
 
-  /// Stages one phase into a named graph-owned turn.
+  /// Stages one metadata value into a named graph-owned turn.
   ///
   /// The body only fills the pending slot and touches this source. The ordinary
   /// turn flush performs visibility, invalidation, Observation, and reactions in
   /// the same order used by application commits.
-  private func stage(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
-    cogs.withSystemTurn("\(renderedName) \(phaseName)") { turn in
-      self.pendingPhase = phase
+  private func stage(_ metadata: CogMeta<Value>, named metadataName: String, in cogs: Cogs) {
+    cogs.withSystemTurn("\(renderedName) \(metadataName)") { turn in
+      self.pendingMeta = metadata
       turn.touch(self)
     }
   }
 
-  /// Makes the staged phase visible and invalidates phase consumers atomically.
+  /// Makes the staged metadata visible and invalidates metadata consumers atomically.
   ///
-  /// Full-phase state deliberately has no equality gate: pending, success, and
+  /// Full metadata deliberately has no equality gate: pending, success, and
   /// failure are visible transitions even when their latest successful values
   /// compare equal. The `.latest` projection applies its own equality downstream.
-  func flushPendingValue(in cogs: Cogtext, at revision: CogVersion) {
-    guard let pendingPhase else { return }
-    self.pendingPhase = nil
-    phase = pendingPhase
+  func flushPendingValue(in cogs: Cogs, at revision: CogVersion) {
+    guard let pendingMeta else { return }
+    self.pendingMeta = nil
+    meta = pendingMeta
     markChanged(at: revision)
     cogs.invalidateSubscribers(of: self)
   }

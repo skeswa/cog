@@ -22,7 +22,7 @@ Four principles judge the design:
    sources after settling every dependency needed for that value.
 3. **Minimize runtime overhead:** do no more computation, allocation, or UI
    work than the result needs.
-4. **Keep state singular:** one running app has one authoritative `Cogtext`,
+4. **Keep state singular:** one running app has one authoritative `Cogs`,
    and each mutable fact represented in Cog has one writable source in it.
    Scenes, screens, and features do not create state islands or mirror
    sources.
@@ -129,7 +129,7 @@ Terms used below:
 
 - A **source** is writable state.
 - A **derived cog** computes a value from other cogs.
-- A **state** is one source or derived value in the app `Cogtext`, or in the
+- A **state** is one source or derived value in the app `Cogs`, or in the
   one isolated context of a test or preview runtime.
 - A **turn** is one outermost `commit` and the work it causes.
 - A **hot root** has a live UI, reaction, or stream consumer. A cold state does
@@ -137,7 +137,7 @@ Terms used below:
 
 A “correct read” is a value derived from all source writes in the latest
 completed turn. It does not mean outside data is always fresh: an async cog
-may be pending or showing a previous value, but `CogPhase` makes that
+may be pending or showing a previous value, but `CogMeta` makes that
 explicit. During a commit, reads through its `Writer` instead see that turn's
 staged source values, so read-modify-write stays correct.
 
@@ -160,10 +160,10 @@ The commit point is structural. Writes require the `Writer` passed into
 `commit`; when the outer body exits, Cog flushes the turn. Nested commits join
 it. A writer carries a turn ID, so saving it and calling it later fails.
 
-### 2.3 Descriptors name state; `Cogtext` stores it
+### 2.3 Descriptors name state; `Cogs` stores it
 
 A top-level declaration is a light descriptor, not a live global value. The
-app's one `Cogtext` stores the state for each descriptor and optional key; a
+app's one `Cogs` stores the state for each descriptor and optional key; a
 test or preview runtime has its own isolated context. This split gives Cog
 keyed boxes (a box plus a key finds one state), singular state (every feature
 resolves through one graph), clean tests (no process-global reset), and one
@@ -175,11 +175,11 @@ a screen identity when needed, and resets through an explicit op. One mutable
 domain fact gets one manual source; another feature may read it or derive a
 new shape, but must not mirror it into a second `ManualCog`.
 
-Production construction is guarded: the plain `Cogtext` initializer is
+Production construction is guarded: the plain `Cogs` initializer is
 `package`, so application code cannot name it at all. The app's bootstrap
-calls `Cogtext.bootstrapApp()` once, at launch; a second call fails fast in
+calls `Cogs.bootstrapApp()` once, at launch; a second call fails fast in
 debug and release builds. The `CogTesting` product adds
-`Cogtext.forTesting()`, which hands a test or preview runtime a fresh isolated
+`Cogs.forTesting()`, which hands a test or preview runtime a fresh isolated
 context as often as it asks and never registers as the production context.
 
 The two spellings differ in grammar on purpose. Creating the app's context is
@@ -190,8 +190,8 @@ ordinary value creation, so it reads as a noun phrase. Neither is spelled
 `bootstrapApp()`'s return value is the production ownership handle. The app
 keeps it and passes it into effects, services, and every scene; views receive
 that same object through the `\.cogs` environment value. Ops remain ordinary
-instance methods on `Cogtext`. There is deliberately no ambient
-`Cogtext.app`: code outside an injection chain receives the context at its
+instance methods on `Cogs`. There is deliberately no ambient
+`Cogs.app`: code outside an injection chain receives the context at its
 composition boundary, which keeps the same feature usable with an isolated
 testing context and avoids a separate missing-bootstrap trap contract.
 
@@ -244,7 +244,7 @@ Rules:
   fail in every build and show the full descriptor-and-key path. An internal
   seam lets tests inspect diagnostics without crashing the test process.
 - Synchronous selectors do not throw in v1. Use `Result` for fallible sync
-  domain work and `CogPhase` for async failures.
+  domain work and `CogMeta` for async failures.
 - `c.peek` returns a cog's current value without creating an edge — the
   untracked escape hatch for a value the selector uses but must not follow, as
   in `withLatestFrom` (§5.4). Non-tracking reads still settle: `c.peek` and the
@@ -323,14 +323,14 @@ let isNiceOutsideHere = Cog { c in
 
 The public forms are:
 
-| Declare           | Example                                  | Read                                           |
-| ----------------- | ---------------------------------------- | ---------------------------------------------- |
-| One derived value | `Cog<Bool> { ... }`                      | `c[valueReference]` → `Bool`                   |
-| A derived box     | `CogBox<Bool, ZipCode> { ... }`          | `c[box[zip]]`                                  |
-| One source        | `ManualCog<ZipCode?>(nil)`               | Read normally; write `c[valueReference] = zip` |
-| A source box      | `ManualCogBox<Weather?, ZipCode>(nil)`   | `c[box[zip]] = report`                         |
-| One async value   | `AsyncCog<Forecast?> { ... }`            | `c[valueReference]` → `Forecast?`              |
-| An async box      | `AsyncCogBox<Weather?, ZipCode> { ... }` | `c[box[zip]]`; phase via `c.phase[...]` (§5.1) |
+| Declare           | Example                                  | Read                                             |
+| ----------------- | ---------------------------------------- | ------------------------------------------------ |
+| One derived value | `Cog<Bool> { ... }`                      | `c[valueReference]` → `Bool`                     |
+| A derived box     | `CogBox<Bool, ZipCode> { ... }`          | `c[box[zip]]`                                    |
+| One source        | `ManualCog<ZipCode?>(nil)`               | Read normally; write `c[valueReference] = zip`   |
+| A source box      | `ManualCogBox<Weather?, ZipCode>(nil)`   | `c[box[zip]] = report`                           |
+| One async value   | `AsyncCog<Forecast?> { ... }`            | `c[valueReference]` → `Forecast?`                |
+| An async box      | `AsyncCogBox<Weather?, ZipCode> { ... }` | `c[box[zip]]`; metadata via `c.meta[...]` (§5.1) |
 
 Four rules keep these forms consistent:
 
@@ -343,7 +343,7 @@ Four rules keep these forms consistent:
 3. **Production kind does not change the read type.** Manual, derived, and
    async describe how a value is made. `c[...]` of an async value reference is
    an ordinary total read of `T`, resting on the declaration's default until
-   work first succeeds; the request lifecycle is read through the `phase` lens
+   work first succeeds; the request lifecycle is read through the `meta` lens
    (§5.1).
 4. **Frequent call sites stay short.** `c[...]`, `commit`, and `box[key]` are
    common. The exceptional non-tracking operation is the explicit `peek`.
@@ -361,7 +361,7 @@ initial value may also be a key-based closure.
 ### 3.2 Ops and turns
 
 ```swift
-extension Cogtext {
+extension Cogs {
     func checkWeather(_ zip: ZipCode) async throws {
         let service = read(weatherService)
 
@@ -375,21 +375,21 @@ extension Cogtext {
         }
     }
 
-    func useCurrentLocation(_ zip: ZipCode) {
-        commit { c in c[currentZipSource] = zip }
+    func selectCurrentLocation(_ zip: ZipCode) {
+        commit(currentZipSource, to: zip)
     }
 }
 ```
 
-`commit(_ name: String = #function, _ body: (Writer) -> Void)` is the only
-write primitive.
+`commit` is the only write entry point. Its scalar overload handles the common
+one-source operation; the writer overload groups related writes into one turn.
 
 - Only `Writer` can change a source. It supports read and write, so
   `c[count] += 1` works.
 - Each writer carries an unforgeable turn ID and checks that its context is
   still accumulating that turn. An escaped writer cannot be used later.
 - `#function` names the turn without extra code. An op is just a normal
-  `Cogtext` method that calls `commit`; pass a custom name only when needed.
+  `Cogs` method that calls `commit`; pass a custom name only when needed.
 - Access control decides which source value references the method may name (§4).
 
 A context has three phases:
@@ -462,20 +462,25 @@ struct WeatherCard: View {
 `cogs[valueReference]` reads through the state's registrar, so SwiftUI tracks
 that exact descriptor and key and updates the view only when one of those
 values really changes. There is no special view, hook, or property wrapper;
-the app injects its one `Cogtext` above every scene through the environment.
+the app injects its one `Cogs` above every scene through the environment.
 SwiftUI does not tell Cog when it stops watching a registrar object, so any
 state that reaches this UI boundary stays pinned to the app context (§5.3).
 
-Sources are `fileprivate`, so views cannot create raw writable bindings. The
-state file exports a domain binding:
+Sources are `fileprivate`, so views cannot name writable references. The state
+file may export an ordinary SwiftUI adapter when a control requires `Binding`:
 
 ```swift
 // WeatherState.swift
-extension Cogtext {
+extension Cogs {
+    func selectCurrentLocation(_ zip: ZipCode?) {
+        commit(currentZipSource, to: zip)
+    }
+
     var currentZipBinding: Binding<ZipCode?> {
-        binding(for: currentZipCode) { c, zip in
-            c[currentZipSource] = zip
-        }
+        Binding(
+            get: { self[currentZipCode] },
+            set: { self.selectCurrentLocation($0) }
+        )
     }
 }
 
@@ -483,9 +488,12 @@ extension Cogtext {
 TextField("ZIP", value: cogs.currentZipBinding, format: .zipCode)
 ```
 
-`binding(for:)` pairs a tracked read with a named commit, so the state file
-still lists every write path. For a one-time untracked read, use
-`cogs.peek(...)`.
+`Binding` needs no Cog-specific primitive: its getter already uses the tracked
+subscript, and its setter calls the existing domain operation. Cog therefore
+does not vend binding helpers. The single-source `commit(_:to:)` overload keeps
+that operation compact while preserving `commit` as the only write boundary.
+Multi-source and read-modify-write operations keep the writer form. For a
+one-time untracked read, use `cogs.peek(...)`.
 
 ---
 
@@ -496,15 +504,16 @@ Swift access control replaces the custom lints proposed for Dart:
 - Declare writable sources `fileprivate`, or `private` inside a type. Only
   that file or type can name them.
 - Expose `.readOnly` value references or derived cogs.
-- Put ops, bindings, and test seams beside the sources they may write.
+- Put ops, UI adapters, and test seams beside the sources they may write.
 
 Callers can use `try await cogs.checkWeather(zip)` but cannot reach
 `weatherReportSource`. A review finds every possible write by searching one
 file's commit blocks.
 
-`@testable import` cannot see `fileprivate` sources, so the owning file must
-publish narrow debug-only seed or stub methods; §6.6 shows quiet `seed`
-helpers and loud commit helpers. Making all sources `internal` would weaken
+`@testable import` cannot see `fileprivate` sources, so the owning file may
+publish narrow debug-only source capabilities. Test support imports
+`CogTesting` to seed those capabilities or calls loud commit helpers from the
+owning file; §6.6 shows both paths. Making all sources `internal` would weaken
 the rule from one file to one module.
 
 ---
@@ -513,109 +522,76 @@ the rule from one file to one module.
 
 ### 5.1 Values and work
 
-Async state uses one phase type and keeps the last good value:
+Async state uses one metadata type and keeps a renderable value in every case:
 
 ```swift
-enum Previous<Value> {
-    case none
-    case some(Value)
-}
-
-enum CogPhase<Value> {
-    case pending(previous: Previous<Value>)
+enum CogMeta<Value> {
+    case pending(value: Value, hasSucceeded: Bool)
     case success(Value)
-    case failure(any Error, previous: Previous<Value>)
+    case failure(any Error, value: Value, hasSucceeded: Bool)
 
-    var latestValue: Value? { ... }
-    var value: Value? { ... }
+    var value: Value { ... }
+    var hasSucceeded: Bool { ... }
     var error: (any Error)? { ... }
     var isLoading: Bool { ... }
-    var isInitialLoading: Bool { ... }
-    var isReloading: Bool { ... }
 }
 ```
 
-The phase is how uncertainty stays explicit, but it is not how an async cog
+Metadata is how uncertainty stays explicit, but it is not how an async cog
 is normally read. Reading an async cog is total: `c[...]` returns `Value` —
 the last accepted success, or the declaration's resting default before any
 generation has succeeded — so sync and async cogs read identically wherever
-only the value matters. The request lifecycle moves behind the `phase` lens
+only the value matters. The request lifecycle moves behind the `meta` lens
 on the same read capability, and consumers opt into it exactly where they
 render the request itself.
 
-There is no public `initial` phase. Before first use, an async state does not
-exist in the context and has no phase to observe. The first read through
+There is no public `initial` case. Before first use, an async state does not
+exist in the context and has no metadata to observe. The first read through
 either spelling creates the state, starts its work, and publishes
-`.pending(previous: .none)` as a turn; a phase read returns that pending
-phase, while a value read returns the resting default the declaration vouched
-for. This keeps the first observable state honest: work has begun, no value
-has completed yet, and the only value shown is one the author chose for
-exactly that moment.
+`.pending(value: default, hasSucceeded: false)` as a turn; a metadata read
+returns that pending case, while a value read returns the same resting default
+the declaration vouched for. This keeps the first observable state honest:
+work has begun, no value has completed yet, and the only value shown is one
+the author chose for exactly that moment.
 
 Every read spelling follows that rule. A non-tracking `c.peek` or one-shot
 `cogs.peek` of a never-read async value reference creates its state, runs its
 synchronous selector, starts exactly one generation, publishes the initial
 pending turn, and returns its spelling's view of it — the resting default
-from a value peek, the pending phase from a `phase` peek. It records no
+from a value peek, the pending metadata from a `meta` peek. It records no
 dependency, subscription, or Observation boundary. Refreshing a never-read
 value reference is the same single initial load: it is not a no-op, and it
 does not create the state only to replace and cancel that first run. Once a
 state exists, refresh follows the replacement policy in §5.2.
 
-`Previous` keeps “no previous value” distinct from “the previous value was
-nil.” With a plain `Value?`, that distinction would hide in a nested optional
-whenever `Value` is itself optional, and a bare `nil` would be ambiguous at
-use sites. `latestValue` still returns `Value?`; its outer layer answers “is
-there a latest value at all.” There is no failure type parameter in v1; typed
-throws may add one once the required Swift and OS versions are practical.
+`value` answers “what should be on screen” in every case: the current or
+retained success, resting on the declared default until one exists.
+`hasSucceeded` keeps optional values honest: when `Value == Optional<T>`, a
+`nil` value plus `false` means the resting default, while the same `nil` plus
+`true` means an accepted successful `nil`. This is stronger and flatter than
+a nested `Previous<Value>` wrapper and eliminates the weaker optional-valued
+metadata accessors. `error` is non-`nil` only for the current failure, while
+`isLoading` and `hasSucceeded` remain orthogonal. A full `switch` remains the
+tool for rendering the whole process. There is no failure type parameter in
+v1; typed throws may add one once the required Swift and OS versions are
+practical.
 
-The accessors form a deliberately complete narrowing surface, so code that
-needs one fact reads it with `if let` or a boolean instead of matching through
-`Previous`. `latestValue` answers “what should be on screen”: the current or
-retained success, through pending and failure alike. `value` and `error`
-answer “how did the current generation end”: `value` is that generation’s
-success and nothing else, `error` is its failure and nothing else, so a reload
-retrying after a failure reports neither. `isInitialLoading` and `isReloading`
-split `isLoading` by retained success — a first load with nothing to show
-versus a reload still showing the last good value — the same distinction Solid
-(`pending`/`refreshing`) and Angular (`loading`/`reloading`) promote to whole
-states. When `Value` is itself optional, `value` nests exactly like
-`latestValue`: the outer optional reports whether the current generation
-succeeded. A full `switch` remains the tool for rendering the whole process;
-the accessors remove ceremony only where one case matters.
-
-Total reads rest on a declared default, which is a required invariant but an
-omittable argument. `init(default:)` states a resting value explicitly; when
-`Value` conforms to `CogDefaultable`, the argument may be dropped and the
-type supplies it:
-
-```swift
-protocol CogDefaultable {
-    static var cogDefault: Self { get }
-}
-extension Optional: CogDefaultable {
-    static var cogDefault: Self { nil }
-}
-```
-
-The library conforms only `Optional`, resting at `nil`, so declaring the
-value optional is the entire spelling for “nothing until the first success.”
-Blanket conformances for collections or numbers are deliberately absent: a
-process-wide “every array rests at empty” would install the dishonest empty
-state everywhere at once. An app may conform its own domain types when a
-resting value renders honestly (`Settings.cogDefault = .standard`), which is
-the `EnvironmentKey.defaultValue` philosophy: the type's author vouches once.
-Declaring a non-conforming value without `default:` is a compile-time error
-whose diagnostic names both ways out. Choose defaults whose rendering is
-honest while work is in flight — a zero unread count reads truthfully during
-a first load; an empty message list claims an answer nobody has yet, and
-belongs behind an optional instead.
+Total reads rest on an explicit declared default. Every async declaration
+spells `default:`, including optional values, which use `default: nil`. The
+argument makes the rendering invariant visible where the request is declared
+without adding a protocol or hidden type-wide behavior. Choose defaults whose
+rendering is honest while work is in flight — a zero unread count reads
+truthfully during a first load; an empty message list claims an answer nobody
+has yet, and belongs behind an optional instead.
 
 An async selector is synchronous and tracked. It reads dependencies, then
 returns a description of async work:
 
 ```swift
-let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(.latest) { c, zip in
+let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(
+    .latest,
+    default: nil
+) { c, zip in
     let service = c[weatherService]
     return .run { try await service.weather(for: zip) }
 }
@@ -633,34 +609,35 @@ starts, so no read can silently stop tracking after an `await`. Changing a
 dependency reruns the selector and creates new work; the policy in §5.2
 decides what happens to the old work.
 
-Read the value normally, or opt into the lifecycle through the `phase` lens:
+Read the value normally, or opt into the lifecycle through the `meta` lens:
 
 ```swift
 c[fetchedWeather[zip]]          // Weather? — total value read
-c.phase[fetchedWeather[zip]]    // CogPhase<Weather?> — the request itself
+c.meta[fetchedWeather[zip]]    // CogMeta<Weather?> — the request itself
 ```
 
 Every read capability carries the same pair: `c[...]`, `c.peek(...)`, and
-`cogs.watch(...)` read and observe the value, while `c.phase[...]`,
-`c.phase.peek(...)`, and `cogs.phase.watch(...)` read and observe the phase,
+`cogs.watch(...)` read and observe the value, while `c.meta[...]`,
+`c.meta.peek(...)`, and `cogs.meta.watch(...)` read and observe the metadata,
 with identical demand, tracking, and lifetime rules. The lens exists only for
-async references — asking a synchronous cog for a phase is a compile-time
+async references — asking a synchronous cog for metadata is a compile-time
 error, not a degenerate success. Value consumers are equality-gated when
 `Value` is `Equatable`: a reload that succeeds with an equal value still
-shows phase consumers its pending and success turns, but leaves value
+shows metadata consumers its pending and success turns, but leaves value
 consumers quiet. The value read therefore lets downstream code treat a manual
 `Weather?` and an async weather value as the same shape. Use `AsyncCog` for
-async derived state and an op for an imperative action; a forced refresh can
-be an op such as `cogs.refresh(fetchedWeather[zip])`.
+async derived state and an op for an imperative action. A forced refresh
+returns a `CogRefresh` handle whose `outcome` belongs to that exact generation:
+success and failure resolve after their publication turn, replacement resolves
+as `superseded`, and state release resolves as `released`. The handle never
+waits for or reports a later generation.
 
-Reading the value beside the phase is the normal shape for request chrome — a
-card shows the last good reading and the request's progress at once, each
-through its own spelling. The pair costs one render: an observer's one-shot
-tracking session fires once per turn no matter how many of its facets mutate,
-and a real `body` can never run mid-flush, because the flush is synchronous
-on the MainActor. The two facets must still never share a subscription
-target — a shared target would notify value-only consumers on the pending and
-equal-success turns that equality gating keeps quiet.
+One metadata read is the normal shape for request chrome: `meta.value` shows
+the retained or resting content while the neighboring flags and error describe
+the request. Code that needs only the equality-gated value keeps the plain
+`c[...]` spelling and stays quiet for pending, failure with an unchanged value,
+and equal success. Those two read paths remain separate subscription targets so
+value-only consumers do not inherit metadata traffic.
 
 ### 5.2 Scheduling policies
 
@@ -676,8 +653,8 @@ cancellation, so every run gets a generation number, and the MainActor commits
 a result only if that generation is still current.
 
 Each visible pending, success, or failure state is a turn. Replacing cancelled
-work does not publish a failure; a future explicit cancel API must define the
-phase it writes.
+work does not publish a failure; the replaced `CogRefresh` handle resolves as
+`superseded`.
 
 True exhaust behavior drops events while busy. A derived value cannot forget
 dependency changes and still represent current state, so `.exhaustLatest`
@@ -724,9 +701,9 @@ State lifetime depends on state kind:
   reliable observer-removal hook. Reactions and exported streams have exact
   lease tokens and may release normally.
 
-Public lifetime terms are `app`, `whileObserved(grace:)`, and `cache(...)`;
-`keepAlive` is only sugar for `.app`. If UI-pinned keyed growth becomes a
-measured problem, an optional `DynamicProperty` can own an exact view lease.
+Lifetime follows state kind rather than a declaration convenience flag. If
+UI-pinned keyed growth becomes a measured problem, an optional
+`DynamicProperty` can own an exact view lease.
 
 A declaration that selects `whileObserved` without an explicit grace uses its
 context's default. Production contexts use 30 seconds: long enough to absorb
@@ -842,43 +819,43 @@ singular, and does measurement show less runtime work?
 
 ### Settled
 
-| Question                          | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Keyed and keyless API?            | Boxes make value references; keyless cogs are pre-bound value references. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are value references over internal final-class descriptors (§2.3, §3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Writes from derived computation?  | A derived computation is read-only from selector entry through dependency reconciliation, custom equality, and result publication. Any commit attempted in that region fails immediately in every build, before the commit body runs or that attempt mutates graph state, and names the derived cog/key plus the attempted turn. Invoke the op outside derived computation, from event handling or a reaction (§2.4, §3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Async value shape?                | Async reads are total and value-first: `c[valueReference]` returns `Value` — the last accepted success, resting on the declaration's default before one exists — and the request lifecycle is read through the `phase` lens (`c.phase[...]`), which exists only for async references. The default is a required invariant but an omittable argument: `init(default:)` states it, or `Value: CogDefaultable` supplies it, and the library conforms only `Optional` (resting `nil`). `CogPhase` begins publicly at `pending`—there is no observable `initial` phase—and uses an explicit `Previous` case to distinguish “no previous value” from “previous value was nil.” A complete accessor set — `latestValue`, `value`, `error`, `isLoading`, `isInitialLoading`, `isReloading` — narrows one fact with `if let` or a boolean instead of a `switch` through `Previous` (§5.1). |
-| Never-read async demand?          | A non-tracking peek or refresh creates the state and starts exactly one initial generation at `pending(previous: .none)` without installing a dependency, subscription, or Observation boundary. The call is transient demand: it renews the ordinary `whileObserved` grace window but does not retain work through completion, and expiry cancels, advances the generation, releases, and rejects late results (§5.1, §5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Default async policy?             | `.latest` (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Effect lifecycle?                 | Explicit `install(in:)` returns an idempotent final-class `EffectGroup`. Cancellation is terminal and shared across copies: adding a reaction token afterward synchronously cancels it before `add` returns without retaining it; a task requested afterward is already cancelled when `task` returns. Neither operation reopens the group (§6.2–§6.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug turn-chain guard reports long causal chains through a testable diagnostic seam (§6.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Reaction registration in a flush? | Do not run the new reaction reentrantly. Append its initial tracking run to the tail of the current flush's reaction queue, in registration order: after reactions already scheduled for that turn and before queued write-back turns begin (§3.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Test seeding?                     | Debug-only `seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions (§6.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock (§5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| State graph count?                | One app-wide `Cogtext`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Untracked reads?                  | `c.peek` and one-shot `cogs.peek` skip the dependency edge but still settle the value they return; an untracked read is never stale. Peeking a `whileObserved` synchronous derived or async state is transient demand that renews ordinary grace without installing a durable consumer (§2.4, §5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Read spelling?                    | Use `c[valueReference]` for tracked selector and reaction reads, `cogs[valueReference]` for tracked UI reads, and `c.peek(...)` or `cogs.peek(...)` for non-tracking reads. Async phases read through the `phase` lens on the same capability — `c.phase[...]`, `cogs.phase[...]`, `c.phase.peek(...)`, `cogs.phase.watch(...)` — with the same tracking, demand, and lifetime rules as the value spelling beside it. Commit closures also call their `Writer` parameter `c`; its distinct type makes the same subscript expose and stage the active turn's values (§2.3, §3.2, §3.4, §5.1).                                                                                                                                                                                                                                                                                      |
-| Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Context construction?             | App bootstrap calls `Cogtext.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Bootstrap helper names?           | `Cogtext.bootstrapApp()`, vended by `Cog`, creates the one production context and fails fast on a second call; `Cogtext.forTesting()`, vended by `CogTesting`, returns a fresh isolated context as often as a test or preview asks. A `package` initializer leaves those two as the only ways in, and separating them by product rather than by an argument keeps the test factory out of a shipping app target (§2.3, §6.3, §6.6).                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Production context access?        | `bootstrapApp()` returns the ownership handle; the app passes it into effects, services, and scenes, and views receive it through `\.cogs`. Ops are `Cogtext` instance methods. There is no ambient `Cogtext.app`, so production and isolated tests use the same explicit composition boundaries (§2.3, §3.2, §3.4, §6.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Production-install test fixture?  | `CogTesting` vends a synchronous MainActor `withBootstrappedApp` scope plus narrow install predicates. It calls the real bootstrap and removes the registration in `defer`; it is deliberately not async, so parallel tests cannot interleave through process-global install state (§2.3; impl scenarios constraint 3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Testing posture?                  | Fully optimistic (every wait is a definite injected signal: clocks, continuations, acknowledgements), as fast and cheap as possible (host-first; simulators only at the device boundary; injected time everywhere, including `whileObserved` grace), and as implementation agnostic as possible (public API, then `CogTesting`, then debug history, then named diagnostic seams; the behavior suite passes unchanged across core swaps). Normative statement in impl/scenarios.md.                                                                                                                                                                                                                                                                                                                                                                                                |
-| Trap spelling?                    | Fail-fast traps use `fatalError`, never `preconditionFailure`. The standard library drops `preconditionFailure`'s message under `-O`, so the process traps with no explanation and a promise of "a clear error … in release builds" (ONE-02, TURN-07, CYCLE-01, CYCLE-02) could not be kept. Measured on Apple Swift 6.3: under `-Onone` both spellings print; under `-O` only `fatalError` does, including under `-Ounchecked`. An exit test proving a trap asserts on the child process's standard error, not merely its exit status.                                                                                                                                                                                                                                                                                                                                           |
-| Generic class `deinit`?           | Every generic class in the library writes an explicit `nonisolated deinit`. Under `.defaultIsolation(MainActor.self)` a _synthesized_ `deinit` on a generic class is main-actor-isolated, and Apple Swift 6.3.0 and 6.3.3 both crash the optimizer on it (SIGSEGV in `EarlyPerfInliner`) in release configuration only. Debug builds are unaffected, so only a release build catches a regression — `mise run test:release` is the guard, and it runs in CI. The rule is independently correct, since these deinits only release their own stored properties and the classes are never `Sendable`. Revisit when the toolchain fixes it.                                                                                                                                                                                                                                           |
-| Implementation execution?         | Dependency-aware half-day tasks, each typed as a decision, infrastructure slice, red-green behavior slice, gate, or single publication step. Every task names its dependencies and closing verification and ends green; representation changes integrate incrementally, and releases separate non-mutating preparation from publication. Normative statement in impl/tasks.md.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Question                          | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Keyed and keyless API?            | Boxes make value references; keyless cogs are pre-bound value references. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are value references over internal final-class descriptors (§2.3, §3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Writes from derived computation?  | A derived computation is read-only from selector entry through dependency reconciliation, custom equality, and result publication. Any commit attempted in that region fails immediately in every build, before the commit body runs or that attempt mutates graph state, and names the derived cog/key plus the attempted turn. Invoke the op outside derived computation, from event handling or a reaction (§2.4, §3.2).                                                                                                                                                                                                                                                                                                          |
+| Consistent updates?               | Lazy pull for reads; settle hot roots before push notices (§2.2, §3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Key flow?                         | Normal lexical capture in a `CogBox` closure (§3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Async value shape?                | Async reads are total and value-first: `c[valueReference]` returns `Value` — the last accepted success, resting on the declaration's explicit `default:` before one exists — and the request lifecycle is read through the `meta` lens (`c.meta[...]`), which exists only for async references. Optional values spell `default: nil`; there is no default protocol or argument omission. `CogMeta` begins publicly at `pending`—there is no observable `initial` case. Pending and failure carry a total `value` plus `hasSucceeded`, which distinguishes a resting optional `nil` from an accepted successful `nil` without a nested wrapper. The focused accessor set is `value`, `hasSucceeded`, `error`, and `isLoading` (§5.1). |
+| Never-read async demand?          | A non-tracking peek or refresh creates the state and starts exactly one initial generation at `pending(value: default, hasSucceeded: false)` without installing a dependency, subscription, or Observation boundary. The call is transient demand: it renews the ordinary `whileObserved` grace window but does not retain work through completion, and expiry cancels, advances the generation, releases, rejects late results, and resolves an exact refresh handle as `released` (§5.1, §5.3).                                                                                                                                                                                                                                    |
+| Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Default async policy?             | `.latest`. `refresh` returns an exact-generation `CogRefresh`: accepted publication resolves as success or failure, replacement as `superseded`, and lifetime removal as `released` (§5.1–§5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Effect lifecycle?                 | `Cogs.effects` owns app-lifetime reactions and tasks, so the app entry point retains one runtime object. A shorter-lived feature owns an idempotent final-class `EffectGroup`. Group cancellation is terminal and shared across copies: adding a reaction token afterward synchronously cancels it before `add` returns without retaining it; a task requested afterward is already cancelled when `task` returns. Neither operation reopens the group (§6.2–§6.3).                                                                                                                                                                                                                                                                  |
+| Writes from reactions?            | Queue a new turn after the current flush; never re-enter. A debug turn-chain guard reports long causal chains through a testable diagnostic seam (§6.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Reaction registration in a flush? | Do not run the new reaction reentrantly. Append its initial tracking run to the tail of the current flush's reaction queue, in registration order: after reactions already scheduled for that turn and before queued write-back turns begin (§3.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Test seeding?                     | Debug-only `CogTesting.seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions. Apps importing only `Cog` cannot seed (§6.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock (§5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| State graph count?                | One app-wide `Cogs`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Untracked reads?                  | `c.peek` and one-shot `cogs.peek` skip the dependency edge but still settle the value they return; an untracked read is never stale. Peeking a `whileObserved` synchronous derived or async state is transient demand that renews ordinary grace without installing a durable consumer (§2.4, §5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Read spelling?                    | Use `c[valueReference]` for tracked selector and reaction reads, `cogs[valueReference]` for tracked UI reads, and `c.peek(...)` or `cogs.peek(...)` for non-tracking reads. Async metadata reads through the `meta` lens on the same capability — `c.meta[...]`, `cogs.meta[...]`, `c.meta.peek(...)`, `cogs.meta.watch(...)` — with the same tracking, demand, and lifetime rules as the value spelling beside it. Commit closures also call their `Writer` parameter `c`; its distinct type makes the same subscript expose and stage the active turn's values (§2.3, §3.2, §3.4, §5.1).                                                                                                                                           |
+| Export buffer overflow?           | `.newest(1)` may skip turns for a slow reader; `.oldest(n)` delivers the oldest n in order and drops newer while full; `.unbounded` delivers everything. Commits never wait on readers (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Context construction?             | App bootstrap calls `Cogs.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Bootstrap helper names?           | `Cogs.bootstrapApp()`, vended by `Cog`, creates the one production context and fails fast on a second call; `Cogs.forTesting()`, vended by `CogTesting`, returns a fresh isolated context as often as a test or preview asks. A `package` initializer leaves those two as the only ways in, and separating them by product rather than by an argument keeps the test factory out of a shipping app target (§2.3, §6.3, §6.6).                                                                                                                                                                                                                                                                                                        |
+| Production context access?        | `bootstrapApp()` returns the ownership handle; the app passes it into effects, services, and scenes, and views receive it through `\.cogs`. Ops are `Cogs` instance methods. There is no ambient `Cogs.app`, so production and isolated tests use the same explicit composition boundaries (§2.3, §3.2, §3.4, §6.3).                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Production-install test fixture?  | `CogTesting` vends a synchronous MainActor `withBootstrappedApp` scope plus narrow install predicates. It calls the real bootstrap and removes the registration in `defer`; it is deliberately not async, so parallel tests cannot interleave through process-global install state (§2.3; impl scenarios constraint 3).                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Testing posture?                  | Fully optimistic (every wait is a definite injected signal: `CogTesting.TestClock`, continuations, exact refresh handles, or narrow acknowledgements), as fast and cheap as possible (host-first; simulators only at the device boundary; injected time everywhere, including `whileObserved` grace), and as implementation agnostic as possible (public API, then `CogTesting`, then debug history, then named diagnostic seams; the behavior suite passes unchanged across core swaps). Normative statement in impl/scenarios.md.                                                                                                                                                                                                  |
+| Trap spelling?                    | Fail-fast traps use `fatalError`, never `preconditionFailure`. The standard library drops `preconditionFailure`'s message under `-O`, so the process traps with no explanation and a promise of "a clear error … in release builds" (ONE-02, TURN-07, CYCLE-01, CYCLE-02) could not be kept. Measured on Apple Swift 6.3: under `-Onone` both spellings print; under `-O` only `fatalError` does, including under `-Ounchecked`. An exit test proving a trap asserts on the child process's standard error, not merely its exit status.                                                                                                                                                                                              |
+| Generic class `deinit`?           | Every generic class in the library writes an explicit `nonisolated deinit`. Under `.defaultIsolation(MainActor.self)` a _synthesized_ `deinit` on a generic class is main-actor-isolated, and Apple Swift 6.3.0 and 6.3.3 both crash the optimizer on it (SIGSEGV in `EarlyPerfInliner`) in release configuration only. Debug builds are unaffected, so only a release build catches a regression — `mise run test:release` is the guard, and it runs in CI. The rule is independently correct, since these deinits only release their own stored properties and the classes are never `Sendable`. Revisit when the toolchain fixes it.                                                                                              |
+| Implementation execution?         | Dependency-aware half-day tasks, each typed as a decision, infrastructure slice, red-green behavior slice, gate, or single publication step. Every task names its dependencies and closing verification and ends green; representation changes integrate incrementally, and releases separate non-mutating preparation from publication. Normative statement in impl/tasks.md.                                                                                                                                                                                                                                                                                                                                                       |
 
 ### Still open
 
@@ -893,24 +870,24 @@ keeps its slot and points at the table above instead of renumbering the rest.
 3. **Deferred reactions:** synchronous ordered flush and the write-back queue
    are settled. An optional next-tick `.deferred` mode may or may not earn its
    complexity.
-4. **App bootstrap:** settled on August 11, 2026 as `Cogtext.bootstrapApp()`
-   and `Cogtext.forTesting()`, with explicit ownership/injection and the scoped
+4. **App bootstrap:** settled on August 11, 2026 as `Cogs.bootstrapApp()`
+   and `Cogs.forTesting()`, with explicit ownership/injection and the scoped
    `CogTesting` production-install fixture. See "Bootstrap helper names?",
    "Production context access?", and "Production-install test fixture?"
    above.
-5. **Debug history UI:** the bounded log records ops, writes, recomputations,
-   and notices. Labels are settled. Display may be `os_log`, an in-app
-   inspector, or another developer tool.
+5. **Debug history UI:** the structured bounded snapshot records ops, writes,
+   recomputations, and notices. Cog does not vend a logging convenience;
+   display may be an in-app inspector or another developer tool.
 6. **Dart and Flutter:** decide later whether a proven Swift model should feed
    descriptor, lazy-pull, and lexical-key choices back into Dart.
 7. **Persistence helpers:** durable state writes the store first and its cog
    second (§6.7). Open whether this needs `PersistedCog` sugar or stays an op
    pattern, and when GRDB observation should replace seeding.
-8. **Stream termination:** what a `.stream` cog's phase does when its
+8. **Stream termination:** what a `.stream` cog's metadata does when its
    sequence ends naturally — stay at the last success forever, or something
    observable.
 9. **Stream failure:** whether a `.stream` sequence that throws publishes a
-   failure phase. §5.2 defines only the replaced-cancelled case.
+   failure metadata. §5.2 defines only the replaced-cancelled case.
 10. **`.queue` failure:** whether a failed queued run stops the queue or the
     next queued run still starts.
 11. **Writes from a selector:** settled on August 12, 2026. A commit attempted
@@ -940,6 +917,30 @@ keeps its slot and points at the table above instead of renumbering the rest.
     accidental action read. M2 ships no warning; actions use `cogs.peek`.
     Revisit only when a public tracking-presence API can make the diagnostic
     exact without a wrapper or private SPI. See §7.
+18. **Async lifecycle surface:** settled on August 13, 2026. The only public
+    lifecycle lens is `meta`; the weaker `phase` lens is removed. `CogMeta`
+    carries a total value plus `hasSucceeded`, so optional success remains
+    distinguishable without `Previous` or optional-valued accessors. See
+    "Async value shape?" above.
+19. **App runtime name and ownership:** settled on August 13, 2026. `Cogs` is
+    the public app runtime and the object application code retains, injects,
+    reads, writes, and installs app-lifetime effects through. The implementation
+    context is not a second public concept. See "State graph count?",
+    "Context construction?", and "Effect lifecycle?" above.
+20. **SwiftUI binding boundary:** settled on August 13, 2026. Cog vends no
+    binding helper. Application code constructs ordinary SwiftUI bindings whose
+    getter uses the tracked subscript and whose setter calls a domain operation.
+    `commit(_:to:name:)` is the compact single-source form; the writer form
+    remains the multi-write primitive. See §3.4 and §4.
+21. **Refresh completion:** settled on August 13, 2026. `refresh` returns a
+    `CogRefresh` whose outcome follows exactly the generation that call
+    started: success, failure, superseded, or released. It never drifts to a
+    later generation. See "Default async policy?" above.
+22. **Controllable time:** settled on August 13, 2026. `CogTesting.TestClock`
+    is the reusable test-time implementation for application scheduling and
+    Cog-owned lifetime grace. It supports concurrent deadline sleeps and
+    bounded acknowledgement that work has scheduled its next sleep. See
+    "Testing posture?" above.
 
 ---
 

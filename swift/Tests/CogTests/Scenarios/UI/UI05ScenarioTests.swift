@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 @Test func `UI-05 only states read through the UI boundary allocate boundary objects`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(2)
   let interior = Cog<Int> { c in c[source] * 3 }
   let displayed = Cog<String> { c in "value: \(c[interior])" }

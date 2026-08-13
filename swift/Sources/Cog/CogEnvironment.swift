@@ -5,9 +5,9 @@ public import SwiftUI
 /// A fabricated default context would split state from the graph bootstrapped
 /// by the app. Keeping the default `nil` lets the public accessor fail with
 /// installation guidance instead.
-private struct CogtextEnvironmentKey: EnvironmentKey {
+private struct CogsEnvironmentKey: EnvironmentKey {
   /// `nil` is a deliberate missing-installation sentinel, not a usable graph.
-  nonisolated static var defaultValue: Cogtext? { nil }
+  nonisolated static var defaultValue: Cogs? { nil }
 }
 
 extension EnvironmentValues {
@@ -16,16 +16,16 @@ extension EnvironmentValues {
   /// Keeping this fileprivate prevents views from bypassing the fail-fast
   /// ``cogs`` accessor or installing `nil` accidentally.
   @MainActor
-  fileprivate var installedCogs: Cogtext? {
-    get { self[CogtextEnvironmentKey.self] }
-    set { self[CogtextEnvironmentKey.self] = newValue }
+  fileprivate var installedCogs: Cogs? {
+    get { self[CogsEnvironmentKey.self] }
+    set { self[CogsEnvironmentKey.self] = newValue }
   }
 }
 
 extension EnvironmentValues {
   /// The app-wide Cog context installed above this view hierarchy.
   ///
-  /// At app launch, keep the value returned by ``Cogtext/bootstrapApp()`` and
+  /// At app launch, keep the value returned by ``Cogs/bootstrapApp()`` and
   /// install it above every scene:
   ///
   /// ```swift
@@ -35,7 +35,7 @@ extension EnvironmentValues {
   /// }
   /// ```
   ///
-  /// Tests and previews inject their isolated `Cogtext.forTesting()` context
+  /// Tests and previews inject their isolated `Cogs.forTesting()` context
   /// through the same environment key.
   ///
   /// Reading this property does not itself read graph state or establish a Cog
@@ -48,14 +48,14 @@ extension EnvironmentValues {
   /// - Important: A missing installation traps in debug and release rather
   ///   than creating a second state island.
   @MainActor
-  public var cogs: Cogtext {
+  public var cogs: Cogs {
     guard let cogs = installedCogs else {
       fatalError(
         """
         No Cog context is installed in this view hierarchy. Keep the context \
-        returned by `Cogtext.bootstrapApp()` and inject it above every scene with \
+        returned by `Cogs.bootstrapApp()` and inject it above every scene with \
         `.cogEnvironment(cogs)`. Tests and previews should inject their \
-        isolated `Cogtext.forTesting()` context through the same boundary.
+        isolated `Cogs.forTesting()` context through the same boundary.
         """
       )
     }
@@ -67,7 +67,7 @@ extension View {
   /// Installs the app-wide Cog context above a SwiftUI view hierarchy.
   ///
   /// Call this at the composition root with the single context returned by
-  /// ``Cogtext/bootstrapApp()``. Descendants inherit that exact reference, so
+  /// ``Cogs/bootstrapApp()``. Descendants inherit that exact reference, so
   /// multiple scenes share one authoritative graph. Tests and previews may use
   /// their one isolated testing context instead.
   ///
@@ -78,7 +78,7 @@ extension View {
   /// - Returns: A view whose descendants resolve ``EnvironmentValues/cogs`` to
   ///   that exact context.
   @MainActor
-  public func cogEnvironment(_ cogs: Cogtext) -> some View {
+  public func cogEnvironment(_ cogs: Cogs) -> some View {
     environment(\.installedCogs, cogs)
   }
 }

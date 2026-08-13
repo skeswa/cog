@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-extension Cogtext {
+extension Cogs {
   fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
     commit("reaction.writeback") { c in c[source] = value }
   }
@@ -14,7 +14,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-01 run performs its initial tracking run immediately`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -28,7 +28,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-02 changing a dependency wakes the reaction`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -44,7 +44,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-03 an unrelated turn leaves the reaction quiet`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let observed = ManualCog<Int>(1)
   let unrelated = ManualCog<Int>(10)
   var runs = 0
@@ -62,7 +62,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-04 dependencies settle before the reaction body starts`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var events: [String] = []
   let doubled = Cog<Int> { c in
@@ -85,7 +85,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-05 changed reactions run in registration order`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var order: [Int] = []
 
@@ -111,7 +111,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-06 every run replaces the reaction dependency set`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let useX = ManualCog<Bool>(true)
   let x = ManualCog<Int>(1)
   let y = ManualCog<Int>(10)
@@ -137,7 +137,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-07 a changed reaction completes before commit returns`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var observed = -1
 
@@ -155,7 +155,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-23 flush-time registrations join the reaction queue tail`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let writeback = ManualCog<Int>(0)
   var events: [String] = []
@@ -212,7 +212,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-15 an op called by a reaction becomes a later turn`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let followup = ManualCog<Int>(0)
   var snapshots: [String] = []
@@ -237,7 +237,7 @@ extension Cogtext {
 
 @MainActor
 @Test func `REACT-16 reaction write-back chains drain settled and FIFO`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let middle = ManualCog<Int>(0)
   let side = ManualCog<Int>(0)

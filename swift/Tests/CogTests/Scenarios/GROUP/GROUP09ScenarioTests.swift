@@ -17,7 +17,7 @@ private actor EffectGroupDropper {
 
 @MainActor
 @Test func `GROUP-09 background group release acknowledges MainActor cleanup`() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
   let group = EffectGroup()

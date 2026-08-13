@@ -10,7 +10,7 @@ import Testing
 @Test func `READ-02 a second read of a derived cog uses the cache`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let price = ManualCog<Int>(7)
   let quantity = ManualCog<Int>(3)
   let total = Cog<Int> { c in
@@ -28,7 +28,7 @@ import Testing
 @Test func `READ-02 any number of reads with nothing changing is still one run`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(5)
   let doubled = Cog<Int> { c in
     runs += 1
@@ -49,7 +49,7 @@ import Testing
   // computing its shared parent twice.
   var sharedRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(4)
   let shared = Cog<Int> { c in
     sharedRuns += 1
@@ -71,7 +71,7 @@ import Testing
   // that computed `nil` has run, and reading it again must not run it again.
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let rawZip = ManualCog<String>("")
   let currentZip = Cog<String?> { c in
     runs += 1
@@ -91,8 +91,8 @@ import Testing
   // a value another test's context can hand back.
   var runs = 0
 
-  let first = Cogtext.forTesting()
-  let second = Cogtext.forTesting()
+  let first = Cogs.forTesting()
+  let second = Cogs.forTesting()
   let source = ManualCog<Int>(6)
   let doubled = Cog<Int> { c in
     runs += 1
@@ -114,7 +114,7 @@ import Testing
 @Test func `READ-03 one commit presents two changed sources as one settled pair`() {
   var pairsSeen: [String] = []
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let left = ManualCog<Int>(1)
   let right = ManualCog<Int>(10)
   let pair = Cog<String> { c in

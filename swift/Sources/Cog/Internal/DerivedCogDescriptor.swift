@@ -12,9 +12,8 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// Whether states of this declaration are releasable when unobserved.
   ///
-  /// Synchronous derived values default to `whileObserved` because Cog can
-  /// recompute them. The public `keepAlive` declaration sugar instead stores
-  /// `app`; the lifetime engine uses this policy when it schedules release.
+  /// Synchronous derived values use `whileObserved` because Cog can recompute
+  /// them; the lifetime engine uses this policy when it schedules release.
   let lifetime: CogStateLifetime
 
   /// How a state of this declaration computes its value.

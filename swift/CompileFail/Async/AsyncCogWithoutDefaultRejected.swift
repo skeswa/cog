@@ -1,10 +1,8 @@
 // scenario: ASYNC-34
 //
 // An async cog always has a resting value, and a declaration that supplies
-// none does not compile. The rejection is a deliberate diagnostic, not an
-// opaque overload failure: an unavailable initializer catches the mistake and
-// names both ways out — pass `default:`, or make the value `Optional` so it
-// rests at `nil` through the library's one `CogDefaultable` conformance.
+// none does not compile. The required argument makes the invariant visible at
+// every declaration site, including when the value is optional.
 //
 // The legal spellings appear alongside the rejected one, so this fixture also
 // proves the diagnostic is about the missing default rather than the
@@ -18,13 +16,13 @@ enum AsyncCogWithoutDefaultRejected {
 
   /// A keyless declaration with no default and no conformance is rejected.
   static func declaresKeylessWithoutADefault() {
-    // expect-error: an async cog needs a resting value
+    // expect-error: missing argument for parameter 'default' in call
     _ = AsyncCog<Reading> { _ in .run { Reading() } }
   }
 
   /// A keyed declaration is rejected the same way.
   static func declaresKeyedWithoutADefault() {
-    // expect-error: an async cog needs a resting value
+    // expect-error: missing argument for parameter 'default' in call
     _ = AsyncCogBox<Reading, Int> { _, _ in .run { Reading() } }
   }
 
@@ -33,8 +31,8 @@ enum AsyncCogWithoutDefaultRejected {
     _ = AsyncCog<Reading>(default: Reading()) { _ in .run { Reading() } }
   }
 
-  /// Resting an `Optional` at `nil` is the other.
+  /// An `Optional` states its resting `nil` explicitly too.
   static func declaresAnOptionalRestingAtNil() {
-    _ = AsyncCog<Reading?> { _ in .run { Reading() } }
+    _ = AsyncCog<Reading?>(default: nil) { _ in .run { Reading() } }
   }
 }

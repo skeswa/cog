@@ -26,8 +26,8 @@ struct WeatherCard: View {
 /// no such constraint and read the environment normally.
 struct WeatherCardContent: View {
   /// The context whose Observation boundaries this body registers.
-  let cogs: Cogtext
-  /// The exact keyed phase and derivations this body tracks.
+  let cogs: Cogs
+  /// The exact keyed metadata and derivations this body tracks.
   let zip: ZipCode
   #if DEBUG
   /// Captures each complete render snapshot without changing production behavior.
@@ -36,20 +36,17 @@ struct WeatherCardContent: View {
 
   /// Renders pending, success, and failure without discarding a prior success.
   ///
-  /// The card reads the forecast's value and its phase side by side — the
-  /// encouraged shape for request chrome (§5.1). The plain value read keeps
-  /// the accepted forecast on screen during a reload or failed replacement —
-  /// it is total, resting at `nil` before the first success — while the
-  /// `phase` lens drives progress and failure chrome. A turn that changes
-  /// both facets still costs one render, because SwiftUI's one-shot tracking
-  /// invalidates once per frame. `isNiceOutside` demonstrates a separately
-  /// equality-gated derivation over the same value read. All reads settle
-  /// within the same completed graph turn.
+  /// The card reads one total `CogMeta` value for both retained content and
+  /// request chrome. Its value rests at `nil`, survives reload and failure,
+  /// and its flags describe the current request without a parallel lifecycle read.
+  /// `isNiceOutside` demonstrates a separately equality-gated derivation over
+  /// the ordinary async value. All reads settle within one completed graph
+  /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let report = cogs[weatherForecast[zip]]?.weather
-    let phase = cogs.phase[weatherForecast[zip]]
+    let metadata = cogs.meta[weatherForecast[zip]]
+    let report = metadata.value?.weather
     let nice = cogs[isNiceOutside[zip]]
-    let status = WeatherLoadStatus(phase)
+    let status = WeatherLoadStatus(metadata)
     let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
     let cadence = cogs[refreshInterval]?.shortCadenceDescription
     #if DEBUG
@@ -146,7 +143,7 @@ struct WeatherCardContent: View {
 private struct EmptyForecast: View {
   /// The key used by retry copy and action.
   let zip: ZipCode
-  /// The card-sized presentation mapping of the full async phase.
+  /// The card-sized presentation mapping of the full async metadata.
   let status: WeatherLoadStatus
 
   /// Shows progress for pending and a retry path for failure or idle state.
@@ -184,10 +181,12 @@ private struct EmptyForecast: View {
 
 /// One-shot demand for a new generation of the keyed forecast.
 ///
-/// `refresh` returns after publishing pending and starting graph-owned work, so
-/// the button needs no ad hoc `Task` or view-local request lifetime. The phase
-/// disables replacement while this particular UI action is already pending;
-/// other graph callers still retain `.latest` replacement semantics.
+/// `refresh` returns an exact-generation handle after publishing pending and
+/// starting graph-owned work. This button deliberately discards it because the
+/// card already renders authoritative metadata; imperative callers can await
+/// the handle without creating a second request state. The metadata disables
+/// replacement while this UI action is pending; other graph callers retain
+/// `.latest` replacement semantics.
 private struct RefreshButton: View {
   /// The singular graph that owns the resulting generation.
   @Environment(\.cogs) private var cogs
@@ -197,7 +196,7 @@ private struct RefreshButton: View {
   /// The current display state used for labeling and disabling the action.
   let status: WeatherLoadStatus
 
-  /// Demands a refresh and reflects its phase in the button label.
+  /// Demands a refresh and reflects its metadata in the button label.
   var body: some View {
     Button {
       cogs.refresh(weatherForecast[zip])

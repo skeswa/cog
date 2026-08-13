@@ -10,7 +10,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure creates nothing until a declaration is used`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
@@ -24,7 +24,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure reuses one state for one declaration`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
 
@@ -36,7 +36,7 @@ import Testing
 @Test func `DerivedCogInfrastructure tells identical declarations apart`() {
   // Same type, same selector shape, same label — two declarations, so two
   // states and two runs. Identity is the descriptor object.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let left = Cog<Int>({ c in c[source] }, name: "twin")
   let right = Cog<Int>({ c in c[source] }, name: "twin")
@@ -47,7 +47,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure keeps a state's label for diagnostics`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let named = Cog<Int>({ _ in 1 }, name: "retry budget")
   let unnamed = Cog<Int> { _ in 1 }
 
@@ -62,7 +62,7 @@ import Testing
 @Test func `DerivedCogInfrastructure gives a fresh state no value at all`() {
   // Resolving a state is not reading it. The state is filed, and it holds
   // nothing until something asks it for a value.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
 
@@ -82,7 +82,7 @@ import Testing
 @Test func `DerivedCogInfrastructure records a run that produced nil as a run`() {
   // The cache is storage presence, not value optionality: a state that computed
   // `nil` has computed, so the next read must not run the selector again.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let nothing = Cog<Int?> { _ in nil }
 
   let state = cogs.derivedState(for: nothing)
@@ -97,7 +97,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure tracks the state whose selector is running`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   var consumerDuringRun: (any CogConsumer)?
   let observing = Cog<Int> { _ in
@@ -117,7 +117,7 @@ import Testing
   // Runs nest whenever a selector reads a derived cog that has not computed.
   // The inner run must own the slot while it runs and give it back afterwards,
   // or the outer selector's later reads would attach to the wrong state.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   var slotDuringInnerRun: (any CogConsumer)?
   var slotAfterInnerRead: (any CogConsumer)?
@@ -143,7 +143,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure records every cog a run read, in read order`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let width = ManualCog<Int>(3)
   let height = ManualCog<Int>(4)
@@ -166,7 +166,7 @@ import Testing
 
 @MainActor
 @Test func `DerivedCogInfrastructure records nothing for a selector that read nothing`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let constant = Cog<Int> { _ in 7 }
 
   #expect(cogs.peek(constant) == 7)
@@ -178,7 +178,7 @@ import Testing
   // `cogs.peek` is an untracked one-shot read. Peeking at a derived cog that
   // way computes it and records what *it* read, and creates no edge to the
   // caller, because there is no caller in the graph to create one to.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }

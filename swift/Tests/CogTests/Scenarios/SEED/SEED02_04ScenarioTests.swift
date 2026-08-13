@@ -10,7 +10,7 @@ import Testing
 
 @MainActor
 @Test func `SEED-02 seed adds no entry to debug history`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
 
   #expect(cogs.debugHistory.count == 0)
@@ -25,7 +25,7 @@ import Testing
 
 @MainActor
 @Test func `SEED-02 seed does not run a reaction`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -66,7 +66,7 @@ import Testing
     let digits: String
   }
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let zip = ZipCode(digits: "90210")
   let currentZipSource = ManualCog<ZipCode?>(nil)
   let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)

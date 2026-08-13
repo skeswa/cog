@@ -29,35 +29,35 @@ private final class Async32ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-32 the phase lens carries tracked reads with value parity`() async {
-  let cogs = Cogtext.forTesting()
+@Test func `ASYNC-32 the meta lens carries tracked reads with value parity`() async {
+  let cogs = Cogs.forTesting()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
+  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
 
   // A tracked selector-side phase read demands the state exactly like a value
   // read would, and delivers every later phase turn to its consumer.
-  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(previous: .none)) = await phaseIterator.next() else {
+  guard case .some(.pending(_, hasSucceeded: false)) = await phaseIterator.next() else {
     Issue.record("The tracked phase read did not begin at initial pending")
     return
   }
   #expect(await startIterator.next() == 0)
 
-  // The UI-boundary lens and the one-shot lens read the same settled phase,
+  // The UI-boundary lens and the one-shot lens read the same settled metadata,
   // and the plain value spellings beside them stay total.
-  if case .pending(previous: .none) = cogs.phase[forecast] {
+  if case .pending(_, hasSucceeded: false) = cogs.meta[forecast] {
   } else {
-    Issue.record("The UI phase lens did not read the settled pending phase")
+    Issue.record("The UI meta lens did not read settled pending metadata")
   }
-  if case .pending(previous: .none) = cogs.phase.peek(forecast) {
+  if case .pending(_, hasSucceeded: false) = cogs.meta.peek(forecast) {
   } else {
-    Issue.record("The one-shot phase lens did not read the settled pending phase")
+    Issue.record("The one-shot meta lens did not read settled pending metadata")
   }
   #expect(cogs[forecast] == 0)
   #expect(cogs.peek(forecast) == 0)
@@ -71,18 +71,18 @@ private final class Async32ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-32 a phase watch sees the turns an equal-success value watch gates away`()
+@Test func `ASYNC-32 a metadata watch sees turns an equal-success value watch gates away`()
   async
 {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
-  let (phaseEvents, phaseContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
+  let (phaseEvents, phaseContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
   var valueEvents: [Int] = []
 
-  let phaseToken = cogs.phase.watch(forecast, initial: .run, name: "watch.phase") {
+  let phaseToken = cogs.meta.watch(forecast, initial: .run, name: "watch.meta") {
     _, new in
     phaseContinuation.yield(new)
   }
@@ -92,7 +92,7 @@ private final class Async32ControlledWork {
   var phaseIterator = phaseEvents.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(previous: .none)) = await phaseIterator.next() else {
+  guard case .some(.pending(_, hasSucceeded: false)) = await phaseIterator.next() else {
     Issue.record("The phase watch did not begin at initial pending")
     return
   }
@@ -109,7 +109,7 @@ private final class Async32ControlledWork {
   // An equal-success refresh cycles the full phase — pending, then success —
   // while the value watch beside the lens stays quiet.
   cogs.refresh(forecast)
-  guard case .some(.pending(previous: .some(42))) = await phaseIterator.next() else {
+  guard case .some(.pending(value: 42, hasSucceeded: true)) = await phaseIterator.next() else {
     Issue.record("The phase watch did not observe reload pending")
     return
   }

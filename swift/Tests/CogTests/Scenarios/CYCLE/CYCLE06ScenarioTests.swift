@@ -6,7 +6,7 @@ import Testing
 @Test func `CYCLE-06 a keyed selector cannot commit`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let weather = CogBox<Int, String>(
         { _, _ in
           cogs.commit("illegal selector turn") { _ in
@@ -33,7 +33,7 @@ import Testing
 @Test func `CYCLE-06 custom equality cannot commit before publication`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       let source = ManualCog<Int>(0)
       let weather = CogBox<Int, String>(
         { c, _ in c[source] },

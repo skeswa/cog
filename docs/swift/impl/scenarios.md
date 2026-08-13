@@ -44,7 +44,8 @@ Cog is the library.
   in `CogTests`, run in all four build legs and once more in the
   release-configuration `test-release` leg (plan M0), which is where every-build
   guardrail claims are proven outside debug. Scenarios that exercise
-  debug-only surface — `seed`, debug history content, debug warnings —
+  debug-only surface — `CogTesting.seed`, debug history content, debug
+  warnings —
   compile out of the `test-release` leg behind `#if DEBUG`; that leg proves
   their absence instead (SEED-05, HIST-04).
 - A dropped scenario's line is deleted. While no tests exist yet, its group
@@ -65,9 +66,10 @@ justifies a slow, flaky, or core-coupled test.
 
 1. **Fully optimistic.** A test drives straight to its conclusion and never
    hedges against nondeterminism. Every suspension awaits a definite signal
-   the test controls — an injected clock advancing, a continuation resuming,
-   a deterministic internal acknowledgement — never a sleep, a timeout used
-   as synchronization, a poll loop, a retry, or a flake allowance. Nothing in
+   the test controls — `CogTesting.TestClock` advancing, a continuation
+   resuming, an exact refresh handle completing, or a deterministic internal
+   acknowledgement — never a sleep, a timeout used as synchronization, a poll
+   loop, a retry, or a flake allowance. Nothing in
    a test happens "eventually"; if a promised signal might not arrive, that
    is a library bug for the test to expose, not a reason to wait longer.
 2. **As fast and cheap as possible.** The default home for every test is
@@ -139,7 +141,7 @@ My whole app shares one Cog world. Tests get their own little worlds.
 - **ONE-02.** Some code tries to install a second app context. Cog stops
   it right away with a clear error, in debug builds and release builds.
   (Proof: exit test.)
-- **ONE-03.** Feature code tries to build a plain `Cogtext` with an
+- **ONE-03.** Feature code tries to build a plain `Cogs` with an
   initializer. The compiler says no. (Proof: compile-fail.)
 - **ONE-04.** My test asks the testing product for a context. It gets a
   fresh, isolated one that works without any app setup.
@@ -415,7 +417,7 @@ changes.
 
 _Milestone M1. Design: §6.2, §6.3._
 
-An `EffectGroup` owns the lifetime of my app's effects.
+`Cogs` owns app-lifetime effects; an `EffectGroup` owns any shorter scope.
 
 - **GROUP-01.** I add a watch token to a group. Cancelling the group
   stops the watch.
@@ -427,9 +429,10 @@ An `EffectGroup` owns the lifetime of my app's effects.
   cancelled.
 - **GROUP-05.** I copy a group. Both copies own the same effects;
   cancelling either stops them all.
-- **GROUP-06.** A group task sleeps on an injected clock and then calls
-  an op every hour. When my test clock jumps an hour, the op runs and its
-  named turn lands in debug history. Before that, it does not run.
+- **GROUP-06.** An app-runtime task in `cogs.effects` sleeps on the reusable
+  `CogTesting.TestClock` and then calls an op every hour. When the clock jumps
+  an hour, the op runs and its named turn lands in debug history. Before that,
+  it does not run, and the app entry point owns no parallel effect-group state.
 - **GROUP-07.** A screen installs its own group and later cancels it. The
   screen's effects stop, but the app's state is untouched.
 - **GROUP-08.** Declaring an effects struct does nothing by itself.
@@ -467,8 +470,6 @@ test waits wall-clock time.
 - **LIFE-05.** A manual cog opts into
   `whileObserved(resetToInitial: true)`. After release, the next read
   gives the starting value again.
-- **LIFE-06.** I mark a derived cog `keepAlive`. It survives with no
-  watchers, exactly like app lifetime.
 - **LIFE-07.** A registered reaction counts as a watcher: the cogs it
   reads stay alive.
 - **LIFE-08.** Once a view has read a cog, that cog is pinned for the
@@ -486,7 +487,8 @@ test waits wall-clock time.
 
 _Milestone M1, except SEED-07 (M2). Design: §6.6, §4._
 
-My tests set up state quietly with `seed`, or loudly with a real commit.
+My tests import `CogTesting` to set up state quietly with `seed`, or use a real
+commit for a loud domain operation.
 
 - **SEED-01.** I seed a source. The next read returns the seeded value.
 - **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
@@ -497,8 +499,8 @@ My tests set up state quietly with `seed`, or loudly with a real commit.
   alert reaction, seed the zip and cloudy weather (no alert), then stub
   sunny weather with a real commit. The alert fires exactly once, even
   though the reaction's first run never read the weather.
-- **SEED-05.** `seed` exists only in debug builds. A release build has no
-  way to seed. (Proof: release configuration.)
+- **SEED-05.** `CogTesting.seed` exists only in debug builds. A release build
+  has no way to seed. (Proof: release configuration.)
 - **SEED-06.** I try to seed a derived cog. The compiler says no: only
   manual sources can be seeded. (Proof: compile-fail.)
 - **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
@@ -544,8 +546,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
   internal seam.)
 - **UI-06.** Views find the one app context through the `\.cogs`
   environment key.
-- **UI-07.** `binding(for:)` shows the current value, and setting it
-  writes through a named commit that shows up in history.
+- **UI-07.** An application-owned SwiftUI binding reads the current Cog value,
+  and setting it writes through a named domain commit that shows up in history.
 - **UI-08.** A text field writes through a binding and immediately reads
   back. It sees its own write — no dropped characters.
 - **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes
@@ -565,55 +567,53 @@ wall-clock waits; real rendering is proven once by the Weather example.
 _Milestone M3, except ASYNC-30 through ASYNC-34 (M4). Design: §5.1, §5.2
 (`.latest` only), §5.3._
 
-Async state is honest: it always says whether it is loading, what it has, and
-what it had.
+Async state is honest: it always says whether it is loading, what value is
+renderable, and whether any generation has succeeded.
 
-### 13.1 Phases
+### 13.1 Metadata
 
 - **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
-  work and publishes a pending turn; a `phase` read returns
-  `.pending(previous: .none)`, while a value read returns the declared
-  resting default. There is no observable `initial` phase.
-- **ASYNC-02.** The work throws. The phase becomes failure holding the
-  error — and the previous value, if there was one.
+  work and publishes a pending turn; a `meta` read returns
+  `.pending(value: default, hasSucceeded: false)`, while a value read returns
+  that same declared resting default. There is no observable `initial` case.
+- **ASYNC-02.** The work throws. Metadata becomes failure holding the
+  error, its total renderable value, and whether an earlier success exists.
 - **ASYNC-03.** An async cog whose value is optional succeeded with
-  `nil`. When it reloads, its previous value is "some(nil)" — clearly
-  different from "never had a value."
-- **ASYNC-04.** `latestValue` and `isLoading` are right in every phase:
-  nothing and loading at first; the old value and loading while
+  `nil`. When it reloads, `value` remains `nil` and `hasSucceeded` remains
+  true — clearly different from the resting `nil` before any success.
+- **ASYNC-04.** `value`, `hasSucceeded`, and `isLoading` are right in every case:
+  the default and loading before success; the old value and loading while
   reloading; the value and not loading on success; the last good value
   and not loading on failure.
 - **ASYNC-05.** The plain value read lets me read an async cog in the same
   shape as a manual cog: the resting default before the first success, then
   the last accepted success.
-- **ASYNC-06.** A phase watcher sees each visible phase change as its own
+- **ASYNC-06.** A metadata watcher sees each visible metadata change as its own
   turn: first pending, then success, two separate turns.
-- **ASYNC-30.** `value`, `error`, `isInitialLoading`, and `isReloading`
-  complete the accessor set: `value` is the current generation's success
-  and nothing else; `error` is its failure and nothing else, so a reload
-  retrying after a failure reports neither; the two loading accessors
-  split pending by whether a previous success is retained. Each is right
-  in every phase, and a successful `nil` stays distinct from "never
-  succeeded" through `value`, exactly as it does through `latestValue`.
+- **ASYNC-30.** `value`, `hasSucceeded`, `error`, and `isLoading` form the
+  accessor set: `value` remains total while `error` reports only the current
+  failure; a reload retrying after a failure has no error and retains its
+  renderable value. Loading and prior success remain orthogonal, and a
+  successful `nil` stays distinct from "never succeeded" through
+  `hasSucceeded`.
 - **ASYNC-31.** Every async cog rests on a declared default, and value reads
-  are total. `default:` states the resting value explicitly; an `Optional`
-  value may omit it and rests at `nil`. In every value spelling — `c[...]`,
+  are total. Every declaration states the resting value with `default:`, and
+  an `Optional` spells `default: nil`. In every value spelling — `c[...]`,
   `cogs[...]`, and their peeks — the read returns the default before any
   success and the last accepted success afterward, through reload pending
   and failure alike.
-- **ASYNC-32.** The `phase` lens carries the same read family as the value
-  spelling beside it: tracked `c.phase[...]` and `cogs.phase[...]` reads,
-  `phase.peek` one-shots, and `cogs.phase.watch`, with identical demand,
+- **ASYNC-32.** The `meta` lens carries the same read family as the value
+  spelling beside it: tracked `c.meta[...]` and `cogs.meta[...]` reads,
+  `meta.peek` one-shots, and `cogs.meta.watch`, with identical demand,
   tracking, and lifetime rules. While an equal-success reload leaves a value
   consumer quiet, the lens still shows its consumers every pending, success,
   and failure turn.
-- **ASYNC-33.** The `phase` lens refuses synchronous state: asking
-  `cogs.phase` or a selector's `c.phase` for a manual or derived cog does
+- **ASYNC-33.** The `meta` lens refuses synchronous state: asking
+  `cogs.meta` or a selector's `c.meta` for a manual or derived cog does
   not compile. (Proof: compile-fail.)
-- **ASYNC-34.** An async declaration without a resting value does not
-  compile unless its `Value` supplies one: a non-`CogDefaultable` value
-  without `default:` fails with a diagnostic naming both ways out, while
-  `default:` and `Optional` spellings compile. (Proof: compile-fail.)
+- **ASYNC-34.** An async declaration without `default:` does not compile.
+  Optional values are not special: they state `default: nil` explicitly.
+  (Proof: compile-fail.)
 
 ### 13.2 Latest wins
 
@@ -623,9 +623,10 @@ what it had.
 - **ASYNC-08.** The old work finishes anyway, ignoring cancellation. Its
   result is thrown away. Only the newest run may commit.
 - **ASYNC-09.** Work that was cancelled because it was replaced publishes
-  no failure phase.
+  no failure metadata.
 - **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
-  though no dependency changed, and the phases cycle again.
+  though no dependency changed, the metadata cycles again, and the returned
+  handle completes only when that exact generation succeeds or fails.
 - **ASYNC-11.** Only what the selector reads with `c[...]` before
   returning counts as a dependency. Values the work closure touches after
   an `await` do not retrigger it.
@@ -636,11 +637,12 @@ what it had.
 
 - **ASYNC-13.** An unwatched async cog is released while its work is
   pending. The work is cancelled, and if a late result sneaks through, it
-  commits nothing.
+  commits nothing. An exact refresh handle waiting on that generation resolves
+  as `released` rather than hanging or following a recreated state.
 - **ASYNC-14.** After a release, reading the value reference again starts fresh work
-  and fresh phases, unpolluted by anything from before.
+  and fresh metadata, unpolluted by anything from before.
 
-### 13.4 Work isolation and previous values
+### 13.4 Work isolation and retained values
 
 - **ASYNC-15.** An async cog's work body runs on the MainActor by
   default. A runtime precondition inside the work proves it in every leg.
@@ -650,35 +652,37 @@ what it had.
 - **ASYNC-17.** The internal task that runs an async cog's work carries
   the descriptor's name and key, so Instruments can show it. (Checked
   through an internal seam.)
-- **ASYNC-18.** Initial work throws. A phase watcher and history see pending
-  with no previous value, then failure with no previous value, as two
-  distinct turns.
+- **ASYNC-18.** Initial work throws. A metadata watcher and history see pending
+  with the resting default and `hasSucceeded == false`, then failure with the
+  same pair, as two distinct turns.
 - **ASYNC-19.** Work succeeds, then a dependency change starts a reload
-  that fails. A phase watcher and history see success, pending with that
-  success as the previous value, then failure with the same previous value,
+  that fails. A metadata watcher and history see success, pending with that
+  success as its value, then failure with the same retained value,
   each as its own turn. A further reload's pending still carries that
   success — the last good value, never the failure.
 - **ASYNC-20.** A reload succeeds with a value equal to the one it had.
-  Phase watchers see the pending and success turns, but value consumers see
+  Metadata watchers see the pending and success turns, but value consumers see
   no change: no recompute, no re-render.
 - **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
   newest run may commit — a refresh replaces work the same way a
-  dependency change does.
+  dependency change does. Its exact handle resolves as `superseded` when a
+  still newer refresh replaces it; it never drifts forward to that newer run.
 
 ### 13.5 Cold one-shot demand
 
 - **ASYNC-22.** I use one-shot `cogs.peek` on a never-read async cog. It
-  starts one suspended run, publishes `.pending(previous: .none)`, returns
+  starts one suspended run, publishes
+  `.pending(value: default, hasSucceeded: false)`, returns
   its spelling's view — the resting default from a value peek, that pending
-  phase from `cogs.phase.peek` — and installs no durable consumer. Another
+  metadata from `cogs.meta.peek` — and installs no durable consumer. Another
   peek sees that same generation instead of starting a second run and renews
   its grace window. With no durable consumer, injected grace expiry cancels
   and releases the state; a late result commits nothing, and a later read
   starts fresh work.
 - **ASYNC-23.** I refresh a never-read async value reference. Refresh is one
   initial load, not a no-op or an initialize-then-replace sequence: the
-  selector and work run once, one pending-with-no-previous turn lands, and no
+  selector and work run once, one pending-with-default-and-no-success turn lands, and no
   cancellation occurs. The call installs no durable consumer and follows the
   same renewable grace and safe-release rule. A later refresh while that work
   is in flight still follows ASYNC-21.
@@ -738,7 +742,7 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open questions 8, 9, and 14): what phase a stream
+_Pending (core §10, open questions 8, 9, and 14): what metadata a stream
 publishes when its sequence ends naturally, whether a throwing sequence
 publishes a failure, and whether consecutive equal elements each commit a
 turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
@@ -887,7 +891,7 @@ Cog behaves the same no matter how my app is compiled.
   its intended settings, so the matrix cannot silently collapse.
 - **LEG-03.** The suite also passes in the release-configuration
   `test-release` leg, where the every-build guardrails — second app
-  context, escaped writer, cycles, no `seed`, no history cost — prove
+  context, escaped writer, cycles, no `CogTesting.seed`, no history cost — prove
   they hold outside debug. (Proof: release configuration.)
 - **LEG-04.** The package builds with its macOS 14 deployment target, and
   a scratch app plus the Weather example build with an iOS 17 deployment

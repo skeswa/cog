@@ -6,7 +6,7 @@ import Testing
 @Test func `CYCLE-01 a cog that reads itself fails and names itself`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       var accountBalance: Cog<Int>!
       accountBalance = Cog<Int>({ c in c[accountBalance] }, name: "account balance")
       _ = cogs.peek(accountBalance)
@@ -23,7 +23,7 @@ import Testing
 @Test func `CYCLE-02 a multi cog cycle fails with its whole closed path`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let cogs = Cogtext.forTesting()
+      let cogs = Cogs.forTesting()
       var subtotal: Cog<Int>!
       var tax: Cog<Int>!
       subtotal = Cog<Int>({ c in c[tax] }, name: "subtotal")

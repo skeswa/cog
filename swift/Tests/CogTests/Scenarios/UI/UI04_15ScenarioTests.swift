@@ -6,7 +6,7 @@ import os
 
 @MainActor
 @Test func `UI-04 an equal derived recomputation sends no Observation notice`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(1)
   var selectorRuns = 0
   let isOdd = Cog<Bool> { c in
@@ -33,7 +33,7 @@ import os
 
 @MainActor
 @Test func `UI-15 an equal manual write sends no Observation notice`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let status = ManualCog<String>("ready")
   let notices = OSAllocatedUnfairLock(initialState: 0)
 

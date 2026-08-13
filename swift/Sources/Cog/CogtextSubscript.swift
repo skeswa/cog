@@ -1,10 +1,10 @@
 /// Adds Swift Observation-tracked UI reads to a context.
 ///
-/// These subscripts are MainActor-isolated with ``Cogtext``. Each one settles
+/// These subscripts are MainActor-isolated with ``Cogs``. Each one settles
 /// before returning and records the exact state with the caller's active
-/// Observation tracking scope; use ``Cogtext/peek(_:)`` for a current read that
+/// Observation tracking scope; use ``Cogs/peek(_:)`` for a current read that
 /// should not invalidate UI later.
-extension Cogtext {
+extension Cogs {
   /// Reads a source and registers its exact state with the active UI consumer.
   ///
   /// Use this from a SwiftUI view body. Later changed turns notify the active
@@ -47,7 +47,7 @@ extension Cogtext {
   /// that work runs; settlement happens before boundary access, so the cold
   /// pending publication cannot reenter this read or send a redundant
   /// baseline notice. Equality gating keeps the UI consumer quiet when a
-  /// reload succeeds with an equal value; read ``Cogtext/phase`` where the
+  /// reload succeeds with an equal value; read ``Cogs/meta`` where the
   /// request lifecycle itself drives chrome.
   ///
   /// This is UI tracking, not a selector or reaction dependency edge. Creating

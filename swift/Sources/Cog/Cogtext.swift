@@ -7,19 +7,29 @@
 /// create its own.
 ///
 /// Reads settle every dependency needed by the returned value. Application
-/// writes and runtime-owned async phase changes publish as ordered turns;
+/// writes and runtime-owned async metadata changes publish as ordered turns;
 /// notifications and reactions run only after the active value computation has
 /// finished. UI subscripts participate in Swift Observation, selector and
 /// reaction readers record graph edges, and `peek` deliberately does neither.
 ///
-/// `Cogtext` and all graph access are MainActor-isolated. It is not a container
+/// `Cogs` and all graph access are MainActor-isolated. It is not a container
 /// to pass between arbitrary executors: enter the MainActor before reading,
 /// refreshing, registering reactions, or committing operations.
 ///
 /// Call ``bootstrapApp()`` once when an app launches. Tests and previews use
-/// `Cogtext.forTesting()` from the `CogTesting` product.
+/// `Cogs.forTesting()` from the `CogTesting` product.
 @MainActor
-public final class Cogtext {
+public final class Cogs {
+  /// The effect group owned for exactly this app runtime's lifetime.
+  ///
+  /// Register process-lifetime reactions and tasks here so the app entry point
+  /// retains only `Cogs`. Features needing an earlier cancellation boundary
+  /// create and own a separate ``EffectGroup``. A long-running task that reads
+  /// this runtime should capture it weakly, promoting it only around each unit
+  /// of graph work; otherwise the root group and task would retain one another
+  /// through `Cogs` in isolated tests and previews.
+  public let effects = EffectGroup()
+
   /// The monotonic clock used by context-owned timing work.
   ///
   /// Production uses ``ContinuousClock``. `CogTesting` can supply a controlled
@@ -38,7 +48,7 @@ public final class Cogtext {
   /// One test-only signal after an async result reaches its commit eligibility check.
   ///
   /// Cancellation and ignored-cancellation scenarios need to prove that a
-  /// result was rejected, which produces no public phase event to await. The
+  /// result was rejected, which produces no public metadata event to await. The
   /// `CogTesting` seam installs this callback as a deterministic negative-event
   /// acknowledgement. Production code never installs one.
   private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
@@ -207,7 +217,7 @@ public final class Cogtext {
 
 // MARK: - State storage
 
-extension Cogtext {
+extension Cogs {
   /// Adds one reaction-owned lease when this state uses observed lifetime.
   ///
   /// Advancing the release generation invalidates an earlier grace task.
@@ -427,7 +437,7 @@ extension Cogtext {
   /// Lookup and work start are deliberately separate. Merely resolving the
   /// descriptor-and-key slot allocates state but does not run the selector;
   /// settlement by a tracked read, peek, or refresh creates the first pending
-  /// phase and starts work.
+  /// metadata and starts work.
   internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
     asyncState(descriptor: valueReference.descriptor, key: valueReference.key)
   }
@@ -446,7 +456,7 @@ extension Cogtext {
   ///
   /// The projection captures the original async descriptor and forwards its
   /// own key here. Reusing that descriptor-and-key identity makes
-  /// `valueReference.latest` observe the same phase state as the full async
+  /// the value projection observes the same metadata state as the full async
   /// value instead of creating a mirror or a second task.
   internal func asyncState<Value>(
     descriptor: AsyncCogDescriptor<Value>,
@@ -489,7 +499,7 @@ extension Cogtext {
 
 // MARK: - Reading
 
-extension Cogtext {
+extension Cogs {
   /// Reads a source's current value without creating a dependency edge.
   ///
   /// The read uses the source value from the latest completed turn. It does not
@@ -533,7 +543,7 @@ extension Cogtext {
   /// replacing work already in flight. The returned value is fully settled at
   /// the latest completed turn, just like a tracked read; only future
   /// invalidation is intentionally omitted. No Swift Observation boundary or
-  /// reaction lease is created. Use ``Cogtext/phase`` to peek the request
+  /// reaction lease is created. Use ``Cogs/meta`` to peek the request
   /// lifecycle instead.
   ///
   /// - Parameter valueReference: The async declaration and optional key to inspect.

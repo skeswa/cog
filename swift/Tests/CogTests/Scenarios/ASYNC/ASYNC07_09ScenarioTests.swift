@@ -44,7 +44,7 @@ private final class Async07WorkProbe {
 
 @MainActor
 @Test func `ASYNC-07 dependency changes replace explicit and default latest work`() async {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
   let defaultLatest = AsyncCog<Int>(default: 0, name: "default") { c in
@@ -80,16 +80,16 @@ private final class Async07WorkProbe {
 }
 
 @MainActor
-@Test func `ASYNC-09 replaced cancellation publishes no failure phase`() async {
-  let cogs = Cogtext.forTesting()
+@Test func `ASYNC-09 replaced cancellation publishes no failure metadata`() async {
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let value = c[request]
     return probe.work(name: "forecast", request: value)
   }
-  var phases: [CogPhase<Int>] = []
-  let token = cogs.run { c in phases.append(c.phase[forecast]) }
+  var phases: [CogMeta<Int>] = []
+  let token = cogs.run { c in phases.append(c.meta[forecast]) }
   var startIterator = probe.starts.makeAsyncIterator()
   var cancellationIterator = probe.cancellations.makeAsyncIterator()
 

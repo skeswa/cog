@@ -1,4 +1,4 @@
-/// One live piece of state inside one ``Cogtext``.
+/// One live piece of state inside one ``Cogs``.
 ///
 /// A descriptor and key name state. Each context creates its own state on first
 /// use (§2.2, §2.3).
@@ -34,7 +34,7 @@ internal protocol CogState: AnyObject {
   var subscribers: [CogSubscriberEdge] { get set }
 }
 
-/// What a ``Cogtext`` files a state under: a declaration plus a key.
+/// What a ``Cogs`` files a state under: a declaration plus a key.
 ///
 /// Identity is the descriptor's `ObjectIdentifier` plus an optional key (§2.3,
 /// §3.1).

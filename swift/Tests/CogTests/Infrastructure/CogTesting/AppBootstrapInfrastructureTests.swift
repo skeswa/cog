@@ -11,21 +11,21 @@ import Testing
 
 @MainActor
 @Test func `AppBootstrapInfrastructure installs for the scope and leaves nothing behind`() {
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 
-  Cogtext.withBootstrappedApp { _ in
-    #expect(Cogtext.hasBootstrappedApp == true)
+  Cogs.withBootstrappedApp { _ in
+    #expect(Cogs.hasBootstrappedApp == true)
   }
 
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 }
 
 @MainActor
 @Test func `AppBootstrapInfrastructure gives each scope its own context`() {
   // Consecutive scopes are consecutive app runtimes, not one install handed
   // out twice. A test that installs cannot see what an earlier test installed.
-  let first = Cogtext.withBootstrappedApp { $0 }
-  let second = Cogtext.withBootstrappedApp { $0 }
+  let first = Cogs.withBootstrappedApp { $0 }
+  let second = Cogs.withBootstrappedApp { $0 }
 
   #expect(first !== second)
 }
@@ -35,10 +35,10 @@ import Testing
   struct Failure: Error {}
 
   #expect(throws: Failure.self) {
-    try Cogtext.withBootstrappedApp { _ in
+    try Cogs.withBootstrappedApp { _ in
       throw Failure()
     }
   }
 
-  #expect(Cogtext.hasBootstrappedApp == false)
+  #expect(Cogs.hasBootstrappedApp == false)
 }

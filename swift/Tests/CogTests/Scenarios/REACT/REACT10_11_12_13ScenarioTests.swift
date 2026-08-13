@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-10 a cancelled token stops the reaction for good`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -33,7 +33,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-10 cancelling during a flush stops runs that flush had queued`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   var events: [String] = []
   var queued: ReactionToken?
@@ -79,7 +79,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-11 cancelling the same token twice is harmless`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let cancelled = ManualCog<Int>(1)
   let watched = ManualCog<Int>(1)
   var seen: [Int] = []
@@ -110,7 +110,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-12 dropping the last token copy cancels the reaction`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -145,7 +145,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-13 token copies name one registration`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let aliased = ManualCog<Int>(1)
   let collected = ManualCog<Int>(1)
   var aliasedSeen: [Int] = []

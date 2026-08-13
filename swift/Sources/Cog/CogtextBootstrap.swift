@@ -4,13 +4,13 @@
 
 // MARK: - Installing the app's context
 
-extension Cogtext {
+extension Cogs {
   /// The app's context, once bootstrap has installed it.
   ///
   /// MainActor isolation makes access serialized without a lock. The strong
   /// reference keeps the authoritative production graph alive for the process
   /// after bootstrap, independently of scene recreation.
-  private static var installedAppContext: Cogtext?
+  private static var installedAppContext: Cogs?
 
   /// Creates the app's one context and installs it for the whole process.
   ///
@@ -20,10 +20,10 @@ extension Cogtext {
   /// ```swift
   /// @main
   /// struct WeatherApp: App {
-  ///   @State private var cogs: Cogtext
+  ///   @State private var cogs: Cogs
   ///
   ///   init() {
-  ///     let cogs = Cogtext.bootstrapApp()
+  ///     let cogs = Cogs.bootstrapApp()
   ///     _cogs = State(initialValue: cogs)
   ///   }
   ///
@@ -43,13 +43,13 @@ extension Cogtext {
   /// graph remains lazy until value references are used.
   ///
   /// A second call traps in every build. Tests and previews use
-  /// `Cogtext.forTesting()`.
+  /// `Cogs.forTesting()`.
   ///
   /// - Returns: The newly installed, process-authoritative app context. Keep and
   ///   pass this exact reference rather than bootstrapping again.
   @discardableResult
-  public static func bootstrapApp() -> Cogtext {
-    let cogs = Cogtext(
+  public static func bootstrapApp() -> Cogs {
+    let cogs = Cogs(
       clock: ContinuousClock(),
       defaultWhileObservedGrace: .seconds(30)
     )
@@ -62,7 +62,7 @@ extension Cogtext {
   /// Package access is only for the `CogTesting` bootstrap fixture to verify
   /// installation identity without making production code depend on global
   /// lookup.
-  package static var installedApp: Cogtext? {
+  package static var installedApp: Cogs? {
     installedAppContext
   }
 
@@ -74,19 +74,19 @@ extension Cogtext {
   ///
   /// `fatalError` preserves its message under `-O`;
   /// `preconditionFailure` does not.
-  private static func installAsAppContext(_ cogs: Cogtext) {
+  private static func installAsAppContext(_ cogs: Cogs) {
     guard installedAppContext == nil else {
       fatalError(
         """
-        Cog is already bootstrapped. `Cogtext.bootstrapApp()` installs the \
+        Cog is already bootstrapped. `Cogs.bootstrapApp()` installs the \
         app's one context and runs exactly once, at launch; a second install \
         would leave this process holding two graphs, with the app's state \
         split between them. Keep the context the first call returned and pass \
         it to your scenes, effects, and services rather than bootstrapping \
         again. A test or a preview is a separate app runtime and wants its \
-        own isolated context: call `Cogtext.forTesting()` from the \
+        own isolated context: call `Cogs.forTesting()` from the \
         `CogTesting` product, or, when the app install itself is the subject, \
-        `Cogtext.withBootstrappedApp { }` — which is not re-entrant, so do \
+        `Cogs.withBootstrappedApp { }` — which is not re-entrant, so do \
         not nest it.
         """
       )

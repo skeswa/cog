@@ -29,19 +29,19 @@ private final class Async24ControlledWork {
 @MainActor
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let request = ManualCog<Int>(0)
   let work = Async24ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let selectedRequest = c[request]
     return .run { await work.run(for: selectedRequest) }
   }
-  let (initialPhases, initialContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let initialToken = cogs.run { c in initialContinuation.yield(c.phase[forecast]) }
+  let (initialPhases, initialContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let initialToken = cogs.run { c in initialContinuation.yield(c.meta[forecast]) }
   var initialPhaseIterator = initialPhases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(previous: .none)) = await initialPhaseIterator.next() else {
+  guard case .some(.pending(_, hasSucceeded: false)) = await initialPhaseIterator.next() else {
     Issue.record("Expected initial pending without a previous value")
     return
   }
@@ -56,11 +56,11 @@ private final class Async24ControlledWork {
   work.succeed(0, with: 100)
   try await staleChecked.wait()
 
-  let (returningPhases, returningContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let returningToken = cogs.run { c in returningContinuation.yield(c.phase[forecast]) }
+  let (returningPhases, returningContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
+  let returningToken = cogs.run { c in returningContinuation.yield(c.meta[forecast]) }
   var returningPhaseIterator = returningPhases.makeAsyncIterator()
 
-  guard case .some(.pending(previous: .none)) = await returningPhaseIterator.next() else {
+  guard case .some(.pending(_, hasSucceeded: false)) = await returningPhaseIterator.next() else {
     Issue.record("A returning consumer observed the invalidated run's result")
     return
   }

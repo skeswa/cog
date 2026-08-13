@@ -20,7 +20,7 @@ private final class Async11WorkProbe {
 
   func run(
     selectorValue: Int,
-    cogs: Cogtext,
+    cogs: Cogs,
     workValue: ManualCog<Int>
   ) async -> Int {
     nextRunID += 1
@@ -59,7 +59,7 @@ private final class Async11WorkProbe {
 
 @MainActor
 @Test func `ASYNC-11 only synchronous selector reads become dependencies`() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let selectorInput = ManualCog<Int>(10)
   let workInput = ManualCog<Int>(20)
   let probe = Async11WorkProbe()

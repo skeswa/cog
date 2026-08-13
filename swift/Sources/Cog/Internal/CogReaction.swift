@@ -12,7 +12,7 @@ internal final class CogReaction: CogState, CogConsumer {
   ///
   /// Weak because the context owns its registrations. A token may outlive an
   /// isolated test context without keeping that graph alive.
-  private weak var cogs: Cogtext?
+  private weak var cogs: Cogs?
 
   /// What this registration runs, until cancellation releases it.
   ///
@@ -53,7 +53,7 @@ internal final class CogReaction: CogState, CogConsumer {
   /// Creates an inert registration; the context installs and initially runs it
   /// in registration order after ownership is established.
   init(
-    cogs: Cogtext,
+    cogs: Cogs,
     label: CogLabel,
     body: @escaping @MainActor (ReactionReader) -> Void
   ) {
@@ -117,7 +117,7 @@ internal final class CogReaction: CogState, CogConsumer {
   ///
   /// Initial runs share the active flush's ordered reaction queue when created
   /// during a turn, preventing them from overtaking already-invalidated effects.
-  func runInitially(in cogs: Cogtext) {
+  func runInitially(in cogs: Cogs) {
     run(in: cogs)
   }
 
@@ -126,7 +126,7 @@ internal final class CogReaction: CogState, CogConsumer {
   ///
   /// CHECK dependencies settle first. If they all prove equal, advancing only
   /// this reaction's `checkedAt` stops work without invoking user code.
-  func runIfNeeded(in cogs: Cogtext) {
+  func runIfNeeded(in cogs: Cogs) {
     guard !isCancelled, settleState != .clean else { return }
 
     for dependency in dependencies {
@@ -152,7 +152,7 @@ internal final class CogReaction: CogState, CogConsumer {
   /// Dependency edges and lease ownership reconcile before the final checked
   /// mark. Any system turns requested by async reads inside the body drain only
   /// afterward, when tracking and the derived computing path are both empty.
-  private func run(in cogs: Cogtext) {
+  private func run(in cogs: Cogs) {
     // Every run checks cancellation. The local keeps the closure alive through
     // self-cancellation.
     guard !isCancelled, let body = self.body else { return }
@@ -182,7 +182,7 @@ internal final class CogReaction: CogState, CogConsumer {
   }
 
   /// Replaces this registration's lease set after one completed tracking run.
-  private func reconcileExternalLeases(in cogs: Cogtext) {
+  private func reconcileExternalLeases(in cogs: Cogs) {
     // Self-cancellation releases the old set immediately. Reads after that
     // point are ignored, and finishing the now-cancelled run must not acquire
     // anything again.
@@ -242,7 +242,7 @@ internal enum CogReactionRun {
   case initial(CogReaction)
 
   /// Performs the queued run using the mode captured when it was enqueued.
-  func perform(in cogs: Cogtext) {
+  func perform(in cogs: Cogs) {
     switch self {
     case .changed(let reaction):
       reaction.runIfNeeded(in: cogs)

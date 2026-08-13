@@ -48,7 +48,7 @@ extension ManualCog {
 
 // MARK: - Reading
 
-extension Cogtext {
+extension Cogs {
   /// Reads a read-only value reference's current value without creating a dependency edge.
   ///
   /// This one-shot read observes the latest completed turn and never sees a

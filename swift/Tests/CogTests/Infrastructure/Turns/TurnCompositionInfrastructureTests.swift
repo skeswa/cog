@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `TurnCompositionInfrastructure nested commits join one outer turn`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   var comparisons = 0
   var flushingTurn: CogTurnID?
   let source = ManualCog<Int>(
@@ -72,7 +72,7 @@ import Testing
 
 @MainActor
 @Test func `TurnCompositionInfrastructure sibling commits are separate turns`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var turnIDs: [CogTurnID] = []
   var turnNames: [String] = []

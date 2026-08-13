@@ -1,4 +1,4 @@
-extension Cogtext {
+extension Cogs {
   /// Registers a reaction and schedules its first tracking run.
   ///
   /// `run` is the general synchronous effect primitive. The body runs once to

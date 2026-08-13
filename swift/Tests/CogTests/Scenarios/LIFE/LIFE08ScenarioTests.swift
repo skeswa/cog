@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `LIFE-08 a first UI read pins a derived cog for the context lifetime`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogtext.forTesting(
+  let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

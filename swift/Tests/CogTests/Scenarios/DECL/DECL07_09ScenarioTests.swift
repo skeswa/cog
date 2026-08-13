@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `DECL-07 a derived cog reads back what its selector computed`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let width = ManualCog<Int>(3)
   let height = ManualCog<Int>(4)
@@ -21,8 +21,8 @@ import Testing
 @Test func `DECL-07 a derived cog computes from whatever its sources hold`() {
   // Two contexts, one declaration, different source values: the derived value
   // follows the state it was computed from rather than the declaration.
-  let quiet = Cogtext.forTesting()
-  let busy = Cogtext.forTesting()
+  let quiet = Cogs.forTesting()
+  let busy = Cogs.forTesting()
 
   let attempts = ManualCog<Int>(0)
   let hasRetried = Cog<Bool> { c in c[attempts] > 1 }
@@ -38,7 +38,7 @@ import Testing
   // `c[valueReference]` reads a derived cog the same way it reads a source, so a chain is
   // written the same way a leaf is — and reading the top computes the whole
   // chain.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let celsius = ManualCog<Double>(100)
   let fahrenheit = Cog<Double> { c in c[celsius] * 9 / 5 + 32 }
@@ -53,7 +53,7 @@ import Testing
 @Test func `DECL-07 a derived cog's selector is an ordinary function`() {
   // Branches, early returns, and locals are all fine: a selector is normal
   // Swift, and the dependencies are whatever the run actually read.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let currentZip = ManualCog<String?>(nil)
   let knownZips = ManualCog<[String]>(["90210"])
@@ -70,7 +70,7 @@ import Testing
 @Test func `DECL-07 a derived cog may compute an optional value`() {
   // A derived cog whose value is itself optional is not a special case: `nil`
   // is a computed value like any other.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let rawZip = ManualCog<String>("")
   let currentZip = Cog<String?> { c in
@@ -87,7 +87,7 @@ import Testing
 @Test func `DECL-09 declaring a derived cog runs nothing`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1
@@ -112,7 +112,7 @@ import Testing
 @Test func `DECL-09 the first read is what runs the selector`() {
   var runs = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(21)
   let doubled = Cog<Int> { c in
     runs += 1
@@ -129,7 +129,7 @@ import Testing
   var readRuns = 0
   var unreadRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let read = Cog<Int> { c in
     readRuns += 1
@@ -153,7 +153,7 @@ import Testing
   var innerRuns = 0
   var outerRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(2)
   let inner = Cog<Int> { c in
     innerRuns += 1
@@ -180,8 +180,8 @@ import Testing
   // second context has run nothing until it is asked.
   var runs = 0
 
-  let first = Cogtext.forTesting()
-  let second = Cogtext.forTesting()
+  let first = Cogs.forTesting()
+  let second = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     runs += 1

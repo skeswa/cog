@@ -136,7 +136,7 @@ internal final class DerivedCogState<Value>:
   ///
   /// Every tracked or untracked read goes through this method, so no caller can
   /// skip first computation or settlement.
-  func settledValue(in cogs: Cogtext) -> Value {
+  func settledValue(in cogs: Cogs) -> Value {
     if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
       fatalError(cycle.message)
     }
@@ -184,7 +184,7 @@ internal final class DerivedCogState<Value>:
   ///
   /// By the time the exit frame calls this, dirty parents have settled and this
   /// state is on the active computation path for cycle and write rejection.
-  func recompute(in cogs: Cogtext) {
+  func recompute(in cogs: Cogs) {
     _ = run(in: cogs)
   }
 
@@ -195,7 +195,7 @@ internal final class DerivedCogState<Value>:
   /// cog against *itself* and hands tracking back on the way out. The completed
   /// run then removes reverse edges for abandoned branches before equality can
   /// stop the downstream wave.
-  private func run(in cogs: Cogtext) -> Value {
+  private func run(in cogs: Cogs) -> Value {
     guard isComputing else {
       fatalError("A derived Cog selector ran outside the settle computation path.")
     }

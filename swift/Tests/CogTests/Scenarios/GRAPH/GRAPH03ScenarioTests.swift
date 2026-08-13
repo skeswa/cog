@@ -14,7 +14,7 @@ private final class Graph03ChainStorage {
 @MainActor
 @Test func `GRAPH-03 a deep changed chain settles source to root without exhausting the stack`() {
   let depth = 20_000
-  var cogs: Cogtext? = Cogtext.forTesting()
+  var cogs: Cogs? = Cogs.forTesting()
   weak let releasedContext = cogs
   let source = ManualCog<Int>(0)
   let storage = Graph03ChainStorage()

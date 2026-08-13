@@ -9,7 +9,7 @@ import Testing
   // No app bootstrap, no environment, no shared setup, no teardown: the whole
   // ceremony is one call, and the context that comes back is immediately
   // usable.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let retryLimit = ManualCog<Int>(3)
 
@@ -20,8 +20,8 @@ import Testing
 @Test func `ONE-04 every request for a testing context gets a fresh one`() {
   // Two contexts, not one shared context handed out twice — which is what lets
   // two previews, or two tests running in parallel, each have their own world.
-  let first = Cogtext.forTesting()
-  let second = Cogtext.forTesting()
+  let first = Cogs.forTesting()
+  let second = Cogs.forTesting()
 
   #expect(first !== second)
 
@@ -38,7 +38,7 @@ import Testing
   let declaration = ManualCog<Int>(3)
 
   for _ in 0..<50 {
-    let cogs = Cogtext.forTesting()
+    let cogs = Cogs.forTesting()
     #expect(cogs.peek(declaration) == 3)
   }
 }

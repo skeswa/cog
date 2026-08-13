@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `GROUP-04 dropping the final group reference cancels its effects`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
   var group: EffectGroup? = EffectGroup()

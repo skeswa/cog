@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `READ-06 a trigger rerun peeks at the newest settled value`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let xSource = ManualCog<Int>(1)
   var xRuns = 0
@@ -34,7 +34,7 @@ import Testing
 
 @MainActor
 @Test func `READ-06 manual and read-only peeks also skip edges`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let manual = ManualCog<Int>(1)
   let owned = ManualCog<Int>(10)

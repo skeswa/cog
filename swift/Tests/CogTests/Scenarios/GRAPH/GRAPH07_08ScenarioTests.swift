@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Test func `GRAPH-07 a cold derived cog waits for a later read to recompute`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var inputsSeen: [Int] = []
   let doubled = Cog<Int> { c in
@@ -30,7 +30,7 @@ import Testing
 
 @MainActor
 @Test func `GRAPH-08 a cold cog catches up once after ten missed turns`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var inputsSeen: [Int] = []
   let scaled = Cog<Int> { c in

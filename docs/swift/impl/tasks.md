@@ -488,11 +488,6 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-17, M1-31a._
   _Verify: `mise run test --filter HIST-05`._
   _Greens: HIST-05._
-- **M1-31d** _(Infrastructure)_ — Display bounded debug history through
-  `os_log` without making display part of graph correctness.
-  _Depends: M1-31c._
-  _Verify: `mise run test --filter DebugHistoryDisplayInfrastructure` plus
-  `mise run fmt:check`._
 - **M1-23a** _(Decision)_ — Settle adding a token to an already-cancelled
   `EffectGroup`; update §10, snapshot, scenarios, and tasks, using the
   `M1-23d*` branch for any new behavior tasks.
@@ -521,8 +516,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-23b._
   _Verify: `mise run test --filter GROUP-02`._
   _Greens: GROUP-02._
-- **M1-24b** _(Behavior)_ — Drive the named hourly task with the injected
-  clock and record its turn in history.
+- **M1-24b** _(Behavior)_ — Drive the named app-runtime hourly task with
+  `CogTesting.TestClock` and record its turn in history without a second
+  app-level effect owner.
   _Depends: M1-01ca, M1-24a, M1-31a._
   _Verify: `mise run test --filter GROUP-06`._
   _Greens: GROUP-06._
@@ -537,8 +533,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter GROUP-09`._
   _Greens: GROUP-09._
 - **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
-  manual `.app` and synchronous-derived `.whileObserved` defaults, plus
-  derived `keepAlive` sugar for `.app`.
+  manual `.app` and synchronous-derived `.whileObserved` defaults.
   _Depends: M1-05b, M1-08a._
   _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
 - **M1-27b** _(Infrastructure)_ — Track registered reactions as external
@@ -551,11 +546,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-01ca, M1-27b._
   _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._
   _Greens: LIFE-02, LIFE-03._
-- **M1-28b** _(Behavior)_ — Cancel pending derived release and prove
-  `keepAlive` and reaction leases suppress release.
+- **M1-28b** _(Behavior)_ — Cancel pending derived release and prove reaction
+  leases suppress release.
   _Depends: M1-28a._
-  _Verify: `mise run test --filter 'LIFE-04|LIFE-06|LIFE-07'`._
-  _Greens: LIFE-04, LIFE-06, LIFE-07._
+  _Verify: `mise run test --filter 'LIFE-04|LIFE-07'`._
+  _Greens: LIFE-04, LIFE-07._
 - **M1-28c** _(Behavior)_ — Preserve default manual state and reset opted-in
   manual state to its initial value after release.
   _Depends: M1-28a._
@@ -589,8 +584,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   isolated-testing usage after both paths are proven end to end.
   _Depends: M1-29c, M1-29d._
   _Verify: README call-site review plus `mise run fmt:check`._
-- **M1-30a** _(Behavior)_ — Add debug-only manual-source `seed` and dirty
-  propagation without a turn.
+- **M1-30a** _(Behavior)_ — Add debug-only manual-source `seed` through
+  `CogTesting` and dirty propagation without a turn.
   _Depends: M1-07a, M1-09a._
   _Verify: `mise run test --filter 'SEED-01|SEED-03'`._
   _Greens: SEED-01, SEED-03._
@@ -619,11 +614,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
   M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-23da, M1-24b, M1-25,
   M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
-  M1-31b, M1-31d, M1-33b, M1-34b._
+  M1-31b, M1-31c, M1-33b, M1-34b._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
   _Greens: LEG-01._
 - **M1-32** _(Gate)_ — Prove the completed M1 suite and every-build guards in
-  release, including absent seed and zero-cost history.
+  release, including absent `CogTesting.seed` and zero-cost history.
   _Depends: M1-33c._
   _Verify: `mise run test:release` plus release API/build checks._
   _Greens: SEED-05, HIST-04, LEG-03._
@@ -669,8 +664,9 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Depends: M2-02ab._
   _Verify: `mise run test --filter 'UI-04|UI-15'`._
   _Greens: UI-04, UI-15._
-- **M2-05** _(Behavior)_ — Add `binding(for:)` with named history commits and
-  immediate read-back.
+- **M2-05** _(Behavior)_ — Prove an application-owned SwiftUI binding can
+  delegate to domain ops, with compact single-source commits and immediate
+  read-back; add no Cog binding helper.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter 'UI-07|UI-08'`._
   _Greens: UI-07, UI-08._
@@ -716,9 +712,9 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   sources, `fileprivate` access, derived values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
-- **M2-14b** _(Infrastructure)_ — Install Weather's nice-weather reaction and
-  injected-clock hourly task through the complete public `EffectGroup`
-  lifecycle.
+- **M2-14b** _(Infrastructure)_ — Install Weather's app-lifetime reaction and
+  injected-clock hourly task through `cogs.effects`, reserving separately
+  owned `EffectGroup` values for shorter lifetimes.
   _Depends: M2-14a._
   _Verify: Weather scheme builds and its effect installation tests pass._
 - **M2-15** _(Infrastructure)_ — Build Weather cards, bindings, and per-ZIP
@@ -755,13 +751,13 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
 _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
 
-- **M3-01** _(Behavior)_ — Add `CogPhase`, `Previous`, `latestValue`, and
-  `isLoading` value semantics with exhaustive phase accessor tests.
+- **M3-01** _(Behavior)_ — Add `CogMeta` with total `value`, `hasSucceeded`,
+  and loading semantics, with exhaustive metadata accessor tests.
   _Depends: M2-20._
   _Verify: `mise run test --filter ASYNC-04`._
   _Greens: ASYNC-04._
 - **M3-02** _(Behavior)_ — On first tracked read, start work, publish pending
-  as a turn, and expose no initial phase.
+  as a turn, and expose no initial metadata case.
   _Depends: M3-01._
   _Verify: `mise run test --filter ASYNC-01`._
   _Greens: ASYNC-01._
@@ -770,17 +766,17 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test --filter 'ASYNC-02|ASYNC-06'`._
   _Greens: ASYNC-02, ASYNC-06._
-- **M3-03b** _(Behavior)_ — Preserve explicit `Previous.some(nil)` for
-  optional successes.
+- **M3-03b** _(Behavior)_ — Preserve a successful optional `nil` through
+  `value` plus `hasSucceeded`.
   _Depends: M3-03a._
   _Verify: `mise run test --filter ASYNC-03`._
   _Greens: ASYNC-03._
 - **M3-03c** _(Behavior)_ — Record initial pending and failure as separate
-  watcher/history turns with no previous value.
+  watcher/history turns with the resting default and no accepted success.
   _Depends: M3-03a._
   _Verify: `mise run test --filter ASYNC-18`._
   _Greens: ASYNC-18._
-- **M3-04** _(Behavior)_ — Add `.latest` optional projection and suppress
+- **M3-04** _(Behavior)_ — Add the total value projection and suppress
   downstream change for equal reload results.
   _Depends: M3-03a._
   _Verify: `mise run test --filter 'ASYNC-05|ASYNC-20'`._
@@ -805,7 +801,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-11`._
   _Greens: ASYNC-11._
-- **M3-07** _(Behavior)_ — Fetch and phase `AsyncCogBox` keys independently.
+- **M3-07** _(Behavior)_ — Fetch and track `AsyncCogBox` metadata independently by key.
   _Depends: M3-05a._
   _Verify: `mise run test --filter ASYNC-12`._
   _Greens: ASYNC-12._
@@ -816,7 +812,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: recorded decision, any `M3-08c*` terminal added to M3-11, and
   `mise run tasks:check`._
 - **M3-08b** _(Behavior)_ — Refresh settled or in-flight latest work under
-  the same replacement and generation rules.
+  the same replacement and generation rules, returning handles bound to their
+  exact success, failure, supersession, or release outcome.
   _Depends: M3-05b, M3-08a._
   _Verify: `mise run test --filter 'ASYNC-10|ASYNC-21'`._
   _Greens: ASYNC-10, ASYNC-21._
@@ -887,7 +884,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter LIFE-10`._
   _Greens: LIFE-10._
 - **M3-10k** _(Infrastructure)_ — Replace Weather's imperative request sources
-  and async op with one keyed `AsyncCogBox`; render full and latest phases, and
+  and async op with one keyed `AsyncCogBox`; render metadata and total values, and
   route initial, retry, and hourly demand through `refresh` with deterministic
   example tests.
   _Depends: M3-04, M3-07, M3-08b, M3-10b._
@@ -953,26 +950,26 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   changelog excerpt.
   _Depends: M4-05d._
   _Verify: published GitHub Release points at the approved tag._
-- **M4-06** _(Behavior)_ — Complete the `CogPhase` accessor set with `value`,
-  `error`, `isInitialLoading`, and `isReloading`, documented and proven right
-  in every phase.
+- **M4-06** _(Behavior)_ — Complete and flatten `CogMeta` with total `value`,
+  `hasSucceeded`, `error`, and `isLoading`, documented and proven right in
+  every case.
   _Depends: M3-11._
   _Verify: `mise run test --filter ASYNC-30`._
   _Greens: ASYNC-30._
 - **M4-07a** _(Decision)_ — Record the value-first async read model: total
-  value reads over declaration defaults, the `phase` lens on every read
-  capability, and conformance-gated default omission; land the §5.1 and §10
+  value reads over declaration defaults, the `meta` lens on every read
+  capability, and an explicit default at every declaration; land the §5.1 and §10
   amendments with the scenario and task deltas they require.
   _Depends: M3-11._
   _Verify: updated design ledger, scenario tree, and task graph pass
   `mise run tasks:check` and `mise run fmt:check`._
-- **M4-07b** _(Behavior)_ — Store declaration defaults with conformance-gated
-  omission (`CogDefaultable`, `Optional` only) and make every value spelling
-  total.
+- **M4-07b** _(Behavior)_ — Store explicit declaration defaults, require
+  `default:` for every value including `Optional`, and make every value
+  spelling total.
   _Depends: M4-07a._
   _Verify: `mise run test --filter ASYNC-31` and `mise run test:compilefail`._
   _Greens: ASYNC-31, ASYNC-34._
-- **M4-07c** _(Behavior)_ — Add the `phase` lens to every read capability
+- **M4-07c** _(Behavior)_ — Add the `meta` lens to every read capability
   with value-spelling parity, refusing synchronous state at compile time.
   _Depends: M4-07a._
   _Verify: `mise run test --filter ASYNC-32` and `mise run test:compilefail`._
@@ -983,7 +980,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M4-07b, M4-07c._
   _Verify: `mise run test`, `mise run test:compilefail`, and
   `mise run fmt:check`._
-- **M4-07e** _(Infrastructure)_ — Adopt value-first reads and the `phase`
+- **M4-07e** _(Infrastructure)_ — Adopt value-first reads and the `meta`
   lens in the Weather example and its tests.
   _Depends: M4-07d._
   _Verify: `mise run build:weather` and `mise run test:weather`._
@@ -1235,8 +1232,9 @@ ArenaDirtyPropagationInfrastructure`._
   through arena grace, release, manual reset, and slot reuse.
   _Depends: M6-10ea._
   _Verify: `COG_TEST_CORE=arena mise run test --filter LIFE`._
-- **M6-10fa** _(Infrastructure)_ — Pass the M1 debug-seed semantics through
-  arena dirty propagation without turns, reactions, or history.
+- **M6-10fa** _(Infrastructure)_ — Pass the M1 `CogTesting` debug-seed
+  semantics through arena dirty propagation without turns, reactions, or
+  history.
   _Depends: M6-09, M6-10cb._
   _Verify: `COG_TEST_CORE=arena mise run test --filter 'SEED-0[1-4]'`,
   `mise run test:compilefail`, and the release absence check._
@@ -1255,7 +1253,7 @@ ArenaDirtyPropagationInfrastructure`._
   boundary.
   _Depends: M6-10fa, M6-10g._
   _Verify: `COG_TEST_CORE=arena mise run test --filter SEED-07`._
-- **M6-10ha** _(Infrastructure)_ — Pass async phase creation, first work,
+- **M6-10ha** _(Infrastructure)_ — Pass async metadata creation, first work,
   results, projections, dependency capture, keys, isolation, and task naming
   through arena values.
   _Depends: M6-10ba._

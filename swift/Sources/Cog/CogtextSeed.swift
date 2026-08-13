@@ -1,15 +1,13 @@
 #if DEBUG
 
-extension Cogtext {
-  /// Seeds a manual source for deterministic test setup.
+extension Cogs {
+  /// Implements deterministic manual-source setup for `CogTesting`.
   ///
-  /// Seeding is a public API only in debug builds and the exception to ordinary
-  /// turn-based writes. It applies the source's equality rule and marks
-  /// dependent cogs for later settlement, but opens no turn and computes
-  /// nothing eagerly. Feature state
-  /// files should wrap `fileprivate` sources in narrow test helpers. Seed only
-  /// while the context is idle; seeding during graph work would break its
-  /// snapshot.
+  /// This package seam is the exception to ordinary turn-based writes. It
+  /// applies the source's equality rule and marks dependent cogs for later
+  /// settlement, but opens no turn and computes nothing eagerly. Only the
+  /// `CogTesting` product publishes it to clients. Seed only while the context
+  /// is idle; seeding during graph work would break its snapshot.
   ///
   /// A changed seed advances the context revision, updates an existing or
   /// lazily created app-lifetime manual state, invalidates dependents, and
@@ -27,7 +25,10 @@ extension Cogtext {
   ///   - valueReference: The exact manual descriptor-and-key state to seed.
   ///   - value: The candidate value, installed only when the source's equality
   ///     rule considers it changed.
-  public func seed<Value>(_ valueReference: ManualCog<Value>, to value: Value) {
+  package func seedForTesting<Value>(
+    _ valueReference: ManualCog<Value>,
+    to value: Value
+  ) {
     guard case .idle = turnPhase, trackedConsumer == nil, seedBarrierDepth == 0 else {
       fatalError("Cog seed can run only during idle test setup, outside a selector or reaction.")
     }

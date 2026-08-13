@@ -7,7 +7,7 @@ an implementation plan. It does not settle value-reference, edge, hash-table, or
 exclusivity layouts; benchmarks must choose those details.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
-`Cogtext`. This avoids locks, per-edge objects, weak references, and repeated
+`Cogs`. This avoids locks, per-edge objects, weak references, and repeated
 reference counting in the hot path.
 
 This document serves Cog's third principle, minimizing runtime overhead. The
@@ -49,7 +49,7 @@ fast paths; public value references must name data, not expose arena slots; and
 multi-writer snapshots are wasted work in a single-threaded graph. Appendix B
 keeps the detailed prior-art notes and measurements.
 
-## 3. `Cogtext` as a table of graph data
+## 3. `Cogs` as a table of graph data
 
 An entity-component-system (ECS) stores each kind of data in a separate
 column. Cog uses the same pattern: states are rows, while flags, versions, and
@@ -226,9 +226,6 @@ Releasing a sync-derived row drops its value, returns edges to the free list,
 and increases the slot generation. Releasing an async row first cancels its
 task and increases the async generation, so late results fail before they can
 touch a reused slot. Debug builds also check stale internal slot access.
-
-`keepAlive` remains sugar for app lifetime, not an exception added to one
-global observer rule.
 
 ## 8. Turns over the arrays
 

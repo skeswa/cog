@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure gives fresh states the right state and versions`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
 
@@ -29,7 +29,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure advances revisions monotonically`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   let first = cogs.advanceRevision()
   let second = cogs.advanceRevision()
@@ -41,7 +41,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure never weakens an invalidation`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = cogs.manualState(for: ManualCog<Int>(1))
 
   source.markForCheck()
@@ -58,7 +58,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure distinguishes change from verification`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = cogs.manualState(for: ManualCog<Int>(1))
 
   let changed = cogs.advanceRevision()
@@ -79,7 +79,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure stores enter and exit frames in LIFO order`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = cogs.manualState(for: ManualCog<Int>(1))
   let derived = cogs.derivedState(for: Cog<Int> { _ in 2 })
 
@@ -109,7 +109,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure reuses one stack and clears abandoned frames`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let first = cogs.derivedState(for: Cog<Int> { _ in 1 })
   let second = cogs.derivedState(for: Cog<Int> { _ in 2 })
 
@@ -134,7 +134,7 @@ import Testing
 
 @MainActor
 @Test func `SettleEngineInfrastructure severs strong graph chains before context teardown`() {
-  var cogs: Cogtext? = Cogtext.forTesting()
+  var cogs: Cogs? = Cogs.forTesting()
   weak let releasedContext = cogs
 
   let source = ManualCog<Int>(1)

@@ -20,7 +20,7 @@
 @MainActor
 public struct ReactionReader {
   /// The context whose active reaction run owns this capability.
-  private let cogs: Cogtext
+  private let cogs: Cogs
 
   /// The exact registration receiving dependencies and lifetime leases.
   private let reaction: CogReaction
@@ -33,7 +33,7 @@ public struct ReactionReader {
   /// - Parameters:
   ///   - cogs: The context evaluating the reaction.
   ///   - reaction: The active registration that receives dependency edges.
-  internal init(cogs: Cogtext, reaction: CogReaction) {
+  internal init(cogs: Cogs, reaction: CogReaction) {
     self.cogs = cogs
     self.reaction = reaction
   }
@@ -80,7 +80,7 @@ public struct ReactionReader {
   /// state and starts its work; the reaction then holds a `whileObserved`
   /// lease that reaches the async state through the projection's dependency.
   /// Equality gating keeps the reaction quiet when a reload succeeds with an
-  /// equal value; track `c.phase[valueReference]` instead where each phase
+  /// equal value; track `c.meta[valueReference]` instead where each metadata
   /// turn should rerun the reaction. If initial demand establishes pending,
   /// Cog defers that graph-owned turn until tracking and lease reconciliation
   /// finish, so the turn cannot flush through the active reaction.
@@ -91,42 +91,42 @@ public struct ReactionReader {
     self[valueReference.valueCog]
   }
 
-  /// The phase lens over this reaction's read capability.
+  /// The metadata lens over this reaction's read capability.
   ///
-  /// `c.phase[asyncValue]` inside a reaction records the async state itself
+  /// `c.meta[asyncValue]` inside a reaction records the async state itself
   /// as the dependency, so every pending, success, and failure turn reruns
   /// the reaction — the opposite gating from the value read beside it. The
   /// lens has no spelling for manual or derived cogs: synchronous state has
-  /// no phase, and asking for one is a type error.
-  public var phase: Phase {
-    Phase(cogs: cogs, reaction: reaction)
+  /// no request metadata, and asking for it is a type error.
+  public var meta: Meta {
+    Meta(cogs: cogs, reaction: reaction)
   }
 
-  /// The tracked phase-reading facet of one reaction run.
+  /// The tracked metadata-reading facet of one reaction run.
   ///
   /// As transient as the reader that made it: it borrows the same context
   /// and reaction, and every access enforces the same active-tracking
   /// requirement.
   @MainActor
-  public struct Phase {
+  public struct Meta {
     /// The context whose graph this reaction reads.
-    private let cogs: Cogtext
+    private let cogs: Cogs
 
-    /// The reaction receiving phase dependencies and leases.
+    /// The reaction receiving metadata dependencies and leases.
     private let reaction: CogReaction
 
-    /// Borrows the reaction reader's capability for phase spellings.
-    internal init(cogs: Cogtext, reaction: CogReaction) {
+    /// Borrows the reaction reader's capability for metadata spellings.
+    internal init(cogs: Cogs, reaction: CogReaction) {
       self.cogs = cogs
       self.reaction = reaction
     }
 
-    /// Reads an async cog's full phase and records its exact state as a
+    /// Reads an async cog's full metadata and records its exact state as a
     /// dependency.
     ///
     /// Cog settles the state before attaching the reaction edge. A first read
     /// can therefore select work and return pending; a dirty state selects
-    /// fresh work before the reaction observes its phase. At the end of the
+    /// fresh work before the reaction observes its metadata. At the end of the
     /// tracking run, the reaction acquires one `whileObserved` lease for the
     /// state. Later pending, success, or failure turns rerun the reaction
     /// after affected dependencies settle. Cancelling the reaction releases
@@ -135,30 +135,30 @@ public struct ReactionReader {
     /// reconciliation finish, so the turn cannot flush through the active
     /// reaction.
     ///
-    /// - Parameter valueReference: The async value whose phase to track.
-    /// - Returns: Its newest settled phase in this context.
-    public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+    /// - Parameter valueReference: The async value whose metadata to track.
+    /// - Returns: Its newest settled metadata in this context.
+    public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogMeta<Value> {
       cogs.requireTracking(reaction)
 
       let producer = cogs.asyncState(for: valueReference)
-      let phase = producer.settledPhase(in: cogs)
+      let meta = producer.settledMeta(in: cogs)
       reaction.recordDependency(on: producer)
-      return phase
+      return meta
     }
 
-    /// Peeks at an async cog's phase without recording a dependency.
+    /// Peeks at an async cog's metadata without recording a dependency.
     ///
     /// The read still settles the exact state, starting initial work or
     /// selecting replacement work when needed. It does not add a reaction
-    /// edge or lease, so later phase turns do not rerun this reaction. If no
+    /// edge or lease, so later metadata turns do not rerun this reaction. If no
     /// other durable consumer exists, the peek starts or renews ordinary
     /// `whileObserved` grace.
     ///
-    /// - Parameter valueReference: The async value whose phase to read once.
-    /// - Returns: Its newest settled phase in this context.
-    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+    /// - Parameter valueReference: The async value whose metadata to read once.
+    /// - Returns: Its newest settled metadata in this context.
+    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogMeta<Value> {
       cogs.requireTracking(reaction)
-      return cogs.phase.peek(valueReference)
+      return cogs.meta.peek(valueReference)
     }
   }
 

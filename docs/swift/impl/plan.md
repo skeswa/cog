@@ -93,13 +93,15 @@ scenario to exactly one task.
 
 Execution constraints from the design docs:
 
-- One app-wide `Cogtext`; guarded production construction; tests and previews
+- One app-wide `Cogs`; guarded production construction; tests and previews
   get isolated contexts from the testing product.
-- `commit(_:_:)` is the only write primitive: writer turn IDs, three context
-  phases, six-step flush order (§3.2).
+- `commit` is the only write entry point: a compact scalar overload, a writer
+  overload with turn IDs, three context phases, and the six-step flush order
+  (§3.2).
 - Lazy pull plus pushed dirty flags; CLEAN, CHECK, DIRTY with versions;
   equality gates; dependencies recaptured every run.
-- `CogPhase` begins publicly at `pending` with explicit `Previous`; async
+- `CogMeta` begins publicly at `pending` with a total value and
+  `hasSucceeded`; async
   selectors are synchronous and return `Work`; `.latest` is the default;
   streams are `.latest`-only.
 - Public value references stay resilient (no `@frozen`) and never expose arena slots.
@@ -124,7 +126,7 @@ cog/                                  (git root = SwiftPM package root)
 ├── swift/
 │   ├── Sources/
 │   │   ├── Cog/                      # the library; Cog.docc/ catalog inside
-│   │   ├── CogTesting/               # isolated-Cogtext factory for tests/previews
+│   │   ├── CogTesting/               # isolated-Cogs factory for tests/previews
 │   │   └── CogScenarios/             # benchmark graphs + expected run counts,
 │   │                                 #   shared by tests and benchmarks; exported
 │   │                                 #   as non-API product _CogScenarios
@@ -141,7 +143,8 @@ cog/                                  (git root = SwiftPM package root)
 ```
 
 Products: `Cog`, `CogTesting` (depends on Cog), and `_CogScenarios` (for the
-benchmark package only). Compile `seed` only behind `#if DEBUG` (§6.6).
+benchmark package only). Publish `seed` from `CogTesting`, only behind
+`#if DEBUG` (§6.6).
 
 Manifest choices:
 
@@ -247,7 +250,8 @@ carries the live state of doing it.
   `test-host` (four-leg matrix of `swift test --parallel`, `.build` cached per
   leg), and `test-release` (`swift test -c release` on the default leg — the
   leg where every-build guardrails such as the second-context guard, escaped
-  writers, cycle detection, the absence of `seed`, and free debug history are
+  writers, cycle detection, the absence of `CogTesting.seed`, and free debug
+  history are
   proven outside debug). Add `test-simulator` in M2 and `bench-build` in M5.
   macOS jobs run on the self-hosted Mac mini under the labels and topology
   `M0-05a` records, with the pinned Xcode 26.x baked into the runner image;
@@ -299,7 +303,7 @@ The class-state build. Correctness first; no perf tricks.
   `name:` or `fileID:line` labels). Public value references `Cog<T>` and
   `ManualCog<T>`; boxes `CogBox` and `ManualCogBox`; inline `AnyHashable?`
   keys; allocation-free `box[key]`; the `.readOnly` projection.
-- Cogtext: states stored by descriptor plus key, created lazily; tracked
+- Cogs: states stored by descriptor plus key, created lazily; tracked
   subscripts, `peek`, and `curr` on the read capability; a MainActor-confined
   tracking slot. Non-tracking peeks still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
@@ -322,23 +326,24 @@ The class-state build. Correctness first; no perf tricks.
   a debug turn-chain guard (about 64 turns) prints the causes through an
   internal diagnostic seam (§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
-  manual opt-in; `keepAlive` as sugar; per-kind defaults from §5.3. A
+  manual opt-in; per-kind defaults from §5.3. A
   declaration without an explicit grace uses its context default: 30 seconds
   in production and an explicit testing override when elapsed time is under
   test. Internal graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  `M1-34a` settled the helper spellings on 2026-08-11: `Cogtext.bootstrapApp()`
-  from `Cog` and `Cogtext.forTesting()` from `CogTesting`, with a `package`
+  `M1-34a` settled the helper spellings on 2026-08-11: `Cogs.bootstrapApp()`
+  from `Cog` and `Cogs.forTesting()` from `CogTesting`, with a `package`
   initializer so neither can be bypassed. Add the `CogTesting` isolated-context factory for tests and
   previews. Introduce its injected clock and cleanup-acknowledgement seams
   independently near the start of M1; `whileObserved` grace timing runs on the
   context's clock, so lifetime tests never wait wall-clock time. Verify that
   separate preview runtimes neither share values nor touch the production
   install guard.
-- Seeding: debug-only `seed` stages a value and pushes dirty flags, with
-  no turn, notice, or reaction (§6.6).
+- Seeding: debug-only `CogTesting.seed` stages a value and pushes dirty flags,
+  with no turn, notice, or reaction (§6.6).
 - Debug history: a bounded log of ops, writes, recomputations, and
-  notices; `os_log` display for now; zero release-build cost.
+  notices, exposed as structured snapshots without a logging convenience;
+  zero release-build cost.
 - Test seams and traps: the cycle diagnostic, turn-chain warning,
   no-consumer warning, and cross-executor cleanup acknowledgements are named
   diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
@@ -369,14 +374,14 @@ isolation; and named effect runs in history.
   phantom key path, `withMutation` only when the value changes. UI-read states
   stay pinned to the app context (§5.3, perf §6).
 - The `\.cogs` environment key; tracked `cogs[valueReference]` in `body`;
-  `binding(for:)` pairs a tracked read with a named commit; non-tracking
-  one-shot `cogs.peek(valueReference)`.
+  application-owned SwiftUI bindings pair that tracked read with an existing
+  domain operation; non-tracking one-shot `cogs.peek(valueReference)`.
 - Escaping closures use one-shot `cogs.peek`. `M2-07` confirmed that public
   Observation exposes no current-consumer query, so the direct subscript
   API cannot diagnose a missing UI consumer without false positives. Ship no
   warning or private-SPI heuristic; §7 and §10 record the deferred diagnostic.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
-  `fileprivate` sources plus ops, an effects group, and bindings.
+  `fileprivate` sources plus ops, app-runtime effects, and bindings.
   Verify per-ZIP invalidation, equality-gated derived notices, and a view that
   reads two values changed in one commit without ever rendering a torn pair.
   Verify that boundary notices and their history entries precede reaction
@@ -385,7 +390,7 @@ isolation; and named effect runs in history.
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
 - Weather proceeds in two branches. `M2-14a` creates the app and state layer,
   allowing `M2-15` UI work to proceed independently. `M2-14b` joins that app
-  to the complete `EffectGroup` contract after M1's terminal cancellation,
+  to the complete `Cogs.effects` and `EffectGroup` contract after M1's terminal cancellation,
   task ownership, explicit installation, hourly-clock, and deinit-cleanup
   leaves are green. `M2-16` joins both branches; the example never carries a
   local lifecycle substitute or a partially implemented public group.
@@ -419,20 +424,22 @@ isolation; and named effect runs in history.
 
 Limit this milestone to the async pieces needed for 0.1.0:
 
-- `CogPhase<Value>` plus `Previous<Value>`, `latestValue`, `isLoading`, and
-  the `.latest` projection so async and manual values read alike. There is no
-  observable `initial` phase: first read starts work, publishes
-  `pending(previous: .none)` as a turn, and returns that phase.
+- `CogMeta<Value>` with a total `value`, `hasSucceeded`, and loading/error
+  accessors, plus the value projection so async and manual values read alike.
+  There is no observable `initial` case: first read starts work, publishes
+  `pending(value: default, hasSucceeded: false)` as a turn, and returns that
+  metadata.
 - `AsyncCog` and `AsyncCogBox`: synchronous tracked selectors returning
   `Work.run`; the `.latest` policy with generation numbers (the MainActor
   commits a result only if its generation is still current); each visible
-  phase change is its own turn; replaced-cancelled work publishes no failure.
+  metadata change is its own turn; replaced-cancelled work publishes no failure.
 - Safe release: cancel and advance the generation on `.whileObserved` expiry
   (§5.3).
-- A `cogs.refresh(valueReference)` op; task names from descriptor labels for
-  Instruments.
+- A `cogs.refresh(valueReference)` op returning an exact-generation
+  `CogRefresh` outcome; task names from descriptor labels for Instruments.
 - A one-shot peek or refresh of a never-read async value reference creates its
-  state and starts exactly one initial run at `pending(previous: .none)`. It
+  state and starts exactly one initial run at
+  `pending(value: default, hasSucceeded: false)`. It
   installs no durable consumer: the call renews ordinary `whileObserved`
   grace, after which release cancels the work and rejects late results if no
   consumer arrived. Refresh does not initialize and then replace the first
@@ -440,7 +447,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
 - A one-shot peek of synchronous derived state is the same kind of transient
   demand: it installs no durable consumer, renews ordinary `whileObserved`
   grace, and releases and recreates from current dependencies after expiry.
-- Tests: cancellation, stale-generation rejection, phase-per-turn sequencing,
+- Tests: cancellation, stale-generation rejection, metadata-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure
   turns with the last successful value, MainActor-by-default and `@concurrent`
@@ -451,7 +458,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
   of one-shot synchronous derived demand. Use injected clocks and
   continuations; do not sleep.
 - Revise `swift/Examples/Weather` around the completed slice: one keyed
-  `AsyncCogBox` owns forecast request phases and tasks; cards retain the last
+  `AsyncCogBox` owns forecast request metadata and tasks; cards retain the last
   successful reading through reload and failure; initial loads, retries, and
   hourly updates use `refresh`; deterministic example tests prove per-ZIP
   invalidation, untorn atomic readings, failure retention, replacement, and
@@ -467,14 +474,17 @@ query caching.
 - Read swift-state-graph source before freezing public names; credit prior
   art; compare tracked reads with capture lists. Adjust names if warranted;
   update §10.
-- Complete the `CogPhase` accessor surface — `value`, `error`,
-  `isInitialLoading`, `isReloading` (§5.1) — so the public-name review and
-  0.1.0 freeze cover the whole phase-reading surface (ASYNC-30).
+- Complete and simplify the `CogMeta` surface — a total `value`,
+  `hasSucceeded`, `error`, and `isLoading` (§5.1) — so
+  the public-name review and 0.1.0 freeze cover the whole metadata surface
+  without `Previous` or weaker optional accessors (ASYNC-30).
 - Adopt value-first async reads before the freeze: total `c[...]` value reads
-  resting on a required-but-omittable declaration default (`CogDefaultable`,
-  with only `Optional` conforming), the `phase` lens on every read
+  resting on an explicit declaration `default:`, the `meta` lens on every read
   capability, and no separate `.latest` projection (§5.1; ASYNC-31 through
   ASYNC-34, with the existing async suite respelled).
+- Return exact-generation `CogRefresh` handles; make `Cogs` the sole public
+  runtime and root effect owner; delegate bindings to domain operations; and
+  ship `CogTesting.TestClock` for deterministic application schedules.
 - `Cog.docc`: landing page, Getting Started, and an article on the
   one-context rule and testing with `CogTesting`. Start `CHANGELOG.md`.
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that

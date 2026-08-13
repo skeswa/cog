@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `GROUP-10 adding reactions cannot reopen a cancelled group`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   let group = EffectGroup()
   let copy = group

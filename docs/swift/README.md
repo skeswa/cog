@@ -17,12 +17,12 @@ Four principles guide every API and implementation choice:
 2. **Every state read should be correct.** A read must match the latest
    committed source state after settling every dependency it needs. It must
    not expose a torn update, stale derived value, or half-finished change.
-   Uncertain async state must be explicit in `CogPhase`.
+   Uncertain async state must be explicit in `CogMeta`.
 3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
    allocation, reference counting, locks, and UI updates. Measure competing
    implementations instead of guessing.
 4. **Cog state should be singular.** One running app has one authoritative
-   `Cogtext`, and each mutable fact represented in Cog has one writable source
+   `Cogs`, and each mutable fact represented in Cog has one writable source
    in it. Scenes, screens, and features must not create competing contexts or
    mirror sources. A test or preview is a separate runtime with one context.
 
@@ -94,12 +94,12 @@ pinned version and the runner topology.
 
 ## Production, tests, and previews
 
-Production depends on `Cog` only. Call `Cogtext.bootstrapApp()` exactly once,
+Production depends on `Cog` only. Call `Cogs.bootstrapApp()` exactly once,
 at app launch, and retain the context it returns as the app's ownership handle.
 Pass that same object into services, effects, and every scene. A rebuilt scene
 receives the existing context; it never bootstraps another one. Features cannot
-construct a `Cogtext` directly, and there is deliberately no ambient
-`Cogtext.app` lookup.
+construct a `Cogs` directly, and there is deliberately no ambient
+`Cogs.app` lookup.
 
 ```swift
 import Cog
@@ -108,10 +108,10 @@ import SwiftUI
 @main
 @MainActor
 struct WeatherApp: App {
-  private let cogs: Cogtext
+  private let cogs: Cogs
 
   init() {
-    cogs = Cogtext.bootstrapApp()
+    cogs = Cogs.bootstrapApp()
   }
 
   var body: some Scene {
@@ -142,7 +142,7 @@ import Testing
 @MainActor
 @Test func counterStartsClean() {
   let count = ManualCog<Int>(0)
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(count) == 0)
   cogs.commit { c in c[count] = 1 }
@@ -151,17 +151,18 @@ import Testing
 ```
 
 Keep `CogTesting` in test or preview-support targets rather than the shipping
-app target. A timed test retains its own controllable `Clock<Duration>` and
-passes it as `Cogtext.forTesting(clock:)`; CogTesting does not ship a separate
-test-clock type. Untimed tests use the default continuous clock.
+app target. Timed tests use `TestClock`, inject it wherever scheduling happens,
+and call `advance(by:)` instead of waiting for wall-clock time. Pass that same
+clock as `Cogs.forTesting(clock:)` when Cog-owned lifetime grace is under test.
+Untimed tests use the default continuous clock.
 
 Only a test whose subject is the production install uses the scoped fixture:
 
 ```swift
 @MainActor
 @Test func appBootstrapIsTheSubject() {
-  Cogtext.withBootstrappedApp { cogs in
-    #expect(Cogtext.isBootstrappedApp(cogs))
+  Cogs.withBootstrappedApp { cogs in
+    #expect(Cogs.isBootstrappedApp(cogs))
   }
 }
 ```
@@ -175,9 +176,10 @@ preview setup.
 
 These choices are settled; §10 of the core document has the full record.
 
-- `commit(_:_:)` is the only write primitive. Ops are normal `Cogtext`
-  methods. `fileprivate` and `.readOnly` control which code may name writable
-  state. A turn ID stops an escaped writer from writing later.
+- `commit` is the only write entry point. Its scalar overload keeps ordinary
+  setters compact; its writer overload makes related writes atomic. Ops are
+  normal `Cogs` methods. `fileprivate` and `.readOnly` control which code may
+  name writable state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
   from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
@@ -203,39 +205,39 @@ These choices are settled; §10 of the core document has the full record.
   interned keys, and generic keyed value references.
 - Async reads are total and value-first: `c[valueReference]` returns the last
   accepted success, resting on the declaration's default until one exists, and
-  the request lifecycle reads through the `phase` lens (`c.phase[...]`,
-  `cogs.phase[...]`), which exists only for async references. The default is a
-  required invariant but an omittable argument — `init(default:)` states it,
-  or `Value: CogDefaultable` supplies it, and the library conforms only
-  `Optional`, resting at `nil`.
+  the request lifecycle reads through the `meta` lens (`c.meta[...]`,
+  `cogs.meta[...]`), which exists only for async references. Every declaration
+  states the resting invariant with `default:`, including `default: nil` for
+  optional values.
 - Async selectors read dependencies synchronously, then return `Work.run` or
   `Work.stream`. The first read starts work and publicly begins at
-  `pending(previous: .none)`; there is no observable `initial` phase. An
-  explicit `Previous` case keeps “no previous value” distinct from “previous
-  value was nil.” A complete accessor set — `latestValue`, `value`, `error`,
-  `isLoading`, `isInitialLoading`, `isReloading` — narrows one fact without
-  matching through `Previous`. `.latest` is the default policy. Streams allow
-  only `.latest`.
+  `pending(value: default, hasSucceeded: false)`; there is no observable
+  `initial` case. `CogMeta.value` is total in every case, while `hasSucceeded`
+  keeps a successful optional `nil` distinct from the resting default. The
+  focused accessors are `value`, `hasSucceeded`, `error`, and `isLoading`.
+  `.latest` is the default policy.
+  Streams allow only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
-- `Cogtext` owns state and reactions. Final-class `ReactionToken` and
-  `EffectGroup` handles own lifecycle and cancel safely more than once. A
+- `Cogs` owns state, reactions, and its app-lifetime `effects` group. A
+  shorter-lived feature owns a separate final-class `EffectGroup`; those
+  handles cancel safely more than once. A
   cancelled group is terminal; adding a reaction token afterward synchronously
   cancels the token without retaining it, and a task requested afterward is
   already cancelled when `task` returns. Neither operation reopens the group.
-- Production creates one app-wide `Cogtext` and injects it above all scenes.
+- Production creates one app-wide `Cogs` and injects it above all scenes.
   Screens and features share it. Tests and previews create one isolated
   context for their runtime.
-- Production construction is guarded. `Cogtext.bootstrapApp()` creates the one
+- Production construction is guarded. `Cogs.bootstrapApp()` creates the one
   production context and fails fast on a second call; the plain initializer is
   `package`, so feature code cannot name it. The `CogTesting` product adds
-  `Cogtext.forTesting()` for a test or preview runtime, which never registers
+  `Cogs.forTesting()` for a test or preview runtime, which never registers
   as the production context.
 - The context returned by `bootstrapApp()` is the app's ownership handle. The
   app passes it to effects, services, and scenes; views receive it through the
   planned M2 environment boundary, and ops are instance methods on it. Current
   M1 composition passes the same object explicitly. There is no ambient
-  `Cogtext.app`. Tests of production installation use a synchronous scoped
+  `Cogs.app`. Tests of production installation use a synchronous scoped
   fixture from `CogTesting`, so they cannot leak global install state across
   the suite.
 - Manual state and states seen by the UI live for the app context by default.
@@ -249,7 +251,7 @@ These choices are settled; §10 of the core document has the full record.
   stale. A synchronous derived or async peek is transient demand: without a
   durable consumer it renews normal `whileObserved` grace, and expiry releases
   the state. Peeking or refreshing a never-read async value starts exactly one
-  initial run at `pending(previous: .none)` without a dependency,
+  initial run at `pending(value: default, hasSucceeded: false)` without a dependency,
   subscription, or Observation boundary; expiry also cancels its work and
   rejects late results. Exported
   streams (`cogs.values(of:)`) start from the current settled value and never
@@ -260,9 +262,10 @@ These choices are settled; §10 of the core document has the full record.
   propagation boundary; several mutations may coalesce. The pre-iOS-26
   one-shot shim internally acknowledges re-arming for deterministic tests, but
   its small disarmed race remains a documented platform limitation.
-- Debug-only `seed` stages a value and pushes dirty flags like a write, but
-  records no turn, sends no notices, and runs no reactions. Tests may seed
-  after effects install; the next real turn settles what the seed dirtied.
+- Debug-only `CogTesting.seed` stages a value and pushes dirty flags like a
+  write, but records no turn, sends no notices, and runs no reactions. Tests
+  may seed after effects install; the next real turn settles what the seed
+  dirtied. Apps importing only `Cog` cannot seed.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.
 - Derived computation is read-only through selector execution, dependency
@@ -288,7 +291,7 @@ These choices are settled; §10 of the core document has the full record.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, and persistence helpers. Also open are several edge
-behaviors: what a stream's phase does when its sequence ends or throws, whether
+behaviors: what a stream's metadata does when its sequence ends or throws, whether
 equal stream elements commit distinct turns, whether a failed `.queue` run
 stops the queue, and debounce/throttle timing modifiers (deferred backlog).
 Value-reference layout, edge layout, and hash tables also remain open until

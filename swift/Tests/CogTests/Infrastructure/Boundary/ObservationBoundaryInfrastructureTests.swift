@@ -7,7 +7,7 @@ import os
 
 @MainActor
 @Test func `ObservationBoundaryInfrastructure creates one boundary for one UI-read state`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let counts = ManualCogBox<Int, String>(0)
   let firstState = cogs.manualState(for: counts["first"])
   let secondState = cogs.manualState(for: counts["second"])
@@ -26,7 +26,7 @@ import os
 
 @MainActor
 @Test func `ObservationBoundaryInfrastructure mutates only after a manual value changes`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
   let state = cogs.manualState(for: count)
   let notices = OSAllocatedUnfairLock(initialState: 0)
@@ -47,7 +47,7 @@ import os
 @MainActor
 @Test
 func `ObservationBoundaryInfrastructure settles a derived boundary before change-only mutation`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
   let isEven = Cog<Bool> { c in c[count].isMultiple(of: 2) }
   let state = cogs.derivedState(for: isEven)

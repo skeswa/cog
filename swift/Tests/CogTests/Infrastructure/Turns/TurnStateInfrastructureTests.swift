@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `TurnStateInfrastructure advances through one turn and returns to idle`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   guard case .idle = cogs.turnPhase else {
     Issue.record("A new context did not start idle")
@@ -38,7 +38,7 @@ import Testing
 
 @MainActor
 @Test func `TurnStateInfrastructure captures a custom turn name`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   cogs.withTurn("refreshWeather") { turn in
     #expect(turn.name == "refreshWeather")
@@ -53,13 +53,13 @@ import Testing
 
 @MainActor
 @Test func `TurnStateInfrastructure captures the calling function by default`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
 
   #expect(defaultTurnName(in: cogs) == "defaultTurnName(in:)")
 }
 
 @MainActor
-private func defaultTurnName(in cogs: Cogtext) -> String {
+private func defaultTurnName(in cogs: Cogs) -> String {
   var captured = ""
   cogs.withTurn { turn in
     captured = turn.name
@@ -69,7 +69,7 @@ private func defaultTurnName(in cogs: Cogtext) -> String {
 
 @MainActor
 @Test func `TurnStateInfrastructure gives every turn an identity Cog alone minted`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   var first: CogTurnID?
   var second: CogTurnID?
 
@@ -83,7 +83,7 @@ private func defaultTurnName(in cogs: Cogtext) -> String {
 
 @MainActor
 @Test func `TurnStateInfrastructure keeps keyless pending state apart from committed state`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let selectedZip = ManualCog<String?>("10001")
   let state = cogs.manualState(for: selectedZip)
 

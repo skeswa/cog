@@ -5,18 +5,26 @@ private nonisolated enum Async30Error: Error, Equatable {
   case offline
 }
 
-@Test func `ASYNC-30 value and error extract only the current generation`() {
-  let initialPending = CogPhase<Int>.pending(previous: .none)
-  let reloadPending = CogPhase<Int>.pending(previous: .some(41))
-  let success = CogPhase<Int>.success(42)
-  let initialFailure = CogPhase<Int>.failure(Async30Error.offline, previous: .none)
-  let reloadFailure = CogPhase<Int>.failure(Async30Error.offline, previous: .some(42))
+@Test func `ASYNC-30 value stays total while error describes the current generation`() {
+  let initialPending = CogMeta<Int>.pending(value: 0, hasSucceeded: false)
+  let reloadPending = CogMeta<Int>.pending(value: 41, hasSucceeded: true)
+  let success = CogMeta<Int>.success(42)
+  let initialFailure = CogMeta<Int>.failure(
+    Async30Error.offline,
+    value: 0,
+    hasSucceeded: false
+  )
+  let reloadFailure = CogMeta<Int>.failure(
+    Async30Error.offline,
+    value: 42,
+    hasSucceeded: true
+  )
 
-  #expect(initialPending.value == nil)
-  #expect(reloadPending.value == nil)
+  #expect(initialPending.value == 0)
+  #expect(reloadPending.value == 41)
   #expect(success.value == 42)
-  #expect(initialFailure.value == nil)
-  #expect(reloadFailure.value == nil)
+  #expect(initialFailure.value == 0)
+  #expect(reloadFailure.value == 42)
 
   #expect(initialPending.error == nil)
   #expect(reloadPending.error == nil)
@@ -26,41 +34,47 @@ private nonisolated enum Async30Error: Error, Equatable {
 }
 
 @Test func `ASYNC-30 a reload retrying after a failure reports neither value nor error`() {
-  let retryPending = CogPhase<Int>.pending(previous: .some(42))
+  let retryPending = CogMeta<Int>.pending(value: 42, hasSucceeded: true)
 
-  #expect(retryPending.value == nil)
+  #expect(retryPending.value == 42)
   #expect(retryPending.error == nil)
-  #expect(retryPending.latestValue == 42)
 }
 
-@Test func `ASYNC-30 loading accessors split pending by retained success`() {
-  let initialPending = CogPhase<Int>.pending(previous: .none)
-  let reloadPending = CogPhase<Int>.pending(previous: .some(41))
-  let success = CogPhase<Int>.success(42)
-  let initialFailure = CogPhase<Int>.failure(Async30Error.offline, previous: .none)
-  let reloadFailure = CogPhase<Int>.failure(Async30Error.offline, previous: .some(42))
+@Test func `ASYNC-30 loading and success stay orthogonal`() {
+  let initialPending = CogMeta<Int>.pending(value: 0, hasSucceeded: false)
+  let reloadPending = CogMeta<Int>.pending(value: 41, hasSucceeded: true)
+  let success = CogMeta<Int>.success(42)
+  let initialFailure = CogMeta<Int>.failure(
+    Async30Error.offline,
+    value: 0,
+    hasSucceeded: false
+  )
+  let reloadFailure = CogMeta<Int>.failure(
+    Async30Error.offline,
+    value: 42,
+    hasSucceeded: true
+  )
 
-  #expect(initialPending.isInitialLoading)
-  #expect(!initialPending.isReloading)
-  #expect(!reloadPending.isInitialLoading)
-  #expect(reloadPending.isReloading)
-  #expect(!success.isInitialLoading)
-  #expect(!success.isReloading)
-  #expect(!initialFailure.isInitialLoading)
-  #expect(!initialFailure.isReloading)
-  #expect(!reloadFailure.isInitialLoading)
-  #expect(!reloadFailure.isReloading)
+  #expect(initialPending.isLoading)
+  #expect(reloadPending.isLoading)
+  #expect(!success.isLoading)
+  #expect(!initialFailure.isLoading)
+  #expect(!reloadFailure.isLoading)
+
+  #expect(!initialPending.hasSucceeded)
+  #expect(reloadPending.hasSucceeded)
+  #expect(success.hasSucceeded)
+  #expect(!initialFailure.hasSucceeded)
+  #expect(reloadFailure.hasSucceeded)
 }
 
 @Test func `ASYNC-30 a successful nil stays distinct through value`() {
-  let successNil = CogPhase<Int?>.success(nil)
-  let reloadAfterNil = CogPhase<Int?>.pending(previous: .some(nil))
+  let successNil = CogMeta<Int?>.success(nil)
+  let reloadAfterNil = CogMeta<Int?>.pending(value: nil, hasSucceeded: true)
 
-  if let produced = successNil.value {
-    #expect(produced == nil)
-  } else {
-    Issue.record("A successful nil should still report a current success")
-  }
+  #expect(successNil.value == nil)
+  #expect(successNil.hasSucceeded)
   #expect(reloadAfterNil.value == nil)
-  #expect(reloadAfterNil.isReloading)
+  #expect(reloadAfterNil.hasSucceeded)
+  #expect(reloadAfterNil.isLoading)
 }

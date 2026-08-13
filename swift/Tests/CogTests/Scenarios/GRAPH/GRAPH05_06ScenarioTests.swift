@@ -9,7 +9,7 @@ import Testing
   var middleRuns = 0
   var leafRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let isPositive = Cog<Bool> { c in
     middleRuns += 1
@@ -41,7 +41,7 @@ import Testing
   var middleRuns = 0
   var leafRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(11)
   let summary = Cog<Summary>(
     { c in
@@ -71,7 +71,7 @@ import Testing
   var lowerRuns = 0
   var leafRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let doubled = Cog<Int> { c in
     middleRuns += 1
@@ -107,7 +107,7 @@ import Testing
   var middleRuns = 0
   var leafRuns = 0
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   let parity = Cog<Parity> { c in
     middleRuns += 1

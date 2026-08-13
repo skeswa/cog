@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `READ-01 a read after commit sees the written value`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
   cogs.commit { c in

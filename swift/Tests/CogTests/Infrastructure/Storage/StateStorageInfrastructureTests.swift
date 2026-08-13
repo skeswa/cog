@@ -10,7 +10,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure creates nothing until a declaration is used`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   #expect(cogs.states.isEmpty)
 
   // Declaring allocates a descriptor and touches no context.
@@ -29,7 +29,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure reuses one state for one declaration`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let retryLimit = ManualCog<Int>(3)
 
   let first = cogs.manualState(for: retryLimit)
@@ -43,7 +43,7 @@ import Testing
 @Test func `StateStorageInfrastructure resolves a copied value reference to the same state`() {
   // Value references are values that get copied and passed around freely; copying one must
   // not be a way to end up with a second piece of state.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let declared = ManualCog<Int>(3)
   let copied = declared
 
@@ -54,7 +54,7 @@ import Testing
 @MainActor
 @Test func `StateStorageInfrastructure gives every key of a declaration its own state`() {
   // A box reuses one descriptor and stores one state per key.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let weather = ManualCog<Int>(0)
 
   let here = ManualCog(descriptor: weather.descriptor, key: 90210)
@@ -68,7 +68,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure keeps a keyless declaration separate from its keys`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   let keyed = ManualCog(descriptor: source.descriptor, key: 0)
 
@@ -80,7 +80,7 @@ import Testing
 @Test func `StateStorageInfrastructure tells identical declarations apart`() {
   // Same type, same starting value, same label — two declarations, so two
   // states. Identity is the descriptor object and nothing else.
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let left = ManualCog<Int>(0, name: "twin")
   let right = ManualCog<Int>(0, name: "twin")
 
@@ -92,8 +92,8 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure gives every context its own states`() {
-  let first = Cogtext.forTesting()
-  let second = Cogtext.forTesting()
+  let first = Cogs.forTesting()
+  let second = Cogs.forTesting()
   let retryLimit = ManualCog<Int>(3)
 
   let inFirst = first.manualState(for: retryLimit)
@@ -108,7 +108,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure starts a state at its declaration's starting value`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let retryLimit = ManualCog<Int>(3)
   let keyed = ManualCog(descriptor: retryLimit.descriptor, key: 90210)
 
@@ -118,7 +118,7 @@ import Testing
 
 @MainActor
 @Test func `StateStorageInfrastructure keeps a state's label and key for diagnostics`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let weather = ManualCog<Int>(0, name: "weather")
   let keyed = ManualCog(descriptor: weather.descriptor, key: 90210)
 

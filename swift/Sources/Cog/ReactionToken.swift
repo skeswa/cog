@@ -12,7 +12,7 @@
 /// ```
 ///
 /// A token is a MainActor-isolated reference type. Additional references share
-/// one registration rather than copying it. The owning ``Cogtext`` keeps the
+/// one registration rather than copying it. The owning ``Cogs`` keeps the
 /// registration in execution order, while the last token reference controls
 /// when its body, dependency edges, and `whileObserved` leases are removed.
 @MainActor

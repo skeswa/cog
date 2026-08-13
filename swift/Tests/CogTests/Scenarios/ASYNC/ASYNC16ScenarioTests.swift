@@ -50,7 +50,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
 @Test func `ASYNC-16 concurrent work runs off actor and newest result commits on MainActor`()
   async throws
 {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async16ControlledWork()
   let forecast = AsyncCog<Async16Run>(
@@ -68,10 +68,10 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
     }
   }
   let (phases, phaseContinuation) = AsyncStream.makeStream(
-    of: CogPhase<Async16Run>.self
+    of: CogMeta<Async16Run>.self
   )
   let token = cogs.run { c in
-    let phase = c.phase[forecast]
+    let phase = c.meta[forecast]
     if case .success = phase {
       MainActor.preconditionIsolated("AsyncCog concurrent result publication")
     }
@@ -103,7 +103,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
   work.finish(0)
   try await staleChecked.wait()
-  if case .pending(previous: .none) = cogs.phase.peek(forecast) {
+  if case .pending(_, hasSucceeded: false) = cogs.meta.peek(forecast) {
   } else {
     Issue.record("The stale concurrent result escaped the generation check")
   }

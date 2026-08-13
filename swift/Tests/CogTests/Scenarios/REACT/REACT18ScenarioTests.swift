@@ -17,7 +17,7 @@ private actor ReactionTokenDropper {
 
 @MainActor
 @Test func `REACT-18 background token release acknowledges MainActor cleanup`() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var seen: [Int] = []
 

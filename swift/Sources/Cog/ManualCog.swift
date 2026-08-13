@@ -11,11 +11,11 @@
 ///
 /// Constructing or copying a `ManualCog` does not create graph state. Its
 /// stable descriptor identity names one app-lifetime state inside each
-/// ``Cogtext``; a test or preview context therefore receives isolated state,
+/// ``Cogs``; a test or preview context therefore receives isolated state,
 /// while every copy used in the same context reaches the same source.
 ///
 /// Manual state changes only through a ``Writer`` inside a named
-/// ``Cogtext/commit(_:_:)`` turn (or debug-only test seeding). A writer reads
+/// ``Cogs/commit(_:_:)`` turn (or debug-only test seeding). A writer reads
 /// that turn's staged value, while normal reads continue to see the latest
 /// completed turn until the commit boundary. Multiple writes in one turn
 /// collapse to the final staged value before equality and propagation.

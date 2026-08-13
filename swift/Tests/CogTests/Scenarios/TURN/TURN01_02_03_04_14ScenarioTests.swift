@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-01 the writer reads back the value it staged`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
   cogs.commit { c in
@@ -27,7 +27,7 @@ import Testing
 @Test func `TURN-02 the last repeated write is the one downstream sees`() {
   var sourceValuesSeen: [Int] = []
 
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   let doubled = Cog<Int> { c in
     let value = c[source]
@@ -51,7 +51,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-03 the writer reads current state before staging that source`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
   let note = ManualCog<String>("old")
 
@@ -67,7 +67,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-04 normal reads stay committed while the writer accumulates`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
   cogs.commit { c in
@@ -82,7 +82,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-14 keyed writer read-back changes only the selected key`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let unreadCounts = ManualCogBox<Int, String>(0)
 
   cogs.commit { c in

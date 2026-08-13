@@ -13,19 +13,19 @@ import Testing
 /// evaluates `body` reentrantly, because SwiftUI cannot: Cog's flush is
 /// synchronous on the MainActor, so a real body evaluation only happens after
 /// the turn completes. A turn that mutates several of the card's boundaries —
-/// the paired value and phase reads of one forecast, or a forecast plus its
+/// a forecast's metadata and its
 /// `isNice` derivation — therefore invalidates once, exactly like a frame.
 /// Tests call ``renderFrame()`` at their settle points to evaluate the body
 /// and re-arm.
 @MainActor
 private final class TrackedWeatherCard {
-  let cogs: Cogtext
+  let cogs: Cogs
   let zip: ZipCode
   private(set) var invalidations = 0
   private(set) var snapshots: [WeatherCardSnapshot] = []
   private var needsRender = false
 
-  init(cogs: Cogtext, zip: ZipCode) {
+  init(cogs: Cogs, zip: ZipCode) {
     self.cogs = cogs
     self.zip = zip
   }
@@ -67,7 +67,7 @@ private final class TrackedWeatherCard {
 
 @MainActor
 @Test func asyncZIPsInvalidateOnlyTheirOwnCardsAndNeverRenderATornReading() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
@@ -88,9 +88,8 @@ private final class TrackedWeatherCard {
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(newYorkRun, with: newYorkReading)
   }
-  // The card reads the forecast value and its phase side by side — the
-  // encouraged shape for request chrome. One success turn mutates both
-  // boundaries but invalidates the one-shot tracking session once.
+  // One metadata read supplies retained content and request chrome. The
+  // success turn invalidates that boundary once.
   #expect(newYorkCard.invalidations == 1)
   #expect(sanFranciscoCard.invalidations == 0)
   newYorkCard.renderFrame()
@@ -103,8 +102,7 @@ private final class TrackedWeatherCard {
   sanFranciscoCard.renderFrame()
 
   cogs.refresh(weatherForecast[.sanFrancisco])
-  // Reload pending notices only the phase boundary; the equality-gated value
-  // read stays quiet, and the frame still counts once.
+  // Reload pending notices the metadata boundary, and the frame counts once.
   #expect(sanFranciscoCard.invalidations == 2)
   sanFranciscoCard.renderFrame()
   let changedRun = try #require(await starts.next())
@@ -137,7 +135,7 @@ private final class TrackedWeatherCard {
         report: sanFranciscoReading.weather,
         isNice: false
       ),
-      // The changed success turn mutates the phase, the value, and `isNice`
+      // The changed success turn mutates metadata and `isNice`
       // together; the frame renders once and must see them from the same
       // settled turn rather than a mixed set.
       WeatherCardSnapshot(
@@ -151,13 +149,13 @@ private final class TrackedWeatherCard {
 
 @MainActor
 @Test func asyncNoticesPrecedeEffectsAndEqualDerivedValuesStayQuiet() async throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedCurrentZip(.newYork)
   cogs.seedWeatherService(requests.service)
   var alerts: [String] = []
-  let effects = WeatherEffects(
+  WeatherEffects(
     notifier: Notifier { alerts.append($0) },
     initialZipCodes: []
   ).install(in: cogs)
@@ -195,12 +193,11 @@ private final class TrackedWeatherCard {
   let noticeNames = equalEntries.filter { $0.event == .notice }.map(\.name)
   #expect(noticeNames.contains("weather.forecast[10001]"))
   #expect(!noticeNames.contains("weather.isNice[10001]"))
-  effects.cancel()
   withExtendedLifetime(card) {}
 }
 
 @MainActor
-private func entriesInLatestTurn(_ cogs: Cogtext) -> [CogHistoryEntry] {
+private func entriesInLatestTurn(_ cogs: Cogs) -> [CogHistoryEntry] {
   let entries = cogs.debugHistory.entries
   guard let turn = entries.last(where: { $0.event == .turn })?.turn else { return [] }
   return entries.filter { $0.turn == turn }

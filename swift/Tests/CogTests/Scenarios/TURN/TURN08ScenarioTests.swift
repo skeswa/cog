@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-08 queued commits finish one full flush at a time in FIFO order`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let value = ManualCog<Int>(0)
   var events: [String] = []

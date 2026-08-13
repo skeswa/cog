@@ -3,7 +3,7 @@
 /// `Work` describes execution; creating it does not start a `Task`. An async
 /// selector returns a fresh value after synchronously recording its Cog
 /// dependencies. Cog then owns the task, cancellation, generation checks, and
-/// MainActor publication of the resulting phase.
+/// MainActor publication of the resulting metadata.
 ///
 /// The operation may throw and may return a non-`Sendable` value when Swift's
 /// region-based `sending` rules prove the transfer safe. Replacement and
@@ -43,13 +43,13 @@ public struct Work<Value> {
 ///
 /// Policies are part of declaration behavior and apply independently to each
 /// key of an ``AsyncCogBox``. The initial API offers only replacement semantics;
-/// later policies can expand this enum without changing phase or work types.
+/// later policies can expand this enum without changing metadata or work types.
 /// The policy is `nonisolated` and `Sendable`; choosing one does not access a
 /// context or start work.
 public nonisolated enum LatestPolicy: Sendable, Equatable {
   /// Cancel prior work and accept a result only from the newest generation.
   ///
-  /// Every reload publishes pending as its next visible phase, advances a
+  /// Every reload publishes pending as its next visible metadata, advances a
   /// monotonically increasing generation, and requests cancellation of the old
   /// task. If the old task ignores cancellation and completes, the generation
   /// check discards its result. Replacement cancellation itself never publishes

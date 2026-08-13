@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-17 a finite reaction loop warns and returns idle`() throws {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let ping = ManualCog<Int>(0)
   let pong = ManualCog<Int>(0)
   var reactionRuns = 0
@@ -74,7 +74,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-17 turns separated by idle do not form one turn chain`() {
-  let cogs = Cogtext.forTesting()
+  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
 
   for turn in 1...65 {

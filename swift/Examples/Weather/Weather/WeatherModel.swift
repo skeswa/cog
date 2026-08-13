@@ -87,10 +87,10 @@ nonisolated enum WeatherAdvisory: Equatable, Sendable {
   case heat
 }
 
-/// The presentation state derived from a forecast's full async phase.
+/// The presentation state derived from a forecast's full async metadata.
 ///
 /// This is deliberately not Cog state. The authoritative request lifecycle is
-/// `CogPhase<WeatherReading?>`, read through the `phase` lens; the enum only
+/// `CogMeta<WeatherReading?>`, read through the `meta` lens; the enum only
 /// gives buttons and empty-state views concise labels for those three cases.
 nonisolated enum WeatherLoadStatus: Equatable, Sendable {
   /// The latest generation succeeded.
@@ -100,9 +100,9 @@ nonisolated enum WeatherLoadStatus: Equatable, Sendable {
   /// The latest generation failed, possibly with a retained prior reading.
   case failed
 
-  /// Maps the authoritative async phase to the card's smaller display vocabulary.
-  init(_ phase: CogPhase<WeatherReading?>) {
-    switch phase {
+  /// Maps authoritative async metadata to the card's smaller display vocabulary.
+  init(_ metadata: CogMeta<WeatherReading?>) {
+    switch metadata {
     case .pending: self = .refreshing
     case .success: self = .idle
     case .failure: self = .failed
@@ -115,7 +115,7 @@ nonisolated enum WeatherLoadStatus: Equatable, Sendable {
 /// The service contains no Cog state and owns no task. Its closure executes only
 /// after the async selector returns `Work`, on the executor selected by that
 /// work. Tests replace the closure before demand to control completions while
-/// leaving task ownership, cancellation, and phase publication with Cog.
+/// leaving task ownership, cancellation, and metadata publication with Cog.
 nonisolated struct WeatherService: Sendable {
   /// The sendable request implementation captured by off-MainActor work.
   private let forecastRequest: @Sendable (ZipCode) async throws -> WeatherReading
@@ -123,7 +123,7 @@ nonisolated struct WeatherService: Sendable {
   /// Creates a service from one atomic reading request.
   ///
   /// - Parameter forecast: The request for a ZIP. Throwing becomes the async
-  ///   cog's failure phase; returning becomes its success phase.
+  ///   cog's failure metadata; returning becomes its success metadata.
   init(
     forecast: @escaping @Sendable (ZipCode) async throws -> WeatherReading
   ) {

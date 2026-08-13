@@ -1,6 +1,6 @@
 public import Cog
 
-extension Cogtext {
+extension Cogs {
   /// Signals after the next eligible derived root finishes graph removal.
   ///
   /// A lifetime test installs this before removing the last lease, advances its
