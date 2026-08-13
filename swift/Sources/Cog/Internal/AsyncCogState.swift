@@ -61,6 +61,9 @@ internal final class AsyncCogState<Value>:
   /// dependency join a later release cascade without receiving a second grace.
   var pendingLifetimeReleaseGeneration: UInt64? = nil
 
+  /// The single cancellable task waiting for this state's current deadline.
+  var lifetimeReleaseTask: Task<Void, Never>?
+
   /// The exact slot this context must still map to this object before accepting
   /// a task result or releasing state.
   var stateIdentity: CogStateIdentity {
@@ -180,6 +183,7 @@ internal final class AsyncCogState<Value>:
   /// outrun cooperative cancellation. The later storage-identity check supplies
   /// a second guard against a fresh state reusing the descriptor-and-key slot.
   func prepareForLifetimeRelease() {
+    cancelPendingLifetimeRelease()
     _ = advanceGeneration()
     activeTask?.cancel()
     activeTask = nil

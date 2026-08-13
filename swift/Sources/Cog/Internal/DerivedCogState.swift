@@ -92,6 +92,9 @@ internal final class DerivedCogState<Value>:
   /// consumer may cascade release immediately instead of scheduling fresh grace.
   var pendingLifetimeReleaseGeneration: UInt64?
 
+  /// The single cancellable task waiting for this state's current deadline.
+  var lifetimeReleaseTask: Task<Void, Never>?
+
   /// Whether the selector has run in this context yet.
   ///
   /// Exposes cache presence without exposing its representation.
@@ -116,6 +119,7 @@ internal final class DerivedCogState<Value>:
     self.externalLeaseCount = 0
     self.lifetimeReleaseGeneration = 0
     self.pendingLifetimeReleaseGeneration = nil
+    self.lifetimeReleaseTask = nil
   }
 
   /// The state's value, running the selector if this is its first read.

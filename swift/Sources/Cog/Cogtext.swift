@@ -83,7 +83,7 @@ public final class Cogtext {
   /// Pins one newly UI-read state in boundary creation order.
   internal func registerObservationState(_ state: any CogObservationState) {
     if let lifetimeState = state as? any CogLifetimeLeaseState {
-      lifetimeState.advanceLifetimeReleaseGeneration()
+      lifetimeState.cancelPendingLifetimeRelease()
     }
     observationStates.append(state)
   }
@@ -178,7 +178,7 @@ extension Cogtext {
   /// Advancing the release generation invalidates an earlier grace task.
   internal func acquireExternalLease(on state: any CogLifetimeLeaseState) {
     guard case .whileObserved = state.lifetime else { return }
-    state.advanceLifetimeReleaseGeneration()
+    state.cancelPendingLifetimeRelease()
     state.incrementExternalLeaseCount()
   }
 
@@ -209,13 +209,15 @@ extension Cogtext {
 
   /// Schedules one renewable release deadline using the resolved grace.
   ///
-  /// Advancing the lifetime generation invalidates every older sleeper without
-  /// retaining a cancellation handle for each renewal. The task captures both
-  /// context and state weakly, so the deadline itself cannot extend either
-  /// lifetime. `pendingLifetimeReleaseGeneration` distinguishes a future
-  /// deadline from one that elapsed while an internal subscriber still needed
-  /// the state; the release cascade uses that distinction to avoid granting a
-  /// second grace window.
+  /// Each state owns at most one sleeper. Renewal cancels and replaces that
+  /// task, while a generation check still rejects a completion that raced with
+  /// cancellation. The task captures both context and state weakly, so the
+  /// deadline itself cannot extend either lifetime.
+  ///
+  /// `pendingLifetimeReleaseGeneration` distinguishes a future deadline from
+  /// one that elapsed while an internal subscriber still needed the state; the
+  /// release cascade uses that distinction to avoid granting a second grace
+  /// window.
   private func scheduleLifetimeReleaseIfUnobserved(
     _ state: any CogLifetimeLeaseState,
     declaredGrace: Duration?
@@ -223,13 +225,14 @@ extension Cogtext {
     guard state.externalLeaseCount == 0 else { return }
     guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
+    state.lifetimeReleaseTask?.cancel()
     let generation = state.advanceLifetimeReleaseGeneration()
     state.pendingLifetimeReleaseGeneration = generation
     let identity = state.stateIdentity
     let grace = declaredGrace ?? defaultWhileObservedGrace
     let clock = clock
 
-    Task { @MainActor [weak self, weak state] in
+    state.lifetimeReleaseTask = Task { @MainActor [weak self, weak state] in
       do {
         try await clock.sleep(for: grace)
       } catch {
@@ -284,6 +287,7 @@ extension Cogtext {
 
     if state.pendingLifetimeReleaseGeneration == generation {
       state.pendingLifetimeReleaseGeneration = nil
+      state.lifetimeReleaseTask = nil
     }
 
     guard let stored = states[identity], stored === state else { return }

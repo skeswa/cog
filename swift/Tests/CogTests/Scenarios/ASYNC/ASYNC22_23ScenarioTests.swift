@@ -3,6 +3,12 @@ import CogTesting
 import Testing
 import os
 
+private nonisolated enum AsyncColdDemandSleepOutcome {
+  case cancelled
+  case due
+  case scheduled
+}
+
 @MainActor
 private final class AsyncColdDemandControlledWork {
   let starts: AsyncStream<Int>
@@ -49,7 +55,9 @@ private final class AsyncColdDemandControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-22 one-shot peek starts once renews grace and recreates fresh`() async throws {
+@Test func `ASYNC-22 ASYNC-29 one-shot peek renews one grace sleeper and recreates fresh`()
+  async throws
+{
   let clock = AsyncColdDemandTestClock()
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
@@ -70,22 +78,25 @@ private final class AsyncColdDemandControlledWork {
   #expect(work.madeRuns == [0])
   #expect(await startIterator.next() == 0)
   try await clock.waitForScheduledSleep()
+  #expect(clock.activeSleeperCount == 1)
 
   clock.advance(by: .seconds(4))
-  let repeated = cogs.peek(forecast)
-  if case .pending(previous: .none) = repeated {
-  } else {
-    Issue.record("A repeated peek did not retain the current pending generation")
+  for _ in 0..<32 {
+    let repeated = cogs.peek(forecast)
+    if case .pending(previous: .none) = repeated {
+    } else {
+      Issue.record("A repeated peek did not retain the current pending generation")
+    }
+    try await clock.waitForScheduledSleep()
+    #expect(clock.activeSleeperCount == 1)
   }
   #expect(selectorRuns == 1)
   #expect(work.madeRuns == [0])
-  try await clock.waitForScheduledSleep()
+  #expect(clock.maximumActiveSleeperCount == 1)
 
-  let staleGraceChecked = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedReleaseCheck(with: staleGraceChecked)
   clock.advance(by: .seconds(6))
-  try await staleGraceChecked.wait()
   #expect(work.cancelledRuns.isEmpty)
+  #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
@@ -93,6 +104,7 @@ private final class AsyncColdDemandControlledWork {
   try await released.wait()
   #expect(await cancellationIterator.next() == 0)
   #expect(work.cancelledRuns == [0])
+  #expect(clock.activeSleeperCount == 0)
 
   let lateChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: lateChecked)
@@ -114,6 +126,9 @@ private final class AsyncColdDemandControlledWork {
   #expect(selectorRuns == 2)
   #expect(work.madeRuns == [0, 1])
   #expect(await startIterator.next() == 1)
+  try await clock.waitForScheduledSleep()
+  #expect(clock.activeSleeperCount == 1)
+  #expect(clock.maximumActiveSleeperCount == 1)
 
   let freshChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: freshChecked)
@@ -128,7 +143,9 @@ private final class AsyncColdDemandControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-23 cold refresh is one load and follows renewable grace`() async throws {
+@Test func `ASYNC-23 ASYNC-29 cold refresh is one load with one renewable grace sleeper`()
+  async throws
+{
   let clock = AsyncColdDemandTestClock()
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
@@ -146,6 +163,7 @@ private final class AsyncColdDemandControlledWork {
   #expect(work.cancelledRuns.isEmpty)
   #expect(await startIterator.next() == 0)
   try await clock.waitForScheduledSleep()
+  #expect(clock.activeSleeperCount == 1)
 
   #if DEBUG
   let initialPendingTurns = cogs.debugHistory.entries.filter {
@@ -155,41 +173,46 @@ private final class AsyncColdDemandControlledWork {
   #endif
 
   clock.advance(by: .seconds(4))
-  cogs.refresh(forecast)
-  #expect(selectorRuns == 2)
-  #expect(work.madeRuns == [0, 1])
-  #expect(await cancellationIterator.next() == 0)
-  #expect(await startIterator.next() == 1)
-  try await clock.waitForScheduledSleep()
+  for run in 1...32 {
+    cogs.refresh(forecast)
+    #expect(selectorRuns == run + 1)
+    #expect(await cancellationIterator.next() == run - 1)
+    #expect(await startIterator.next() == run)
+    try await clock.waitForScheduledSleep()
+    #expect(clock.activeSleeperCount == 1)
+  }
+  #expect(work.madeRuns == Array(0...32))
+  #expect(clock.maximumActiveSleeperCount == 1)
 
   #if DEBUG
   let replacementPendingTurns = cogs.debugHistory.entries.filter {
     $0.event == .turn && $0.name == "forecast pending"
   }
-  #expect(replacementPendingTurns.count == 2)
+  #expect(replacementPendingTurns.count == 33)
   #endif
 
-  let replacedChecked = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextAsyncCompletionCheck(with: replacedChecked)
-  work.finish(0, with: 100)
-  try await replacedChecked.wait()
+  for run in 0..<32 {
+    let replacedChecked = MainActorCleanupAcknowledgement()
+    cogs.acknowledgeNextAsyncCompletionCheck(with: replacedChecked)
+    work.finish(run, with: 100 + run)
+    try await replacedChecked.wait()
+  }
 
-  let staleGraceChecked = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedReleaseCheck(with: staleGraceChecked)
   clock.advance(by: .seconds(6))
-  try await staleGraceChecked.wait()
-  #expect(work.cancelledRuns == [0])
+  #expect(work.cancelledRuns == Array(0..<32))
+  #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
   clock.advance(by: .seconds(4))
   try await released.wait()
-  #expect(await cancellationIterator.next() == 1)
-  #expect(work.cancelledRuns == [0, 1])
+  #expect(await cancellationIterator.next() == 32)
+  #expect(work.cancelledRuns == Array(0...32))
+  #expect(clock.activeSleeperCount == 0)
 
   let lateChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: lateChecked)
-  work.finish(1, with: 200)
+  work.finish(32, with: 200)
   try await lateChecked.wait()
 
   #if DEBUG
@@ -202,6 +225,7 @@ private final class AsyncColdDemandControlledWork {
 
 private nonisolated final class AsyncColdDemandTestClock: Clock, @unchecked Sendable {
   private struct Sleeper {
+    let id: UInt64
     let deadline: Instant
     let continuation: CheckedContinuation<Void, any Error>
   }
@@ -209,6 +233,9 @@ private nonisolated final class AsyncColdDemandTestClock: Clock, @unchecked Send
   private struct State {
     var now = Instant(offset: .zero)
     var sleepers: [Sleeper] = []
+    var cancelledSleeperIDs: Set<UInt64> = []
+    var nextSleeperID: UInt64 = 0
+    var maximumActiveSleeperCount = 0
   }
 
   struct Instant: InstantProtocol, Hashable, Sendable {
@@ -245,21 +272,58 @@ private nonisolated final class AsyncColdDemandTestClock: Clock, @unchecked Send
 
   var minimumResolution: Swift.Duration { .nanoseconds(1) }
 
+  var activeSleeperCount: Int {
+    state.withLock { $0.sleepers.count }
+  }
+
+  var maximumActiveSleeperCount: Int {
+    state.withLock { $0.maximumActiveSleeperCount }
+  }
+
   func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
     try Task.checkCancellation()
-    try await withCheckedThrowingContinuation {
-      (continuation: CheckedContinuation<Void, any Error>) in
-      let isAlreadyDue = state.withLock { state in
-        guard deadline > state.now else { return true }
-        state.sleepers.append(Sleeper(deadline: deadline, continuation: continuation))
-        return false
-      }
+    let sleeperID = state.withLock { state in
+      let sleeperID = state.nextSleeperID
+      state.nextSleeperID += 1
+      return sleeperID
+    }
 
-      if isAlreadyDue {
-        continuation.resume()
-      } else {
-        scheduledContinuation.yield()
+    try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<Void, any Error>) in
+        let outcome = state.withLock { state in
+          if state.cancelledSleeperIDs.remove(sleeperID) != nil || Task.isCancelled {
+            return AsyncColdDemandSleepOutcome.cancelled
+          }
+          guard deadline > state.now else { return .due }
+          state.sleepers.append(
+            Sleeper(id: sleeperID, deadline: deadline, continuation: continuation)
+          )
+          state.maximumActiveSleeperCount = max(
+            state.maximumActiveSleeperCount,
+            state.sleepers.count
+          )
+          return .scheduled
+        }
+
+        switch outcome {
+        case .cancelled:
+          continuation.resume(throwing: CancellationError())
+        case .due:
+          continuation.resume()
+        case .scheduled:
+          scheduledContinuation.yield()
+        }
       }
+    } onCancel: {
+      let continuation: CheckedContinuation<Void, any Error>? = state.withLock { state in
+        guard let index = state.sleepers.firstIndex(where: { $0.id == sleeperID }) else {
+          state.cancelledSleeperIDs.insert(sleeperID)
+          return nil
+        }
+        return state.sleepers.remove(at: index).continuation
+      }
+      continuation?.resume(throwing: CancellationError())
     }
   }
 

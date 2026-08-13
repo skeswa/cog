@@ -36,6 +36,13 @@ internal protocol CogLifetimeLeaseState: CogState {
   /// second window after its last internal consumer leaves.
   var pendingLifetimeReleaseGeneration: UInt64? { get set }
 
+  /// The one currently sleeping expiry task for this state, if any.
+  ///
+  /// Renewing grace cancels and replaces this task instead of leaving an older
+  /// sleeper alive until its obsolete deadline. Generation and identity checks
+  /// remain necessary because cancellation and deadline resumption can race.
+  var lifetimeReleaseTask: Task<Void, Never>? { get set }
+
   /// Severs this state's forward and reverse dependency edges before removal.
   ///
   /// Surviving producers must no longer invalidate the removed consumer. Edge
@@ -52,8 +59,18 @@ internal protocol CogLifetimeLeaseState: CogState {
 }
 
 extension CogLifetimeLeaseState {
-  /// Synchronous derived states own no work or completion capability to revoke.
-  func prepareForLifetimeRelease() {}
+  /// Synchronous derived states own only their grace-expiry task.
+  func prepareForLifetimeRelease() {
+    cancelPendingLifetimeRelease()
+  }
+
+  /// Cancels the one outstanding grace task and invalidates its generation.
+  func cancelPendingLifetimeRelease() {
+    advanceLifetimeReleaseGeneration()
+    pendingLifetimeReleaseGeneration = nil
+    lifetimeReleaseTask?.cancel()
+    lifetimeReleaseTask = nil
+  }
 
   /// Adds one external owner without silently wrapping the exact lease count.
   func incrementExternalLeaseCount() {
