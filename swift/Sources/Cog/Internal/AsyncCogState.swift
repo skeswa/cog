@@ -124,6 +124,7 @@ internal final class AsyncCogState<Value>:
     }
 
     let operation = work.operation
+    activeTask?.cancel()
     activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
@@ -131,6 +132,7 @@ internal final class AsyncCogState<Value>:
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
       } catch {
+        guard !Task.isCancelled else { return }
         guard let self, let cogs else { return }
         self.publish(.failure(error, previous: .none), named: "failure", in: cogs)
       }
