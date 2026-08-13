@@ -13,6 +13,11 @@ public struct CogBox<Value, Key: Hashable> {
   /// The one declaration behind every key of this box.
   internal let descriptor: DerivedCogDescriptor<Value>
 
+  /// Builds a keyed facade over an existing derived declaration.
+  internal init(descriptor: DerivedCogDescriptor<Value>) {
+    self.descriptor = descriptor
+  }
+
   /// Declares a keyed derived value.
   ///
   /// - Parameters:

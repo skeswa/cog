@@ -87,6 +87,15 @@ public struct AsyncCogBox<Value, Key: Hashable> {
       key: AnyHashable(key)
     )
   }
+
+  /// A keyed projection that reads each key's last successful value.
+  ///
+  /// Pending and failure phases retain their previous success. For equatable
+  /// values, an unchanged latest value stops the downstream wave independently
+  /// for each key.
+  public var latest: CogBox<Value?, Key> {
+    CogBox(descriptor: latestDescriptor)
+  }
 }
 
 extension AsyncCogBox where Value: Equatable {
