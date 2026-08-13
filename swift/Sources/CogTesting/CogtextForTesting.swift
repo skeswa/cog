@@ -29,6 +29,7 @@ extension Cogtext {
   ///   - whileObservedGrace: The context default for declarations that do not
   ///     supply their own grace. Production and ordinary tests use 30 seconds;
   ///     a lifetime test passes an explicit duration to its controllable clock.
+  /// - Returns: A new, uninstalled context with no materialized Cog state.
   public static func forTesting(
     clock: any Clock<Duration> = ContinuousClock(),
     whileObservedGrace: Duration = .seconds(30)

@@ -13,7 +13,8 @@ extension Cogtext {
   /// can resume controlled stale work, await the acknowledgement, and then
   /// inspect public phase state knowing no publication is still racing, without
   /// sleeps, polling, or access to the generation counter. Install at most one
-  /// acknowledgement at a time.
+  /// acknowledgement at a time. The seam consumes it after one eligibility
+  /// decision; a later result needs a new acknowledgement and a new call.
   ///
   /// - Parameter acknowledgement: The signal to complete after the next result
   ///   eligibility check.

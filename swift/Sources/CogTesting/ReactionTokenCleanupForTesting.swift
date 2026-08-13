@@ -6,6 +6,9 @@ extension ReactionToken {
   /// Tests that release their last token copy from another executor await the
   /// acknowledgement before asserting on the graph. Production code should
   /// call ``ReactionToken/cancel()`` when it needs an immediate stopping point.
+  ///
+  /// - Parameter acknowledgement: The one-shot signal completed after graph
+  ///   cleanup finishes on the MainActor.
   public func acknowledgeDeinitCleanup(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {

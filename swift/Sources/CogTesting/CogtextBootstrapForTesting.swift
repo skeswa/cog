@@ -23,7 +23,9 @@ extension Cogtext {
   ///
   /// - Parameter body: What to run while the app context is installed. It
   ///   receives the context ``Cogtext/bootstrapApp()`` just made.
-  /// - Returns: Whatever `body` returns.
+  /// - Returns: The value returned by `body`.
+  /// - Throws: Any error thrown by `body`, after uninstalling the temporary
+  ///   app context.
   @discardableResult
   public static func withBootstrappedApp<R>(_ body: (Cogtext) throws -> R) rethrows -> R {
     defer { Cogtext.uninstallApp() }
@@ -36,6 +38,10 @@ extension Cogtext {
   /// to the shipping `Cog` product. It is a lifecycle diagnostic only: tests
   /// still receive the context from ``withBootstrappedApp(_:)`` and pass it
   /// through the same composition boundaries as production.
+  ///
+  /// - Parameter context: The context whose identity should be compared with
+  ///   the process's app-install slot.
+  /// - Returns: `true` only when `context` is the currently installed object.
   public static func isBootstrappedApp(_ context: Cogtext) -> Bool {
     Cogtext.installedApp === context
   }

@@ -1,10 +1,13 @@
 internal import Cog
 
-/// Scaffolding placeholder for the `CogScenarios` target, exported as the
-/// non-API `_CogScenarios` product.
+/// Linkage marker for the `CogScenarios` target, exported as the non-API
+/// `_CogScenarios` product.
 ///
-/// The benchmark graphs and their expected recomputation counts arrive in `M5`.
+/// The product gives tests and, later, benchmarks one home for reusable graph
+/// declarations without making those fixtures part of the shipping `Cog` API.
+/// The benchmark graphs and their expected recomputation counts arrive in M5;
+/// until then the marker keeps target-linkage tests meaningful.
 enum CogScenariosScaffolding {
-  /// Marker the M0 sentinel tests use to prove the target links.
+  /// A stable value sentinel tests reference to prove this target was linked.
   static let marker = "CogScenarios"
 }

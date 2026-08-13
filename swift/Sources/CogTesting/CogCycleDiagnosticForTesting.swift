@@ -11,6 +11,7 @@ public nonisolated struct CogCycleDiagnostic: Sendable, Equatable {
   /// The message Cog would use when the corresponding read fails.
   public let message: String
 
+  /// Copies the internal snapshot into representation-independent test data.
   fileprivate init(_ snapshot: CogCycleDiagnosticSnapshot) {
     path = snapshot.path
     message = snapshot.message
@@ -23,6 +24,11 @@ extension Reader {
   /// Call this only as a test diagnostic from the active selector. It records
   /// no dependency and creates no state. A `nil` result means the read would not
   /// close the current derived-computation path.
+  ///
+  /// - Parameter valueReference: The derived value whose hypothetical read is
+  ///   checked against the active computation path.
+  /// - Returns: The closed path and fatal-error text that a real cyclic read
+  ///   would produce, or `nil` when the read is acyclic.
   public func cycleDiagnostic<Read>(
     ifReading valueReference: Cog<Read>
   ) -> CogCycleDiagnostic? {
