@@ -653,6 +653,15 @@ consumers quiet. The value read therefore lets downstream code treat a manual
 async derived state and an op for an imperative action; a forced refresh can
 be an op such as `cogs.refresh(fetchedWeather[zip])`.
 
+Reading the value beside the phase is the normal shape for request chrome — a
+card shows the last good reading and the request's progress at once, each
+through its own spelling. The pair costs one render: an observer's one-shot
+tracking session fires once per turn no matter how many of its facets mutate,
+and a real `body` can never run mid-flush, because the flush is synchronous
+on the MainActor. The two facets must still never share a subscription
+target — a shared target would notify value-only consumers on the pending and
+equal-success turns that equality gating keeps quiet.
+
 ### 5.2 Scheduling policies
 
 | Policy              | Behavior                                                   | Common stream name           |

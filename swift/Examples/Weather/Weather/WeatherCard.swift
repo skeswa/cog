@@ -36,12 +36,15 @@ struct WeatherCardContent: View {
 
   /// Renders pending, success, and failure without discarding a prior success.
   ///
-  /// The plain value read keeps the accepted forecast on screen during a
-  /// reload or failed replacement — it is total, resting at `nil` before the
-  /// first success — while the `phase` lens drives progress and failure
-  /// chrome only. `isNiceOutside` demonstrates a separately equality-gated
-  /// derivation over the same value read. All reads settle within the same
-  /// completed graph turn.
+  /// The card reads the forecast's value and its phase side by side — the
+  /// encouraged shape for request chrome (§5.1). The plain value read keeps
+  /// the accepted forecast on screen during a reload or failed replacement —
+  /// it is total, resting at `nil` before the first success — while the
+  /// `phase` lens drives progress and failure chrome. A turn that changes
+  /// both facets still costs one render, because SwiftUI's one-shot tracking
+  /// invalidates once per frame. `isNiceOutside` demonstrates a separately
+  /// equality-gated derivation over the same value read. All reads settle
+  /// within the same completed graph turn.
   var body: some View {
     let report = cogs[weatherForecast[zip]]?.weather
     let phase = cogs.phase[weatherForecast[zip]]

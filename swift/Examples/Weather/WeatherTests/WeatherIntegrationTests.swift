@@ -6,13 +6,24 @@ import Observation
 import SwiftUI
 import Testing
 
-/// Re-arms Observation after every invalidation, as SwiftUI does for `body`.
+/// Tracks a card body the way SwiftUI does: one-shot Observation with the
+/// re-render deferred to the next explicit frame.
+///
+/// `onChange` only counts the invalidation and marks the card dirty — it never
+/// evaluates `body` reentrantly, because SwiftUI cannot: Cog's flush is
+/// synchronous on the MainActor, so a real body evaluation only happens after
+/// the turn completes. A turn that mutates several of the card's boundaries —
+/// the paired value and phase reads of one forecast, or a forecast plus its
+/// `isNice` derivation — therefore invalidates once, exactly like a frame.
+/// Tests call ``renderFrame()`` at their settle points to evaluate the body
+/// and re-arm.
 @MainActor
 private final class TrackedWeatherCard {
   let cogs: Cogtext
   let zip: ZipCode
   private(set) var invalidations = 0
   private(set) var snapshots: [WeatherCardSnapshot] = []
+  private var needsRender = false
 
   init(cogs: Cogtext, zip: ZipCode) {
     self.cogs = cogs
@@ -23,6 +34,14 @@ private final class TrackedWeatherCard {
     render()
   }
 
+  /// Evaluates the body once if an invalidation is pending, as the next
+  /// SwiftUI frame would, and re-arms tracking.
+  func renderFrame() {
+    guard needsRender else { return }
+    needsRender = false
+    render()
+  }
+
   private func render() {
     _ = withObservationTracking {
       makeBody()
@@ -30,7 +49,7 @@ private final class TrackedWeatherCard {
       MainActor.assumeIsolated {
         guard let self else { return }
         self.invalidations += 1
-        self.render()
+        self.needsRender = true
       }
     }
   }
@@ -69,37 +88,41 @@ private final class TrackedWeatherCard {
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(newYorkRun, with: newYorkReading)
   }
-  // The card reads the forecast value and its phase through separate
-  // Observation boundaries, and this direct harness re-arms between their
-  // notices, so one success turn invalidates twice.
-  #expect(newYorkCard.invalidations == 2)
+  // The card reads the forecast value and its phase side by side — the
+  // encouraged shape for request chrome. One success turn mutates both
+  // boundaries but invalidates the one-shot tracking session once.
+  #expect(newYorkCard.invalidations == 1)
   #expect(sanFranciscoCard.invalidations == 0)
+  newYorkCard.renderFrame()
 
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(sanFranciscoRun, with: sanFranciscoReading)
   }
-  #expect(newYorkCard.invalidations == 2)
-  #expect(sanFranciscoCard.invalidations == 2)
+  #expect(newYorkCard.invalidations == 1)
+  #expect(sanFranciscoCard.invalidations == 1)
+  sanFranciscoCard.renderFrame()
 
   cogs.refresh(weatherForecast[.sanFrancisco])
+  // Reload pending notices only the phase boundary; the equality-gated value
+  // read stays quiet, and the frame still counts once.
+  #expect(sanFranciscoCard.invalidations == 2)
+  sanFranciscoCard.renderFrame()
   let changedRun = try #require(await starts.next())
   #expect(changedRun.zip == .sanFrancisco)
   let changedReading = WeatherReading(.clear, 75)
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(changedRun, with: changedReading)
   }
+  #expect(sanFranciscoCard.invalidations == 3)
+  sanFranciscoCard.renderFrame()
 
-  #expect(newYorkCard.invalidations == 2)
+  #expect(newYorkCard.invalidations == 1)
   #expect(
     newYorkCard.snapshots == [
       WeatherCardSnapshot(zip: .newYork, report: nil, isNice: false),
-      // The value and phase boundaries notify separately; each re-render must
-      // see the same settled turn rather than a mixed pair.
-      WeatherCardSnapshot(zip: .newYork, report: newYorkReading.weather, isNice: false),
       WeatherCardSnapshot(zip: .newYork, report: newYorkReading.weather, isNice: false),
     ]
   )
-  #expect(sanFranciscoCard.invalidations == 6)
   #expect(
     sanFranciscoCard.snapshots == [
       WeatherCardSnapshot(zip: .sanFrancisco, report: nil, isNice: false),
@@ -108,31 +131,15 @@ private final class TrackedWeatherCard {
         report: sanFranciscoReading.weather,
         isNice: false
       ),
+      // Reload pending retains the prior success as one atomic reading.
       WeatherCardSnapshot(
         zip: .sanFrancisco,
         report: sanFranciscoReading.weather,
         isNice: false
       ),
-      // Reload pending retains the prior success as one atomic reading, and
-      // the equality-gated value read stays quiet: only the phase notices.
-      WeatherCardSnapshot(
-        zip: .sanFrancisco,
-        report: sanFranciscoReading.weather,
-        isNice: false
-      ),
-      // The value, full phase, and `isNice` boundaries notice separately.
-      // This direct harness re-arms between them, so every render must see
-      // the same settled turn rather than a mixed pair.
-      WeatherCardSnapshot(
-        zip: .sanFrancisco,
-        report: changedReading.weather,
-        isNice: true
-      ),
-      WeatherCardSnapshot(
-        zip: .sanFrancisco,
-        report: changedReading.weather,
-        isNice: true
-      ),
+      // The changed success turn mutates the phase, the value, and `isNice`
+      // together; the frame renders once and must see them from the same
+      // settled turn rather than a mixed set.
       WeatherCardSnapshot(
         zip: .sanFrancisco,
         report: changedReading.weather,
