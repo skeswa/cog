@@ -160,7 +160,9 @@ public final class Cogtext {
   /// the generation and state-identity checks. It therefore acknowledges a
   /// completed decision, not merely that the work closure returned. Only one
   /// waiter is supported because the seam exists for one deterministic test
-  /// assertion at a time.
+  /// assertion at a time. The caller must retain this context until the result
+  /// returns: the work task captures it weakly, and context teardown releases
+  /// this stored callback together with the graph.
   ///
   /// - Parameter acknowledgement: MainActor callback consumed after the next
   ///   accepted or rejected completion reaches its eligibility decision.
@@ -175,9 +177,11 @@ public final class Cogtext {
 
   /// Consumes the next async-completion acknowledgement, when a test installed one.
   ///
-  /// Async completion paths call this from `defer` after obtaining the
-  /// context, so stale, cancelled, released, and accepted results all unblock
-  /// the waiter after their eligibility check has finished.
+  /// Async completion paths call this from `defer` after obtaining the weakly
+  /// captured context, so stale, cancelled, state-released, and accepted results
+  /// all unblock the waiter after their eligibility check has finished. A
+  /// result that outlives the context cannot reach this method or acknowledge a
+  /// callback the context no longer owns.
   internal func acknowledgeAsyncCompletionCheckIfRequested() {
     let acknowledgement = nextAsyncCompletionCheckAcknowledgement
     nextAsyncCompletionCheckAcknowledgement = nil
