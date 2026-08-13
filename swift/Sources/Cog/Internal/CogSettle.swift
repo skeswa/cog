@@ -13,6 +13,7 @@ internal nonisolated struct CogVersion: Comparable, Sendable {
 
   private let rawValue: UInt64
 
+  /// Orders revisions by their monotonically increasing scalar.
   static func < (lhs: CogVersion, rhs: CogVersion) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
@@ -39,10 +40,14 @@ internal nonisolated struct CogVersion: Comparable, Sendable {
 /// A weaker invalidation never replaces a stronger one. In particular, a
 /// transitive CHECK path cannot erase a direct DIRTY path in a diamond.
 internal enum CogSettleState: UInt8, Comparable {
+  /// The cached value is current through `checkedAt`.
   case clean
+  /// Settle dependencies and recompute only if one changed after `checkedAt`.
   case check
+  /// A direct input changed, so recomputation is mandatory after parents settle.
   case dirty
 
+  /// Orders marks by strength so propagation never replaces DIRTY with CHECK.
   static func < (lhs: CogSettleState, rhs: CogSettleState) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
@@ -54,8 +59,10 @@ internal enum CogSettleState: UInt8, Comparable {
 /// the reverse edge weak prevents those two arrays from forming a retain cycle
 /// when a context or, later, a released state lets the graph go.
 internal final class CogSubscriberEdge {
+  /// The consumer to invalidate, or `nil` after it has been released.
   weak var state: (any CogState)?
 
+  /// Creates a non-owning reverse edge to `state`.
   init(_ state: any CogState) {
     self.state = state
   }
@@ -64,6 +71,10 @@ internal final class CogSubscriberEdge {
 extension CogState {
   /// Adds one reverse edge, reusing the existing edge when a stable selector
   /// reads the same producer again.
+  ///
+  /// Dead weak edges are pruned before identity comparison. Dependency arrays
+  /// may preserve repeated reads, but invalidation visits a consumer only once
+  /// per producer.
   func addSubscriber(_ consumer: any CogState) {
     subscribers.removeAll { $0.state == nil }
     guard !subscribers.contains(where: { $0.state === consumer }) else { return }
@@ -92,12 +103,18 @@ extension CogState {
   }
 
   /// Records that the state was checked through `version` and stayed equal.
+  ///
+  /// Preserve `changedAt`; downstream CHECK consumers compare it with their own
+  /// earlier `checkedAt` to decide that no rerun is needed.
   func markChecked(at version: CogVersion) {
     checkedAt = version
     settleState = .clean
   }
 
   /// Records that the state's current value changed in `version`.
+  ///
+  /// Publishing a value proves it current too, so both timestamps advance and
+  /// the state returns to CLEAN before subscribers are invalidated.
   func markChanged(at version: CogVersion) {
     changedAt = version
     checkedAt = version
@@ -108,7 +125,8 @@ extension CogState {
 /// The type-erased capabilities only a derived state needs during settlement.
 ///
 /// This protocol lets an erased exit frame inspect dependencies and rerun a
-/// generic selector.
+/// generic selector. Its state remains on the ordered computing path from enter
+/// until exit completes, including nested pulls and user equality code.
 @MainActor
 internal protocol DerivedCogSettleState: CogState {
   /// The declaration half of this state's stable descriptor-and-key identity.
@@ -120,7 +138,10 @@ internal protocol DerivedCogSettleState: CogState {
   /// Whether this state is on the context's active derived-computation path.
   var isComputing: Bool { get set }
 
+  /// Producers captured by the latest completed synchronous selector run.
   var dependencies: [any CogState] { get }
+
+  /// Recomputes after dirty parents are current, while this state is computing.
   func recompute(in cogs: Cogtext)
 }
 
@@ -130,7 +151,9 @@ internal protocol DerivedCogSettleState: CogState {
 /// recompute after those dependencies settle. Type erasure avoids recursive
 /// generic calls.
 internal enum CogSettleFrame {
+  /// Inspect a state and schedule its dirty producers before its exit.
   case enter(any CogState)
+  /// Decide whether the now-parent-current state must recompute.
   case exit(any CogState)
 }
 
@@ -138,15 +161,23 @@ internal enum CogSettleFrame {
 ///
 /// Nested pulls append above a checkpoint and pop their own suffix. They share
 /// the active computation path for cycle detection. The arena core will replace
-/// references with slots but keep this traversal shape.
+/// references with slots but keep this traversal shape. Frames and computing
+/// states are separate intentionally: after an exit frame is popped, its state
+/// remains computing through recomputation, and a nested settle may temporarily
+/// consume every frame while that enclosing computation is still active.
 internal struct CogSettleStack {
   private var frames: [CogSettleFrame] = []
   private var computingPath: [any DerivedCogSettleState] = []
 
+  /// Number of pending enter and exit frames across all nested settle walks.
   var count: Int { frames.count }
+  /// Reserved frame storage exposed only to infrastructure diagnostics.
   var capacity: Int { frames.capacity }
+  /// Whether no traversal frame remains; this does not imply no computation is active.
   var isEmpty: Bool { frames.isEmpty }
+  /// Number of derived states on the active synchronous computation path.
   var computingCount: Int { computingPath.count }
+  /// Whether selectors and their post-tracking equality/publication work have unwound.
   var isComputingEmpty: Bool { computingPath.isEmpty }
 
   /// The innermost cog whose derived computation has not published yet.
@@ -164,14 +195,17 @@ internal struct CogSettleStack {
     frames.append(.enter(root))
   }
 
+  /// Appends an enter frame above the current nested-walk checkpoint.
   mutating func pushEnter(_ state: any CogState) {
     frames.append(.enter(state))
   }
 
+  /// Appends an exit frame that runs after the state's scheduled dependencies.
   mutating func pushExit(_ state: any CogState) {
     frames.append(.exit(state))
   }
 
+  /// Removes the next LIFO traversal frame, or `nil` when the buffer is empty.
   mutating func popLast() -> CogSettleFrame? {
     frames.popLast()
   }
@@ -190,6 +224,9 @@ internal struct CogSettleStack {
   }
 
   /// Marks and appends one derived state after cycle detection has succeeded.
+  ///
+  /// The state bit is set before frames for its parents run, making a nested read
+  /// of this state detect the cycle even if the raw frame suffix changes.
   mutating func beginComputing(_ state: any DerivedCogSettleState) {
     guard cyclePath(ifEntering: state) == nil else {
       fatalError("Cog tried to enter a derived cycle without reporting it.")
@@ -199,6 +236,9 @@ internal struct CogSettleStack {
   }
 
   /// Clears the last derived path entry, enforcing balanced LIFO traversal.
+  ///
+  /// Exit is deferred around recomputation so every successful nested traversal
+  /// restores both the state bit and ordered path together.
   mutating func endComputing(_ state: any DerivedCogSettleState) {
     guard let active = computingPath.last, active === state else {
       fatalError("Cog tried to finish derived computation out of path order.")
@@ -215,6 +255,9 @@ extension Cogtext {
   /// States farther downstream become CHECK because equality may stop the wave
   /// before it reaches them. The local work list keeps even a deep subscriber
   /// chain off the Swift call stack.
+  /// Weak edges that have lost their consumers are ignored. A state already at
+  /// least as strongly marked also cuts off that traversal branch, which both
+  /// preserves DIRTY and bounds diamond propagation.
   internal func invalidateSubscribers(of producer: any CogState) {
     var work: [(any CogState, CogSettleState)] = []
     for edge in producer.subscribers {
@@ -241,6 +284,11 @@ extension Cogtext {
   /// `changedAt` versus the consumer's prior `checkedAt` to decide whether a
   /// CHECK state must run. A recomputation that lands equal advances only
   /// `checkedAt`, so consumers farther down a CHECK wave stay cached.
+  ///
+  /// The deferred queue drain runs after this invocation has popped its suffix.
+  /// `canRunSystemTurnImmediately` also requires the shared computing path and
+  /// tracking slot to be empty, preventing a nested settle from draining an
+  /// async system turn while an enclosing selector is still computing.
   internal func settle(_ root: any DerivedCogSettleState) {
     defer { drainQueuedTurnsIfPossible() }
 

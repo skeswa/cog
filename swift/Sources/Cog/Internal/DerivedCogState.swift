@@ -10,6 +10,8 @@
 /// and the next run replaces the dependency set so branches and early returns
 /// can change it. Lifetime release removes a whole unobserved dependency closure
 /// without treating its internal graph edges as durable observation.
+/// The context owns this object in its descriptor-and-key map and confines its
+/// cache, edges, lease bookkeeping, and computation markers to the MainActor.
 internal final class DerivedCogState<Value>:
   CogState, CogConsumer, CogReaderState, DerivedCogSettleState, CogLifetimeLeaseState,
   CogObservationState
@@ -20,6 +22,8 @@ internal final class DerivedCogState<Value>:
   /// Which state of `descriptor` this is, or `nil` for a keyless declaration.
   ///
   /// Used to print names such as `isNiceOutside[90210]` (§2.4).
+  /// Together with descriptor object identity, the key also determines storage
+  /// identity and remains fixed until this state is released.
   let key: AnyHashable?
 
   /// The declaration half of this state's stable descriptor-and-key identity.
@@ -38,6 +42,7 @@ internal final class DerivedCogState<Value>:
   /// values, `.some(.none)` is a cached `nil`.
   internal private(set) var cachedValue: Value?
 
+  /// The last completed cached value available to `Reader.curr`.
   var readerCurrentValue: Value? { cachedValue }
 
   /// The producers the last run read through `c[valueReference]`, in read order.
@@ -61,8 +66,10 @@ internal final class DerivedCogState<Value>:
   /// Created only after this exact descriptor-and-key state reaches the UI.
   var observationBoundary: CogObservationBoundary?
 
+  /// The erased key rendered with UI notice history for this boundary.
   var observationKey: AnyHashable? { key }
 
+  /// The declaration label used for diagnostics, history, and UI notices.
   var label: CogLabel { descriptor.label }
 
   /// The declaration's lifetime policy, shared by every key of a box.
@@ -93,6 +100,9 @@ internal final class DerivedCogState<Value>:
   var pendingLifetimeReleaseGeneration: UInt64?
 
   /// The single cancellable task waiting for this state's current deadline.
+  ///
+  /// A new demand cancels and clears it; generation validation still protects
+  /// against a wake racing cancellation.
   var lifetimeReleaseTask: Task<Void, Never>?
 
   /// Whether the selector has run in this context yet.
@@ -142,6 +152,9 @@ internal final class DerivedCogState<Value>:
   }
 
   /// Records one selector read and installs its reverse invalidation edge.
+  ///
+  /// Repeated reads remain in dependency order but `addSubscriber` keeps one
+  /// weak reverse edge for this consumer.
   func recordDependency(on producer: any CogState) {
     dependencies.append(producer)
     producer.addSubscriber(self)

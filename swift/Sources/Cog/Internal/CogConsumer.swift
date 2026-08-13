@@ -4,7 +4,9 @@
 /// consumer. Async selectors leave this protocol's tracking scope when they
 /// return ``Work``; the later work body cannot silently add dependencies after
 /// suspension. SwiftUI uses observation boundaries rather than extending this
-/// synchronous tracking interval.
+/// synchronous tracking interval. A consumer strongly owns its last producer
+/// list while each producer keeps only a weak reverse subscriber edge, avoiding
+/// ownership cycles. All reconciliation occurs synchronously on the MainActor.
 @MainActor
 internal protocol CogConsumer: AnyObject {
   /// Records that this consumer read `producer` during the run in progress.
@@ -32,10 +34,15 @@ internal protocol CogConsumer: AnyObject {
 ///
 /// The outer optional records whether a previous value exists; it must not
 /// collapse a real optional `nil`. Async state uses the same contract to expose
-/// its previously published phase to `Reader.curr` machinery.
+/// its previously published phase to `Reader.curr` machinery. The value belongs
+/// to the consumer's latest completed selector run; a reader may consult it only
+/// while that same consumer occupies the context tracking slot.
 @MainActor
 internal protocol CogReaderState<Value>: CogConsumer {
+  /// The typed value this consumer caches for `Reader.curr`.
   associatedtype Value
+
+  /// The previous completed value, with the outer optional representing absence.
   var readerCurrentValue: Value? { get }
 }
 

@@ -4,7 +4,12 @@
 ///
 /// The context owns and reuses this fixed-size ring. Labels render only for
 /// display (perf §8). The arena core will replace records with integer slots
-/// without changing call sites.
+/// without changing call sites. MainActor confinement gives event insertion a
+/// total order: each outer turn is recorded before its body, and graph work it
+/// causes then appears in actual flush order. Lazy reads and initial reaction
+/// runs outside a turn attach to the latest ordinal (or zero before the first
+/// turn) without inventing a turn. The entire recorder is excluded from release
+/// builds.
 internal struct CogHistoryLog {
   /// How many entries the ring holds.
   ///
@@ -22,6 +27,9 @@ internal struct CogHistoryLog {
   private var turn: UInt64 = 0
 
   /// The history as a reader sees it.
+  ///
+  /// `CogHistory` receives ring storage plus its logical oldest index, so taking
+  /// a snapshot does not rotate or mutate the context's next-overwrite cursor.
   var snapshot: CogHistory {
     CogHistory(
       ring: ring,
@@ -75,10 +83,15 @@ internal struct CogHistoryLog {
 
 /// The unrendered identity behind one history entry.
 ///
-/// ``CogHistoryEntry/name`` renders these values at display time.
+/// ``CogHistoryEntry/name`` renders these values at display time. Subjects keep
+/// declaration labels and erased keys, not state or descriptor references, so
+/// retaining debug history cannot extend graph-state lifetime.
 internal enum CogHistorySubject {
+  /// A named outer turn, recorded before its staging body begins.
   case turn(String)
+  /// One descriptor label and optional key involved in graph propagation.
   case cog(CogLabel, AnyHashable?)
+  /// One reaction or watch label whose body ran.
   case effect(CogLabel)
 }
 

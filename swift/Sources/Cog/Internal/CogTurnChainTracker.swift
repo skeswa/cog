@@ -2,21 +2,29 @@
 
 /// One rendered cause in a turn-chain warning crossing the package boundary.
 package nonisolated enum CogTurnChainCauseSnapshot: Sendable, Equatable {
+  /// One named outer application or system turn.
   case turn(String)
+  /// One reaction body that ran in the chain.
   case reaction(String)
 }
 
 /// The last long turn chain this context warned about.
 package nonisolated struct CogTurnChainWarningSnapshot: Sendable, Equatable {
+  /// Number of completed outer turns when the warning threshold was crossed.
   package let uninterruptedTurnCount: Int
+  /// Bounded causal prefix in execution order.
   package let causalChain: [CogTurnChainCauseSnapshot]
+  /// Whether causes after the retained prefix were omitted.
   package let causalChainIsTruncated: Bool
 }
 
 /// The behavior snapshot exposed to `CogTesting`.
 package nonisolated struct CogTurnChainDiagnosticSnapshot: Sendable, Equatable {
+  /// Total warnings emitted by this context.
   package let warningCount: Int
+  /// The latest warning, or `nil` before any chain crosses the threshold.
   package let lastWarning: CogTurnChainWarningSnapshot?
+  /// Whether all turn, tracking, settlement, reaction, and debug barriers are idle.
   package let isIdle: Bool
 }
 
@@ -31,20 +39,27 @@ private enum CogTurnChainTraceStep {
 /// A chain starts with a commit made while the context is idle. If a reaction
 /// writes state, that write becomes the next turn in the same chain. For
 /// example: `turn A → reaction B → turn B`. The chain ends after all queued
-/// writes finish and control returns to the caller.
+/// writes finish and control returns to the caller. Graph-owned system turns
+/// use the same accounting, including those deferred until selector or reaction
+/// tracking unwinds. The tracker exists only in DEBUG and owns rendered trace
+/// metadata, never graph state.
 internal struct CogTurnChainTracker {
   private static let turnThreshold = 64
   private static let maximumCausalChainLength = 256
 
+  /// Whether one synchronous outer-turn/FIFO chain is currently being measured.
   private(set) var isActive = false
   private var completedTurnCount = 0
   private var causalChain: [CogTurnChainTraceStep] = []
   private var causalChainIsTruncated = false
   private var warnedInActiveChain = false
 
+  /// Number of threshold warnings emitted over this context's lifetime.
   private(set) var warningCount = 0
+  /// Most recent bounded warning snapshot retained for `CogTesting`.
   private(set) var lastWarning: CogTurnChainWarningSnapshot?
 
+  /// Opens a fresh synchronous chain and resets its bounded trace.
   mutating func beginChain() {
     guard !isActive else {
       fatalError("Cog tried to begin a turn chain while one was already active.")
@@ -57,6 +72,7 @@ internal struct CogTurnChainTracker {
     warnedInActiveChain = false
   }
 
+  /// Closes the active chain after every FIFO turn has returned to idle.
   mutating func endChain() {
     guard isActive else {
       fatalError("Cog tried to end a turn chain while none was active.")
@@ -69,10 +85,12 @@ internal struct CogTurnChainTracker {
     warnedInActiveChain = false
   }
 
+  /// Appends one named turn cause while the trace still accepts causes.
   mutating func recordTurn(named name: String) {
     record(.turn(name))
   }
 
+  /// Appends one reaction cause without rendering its label on the hot path.
   mutating func recordReaction(label: CogLabel) {
     record(.reaction(label))
   }
@@ -104,6 +122,7 @@ internal struct CogTurnChainTracker {
     lastWarning = warning
   }
 
+  /// Copies the retained warning behavior and caller-computed graph-idle state.
   func diagnostic(isIdle: Bool) -> CogTurnChainDiagnosticSnapshot {
     CogTurnChainDiagnosticSnapshot(
       warningCount: warningCount,
@@ -124,6 +143,10 @@ internal struct CogTurnChainTracker {
 
 extension Cogtext {
   /// The turn-chain behavior a test may observe without seeing graph storage.
+  ///
+  /// Idle is deliberately stronger than `turnPhase == .idle`: queued system
+  /// turns, a popped-but-computing settle path, consumer tracking, reaction work,
+  /// or an active debug chain all mean observable synchronous work remains.
   package var turnChainDiagnosticSnapshot: CogTurnChainDiagnosticSnapshot {
     let phaseIsIdle: Bool
     if case .idle = turnPhase {

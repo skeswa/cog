@@ -4,7 +4,8 @@
 /// state separately. Internal dependency edges block removal while their
 /// consumer remains stored, but do not renew observation or earn another grace
 /// window. This separation lets an expired unobserved dependency leave with the
-/// consumer whose removal disconnects it.
+/// consumer whose removal disconnects it. The context is the sole release
+/// coordinator; every field and transition below is MainActor-confined.
 @MainActor
 internal protocol CogLifetimeLeaseState: CogState {
   /// The declaration policy that decides whether release eligibility applies.
@@ -41,6 +42,8 @@ internal protocol CogLifetimeLeaseState: CogState {
   /// Renewing grace cancels and replaces this task instead of leaving an older
   /// sleeper alive until its obsolete deadline. Generation and identity checks
   /// remain necessary because cancellation and deadline resumption can race.
+  /// The task holds context and state weakly, so an outstanding deadline cannot
+  /// keep either owner alive through teardown.
   var lifetimeReleaseTask: Task<Void, Never>? { get set }
 
   /// Severs this state's forward and reverse dependency edges before removal.
@@ -65,6 +68,10 @@ extension CogLifetimeLeaseState {
   }
 
   /// Cancels the one outstanding grace task and invalidates its generation.
+  ///
+  /// Generation advances before cancellation and slot clearing. A sleeper that
+  /// has already resumed therefore fails validation even if cooperative task or
+  /// controlled-clock cancellation is delivered too late.
   func cancelPendingLifetimeRelease() {
     advanceLifetimeReleaseGeneration()
     pendingLifetimeReleaseGeneration = nil

@@ -11,6 +11,8 @@
 /// the async selector. It never stores a current phase or a running `Task`.
 /// Those belong to ``AsyncCogState`` so one declaration can be used safely in
 /// multiple isolated contexts and, for ``AsyncCogBox``, at multiple keys.
+/// All descriptor access remains MainActor-confined; `Work` is the explicit
+/// boundary that permits the selected operation to choose its own isolation.
 ///
 /// Async selection deliberately has two stages:
 ///
@@ -54,6 +56,9 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   private let selector: @MainActor (Reader<CogPhase<Value>>, AnyHashable?) -> Work<Value>
 
   /// Records the declaration choices shared by every state created from it.
+  ///
+  /// Construction stores no context and starts no work. State creation remains
+  /// lazy in each context and key, preserving independent phase and task life.
   init(
     policy: LatestPolicy,
     selector: @escaping @MainActor (Reader<CogPhase<Value>>, AnyHashable?) -> Work<Value>,

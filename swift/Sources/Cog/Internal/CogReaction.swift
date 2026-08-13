@@ -1,8 +1,11 @@
 /// One reaction registration owned by a context.
 ///
 /// A reaction is a consumer, not readable state. It conforms to `CogState` so
-/// producers can use the same reverse edges and invalidation marks.
+/// producers can use the same reverse edges and invalidation marks. The owning
+/// MainActor context orders registrations, runs them after UI settlement, and
+/// keeps only the durable derived roots they directly read externally leased.
 internal final class CogReaction: CogState, CogConsumer {
+  /// The stable diagnostic identity supplied at registration.
   let label: CogLabel
 
   /// The context that owns this registration, or `nil` once it is gone.
@@ -22,6 +25,9 @@ internal final class CogReaction: CogState, CogConsumer {
   private(set) var isCancelled = false
 
   /// Producers read by the last completed run, in read order.
+  ///
+  /// Strong ownership keeps the producer graph alive while registered; each
+  /// producer stores only one weak reverse edge back to this reaction.
   private(set) var dependencies: [any CogState] = []
 
   /// Unique directly read derived roots this registration keeps observed.
@@ -29,13 +35,23 @@ internal final class CogReaction: CogState, CogConsumer {
   /// Separate from `dependencies` because repeated reads still own one lease.
   private(set) var leasedDependencies: [any CogLifetimeLeaseState] = []
 
+  /// Whether invalidation requires this terminal consumer to check or rerun.
   var settleState: CogSettleState = .clean
+
+  /// The last revision in which a reaction body was treated as changed.
+  ///
+  /// Reactions do not publish a value, so this remains the initial revision;
+  /// direct DIRTY state, not `changedAt`, forces a run.
   var changedAt: CogVersion = .initial
+
+  /// The graph revision against which the last completed body run was checked.
   var checkedAt: CogVersion = .initial
 
   /// Reactions are terminal consumers, so invalidation stops here.
   var subscribers: [CogSubscriberEdge] = []
 
+  /// Creates an inert registration; the context installs and initially runs it
+  /// in registration order after ownership is established.
   init(
     cogs: Cogtext,
     label: CogLabel,
@@ -73,6 +89,7 @@ internal final class CogReaction: CogState, CogConsumer {
     cogs?.reactions.removeAll { $0 === self }
   }
 
+  /// Records a body read and installs its reverse invalidation edge.
   func recordDependency(on producer: any CogState) {
     // A body that cancels itself and then keeps reading must not attach a new
     // edge to a registration that is already out of the graph.
@@ -82,6 +99,10 @@ internal final class CogReaction: CogState, CogConsumer {
     producer.addSubscriber(self)
   }
 
+  /// Balances external leases and drops strong edges during context teardown.
+  ///
+  /// This bypasses normal grace scheduling because no state in the context can
+  /// survive the same isolated deinitialization pass.
   func releaseDependenciesForContextTeardown() {
     // The context is already ending, so balance the inert counts directly and
     // never enter the normal release path that later schedules grace work.
@@ -93,12 +114,18 @@ internal final class CogReaction: CogState, CogConsumer {
   }
 
   /// Runs once at registration to establish the first dependency set.
+  ///
+  /// Initial runs share the active flush's ordered reaction queue when created
+  /// during a turn, preventing them from overtaking already-invalidated effects.
   func runInitially(in cogs: Cogtext) {
     run(in: cogs)
   }
 
   /// Settles the hot dependencies of a reachable reaction and reruns it only
   /// when at least one value changed since its last completed run.
+  ///
+  /// CHECK dependencies settle first. If they all prove equal, advancing only
+  /// this reaction's `checkedAt` stops work without invoking user code.
   func runIfNeeded(in cogs: Cogtext) {
     guard !isCancelled, settleState != .clean else { return }
 
@@ -121,6 +148,10 @@ internal final class CogReaction: CogState, CogConsumer {
   }
 
   /// Captures a fresh dependency set around one synchronous body run.
+  ///
+  /// Dependency edges and lease ownership reconcile before the final checked
+  /// mark. Any system turns requested by async reads inside the body drain only
+  /// afterward, when tracking and the derived computing path are both empty.
   private func run(in cogs: Cogtext) {
     // Every run checks cancellation. The local keeps the closure alive through
     // self-cancellation.
@@ -199,10 +230,18 @@ internal final class CogReaction: CogState, CogConsumer {
 }
 
 /// One entry in the active flush's registration-ordered reaction queue.
+///
+/// Changed registrations precede initial registrations appended during that
+/// flush. Each entry rechecks cancellation when performed, since cancellation
+/// intentionally does not mutate the queue being iterated.
 internal enum CogReactionRun {
+  /// Reconsider a previously registered reaction after invalidation.
   case changed(CogReaction)
+
+  /// Establish dependencies for a registration created during this flush.
   case initial(CogReaction)
 
+  /// Performs the queued run using the mode captured when it was enqueued.
   func perform(in cogs: Cogtext) {
     switch self {
     case .changed(let reaction):

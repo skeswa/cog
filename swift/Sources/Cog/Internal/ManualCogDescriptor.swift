@@ -3,6 +3,8 @@
 /// ``ManualCog`` and ``ManualCogBox`` share this descriptor type. It is
 /// generic over the value; the reference carries an erased key. A keyed
 /// reference is one descriptor plus its key (§2.3, perf §4).
+/// The immutable descriptor is shared across contexts; each context owns the
+/// current and staged value for each descriptor-and-key identity separately.
 internal final class ManualCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
@@ -57,6 +59,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 
   /// The value the state for `key` holds before anything writes to it.
   ///
+  /// The context invokes this once when it lazily creates that exact state.
+  /// Repeated reads and writes use the resident value and never rerun a per-key
+  /// initializer unless a future releasable-manual policy recreates the state.
+  ///
   /// - Parameter key: The state's key, or `nil` for a keyless declaration.
   func startingValue(forKey key: AnyHashable?) -> Value {
     switch start {
@@ -83,7 +89,9 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 /// The two forms a manual declaration's starting value can take.
 ///
 /// The constant case avoids a closure allocation and call. Public initializers
-/// select the case from `(0)` or `{ key in ... }`.
+/// select the case from `(0)` or `{ key in ... }`. The per-key closure is
+/// MainActor-isolated because lazy state creation is graph work; the erased key
+/// adapter restores the public key type before user code observes it.
 internal enum ManualCogStartingValue<Value> {
   /// Every state of the declaration starts at this value.
   case constant(Value)

@@ -39,6 +39,7 @@ internal final class CogTurn {
   /// no-ops. A future measured representation may deduplicate this work.
   private var touchedSources: [any PendingCogSource] = []
 
+  /// Creates one accumulating turn with its unforgeable writer capability.
   init(id: CogTurnID, name: String) {
     self.id = id
     self.name = name
@@ -72,7 +73,9 @@ internal final class CogTurn {
 /// Bodies are retained in arrival order and receive a fresh turn only after the
 /// current flush, including all reactions, has returned the context to idle.
 internal struct QueuedCogTurn {
+  /// The history and diagnostic name preserved from the requesting operation.
   let name: String
+  /// The deferred staging body, executed only in its fresh accumulating turn.
   let body: (CogTurn) -> Void
 }
 
@@ -81,8 +84,11 @@ internal struct QueuedCogTurn {
 /// Accumulation permits nested application writes to join atomically. Flushing
 /// closes writer mutation; new turns queue instead of re-entering propagation.
 internal enum CogTurnPhase {
+  /// No body, publication, Observation flush, or reaction flush is active.
   case idle
+  /// An open writer boundary accepting nested writes into the same atomic turn.
   case accumulating(CogTurn)
+  /// A closed writer boundary publishing and propagating one completed revision.
   case flushing(CogTurn)
 }
 
@@ -95,7 +101,8 @@ extension Cogtext {
   /// An idle context is not sufficient: a selector or reaction may be tracking
   /// outside a turn. System publication waits until both tracking and settlement
   /// have completed, so Observation and reactions never run through an active
-  /// consumer.
+  /// consumer. Both settle representations are checked because a popped exit
+  /// frame leaves its derived state on the computing path through recomputation.
   internal var canRunSystemTurnImmediately: Bool {
     guard case .idle = turnPhase else { return false }
     return settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil
@@ -129,7 +136,9 @@ extension Cogtext {
   ///
   /// If another turn is active, queue rather than nest a flush. That preserves
   /// completed-turn reads and ensures pending, success, and failure each occupy
-  /// their own visible revision.
+  /// their own visible revision. The same deferral applies while otherwise-idle
+  /// selector or reaction tracking is active; the first safe outer boundary
+  /// drains the preserved name and body in FIFO order.
   internal func withSystemTurn(_ name: String, _ body: @escaping (CogTurn) -> Void) {
     guard canRunSystemTurnImmediately else {
       queuedTurns.append(QueuedCogTurn(name: name, body: body))
@@ -149,6 +158,8 @@ extension Cogtext {
   ///
   /// The queue also carries turns requested during an active flush; those stay
   /// owned by that outer turn and fail this guard until it returns to idle.
+  /// Settlement and reaction completion both call this method because either
+  /// can be the outermost synchronous scope that requested the deferred turn.
   internal func drainQueuedTurnsIfPossible() {
     guard !queuedTurns.isEmpty, canRunSystemTurnImmediately else { return }
 
@@ -195,6 +206,8 @@ extension Cogtext {
   ///
   /// Flush order is part of correctness: publish staged state, settle and notify
   /// UI roots, run reactions against that completed revision, then return idle.
+  /// Reactions may enqueue write-back or async publication, but none may reenter
+  /// this sequence; the caller drains them after `finishTurn`.
   private func runOuterTurn(named name: String, _ body: (CogTurn) -> Void) {
     let turn = startTurn(named: name)
     body(turn)
@@ -213,6 +226,9 @@ extension Cogtext {
   ///
   /// The indexed loop intentionally observes bodies appended by reactions in a
   /// queued turn, preserving one non-reentrant FIFO until the chain is empty.
+  /// Queue removal is delayed until all captured and newly appended entries have
+  /// run, so mutating the array during reaction write-back cannot invalidate the
+  /// current iteration index.
   private func drainQueuedTurns() {
     var index = 0
     while index < queuedTurns.count {

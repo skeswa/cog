@@ -4,6 +4,9 @@
 /// value; the reference carries an erased key (perf §4).
 ///
 /// Every state for the declaration uses the selector stored here.
+/// Mutable cache, dependency, Observation, and lifetime bookkeeping remain on
+/// the per-context ``DerivedCogState``; the descriptor is immutable after
+/// declaration construction and is invoked only on the graph's MainActor.
 internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   let label: CogLabel
 
@@ -40,7 +43,9 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// Runs the selector once for the state `reader` belongs to.
   ///
-  /// Keyless and keyed declarations share this call site.
+  /// Keyless and keyed declarations share this call site. The state must have
+  /// installed its tracking scope and active-computation marker first; this
+  /// descriptor deliberately cannot start settlement or publish a result.
   func compute(_ reader: Reader<Value>, key: AnyHashable?) -> Value {
     selector(reader, key)
   }
@@ -48,7 +53,9 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// Whether a recomputation is equivalent to the state's cached value.
   ///
   /// The public declaration overloads install `==`, preserve a custom rule,
-  /// or leave the comparator absent so an opaque value assumes change.
+  /// or leave the comparator absent so an opaque value assumes change. This
+  /// comparison runs after dependency capture but before the state records its
+  /// final versions, within the enclosing computation barrier.
   func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
     equals?(oldValue, newValue) ?? false
   }

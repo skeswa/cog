@@ -13,7 +13,9 @@
 /// The shape every declaration's descriptor shares.
 ///
 /// A descriptor names state but does not store it. Each `Cogtext` creates its
-/// own state for a descriptor and key (§2.3).
+/// own state for a descriptor and key (§2.3). The descriptor and all mutable
+/// state it names are MainActor-confined; copied public value references share
+/// this declaration identity rather than copying graph state.
 ///
 /// Descriptor object identity distinguishes declarations without a registry.
 /// Two declarations remain distinct even if their labels, types, and starting
@@ -29,8 +31,10 @@ internal protocol CogDescriptor: AnyObject {
 extension CogDescriptor {
   /// Stable process identity for this declaration.
   ///
-  /// The declaration owns its descriptor, so the object outlives every state,
-  /// edge, and history entry that refers to it.
+  /// Public references and every live state retain their descriptor, so this
+  /// identity cannot be reused while either can still address the declaration.
+  /// Debug history stores rendered labels and keys rather than retaining a
+  /// descriptor solely for diagnostics.
   var identity: ObjectIdentifier {
     ObjectIdentifier(self)
   }

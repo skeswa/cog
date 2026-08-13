@@ -4,7 +4,10 @@
 /// object identity still distinguishes declarations that share a label.
 ///
 /// A label keeps `#fileID` as a `StaticString` and renders a `String` only for
-/// display. Unnamed declarations allocate no label string.
+/// display. Unnamed declarations allocate no label string. It is immutable and
+/// `Sendable` for diagnostic snapshots, but it is never a state key: two
+/// declarations at the same printed location remain distinct by descriptor
+/// object identity.
 internal struct CogLabel: Sendable, CustomStringConvertible {
   /// The name the declaration passed as `name:`, or `nil` when it did not.
   let name: String?
@@ -25,6 +28,9 @@ internal struct CogLabel: Sendable, CustomStringConvertible {
   }
 
   /// The label as Cog prints it: the explicit name, else `fileID:line`.
+  ///
+  /// Rendering is intentionally deferred until diagnostics, task naming, or
+  /// history presentation asks for it; normal state lookup compares no strings.
   var description: String {
     if let name {
       return name

@@ -4,7 +4,11 @@
 /// captures graph dependencies, then its returned ``Work`` runs outside
 /// dependency tracking. The state publishes pending, success, and failure as
 /// separate system turns so readers and push consumers observe only completed
-/// phase transitions.
+/// phase transitions. Initial demand is the exception: it must install an honest
+/// pending baseline synchronously, then preserves ordering with a deferred named
+/// turn once its computing path unwinds. The context is the sole owner of the
+/// descriptor-and-key slot; work and grace tasks hold it weakly and must pass
+/// identity plus generation checks before mutating MainActor-confined state.
 internal final class AsyncCogState<Value>:
   CogState, CogConsumer, CogReaderState, DerivedCogSettleState, CogLifetimeLeaseState,
   CogObservationState, PendingCogSource
@@ -13,12 +17,18 @@ internal final class AsyncCogState<Value>:
   let descriptor: AsyncCogDescriptor<Value>
 
   /// The keyed instance of `descriptor`, or `nil` for a keyless declaration.
+  ///
+  /// Together with descriptor object identity, this is stable for the full
+  /// lifetime of the state and names its context storage slot and task.
   let key: AnyHashable?
 
   /// The declaration half of the context's descriptor-and-key storage identity.
   var descriptorIdentity: ObjectIdentifier { descriptor.identity }
 
   /// Whether settlement is currently running this state's synchronous selector.
+  ///
+  /// Mirrored in the context's computing path: the bit provides the common cycle
+  /// check, while the ordered path produces diagnostics and balances nested runs.
   var isComputing = false
 
   /// Producers read by the latest synchronous selector run, in read order.
@@ -32,9 +42,15 @@ internal final class AsyncCogState<Value>:
   var settleState: CogSettleState = .dirty
 
   /// The revision of the last phase publication visible to readers.
+  ///
+  /// The exceptional synchronous pending baseline uses the current revision and
+  /// queues an empty named turn; it has no pre-existing consumers to invalidate.
   var changedAt: CogVersion = .initial
 
   /// The revision through which the selector and its dependencies are current.
+  ///
+  /// A queued reload marks the selector checked in the source turn without
+  /// publishing pending early; its later system turn advances both timestamps.
   var checkedAt: CogVersion = .initial
 
   /// Weak reverse edges to phase or projection consumers.
@@ -42,6 +58,8 @@ internal final class AsyncCogState<Value>:
 
   /// Created only when this exact async phase crosses the UI boundary.
   var observationBoundary: CogObservationBoundary?
+
+  /// The erased key rendered with UI notices for this boundary.
   var observationKey: AnyHashable? { key }
   var label: CogLabel { descriptor.label }
 
@@ -66,6 +84,9 @@ internal final class AsyncCogState<Value>:
 
   /// The exact slot this context must still map to this object before accepting
   /// a task result or releasing state.
+  ///
+  /// State identity alone cannot reject recreation, so callers also compare the
+  /// stored object by identity.
   var stateIdentity: CogStateIdentity {
     CogStateIdentity(descriptor: descriptorIdentity, key: key)
   }
@@ -101,8 +122,10 @@ internal final class AsyncCogState<Value>:
   /// so cancellation is never the correctness boundary for late completion.
   private var generation: UInt64 = 0
 
+  /// The last completed phase available to `Reader.curr`, preserving initial absence.
   var readerCurrentValue: CogPhase<Value>? { phase }
 
+  /// Creates an uncomputed, task-free state for one context storage identity.
   init(descriptor: AsyncCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -203,6 +226,10 @@ internal final class AsyncCogState<Value>:
   /// the boundary that prevents reads after suspension from becoming graph
   /// dependencies. `pendingTurn` is supplied by refresh so dependency capture
   /// and the pending transition belong to its already-open system turn.
+  /// When selection occurs inside an active computing or tracking path, a first
+  /// synchronous read installs its pending baseline immediately but queues the
+  /// named turn until both paths unwind. This avoids reentrant Observation or
+  /// reaction flushing while preserving diagnostic turn order.
   private func startWork(in cogs: Cogtext, publishingPendingIn pendingTurn: CogTurn? = nil) {
     guard isComputing else {
       fatalError("An async Cog selector ran outside the settle computation path.")
@@ -313,7 +340,9 @@ internal final class AsyncCogState<Value>:
   /// Publishes one accepted work result as its own named system turn.
   ///
   /// Clearing the handle records that no current task remains; generation still
-  /// guards any older task that outlived replacement cancellation.
+  /// guards any older task that outlived replacement cancellation. If graph
+  /// evaluation is active, `stage` queues publication; completion never nests a
+  /// turn into selector or reaction tracking.
   private func publish(_ phase: CogPhase<Value>, named phaseName: String, in cogs: Cogtext) {
     activeTask = nil
     stage(phase, named: phaseName, in: cogs)
@@ -345,6 +374,9 @@ internal final class AsyncCogState<Value>:
   }
 
   /// The descriptor label plus key used consistently for turns and task tools.
+  ///
+  /// One rendering rule prevents task diagnostics from drifting from pending,
+  /// success, and failure history names.
   private var renderedName: String {
     guard let key else { return "\(label)" }
     return "\(label)[\(key.base)]"
