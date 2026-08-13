@@ -1,18 +1,3 @@
-public import Cog
-
-extension AsyncCog {
-  /// Builds a keyed reference for verifying Cog's internal task name.
-  ///
-  /// This narrow diagnostic exists only until `AsyncCogBox` supplies the
-  /// public keyed declaration API. Use it in tests that need to observe the
-  /// descriptor-and-key name attached to an async cog's task.
-  public func taskNameDiagnosticReference<Key: Hashable>(
-    for key: Key
-  ) -> AsyncCog<Value> {
-    valueReferenceForTaskNameDiagnostic(key)
-  }
-}
-
 /// Runtime task information exposed only by the `CogTesting` product.
 public nonisolated enum CogTaskDiagnostic {
   /// The current Swift task's actual runtime name, when the runtime exposes it.

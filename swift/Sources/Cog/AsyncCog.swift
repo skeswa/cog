@@ -63,21 +63,6 @@ public struct AsyncCog<Value> {
     self.latestDescriptor = latestDescriptor
     self.key = key
   }
-  /// Builds a keyed reference solely for the task-name testing seam.
-  ///
-  /// `AsyncCogBox` owns the eventual public keyed API. Until it arrives, this
-  /// package-only constructor lets `CogTesting` prove that internal task names
-  /// include a descriptor's key without publishing an early API shape.
-  package func valueReferenceForTaskNameDiagnostic<Key: Hashable>(
-    _ key: Key
-  ) -> AsyncCog<Value> {
-    AsyncCog(
-      descriptor: descriptor,
-      latestDescriptor: latestDescriptor,
-      key: AnyHashable(key)
-    )
-  }
-
   /// A value reference that reads only the last successful value.
   ///
   /// Pending and failure phases retain their previous success. For equatable
@@ -87,7 +72,7 @@ public struct AsyncCog<Value> {
   }
 
   /// Builds the stable projection descriptor shared by copies of this reference.
-  private static func makeLatestDescriptor(
+  internal static func makeLatestDescriptor(
     for descriptor: AsyncCogDescriptor<Value>,
     equals: (@MainActor (Value?, Value?) -> Bool)?,
     lifetime: CogStateLifetime,
