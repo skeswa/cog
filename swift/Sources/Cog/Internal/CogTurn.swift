@@ -63,6 +63,20 @@ internal enum CogTurnPhase {
 // optimization. See `Cogtext.requireWriterTurn` in `Writer.swift`.
 
 extension Cogtext {
+  /// Rejects an application operation before it can open a turn during derivation.
+  internal func requireOutsideDerivedComputation(forTurnNamed name: String) {
+    if let computing = settleStack.innermostComputingState {
+      let cogName = CogCycleStep(state: computing).name
+      fatalError(
+        """
+        Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \
+        computing. Derived computation may only read Cog state. Invoke this op outside \
+        derived computation, from event handling or a reaction.
+        """
+      )
+    }
+  }
+
   /// Runs one graph-owned turn without applying the public commit guard.
   ///
   /// Async phase publication originates from derived computation itself. It is
@@ -90,16 +104,7 @@ extension Cogtext {
   /// Commits during flush enter the FIFO queue. Derived computation rejects a
   /// commit before any of these paths run.
   internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
-    if let computing = settleStack.innermostComputingState {
-      let cogName = CogCycleStep(state: computing).name
-      fatalError(
-        """
-        Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \
-        computing. Derived computation may only read Cog state. Invoke this op outside \
-        derived computation, from event handling or a reaction.
-        """
-      )
-    }
+    requireOutsideDerivedComputation(forTurnNamed: name)
 
     switch turnPhase {
     case .accumulating(let turn):

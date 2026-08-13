@@ -8,7 +8,9 @@ extension Cogtext {
   ///
   /// Refresh installs no durable consumer. When no consumer already exists,
   /// the call starts or renews ordinary `whileObserved` grace.
+  /// Calling refresh during derived computation traps before creating target state.
   public func refresh<Value>(_ valueReference: AsyncCog<Value>) {
+    requireOutsideDerivedComputation(forTurnNamed: #function)
     let state = asyncState(for: valueReference)
     state.refresh(in: self)
     scheduleLifetimeReleaseIfUnobserved(state)
