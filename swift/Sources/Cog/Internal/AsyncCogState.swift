@@ -160,20 +160,35 @@ internal final class AsyncCogState<Value>:
         let value = try await operation()
         guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard let self, self.generation == runGeneration,
-          cogs.stillStoresAsyncState(self)
+        guard let self, self.acceptsResult(for: runGeneration, in: cogs)
         else { return }
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
       } catch {
         guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard let self, !Task.isCancelled, self.generation == runGeneration,
-          cogs.stillStoresAsyncState(self)
+        guard let self, !Task.isCancelled,
+          self.acceptsResult(for: runGeneration, in: cogs)
         else { return }
         self.publish(.failure(error, previous: self.lastSuccess), named: "failure", in: cogs)
       }
     }
+  }
+
+  /// Whether work selected from one generation may publish into current state.
+  ///
+  /// An unobserved state stays lazy when a dependency changes, so its old task
+  /// can finish while the state is still DIRTY or CHECK. Reject that result and
+  /// force the next consumer to select fresh work instead of letting phase
+  /// publication erase the pending invalidation.
+  private func acceptsResult(for runGeneration: UInt64, in cogs: Cogtext) -> Bool {
+    guard generation == runGeneration, cogs.stillStoresAsyncState(self) else { return false }
+    guard settleState == .clean else {
+      activeTask = nil
+      markDirty()
+      return false
+    }
+    return true
   }
 
   /// Advances the latest-work generation without allowing stale revival.
