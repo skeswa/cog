@@ -272,9 +272,16 @@ extension Cogtext {
 
   /// Gets this async state, creating it without starting work on first use.
   internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
-    state(CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
-    {
-      AsyncCogState(descriptor: valueReference.descriptor, key: valueReference.key)
+    asyncState(descriptor: valueReference.descriptor, key: valueReference.key)
+  }
+
+  /// Gets async state from a descriptor captured by its latest-value projection.
+  internal func asyncState<Value>(
+    descriptor: AsyncCogDescriptor<Value>,
+    key: AnyHashable?
+  ) -> AsyncCogState<Value> {
+    state(CogStateIdentity(descriptor: descriptor.identity, key: key)) {
+      AsyncCogState(descriptor: descriptor, key: key)
     }
   }
 

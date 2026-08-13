@@ -67,6 +67,19 @@ public struct Reader<Value> {
     return phase
   }
 
+  /// Reads one async descriptor for an internal projection selector.
+  internal func asyncPhase<Read>(
+    from descriptor: AsyncCogDescriptor<Read>,
+    key: AnyHashable?
+  ) -> CogPhase<Read> {
+    cogs.requireTracking(state)
+
+    let producer = cogs.asyncState(descriptor: descriptor, key: key)
+    let phase = producer.settledPhase(in: cogs)
+    state.recordDependency(on: producer)
+    return phase
+  }
+
   /// Reads a source exposed through `.readOnly`, and depends on it.
   ///
   /// This lets a selector read a published projection while the writable
