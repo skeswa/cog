@@ -81,6 +81,76 @@ public nonisolated enum CogPhase<Value> {
     }
     return false
   }
+
+  /// The successful value of the current generation, if that is how it ended.
+  ///
+  /// Unlike ``latestValue``, this never surfaces a retained previous success:
+  /// pending and failure return `nil` whatever their `previous` carries. It
+  /// answers "did the current generation succeed," where `latestValue`
+  /// answers "what should be on screen."
+  ///
+  /// When `Value` is itself optional, the outer optional reports whether the
+  /// current generation succeeded and the inner optional is the value it
+  /// produced, so a successful `nil` remains distinct from pending and
+  /// failure — the same nesting rule as `latestValue`.
+  ///
+  /// - Returns: The current generation's successful value, or `nil` for
+  ///   pending and failure phases.
+  public var value: Value? {
+    if case .success(let value) = self {
+      return value
+    }
+    return nil
+  }
+
+  /// The error of the current generation, if that is how it ended.
+  ///
+  /// Pending and success return `nil`, including a reload retrying after an
+  /// earlier failure: the error belonged to the generation that published it,
+  /// and its replacement publicly begins at pending again. The error keeps
+  /// its existential type; consumers that need domain-specific handling cast
+  /// or map it at their boundary.
+  ///
+  /// - Returns: The current generation's error, or `nil` for pending and
+  ///   success phases.
+  public var error: (any Error)? {
+    if case .failure(let error, _) = self {
+      return error
+    }
+    return nil
+  }
+
+  /// Whether this is a first load, with no retained success to show.
+  ///
+  /// This is `true` only for ``pending(previous:)`` carrying
+  /// ``Previous/none``. Together with ``isReloading`` it splits ``isLoading``
+  /// by retained success, so a consumer can show a skeleton for a first load
+  /// and keep the last good value on screen for a reload without matching
+  /// through `Previous`.
+  ///
+  /// - Returns: Whether in-flight work has no retained success to fall back
+  ///   on.
+  public var isInitialLoading: Bool {
+    if case .pending(previous: .none) = self {
+      return true
+    }
+    return false
+  }
+
+  /// Whether this is a reload, still holding the last accepted success.
+  ///
+  /// This is `true` only for ``pending(previous:)`` carrying
+  /// ``Previous/some(_:)``, including a retained successful `nil` for
+  /// optional values. Failure phases return `false` even when they retain a
+  /// previous success: they represent finished work, not a reload in flight.
+  ///
+  /// - Returns: Whether in-flight work retains the last accepted success.
+  public var isReloading: Bool {
+    if case .pending(previous: .some(_)) = self {
+      return true
+    }
+    return false
+  }
 }
 
 /// Whether an async state has a last successful value to retain.
