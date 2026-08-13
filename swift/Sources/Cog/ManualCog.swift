@@ -1,4 +1,4 @@
-/// A writable source of state.
+/// A declaration and value reference for one writable source of truth.
 ///
 /// Declare one at the top of the file that owns the state, and keep the
 /// declaration `fileprivate` (or `private` inside a type) so only that file can
@@ -9,15 +9,23 @@
 /// fileprivate let currentZipSource = ManualCog<ZipCode?>(nil)
 /// ```
 ///
-/// A `ManualCog` names state stored in a ``Cogtext``. Copying the reference
-/// still names the same state. A test or preview uses separate state in its own
-/// context.
+/// Constructing or copying a `ManualCog` does not create graph state. Its
+/// stable descriptor identity names one app-lifetime state inside each
+/// ``Cogtext``; a test or preview context therefore receives isolated state,
+/// while every copy used in the same context reaches the same source.
+///
+/// Manual state changes only through a ``Writer`` inside a named
+/// ``Cogtext/commit(_:_:)`` turn (or debug-only test seeding). A writer reads
+/// that turn's staged value, while normal reads continue to see the latest
+/// completed turn until the commit boundary. Multiple writes in one turn
+/// collapse to the final staged value before equality and propagation.
 ///
 /// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
-/// Names do not define identity.
+/// Names do not define identity. The declaration and all graph access are
+/// MainActor-isolated, allowing non-`Sendable` values to remain inside Cog.
 @MainActor
 public struct ManualCog<Value> {
-  /// The declaration this value reference names.
+  /// Stable declaration identity and behavior shared by reference copies.
   internal let descriptor: ManualCogDescriptor<Value>
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
@@ -28,10 +36,14 @@ public struct ManualCog<Value> {
 
   /// Declares a source of state that starts at `startingValue`.
   ///
-  /// This allocates one descriptor. A context creates the state on first use.
+  /// This allocates one descriptor but no graph state. Each context creates its
+  /// own state lazily and retains it until that context ends. Without an
+  /// equality rule, every turn that writes the source counts as a change even
+  /// if the old and final values happen to be equal.
   ///
   /// - Parameters:
-  ///   - startingValue: The value reads see until something writes.
+  ///   - startingValue: The value a context's first read sees and retains until
+  ///     a completed turn writes another value.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -59,10 +71,12 @@ public struct ManualCog<Value> {
   /// final value staged by the turn. Returning `true` suppresses downstream
   /// work; returning `false` commits and propagates the new value. This also
   /// makes a change followed by a reversion in one turn count as no change.
+  /// The comparison runs on the MainActor at the commit boundary.
   ///
   /// - Parameters:
   ///   - startingValue: The value reads see until something writes.
-  ///   - equals: Whether the old and newly staged values count as equal.
+  ///   - equals: Comparison of the latest completed value and the turn's final
+  ///     staged value. Return `true` to keep the old value and stop propagation.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -84,7 +98,11 @@ public struct ManualCog<Value> {
     )
   }
 
-  /// Builds a keyed reference without allocating another descriptor.
+  /// Builds a reference for an existing descriptor-and-key identity.
+  ///
+  /// ``ManualCogBox`` uses this path so repeated subscripting stays inert and
+  /// lightweight. Context state is still created only when the reference is
+  /// first read or written.
   internal init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -96,7 +114,15 @@ extension ManualCog where Value: Equatable {
   ///
   /// This overload is selected automatically when `Value` conforms to
   /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to substitute a
-  /// domain-specific equality rule.
+  /// domain-specific equality rule. Equality is applied once to the turn's
+  /// final staged value, so equal writes and within-turn reversions produce no
+  /// downstream work.
+  ///
+  /// - Parameters:
+  ///   - startingValue: The initial app-lifetime value in each context.
+  ///   - name: The diagnostic and history label for this declaration.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: Value,
     name: String? = nil,

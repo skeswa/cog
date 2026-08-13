@@ -4,10 +4,17 @@
 /// values and stages writes until the outer commit body returns. Application
 /// code cannot construct one.
 ///
+/// All access is MainActor-isolated and names only ``ManualCog`` sources;
+/// derived cogs and read-only projections deliberately have no writer
+/// subscript. A normal read sees the latest completed turn, but a writer read
+/// sees this accumulating turn's most recently staged value so read-modify-write
+/// operations compose correctly.
+///
 /// Do not save a writer in an escaping closure or `Task`. Reads and writes trap
 /// after the commit body ends because the staged view no longer exists.
 @MainActor
 public struct Writer {
+  /// The graph that owns the accumulating turn and source states.
   private let cogs: Cogtext
 
   /// The turn this writer may act on.
@@ -15,12 +22,30 @@ public struct Writer {
   /// Held strongly so object identity cannot be reused while a writer exists.
   private let turnID: CogTurnID
 
+  /// Creates the capability for one exact accumulating turn.
+  ///
+  /// The context and identity are deliberately paired: validating object
+  /// identity on every access prevents an escaped writer from joining a later
+  /// turn that happens to run in the same context.
+  ///
+  /// - Parameters:
+  ///   - cogs: The graph that owns the active turn and manual state.
+  ///   - turnID: The retained identity that must still match that active turn.
   internal init(cogs: Cogtext, turnID: CogTurnID) {
     self.cogs = cogs
     self.turnID = turnID
   }
 
-  /// Reads or stages one manual source in this turn.
+  /// Reads or stages one manual source in this writer's turn.
+  ///
+  /// The getter returns the last value staged through this turn, or the latest
+  /// completed value when the source has not been written yet. The setter
+  /// replaces that staged value; only the final value reaches equality checks
+  /// and the commit boundary. Reads and writes through an escaped writer trap
+  /// in every build.
+  ///
+  /// - Parameter valueReference: The writable descriptor-and-key identity to
+  ///   read or stage.
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
     get { cogs.writerRead(valueReference, turnID: turnID) }
     nonmutating set { cogs.writerStage(valueReference, value: newValue, turnID: turnID) }
@@ -36,10 +61,15 @@ extension Cogtext {
   /// returning.
   ///
   /// The writer's changes cross the commit boundary together. Ops are
-  /// `Cogtext` methods that wrap this primitive.
+  /// `Cogtext` methods that wrap this primitive. Normal reads made before the
+  /// boundary still see the prior completed snapshot; reactions, derived
+  /// settlement, Observation notices, and debug history run only as the turn
+  /// flushes.
   ///
   /// Calling `commit` during a derived computation traps before `body` runs.
-  /// The error names the active cog and attempted turn.
+  /// The error names the active cog and attempted turn. The method is
+  /// MainActor-isolated through `Cogtext`; `body` is synchronous even though
+  /// it is escaping for queued-turn storage.
   ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. By default,
@@ -52,7 +82,10 @@ extension Cogtext {
     }
   }
 
-  /// Reads through a writer after proving it belongs to the active turn.
+  /// Reads the staged overlay after proving the writer belongs to the active turn.
+  ///
+  /// Validation precedes state lookup so an escaped writer cannot lazily create
+  /// state outside its turn.
   internal func writerRead<Value>(_ valueReference: ManualCog<Value>, turnID: CogTurnID) -> Value {
     requireWriterTurn(turnID, usage: .reading, target: valueReference)
 
@@ -63,7 +96,10 @@ extension Cogtext {
     return pending
   }
 
-  /// Stages a value after proving the writer belongs to the active turn.
+  /// Replaces a source's staged value and marks it touched once for this turn.
+  ///
+  /// Touching delegates deduplication to the turn, so repeated writes preserve
+  /// the last staged value without duplicating commit-boundary work.
   internal func writerStage<Value>(
     _ valueReference: ManualCog<Value>,
     value: Value,

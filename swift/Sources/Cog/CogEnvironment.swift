@@ -1,11 +1,20 @@
 public import SwiftUI
 
-/// The explicit SwiftUI composition boundary for an app's Cog context.
+/// Optional storage makes a missing composition boundary diagnosable.
+///
+/// A fabricated default context would split state from the graph bootstrapped
+/// by the app. Keeping the default `nil` lets the public accessor fail with
+/// installation guidance instead.
 private struct CogtextEnvironmentKey: EnvironmentKey {
+  /// `nil` is a deliberate missing-installation sentinel, not a usable graph.
   nonisolated static var defaultValue: Cogtext? { nil }
 }
 
 extension EnvironmentValues {
+  /// Raw optional storage used only by the installation and checked-access APIs.
+  ///
+  /// Keeping this fileprivate prevents views from bypassing the fail-fast
+  /// ``cogs`` accessor or installing `nil` accidentally.
   @MainActor
   fileprivate var installedCogs: Cogtext? {
     get { self[CogtextEnvironmentKey.self] }
@@ -28,6 +37,16 @@ extension EnvironmentValues {
   ///
   /// Tests and previews inject their isolated `Cogtext.forTesting()` context
   /// through the same environment key.
+  ///
+  /// Reading this property does not itself read graph state or establish a Cog
+  /// dependency. Subsequent `cogs[valueReference]` calls cross the tracked
+  /// SwiftUI boundary. The property is MainActor-isolated because all context
+  /// operations and values belong to the app's main-actor graph.
+  ///
+  /// - Returns: The exact context installed by the nearest ancestor.
+  ///
+  /// - Important: A missing installation traps in debug and release rather
+  ///   than creating a second state island.
   @MainActor
   public var cogs: Cogtext {
     guard let cogs = installedCogs else {
@@ -46,6 +65,18 @@ extension EnvironmentValues {
 
 extension View {
   /// Installs the app-wide Cog context above a SwiftUI view hierarchy.
+  ///
+  /// Call this at the composition root with the single context returned by
+  /// ``Cogtext/bootstrapApp()``. Descendants inherit that exact reference, so
+  /// multiple scenes share one authoritative graph. Tests and previews may use
+  /// their one isolated testing context instead.
+  ///
+  /// This modifier installs the context only; it does not create state, read a
+  /// value, or start observation.
+  ///
+  /// - Parameter cogs: The production or isolated-test graph for this runtime.
+  /// - Returns: A view whose descendants resolve ``EnvironmentValues/cogs`` to
+  ///   that exact context.
   @MainActor
   public func cogEnvironment(_ cogs: Cogtext) -> some View {
     environment(\.installedCogs, cogs)

@@ -1,11 +1,15 @@
-// The process-wide production context registry. Test contexts do not use it.
+// The process-wide production install guard. It enforces singular app state but
+// intentionally exposes no service-locator accessor; tests and previews do not
+// enter this registry.
 
 // MARK: - Installing the app's context
 
 extension Cogtext {
   /// The app's context, once bootstrap has installed it.
   ///
-  /// MainActor isolation makes access serialized without a lock.
+  /// MainActor isolation makes access serialized without a lock. The strong
+  /// reference keeps the authoritative production graph alive for the process
+  /// after bootstrap, independently of scene recreation.
   private static var installedAppContext: Cogtext?
 
   /// Creates the app's one context and installs it for the whole process.
@@ -33,10 +37,16 @@ extension Cogtext {
   /// services; views receive it through `\.cogs`. There is no static accessor,
   /// so tests can pass an isolated context through the same boundaries.
   ///
+  /// The context is MainActor-confined, uses a continuous production clock,
+  /// and gives declarations without explicit lifetime grace a 30-second
+  /// `whileObserved` default. Bootstrap creates no individual Cog state; the
+  /// graph remains lazy until value references are used.
+  ///
   /// A second call traps in every build. Tests and previews use
   /// `Cogtext.forTesting()`.
   ///
-  /// - Returns: The app's context.
+  /// - Returns: The newly installed, process-authoritative app context. Keep and
+  ///   pass this exact reference rather than bootstrapping again.
   @discardableResult
   public static func bootstrapApp() -> Cogtext {
     let cogs = Cogtext(
@@ -49,7 +59,9 @@ extension Cogtext {
 
   /// The app's context, or `nil` when nothing has bootstrapped one.
   ///
-  /// Package access is for the `CogTesting` bootstrap fixture.
+  /// Package access is only for the `CogTesting` bootstrap fixture to verify
+  /// installation identity without making production code depend on global
+  /// lookup.
   package static var installedApp: Cogtext? {
     installedAppContext
   }
@@ -86,7 +98,9 @@ extension Cogtext {
   /// bootstrap.
   ///
   /// Used by `CogTesting` to restore the process after a scoped bootstrap test.
-  /// Shipping apps cannot call it.
+  /// This drops the registry's strong reference; normal context deinitialization
+  /// then cancels graph-owned work and breaks dependency chains when no other
+  /// references remain. Shipping apps cannot call it.
   package static func uninstallApp() {
     installedAppContext = nil
   }

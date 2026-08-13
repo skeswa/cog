@@ -1,4 +1,4 @@
-/// A read-only facade for a ``ManualCogBox``.
+/// A read-only keyed facade over one ``ManualCogBox`` declaration.
 ///
 /// Keep a source box `fileprivate`, then publish its `.readOnly` projection:
 ///
@@ -8,8 +8,15 @@
 /// let weatherReport = weatherReportSource.readOnly
 /// ```
 ///
-/// Callers can then read `weatherReport[zip]`. The projection holds no state,
-/// keys, or values.
+/// The projection holds the source box's descriptor identity but no keys,
+/// states, or copied values. Equal keys name the same app-lifetime manual state
+/// through either facade, so reads remain singular while ``Writer`` accepts
+/// only the hidden writable references. Creating or subscripting the projection
+/// is inert; a context creates a key's state on first use.
+///
+/// The facade is MainActor-isolated with the source it names. It is an access
+/// boundary, not a security boundary: keep the source declaration private in
+/// the file that owns its write operations.
 @MainActor
 public struct CogBoxProjection<Value, Key: Hashable> {
   /// The source box this projection reads.
@@ -20,6 +27,7 @@ public struct CogBoxProjection<Value, Key: Hashable> {
   /// The read-only value reference naming this box's state for one key.
   ///
   /// `readOnlyBox[5]` and `sourceBox[5]` name the same state.
+  /// Building the projected reference allocates no descriptor or graph state.
   ///
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A read-only value reference for that key.
@@ -33,8 +41,9 @@ public struct CogBoxProjection<Value, Key: Hashable> {
 extension ManualCogBox {
   /// A keyed declaration naming this box's state whose value references cannot be written.
   ///
-  /// Publish this beside a `fileprivate` source box. Each projected key names
-  /// the source box's state for that key.
+  /// Publish this beside a `fileprivate` source box. Each projected key keeps
+  /// the source descriptor-and-key identity, equality behavior, starting value,
+  /// and context-local state; only write capability is removed.
   public var readOnly: CogBoxProjection<Value, Key> {
     CogBoxProjection(source: self)
   }

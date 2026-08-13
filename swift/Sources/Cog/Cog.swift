@@ -1,4 +1,4 @@
-/// A value derived from other cogs.
+/// A declaration and value reference for synchronously derived state.
 ///
 /// Declare one next to the state it summarizes, and write it as a plain
 /// function of the cogs it reads:
@@ -14,21 +14,30 @@
 /// dependency, so changes can update this value. Reads from captured values,
 /// globals, or stored properties are invisible to Cog.
 ///
-/// A `Cog` names a derived value. The value lives in a ``Cogtext``. Its first
-/// read in a context runs the selector, and later reads use the cached result
-/// until a dependency changes. Tests and previews compute their own values in
-/// their own contexts.
+/// Constructing or copying a `Cog` does not create graph state or run its
+/// selector. The declaration carries stable descriptor identity; each
+/// ``Cogtext`` lazily creates its own cached state for that identity on first
+/// read. Copies therefore name one state inside a context and independent state
+/// in tests, previews, or other contexts. A diagnostic `name` labels the
+/// declaration but never defines identity.
+///
+/// Later reads reuse the cached result until a dependency may have changed.
+/// Cog settles those dependencies first, then reruns the selector only when
+/// required. A tracked reaction keeps a default `whileObserved` cog alive and
+/// its final lease begins the context's grace period; `keepAlive` instead gives
+/// demanded state context lifetime. Internal graph edges are dependencies, not
+/// lifetime leases.
 ///
 /// Keep selectors synchronous, cheap, and free of side effects. They may
 /// branch or return early; each run replaces the dependency set. A selector
 /// cannot `throw` in v1. Return `Result` for fallible domain work, or use an
 /// `AsyncCog` when the work must await.
 ///
-/// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
-/// Names do not define identity.
+/// `Cog` and its selector are MainActor-isolated, so selectors may safely work
+/// with non-`Sendable` values that remain inside the graph.
 @MainActor
 public struct Cog<Value> {
-  /// The declaration this value reference names.
+  /// Stable declaration identity and behavior shared by reference copies.
   internal let descriptor: DerivedCogDescriptor<Value>
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
@@ -37,16 +46,17 @@ public struct Cog<Value> {
   /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
   internal let key: AnyHashable?
 
-  /// Declares a value computed by `selector`.
+  /// Declares one keyless value computed by `selector`.
   ///
   /// This allocates one descriptor. It creates no state and does not run
   /// `selector` (§2.3).
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether this declaration has app lifetime instead of the
-  ///     synchronous-derived `whileObserved` default.
-  ///   - selector: How to compute the value. Read other cogs through the
-  ///     ``Reader`` it is given, and read nothing any other way.
+  ///   - keepAlive: Pass `true` to retain demanded state until its context ends.
+  ///     The default follows `whileObserved` reaction leases and grace.
+  ///   - selector: MainActor computation for the value. Reads through the
+  ///     supplied ``Reader`` replace the dependency set on every run; other
+  ///     reads are invisible to Cog.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -74,14 +84,16 @@ public struct Cog<Value> {
   /// Cog calls `equals` after a rerun with the cached value and the newly
   /// computed value. Returning `true` keeps the cached value and stops the
   /// downstream wave; returning `false` commits the new value and lets
-  /// downstream cogs follow it.
+  /// downstream cogs follow it. Equality does not skip a selector rerun that
+  /// dependency settlement already required.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether this declaration has app lifetime instead of the
-  ///     synchronous-derived `whileObserved` default.
-  ///   - selector: How to compute the value. Read other cogs through the
-  ///     ``Reader`` it is given, and read nothing any other way.
-  ///   - equals: Whether the cached and newly computed values count as equal.
+  ///   - keepAlive: Pass `true` to retain demanded state until its context ends
+  ///     instead of following `whileObserved` grace.
+  ///   - selector: MainActor computation whose tracked reads become the next
+  ///     dependency set.
+  ///   - equals: MainActor comparison of the cached and newly computed values.
+  ///     Return `true` to retain the cache and stop the downstream wave.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -105,7 +117,10 @@ public struct Cog<Value> {
     )
   }
 
-  /// Builds a keyed reference without allocating another descriptor.
+  /// Builds a reference for an existing descriptor-and-key identity.
+  ///
+  /// ``CogBox`` and async latest projections use this path so subscripting
+  /// packages identity without allocating another descriptor or graph state.
   internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor
     self.key = key
@@ -117,7 +132,17 @@ extension Cog where Value: Equatable {
   ///
   /// This overload is selected automatically when `Value` conforms to
   /// `Equatable`. Use ``init(keepAlive:_:equals:name:fileID:line:)`` to
-  /// substitute a domain-specific equality rule.
+  /// substitute a domain-specific equality rule. Equality affects downstream
+  /// propagation after a required rerun; it does not change dependency
+  /// tracking, identity, lifetime, or MainActor execution.
+  ///
+  /// - Parameters:
+  ///   - keepAlive: Whether demanded state survives without a reaction lease
+  ///     until the context ends.
+  ///   - selector: MainActor computation and dependency selection for the value.
+  ///   - name: The diagnostic and history label for this declaration.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
   public init(
     keepAlive: Bool = false,
     _ selector: @escaping @MainActor (Reader<Value>) -> Value,

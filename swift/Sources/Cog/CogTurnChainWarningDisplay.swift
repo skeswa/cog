@@ -2,15 +2,22 @@
 
 import OSLog
 
+/// The dedicated channel for debug-only runaway turn-chain diagnostics.
 private let cogTurnChainOSLog = OSLog(
   subsystem: "dev.skeswa.cog",
   category: "turn-chain"
 )
 
-/// Logs a readable warning for a long turn chain.
+/// Renders and logs one long uninterrupted turn-chain warning.
 ///
-/// Tests inspect the stored snapshot through `CogTesting` instead of relying
-/// on unified-log delivery.
+/// The tracker records raw causes on the hot path; this boundary performs the
+/// string work only after the debug threshold is exceeded. Names are logged as
+/// public data so the diagnostic remains readable in Console. Tests inspect the
+/// stored snapshot through `CogTesting` instead of relying on unified-log
+/// delivery, and all of this code compiles out of release builds.
+///
+/// - Parameter warning: The bounded causal-chain snapshot and uninterrupted
+///   turn count captured by the tracker.
 internal func logCogTurnChainWarning(_ warning: CogTurnChainWarningSnapshot) {
   let chain = warning.causalChain.map { cause in
     switch cause {
