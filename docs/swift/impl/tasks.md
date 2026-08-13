@@ -846,10 +846,31 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-17`._
   _Greens: ASYNC-17._
+- **M3-10d** _(Behavior)_ — Reject work selected from invalidated dependencies
+  while an async state is unobserved inside its lifetime grace.
+  _Depends: M3-06, M3-09._
+  _Verify: `mise run test --filter ASYNC-24`._
+  _Greens: ASYNC-24._
+- **M3-10e** _(Behavior)_ — Release an unobserved `.latest` projection and its
+  async dependency after one shared grace window.
+  _Depends: M3-04, M3-09._
+  _Verify: `mise run test --filter ASYNC-25`._
+  _Greens: ASYNC-25._
+- **M3-10f** _(Behavior)_ — Expose the documented keyed `.latest` projection
+  with stable per-key identity and equal-value suppression.
+  _Depends: M3-04, M3-07._
+  _Verify: `mise run test --filter ASYNC-26`._
+  _Greens: ASYNC-26._
+- **M3-10g** _(Behavior)_ — Reject public refresh during selector computation
+  with the commit-during-derivation diagnostic in debug and release.
+  _Depends: M3-08b._
+  _Verify: `mise run test --filter ASYNC-27` and
+  `mise run test:release --filter ASYNC-27`._
+  _Greens: ASYNC-27._
 - **M3-11** _(Gate)_ — Close the deterministic async slice in every host leg
   and release configuration.
-  _Depends: M3-03c, M3-04, M3-05c, M3-06, M3-07, M3-08ca, M3-10b,
-  M3-10c._
+  _Depends: M3-03c, M3-05c, M3-08ca, M3-10b, M3-10c, M3-10d, M3-10e,
+  M3-10f, M3-10g._
   _Verify: `mise run test:matrix` and `mise run test:release`._
 
 ## M4 tasks
@@ -1179,13 +1200,13 @@ ArenaDirtyPropagationInfrastructure`._
   through arena values.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[1-6]|1[125678]|20)'`._
+'ASYNC-(0[1-6]|1[125678]|20|26)'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
   generation rejection, previous-value carry, cold one-shot demand, and
   release/recreation through arena generations.
   _Depends: M6-10eb, M6-10ha._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[7-9]|10|1[349]|2[1-3])'`._
+'ASYNC-(0[7-9]|10|1[349]|2[1-57])'`._
 - **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
   the arena core selected in place of the simple one, leaving the default
   core untouched; expose simple-versus-arena checking as

@@ -441,8 +441,10 @@ Limit this milestone to the async pieces needed for 0.1.0:
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure
   turns with the last successful value, MainActor-by-default and `@concurrent`
-  work isolation, and task naming. Use injected clocks and continuations; do
-  not sleep.
+  work isolation, task naming, invalidation during unobserved grace, one-grace
+  release through `.latest`, keyed `.latest` spelling, and refresh rejection
+  during selector computation. Use injected clocks and continuations; do not
+  sleep.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.

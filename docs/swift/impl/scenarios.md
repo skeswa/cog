@@ -649,6 +649,23 @@ what it had.
   cancellation occurs. The call installs no durable consumer and follows the
   same renewable grace and safe-release rule. A later refresh while that work
   is in flight still follows ASYNC-21.
+- **ASYNC-24.** An async selector reads a source, then its last durable consumer
+  leaves while work ignores cancellation inside grace. The source changes
+  before that work finishes. Its now-stale result cannot clear the dependency
+  invalidation; a consumer returning during grace starts work from the newest
+  source value, and only that result may commit.
+- **ASYNC-25.** A consumer reads only an async cog's `.latest` projection and
+  then leaves. One injected grace window releases the projection and its now-
+  unobserved async dependency together, cancelling pending work without a
+  second grace window.
+- **ASYNC-26.** A keyed async box exposes the documented
+  `c[forecast.latest[zip]]` spelling. Equal keys share one latest projection
+  state, different keys stay independent, and an equal success does not notify
+  that key's latest consumer.
+- **ASYNC-27.** An async or derived selector calls `cogs.refresh` while it is
+  computing. Cog traps with the same clear commit-during-derivation error in
+  debug and release instead of starting a nested system turn. (Proof: exit
+  test.)
 
 ## 14. POLICY — Ordered async policies
 
