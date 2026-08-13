@@ -16,6 +16,14 @@ internal protocol CogLifetimeLeaseState: CogState {
   /// Invalidates stale grace completions when observation changes.
   var lifetimeReleaseGeneration: UInt64 { get set }
 
+  /// The current generation whose grace deadline has not arrived yet.
+  ///
+  /// An unobserved dependency can join a consumer's release cascade only when
+  /// it has no separately pending deadline. The deadline task clears this
+  /// before checking subscribers, so an earlier elapsed grace does not add a
+  /// second window after its last internal consumer leaves.
+  var pendingLifetimeReleaseGeneration: UInt64? { get set }
+
   /// Severs this state's forward and reverse dependency edges before removal.
   func releaseDependenciesForLifetime()
 

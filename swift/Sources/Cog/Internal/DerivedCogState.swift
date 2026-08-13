@@ -78,6 +78,9 @@ internal final class DerivedCogState<Value>:
   /// Invalidates a pending grace completion when observation changes.
   var lifetimeReleaseGeneration: UInt64
 
+  /// The scheduled grace generation whose deadline has not arrived yet.
+  var pendingLifetimeReleaseGeneration: UInt64?
+
   /// Whether the selector has run in this context yet.
   ///
   /// Exposes cache presence without exposing its representation.
@@ -101,6 +104,7 @@ internal final class DerivedCogState<Value>:
     self.observationBoundary = nil
     self.externalLeaseCount = 0
     self.lifetimeReleaseGeneration = 0
+    self.pendingLifetimeReleaseGeneration = nil
   }
 
   /// The state's value, running the selector if this is its first read.

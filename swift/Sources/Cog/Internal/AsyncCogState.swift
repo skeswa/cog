@@ -19,6 +19,7 @@ internal final class AsyncCogState<Value>:
   var lifetime: CogStateLifetime { descriptor.lifetime }
   var externalLeaseCount = 0
   var lifetimeReleaseGeneration: UInt64 = 0
+  var pendingLifetimeReleaseGeneration: UInt64? = nil
   var stateIdentity: CogStateIdentity {
     CogStateIdentity(descriptor: descriptorIdentity, key: key)
   }

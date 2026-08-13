@@ -191,6 +191,7 @@ extension Cogtext {
     guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
     let generation = state.advanceLifetimeReleaseGeneration()
+    state.pendingLifetimeReleaseGeneration = generation
     let identity = state.stateIdentity
     let grace = declaredGrace ?? defaultWhileObservedGrace
     let clock = clock
@@ -241,29 +242,57 @@ extension Cogtext {
     nextLifetimeReleaseCheckAcknowledgement = nil
     defer { checkAcknowledgement?() }
 
+    if state.pendingLifetimeReleaseGeneration == generation {
+      state.pendingLifetimeReleaseGeneration = nil
+    }
+
     guard let stored = states[identity], stored === state else { return }
     guard state.lifetimeReleaseGeneration == generation else { return }
     guard state.externalLeaseCount == 0 else { return }
     guard case .whileObserved = state.lifetime else { return }
     guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
-    // A still-live internal consumer needs this exact producer until the later
-    // closure-release slice can collect the whole unobserved dependency graph.
     guard state.subscribers.isEmpty else { return }
 
-    let dependencies = (state as? any DerivedCogSettleState)?.dependencies ?? []
-    state.prepareForLifetimeRelease()
-    states.removeValue(forKey: identity)
-    state.releaseDependenciesForLifetime()
-
-    for dependency in dependencies {
-      guard let lifetimeState = dependency as? any CogLifetimeLeaseState else { continue }
-      scheduleLifetimeReleaseIfUnobserved(lifetimeState)
-    }
+    releaseUnobservedClosure(startingAt: state)
 
     let acknowledgement = nextLifetimeReleaseAcknowledgement
     nextLifetimeReleaseAcknowledgement = nil
     acknowledgement?()
+  }
+
+  /// Releases a newly disconnected unobserved dependency closure at the
+  /// deadline that released its root.
+  ///
+  /// A dependency with a separately pending grace keeps that deadline. A
+  /// dependency whose earlier deadline already elapsed while an internal
+  /// subscriber retained it joins this cascade immediately, so removing the
+  /// subscriber never starts a second full grace window.
+  private func releaseUnobservedClosure(startingAt root: any CogLifetimeLeaseState) {
+    var candidates: [any CogLifetimeLeaseState] = [root]
+    var index = 0
+
+    while index < candidates.count {
+      let state = candidates[index]
+      index += 1
+
+      guard let stored = states[state.stateIdentity], stored === state else { continue }
+      guard state.externalLeaseCount == 0 else { continue }
+      guard case .whileObserved = state.lifetime else { continue }
+      guard (state as? any CogObservationState)?.observationBoundary == nil else { continue }
+      guard state.subscribers.isEmpty else { continue }
+      guard state === root || state.pendingLifetimeReleaseGeneration == nil else { continue }
+
+      let dependencies = (state as? any DerivedCogSettleState)?.dependencies ?? []
+      state.prepareForLifetimeRelease()
+      states.removeValue(forKey: state.stateIdentity)
+      state.releaseDependenciesForLifetime()
+
+      for dependency in dependencies {
+        guard let lifetimeState = dependency as? any CogLifetimeLeaseState else { continue }
+        candidates.append(lifetimeState)
+      }
+    }
   }
 
   /// Advances the graph revision for one turn flush or changed debug seed.
