@@ -3,8 +3,14 @@ extension Cogtext {
   ///
   /// Under `.latest`, refresh replaces any in-flight work. The refreshed phase
   /// follows the same pending, generation, and result rules as a dependency-
-  /// triggered reload.
+  /// triggered reload. Refreshing a never-read reference starts its initial
+  /// work exactly once rather than initializing and replacing it.
+  ///
+  /// Refresh installs no durable consumer. When no consumer already exists,
+  /// the call starts or renews ordinary `whileObserved` grace.
   public func refresh<Value>(_ valueReference: AsyncCog<Value>) {
-    asyncState(for: valueReference).refresh(in: self)
+    let state = asyncState(for: valueReference)
+    state.refresh(in: self)
+    scheduleLifetimeReleaseIfUnobserved(state)
   }
 }

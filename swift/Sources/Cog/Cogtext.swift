@@ -372,7 +372,15 @@ extension Cogtext {
   }
 
   /// Reads an async cog's current phase without creating a dependency edge.
+  ///
+  /// A first one-shot read starts the initial work. Because the read installs
+  /// no durable consumer, it also starts the declaration's ordinary
+  /// `whileObserved` grace. Another one-shot read renews that grace without
+  /// replacing work already in flight.
   public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
-    asyncState(for: valueReference).settledPhase(in: self)
+    let state = asyncState(for: valueReference)
+    let phase = state.settledPhase(in: self)
+    scheduleLifetimeReleaseIfUnobserved(state)
+    return phase
   }
 }
