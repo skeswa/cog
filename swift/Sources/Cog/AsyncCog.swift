@@ -47,4 +47,15 @@ public struct AsyncCog<Value> {
     self.descriptor = descriptor
     self.key = key
   }
+
+  /// Builds a keyed reference solely for the task-name testing seam.
+  ///
+  /// `AsyncCogBox` owns the eventual public keyed API. Until it arrives, this
+  /// package-only constructor lets `CogTesting` prove that internal task names
+  /// include a descriptor's key without publishing an early API shape.
+  package func valueReferenceForTaskNameDiagnostic<Key: Hashable>(
+    _ key: Key
+  ) -> AsyncCog<Value> {
+    AsyncCog(descriptor: descriptor, key: AnyHashable(key))
+  }
 }
