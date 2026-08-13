@@ -144,6 +144,7 @@ public final class Cogtext {
   /// pass breaks them before stored properties are released.
   isolated deinit {
     for state in states.values {
+      (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()
       (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
     }
     for reaction in reactions {
@@ -170,6 +171,22 @@ extension Cogtext {
   internal func releaseExternalLease(on state: any CogLifetimeLeaseState) {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     state.decrementExternalLeaseCount()
+    guard state.externalLeaseCount == 0 else { return }
+    guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
+
+    scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)
+  }
+
+  /// Starts grace for a state that has become unobserved without losing a lease.
+  internal func scheduleLifetimeReleaseIfUnobserved(_ state: any CogLifetimeLeaseState) {
+    guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
+    scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)
+  }
+
+  private func scheduleLifetimeReleaseIfUnobserved(
+    _ state: any CogLifetimeLeaseState,
+    declaredGrace: Duration?
+  ) {
     guard state.externalLeaseCount == 0 else { return }
     guard (state as? any CogObservationState)?.observationBoundary == nil else { return }
 
@@ -234,8 +251,15 @@ extension Cogtext {
     // closure-release slice can collect the whole unobserved dependency graph.
     guard state.subscribers.isEmpty else { return }
 
+    let dependencies = (state as? any DerivedCogSettleState)?.dependencies ?? []
+    state.prepareForLifetimeRelease()
     states.removeValue(forKey: identity)
     state.releaseDependenciesForLifetime()
+
+    for dependency in dependencies {
+      guard let lifetimeState = dependency as? any CogLifetimeLeaseState else { continue }
+      scheduleLifetimeReleaseIfUnobserved(lifetimeState)
+    }
 
     let acknowledgement = nextLifetimeReleaseAcknowledgement
     nextLifetimeReleaseAcknowledgement = nil
@@ -273,6 +297,11 @@ extension Cogtext {
   /// Gets this async state, creating it without starting work on first use.
   internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
     asyncState(descriptor: valueReference.descriptor, key: valueReference.key)
+  }
+
+  /// Whether this exact async state still owns its descriptor-and-key slot.
+  internal func stillStoresAsyncState<Value>(_ state: AsyncCogState<Value>) -> Bool {
+    states[state.stateIdentity] === state
   }
 
   /// Gets async state from a descriptor captured by its latest-value projection.

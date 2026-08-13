@@ -93,6 +93,12 @@ internal final class AsyncCogState<Value>:
     dependencies.removeAll()
   }
 
+  func prepareForLifetimeRelease() {
+    _ = advanceGeneration()
+    activeTask?.cancel()
+    activeTask = nil
+  }
+
   func recompute(in cogs: Cogtext) {
     startWork(in: cogs)
   }
@@ -152,15 +158,19 @@ internal final class AsyncCogState<Value>:
     activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
-        guard let self, let cogs else { return }
+        guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard self.generation == runGeneration else { return }
+        guard let self, self.generation == runGeneration,
+          cogs.stillStoresAsyncState(self)
+        else { return }
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
       } catch {
-        guard let self, let cogs else { return }
+        guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
-        guard !Task.isCancelled, self.generation == runGeneration else { return }
+        guard let self, !Task.isCancelled, self.generation == runGeneration,
+          cogs.stillStoresAsyncState(self)
+        else { return }
         self.publish(.failure(error, previous: self.lastSuccess), named: "failure", in: cogs)
       }
     }

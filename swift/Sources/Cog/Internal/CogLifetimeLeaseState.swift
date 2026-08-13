@@ -18,9 +18,15 @@ internal protocol CogLifetimeLeaseState: CogState {
 
   /// Severs this state's forward and reverse dependency edges before removal.
   func releaseDependenciesForLifetime()
+
+  /// Cancels state-owned work and invalidates late completions before removal.
+  func prepareForLifetimeRelease()
 }
 
 extension CogLifetimeLeaseState {
+  /// Synchronous derived states own no work that lifetime release must cancel.
+  func prepareForLifetimeRelease() {}
+
   /// Adds one external owner without silently wrapping the count.
   func incrementExternalLeaseCount() {
     guard externalLeaseCount < Int.max else {
