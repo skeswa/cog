@@ -867,10 +867,22 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter ASYNC-27` and
   `mise run test:release --filter ASYNC-27`._
   _Greens: ASYNC-27._
+- **M3-10h** _(Behavior)_ — Defer graph-owned system turns requested during
+  derived computation until the outermost settle path exits, while keeping
+  first pending synchronously readable and preserving named turn order.
+  _Depends: M3-04._
+  _Verify: `mise run test --filter ASYNC-28`._
+  _Greens: ASYNC-28._
+- **M3-10i** _(Behavior)_ — Coalesce repeated one-shot async grace renewals to
+  one outstanding sleeper per exact state while retaining the newest deadline
+  and shared release-cascade behavior.
+  _Depends: M3-08ca._
+  _Verify: `mise run test --filter ASYNC-29`._
+  _Greens: ASYNC-29._
 - **M3-11** _(Gate)_ — Close the deterministic async slice in every host leg
   and release configuration.
-  _Depends: M3-03c, M3-05c, M3-08ca, M3-10b, M3-10c, M3-10d, M3-10e,
-  M3-10f, M3-10g._
+  _Depends: M3-03c, M3-05c, M3-10b, M3-10c, M3-10d, M3-10e, M3-10f,
+  M3-10g, M3-10h, M3-10i._
   _Verify: `mise run test:matrix` and `mise run test:release`._
 
 ## M4 tasks
@@ -1202,11 +1214,12 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'ASYNC-(0[1-6]|1[125678]|20|26)'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
-  generation rejection, previous-value carry, cold one-shot demand, and
-  release/recreation through arena generations.
+  generation rejection, previous-value carry, cold one-shot demand,
+  non-reentrant system turns, bounded grace scheduling, and release/recreation
+  through arena generations.
   _Depends: M6-10eb, M6-10ha._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[7-9]|10|1[349]|2[1-57])'`._
+'ASYNC-(0[7-9]|10|1[349]|2[1-5]|2[7-9])'`._
 - **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
   the arena core selected in place of the simple one, leaving the default
   core untouched; expose simple-versus-arena checking as

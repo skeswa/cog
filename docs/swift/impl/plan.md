@@ -442,9 +442,10 @@ Limit this milestone to the async pieces needed for 0.1.0:
   while pending, initial pending-to-failure turns, reload pending-to-failure
   turns with the last successful value, MainActor-by-default and `@concurrent`
   work isolation, task naming, invalidation during unobserved grace, one-grace
-  release through `.latest`, keyed `.latest` spelling, and refresh rejection
-  during selector computation. Use injected clocks and continuations; do not
-  sleep.
+  release through `.latest`, keyed `.latest` spelling, refresh rejection
+  during selector computation, non-reentrant UI reads through async-derived
+  values, and bounded grace scheduling under repeated one-shot demand. Use
+  injected clocks and continuations; do not sleep.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.

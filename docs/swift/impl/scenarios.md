@@ -666,6 +666,15 @@ what it had.
   computing. Cog traps with the same clear commit-during-derivation error in
   debug and release instead of starting a nested system turn. (Proof: exit
   test.)
+- **ASYNC-28.** I read a derived cog backed by an async cog through the UI
+  boundary, including the documented `cogs[forecast.latest]` spelling. Its
+  initial pending publication does not re-enter the derived computation or
+  flush reactions mid-derivation: the read returns the projection's current
+  value, records one named pending turn, and later work completion updates it.
+- **ASYNC-29.** Repeated one-shot `peek` or `refresh` demand renews an async
+  state's grace while keeping at most one scheduled grace sleeper for that
+  exact state. An obsolete deadline cannot release it; the latest
+  demand-plus-grace deadline releases it and leaves no sleeper behind.
 
 ## 14. POLICY — Ordered async policies
 
