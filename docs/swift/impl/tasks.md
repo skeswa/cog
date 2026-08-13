@@ -886,11 +886,18 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M1-08b, M1-28a._
   _Verify: `mise run test --filter LIFE-10`._
   _Greens: LIFE-10._
+- **M3-10k** _(Infrastructure)_ — Replace Weather's imperative request sources
+  and async op with one keyed `AsyncCogBox`; render full and latest phases, and
+  route initial, retry, and hourly demand through `refresh` with deterministic
+  example tests.
+  _Depends: M3-04, M3-07, M3-08b, M3-10b._
+  _Verify: `mise run build:weather` and `mise run test:weather`._
 - **M3-11** _(Gate)_ — Close the deterministic async slice in every host leg
-  and release configuration.
-  _Depends: M3-03c, M3-05c, M3-10b, M3-10c, M3-10d, M3-10e, M3-10f,
-  M3-10g, M3-10h, M3-10i, M3-10j._
-  _Verify: `mise run test:matrix` and `mise run test:release`._
+  and release configuration, including the async Weather integration.
+  _Depends: M3-03c, M3-05c, M3-10c, M3-10d, M3-10e, M3-10f, M3-10g,
+  M3-10h, M3-10i, M3-10j, M3-10k._
+  _Verify: `mise run test:matrix`, `mise run test:release`, and
+  `mise run test:weather`._
 
 ## M4 tasks
 

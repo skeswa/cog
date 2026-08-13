@@ -6,45 +6,47 @@ import Testing
 import os
 
 @MainActor
-@Test func niceWeatherEffectSkipsInstallationAndAlertsOnFalseToTrueTransitions() {
+@Test func niceWeatherEffectSkipsInstallationAndAlertsOnFalseToTrueTransitions() async throws {
   let cogs = Cogtext.forTesting()
+  let requests = WeatherRequestController()
+  var starts = requests.starts.makeAsyncIterator()
   var alerts: [String] = []
   let notifier = Notifier { alerts.append($0) }
 
   cogs.seedCurrentZip(.newYork)
-  cogs.seedWeather(
-    Weather(kind: .cloudy, temperatureF: 60),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.seedWeatherService(requests.service)
 
   let group = WeatherEffects(notifier: notifier, initialZipCodes: []).install(in: cogs)
+  let initialRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(initialRun, with: WeatherReading(.cloudy, 60))
+  }
   #expect(alerts.isEmpty)
 
-  cogs.stubWeather(
-    Weather(kind: .clear, temperatureF: 75),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.refresh(weatherForecast[.newYork])
+  let firstNiceRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(firstNiceRun, with: WeatherReading(.clear, 75))
+  }
   #expect(alerts == ["It is nice outside!"])
 
-  cogs.stubWeather(
-    Weather(kind: .partlyCloudy, temperatureF: 80),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.refresh(weatherForecast[.newYork])
+  let stillNiceRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(stillNiceRun, with: WeatherReading(.partlyCloudy, 80))
+  }
   #expect(alerts == ["It is nice outside!"])
 
-  cogs.stubWeather(
-    Weather(kind: .rain, temperatureF: 55),
-    heatAdvisory: false,
-    zip: .newYork
-  )
-  cogs.stubWeather(
-    Weather(kind: .clear, temperatureF: 70),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.refresh(weatherForecast[.newYork])
+  let rainRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(rainRun, with: WeatherReading(.rain, 55))
+  }
+  cogs.refresh(weatherForecast[.newYork])
+  let secondNiceRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(secondNiceRun, with: WeatherReading(.clear, 70))
+  }
   #expect(alerts == ["It is nice outside!", "It is nice outside!"])
 
   let effectNames = cogs.debugHistory.entries
@@ -59,20 +61,11 @@ import os
 @Test func injectedClockRunsTheHourlyWeatherOperation() async throws {
   let clock = WeatherTestClock()
   let cogs = Cogtext.forTesting()
-  let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
-  let service = WeatherService(
-    weather: { zip in
-      #expect(zip == .newYork)
-      return refreshedWeather
-    },
-    advisories: { zip in
-      #expect(zip == .newYork)
-      return []
-    }
-  )
-
-  cogs.seedWeatherService(service)
+  let requests = WeatherRequestController()
+  var starts = requests.starts.makeAsyncIterator()
+  cogs.seedWeatherService(requests.service)
   cogs.seedCurrentZip(.newYork)
+  let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
   let group = WeatherEffects(
     notifier: Notifier { _ in },
     clock: clock,
@@ -80,17 +73,28 @@ import os
   )
   .install(in: cogs)
 
+  let initialRun = try #require(await starts.next())
+  #expect(initialRun.zip == .newYork)
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(initialRun, with: WeatherReading(.cloudy, 60))
+  }
   try await clock.waitForScheduledSleep()
-  #expect(cogs.peek(weatherReport[.newYork]) == nil)
 
+  let completed = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextAsyncCompletionCheck(with: completed)
   clock.advance(by: .seconds(3_600))
+  let hourlyRun = try #require(await starts.next())
+  #expect(hourlyRun.zip == .newYork)
+  await requests.succeed(hourlyRun, with: WeatherReading(.clear, 75))
+  try await completed.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherReport[.newYork]) == refreshedWeather)
+  #expect(cogs.peek(weatherForecast.latest[.newYork])?.weather == refreshedWeather)
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
-  #expect(turnNames == ["weather.useRefreshInterval", "weather.refreshStarted", "weather.check"])
+  #expect(turnNames.contains("weather.forecast[10001] pending"))
+  #expect(turnNames.last == "weather.forecast[10001] success")
 
   group.cancel()
   clock.finish()
@@ -124,22 +128,11 @@ import os
 @Test func aFailedHourlyRefreshDoesNotStopLaterOnes() async throws {
   let clock = WeatherTestClock()
   let cogs = Cogtext.forTesting()
-  let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
-  let attempts = OSAllocatedUnfairLock(initialState: 0)
-  let service = WeatherService(
-    weather: { _ in
-      let attempt = attempts.withLock { count in
-        count += 1
-        return count
-      }
-      if attempt == 1 { throw WeatherRequestFailure() }
-      return refreshedWeather
-    },
-    advisories: { _ in [] }
-  )
-
-  cogs.seedWeatherService(service)
+  let requests = WeatherRequestController()
+  var starts = requests.starts.makeAsyncIterator()
+  cogs.seedWeatherService(requests.service)
   cogs.seedCurrentZip(.newYork)
+  let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
   let group = WeatherEffects(
     notifier: Notifier { _ in },
     clock: clock,
@@ -147,19 +140,36 @@ import os
   )
   .install(in: cogs)
 
+  let initialRun = try #require(await starts.next())
+  let initialReading = WeatherReading(.cloudy, 60)
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(initialRun, with: initialReading)
+  }
   try await clock.waitForScheduledSleep()
+
+  let failed = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextAsyncCompletionCheck(with: failed)
   clock.advance(by: .seconds(3_600))
+  let failedRun = try #require(await starts.next())
+  await requests.fail(failedRun, with: WeatherRequestFailure())
+  try await failed.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherLoadStatus[.newYork]) == .failed)
-  #expect(cogs.peek(weatherReport[.newYork]) == nil)
+  if case .failure(_, previous: .some(let reading)) = cogs.peek(weatherForecast[.newYork]) {
+    #expect(reading == initialReading)
+  } else {
+    Issue.record("The failed hourly refresh should retain the previous reading")
+  }
 
+  let succeeded = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextAsyncCompletionCheck(with: succeeded)
   clock.advance(by: .seconds(3_600))
+  let succeededRun = try #require(await starts.next())
+  await requests.succeed(succeededRun, with: WeatherReading(.clear, 75))
+  try await succeeded.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherReport[.newYork]) == refreshedWeather)
-  #expect(cogs.peek(weatherLoadStatus[.newYork]) == .idle)
-  #expect(attempts.withLock { $0 } == 2)
+  #expect(cogs.peek(weatherForecast.latest[.newYork])?.weather == refreshedWeather)
 
   group.cancel()
   clock.finish()

@@ -1,33 +1,64 @@
 import Cog
 import os
 
+/// A MainActor notification boundary used by the nice-weather reaction.
+///
+/// Production writes to unified logging; tests inject an array-appending
+/// closure. Keeping this side effect outside Cog state lets the reaction own
+/// transition detection without mirroring whether an alert was sent.
 struct Notifier {
+  /// The production log destination shared by copies of ``live``.
   private static let logger = Logger(
     subsystem: "com.skeswa.cog.weather",
     category: "weather-alerts"
   )
 
+  /// The injected MainActor side effect.
   private let alertBody: @MainActor (String) -> Void
 
+  /// The production notifier, which records a public weather-alert message.
   static let live = Self { message in
     logger.notice("\(message, privacy: .public)")
   }
 
+  /// Creates a notifier from its delivery side effect.
+  ///
+  /// - Parameter alert: MainActor work to perform for one alert message.
   init(alert: @escaping @MainActor (String) -> Void) {
     alertBody = alert
   }
 
+  /// Delivers one alert synchronously on the MainActor.
   func alert(_ message: String) {
     alertBody(message)
   }
 }
 
+/// Installs Weather's process-lifetime reaction and scheduling loop.
+///
+/// Forecast request tasks are not owned by this group: `AsyncCogBox` owns each
+/// generation and retains it according to graph demand. The group instead owns
+/// the nice-weather reaction and the clock loop that periodically asks the
+/// graph to refresh the selected key. Cancelling the group stops future asks;
+/// ordinary async-cog lifetime rules decide whether existing work remains.
 struct WeatherEffects {
+  /// Destination for false-to-true nice-weather transitions.
   let notifier: Notifier
+  /// Injectable clock used only by the periodic scheduling task.
   var clock: any Clock<Duration> = ContinuousClock()
+  /// Keys given one transient initial demand during installation.
   var initialZipCodes = ZipCode.examples
+  /// Distance between periodic refresh deadlines.
   var hourlyRefreshInterval: Duration = .seconds(3_600)
 
+  /// Installs initial demand, the alert reaction, and the periodic loop.
+  ///
+  /// Initial refresh calls return immediately after Cog creates each pending
+  /// generation. The soon-to-render cards turn that transient demand into UI
+  /// observation; if no consumer arrives, normal async grace releases it.
+  ///
+  /// - Parameter cogs: The app's singular graph and owner of forecast work.
+  /// - Returns: A group whose cancellation removes the reaction and loop task.
   @discardableResult
   func install(in cogs: Cogtext) -> EffectGroup {
     let group = EffectGroup()
@@ -37,9 +68,7 @@ struct WeatherEffects {
     cogs.useRefreshInterval(hourlyRefreshInterval)
 
     for zip in initialZipCodes {
-      group.task(name: "weather.initialRefresh[\(zip)]") {
-        try await cogs.checkWeather(zip)
-      }
+      cogs.refresh(weatherForecast[zip])
     }
 
     group.add(
@@ -68,6 +97,10 @@ struct WeatherEffects {
   }
 }
 
+/// Sleeps on deadline-based cadence and refreshes the currently selected key.
+///
+/// Refresh is synchronous graph demand, so service failures become phase data
+/// and never throw out of this loop. Only clock cancellation ends it.
 private func runHourlyRefresh<C: Clock>(
   on clock: C,
   every interval: Duration,
@@ -83,15 +116,9 @@ private func runHourlyRefresh<C: Clock>(
     nextRefresh = nextRefresh.advanced(by: interval)
     guard let zip = cogs.peek(currentZipCode) else { continue }
 
-    do {
-      try await cogs.checkWeather(zip)
-    } catch let cancellation as CancellationError {
-      throw cancellation
-    } catch {
-      // A failed refresh is a modelled state, not a reason to stop refreshing.
-      // `checkWeather` has already recorded `.failed`, which the card surfaces
-      // alongside a retry. Rethrowing would end this task, silently disabling
-      // background refresh for the rest of the process after one bad hour.
-    }
+    // Refresh starts graph-owned work and returns immediately. A request
+    // failure becomes the forecast's `.failure` phase, so it cannot terminate
+    // this scheduling loop and silently disable later ticks.
+    cogs.refresh(weatherForecast[zip])
   }
 }

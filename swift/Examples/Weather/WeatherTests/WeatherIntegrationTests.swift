@@ -6,6 +6,7 @@ import Observation
 import SwiftUI
 import Testing
 
+/// Re-arms Observation after every invalidation, as SwiftUI does for `body`.
 @MainActor
 private final class TrackedWeatherCard {
   let cogs: Cogtext
@@ -18,14 +19,18 @@ private final class TrackedWeatherCard {
     self.zip = zip
   }
 
-  func renderOnce() {
+  func start() {
+    render()
+  }
+
+  private func render() {
     _ = withObservationTracking {
       makeBody()
     } onChange: { [weak self] in
       MainActor.assumeIsolated {
         guard let self else { return }
         self.invalidations += 1
-        _ = self.makeBody()
+        self.render()
       }
     }
   }
@@ -42,58 +47,110 @@ private final class TrackedWeatherCard {
 }
 
 @MainActor
-@Test func oneZIPInvalidatesOnlyItsCardAndNeverRendersATornPair() {
+@Test func asyncZIPsInvalidateOnlyTheirOwnCardsAndNeverRenderATornReading() async throws {
   let cogs = Cogtext.forTesting()
-  let newYorkWeather = Weather(kind: .cloudy, temperatureF: 55)
-  let sanFranciscoWeather = Weather(kind: .cloudy, temperatureF: 58)
-  cogs.seedWeather(newYorkWeather, heatAdvisory: false, zip: .newYork)
-  cogs.seedWeather(sanFranciscoWeather, heatAdvisory: false, zip: .sanFrancisco)
+  let requests = WeatherRequestController()
+  var starts = requests.starts.makeAsyncIterator()
+  cogs.seedWeatherService(requests.service)
 
   let newYorkCard = TrackedWeatherCard(cogs: cogs, zip: .newYork)
   let sanFranciscoCard = TrackedWeatherCard(cogs: cogs, zip: .sanFrancisco)
-  newYorkCard.renderOnce()
-  sanFranciscoCard.renderOnce()
+  newYorkCard.start()
+  sanFranciscoCard.start()
 
-  let changedWeather = Weather(kind: .clear, temperatureF: 75)
-  cogs.stubWeather(changedWeather, heatAdvisory: false, zip: .sanFrancisco)
+  let firstRun = try #require(await starts.next())
+  let secondRun = try #require(await starts.next())
+  let runsByZip = Dictionary(uniqueKeysWithValues: [firstRun, secondRun].map { ($0.zip, $0) })
+  let newYorkRun = try #require(runsByZip[.newYork])
+  let sanFranciscoRun = try #require(runsByZip[.sanFrancisco])
+  let newYorkReading = WeatherReading(.cloudy, 55)
+  let sanFranciscoReading = WeatherReading(.cloudy, 58)
 
-  #expect(newYorkCard.invalidations == 0)
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(newYorkRun, with: newYorkReading)
+  }
+  #expect(newYorkCard.invalidations == 1)
+  #expect(sanFranciscoCard.invalidations == 0)
+
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(sanFranciscoRun, with: sanFranciscoReading)
+  }
+  #expect(newYorkCard.invalidations == 1)
+  #expect(sanFranciscoCard.invalidations == 1)
+
+  cogs.refresh(weatherForecast[.sanFrancisco])
+  let changedRun = try #require(await starts.next())
+  #expect(changedRun.zip == .sanFrancisco)
+  let changedReading = WeatherReading(.clear, 75)
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(changedRun, with: changedReading)
+  }
+
+  #expect(newYorkCard.invalidations == 1)
   #expect(
     newYorkCard.snapshots == [
-      WeatherCardSnapshot(zip: .newYork, report: newYorkWeather, isNice: false)
+      WeatherCardSnapshot(zip: .newYork, report: nil, isNice: false),
+      WeatherCardSnapshot(zip: .newYork, report: newYorkReading.weather, isNice: false),
     ]
   )
-  #expect(sanFranciscoCard.invalidations == 1)
+  #expect(sanFranciscoCard.invalidations == 4)
   #expect(
     sanFranciscoCard.snapshots == [
-      WeatherCardSnapshot(zip: .sanFrancisco, report: sanFranciscoWeather, isNice: false),
-      WeatherCardSnapshot(zip: .sanFrancisco, report: changedWeather, isNice: true),
+      WeatherCardSnapshot(zip: .sanFrancisco, report: nil, isNice: false),
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: sanFranciscoReading.weather,
+        isNice: false
+      ),
+      // Reload pending retains the prior success as one atomic reading.
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: sanFranciscoReading.weather,
+        isNice: false
+      ),
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: changedReading.weather,
+        isNice: true
+      ),
+      // The full phase and `isNice` have separate boundary notices. This
+      // direct harness re-arms between them, so both renders must see the same
+      // settled turn rather than a mixed pair.
+      WeatherCardSnapshot(
+        zip: .sanFrancisco,
+        report: changedReading.weather,
+        isNice: true
+      ),
     ]
   )
 }
 
 @MainActor
-@Test func changedWeatherNoticesPrecedeEffectsAndEqualDerivedValuesStayQuiet() {
+@Test func asyncNoticesPrecedeEffectsAndEqualDerivedValuesStayQuiet() async throws {
   let cogs = Cogtext.forTesting()
+  let requests = WeatherRequestController()
+  var starts = requests.starts.makeAsyncIterator()
   cogs.seedCurrentZip(.newYork)
-  cogs.seedWeather(
-    Weather(kind: .cloudy, temperatureF: 55),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.seedWeatherService(requests.service)
   var alerts: [String] = []
   let effects = WeatherEffects(
     notifier: Notifier { alerts.append($0) },
     initialZipCodes: []
   ).install(in: cogs)
-  let firstRender = TrackedWeatherCard(cogs: cogs, zip: .newYork)
-  firstRender.renderOnce()
+  let card = TrackedWeatherCard(cogs: cogs, zip: .newYork)
+  card.start()
 
-  cogs.stubWeather(
-    Weather(kind: .clear, temperatureF: 75),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  let initialRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(initialRun, with: WeatherReading(.cloudy, 55))
+  }
+  #expect(alerts.isEmpty)
+
+  cogs.refresh(weatherForecast[.newYork])
+  let niceRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(niceRun, with: WeatherReading(.clear, 75))
+  }
 
   #expect(alerts == ["It is nice outside!"])
   let changedEntries = entriesInLatestTurn(cogs)
@@ -103,20 +160,19 @@ private final class TrackedWeatherCard {
   #expect(effectIndexes.count == 1)
   #expect(noticeIndexes.allSatisfy { $0 < effectIndexes[0] })
 
-  let equalDerivedRender = TrackedWeatherCard(cogs: cogs, zip: .newYork)
-  equalDerivedRender.renderOnce()
-  cogs.stubWeather(
-    Weather(kind: .partlyCloudy, temperatureF: 80),
-    heatAdvisory: false,
-    zip: .newYork
-  )
+  cogs.refresh(weatherForecast[.newYork])
+  let stillNiceRun = try #require(await starts.next())
+  try await resolveWeatherRequest(in: cogs) {
+    await requests.succeed(stillNiceRun, with: WeatherReading(.partlyCloudy, 80))
+  }
 
-  #expect(equalDerivedRender.invalidations == 1)
+  #expect(alerts == ["It is nice outside!"])
   let equalEntries = entriesInLatestTurn(cogs)
   let noticeNames = equalEntries.filter { $0.event == .notice }.map(\.name)
-  #expect(noticeNames.contains("weather.report[10001]"))
+  #expect(noticeNames.contains("weather.forecast[10001]"))
   #expect(!noticeNames.contains("weather.isNice[10001]"))
   effects.cancel()
+  withExtendedLifetime(card) {}
 }
 
 @MainActor

@@ -1,11 +1,15 @@
 import Cog
 import SwiftUI
 
+/// Resolves the app context from SwiftUI and renders one keyed forecast.
 struct WeatherCard: View {
+  /// The singular graph installed by `WeatherApp`.
   @Environment(\.cogs) private var cogs
 
+  /// The async-cog key this card observes and refreshes.
   let zip: ZipCode
 
+  /// Delegates tracked reads to the explicitly injectable card body.
   var body: some View {
     WeatherCardContent(cogs: cogs, zip: zip)
   }
@@ -21,16 +25,26 @@ struct WeatherCard: View {
 /// only act on the graph rather than read it — the refresh button below — have
 /// no such constraint and read the environment normally.
 struct WeatherCardContent: View {
+  /// The context whose Observation boundaries this body registers.
   let cogs: Cogtext
+  /// The exact keyed phase and derivations this body tracks.
   let zip: ZipCode
   #if DEBUG
+  /// Captures each complete render snapshot without changing production behavior.
   var renderProbe: (@MainActor (WeatherCardSnapshot) -> Void)? = nil
   #endif
 
+  /// Renders pending, success, and failure without discarding a prior success.
+  ///
+  /// The full phase drives progress and failure chrome. `latestValue` keeps the
+  /// accepted forecast on screen during a reload or failed replacement, while
+  /// `isNiceOutside` demonstrates a separately equality-gated `.latest`
+  /// derivation. Both reads settle within the same completed graph turn.
   var body: some View {
-    let report = cogs[weatherReport[zip]]
+    let phase = cogs[weatherForecast[zip]]
+    let report = phase.latestValue?.weather
     let nice = cogs[isNiceOutside[zip]]
-    let status = cogs[weatherLoadStatus[zip]]
+    let status = WeatherLoadStatus(phase)
     let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
     let cadence = cogs[refreshInterval]?.shortCadenceDescription
     #if DEBUG
@@ -123,10 +137,14 @@ struct WeatherCardContent: View {
   }
 }
 
+/// The no-success-yet presentation for initial pending or failure.
 private struct EmptyForecast: View {
+  /// The key used by retry copy and action.
   let zip: ZipCode
+  /// The card-sized presentation mapping of the full async phase.
   let status: WeatherLoadStatus
 
+  /// Shows progress for pending and a retry path for failure or idle state.
   var body: some View {
     VStack(spacing: 12) {
       if status == .refreshing {
@@ -159,17 +177,25 @@ private struct EmptyForecast: View {
   }
 }
 
+/// One-shot demand for a new generation of the keyed forecast.
+///
+/// `refresh` returns after publishing pending and starting graph-owned work, so
+/// the button needs no ad hoc `Task` or view-local request lifetime. The phase
+/// disables replacement while this particular UI action is already pending;
+/// other graph callers still retain `.latest` replacement semantics.
 private struct RefreshButton: View {
+  /// The singular graph that owns the resulting generation.
   @Environment(\.cogs) private var cogs
 
+  /// The keyed forecast to refresh.
   let zip: ZipCode
+  /// The current display state used for labeling and disabling the action.
   let status: WeatherLoadStatus
 
+  /// Demands a refresh and reflects its phase in the button label.
   var body: some View {
     Button {
-      Task {
-        try? await cogs.checkWeather(zip)
-      }
+      cogs.refresh(weatherForecast[zip])
     } label: {
       if status == .refreshing {
         HStack(spacing: 6) {
@@ -189,14 +215,23 @@ private struct RefreshButton: View {
 }
 
 #if DEBUG
+/// The graph-derived values captured together by one test render.
+///
+/// Integration tests use this value to prove a card never combines a forecast
+/// from one completed turn with the derived `isNice` result from another.
 nonisolated struct WeatherCardSnapshot: Equatable, Sendable {
+  /// The card identity rendered.
   let zip: ZipCode
+  /// The last accepted forecast visible in that render.
   let report: Weather?
+  /// The suitability derivation settled in that same render.
   let isNice: Bool
 }
 #endif
 
+/// Display metadata for the example's small condition vocabulary.
 extension Weather.Kind {
+  /// Human-readable condition copy.
   fileprivate var label: String {
     switch self {
     case .clear: "Clear"
@@ -207,6 +242,7 @@ extension Weather.Kind {
     }
   }
 
+  /// SF Symbol corresponding to the condition.
   fileprivate var symbolName: String {
     switch self {
     case .clear: "sun.max.fill"
@@ -217,6 +253,7 @@ extension Weather.Kind {
     }
   }
 
+  /// Accent color corresponding to the condition.
   fileprivate var tint: Color {
     switch self {
     case .clear: .orange

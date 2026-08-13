@@ -450,6 +450,12 @@ Limit this milestone to the async pieces needed for 0.1.0:
   values, bounded grace scheduling under repeated one-shot demand, and release
   of one-shot synchronous derived demand. Use injected clocks and
   continuations; do not sleep.
+- Revise `swift/Examples/Weather` around the completed slice: one keyed
+  `AsyncCogBox` owns forecast request phases and tasks; cards retain the last
+  successful reading through reload and failure; initial loads, retries, and
+  hourly updates use `refresh`; deterministic example tests prove per-ZIP
+  invalidation, untorn atomic readings, failure retention, replacement, and
+  effect ordering without wall-clock waits or polling.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.
