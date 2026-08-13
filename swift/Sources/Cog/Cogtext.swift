@@ -23,6 +23,9 @@ public final class Cogtext {
   /// Signals after the next grace-expiry release check, including a pinned skip.
   private var nextLifetimeReleaseCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
 
+  /// One test-only signal after an async result reaches its generation check.
+  private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
+
   /// The monotonic version assigned to graph work.
   ///
   /// Each outer turn advances it once, including an empty or all-equal turn. A
@@ -116,6 +119,23 @@ public final class Cogtext {
   ) {
     self.clock = clock
     self.defaultWhileObservedGrace = defaultWhileObservedGrace
+  }
+
+  /// Installs a one-shot acknowledgement for the next async completion check.
+  package func acknowledgeNextAsyncCompletionCheck(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextAsyncCompletionCheckAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next async completion check.")
+    }
+    nextAsyncCompletionCheckAcknowledgement = acknowledgement
+  }
+
+  /// Consumes the next async-completion acknowledgement, when a test installed one.
+  internal func acknowledgeAsyncCompletionCheckIfRequested() {
+    let acknowledgement = nextAsyncCompletionCheckAcknowledgement
+    nextAsyncCompletionCheckAcknowledgement = nil
+    acknowledgement?()
   }
 
   /// Breaks graph-owned dependency chains before stored properties release.

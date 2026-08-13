@@ -35,6 +35,9 @@ internal final class AsyncCogState<Value>:
   /// Work started by the first read.
   private var activeTask: Task<Void, Never>?
 
+  /// Only the current generation may publish a result.
+  private var generation: UInt64 = 0
+
   var readerCurrentValue: CogPhase<Value>? { phase }
 
   init(descriptor: AsyncCogDescriptor<Value>, key: AnyHashable?) {
@@ -124,19 +127,32 @@ internal final class AsyncCogState<Value>:
     }
 
     let operation = work.operation
+    let runGeneration = advanceGeneration()
     activeTask?.cancel()
     activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
         guard let self, let cogs else { return }
+        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        guard self.generation == runGeneration else { return }
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
       } catch {
-        guard !Task.isCancelled else { return }
         guard let self, let cogs else { return }
+        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        guard !Task.isCancelled, self.generation == runGeneration else { return }
         self.publish(.failure(error, previous: .none), named: "failure", in: cogs)
       }
     }
+  }
+
+  /// Advances the latest-work generation without allowing stale revival.
+  private func advanceGeneration() -> UInt64 {
+    guard generation < UInt64.max else {
+      fatalError("An async Cog exhausted its work generation counter.")
+    }
+    generation += 1
+    return generation
   }
 
   /// Publishes one completed work result as its own named turn.
