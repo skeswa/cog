@@ -9,7 +9,7 @@ import Testing
     of: Void.self,
     bufferingPolicy: .bufferingNewest(1)
   )
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run {
       MainActor.preconditionIsolated("AsyncCog default work")
       startedContinuation.yield()

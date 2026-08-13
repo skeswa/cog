@@ -24,13 +24,13 @@ private final class Async01WorkProbe {
 @Test func `ASYNC-01 first tracked read starts work and returns pending`() async {
   let cogs = Cogtext.forTesting()
   let probe = Async01WorkProbe()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { probe.run() }
   }
   var phases: [CogPhase<Int>] = []
 
   let token = cogs.run { c in
-    phases.append(c[forecast])
+    phases.append(c.phase[forecast])
   }
 
   #expect(phases.count == 1)

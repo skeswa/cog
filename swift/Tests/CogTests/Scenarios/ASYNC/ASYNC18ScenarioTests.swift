@@ -42,11 +42,11 @@ private final class Async18ControlledWork {
 {
   let cogs = Cogtext.forTesting()
   let work = Async18ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
   let (observations, continuation) = AsyncStream.makeStream(of: Async18Observation.self)
-  let token = cogs.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
+  let token = cogs.phase.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
     switch (old, new) {
     case (.pending(previous: .none), .pending(previous: .none)):
       continuation.yield(.initialPendingWithoutPrevious)

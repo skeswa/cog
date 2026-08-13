@@ -47,11 +47,11 @@ private final class Async07WorkProbe {
   let cogs = Cogtext.forTesting()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
-  let defaultLatest = AsyncCog<Int>(name: "default") { c in
+  let defaultLatest = AsyncCog<Int>(default: 0, name: "default") { c in
     let value = c[request]
     return probe.work(name: "default", request: value)
   }
-  let explicitLatest = AsyncCog<Int>(.latest, name: "explicit") { c in
+  let explicitLatest = AsyncCog<Int>(.latest, default: 0, name: "explicit") { c in
     let value = c[request]
     return probe.work(name: "explicit", request: value)
   }
@@ -84,12 +84,12 @@ private final class Async07WorkProbe {
   let cogs = Cogtext.forTesting()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
-  let forecast = AsyncCog<Int>(name: "forecast") { c in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let value = c[request]
     return probe.work(name: "forecast", request: value)
   }
   var phases: [CogPhase<Int>] = []
-  let token = cogs.run { c in phases.append(c[forecast]) }
+  let token = cogs.run { c in phases.append(c.phase[forecast]) }
   var startIterator = probe.starts.makeAsyncIterator()
   var cancellationIterator = probe.cancellations.makeAsyncIterator()
 

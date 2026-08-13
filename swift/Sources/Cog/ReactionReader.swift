@@ -72,27 +72,94 @@ public struct ReactionReader {
     return producer.settledValue(in: cogs)
   }
 
-  /// Reads an async cog's full phase and records its exact state as a dependency.
+  /// Reads an async cog's value and records it as a reaction dependency.
   ///
-  /// Cog settles the state before attaching the reaction edge. A first read can
-  /// therefore select work and return pending; a dirty state selects fresh work
-  /// before the reaction observes its phase. At the end of the tracking run,
-  /// the reaction acquires one `whileObserved` lease for the state. Later
-  /// pending, success, or failure turns rerun the reaction after affected
-  /// dependencies settle. Cancelling the reaction releases the lease and can
-  /// begin grace. If initial demand establishes pending, Cog defers that
-  /// graph-owned turn until tracking and lease reconciliation finish, so the
-  /// turn cannot flush through the active reaction.
+  /// This is a total read: it returns the last accepted success, or the
+  /// declaration's resting default before one exists, resolving through the
+  /// async cog's internal value projection. A first read creates the async
+  /// state and starts its work; the reaction then holds a `whileObserved`
+  /// lease that reaches the async state through the projection's dependency.
+  /// Equality gating keeps the reaction quiet when a reload succeeds with an
+  /// equal value; track `c.phase[valueReference]` instead where each phase
+  /// turn should rerun the reaction. If initial demand establishes pending,
+  /// Cog defers that graph-owned turn until tracking and lease reconciliation
+  /// finish, so the turn cannot flush through the active reaction.
   ///
-  /// - Parameter valueReference: The async value whose phase to track.
-  /// - Returns: Its newest settled phase in this context.
-  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
-    cogs.requireTracking(reaction)
+  /// - Parameter valueReference: The async value to track.
+  /// - Returns: Its newest settled value in this context.
+  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+    self[valueReference.valueCog]
+  }
 
-    let producer = cogs.asyncState(for: valueReference)
-    let phase = producer.settledPhase(in: cogs)
-    reaction.recordDependency(on: producer)
-    return phase
+  /// The phase lens over this reaction's read capability.
+  ///
+  /// `c.phase[asyncValue]` inside a reaction records the async state itself
+  /// as the dependency, so every pending, success, and failure turn reruns
+  /// the reaction — the opposite gating from the value read beside it. The
+  /// lens has no spelling for manual or derived cogs: synchronous state has
+  /// no phase, and asking for one is a type error.
+  public var phase: Phase {
+    Phase(cogs: cogs, reaction: reaction)
+  }
+
+  /// The tracked phase-reading facet of one reaction run.
+  ///
+  /// As transient as the reader that made it: it borrows the same context
+  /// and reaction, and every access enforces the same active-tracking
+  /// requirement.
+  @MainActor
+  public struct Phase {
+    /// The context whose graph this reaction reads.
+    private let cogs: Cogtext
+
+    /// The reaction receiving phase dependencies and leases.
+    private let reaction: CogReaction
+
+    /// Borrows the reaction reader's capability for phase spellings.
+    internal init(cogs: Cogtext, reaction: CogReaction) {
+      self.cogs = cogs
+      self.reaction = reaction
+    }
+
+    /// Reads an async cog's full phase and records its exact state as a
+    /// dependency.
+    ///
+    /// Cog settles the state before attaching the reaction edge. A first read
+    /// can therefore select work and return pending; a dirty state selects
+    /// fresh work before the reaction observes its phase. At the end of the
+    /// tracking run, the reaction acquires one `whileObserved` lease for the
+    /// state. Later pending, success, or failure turns rerun the reaction
+    /// after affected dependencies settle. Cancelling the reaction releases
+    /// the lease and can begin grace. If initial demand establishes pending,
+    /// Cog defers that graph-owned turn until tracking and lease
+    /// reconciliation finish, so the turn cannot flush through the active
+    /// reaction.
+    ///
+    /// - Parameter valueReference: The async value whose phase to track.
+    /// - Returns: Its newest settled phase in this context.
+    public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+      cogs.requireTracking(reaction)
+
+      let producer = cogs.asyncState(for: valueReference)
+      let phase = producer.settledPhase(in: cogs)
+      reaction.recordDependency(on: producer)
+      return phase
+    }
+
+    /// Peeks at an async cog's phase without recording a dependency.
+    ///
+    /// The read still settles the exact state, starting initial work or
+    /// selecting replacement work when needed. It does not add a reaction
+    /// edge or lease, so later phase turns do not rerun this reaction. If no
+    /// other durable consumer exists, the peek starts or renews ordinary
+    /// `whileObserved` grace.
+    ///
+    /// - Parameter valueReference: The async value whose phase to read once.
+    /// - Returns: Its newest settled phase in this context.
+    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+      cogs.requireTracking(reaction)
+      return cogs.phase.peek(valueReference)
+    }
   }
 
   /// Reads a source's read-only projection and records the source dependency.
@@ -132,16 +199,17 @@ public struct ReactionReader {
     return cogs.peek(valueReference)
   }
 
-  /// Peeks at an async cog without recording a dependency.
+  /// Peeks at an async cog's value without recording a dependency.
   ///
-  /// The read still settles the exact state, starting initial work or selecting
-  /// replacement work when needed. It does not add a reaction edge or lease, so
-  /// later phase turns do not rerun this reaction. If no other durable consumer
-  /// exists, the peek starts or renews ordinary `whileObserved` grace.
+  /// The read is total and current: it settles the exact state, starting
+  /// initial work when needed, and returns the resting default until the
+  /// first success. It does not add a reaction edge or lease, so later turns
+  /// do not rerun this reaction. If no other durable consumer exists, the
+  /// peek starts or renews ordinary `whileObserved` grace.
   ///
-  /// - Parameter valueReference: The async value whose phase to read once.
-  /// - Returns: Its newest settled phase in this context.
-  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
+  /// - Parameter valueReference: The async value to read once.
+  /// - Returns: Its newest settled value in this context.
+  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
     cogs.requireTracking(reaction)
     return cogs.peek(valueReference)
   }

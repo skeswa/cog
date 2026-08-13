@@ -32,12 +32,12 @@ private final class Async24ControlledWork {
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let request = ManualCog<Int>(0)
   let work = Async24ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { c in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let selectedRequest = c[request]
     return .run { await work.run(for: selectedRequest) }
   }
   let (initialPhases, initialContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let initialToken = cogs.run { c in initialContinuation.yield(c[forecast]) }
+  let initialToken = cogs.run { c in initialContinuation.yield(c.phase[forecast]) }
   var initialPhaseIterator = initialPhases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -57,7 +57,7 @@ private final class Async24ControlledWork {
   try await staleChecked.wait()
 
   let (returningPhases, returningContinuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let returningToken = cogs.run { c in returningContinuation.yield(c[forecast]) }
+  let returningToken = cogs.run { c in returningContinuation.yield(c.phase[forecast]) }
   var returningPhaseIterator = returningPhases.makeAsyncIterator()
 
   guard case .some(.pending(previous: .none)) = await returningPhaseIterator.next() else {

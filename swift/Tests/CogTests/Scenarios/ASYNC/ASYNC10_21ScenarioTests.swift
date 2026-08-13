@@ -32,9 +32,9 @@ private final class Async10ControlledWork {
 @Test func `ASYNC-10 refresh cycles a settled async cog again`() async {
   let cogs = Cogtext.forTesting()
   let work = Async10ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in work.makeWork() }
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -72,9 +72,9 @@ private final class Async10ControlledWork {
 @Test func `ASYNC-21 refresh replaces in-flight latest work`() async throws {
   let cogs = Cogtext.forTesting()
   let work = Async10ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in work.makeWork() }
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -95,7 +95,7 @@ private final class Async10ControlledWork {
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
   work.finish(0, with: 100)
   try await staleChecked.wait()
-  if case .pending(previous: .none) = cogs.peek(forecast) {
+  if case .pending(previous: .none) = cogs.phase.peek(forecast) {
   } else {
     Issue.record("The replaced run committed after refresh")
   }

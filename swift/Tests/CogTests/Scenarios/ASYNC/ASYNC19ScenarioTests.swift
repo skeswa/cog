@@ -36,12 +36,12 @@ private final class Async19ControlledWork {
   let cogs = Cogtext.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async19ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { c in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 

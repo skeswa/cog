@@ -34,7 +34,7 @@ private final class Async03ControlledWork {
     return .run { try await work.run(for: currentRequest) }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int?>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 

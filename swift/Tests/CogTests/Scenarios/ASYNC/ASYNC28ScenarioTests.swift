@@ -30,18 +30,18 @@ private final class Async28ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-28 an initial UI latest read does not reenter derived computation`()
+@Test func `ASYNC-28 an initial UI value read does not reenter derived computation`()
   async throws
 {
   let cogs = Cogtext.forTesting()
   let work = Async28ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int?>(name: "forecast") { _ in
     .run { await work.run() }
   }
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {
-    cogs[forecast.latest]
+    cogs[forecast]
   } onChange: {
     notices.withLock { $0 += 1 }
   }
@@ -65,5 +65,5 @@ private final class Async28ControlledWork {
   try await completed.wait()
 
   #expect(notices.withLock { $0 } == 1)
-  #expect(cogs[forecast.latest] == 42)
+  #expect(cogs[forecast] == 42)
 }

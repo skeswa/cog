@@ -5,27 +5,28 @@
 /// baseline through ``ReactionReader``; later runs preserve normal reaction
 /// ordering and execute only after the changed turn has settled.
 extension Cogtext {
-  /// Registers a reaction that watches an async cog's full phase.
+  /// Registers a reaction that watches an async cog's value.
   ///
-  /// Installation settles the exact async state, records it as the watch's one
-  /// tracked dependency, and captures that phase as the baseline. A first read
-  /// can start work, so the baseline is normally
-  /// ``CogPhase/pending(previous:)``. ``CogWatchStart/skip`` suppresses only the
-  /// initial body call; it does not skip the read or subscription. If that cold
-  /// read establishes pending while the reaction is tracking, Cog defers the
-  /// graph-owned pending flush until installation exits rather than reentering
-  /// the watch.
+  /// Installation settles the internal value projection, records it as the
+  /// watch's one tracked dependency, and captures the returned value as the
+  /// baseline. A first read can start work, so the baseline is normally the
+  /// declaration's resting default. ``CogWatchStart/skip`` suppresses only
+  /// the initial body call; it does not skip the read or subscription. If
+  /// that cold read establishes pending while the reaction is tracking, Cog
+  /// defers the graph-owned pending flush until installation exits rather
+  /// than reentering the watch.
   ///
-  /// Pending, success, and failure are published in separate turns. After each
-  /// such turn settles, the watch runs in registration order and receives its
-  /// previous and current phases. Because it is a durable reaction consumer,
-  /// the returned token holds a `whileObserved` lease on the async state. The
-  /// last token release cancels the watch and begins ordinary grace when no
-  /// other durable consumer remains.
+  /// The watch runs when the value changes: a new accepted success, gated by
+  /// equality when the declaration is `Equatable`. Reload pending and failure
+  /// turns that retain the same value stay quiet; watch through
+  /// ``Cogtext/phase`` to observe every phase turn instead. The returned
+  /// token holds a `whileObserved` lease reaching the async state through the
+  /// projection; the last release cancels the watch and begins ordinary grace
+  /// when no other durable consumer remains.
   ///
   /// - Parameters:
-  ///   - valueReference: The async value whose full phase should be watched.
-  ///   - initial: Whether installation calls `body` with the baseline phase as
+  ///   - valueReference: The async value to watch.
+  ///   - initial: Whether installation calls `body` with the baseline value as
   ///     both arguments.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
@@ -33,8 +34,8 @@ extension Cogtext {
   ///     default.
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
-  ///   - body: Synchronous effect code, given the phase before this change and
-  ///     the phase after it. The body runs on the MainActor; commits it requests
+  ///   - body: Synchronous effect code, given the value before this change and
+  ///     the value after it. The body runs on the MainActor; commits it requests
   ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration and its async-state lease
   ///   alive. Releasing its last reference cancels the watch.
@@ -45,7 +46,7 @@ extension Cogtext {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ body: @escaping @MainActor (CogPhase<Value>, CogPhase<Value>) -> Void
+    _ body: @escaping @MainActor (Value, Value) -> Void
   ) -> ReactionToken {
     watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
@@ -197,7 +198,7 @@ extension Cogtext {
   /// reconciled before any queued graph-owned turn can flush. In particular, a
   /// cold async dependency may establish pending during the read, but its turn
   /// waits until reaction tracking has completed.
-  private func watchTracked<Value>(
+  internal func watchTracked<Value>(
     label: CogLabel,
     initial: CogWatchStart,
     read: @escaping @MainActor (ReactionReader) -> Value,
@@ -222,5 +223,60 @@ extension Cogtext {
         }
       }
     }
+  }
+}
+
+/// Phase watches: the lens spelling of single-value reactions for async
+/// request lifecycles.
+extension Cogtext.Phase {
+  /// Registers a reaction that watches an async cog's full phase.
+  ///
+  /// Installation settles the exact async state, records it as the watch's one
+  /// tracked dependency, and captures that phase as the baseline. A first read
+  /// can start work, so the baseline is normally
+  /// ``CogPhase/pending(previous:)``. ``CogWatchStart/skip`` suppresses only the
+  /// initial body call; it does not skip the read or subscription. If that cold
+  /// read establishes pending while the reaction is tracking, Cog defers the
+  /// graph-owned pending flush until installation exits rather than reentering
+  /// the watch.
+  ///
+  /// Pending, success, and failure are published in separate turns. After each
+  /// such turn settles, the watch runs in registration order and receives its
+  /// previous and current phases — including an equal-success reload the value
+  /// watch beside this lens would gate away. Because it is a durable reaction
+  /// consumer, the returned token holds a `whileObserved` lease on the async
+  /// state. The last token release cancels the watch and begins ordinary grace
+  /// when no other durable consumer remains.
+  ///
+  /// - Parameters:
+  ///   - valueReference: The async value whose full phase should be watched.
+  ///   - initial: Whether installation calls `body` with the baseline phase as
+  ///     both arguments.
+  ///   - name: What Cog should call this effect in debug history. Defaults to
+  ///     the file and line of the registration.
+  ///   - fileID: The registration's file for diagnostics. Leave this at its
+  ///     default.
+  ///   - line: The registration's line for diagnostics. Leave this at its
+  ///     default.
+  ///   - body: Synchronous effect code, given the phase before this change and
+  ///     the phase after it. The body runs on the MainActor; commits it requests
+  ///     during a flush become later FIFO turns.
+  /// - Returns: A handle that keeps the registration and its async-state lease
+  ///   alive. Releasing its last reference cancels the watch.
+  @discardableResult
+  public func watch<Value>(
+    _ valueReference: AsyncCog<Value>,
+    initial: CogWatchStart,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ body: @escaping @MainActor (CogPhase<Value>, CogPhase<Value>) -> Void
+  ) -> ReactionToken {
+    cogs.watchTracked(
+      label: CogLabel(name: name, fileID: fileID, line: line),
+      initial: initial,
+      read: { c in c.phase[valueReference] },
+      body: body
+    )
   }
 }

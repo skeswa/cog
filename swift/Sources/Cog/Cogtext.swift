@@ -523,22 +523,23 @@ extension Cogtext {
     return value
   }
 
-  /// Reads an async cog's current phase without creating a dependency edge.
+  /// Reads an async cog's current value without creating a dependency edge.
   ///
-  /// A first one-shot read starts the initial work. Because the read installs
-  /// no durable consumer, it also starts the declaration's ordinary
-  /// `whileObserved` grace. The state owns at most one grace sleeper; another
-  /// one-shot read cancels and replaces it without replacing work already in
-  /// flight. The returned phase is fully settled at the latest completed turn,
-  /// just like a tracked read; only future invalidation is intentionally
-  /// omitted. No Swift Observation boundary or reaction lease is created.
+  /// A first one-shot read starts the initial work and returns the
+  /// declaration's resting default; afterward it returns the last accepted
+  /// success. Because the read installs no durable consumer, it also starts
+  /// the declaration's ordinary `whileObserved` grace. The state owns at most
+  /// one grace sleeper; another one-shot read cancels and replaces it without
+  /// replacing work already in flight. The returned value is fully settled at
+  /// the latest completed turn, just like a tracked read; only future
+  /// invalidation is intentionally omitted. No Swift Observation boundary or
+  /// reaction lease is created. Use ``Cogtext/phase`` to peek the request
+  /// lifecycle instead.
   ///
   /// - Parameter valueReference: The async declaration and optional key to inspect.
-  /// - Returns: Its current full phase, beginning with pending on first demand.
-  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
-    let state = asyncState(for: valueReference)
-    let phase = state.settledPhase(in: self)
-    scheduleLifetimeReleaseIfUnobserved(state)
-    return phase
+  /// - Returns: Its current settled value, resting on the default at first
+  ///   demand.
+  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+    peek(valueReference.valueCog)
   }
 }

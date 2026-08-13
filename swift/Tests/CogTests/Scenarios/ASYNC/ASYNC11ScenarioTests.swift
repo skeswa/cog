@@ -65,7 +65,7 @@ private final class Async11WorkProbe {
   let probe = Async11WorkProbe()
   var selectorValues: [Int] = []
 
-  let result = AsyncCog<Int> { c in
+  let result = AsyncCog<Int>(default: 0) { c in
     let selectorValue = c[selectorInput]
     selectorValues.append(selectorValue)
     return .run {

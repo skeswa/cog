@@ -7,10 +7,10 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogtext.forTesting()
-      let target = AsyncCog<Int>(name: "target") { _ in
+      let target = AsyncCog<Int>(default: 0, name: "target") { _ in
         fatalError("REFRESH TARGET SELECTOR RAN")
       }
-      let refreshing = AsyncCog<Int>(name: "refreshing") { _ in
+      let refreshing = AsyncCog<Int>(default: 0, name: "refreshing") { _ in
         cogs.refresh(target)
         fatalError("REFRESHING SELECTOR CONTINUED")
       }

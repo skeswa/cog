@@ -38,28 +38,28 @@ extension Cogtext {
     return value
   }
 
-  /// Reads an async cog's full phase through the Observation boundary.
+  /// Reads an async cog's value through the Observation boundary.
   ///
-  /// The read first settles the exact descriptor-and-key state. A first read
-  /// therefore selects work and publishes pending before returning; a dirty
-  /// state selects replacement work before its current phase is observed. Only
-  /// after settlement does Cog register the Observation access, so the boundary
-  /// tracks the phase returned by this call rather than receiving a redundant
-  /// notice for the initial pending publication.
+  /// This is a total read: it returns the last accepted success, or the
+  /// declaration's resting default before one exists. The read resolves
+  /// through the async cog's internal value projection, so a first read
+  /// creates the async state, starts its work, and returns the default while
+  /// that work runs; settlement happens before boundary access, so the cold
+  /// pending publication cannot reenter this read or send a redundant
+  /// baseline notice. Equality gating keeps the UI consumer quiet when a
+  /// reload succeeds with an equal value; read ``Cogtext/phase`` where the
+  /// request lifecycle itself drives chrome.
   ///
   /// This is UI tracking, not a selector or reaction dependency edge. Creating
-  /// the boundary pins the state against `whileObserved` release, and later
-  /// pending, success, or failure turns notify the active Observation consumer.
-  /// Use ``peek(_:)`` for a one-shot read that should not invalidate UI and does
-  /// not keep the async state durably observed.
+  /// the boundary pins the projection — and, through its dependency, the async
+  /// state — against `whileObserved` release. Use ``peek(_:)`` for a one-shot
+  /// read that should not invalidate UI and does not keep the async state
+  /// durably observed.
   ///
-  /// - Parameter valueReference: The async value whose phase the UI reads.
-  /// - Returns: The newest settled phase in this context.
-  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
-    let state = asyncState(for: valueReference)
-    let phase = state.settledPhase(in: self)
-    state.accessObservationBoundary(in: self)
-    return phase
+  /// - Parameter valueReference: The async value the UI reads.
+  /// - Returns: Its newest settled value in this context.
+  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+    self[valueReference.valueCog]
   }
 
   /// Reads a source's read-only projection through the UI boundary.

@@ -44,7 +44,7 @@ private final class Async13ControlledWork {
   let clock = Async13TestClock()
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in work.makeWork() }
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let token = cogs.run { c in _ = c[forecast] }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
@@ -77,7 +77,7 @@ private final class Async13ControlledWork {
   let clock = Async13TestClock()
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in work.makeWork() }
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let firstToken = cogs.run { c in _ = c[forecast] }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
@@ -97,7 +97,7 @@ private final class Async13ControlledWork {
   try await lateChecked.wait()
 
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let secondToken = cogs.run { c in continuation.yield(c[forecast]) }
+  let secondToken = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   guard let freshPending = await phaseIterator.next() else {
     Issue.record("The recreated phase stream ended before pending")

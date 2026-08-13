@@ -39,11 +39,11 @@ private final class Async02ControlledWork {
 @Test func `ASYNC-02 thrown work publishes a failure holding its error`() async {
   let cogs = Cogtext.forTesting()
   let work = Async02ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var iterator = phases.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {
@@ -82,11 +82,11 @@ private final class Async02ControlledWork {
 @Test func `ASYNC-06 watcher sees pending and success in separate named turns`() async {
   let cogs = Cogtext.forTesting()
   let work = Async02ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var iterator = phases.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {

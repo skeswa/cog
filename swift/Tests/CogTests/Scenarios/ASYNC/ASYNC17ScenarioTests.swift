@@ -9,7 +9,7 @@ import Testing
     .run { CogTaskDiagnostic.currentTaskName }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<String?>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast[90_210]]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast[90_210]]) }
   var iterator = phases.makeAsyncIterator()
 
   guard await iterator.next() != nil else {

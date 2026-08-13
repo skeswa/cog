@@ -6,11 +6,19 @@
 /// demanded. Copies therefore name the same state in one context and separate
 /// state in separate contexts.
 ///
-/// Demand may come from a tracked read, one-shot `peek`, or `refresh`. Initial
-/// demand establishes ``CogPhase/pending(previous:)`` with ``Previous/none``
-/// synchronously and starts the selected work; a read returns that phase, while
-/// `refresh` returns no value. Cog records pending as a graph-owned turn, but if
-/// demand occurs while a selector or reaction is being evaluated, it
+/// Reading an async cog is total and value-first (§5.1): `c[valueReference]`
+/// returns `Value` — the last accepted success, or the declaration's resting
+/// default before one exists — so async state reads in the same shape as a
+/// manual or derived cog wherever only the value matters. The request
+/// lifecycle is read through the `phase` lens on the same capability
+/// (`c.phase[valueReference]`), which returns the full ``CogPhase``.
+///
+/// Demand may come from a tracked value or phase read, one-shot `peek`, or
+/// `refresh`. Initial demand establishes ``CogPhase/pending(previous:)`` with
+/// ``Previous/none`` synchronously and starts the selected work; a value read
+/// returns the resting default, a phase read returns that pending phase, and
+/// `refresh` returns no value. Cog records pending as a graph-owned turn, but
+/// if demand occurs while a selector or reaction is being evaluated, it
 /// defers that turn's flush until evaluation exits. Observation and reactions
 /// therefore cannot reenter the consumer that caused initial demand. Each later
 /// pending, success, or failure is likewise a separate, ordered graph turn.
@@ -30,13 +38,19 @@ public struct AsyncCog<Value> {
   /// Stable declaration identity and behavior shared by copies of this reference.
   internal let descriptor: AsyncCogDescriptor<Value>
 
-  /// Stable derived-declaration identity shared by copies of ``latest``.
-  internal let latestDescriptor: DerivedCogDescriptor<Value?>
+  /// Stable derived-declaration identity for the total value projection.
+  ///
+  /// Value reads of this reference resolve through this derived declaration:
+  /// its selector reads the async state's phase and extracts the last accepted
+  /// success, falling back to the resting default captured at declaration.
+  /// One projection descriptor is shared by every copy and — through boxes —
+  /// every key, exactly like `descriptor` itself.
+  internal let valueDescriptor: DerivedCogDescriptor<Value>
 
   /// The state-identity key, or `nil` for this keyless public declaration.
   internal let key: AnyHashable?
 
-  /// Declares one keyless asynchronous value.
+  /// Declares one keyless asynchronous value with an explicit resting default.
   ///
   /// The declaration is inert until a context first demands it. Under the
   /// `.latest` policy, a dependency change or refresh cancels the prior task,
@@ -54,6 +68,10 @@ public struct AsyncCog<Value> {
   /// - Parameters:
   ///   - policy: How new work interacts with an in-flight run. `.latest` is
   ///     currently the only policy and is therefore the default.
+  ///   - default: The honest resting value a value read returns before any
+  ///     generation succeeds. Choose one that renders truthfully while work is
+  ///     in flight; when no such value exists, make `Value` optional and omit
+  ///     this argument instead.
   ///   - keepAlive: Pass `true` to retain this state until its context ends.
   ///     The default releases it after its last durable consumer and grace
   ///     period. A one-shot demand renews grace without becoming a consumer.
@@ -65,6 +83,7 @@ public struct AsyncCog<Value> {
   ///     operation for each generation.
   public init(
     _ policy: LatestPolicy = .latest,
+    default defaultValue: Value,
     keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -80,8 +99,9 @@ public struct AsyncCog<Value> {
     )
     self.init(
       descriptor: descriptor,
-      latestDescriptor: Self.makeLatestDescriptor(
+      valueDescriptor: Self.makeValueDescriptor(
         for: descriptor,
+        default: defaultValue,
         equals: nil,
         lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: label
@@ -97,55 +117,50 @@ public struct AsyncCog<Value> {
   /// created here.
   internal init(
     descriptor: AsyncCogDescriptor<Value>,
-    latestDescriptor: DerivedCogDescriptor<Value?>,
+    valueDescriptor: DerivedCogDescriptor<Value>,
     key: AnyHashable?
   ) {
     self.descriptor = descriptor
-    self.latestDescriptor = latestDescriptor
+    self.valueDescriptor = valueDescriptor
     self.key = key
   }
-  /// A derived value reference for the last successful value, if any.
+
+  /// The derived reference every value spelling of this async cog reads.
   ///
-  /// This projection deliberately erases loading and error details so code
-  /// that needs them should read the `AsyncCog` itself. It returns `nil` until
-  /// the first success, returns that success during later pending and failure
-  /// phases, and updates on a new success.
-  ///
-  /// `latest` is a stable derived declaration, not a snapshot: repeated access
-  /// produces references with the same descriptor-and-key identity. Its state
-  /// follows the async declaration's lifetime, and a latest-only consumer
-  /// releases the projection and async dependency at one shared grace
-  /// deadline. When `Value` is `Equatable`, equal latest values stop the
-  /// projection's downstream wave even though full-phase consumers still see
-  /// the async phase turns. Reading this projection creates demand for the same
-  /// async state and participates in the caller's normal selector, reaction, or
-  /// Observation tracking; accessing the property alone is inert.
-  ///
-  /// - Returns: A stable derived reference whose value is the most recent
-  ///   success, or `nil` when this async state has never succeeded.
-  public var latest: Cog<Value?> {
-    Cog(descriptor: latestDescriptor, key: key)
+  /// This is the internal seam that makes `c[asyncCog]` an ordinary derived
+  /// read: same settlement, equality gating, lifetime, and release behavior
+  /// as any other derived state, with the async state reachable through the
+  /// projection's dependency edge. A value-only consumer therefore releases
+  /// the projection and its async dependency at one shared grace deadline.
+  internal var valueCog: Cog<Value> {
+    Cog(descriptor: valueDescriptor, key: key)
   }
 
-  /// Builds the one projection declaration shared by every matching value reference.
+  /// Builds the one value-projection declaration shared by every matching
+  /// value reference.
   ///
   /// The projection retains the async descriptor so its selector can resolve
-  /// the same key in each context. `equals` applies only to the projected
-  /// optional value; the async state's phase publication remains independent.
-  internal static func makeLatestDescriptor(
+  /// the same key in each context, and captures the resting default chosen at
+  /// declaration. When `Value` is itself optional, a retained successful `nil`
+  /// still reads as `nil` — `latestValue`'s inner optional — rather than
+  /// falling back to the default, so "succeeded with nothing" is preserved.
+  /// `equals` applies only to the projected value; the async state's phase
+  /// publication remains independent.
+  internal static func makeValueDescriptor(
     for descriptor: AsyncCogDescriptor<Value>,
-    equals: (@MainActor (Value?, Value?) -> Bool)?,
+    default defaultValue: Value,
+    equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
     label: CogLabel
-  ) -> DerivedCogDescriptor<Value?> {
+  ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
       selector: { c, key in
-        c.asyncPhase(from: descriptor, key: key).latestValue
+        c.asyncPhase(from: descriptor, key: key).latestValue ?? defaultValue
       },
       equals: equals,
       lifetime: lifetime,
       label: CogLabel(
-        name: "\(label).latest",
+        name: "\(label).value",
         fileID: label.fileID,
         line: label.line
       )
@@ -154,17 +169,19 @@ public struct AsyncCog<Value> {
 }
 
 extension AsyncCog where Value: Equatable {
-  /// Declares one keyless async value with equality-gated ``latest`` updates.
+  /// Declares one keyless async value with equality-gated value reads and an
+  /// explicit resting default.
   ///
   /// This overload has the same scheduling, cancellation, actor, and lifetime
   /// behavior as the unconstrained initializer. The added `Equatable` rule is
-  /// intentionally narrow: when work succeeds with the same latest value,
-  /// consumers of `latest` remain quiet, while consumers of the full
-  /// ``CogPhase`` still observe pending and success as distinct turns.
+  /// intentionally narrow: when work succeeds with an equal value, value
+  /// consumers remain quiet, while `phase` consumers still observe pending
+  /// and success as distinct turns.
   ///
   /// - Parameters:
   ///   - policy: The replacement policy for in-flight work. Only `.latest` is
   ///     currently available.
+  ///   - default: The honest resting value returned before the first success.
   ///   - keepAlive: Whether state survives without a consumer until the
   ///     context ends instead of following `whileObserved` grace.
   ///   - name: A stable label for turns, diagnostics, and task tools.
@@ -174,6 +191,7 @@ extension AsyncCog where Value: Equatable {
   ///     operation per generation.
   public init(
     _ policy: LatestPolicy = .latest,
+    default defaultValue: Value,
     keepAlive: Bool = false,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -189,13 +207,115 @@ extension AsyncCog where Value: Equatable {
     )
     self.init(
       descriptor: descriptor,
-      latestDescriptor: Self.makeLatestDescriptor(
+      valueDescriptor: Self.makeValueDescriptor(
         for: descriptor,
+        default: defaultValue,
         equals: { oldValue, newValue in oldValue == newValue },
         lifetime: CogStateLifetime(keepAlive: keepAlive),
         label: label
       ),
       key: nil
     )
+  }
+}
+
+extension AsyncCog where Value: CogDefaultable {
+  /// Declares one keyless async value resting on `Value`'s own default.
+  ///
+  /// Identical to the explicit-`default:` initializer except that the resting
+  /// value comes from ``CogDefaultable/cogDefault`` — for an optional value,
+  /// `nil`. This is the omitted-argument spelling of the same invariant, not
+  /// a defaultless declaration: value reads are total either way.
+  ///
+  /// - Parameters:
+  ///   - policy: The replacement policy for in-flight work.
+  ///   - keepAlive: Whether state survives without a consumer until the
+  ///     context ends instead of following `whileObserved` grace.
+  ///   - name: A stable label for turns, diagnostics, and task tools.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection that returns one async
+  ///     operation per generation.
+  public init(
+    _ policy: LatestPolicy = .latest,
+    keepAlive: Bool = false,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
+  ) {
+    self.init(
+      policy,
+      default: Value.cogDefault,
+      keepAlive: keepAlive,
+      name: name,
+      fileID: fileID,
+      line: line,
+      selector
+    )
+  }
+}
+
+extension AsyncCog where Value: CogDefaultable & Equatable {
+  /// Declares one keyless async value resting on `Value`'s own default, with
+  /// equality-gated value reads.
+  ///
+  /// The most common spelling for optional `Equatable` values:
+  /// `AsyncCog<Weather?> { ... }` rests at `nil` and keeps value consumers
+  /// quiet across equal-success reloads.
+  ///
+  /// - Parameters:
+  ///   - policy: The replacement policy for in-flight work.
+  ///   - keepAlive: Whether state survives without a consumer until the
+  ///     context ends instead of following `whileObserved` grace.
+  ///   - name: A stable label for turns, diagnostics, and task tools.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection that returns one async
+  ///     operation per generation.
+  public init(
+    _ policy: LatestPolicy = .latest,
+    keepAlive: Bool = false,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
+  ) {
+    self.init(
+      policy,
+      default: Value.cogDefault,
+      keepAlive: keepAlive,
+      name: name,
+      fileID: fileID,
+      line: line,
+      selector
+    )
+  }
+}
+
+extension AsyncCog {
+  /// Unavailable: an async cog always has a resting value.
+  ///
+  /// This overload exists only to turn the missing-default mistake into a
+  /// diagnostic that names both ways out, instead of an opaque
+  /// no-matching-initializer error. It is chosen only when no available
+  /// initializer applies — a non-`CogDefaultable` `Value` with no `default:`
+  /// argument.
+  @available(
+    *, unavailable,
+    message: """
+      an async cog needs a resting value: pass `default:`, or make Value \
+      Optional so it rests at nil
+      """
+  )
+  public init(
+    _ policy: LatestPolicy = .latest,
+    keepAlive: Bool = false,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogPhase<Value>>) -> Work<Value>
+  ) {
+    fatalError("unavailable")
   }
 }

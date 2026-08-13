@@ -28,12 +28,12 @@ private final class Async08ControlledWork {
   let cogs = Cogtext.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async08ControlledWork()
-  let forecast = AsyncCog<Int>(name: "forecast") { c in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { await work.run(for: currentRequest) }
   }
   let (phases, continuation) = AsyncStream.makeStream(of: CogPhase<Int>.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  let token = cogs.run { c in continuation.yield(c.phase[forecast]) }
   var phaseIterator = phases.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -48,7 +48,7 @@ private final class Async08ControlledWork {
   work.finish(0, with: 100)
   try await staleChecked.wait()
 
-  let afterStale = cogs.peek(forecast)
+  let afterStale = cogs.phase.peek(forecast)
   if case .pending(previous: .none) = afterStale {
   } else {
     Issue.record("A stale result changed the newest run's pending phase")

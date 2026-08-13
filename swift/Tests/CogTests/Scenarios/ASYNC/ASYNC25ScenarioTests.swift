@@ -47,19 +47,19 @@ private final class Async25ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-25 latest-only demand releases its pending chain after one grace`() async throws {
+@Test func `ASYNC-25 value-only demand releases its pending chain after one grace`() async throws {
   let clock = DerivedLifetimeTestClock()
   let cogs = Cogtext.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0
-  let forecast = AsyncCog<Int>(name: "forecast") { _ in
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     selectorRuns += 1
     return work.makeWork()
   }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let firstConsumer = cogs.run { c in _ = c[forecast.latest] }
+  let firstConsumer = cogs.run { c in _ = c[forecast] }
   #expect(selectorRuns == 1)
   #expect(await startIterator.next() == 0)
 
@@ -77,7 +77,7 @@ private final class Async25ControlledWork {
   }
   #expect(await cancellationIterator.next() == 0)
 
-  let secondConsumer = cogs.run { c in _ = c[forecast.latest] }
+  let secondConsumer = cogs.run { c in _ = c[forecast] }
   guard selectorRuns == 2 else {
     Issue.record("The latest projection and async dependency were not both recreated")
     work.finish(0, with: 100)

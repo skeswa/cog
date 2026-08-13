@@ -80,26 +80,96 @@ public struct Reader<Value> {
     return producer.settledValue(in: cogs)
   }
 
-  /// Reads an async cog's full phase and depends on its exact state.
+  /// Reads an async cog's value and depends on it.
   ///
-  /// Cog settles the producer before recording the edge. A first read therefore
-  /// selects its work and returns pending, while a dirty producer selects its
-  /// replacement work before this selector observes the phase. Recording the
-  /// edge makes later pending, success, and failure turns invalidate this
-  /// selector and keeps a `whileObserved` producer reachable through the
-  /// derived dependency graph. If initial demand establishes pending during
-  /// this selector, Cog defers the graph-owned pending flush until tracking and
-  /// settlement exit, so Observation and reactions cannot reenter this run.
+  /// This is a total read: it returns the last accepted success, or the
+  /// declaration's resting default before one exists. The read resolves
+  /// through the async cog's internal value projection, so it settles like
+  /// any derived read — a first read creates the async state, starts its
+  /// work, and returns the default while that work runs. Equality gating on
+  /// the projection keeps this selector quiet when a reload succeeds with an
+  /// equal value; read `c.phase[valueReference]` instead where the request
+  /// lifecycle itself matters. If initial demand establishes pending during
+  /// this selector, Cog defers the graph-owned pending flush until tracking
+  /// and settlement exit, so Observation and reactions cannot reenter this
+  /// run.
   ///
-  /// - Parameter valueReference: The async value whose phase to read.
-  /// - Returns: Its newest settled phase in this context.
-  public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
-    cogs.requireTracking(state)
+  /// - Parameter valueReference: The async value to read.
+  /// - Returns: Its newest settled value in this context.
+  public subscript<Read>(_ valueReference: AsyncCog<Read>) -> Read {
+    self[valueReference.valueCog]
+  }
 
-    let producer = cogs.asyncState(for: valueReference)
-    let phase = producer.settledPhase(in: cogs)
-    state.recordDependency(on: producer)
-    return phase
+  /// The phase lens over this reader: the same tracked-read capability,
+  /// returning full ``CogPhase`` values for async references.
+  ///
+  /// `c.phase[asyncValue]` records a dependency on the async state itself, so
+  /// later pending, success, and failure turns each rerun this selector even
+  /// when the successful value is unchanged — the opposite gating from the
+  /// value read beside it. The lens deliberately has no spelling for manual
+  /// or derived cogs: synchronous state has no phase, and asking for one is a
+  /// type error rather than a degenerate success.
+  public var phase: Phase {
+    Phase(cogs: cogs, state: state)
+  }
+
+  /// The tracked phase-reading facet of one selector run.
+  ///
+  /// A lens is as transient as the reader that made it: it borrows the same
+  /// context and computing consumer, enforces the same active-tracking
+  /// requirement on every access, and is invalid outside its selector run.
+  @MainActor
+  public struct Phase {
+    /// The context whose graph this run reads.
+    private let cogs: Cogtext
+
+    /// The computing consumer receiving phase dependencies.
+    private let state: any CogReaderState<Value>
+
+    /// Borrows the reader's capability for phase spellings.
+    internal init(cogs: Cogtext, state: any CogReaderState<Value>) {
+      self.cogs = cogs
+      self.state = state
+    }
+
+    /// Reads an async cog's full phase and depends on its exact state.
+    ///
+    /// Cog settles the producer before recording the edge. A first read
+    /// therefore selects its work and returns pending, while a dirty producer
+    /// selects its replacement work before this selector observes the phase.
+    /// Recording the edge makes later pending, success, and failure turns
+    /// invalidate this selector and keeps a `whileObserved` producer reachable
+    /// through the derived dependency graph. If initial demand establishes
+    /// pending during this selector, Cog defers the graph-owned pending flush
+    /// until tracking and settlement exit, so Observation and reactions cannot
+    /// reenter this run.
+    ///
+    /// - Parameter valueReference: The async value whose phase to read.
+    /// - Returns: Its newest settled phase in this context.
+    public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
+      cogs.requireTracking(state)
+
+      let producer = cogs.asyncState(for: valueReference)
+      let phase = producer.settledPhase(in: cogs)
+      state.recordDependency(on: producer)
+      return phase
+    }
+
+    /// Peeks at an async cog's phase without recording a dependency.
+    ///
+    /// The read still settles the exact state, starting initial work or
+    /// selecting replacement work when needed. It records no edge from this
+    /// selector, so later phase turns do not rerun it, and with no other
+    /// durable consumer the one-shot read starts or renews the async state's
+    /// ordinary `whileObserved` grace.
+    ///
+    /// - Parameter valueReference: The async value whose phase to read
+    ///   without tracking it.
+    /// - Returns: Its newest settled phase in this context.
+    public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
+      cogs.requireTracking(state)
+      return cogs.phase.peek(valueReference)
+    }
   }
 
   /// Reads one async descriptor for an internal projection selector.
@@ -167,18 +237,18 @@ public struct Reader<Value> {
     return cogs.peek(valueReference)
   }
 
-  /// Peeks at an async cog without depending on it.
+  /// Peeks at an async cog's value without depending on it.
   ///
-  /// This remains a current read: it settles dirty state, and a first peek
-  /// selects work and returns pending. It records no edge from this selector,
-  /// so later phase turns do not rerun the selector. With no other durable
-  /// consumer, the one-shot read starts or renews the async state's ordinary
-  /// `whileObserved` grace rather than keeping it alive indefinitely.
+  /// This remains a current, total read: it settles dirty state, and a first
+  /// peek selects work and returns the declaration's resting default while
+  /// that work runs. It records no edge from this selector, so later turns do
+  /// not rerun the selector. With no other durable consumer, the one-shot
+  /// read starts or renews the async state's ordinary `whileObserved` grace
+  /// rather than keeping it alive indefinitely.
   ///
-  /// - Parameter valueReference: The async value whose phase to read without
-  ///   tracking it.
-  /// - Returns: Its newest settled phase in this context.
-  public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
+  /// - Parameter valueReference: The async value to read without tracking it.
+  /// - Returns: Its newest settled value in this context.
+  public func peek<Read>(_ valueReference: AsyncCog<Read>) -> Read {
     cogs.requireTracking(state)
     return cogs.peek(valueReference)
   }

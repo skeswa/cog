@@ -39,28 +39,27 @@ private final class Async26ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-26 keyed latest projection has stable per-key equality`() async throws {
+@Test func `ASYNC-26 keyed value reads have stable per-key equality`() async throws {
   let cogs = Cogtext.forTesting()
   let work = Async26ControlledWork()
-  let forecasts = AsyncCogBox<Int, String>(name: "forecast") { _, key in
+  let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, key in
     work.makeWork(for: key)
   }
-  let latest = forecasts.latest
-  let (firstHomeValues, firstHomeContinuation) = AsyncStream.makeStream(of: Int?.self)
-  let (secondHomeValues, secondHomeContinuation) = AsyncStream.makeStream(of: Int?.self)
-  let (awayValues, awayContinuation) = AsyncStream.makeStream(of: Int?.self)
+  let (firstHomeValues, firstHomeContinuation) = AsyncStream.makeStream(of: Int.self)
+  let (secondHomeValues, secondHomeContinuation) = AsyncStream.makeStream(of: Int.self)
+  let (awayValues, awayContinuation) = AsyncStream.makeStream(of: Int.self)
   var firstHomeRuns = 0
   var secondHomeRuns = 0
 
   let firstHomeToken = cogs.run { c in
     firstHomeRuns += 1
-    firstHomeContinuation.yield(c[latest["home"]])
+    firstHomeContinuation.yield(c[forecasts["home"]])
   }
   let secondHomeToken = cogs.run { c in
     secondHomeRuns += 1
-    secondHomeContinuation.yield(c[forecasts.latest["home"]])
+    secondHomeContinuation.yield(c[forecasts["home"]])
   }
-  let awayToken = cogs.run { c in awayContinuation.yield(c[latest["away"]]) }
+  let awayToken = cogs.run { c in awayContinuation.yield(c[forecasts["away"]]) }
   var firstHomeIterator = firstHomeValues.makeAsyncIterator()
   var secondHomeIterator = secondHomeValues.makeAsyncIterator()
   var awayIterator = awayValues.makeAsyncIterator()
@@ -70,12 +69,12 @@ private final class Async26ControlledWork {
     case .some(let secondHomePending) = await secondHomeIterator.next(),
     case .some(let awayPending) = await awayIterator.next()
   else {
-    Issue.record("Every keyed latest stream must begin with a value")
+    Issue.record("Every keyed value stream must begin with the resting default value")
     return
   }
-  #expect(firstHomePending == nil)
-  #expect(secondHomePending == nil)
-  #expect(awayPending == nil)
+  #expect(firstHomePending == 0)
+  #expect(secondHomePending == 0)
+  #expect(awayPending == 0)
 
   let firstStarts = [await startIterator.next(), await startIterator.next()].compactMap { $0 }
   #expect(
@@ -94,7 +93,7 @@ private final class Async26ControlledWork {
 
   #if DEBUG
   let homeProjectionRuns = cogs.debugHistory.entries.filter {
-    $0.event == .recompute && $0.name == "forecast.latest[home]"
+    $0.event == .recompute && $0.name == "forecast.value[home]"
   }
   #expect(homeProjectionRuns.count == 2)
   #endif
