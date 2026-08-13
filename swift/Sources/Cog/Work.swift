@@ -8,7 +8,9 @@
 /// The operation may throw and may return a non-`Sendable` value when Swift's
 /// region-based `sending` rules prove the transfer safe. Replacement and
 /// lifetime cancellation are advisory to the operation, but Cog rejects every
-/// completion that no longer belongs to the current stored generation.
+/// completion that no longer belongs to the current stored generation. `Work`
+/// itself is a description rather than a task handle: callers cannot start,
+/// await, or cancel it directly.
 public struct Work<Value> {
   /// The deferred operation with the isolation inherited at its declaration.
   internal let operation: @Sendable @isolated(any) () async throws -> sending Value
@@ -42,6 +44,8 @@ public struct Work<Value> {
 /// Policies are part of declaration behavior and apply independently to each
 /// key of an ``AsyncCogBox``. The initial API offers only replacement semantics;
 /// later policies can expand this enum without changing phase or work types.
+/// The policy is `nonisolated` and `Sendable`; choosing one does not access a
+/// context or start work.
 public nonisolated enum LatestPolicy: Sendable, Equatable {
   /// Cancel prior work and accept a result only from the newest generation.
   ///

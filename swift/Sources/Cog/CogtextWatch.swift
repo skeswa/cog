@@ -1,3 +1,9 @@
+/// Adds single-value reactions that report old and new values.
+///
+/// Watches are MainActor-isolated registrations owned by their ``Cogtext`` and
+/// kept active by the returned ``ReactionToken``. Installation captures one
+/// baseline through ``ReactionReader``; later runs preserve normal reaction
+/// ordering and execute only after the changed turn has settled.
 extension Cogtext {
   /// Registers a reaction that watches an async cog's full phase.
   ///
@@ -5,7 +11,10 @@ extension Cogtext {
   /// tracked dependency, and captures that phase as the baseline. A first read
   /// can start work, so the baseline is normally
   /// ``CogPhase/pending(previous:)``. ``CogWatchStart/skip`` suppresses only the
-  /// initial body call; it does not skip the read or subscription.
+  /// initial body call; it does not skip the read or subscription. If that cold
+  /// read establishes pending while the reaction is tracking, Cog defers the
+  /// graph-owned pending flush until installation exits rather than reentering
+  /// the watch.
   ///
   /// Pending, success, and failure are published in separate turns. After each
   /// such turn settles, the watch runs in registration order and receives its
@@ -25,7 +34,8 @@ extension Cogtext {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the phase before this change and
-  ///     the phase after it.
+  ///     the phase after it. The body runs on the MainActor; commits it requests
+  ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration and its async-state lease
   ///   alive. Releasing its last reference cancels the watch.
   @discardableResult
@@ -48,15 +58,23 @@ extension Cogtext {
   /// Registers a reaction that watches one derived cog and receives its old and
   /// new values.
   ///
-  /// A watch is a reaction with one dependency. Its body receives the old and
-  /// new values. Changed watches run in registration order during the flush.
+  /// Installation settles the exact descriptor-and-key state, records it as the
+  /// watch's dependency, and captures the returned value as the baseline.
+  /// ``CogWatchStart/skip`` suppresses only the initial body call; it does not
+  /// skip settlement or subscription. Outside a flush installation completes
+  /// synchronously. Installation requested during a flush joins that flush's
+  /// reaction queue instead of reentering its caller.
   ///
-  /// Installation always reads the cog to subscribe and capture the baseline.
-  /// ``CogWatchStart/skip`` suppresses only the initial body call.
+  /// Later changed turns run watches in registration order after dependencies
+  /// settle. An equality-gated cog keeps the watch quiet when recomputation is
+  /// equal. The token owns the registration and its `whileObserved` lease on the
+  /// exact derived state; releasing its last reference cancels both and may
+  /// begin grace.
   ///
   /// - Parameters:
   ///   - valueReference: The cog to watch.
-  ///   - initial: Whether installing calls `body` once.
+  ///   - initial: Whether installation calls `body` once with the baseline as
+  ///     both old and new values.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
   ///   - fileID: The registration's file for diagnostics. Leave this at its
@@ -64,7 +82,8 @@ extension Cogtext {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
-  ///     the value after it.
+  ///     the value after it. The body runs on the MainActor; commits it requests
+  ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration alive. Releasing its last
   ///   reference cancels the watch.
   @discardableResult
@@ -87,11 +106,17 @@ extension Cogtext {
   /// Registers a reaction that watches one source and receives its old and new
   /// values.
   ///
-  /// The same watch the derived overload above documents, on a source.
+  /// Installation reads the source from the latest completed turn and records
+  /// its exact descriptor-and-key state as the dependency. `initial` controls
+  /// only delivery of that baseline; subscription always occurs. Later changed
+  /// source turns run watches in registration order after mutation has closed.
+  /// Manual state has context lifetime, so cancelling the returned token removes
+  /// the reaction but does not release or reset the source.
   ///
   /// - Parameters:
   ///   - valueReference: The source to watch.
-  ///   - initial: Whether installing calls `body` once.
+  ///   - initial: Whether installation calls `body` once with the baseline as
+  ///     both old and new values.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
   ///   - fileID: The registration's file for diagnostics. Leave this at its
@@ -99,7 +124,8 @@ extension Cogtext {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
-  ///     the value after it.
+  ///     the value after it. The body runs on the MainActor; commits it requests
+  ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration alive. Releasing its last
   ///   reference cancels the watch.
   @discardableResult
@@ -121,11 +147,14 @@ extension Cogtext {
 
   /// Registers a watch on a source's read-only projection.
   ///
-  /// The projection and source name the same state.
+  /// The projection and source name the same state, so installation, ordering,
+  /// baseline delivery, and cancellation match the source overload. This
+  /// spelling exposes no write capability to the registration site.
   ///
   /// - Parameters:
   ///   - valueReference: The read-only value reference to watch.
-  ///   - initial: Whether installing calls `body` once.
+  ///   - initial: Whether installation calls `body` once with the baseline as
+  ///     both old and new values.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
   ///   - fileID: The registration's file for diagnostics. Leave this at its
@@ -133,7 +162,8 @@ extension Cogtext {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change and
-  ///     the value after it.
+  ///     the value after it. The body runs on the MainActor; commits it requests
+  ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration alive. Releasing its last
   ///   reference cancels the watch.
   @discardableResult
@@ -162,6 +192,11 @@ extension Cogtext {
   /// optional value keeps "nothing delivered yet" distinct from "delivered
   /// nil", the same way ``ManualCogState`` keeps a staged nil distinct from no
   /// staged write at all.
+  ///
+  /// Reading precedes delivery so the reaction's dependency and lease set are
+  /// reconciled before any queued graph-owned turn can flush. In particular, a
+  /// cold async dependency may establish pending during the read, but its turn
+  /// waits until reaction tracking has completed.
   private func watchTracked<Value>(
     label: CogLabel,
     initial: CogWatchStart,

@@ -1,11 +1,23 @@
 /// The container for one Cog state graph.
 ///
-/// A context creates state lazily as declarations are read or written. One
-/// running app uses one context; each test or preview may create its own.
+/// A context creates state lazily as declarations are read, refreshed, or
+/// written. Declaration identity plus an optional box key names one state slot,
+/// so copied value references converge inside a context while separate contexts
+/// remain isolated. One running app uses one context; each test or preview may
+/// create its own.
+///
+/// Reads settle every dependency needed by the returned value. Application
+/// writes and runtime-owned async phase changes publish as ordered turns;
+/// notifications and reactions run only after the active value computation has
+/// finished. UI subscripts participate in Swift Observation, selector and
+/// reaction readers record graph edges, and `peek` deliberately does neither.
+///
+/// `Cogtext` and all graph access are MainActor-isolated. It is not a container
+/// to pass between arbitrary executors: enter the MainActor before reading,
+/// refreshing, registering reactions, or committing operations.
 ///
 /// Call ``bootstrapApp()`` once when an app launches. Tests and previews use
-/// `Cogtext.forTesting()` from the `CogTesting` product. All graph operations
-/// run on the MainActor.
+/// `Cogtext.forTesting()` from the `CogTesting` product.
 @MainActor
 public final class Cogtext {
   /// The monotonic clock used by context-owned timing work.
@@ -46,10 +58,13 @@ public final class Cogtext {
   /// data-oriented core later replaces it without exposing the phase as API.
   internal var turnPhase: CogTurnPhase = .idle
 
-  /// Commits requested while a turn is flushing, in arrival order.
+  /// Turns that cannot safely run yet, in arrival order.
   ///
-  /// The outer `withTurn` drains this FIFO after its active turn returns to
-  /// idle. New arrivals join the same queue.
+  /// Application commits enqueue while a turn is flushing. Runtime-owned async
+  /// turns also enqueue while a selector or reaction is tracking even when the
+  /// context is otherwise idle. The current outer turn or the first safe graph
+  /// boundary drains this FIFO only after mutation and value evaluation finish,
+  /// preventing nested Observation or reaction propagation.
   internal var queuedTurns: [QueuedCogTurn] = []
 
   /// Reactions this context owns, in registration order.
@@ -81,6 +96,11 @@ public final class Cogtext {
   internal private(set) var observationStates: [any CogObservationState] = []
 
   /// Pins one newly UI-read state in boundary creation order.
+  ///
+  /// Swift Observation has no exact removal signal that Cog can rely on, so the
+  /// first boundary is context-lifetime in v1. Cancelling the state's owned
+  /// grace sleeper before registration prevents a transient-demand deadline
+  /// from releasing state after the UI has made it durable.
   internal func registerObservationState(_ state: any CogObservationState) {
     if let lifetimeState = state as? any CogLifetimeLeaseState {
       lifetimeState.cancelPendingLifetimeRelease()
@@ -117,7 +137,15 @@ public final class Cogtext {
   /// Creates an empty context.
   ///
   /// Package access limits construction to `bootstrapApp()` and the
-  /// `CogTesting` factory.
+  /// `CogTesting` factory. Construction is synchronous and MainActor-isolated;
+  /// declarations remain inert until used with this context.
+  ///
+  /// - Parameters:
+  ///   - clock: The monotonic clock for context-owned grace sleepers. Production
+  ///     uses ``ContinuousClock``; tests inject a controllable clock.
+  ///   - defaultWhileObservedGrace: Grace used by declarations that request
+  ///     `whileObserved` without an explicit duration. Each state owns at most
+  ///     one such sleeper, which later transient demand cancels and replaces.
   package init(
     clock: any Clock<Duration> = ContinuousClock(),
     defaultWhileObservedGrace: Duration = .seconds(30)
@@ -133,6 +161,9 @@ public final class Cogtext {
   /// completed decision, not merely that the work closure returned. Only one
   /// waiter is supported because the seam exists for one deterministic test
   /// assertion at a time.
+  ///
+  /// - Parameter acknowledgement: MainActor callback consumed after the next
+  ///   accepted or rejected completion reaches its eligibility decision.
   package func acknowledgeNextAsyncCompletionCheck(
     _ acknowledgement: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -248,7 +279,14 @@ extension Cogtext {
     }
   }
 
-  /// Installs a one-shot behavior acknowledgement for a lifetime scenario.
+  /// Installs a one-shot acknowledgement for the next successful state release.
+  ///
+  /// Pinned or otherwise ineligible expiry checks do not consume this callback;
+  /// use ``acknowledgeNextDerivedReleaseCheck(_:)`` when the check itself is the
+  /// event under test.
+  ///
+  /// - Parameter acknowledgement: MainActor callback consumed after the next
+  ///   eligible derived-state closure is removed.
   package func acknowledgeNextDerivedRelease(
     _ acknowledgement: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -259,6 +297,12 @@ extension Cogtext {
   }
 
   /// Installs a one-shot acknowledgement for the next grace-expiry check.
+  ///
+  /// The callback runs after the owned sleeper's identity, generation, lease,
+  /// boundary, and subscriber checks, whether or not they permit removal.
+  ///
+  /// - Parameter acknowledgement: MainActor callback consumed after the next
+  ///   grace-expiry eligibility check finishes.
   package func acknowledgeNextDerivedReleaseCheck(
     _ acknowledgement: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -444,8 +488,10 @@ extension Cogtext {
 extension Cogtext {
   /// Reads a source's current value without creating a dependency edge.
   ///
-  /// Use this outside selectors when code needs the value once. Inside a
-  /// selector, use ``Reader/subscript(_:)`` so changes can rerun the selector.
+  /// The read uses the source value from the latest completed turn. It does not
+  /// register Swift Observation access and does not cause a selector or reaction
+  /// to rerun later. Use this outside tracked bodies when code needs the value
+  /// once; inside one, call that reader's subscript to record an edge.
   ///
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value the source holds in this context, which is its
@@ -457,11 +503,13 @@ extension Cogtext {
   /// Reads a derived cog's value without creating a dependency edge.
   ///
   /// The call computes the cog if needed and settles stale dependencies before
-  /// returning. Inside a selector, use ``Reader/subscript(_:)`` so changes can rerun
-  /// the selector.
+  /// returning, so non-tracking never means stale. It neither registers an
+  /// Observation boundary nor attaches the caller as a graph consumer. Inside a
+  /// selector or reaction, use that reader's subscript when future changes must
+  /// rerun the body.
   ///
   /// - Parameter valueReference: The derived cog to read.
-  /// - Returns: Its value in this context.
+  /// - Returns: Its fully settled value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     derivedState(for: valueReference).settledValue(in: self)
   }
@@ -470,10 +518,11 @@ extension Cogtext {
   ///
   /// A first one-shot read starts the initial work. Because the read installs
   /// no durable consumer, it also starts the declaration's ordinary
-  /// `whileObserved` grace. Another one-shot read renews that grace without
-  /// replacing work already in flight. The returned phase is fully settled at
-  /// the latest completed turn, just like a tracked read; only future
-  /// invalidation is intentionally omitted.
+  /// `whileObserved` grace. The state owns at most one grace sleeper; another
+  /// one-shot read cancels and replaces it without replacing work already in
+  /// flight. The returned phase is fully settled at the latest completed turn,
+  /// just like a tracked read; only future invalidation is intentionally
+  /// omitted. No Swift Observation boundary or reaction lease is created.
   ///
   /// - Parameter valueReference: The async declaration and optional key to inspect.
   /// - Returns: Its current full phase, beginning with pending on first demand.

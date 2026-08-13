@@ -22,7 +22,10 @@
 /// The box and its selector are MainActor-isolated. The selector finishes
 /// dependency capture before returning ``Work``. Each key's work then follows
 /// the actor context chosen by that `Work`, and Cog publishes completions back
-/// on the MainActor.
+/// on the MainActor. Initial demand establishes pending synchronously for that
+/// key. If it happens inside a selector or reaction, Cog defers the
+/// graph-owned pending flush until that evaluation finishes rather than
+/// reentering it.
 @MainActor
 public struct AsyncCogBox<Value, Key: Hashable> {
   /// Stable async-declaration identity shared by all keys and box copies.
@@ -124,6 +127,12 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// latest-only consumer releases both states at one shared grace deadline.
   /// For `Equatable` values, an unchanged latest value stops the downstream
   /// wave independently for each key while full-phase turns remain visible.
+  /// Accessing the property is inert; a read such as
+  /// `cogs[forecast.latest[key]]` demands and tracks the same keyed async state
+  /// as `cogs[forecast[key].latest]`.
+  ///
+  /// - Returns: A keyed facade over the box's one stable latest-projection
+  ///   descriptor.
   public var latest: CogBox<Value?, Key> {
     CogBox(descriptor: latestDescriptor)
   }

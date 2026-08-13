@@ -1,11 +1,14 @@
 /// The complete observable state of one asynchronous Cog value.
 ///
-/// Async cogs have no observable initial phase. Their first read starts work
-/// and returns ``pending(previous:)`` with ``Previous/none``. A reload keeps
-/// the last successful value in `previous` while new work is pending or after
-/// that work fails. A pending, success, or failure publication is a distinct
-/// graph turn, so full-phase consumers can render transitions rather than only
-/// the eventual value.
+/// Async cogs have no observable initial phase. Their first read starts work,
+/// establishes ``pending(previous:)`` with ``Previous/none``, and returns it
+/// synchronously. Cog records that transition as a graph-owned pending turn;
+/// when the read occurs during selector or reaction evaluation, its flush waits
+/// until evaluation exits so it cannot reenter the active consumer. A reload
+/// keeps the last successful value in `previous` while new work is pending or
+/// after that work fails. Pending, success, and failure remain separately
+/// ordered phase transitions, so full-phase consumers can render the process
+/// rather than only the eventual value.
 ///
 /// `CogPhase` is `nonisolated`, so its cases and accessors do not themselves
 /// require the MainActor. Moving a phase across concurrency domains still
@@ -17,12 +20,16 @@ public nonisolated enum CogPhase<Value> {
   ///
   /// Initial work carries ``Previous/none``. Reloads continue to expose the
   /// most recent success even when intervening reloads failed.
+  ///
+  /// - Parameter previous: Presence and value of the last accepted success.
   case pending(previous: Previous<Value>)
 
   /// The current generation completed successfully with `Value`.
   ///
   /// This value becomes the `previous` payload of later pending or failure
   /// phases until another generation succeeds or the state is released.
+  ///
+  /// - Parameter value: The value accepted from the current generation.
   case success(Value)
 
   /// The current generation failed, optionally retaining an earlier success.
@@ -30,6 +37,10 @@ public nonisolated enum CogPhase<Value> {
   /// Cancellation caused by `.latest` replacement or lifetime release does
   /// not publish this case. A cancelled or otherwise stale generation is
   /// rejected even if its operation later throws or returns.
+  ///
+  /// - Parameters:
+  ///   - error: The error thrown by the current accepted generation.
+  ///   - previous: Presence and value of the last accepted success.
   case failure(any Error, previous: Previous<Value>)
 
   /// The last value work completed successfully, if one exists.
@@ -41,6 +52,9 @@ public nonisolated enum CogPhase<Value> {
   /// When `Value` is itself optional, the outer optional reports whether any
   /// success exists and the inner optional is the successfully produced value.
   /// Thus no success and a successful `nil` remain distinct.
+  ///
+  /// - Returns: The current or retained successful value, or `nil` when no
+  ///   generation has succeeded.
   public var latestValue: Value? {
     switch self {
     case .pending(let previous), .failure(_, let previous):
@@ -59,6 +73,8 @@ public nonisolated enum CogPhase<Value> {
   ///
   /// This is `true` only for ``pending(previous:)``. A failure with a retained
   /// value and a success both return `false`.
+  ///
+  /// - Returns: Whether this phase represents an in-flight generation.
   public var isLoading: Bool {
     if case .pending = self {
       return true
@@ -77,6 +93,9 @@ public nonisolated enum Previous<Value> {
   case none
 
   /// A prior generation completed successfully with the associated value.
+  ///
+  /// - Parameter value: The last accepted success, including `nil` when
+  ///   `Value` is optional.
   case some(Value)
 }
 

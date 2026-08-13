@@ -7,12 +7,19 @@
 /// state in separate contexts.
 ///
 /// Demand may come from a tracked read, one-shot `peek`, or `refresh`. Initial
-/// demand synchronously publishes ``CogPhase/pending(previous:)`` with
-/// ``Previous/none`` and starts the selected work; a read also returns that
-/// phase, while `refresh` returns no value. Each later pending, success, or
-/// failure is a separate graph turn. The default `whileObserved` lifetime
-/// releases unobserved state after the context's grace period and cancels
-/// pending work; `keepAlive` retains it for the context lifetime.
+/// demand establishes ``CogPhase/pending(previous:)`` with ``Previous/none``
+/// synchronously and starts the selected work; a read returns that phase, while
+/// `refresh` returns no value. Cog records pending as a graph-owned turn, but if
+/// demand occurs while a selector or reaction is being evaluated, it
+/// defers that turn's flush until evaluation exits. Observation and reactions
+/// therefore cannot reenter the consumer that caused initial demand. Each later
+/// pending, success, or failure is likewise a separate, ordered graph turn.
+///
+/// The default `whileObserved` lifetime releases unobserved state after the
+/// context's renewable grace period and cancels pending work. Each transient
+/// demand replaces the state's one outstanding grace sleeper; it does not retain
+/// work until completion. `keepAlive` instead retains the state for the context
+/// lifetime.
 ///
 /// The selector itself is synchronous and MainActor-isolated. Reads made with
 /// its ``Reader`` become dependencies before the selector returns ``Work``;
@@ -110,7 +117,12 @@ public struct AsyncCog<Value> {
   /// releases the projection and async dependency at one shared grace
   /// deadline. When `Value` is `Equatable`, equal latest values stop the
   /// projection's downstream wave even though full-phase consumers still see
-  /// the async phase turns.
+  /// the async phase turns. Reading this projection creates demand for the same
+  /// async state and participates in the caller's normal selector, reaction, or
+  /// Observation tracking; accessing the property alone is inert.
+  ///
+  /// - Returns: A stable derived reference whose value is the most recent
+  ///   success, or `nil` when this async state has never succeeded.
   public var latest: Cog<Value?> {
     Cog(descriptor: latestDescriptor, key: key)
   }

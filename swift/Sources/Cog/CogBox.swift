@@ -13,9 +13,12 @@
 /// ```
 ///
 /// Constructing or subscripting a box is inert. A context creates and computes
-/// a key's state on its first read. Copies retain descriptor identity, while a
-/// different box declaration remains distinct even when it uses the same key
-/// and selector. All selection and graph access runs on the MainActor.
+/// a key's state on its first tracked, UI, or one-shot read. Copies retain
+/// descriptor identity, while a different box declaration remains distinct
+/// even when it uses the same key and selector. Every selector and equality
+/// comparison runs synchronously on the MainActor. A tracked read records the
+/// exact keyed state as a dependency; a one-shot peek settles it without adding
+/// an edge.
 @MainActor
 public struct CogBox<Value, Key: Hashable> {
   /// Stable declaration identity and behavior shared by every key and box copy.
@@ -39,8 +42,8 @@ public struct CogBox<Value, Key: Hashable> {
   /// stop that wave.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether every key of this declaration has app lifetime
-  ///     instead of the synchronous-derived `whileObserved` default.
+  ///   - keepAlive: Whether each demanded key has context lifetime instead of
+  ///     the synchronous-derived `whileObserved` default.
   ///   - selector: MainActor computation for one key. The key is an ordinary
   ///     lexical value; pass it to inner keyed reads explicitly. Reads through
   ///     `c[...]` replace this key's dependency set on every run.
@@ -71,8 +74,8 @@ public struct CogBox<Value, Key: Hashable> {
   /// maintains its own cache and applies the rule independently.
   ///
   /// - Parameters:
-  ///   - keepAlive: Whether every key of this declaration has app lifetime
-  ///     instead of the synchronous-derived `whileObserved` default.
+  ///   - keepAlive: Whether each demanded key has context lifetime instead of
+  ///     the synchronous-derived `whileObserved` default.
   ///   - selector: MainActor computation for one key and its current tracked
   ///     dependencies.
   ///   - equals: MainActor comparison of the cached value and fresh result.
