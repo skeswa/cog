@@ -23,7 +23,12 @@ public final class Cogtext {
   /// Signals after the next grace-expiry release check, including a pinned skip.
   private var nextLifetimeReleaseCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
 
-  /// One test-only signal after an async result reaches its generation check.
+  /// One test-only signal after an async result reaches its commit eligibility check.
+  ///
+  /// Cancellation and ignored-cancellation scenarios need to prove that a
+  /// result was rejected, which produces no public phase event to await. The
+  /// `CogTesting` seam installs this callback as a deterministic negative-event
+  /// acknowledgement. Production code never installs one.
   private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// The monotonic version assigned to graph work.
@@ -122,6 +127,12 @@ public final class Cogtext {
   }
 
   /// Installs a one-shot acknowledgement for the next async completion check.
+  ///
+  /// The callback runs after a work result has been accepted or rejected by
+  /// the generation and state-identity checks. It therefore acknowledges a
+  /// completed decision, not merely that the work closure returned. Only one
+  /// waiter is supported because the seam exists for one deterministic test
+  /// assertion at a time.
   package func acknowledgeNextAsyncCompletionCheck(
     _ acknowledgement: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -132,6 +143,10 @@ public final class Cogtext {
   }
 
   /// Consumes the next async-completion acknowledgement, when a test installed one.
+  ///
+  /// Async completion paths call this from `defer` after obtaining the
+  /// context, so stale, cancelled, released, and accepted results all unblock
+  /// the waiter after their eligibility check has finished.
   internal func acknowledgeAsyncCompletionCheckIfRequested() {
     let acknowledgement = nextAsyncCompletionCheckAcknowledgement
     nextAsyncCompletionCheckAcknowledgement = nil
@@ -141,7 +156,9 @@ public final class Cogtext {
   /// Breaks graph-owned dependency chains before stored properties release.
   ///
   /// Strong dependency chains can make ARC recurse during teardown. This flat
-  /// pass breaks them before stored properties are released.
+  /// pass breaks them before stored properties are released. Lifetime states
+  /// prepare first so an async state cancels its task and invalidates that
+  /// task's generation before the context releases the graph around it.
   isolated deinit {
     for state in states.values {
       (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()
@@ -177,12 +194,26 @@ extension Cogtext {
     scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)
   }
 
-  /// Starts grace for a state that has become unobserved without losing a lease.
+  /// Starts grace for a state that became demanded without acquiring a lease.
+  ///
+  /// A one-shot async `peek` or cold `refresh` creates real demand and starts
+  /// work, but intentionally installs no reaction or UI consumer. This overload
+  /// gives that state the same renewable grace as a state whose final durable
+  /// lease disappeared. App-lifetime and still-observed states are no-ops.
   internal func scheduleLifetimeReleaseIfUnobserved(_ state: any CogLifetimeLeaseState) {
     guard case .whileObserved(let declaredGrace) = state.lifetime else { return }
     scheduleLifetimeReleaseIfUnobserved(state, declaredGrace: declaredGrace)
   }
 
+  /// Schedules one renewable release deadline using the resolved grace.
+  ///
+  /// Advancing the lifetime generation invalidates every older sleeper without
+  /// retaining a cancellation handle for each renewal. The task captures both
+  /// context and state weakly, so the deadline itself cannot extend either
+  /// lifetime. `pendingLifetimeReleaseGeneration` distinguishes a future
+  /// deadline from one that elapsed while an internal subscriber still needed
+  /// the state; the release cascade uses that distinction to avoid granting a
+  /// second grace window.
   private func scheduleLifetimeReleaseIfUnobserved(
     _ state: any CogLifetimeLeaseState,
     declaredGrace: Duration?
@@ -233,6 +264,13 @@ extension Cogtext {
   }
 
   /// Removes the exact still-unobserved state after its grace task resumes.
+  ///
+  /// Both identity and generation matter. The descriptor-and-key slot may have
+  /// been released and recreated while this sleeper was suspended, and a later
+  /// demand may have renewed grace on the same state object. External leases,
+  /// an Observation boundary, and internal subscribers each keep the state
+  /// alive. Once the root remains eligible, its newly disconnected dependency
+  /// closure can leave at this same deadline.
   private func releaseDerivedStateIfEligible(
     _ state: any CogLifetimeLeaseState,
     identity: CogStateIdentity,
@@ -267,7 +305,14 @@ extension Cogtext {
   /// A dependency with a separately pending grace keeps that deadline. A
   /// dependency whose earlier deadline already elapsed while an internal
   /// subscriber retained it joins this cascade immediately, so removing the
-  /// subscriber never starts a second full grace window.
+  /// subscriber never starts a second full grace window. The walk is iterative
+  /// because a long derived chain must not turn context cleanup into recursive
+  /// ARC or graph traversal.
+  ///
+  /// Each state prepares before removal. For async state that means cancelling
+  /// active work and advancing its generation, which makes a completion racing
+  /// with release ineligible before the descriptor-and-key slot becomes free
+  /// for a fresh state.
   private func releaseUnobservedClosure(startingAt root: any CogLifetimeLeaseState) {
     var candidates: [any CogLifetimeLeaseState] = [root]
     var index = 0
@@ -323,17 +368,32 @@ extension Cogtext {
     }
   }
 
-  /// Gets this async state, creating it without starting work on first use.
+  /// Resolves an async value reference to its state in this context.
+  ///
+  /// Lookup and work start are deliberately separate. Merely resolving the
+  /// descriptor-and-key slot allocates state but does not run the selector;
+  /// settlement by a tracked read, peek, or refresh creates the first pending
+  /// phase and starts work.
   internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
     asyncState(descriptor: valueReference.descriptor, key: valueReference.key)
   }
 
   /// Whether this exact async state still owns its descriptor-and-key slot.
+  ///
+  /// A generation is meaningful only within one state object. Release can
+  /// remove that object and a later read can create a replacement whose
+  /// generation numbers begin again. Async completion therefore checks object
+  /// identity in storage as well as its captured generation before publishing.
   internal func stillStoresAsyncState<Value>(_ state: AsyncCogState<Value>) -> Bool {
     states[state.stateIdentity] === state
   }
 
-  /// Gets async state from a descriptor captured by its latest-value projection.
+  /// Resolves the async state named by an internal latest-value projection.
+  ///
+  /// The projection captures the original async descriptor and forwards its
+  /// own key here. Reusing that descriptor-and-key identity makes
+  /// `valueReference.latest` observe the same phase state as the full async
+  /// value instead of creating a mirror or a second task.
   internal func asyncState<Value>(
     descriptor: AsyncCogDescriptor<Value>,
     key: AnyHashable?
@@ -405,7 +465,12 @@ extension Cogtext {
   /// A first one-shot read starts the initial work. Because the read installs
   /// no durable consumer, it also starts the declaration's ordinary
   /// `whileObserved` grace. Another one-shot read renews that grace without
-  /// replacing work already in flight.
+  /// replacing work already in flight. The returned phase is fully settled at
+  /// the latest completed turn, just like a tracked read; only future
+  /// invalidation is intentionally omitted.
+  ///
+  /// - Parameter valueReference: The async declaration and optional key to inspect.
+  /// - Returns: Its current full phase, beginning with pending on first demand.
   public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogPhase<Value> {
     let state = asyncState(for: valueReference)
     let phase = state.settledPhase(in: self)
