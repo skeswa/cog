@@ -12,6 +12,11 @@
 /// replaces the dependency set, so branches and early returns work as expected.
 /// Reads made outside this reader are invisible to Cog.
 ///
+/// An ``AsyncCog`` selector receives a `Reader<CogPhase<Value>>`. Its tracked
+/// reads finish synchronously while the selector builds ``Work``; code in the
+/// work closure runs after dependency capture and cannot add edges through this
+/// reader.
+///
 /// A reader is valid only during its selector run. Using a saved reader later
 /// traps.
 ///
@@ -57,7 +62,17 @@ public struct Reader<Value> {
     return producer.settledValue(in: cogs)
   }
 
-  /// Reads an async cog's full phase and depends on it.
+  /// Reads an async cog's full phase and depends on its exact state.
+  ///
+  /// Cog settles the producer before recording the edge. A first read therefore
+  /// selects its work and returns pending, while a dirty producer selects its
+  /// replacement work before this selector observes the phase. Recording the
+  /// edge makes later pending, success, and failure turns invalidate this
+  /// selector and keeps a `whileObserved` producer reachable through the
+  /// derived dependency graph.
+  ///
+  /// - Parameter valueReference: The async value whose phase to read.
+  /// - Returns: Its newest settled phase in this context.
   public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
     cogs.requireTracking(state)
 
@@ -68,6 +83,18 @@ public struct Reader<Value> {
   }
 
   /// Reads one async descriptor for an internal projection selector.
+  ///
+  /// The `.latest` projection has the descriptor and key rather than another
+  /// public value reference. This path resolves that same exact async state,
+  /// settles it before recording the projection's dependency, and returns the
+  /// phase from which the projection derives its last successful value. Keeping
+  /// the operation here preserves the public reader's tracking and escaped-use
+  /// checks for the package-only projection implementation.
+  ///
+  /// - Parameters:
+  ///   - descriptor: The async declaration shared with the projection.
+  ///   - key: The keyed state to read, or `nil` for a keyless declaration.
+  /// - Returns: The exact async state's newest settled phase.
   internal func asyncPhase<Read>(
     from descriptor: AsyncCogDescriptor<Read>,
     key: AnyHashable?
@@ -117,6 +144,16 @@ public struct Reader<Value> {
   }
 
   /// Peeks at an async cog without depending on it.
+  ///
+  /// This remains a current read: it settles dirty state, and a first peek
+  /// selects work and returns pending. It records no edge from this selector,
+  /// so later phase turns do not rerun the selector. With no other durable
+  /// consumer, the one-shot read starts or renews the async state's ordinary
+  /// `whileObserved` grace rather than keeping it alive indefinitely.
+  ///
+  /// - Parameter valueReference: The async value whose phase to read without
+  ///   tracking it.
+  /// - Returns: Its newest settled phase in this context.
   public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogPhase<Read> {
     cogs.requireTracking(state)
     return cogs.peek(valueReference)

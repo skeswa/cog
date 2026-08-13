@@ -1,5 +1,33 @@
 extension Cogtext {
-  /// Registers a watch on an async cog's full phase.
+  /// Registers a reaction that watches an async cog's full phase.
+  ///
+  /// Installation settles the exact async state, records it as the watch's one
+  /// tracked dependency, and captures that phase as the baseline. A first read
+  /// can start work, so the baseline is normally
+  /// ``CogPhase/pending(previous:)``. ``CogWatchStart/skip`` suppresses only the
+  /// initial body call; it does not skip the read or subscription.
+  ///
+  /// Pending, success, and failure are published in separate turns. After each
+  /// such turn settles, the watch runs in registration order and receives its
+  /// previous and current phases. Because it is a durable reaction consumer,
+  /// the returned token holds a `whileObserved` lease on the async state. The
+  /// last token release cancels the watch and begins ordinary grace when no
+  /// other durable consumer remains.
+  ///
+  /// - Parameters:
+  ///   - valueReference: The async value whose full phase should be watched.
+  ///   - initial: Whether installation calls `body` with the baseline phase as
+  ///     both arguments.
+  ///   - name: What Cog should call this effect in debug history. Defaults to
+  ///     the file and line of the registration.
+  ///   - fileID: The registration's file for diagnostics. Leave this at its
+  ///     default.
+  ///   - line: The registration's line for diagnostics. Leave this at its
+  ///     default.
+  ///   - body: Synchronous effect code, given the phase before this change and
+  ///     the phase after it.
+  /// - Returns: A handle that keeps the registration and its async-state lease
+  ///   alive. Releasing its last reference cancels the watch.
   @discardableResult
   public func watch<Value>(
     _ valueReference: AsyncCog<Value>,
