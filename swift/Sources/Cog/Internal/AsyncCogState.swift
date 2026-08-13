@@ -60,6 +60,23 @@ internal final class AsyncCogState<Value>:
     return phase
   }
 
+  /// Forces the selector and work to run again under the normal settle path.
+  func refresh(in cogs: Cogtext) {
+    guard phase != nil else {
+      _ = settledPhase(in: cogs)
+      return
+    }
+
+    cogs.withSystemTurn("\(renderedName) pending") { turn in
+      if let cycle = cogs.settleStack.cyclePath(ifEntering: self) {
+        fatalError(cycle.message)
+      }
+      cogs.settleStack.beginComputing(self)
+      defer { cogs.settleStack.endComputing(self) }
+      self.startWork(in: cogs, publishingPendingIn: turn)
+    }
+  }
+
   func recordDependency(on producer: any CogState) {
     dependencies.append(producer)
     producer.addSubscriber(self)
@@ -80,7 +97,7 @@ internal final class AsyncCogState<Value>:
     startWork(in: cogs)
   }
 
-  private func startWork(in cogs: Cogtext) {
+  private func startWork(in cogs: Cogtext, publishingPendingIn pendingTurn: CogTurn? = nil) {
     guard isComputing else {
       fatalError("An async Cog selector ran outside the settle computation path.")
     }
@@ -97,7 +114,10 @@ internal final class AsyncCogState<Value>:
     }
 
     let pending = CogPhase<Value>.pending(previous: lastSuccess)
-    if phase == nil {
+    if let pendingTurn {
+      pendingPhase = pending
+      pendingTurn.touch(self)
+    } else if phase == nil {
       switch cogs.turnPhase {
       case .idle:
         stage(pending, named: "pending", in: cogs)
