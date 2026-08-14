@@ -1,4 +1,5 @@
 # SwiftPM
+.build-mechanisms/
 .build/
 .swiftpm/
 Package.resolved.bak
