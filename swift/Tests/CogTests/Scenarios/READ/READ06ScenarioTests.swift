@@ -33,6 +33,37 @@ import Testing
 }
 
 @MainActor
+@Test func `READ-06 a peek does not cancel a tracked read of the same cog`() {
+  // Peeking is only ever the absence of an edge, never the removal of one: a
+  // selector that both tracks and peeks one cog keeps the dependency, in
+  // either order.
+  let cogs = Cogs.forTesting()
+  let xSource = ManualCog<Int>(1)
+  var peekFirstRuns = 0
+  var peekSecondRuns = 0
+
+  let x = Cog<Int> { c in c[xSource] * 2 }
+  let peekFirst = Cog<String> { c in
+    peekFirstRuns += 1
+    return "\(c.peek(x)):\(c[x])"
+  }
+  let peekSecond = Cog<String> { c in
+    peekSecondRuns += 1
+    return "\(c[x]):\(c.peek(x))"
+  }
+
+  #expect(cogs.peek(peekFirst) == "2:2")
+  #expect(cogs.peek(peekSecond) == "2:2")
+  #expect((peekFirstRuns, peekSecondRuns) == (1, 1))
+
+  cogs.commit { c in c[xSource] = 2 }
+
+  #expect(cogs.peek(peekFirst) == "4:4")
+  #expect(cogs.peek(peekSecond) == "4:4")
+  #expect((peekFirstRuns, peekSecondRuns) == (2, 2))
+}
+
+@MainActor
 @Test func `READ-06 manual and read-only peeks also skip edges`() {
   let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)

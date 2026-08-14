@@ -208,13 +208,17 @@ Every read I make is correct: the latest committed state, fully settled.
 - **READ-03.** I change two sources in one commit. A derived cog that
   combines them sees both new values together, never one new and one old.
 - **READ-04.** A selector uses `c.curr` to see its own previous value and
-  keeps a running total. Each turn folds the new input into the total.
+  keeps a running total. Each turn folds the new input into the total, and
+  each key of a derived box folds with its own previous value — one key's
+  fold never sees another key's total.
 - **READ-05.** The very first run of a `c.curr` selector has no previous
   value, and the selector can tell.
 - **READ-06.** A selector tracks a trigger and peeks at cog X with
   `c.peek`. Changing X alone does not rerun the selector. When the trigger
   later changes, the selector reruns and the peek returns X's newest
-  settled value.
+  settled value. Peeking is only ever the absence of an edge, never the
+  removal of one: a selector that both tracks and peeks the same cog keeps
+  the dependency.
 - **READ-07.** I leave a derived cog cold while its source changes, then
   use one-shot `cogs.peek`. It settles the derived cog and returns its
   newest value without creating a subscription.
