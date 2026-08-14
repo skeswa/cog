@@ -2,12 +2,18 @@ import Cog
 import CogTesting
 import Testing
 
-private nonisolated enum Async04Error: Error {
+// ASYNC-04 and ASYNC-30 describe the same §5.1 accessor set over the same
+// lifecycle walk, so one controlled-work sequence proves both: every accessor
+// at every visible state (ASYNC-04), and the current-generation semantics of
+// `value` and `error` — a retry's pending clears the failure while the
+// renderable value survives (ASYNC-30).
+
+private nonisolated enum Async04Error: Error, Equatable {
   case offline
 }
 
 @MainActor
-@Test func `ASYNC-04 status accessors describe every request state`() async throws {
+@Test func `ASYNC-04 ASYNC-30 status accessors describe every request state`() async throws {
   let cogs = Cogs.forTesting()
   let work = AsyncStatusControlledWork<Int>()
   let forecast = AsyncCog<Int>(default: 0) { _ in work.makeWork() }
@@ -28,10 +34,19 @@ private nonisolated enum Async04Error: Error {
   #expect(initialFailure.kind == .failure)
   #expect(initialFailure.value == 0)
   #expect(!initialFailure.hasSucceeded)
-  #expect(initialFailure.error is Async04Error)
+  #expect(initialFailure.error as? Async04Error == .offline)
   #expect(!initialFailure.isLoading)
 
+  // A retry after a failure is loading again with no error: `error` reports
+  // only the current failure, while `value` stays renderable through it.
   cogs.refresh(forecast)
+  let retryPending = cogs.status.peek(forecast)
+  #expect(retryPending.kind == .pending)
+  #expect(retryPending.value == 0)
+  #expect(!retryPending.hasSucceeded)
+  #expect(retryPending.error == nil)
+  #expect(retryPending.isLoading)
+
   #expect(await starts.next() == 1)
   try await resolveAsyncStatus(in: cogs) {
     work.succeed(1, with: 42)
@@ -59,12 +74,13 @@ private nonisolated enum Async04Error: Error {
   #expect(reloadFailure.kind == .failure)
   #expect(reloadFailure.value == 42)
   #expect(reloadFailure.hasSucceeded)
-  #expect(reloadFailure.error is Async04Error)
+  #expect(reloadFailure.error as? Async04Error == .offline)
   #expect(!reloadFailure.isLoading)
 }
 
 @MainActor
-@Test func `ASYNC-04 hasSucceeded distinguishes a default nil from a successful nil`() async throws
+@Test func `ASYNC-04 ASYNC-30 hasSucceeded distinguishes a default nil from a successful nil`()
+  async throws
 {
   let cogs = Cogs.forTesting()
   let work = AsyncStatusControlledWork<Int?>()
@@ -90,4 +106,5 @@ private nonisolated enum Async04Error: Error {
   #expect(reloadAfterNil.kind == .pending)
   #expect(reloadAfterNil.value == nil)
   #expect(reloadAfterNil.hasSucceeded)
+  #expect(reloadAfterNil.isLoading)
 }

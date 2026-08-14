@@ -109,22 +109,6 @@ import Testing
 }
 
 @MainActor
-@Test func `DECL-09 the first read is what runs the selector`() {
-  var runs = 0
-
-  let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(21)
-  let doubled = Cog<Int> { c in
-    runs += 1
-    return c[source] * 2
-  }
-
-  #expect(runs == 0)
-  #expect(cogs.peek(doubled) == 42)
-  #expect(runs == 1)
-}
-
-@MainActor
 @Test func `DECL-09 a derived cog nobody reads never runs`() {
   var readRuns = 0
   var unreadRuns = 0

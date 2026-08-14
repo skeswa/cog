@@ -28,18 +28,3 @@ import Testing
     #expect(cogs.peek(retryLimit) == 3)
   }
 }
-
-@MainActor
-@Test func `DECL-01 two declarations of the same value hold their own starting values`() {
-  // The starting value belongs to the declaration, not to the type or the
-  // context. Two sources that look identical are still two different cogs.
-  let cogs = Cogs.forTesting()
-
-  let attempts = ManualCog<Int>(0)
-  let failures = ManualCog<Int>(0)
-  let ceiling = ManualCog<Int>(5)
-
-  #expect(cogs.peek(attempts) == 0)
-  #expect(cogs.peek(failures) == 0)
-  #expect(cogs.peek(ceiling) == 5)
-}

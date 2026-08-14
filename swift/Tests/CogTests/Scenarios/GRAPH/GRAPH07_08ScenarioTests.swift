@@ -5,31 +5,12 @@ import Testing
 // MARK: - GRAPH-07 and GRAPH-08
 
 @MainActor
-@Test func `GRAPH-07 a cold derived cog waits for a later read to recompute`() {
-  let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
-  var inputsSeen: [Int] = []
-  let doubled = Cog<Int> { c in
-    let input = c[source]
-    inputsSeen.append(input)
-    return input * 2
-  }
-
-  // Establish the internal source edge, then leave the derived cog without a
-  // live UI, reaction, or stream consumer.
-  #expect(cogs.peek(doubled) == 2)
-  #expect(inputsSeen == [1])
-
-  cogs.commit { c in c[source] = 2 }
-
-  #expect(cogs.peek(source) == 2)
-  #expect(inputsSeen == [1])
-  #expect(cogs.peek(doubled) == 4)
-  #expect(inputsSeen == [1, 2])
-}
-
-@MainActor
-@Test func `GRAPH-08 a cold cog catches up once after ten missed turns`() {
+@Test func `GRAPH-07 GRAPH-08 a cold cog waits for a read and then catches up once`() {
+  // One shape proves both laziness claims. Establish the internal source edge,
+  // then leave the derived cog without a live UI, reaction, or stream
+  // consumer. The first missed turn proves GRAPH-07: a change alone runs
+  // nothing. Ten missed turns and one catch-up run from the newest value —
+  // never one run per missed turn — prove GRAPH-08.
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var inputsSeen: [Int] = []

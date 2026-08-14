@@ -38,19 +38,6 @@ private struct ZipCode: Hashable {
 }
 
 @MainActor
-@Test func `DECL-02 a box needs no list of its keys`() {
-  // Nothing registers a key, and no key is more declared than any other: the
-  // hundredth key a program thinks of works exactly as well as the first.
-  let cogs = Cogs.forTesting()
-
-  let unreadCount = ManualCogBox<Int, Int>(0)
-
-  for conversation in 0..<100 {
-    #expect(cogs.peek(unreadCount[conversation]) == 0)
-  }
-}
-
-@MainActor
 @Test func `DECL-02 a key keeps returning its starting value until something writes`() {
   // Reading is not a one-time unwrapping of the declaration: with nothing
   // written, the tenth read of a key says what the first read said, and

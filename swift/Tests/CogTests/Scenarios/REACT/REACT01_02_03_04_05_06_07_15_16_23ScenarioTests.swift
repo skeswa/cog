@@ -27,7 +27,7 @@ extension Cogs {
 }
 
 @MainActor
-@Test func `REACT-02 changing a dependency wakes the reaction`() {
+@Test func `REACT-02 REACT-07 a change wakes the reaction before the commit returns`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
@@ -38,6 +38,9 @@ extension Cogs {
 
   cogs.commit { c in c[source] = 2 }
 
+  // One assertion carries both claims: the reaction reran because its
+  // dependency changed (REACT-02), and it had already completed when the line
+  // after the commit ran — no await, polling, or callback (REACT-07).
   #expect(seen == [1, 2])
   _ = token
 }
@@ -136,24 +139,6 @@ extension Cogs {
 }
 
 @MainActor
-@Test func `REACT-07 a changed reaction completes before commit returns`() {
-  let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
-  var observed = -1
-
-  let token = cogs.run { c in
-    observed = c[source]
-  }
-
-  cogs.commit { c in c[source] = 1 }
-
-  // No await, polling, or callback: the line immediately after the commit
-  // sees the work the reaction completed during that commit's flush.
-  #expect(observed == 1)
-  _ = token
-}
-
-@MainActor
 @Test func `REACT-23 flush-time registrations join the reaction queue tail`() {
   let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
@@ -211,32 +196,13 @@ extension Cogs {
 }
 
 @MainActor
-@Test func `REACT-15 an op called by a reaction becomes a later turn`() {
-  let cogs = Cogs.forTesting()
-  let trigger = ManualCog<Int>(0)
-  let followup = ManualCog<Int>(0)
-  var snapshots: [String] = []
-
-  let writer = cogs.run { c in
-    guard c[trigger] == 1 else { return }
-    cogs.setFromReaction(followup, to: 1)
-  }
-
-  let observer = cogs.run { c in
-    let triggerValue = c[trigger]
-    let followupValue = c[followup]
-    guard triggerValue == 1 else { return }
-    snapshots.append("\(triggerValue):\(followupValue)")
-  }
-
-  cogs.commit { c in c[trigger] = 1 }
-
-  #expect(snapshots == ["1:0", "1:1"])
-  _ = (writer, observer)
-}
-
-@MainActor
-@Test func `REACT-16 reaction write-back chains drain settled and FIFO`() {
+@Test func `REACT-15 REACT-16 reaction write-back chains drain settled and FIFO`() {
+  // The first hop is REACT-15: `second` wakes exactly once, after `first`'s
+  // whole body ran, seeing middle already settled — the reaction's op landed
+  // as a brand-new turn after the flush, never a change to the turn being
+  // flushed and never a synchronous nested flush (that would run `third`
+  // before `side`). The rest of the chain is REACT-16: each queued turn runs
+  // first-in first-out, fully settled.
   let cogs = Cogs.forTesting()
   let trigger = ManualCog<Int>(0)
   let middle = ManualCog<Int>(0)

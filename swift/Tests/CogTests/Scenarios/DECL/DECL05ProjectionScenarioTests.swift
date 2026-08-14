@@ -21,52 +21,19 @@ private struct ZipCode: Hashable {
 // MARK: - DECL-05, keyless
 
 @MainActor
-@Test func `DECL-05 a read-only value reference reads what its source reads`() {
-  let cogs = Cogs.forTesting()
-
-  let retryLimitSource = ManualCog<Int>(3)
-  let greetingSource = ManualCog<String>("hello")
-  let currentZipSource = ManualCog<ZipCode?>(nil)
-
-  let retryLimit = retryLimitSource.readOnly
-  let greeting = greetingSource.readOnly
-  let currentZip = currentZipSource.readOnly
-
-  #expect(cogs.peek(retryLimit) == cogs.peek(retryLimitSource))
-  #expect(cogs.peek(greeting) == cogs.peek(greetingSource))
-  #expect(cogs.peek(currentZip) == cogs.peek(currentZipSource))
-
-  #expect(cogs.peek(retryLimit) == 3)
-  #expect(cogs.peek(greeting) == "hello")
-  #expect(cogs.peek(currentZip) == nil)
-}
-
-@MainActor
-@Test func `DECL-05 a write through the source is what the read-only value reference reads`() {
-  // The point of the projection: the owning file writes the source, and
-  // everyone holding the published value reference sees it. No copy to refresh, no second
-  // state to keep in step.
-  let cogs = Cogs.forTesting()
-
-  let countSource = ManualCog<Int>(0)
-  let count = countSource.readOnly
-
-  cogs.commit { c in
-    c[countSource] = 7
-  }
-
-  #expect(cogs.peek(count) == 7)
-  #expect(cogs.peek(count) == cogs.peek(countSource))
-}
-
-@MainActor
 @Test func `DECL-05 the read-only value reference agrees with its source after every write`() {
-  // "Always," not "once": the two value references stay indistinguishable across a run of
-  // turns, whichever of them is read first.
+  // "Always," not "once": the two value references agree before any write and
+  // stay indistinguishable across a run of turns, whichever of them is read
+  // first. The point of the projection: the owning file writes the source, and
+  // everyone holding the published value reference sees it. No copy to
+  // refresh, no second state to keep in step.
   let cogs = Cogs.forTesting()
 
   let countSource = ManualCog<Int>(0)
   let count = countSource.readOnly
+
+  #expect(cogs.peek(count) == 0)
+  #expect(cogs.peek(count) == cogs.peek(countSource))
 
   for value in 1...10 {
     cogs.commit { c in
@@ -187,18 +154,4 @@ private struct ZipCode: Hashable {
   #expect(cogs.peek(ledgers[there]).entries == [])
   #expect(cogs.peek(ledgers[here]) !== cogs.peek(ledgers[there]))
   #expect(cogs.peek(ledgers[there]) === cogs.peek(ledgersSource[there]))
-}
-
-@MainActor
-@Test func `DECL-05 equal keys name one piece of state through the projection`() {
-  // Identity is descriptor plus key, and the projection changes neither, so
-  // "the same key" still means equal rather than identical.
-  let cogs = Cogs.forTesting()
-
-  let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }.readOnly
-
-  let here = ZipCode(digits: "90210")
-  let hereAgain = ZipCode(digits: "902" + "10")
-
-  #expect(cogs.peek(ledgers[here]) === cogs.peek(ledgers[hereAgain]))
 }

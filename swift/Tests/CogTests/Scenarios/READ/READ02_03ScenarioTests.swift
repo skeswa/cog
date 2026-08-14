@@ -7,24 +7,6 @@ import Testing
 // MARK: - READ-02
 
 @MainActor
-@Test func `READ-02 a second read of a derived cog uses the cache`() {
-  var runs = 0
-
-  let cogs = Cogs.forTesting()
-  let price = ManualCog<Int>(7)
-  let quantity = ManualCog<Int>(3)
-  let total = Cog<Int> { c in
-    runs += 1
-    return c[price] * c[quantity]
-  }
-
-  #expect(cogs.peek(total) == 21)
-  #expect(cogs.peek(total) == 21)
-
-  #expect(runs == 1)
-}
-
-@MainActor
 @Test func `READ-02 any number of reads with nothing changing is still one run`() {
   var runs = 0
 

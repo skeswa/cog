@@ -31,7 +31,7 @@ private final class Async32ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-32 the status lens carries tracked reads with value parity`() async {
+@Test func `ASYNC-01 ASYNC-32 the status lens carries tracked reads with value parity`() async {
   let cogs = Cogs.forTesting()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
@@ -52,6 +52,15 @@ private final class Async32ControlledWork {
     return
   }
   #expect(await startIterator.next() == 0)
+
+  // ASYNC-01: the first tracked read published exactly one pending turn —
+  // there is no observable `initial` kind and no initialize-then-replace pair.
+  #if DEBUG
+  let pendingTurns = cogs.debugHistory.entries.filter {
+    $0.event == .turn && $0.name == "forecast pending"
+  }
+  #expect(pendingTurns.count == 1)
+  #endif
 
   // The UI-boundary lens and the one-shot lens read the same settled status,
   // and the plain value spellings beside them stay total.
