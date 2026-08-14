@@ -96,10 +96,10 @@ pinned version and the runner topology.
 
 Production depends on `Cog` only. Call `Cogs.bootstrapApp()` exactly once,
 at app launch, and retain the context it returns as the app's ownership handle.
-Pass that same object into services, effects, and every scene. A rebuilt scene
-receives the existing context; it never bootstraps another one. Features cannot
-construct a `Cogs` directly, and there is deliberately no ambient
-`Cogs.app` lookup.
+Use that object at the composition root to install app-lifetime effects and the
+SwiftUI environment above every scene. A rebuilt scene receives the existing
+context; it never bootstraps another one. Features cannot construct a `Cogs`
+directly, and there is deliberately no ambient `Cogs.app` lookup.
 
 ```swift
 import Cog
@@ -124,15 +124,19 @@ struct WeatherApp: App {
 ```
 
 Every scene receives the same retained object through `.cogEnvironment(cogs)`.
-A view reads it with `@Environment(\.cogs) private var cogs`; tests and previews
-install their isolated context through the same modifier.
+Every view that interacts with Cog declares
+`@Environment(\.cogs) private var cogs` itself. Views never accept, store, or
+forward `Cogs` in their initializers; intermediate views pass domain values and
+identities only. Tests and previews host their view hierarchy under the same
+modifier with an isolated context.
 
 An ordinary test or preview-support target depends on `CogTesting`. Create one
-fresh context for that test or preview runtime and pass it through the same
-composition boundaries as production. It starts isolated, never occupies the
+fresh context for that test or preview runtime. Use it directly at non-view
+test boundaries, or install it above a hosted view hierarchy with
+`.cogEnvironment(cogs)`. It starts isolated, never occupies the
 production-install slot, and needs no reset or uninstall. Multiple tests and
-previews may each create a context, but creating a second one partway through a
-single runtime would split the state under test.
+previews may each create a context, but creating a second one partway through
+a single runtime would split the state under test.
 
 ```swift
 import Cog
@@ -246,12 +250,12 @@ These choices are settled; §10 of the core document has the full record.
   `Cogs.forTesting()` for a test or preview runtime, which never registers
   as the production context.
 - The context returned by `bootstrapApp()` is the app's ownership handle. The
-  app passes it to effects, services, and scenes; views receive it through the
-  planned M2 environment boundary, and ops are instance methods on it. Current
-  M1 composition passes the same object explicitly. There is no ambient
-  `Cogs.app`. Tests of production installation use a synchronous scoped
-  fixture from `CogTesting`, so they cannot leak global install state across
-  the suite.
+  app retains it, uses it at non-view composition boundaries such as
+  app-lifetime effect installation, and injects it above every scene. Every
+  consuming view resolves it directly through `\.cogs`; no view accepts or
+  forwards it. Ops are instance methods on the context, and there is no ambient
+  `Cogs.app`. Tests of production installation use a synchronous scoped fixture
+  from `CogTesting`, so they cannot leak global install state across the suite.
 - Manual state and states seen by the UI live for the app context by default.
   Graph-only derived and async states may be released when unused. Query caches
   have their own retention rules. A `whileObserved` declaration with no

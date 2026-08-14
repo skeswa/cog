@@ -573,8 +573,9 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-05.** Only cogs that a view actually read get an Observation
   boundary object. Interior graph states never do. (Checked through an
   internal seam.)
-- **UI-06.** Views find the one app context through the `\.cogs`
-  environment key.
+- **UI-06.** Every view that uses Cog finds the one app context directly
+  through the `\.cogs` environment key. Intermediate views neither accept nor
+  forward the context.
 - **UI-07.** An application-owned SwiftUI binding reads the current Cog value,
   and setting it writes through a named domain commit that shows up in history.
 - **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes

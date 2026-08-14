@@ -188,12 +188,14 @@ ordinary value creation, so it reads as a noun phrase. Neither is spelled
 `install`, which §6.3 gives to effects.
 
 `bootstrapApp()`'s return value is the production ownership handle. The app
-keeps it and passes it into effects, services, and every scene; views receive
-that same object through the `\.cogs` environment value. Ops remain ordinary
-instance methods on `Cogs`. There is deliberately no ambient
-`Cogs.app`: code outside an injection chain receives the context at its
-composition boundary, which keeps the same feature usable with an isolated
-testing context and avoids a separate missing-bootstrap trap contract.
+keeps it, uses it at non-view composition boundaries such as app-lifetime
+effect installation, and injects it above every scene. Every view that
+interacts with Cog resolves that same object directly through the `\.cogs`
+environment value; no view accepts, stores, or forwards `Cogs`. Ops remain
+ordinary instance methods on `Cogs`. There is deliberately no ambient
+`Cogs.app`: code outside SwiftUI receives the context at its composition
+boundary, which keeps the same feature usable with an isolated testing context
+and avoids a separate missing-bootstrap trap contract.
 
 Tests whose subject is the production install use a synchronous MainActor
 `CogTesting` fixture that calls the real bootstrap, passes its result into the
@@ -494,6 +496,12 @@ struct WeatherCard: View {
 that exact descriptor and key and updates the view only when one of those
 values really changes. There is no special view, hook, or property wrapper;
 the app injects its one `Cogs` above every scene through the environment.
+Every view that reads or acts on Cog declares
+`@Environment(\.cogs) private var cogs` itself. A parent never passes the
+runtime through a view initializer, and an intermediate view that does not use
+Cog does not resolve it merely to forward it; views pass domain values and
+identities instead. Tests and previews install their isolated context above the
+hosted hierarchy with the same `.cogEnvironment(cogs)` modifier.
 SwiftUI does not tell Cog when it stops watching a registrar object, so any
 state that reaches this UI boundary stays pinned to the app context (§5.3).
 
@@ -897,7 +905,7 @@ singular, and does measurement show less runtime work?
 | External Observation tracking?    | After an observed mutation propagates, dependents see its newest post-mutation value; mutations may coalesce. The pre-iOS-26 one-shot shim internally acknowledges re-arming but retains a documented disarmed race (§8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Context construction?             | App bootstrap calls `Cogs.bootstrapApp()` once; feature code cannot construct another context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Bootstrap helper names?           | `Cogs.bootstrapApp()`, vended by `Cog`, creates the one production context and fails fast on a second call; `Cogs.forTesting()`, vended by `CogTesting`, returns a fresh isolated context as often as a test or preview asks. A `package` initializer leaves those two as the only ways in, and separating them by product rather than by an argument keeps the test factory out of a shipping app target (§2.3, §6.3, §6.6).                                                                                                                                                                                                                                                                                                                                                   |
-| Production context access?        | `bootstrapApp()` returns the ownership handle; the app passes it into effects, services, and scenes, and views receive it through `\.cogs`. Ops are `Cogs` instance methods. There is no ambient `Cogs.app`, so production and isolated tests use the same explicit composition boundaries (§2.3, §3.2, §3.4, §6.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Production context access?        | `bootstrapApp()` returns the ownership handle; the app retains it, uses it at non-view composition boundaries such as app-lifetime effect installation, and injects it above every scene. Every consuming view resolves it directly through `\.cogs`; no view accepts or forwards it. Ops are `Cogs` instance methods. There is no ambient `Cogs.app`, so production and isolated tests use the same explicit composition boundaries (§2.3, §3.2, §3.4, §6.3).                                                                                                                                                                                                                                                                                                                  |
 | Production-install test fixture?  | `CogTesting` vends a synchronous MainActor `withBootstrappedApp` scope plus narrow install predicates. It calls the real bootstrap and removes the registration in `defer`; it is deliberately not async, so parallel tests cannot interleave through process-global install state (§2.3; impl scenarios constraint 3).                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Testing posture?                  | Fully optimistic (every wait is a definite injected signal: `CogTesting.TestClock`, continuations, exact refresh handles, or narrow acknowledgements), as fast and cheap as possible (host-first; simulators only at the device boundary; injected time everywhere, including `whileObserved` grace), and as implementation agnostic as possible (public API, then `CogTesting`, then debug history, then named diagnostic seams; the behavior suite passes unchanged across core swaps). Normative statement in impl/scenarios.md.                                                                                                                                                                                                                                             |
 | Trap spelling?                    | Fail-fast traps use `fatalError`, never `preconditionFailure`. The standard library drops `preconditionFailure`'s message under `-O`, so the process traps with no explanation and a promise of "a clear error … in release builds" (ONE-02, TURN-07, CYCLE-01, CYCLE-02) could not be kept. Measured on Apple Swift 6.3: under `-Onone` both spellings print; under `-O` only `fatalError` does, including under `-Ounchecked`. An exit test proving a trap asserts on the child process's standard error, not merely its exit status.                                                                                                                                                                                                                                         |
@@ -999,6 +1007,12 @@ keeps its slot and points at the table above instead of renumbering the rest.
     it. A full `CogStatus` follows the same rule rather than adding `Status`;
     reading fields from the local preserves field-level SwiftUI Observation.
     See §3.1.
+25. **SwiftUI context access:** settled on August 14, 2026. The app installs
+    its retained runtime above every scene, and each view that interacts with
+    Cog resolves `\.cogs` itself. Views never accept, store, or forward `Cogs`;
+    intermediate views pass domain values and identities only. Tests and
+    previews install their isolated context through the same modifier. See
+    §2.3 and §3.4.
 
 ---
 

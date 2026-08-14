@@ -211,6 +211,14 @@ that runtime.
   the fields the body uses. This rule applies in views, selectors, reactions,
   and operations. Writer lvalues, commands that accept a value reference, and
   low-level tests isolating an exact read expression need not invent a local.
+- **Resolve `Cogs` in every SwiftUI consumer.** The app or scene root retains
+  the one runtime and installs it with `.cogEnvironment(cogs)`. Every `View`
+  that interacts with Cog declares `@Environment(\.cogs) private var cogs`
+  itself; a view never accepts, stores, or forwards `Cogs` through an
+  initializer. Intermediate views pass domain values and identities only.
+  Tests and previews host views under the same environment modifier. Explicit
+  `Cogs` parameters remain appropriate at non-view composition boundaries such
+  as app-lifetime effect installation and isolated test harnesses.
 - **Make Swift source explain its contracts.** Every Swift source file and
   every internal-or-higher declaration needs substantive documentation
   comments. Explain the semantics a maintainer cannot infer from a signature:

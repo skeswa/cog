@@ -373,7 +373,8 @@ isolation; and named effect runs in history.
 - Registrar-backed boundary objects, created lazily on the first UI read: one
   phantom key path, `withMutation` only when the value changes. UI-read states
   stay pinned to the app context (§5.3, perf §6).
-- The `\.cogs` environment key; tracked `cogs[valueReference]` in `body`;
+- The `\.cogs` environment key; every consuming view resolves it directly, and
+  no view accepts or forwards `Cogs`; tracked `cogs[valueReference]` in `body`;
   application-owned SwiftUI bindings pair that tracked read with an existing
   domain operation; non-tracking one-shot `cogs.peek(valueReference)`.
 - Escaping closures use one-shot `cogs.peek`. `M2-07` confirmed that public

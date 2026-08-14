@@ -640,8 +640,9 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   one phantom key path, lazy per-state storage, and change-only mutation.
   _Depends: M2-17b._
   _Verify: focused registrar infrastructure tests._
-- **M2-02aa** _(Behavior)_ — Add the `\.cogs` environment key and prove views
-  resolve the installed app context through it.
+- **M2-02aa** _(Behavior)_ — Add the `\.cogs` environment key and prove each
+  consuming view resolves the installed app context without an intermediate
+  view accepting or forwarding it.
   _Depends: M2-01._
   _Verify: `mise run test --filter UI-06`._
   _Greens: UI-06._

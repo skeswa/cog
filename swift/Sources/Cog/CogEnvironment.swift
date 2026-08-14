@@ -38,6 +38,11 @@ extension EnvironmentValues {
   /// Tests and previews inject their isolated `Cogs.forTesting()` context
   /// through the same environment key.
   ///
+  /// Every view that interacts with Cog should declare
+  /// `@Environment(\.cogs) private var cogs` itself. Do not accept or forward
+  /// the runtime through view initializers; intermediate views pass only
+  /// domain values and identities.
+  ///
   /// Reading this property does not itself read graph state or establish a Cog
   /// dependency. Subsequent `cogs[valueReference]` calls cross the tracked
   /// SwiftUI boundary. The property is MainActor-isolated because all context
@@ -70,6 +75,10 @@ extension View {
   /// ``Cogs/bootstrapApp()``. Descendants inherit that exact reference, so
   /// multiple scenes share one authoritative graph. Tests and previews may use
   /// their one isolated testing context instead.
+  ///
+  /// Install once at the hosted hierarchy's root. Each descendant that uses
+  /// Cog resolves ``EnvironmentValues/cogs`` directly rather than receiving
+  /// the runtime from its parent.
   ///
   /// This modifier installs the context only; it does not create state, read a
   /// value, or start observation.

@@ -1,38 +1,16 @@
 import Cog
 import SwiftUI
 
-/// Resolves the app context from SwiftUI and renders one keyed forecast.
+/// Renders one keyed forecast from the app context inherited through SwiftUI.
+///
+/// Every view that interacts with Cog resolves `Cogs` for itself. Its parent
+/// passes only the card's domain identity, never the runtime.
 struct WeatherCard: View {
-  /// The singular graph installed by `WeatherApp`.
+  /// The singular graph inherited from `WeatherApp`.
   @Environment(\.cogs) private var cogs
 
   /// The async-cog key this card observes and refreshes.
   let zip: ZipCode
-
-  /// Delegates tracked reads to the explicitly injectable card body.
-  var body: some View {
-    WeatherCardContent(cogs: cogs, zip: zip)
-  }
-}
-
-/// The card body, taking its context explicitly rather than from the
-/// environment.
-///
-/// Every tracked read a card makes happens here, and the render tests evaluate
-/// this `body` directly instead of hosting it. An unhosted view resolves no
-/// environment, so `@Environment(\.cogs)` would trap; taking the context as a
-/// parameter is what lets those tests count renders without a host. Views that
-/// only act on the graph rather than read it — the refresh button below — have
-/// no such constraint and read the environment normally.
-struct WeatherCardContent: View {
-  /// The context whose Observation boundaries this body registers.
-  let cogs: Cogs
-  /// The exact keyed status and derivations this body tracks.
-  let zip: ZipCode
-  #if DEBUG
-  /// Captures each complete render snapshot without changing production behavior.
-  var renderProbe: (@MainActor (WeatherCardSnapshot) -> Void)? = nil
-  #endif
 
   /// Renders pending, success, and failure without discarding a prior success.
   ///
@@ -45,18 +23,7 @@ struct WeatherCardContent: View {
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let weatherForecast = cogs.status[weatherForecastCogs[zip]]
-    let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
-    let receivesHourlyUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
-    let refreshInterval = cogs[refreshIntervalCog]
-    let report = weatherForecast.value?.weather
-    let loadStatus = WeatherLoadStatus(weatherForecast)
-    let cadence = refreshInterval?.shortCadenceDescription
-    #if DEBUG
-    let _ = renderProbe?(
-      WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
-    )
-    #endif
+    let weatherCard = WeatherCardReading(cogs: cogs, zip: zip)
 
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
@@ -71,7 +38,7 @@ struct WeatherCardContent: View {
 
         Spacer()
 
-        if receivesHourlyUpdates, let cadence {
+        if weatherCard.receivesHourlyUpdates, let cadence = weatherCard.cadence {
           Label("Every \(cadence)", systemImage: "timer")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tint)
@@ -82,7 +49,7 @@ struct WeatherCardContent: View {
         }
       }
 
-      if let report {
+      if let report = weatherCard.report {
         HStack(alignment: .center) {
           Text("\(Int(report.temperatureF.rounded()))°")
             .font(.system(size: 48, weight: .semibold, design: .rounded))
@@ -109,17 +76,17 @@ struct WeatherCardContent: View {
 
         HStack(spacing: 12) {
           Label(
-            isNiceOutside ? "Good outdoor weather" : "Better indoors",
-            systemImage: isNiceOutside ? "figure.walk" : "house"
+            weatherCard.isNiceOutside ? "Good outdoor weather" : "Better indoors",
+            systemImage: weatherCard.isNiceOutside ? "figure.walk" : "house"
           )
           .font(.subheadline.weight(.medium))
 
           Spacer(minLength: 8)
 
-          RefreshButton(zip: zip, status: loadStatus)
+          RefreshButton(zip: zip, status: weatherCard.loadStatus)
         }
 
-        if loadStatus == .failed {
+        if weatherCard.loadStatus == .failed {
           Label(
             "Couldn't update. Your last forecast is still shown.",
             systemImage: "exclamationmark.circle"
@@ -128,7 +95,7 @@ struct WeatherCardContent: View {
           .foregroundStyle(.red)
         }
       } else {
-        EmptyForecast(zip: zip, status: loadStatus)
+        EmptyForecast(zip: zip, status: weatherCard.loadStatus)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -139,11 +106,56 @@ struct WeatherCardContent: View {
     .overlay {
       RoundedRectangle(cornerRadius: 20)
         .stroke(
-          receivesHourlyUpdates ? Color.accentColor.opacity(0.55) : .clear,
+          weatherCard.receivesHourlyUpdates ? Color.accentColor.opacity(0.55) : .clear,
           lineWidth: 1.5
         )
     }
     .accessibilityElement(children: .contain)
+  }
+}
+
+/// The graph projection consumed by one card render.
+///
+/// Keeping these reads together lets the body and its Observation test share
+/// the exact same projection without making `Cogs` a view initializer
+/// argument. Constructing the projection inside `body` still registers each
+/// graph and status field read with SwiftUI's active tracking scope.
+@MainActor
+struct WeatherCardReading {
+  /// The accepted forecast shown while the current request changes kind.
+  let report: Weather?
+  /// Whether the accepted forecast is suitable for outdoor activity.
+  let isNiceOutside: Bool
+  /// Whether this ZIP participates in the simulated hourly refresh effect.
+  let receivesHourlyUpdates: Bool
+  /// The current refresh interval formatted for compact card chrome.
+  let cadence: String?
+  /// The request lifecycle reduced to the card's presentation vocabulary.
+  let loadStatus: WeatherLoadStatus
+  #if DEBUG
+  /// The atomic projection used by render-invalidation tests.
+  let snapshot: WeatherCardSnapshot
+  #endif
+
+  /// Reads every graph value the card presents from one settled turn.
+  ///
+  /// `Cogs` enters here only after the view resolves it from the environment;
+  /// it is never stored by or forwarded through a view.
+  init(cogs: Cogs, zip: ZipCode) {
+    let weatherForecast = cogs.status[weatherForecastCogs[zip]]
+    let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
+    let receivesHourlyUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
+    let refreshInterval = cogs[refreshIntervalCog]
+    let report = weatherForecast.value?.weather
+
+    self.report = report
+    self.isNiceOutside = isNiceOutside
+    self.receivesHourlyUpdates = receivesHourlyUpdates
+    self.cadence = refreshInterval?.shortCadenceDescription
+    self.loadStatus = WeatherLoadStatus(weatherForecast)
+    #if DEBUG
+    self.snapshot = WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
+    #endif
   }
 }
 

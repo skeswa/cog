@@ -115,6 +115,13 @@ effects need no parallel `@State`. A screen may own an `EffectGroup` in
 Closing the screen group stops its effects without fragmenting or erasing
 state.
 
+The root installs the runtime into SwiftUI once. Every descendant view that
+interacts with Cog resolves `@Environment(\.cogs)` for itself; views never
+accept or forward `Cogs` through their initializers. Intermediate views pass
+domain values and identities, while explicit runtime parameters remain at
+non-view composition boundaries such as the app-lifetime `install(in:)` call
+above.
+
 ### 6.4 Writing back into the graph
 
 Reactions may cause writes, but never into the turn they are flushing:

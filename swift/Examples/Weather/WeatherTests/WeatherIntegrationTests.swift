@@ -3,11 +3,10 @@
 import Cog
 import CogTesting
 import Observation
-import SwiftUI
 import Testing
 
-/// Tracks a card body the way SwiftUI does: one-shot Observation with the
-/// re-render deferred to the next explicit frame.
+/// Tracks the same graph projection as a card body: one-shot Observation with
+/// the re-render deferred to the next explicit frame.
 ///
 /// `onChange` only counts the invalidation and marks the card dirty — it never
 /// evaluates `body` reentrantly, because SwiftUI cannot: Cog's flush is
@@ -43,8 +42,9 @@ private final class TrackedWeatherCard {
   }
 
   private func render() {
-    _ = withObservationTracking {
-      makeBody()
+    withObservationTracking {
+      let weatherCard = WeatherCardReading(cogs: cogs, zip: zip)
+      snapshots.append(weatherCard.snapshot)
     } onChange: { [weak self] in
       MainActor.assumeIsolated {
         guard let self else { return }
@@ -52,16 +52,6 @@ private final class TrackedWeatherCard {
         self.needsRender = true
       }
     }
-  }
-
-  private func makeBody() -> some View {
-    WeatherCardContent(
-      cogs: cogs,
-      zip: zip,
-      renderProbe: { [weak self] snapshot in
-        self?.snapshots.append(snapshot)
-      }
-    ).body
   }
 }
 

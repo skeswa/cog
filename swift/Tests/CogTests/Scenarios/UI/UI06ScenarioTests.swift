@@ -27,17 +27,29 @@ private struct ContextProbe: View {
   }
 }
 
+/// Proves an intermediate view need not receive or forward the app context.
 @MainActor
-@Test func `UI-06 a view resolves the context installed through the cogs environment key`() {
+private struct ContextProbeHost: View {
+  /// The identity recorder passed as ordinary view data.
+  let box: ResolvedContextBox
+
+  /// Builds the consuming descendant without resolving `Cogs` itself.
+  var body: some View {
+    ContextProbe(box: box)
+  }
+}
+
+@MainActor
+@Test func `UI-06 each consuming view resolves cogs without an intermediate forwarding it`() {
   let cogs = Cogs.forTesting()
   let box = ResolvedContextBox()
-  let renderer = ImageRenderer(content: ContextProbe(box: box).cogEnvironment(cogs))
+  let renderer = ImageRenderer(content: ContextProbeHost(box: box).cogEnvironment(cogs))
 
   // Rendering exercises the real DynamicProperty update. Merely constructing
   // the view would not prove the environment arrives before @Environment reads.
   #expect(renderer.cgImage != nil)
 
-  // The body read the installed context itself — not a default or fallback
-  // context that would also have rendered successfully.
+  // The descendant body read the installed context itself — not a default,
+  // fallback, or value forwarded by its parent.
   #expect(box.resolved === cogs)
 }
