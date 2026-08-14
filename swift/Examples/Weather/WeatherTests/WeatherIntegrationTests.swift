@@ -101,7 +101,7 @@ private final class TrackedWeatherCard {
   #expect(sanFranciscoCard.invalidations == 1)
   sanFranciscoCard.renderFrame()
 
-  cogs.refresh(weatherForecast[.sanFrancisco])
+  cogs.refresh(weatherForecastCogs[.sanFrancisco])
   // Reload pending notices the status boundary, and the frame counts once.
   #expect(sanFranciscoCard.invalidations == 2)
   sanFranciscoCard.renderFrame()
@@ -168,7 +168,7 @@ private final class TrackedWeatherCard {
   }
   #expect(alerts.isEmpty)
 
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let niceRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(niceRun, with: WeatherReading(.clear, 75))
@@ -182,7 +182,7 @@ private final class TrackedWeatherCard {
   #expect(effectIndexes.count == 1)
   #expect(noticeIndexes.allSatisfy { $0 < effectIndexes[0] })
 
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let stillNiceRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(stillNiceRun, with: WeatherReading(.partlyCloudy, 80))

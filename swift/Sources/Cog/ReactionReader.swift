@@ -170,7 +170,7 @@ public struct ReactionReader {
   /// - Parameter valueReference: The read-only source projection to track.
   /// - Returns: Its source value from the latest completed turn.
   public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
-    self[valueReference.source]
+    self[valueReference.sourceCog]
   }
 
   /// Peeks at a source without recording it as a reaction dependency.
@@ -222,6 +222,6 @@ public struct ReactionReader {
   /// - Parameter valueReference: The read-only source projection to inspect.
   /// - Returns: Its source value from the latest completed turn.
   public func peek<Value>(_ valueReference: CogProjection<Value>) -> Value {
-    peek(valueReference.source)
+    peek(valueReference.sourceCog)
   }
 }

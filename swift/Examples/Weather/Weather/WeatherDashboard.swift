@@ -39,7 +39,7 @@ private struct BackgroundUpdatesCard: View {
   @Environment(\.cogs) private var cogs
 
   var body: some View {
-    let cadence = cogs[refreshInterval]?.cadenceDescription
+    let cadence = cogs[refreshIntervalCog]?.cadenceDescription
 
     VStack(alignment: .leading, spacing: 14) {
       HStack(spacing: 12) {

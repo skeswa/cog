@@ -6,7 +6,7 @@ import Testing
 @Test func weatherStateStartsWithoutACurrentLocation() {
   let cogs = Cogs.forTesting()
 
-  #expect(cogs.peek(currentZipCode) == nil)
+  #expect(cogs.peek(currentZipCodeCog) == nil)
 }
 
 #if DEBUG
@@ -18,7 +18,7 @@ import Testing
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  let initialStatus = cogs.status.peek(weatherForecast[.newYork])
+  let initialStatus = cogs.status.peek(weatherForecastCogs[.newYork])
   if initialStatus.kind != .pending || initialStatus.value != nil || initialStatus.hasSucceeded {
     Issue.record("A forecast's first demand should synchronously return initial pending")
   }
@@ -30,10 +30,10 @@ import Testing
     )
   }
 
-  #expect(cogs.peek(isSunny[.newYork]))
-  #expect(cogs.peek(isNiceOutside[.newYork]))
+  #expect(cogs.peek(isSunnyCogs[.newYork]))
+  #expect(cogs.peek(isNiceOutsideCogs[.newYork]))
 
-  let advisoryRefresh = cogs.refresh(weatherForecast[.newYork])
+  let advisoryRefresh = cogs.refresh(weatherForecastCogs[.newYork])
   let advisoryRun = try #require(await starts.next())
   let advisoryOutcome = await resolveWeatherRefresh(advisoryRefresh) {
     await requests.succeed(
@@ -46,10 +46,10 @@ import Testing
     return
   }
 
-  #expect(cogs.peek(isSunny[.newYork]))
-  #expect(!cogs.peek(isNiceOutside[.newYork]))
+  #expect(cogs.peek(isSunnyCogs[.newYork]))
+  #expect(!cogs.peek(isNiceOutsideCogs[.newYork]))
 
-  let hotRefresh = cogs.refresh(weatherForecast[.newYork])
+  let hotRefresh = cogs.refresh(weatherForecastCogs[.newYork])
   let hotRun = try #require(await starts.next())
   let hotOutcome = await resolveWeatherRefresh(hotRefresh) {
     await requests.succeed(
@@ -62,7 +62,7 @@ import Testing
     return
   }
 
-  #expect(!cogs.peek(isNiceOutside[.newYork]))
+  #expect(!cogs.peek(isNiceOutsideCogs[.newYork]))
 }
 
 @MainActor
@@ -72,15 +72,15 @@ import Testing
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  _ = cogs.status.peek(weatherForecast[.newYork])
+  _ = cogs.status.peek(weatherForecastCogs[.newYork])
   let initialRun = try #require(await starts.next())
   let lastGoodReading = WeatherReading(.cloudy, 60)
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(initialRun, with: lastGoodReading)
   }
 
-  let failedRefresh = cogs.refresh(weatherForecast[.newYork])
-  let pendingStatus = cogs.status.peek(weatherForecast[.newYork])
+  let failedRefresh = cogs.refresh(weatherForecastCogs[.newYork])
+  let pendingStatus = cogs.status.peek(weatherForecastCogs[.newYork])
   if pendingStatus.kind == .pending, pendingStatus.hasSucceeded {
     #expect(pendingStatus.value == lastGoodReading)
   } else {
@@ -96,14 +96,14 @@ import Testing
   }
   #expect(refreshError is RefreshFailure)
 
-  let failedStatus = cogs.status.peek(weatherForecast[.newYork])
+  let failedStatus = cogs.status.peek(weatherForecastCogs[.newYork])
   if failedStatus.kind == .failure, failedStatus.hasSucceeded {
     #expect(failedStatus.error is RefreshFailure)
     #expect(failedStatus.value == lastGoodReading)
   } else {
     Issue.record("Failure should retain the last successful reading")
   }
-  #expect(cogs.peek(weatherForecast[.newYork]) == lastGoodReading)
+  #expect(cogs.peek(weatherForecastCogs[.newYork]) == lastGoodReading)
 }
 
 @MainActor
@@ -113,17 +113,17 @@ import Testing
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  _ = cogs.status.peek(weatherForecast[.newYork])
+  _ = cogs.status.peek(weatherForecastCogs[.newYork])
   let replacedRun = try #require(await starts.next())
 
-  let currentRefresh = cogs.refresh(weatherForecast[.newYork])
+  let currentRefresh = cogs.refresh(weatherForecastCogs[.newYork])
   let currentRun = try #require(await starts.next())
   #expect(replacedRun.zip == currentRun.zip)
 
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(replacedRun, with: WeatherReading(.rain, 55))
   }
-  let statusAfterStaleCompletion = cogs.status.peek(weatherForecast[.newYork])
+  let statusAfterStaleCompletion = cogs.status.peek(weatherForecastCogs[.newYork])
   if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.value != nil
     || statusAfterStaleCompletion.hasSucceeded
   {
@@ -138,7 +138,7 @@ import Testing
     Issue.record("The current refresh handle did not complete successfully")
     return
   }
-  let currentStatus = cogs.status.peek(weatherForecast[.newYork])
+  let currentStatus = cogs.status.peek(weatherForecastCogs[.newYork])
   if currentStatus.kind == .success {
     #expect(currentStatus.value == currentReading)
   } else {
@@ -156,9 +156,9 @@ import Testing
     let checked = MainActorCleanupAcknowledgement()
     cogs.acknowledgeNextAsyncCompletionCheck(with: checked)
     if request == 0 {
-      _ = cogs.status.peek(weatherForecast[.newYork])
+      _ = cogs.status.peek(weatherForecastCogs[.newYork])
     } else {
-      let refresh = cogs.refresh(weatherForecast[.newYork])
+      let refresh = cogs.refresh(weatherForecastCogs[.newYork])
       guard case .success = await refresh.outcome else {
         Issue.record("The demo refresh did not complete successfully")
         return
@@ -166,7 +166,7 @@ import Testing
     }
     try await checked.wait()
 
-    let status = cogs.status.peek(weatherForecast[.newYork])
+    let status = cogs.status.peek(weatherForecastCogs[.newYork])
     guard status.kind == .success, let reading = status.value else {
       Issue.record("The demo request did not publish a reading")
       return

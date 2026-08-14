@@ -6,12 +6,12 @@ import CogTesting
 extension Cogs {
   /// Installs a deterministic request service before a test first demands it.
   func seedWeatherService(_ service: WeatherService) {
-    seed(weatherServiceSeedTarget, to: service)
+    seed(weatherServiceSeedTargetCog, to: service)
   }
 
   /// Selects a current ZIP before a test installs effects or renders a picker.
   func seedCurrentZip(_ zip: ZipCode?) {
-    seed(currentZipSeedTarget, to: zip)
+    seed(currentZipSeedTargetCog, to: zip)
   }
 }
 

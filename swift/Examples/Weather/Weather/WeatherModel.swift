@@ -110,7 +110,7 @@ nonisolated enum WeatherLoadStatus: Equatable, Sendable {
   }
 }
 
-/// A sendable request boundary selected synchronously by `weatherForecast`.
+/// A sendable request boundary selected synchronously by `weatherForecastCogs`.
 ///
 /// The service contains no Cog state and owns no task. Its closure executes only
 /// after the async selector returns `Work`, on the executor selected by that
@@ -202,7 +202,7 @@ private actor DemoWeatherFeed {
         WeatherReading(.partlyCloudy, 72),
         WeatherReading(.rain, 64),
         // Clear and sunny, and still no day to be outside: the advisory and
-        // the temperature both push `isNiceOutside` false on their own.
+        // the temperature both push `isNiceOutsideCogs` false on their own.
         WeatherReading(.clear, 94, advisories: [.heat]),
       ]
     case .sanFrancisco:

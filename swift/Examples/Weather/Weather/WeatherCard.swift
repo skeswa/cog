@@ -41,16 +41,16 @@ struct WeatherCardContent: View {
   /// and its kind describes the current request without a parallel lifecycle
   /// read. SwiftUI observes only those two fields; the unused error and flags
   /// do not participate in this body's invalidation.
-  /// `isNiceOutside` demonstrates a separately equality-gated derivation over
+  /// `isNiceOutsideCogs` demonstrates a separately equality-gated derivation over
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let forecastStatus = cogs.status[weatherForecast[zip]]
+    let forecastStatus = cogs.status[weatherForecastCogs[zip]]
     let report = forecastStatus.value?.weather
-    let nice = cogs[isNiceOutside[zip]]
+    let nice = cogs[isNiceOutsideCogs[zip]]
     let loadStatus = WeatherLoadStatus(forecastStatus)
-    let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
-    let cadence = cogs[refreshInterval]?.shortCadenceDescription
+    let receivesUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
+    let cadence = cogs[refreshIntervalCog]?.shortCadenceDescription
     #if DEBUG
     let _ = renderProbe?(WeatherCardSnapshot(zip: zip, report: report, isNice: nice))
     #endif
@@ -201,7 +201,7 @@ private struct RefreshButton: View {
   /// Demands a refresh and reflects its status in the button label.
   var body: some View {
     Button {
-      cogs.refresh(weatherForecast[zip])
+      cogs.refresh(weatherForecastCogs[zip])
     } label: {
       if status == .refreshing {
         HStack(spacing: 6) {

@@ -6,6 +6,9 @@
 /// demanded. Copies therefore name the same state in one context and separate
 /// state in separate contexts.
 ///
+/// Name a keyless declaration with `Cog` as its final word, such as
+/// `forecastCog`; values read from it keep ordinary unsuffixed domain names.
+///
 /// Reading an async cog is total and value-first (§5.1): `c[valueReference]`
 /// returns `Value` — the last accepted success, or the declaration's resting
 /// default before one exists — so async state reads in the same shape as a

@@ -4,8 +4,8 @@
 ///
 /// ```swift
 /// // WeatherState.swift
-/// fileprivate let currentZipSource = ManualCog<ZipCode?>(nil)
-/// let currentZipCode = currentZipSource.readOnly
+/// fileprivate let currentZipSourceCog = ManualCog<ZipCode?>(nil)
+/// let currentZipCog = currentZipSourceCog.readOnly
 /// ```
 ///
 /// The projection creates no descriptor or state and stores no copy of the
@@ -23,7 +23,7 @@ public struct CogProjection<Value> {
   /// The source this value reference reads.
   ///
   /// Internal so callers cannot recover or construct a writable source.
-  internal let source: ManualCog<Value>
+  internal let sourceCog: ManualCog<Value>
 }
 
 // MARK: - Projecting a source
@@ -35,14 +35,14 @@ extension ManualCog {
   /// source itself `fileprivate`:
   ///
   /// ```swift
-  /// fileprivate let weatherServiceSource = ManualCog<WeatherService>(.live)
-  /// let weatherService = weatherServiceSource.readOnly
+  /// fileprivate let weatherServiceSourceCog = ManualCog<WeatherService>(.live)
+  /// let weatherServiceCog = weatherServiceSourceCog.readOnly
   /// ```
   ///
   /// The source and projection name the same state in every context. Accessing
   /// this property allocates no new descriptor and does not create state.
   public var readOnly: CogProjection<Value> {
-    CogProjection(source: self)
+    CogProjection(sourceCog: self)
   }
 }
 
@@ -58,6 +58,6 @@ extension Cogs {
   /// - Parameter valueReference: The read-only value reference to read.
   /// - Returns: The value the source it names holds in this context.
   public func peek<Value>(_ valueReference: CogProjection<Value>) -> Value {
-    peek(valueReference.source)
+    peek(valueReference.sourceCog)
   }
 }

@@ -5,8 +5,11 @@
 /// its owner can write it:
 ///
 /// ```swift
-/// fileprivate let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
+/// fileprivate let weatherReportSourceCogs = ManualCogBox<Weather?, ZipCode>(nil)
 /// ```
+///
+/// The plural final `Cogs` suffix marks this as a box that can produce many
+/// keyed value references.
 ///
 /// The box holds no keys or values. `box[key]` builds a value reference, and
 /// the context creates that key's state on first use. If an app uses 1,000
@@ -19,7 +22,7 @@
 /// its own state for every demanded key.
 ///
 /// Building `box[key]` creates no graph state or descriptor. It is cheap to use
-/// inline, as in `c[weatherReport[zip]]`.
+/// inline, as in `c[weatherReportCogs[zip]]`.
 ///
 /// Each demanded key has app lifetime in its context, like ``ManualCog``.
 /// Writes occur through ``Writer`` inside turns and equality is applied only to
@@ -40,7 +43,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// first use.
   ///
   /// ```swift
-  /// fileprivate let heatAdvisorySource = ManualCogBox<Bool, ZipCode>(false)
+  /// fileprivate let heatAdvisorySourceCogs = ManualCogBox<Bool, ZipCode>(false)
   /// ```
   ///
   /// One value stands behind every key, so a `Value` that is a reference type
@@ -102,7 +105,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// the key.
   ///
   /// ```swift
-  /// fileprivate let cartSource = ManualCogBox<Cart, UserID> { user in
+  /// fileprivate let cartSourceCogs = ManualCogBox<Cart, UserID> { user in
   ///   Cart(owner: user)
   /// }
   /// ```

@@ -6,8 +6,11 @@
 /// the same file:
 ///
 /// ```swift
-/// fileprivate let currentZipSource = ManualCog<ZipCode?>(nil)
+/// fileprivate let currentZipSourceCog = ManualCog<ZipCode?>(nil)
 /// ```
+///
+/// The final `Cog` suffix marks this as one keyless value reference; a narrower
+/// role such as `Source` comes before it.
 ///
 /// Constructing or copying a `ManualCog` does not create graph state. Its
 /// stable descriptor identity names one app-lifetime state inside each

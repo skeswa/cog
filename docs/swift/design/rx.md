@@ -16,9 +16,9 @@ behavior comes from three smaller tools.
 A derived cog depends on what it read during its last run:
 
 ```swift
-let weatherHere = Cog { c in
-    guard let zip = c[currentZipCode] else { return nil as Weather? }
-    return c[weatherReport[zip]]
+let weatherHereCog = Cog { c in
+    guard let zip = c[currentZipCog] else { return nil as Weather? }
+    return c[weatherReportCogs[zip]]
 }
 ```
 
@@ -27,9 +27,9 @@ one — the state half of `switchMap`. The same rule flattens a cog of cogs or
 follows a changing set:
 
 ```swift
-let shouldPackHat = Cog { c in
-    c[vacationZipCodes].contains { zip in
-        c[shouldWearHat[zip]]
+let shouldPackHatCog = Cog { c in
+    c[vacationZipCodesCog].contains { zip in
+        c[shouldWearHatCogs[zip]]
     }
 }
 ```
@@ -53,8 +53,8 @@ true drop or exhaust behavior belongs to imperative ops, whose inputs are
 events.
 
 ```swift
-let forecast = AsyncCog<Forecast?>(.latest) { c in
-    let zip = c[currentZipCode]
+let forecastCog = AsyncCog<Forecast?>(.latest) { c in
+    let zip = c[currentZipCog]
     return .run { try await api.forecast(for: zip) }
 }
 ```
@@ -67,8 +67,8 @@ Some sources really are streams: location updates, websockets, database
 observations.
 
 ```swift
-let locationFix = AsyncCog<CLLocation?>(.latest) { c in
-    let accuracy = c[desiredAccuracy]
+let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
+    let accuracy = c[desiredAccuracyCog]
     return .stream(locationService.updates(accuracy: accuracy))
 }
 ```

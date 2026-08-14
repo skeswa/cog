@@ -286,38 +286,45 @@ does not dominate application code.
 
 ### 3.1 Declarations
 
+Declaration names make state-reference shape visible wherever a read occurs.
+A keyless manual, derived, async, or read-only value reference ends in `Cog`;
+a box ends in plural `Cogs`. Any narrower role comes first, as in
+`weatherServiceSourceCog` or `weatherReportSourceCogs`. The app runtime remains
+the ordinary local `cogs`, and a value read from the graph takes an ordinary
+domain name without either suffix.
+
 ```swift
 // WeatherState.swift
 
-fileprivate let weatherServiceSource = ManualCog<WeatherService>(.live)
-let weatherService = weatherServiceSource.readOnly
+fileprivate let weatherServiceSourceCog = ManualCog<WeatherService>(.live)
+let weatherServiceCog = weatherServiceSourceCog.readOnly
 
-fileprivate let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
-fileprivate let heatAdvisorySource  = ManualCogBox<Bool, ZipCode>(false)
-fileprivate let currentZipSource    = ManualCog<ZipCode?>(nil)
+fileprivate let weatherReportSourceCogs = ManualCogBox<Weather?, ZipCode>(nil)
+fileprivate let heatAdvisorySourceCogs = ManualCogBox<Bool, ZipCode>(false)
+fileprivate let currentZipSourceCog = ManualCog<ZipCode?>(nil)
 
-let weatherReport = weatherReportSource.readOnly
-let currentZipCode = currentZipSource.readOnly
+let weatherReportCogs = weatherReportSourceCogs.readOnly
+let currentZipCog = currentZipSourceCog.readOnly
 
-let isSunny = CogBox<Bool, ZipCode> { c, zip in
-    switch c[weatherReport[zip]]?.kind {
+let isSunnyCogs = CogBox<Bool, ZipCode> { c, zip in
+    switch c[weatherReportCogs[zip]]?.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
 }
 
-let isNiceOutside = CogBox<Bool, ZipCode> { c, zip in
-    guard let report = c[weatherReport[zip]] else { return false }
-    guard c[isSunny[zip]] else { return false }
-    let advisory = c[heatAdvisorySource[zip]]
+let isNiceOutsideCogs = CogBox<Bool, ZipCode> { c, zip in
+    guard let report = c[weatherReportCogs[zip]] else { return false }
+    guard c[isSunnyCogs[zip]] else { return false }
+    let advisory = c[heatAdvisorySourceCogs[zip]]
     return report.temperatureF > 60
         && report.temperatureF < 90
         && !advisory
 }
 
-let isNiceOutsideHere = Cog { c in
-    guard let zip = c[currentZipCode] else { return false }
-    return c[isNiceOutside[zip]]
+let isNiceOutsideHereCog = Cog { c in
+    guard let zip = c[currentZipCog] else { return false }
+    return c[isNiceOutsideCogs[zip]]
 }
 ```
 
@@ -363,20 +370,20 @@ initial value may also be a key-based closure.
 ```swift
 extension Cogs {
     func checkWeather(_ zip: ZipCode) async throws {
-        let service = read(weatherService)
+        let service = read(weatherServiceCog)
 
         async let report = service.weather(for: zip)
         async let advisories = service.advisories(for: zip)
         let (r, a) = try await (report, advisories)
 
         commit { c in
-            c[weatherReportSource[zip]] = r
-            c[heatAdvisorySource[zip]] = a.contains { $0 is HeatAdvisory }
+            c[weatherReportSourceCogs[zip]] = r
+            c[heatAdvisorySourceCogs[zip]] = a.contains { $0 is HeatAdvisory }
         }
     }
 
     func selectCurrentLocation(_ zip: ZipCode) {
-        commit(currentZipSource, to: zip)
+        commit(currentZipSourceCog, to: zip)
     }
 }
 ```
@@ -385,7 +392,7 @@ extension Cogs {
 one-source operation; the writer overload groups related writes into one turn.
 
 - Only `Writer` can change a source. It supports read and write, so
-  `c[count] += 1` works.
+  `c[countCog] += 1` works.
 - Each writer carries an unforgeable turn ID and checks that its context is
   still accumulating that turn. An escaped writer cannot be used later.
 - `#function` names the turn without extra code. An op is just a normal
@@ -420,7 +427,7 @@ give write control and turn names, so v1 does not need them.
 
 ```swift
 let token = cogs.run { c in
-    if c[isNiceOutsideHere] {
+    if c[isNiceOutsideHereCog] {
         notifier.alert("It is nice outside!")
     }
 }
@@ -444,8 +451,8 @@ struct WeatherCard: View {
     let zip: ZipCode
 
     var body: some View {
-        let report = cogs[weatherReport[zip]]
-        let nice = cogs[isNiceOutside[zip]]
+        let report = cogs[weatherReportCogs[zip]]
+        let nice = cogs[isNiceOutsideCogs[zip]]
 
         VStack {
             Text(report.map { "\(Int($0.temperatureF.rounded()))°F" }
@@ -473,12 +480,12 @@ file may export an ordinary SwiftUI adapter when a control requires `Binding`:
 // WeatherState.swift
 extension Cogs {
     func selectCurrentLocation(_ zip: ZipCode?) {
-        commit(currentZipSource, to: zip)
+        commit(currentZipSourceCog, to: zip)
     }
 
     var currentZipBinding: Binding<ZipCode?> {
         Binding(
-            get: { self[currentZipCode] },
+            get: { self[currentZipCog] },
             set: { self.selectCurrentLocation($0) }
         )
     }
@@ -507,7 +514,7 @@ Swift access control replaces the custom lints proposed for Dart:
 - Put ops, UI adapters, and test seams beside the sources they may write.
 
 Callers can use `try await cogs.checkWeather(zip)` but cannot reach
-`weatherReportSource`. A review finds every possible write by searching one
+`weatherReportSourceCogs`. A review finds every possible write by searching one
 file's commit blocks.
 
 `@testable import` cannot see `fileprivate` sources, so the owning file may
@@ -592,17 +599,17 @@ An async selector is synchronous and tracked. It reads dependencies, then
 returns a description of async work:
 
 ```swift
-let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(
+let fetchedWeatherCogs = AsyncCogBox<Weather?, ZipCode>(
     .latest,
     default: nil
 ) { c, zip in
-    let service = c[weatherService]
+    let service = c[weatherServiceCog]
     return .run { try await service.weather(for: zip) }
 }
 ```
 
-§3.1 modeled `weatherReport` as a manual box that the `checkWeather` op fills;
-`fetchedWeather` is the async alternative, where the fetch itself is derived
+§3.1 modeled `weatherReportCogs` as a manual box that the `checkWeather` op fills;
+`fetchedWeatherCogs` is the async alternative, where the fetch itself is derived
 state. A real app picks one shape per fact — the two appear side by side here
 only to compare them.
 
@@ -616,8 +623,8 @@ decides what happens to the old work.
 Read the value normally, or opt into the lifecycle through the `status` lens:
 
 ```swift
-c[fetchedWeather[zip]]          // Weather? — total value read
-c.status[fetchedWeather[zip]]   // CogStatus<Weather?> — the request itself
+c[fetchedWeatherCogs[zip]]          // Weather? — total value read
+c.status[fetchedWeatherCogs[zip]]   // CogStatus<Weather?> — the request itself
 ```
 
 Every read capability carries the same pair: `c[...]`, `c.peek(...)`, and
@@ -834,7 +841,7 @@ singular, and does measurement show less runtime work?
 | Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Op, transaction, or turn?         | One named `commit`; ops are ordinary methods (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Keyed and keyless API?            | Boxes make value references; keyless cogs are pre-bound value references. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are value references over internal final-class descriptors (§2.3, §3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are value references over internal final-class descriptors. Declaration variables end in singular `Cog` for one keyless value reference and plural `Cogs` for a box; narrower qualifiers precede the suffix (§2.3, §3.1).                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Static or dynamic dependencies?   | Dynamic, captured on each run (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Cycles and selector errors?       | Show the keyed computing path and fail. Sync selectors do not throw in v1 (§2.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Writes from derived computation?  | A derived computation is read-only from selector entry through dependency reconciliation, custom equality, and result publication. Any commit attempted in that region fails immediately in every build, before the commit body runs or that attempt mutates graph state, and names the derived cog/key plus the attempted turn. Invoke the op outside derived computation, from event handling or a reaction (§2.4, §3.2).                                                                                                                                                                                                                                                                                                                                                     |
@@ -952,6 +959,11 @@ keeps its slot and points at the table above instead of renumbering the rest.
     Cog-owned lifetime grace. It supports concurrent deadline sleeps and
     bounded acknowledgement that work has scheduled its next sleep. See
     "Testing posture?" above.
+23. **State declaration names:** settled on August 14, 2026. One keyless value
+    reference ends in singular `Cog`; a box ends in plural `Cogs`; narrower
+    qualifiers precede that suffix. The runtime stays `cogs`, and values read
+    from it keep ordinary domain names. See §3.1 and "Identity and names?"
+    above.
 
 ---
 

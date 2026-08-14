@@ -66,12 +66,12 @@ struct WeatherEffects {
     cogs.setRefreshInterval(hourlyRefreshInterval)
 
     for zip in initialZipCodes {
-      cogs.refresh(weatherForecast[zip])
+      cogs.refresh(weatherForecastCogs[zip])
     }
 
     cogs.effects.add(
       cogs.watch(
-        isNiceOutsideHere,
+        isNiceOutsideHereCog,
         initial: .skip,
         name: "weather.niceAlert"
       ) { wasNice, isNice in
@@ -113,11 +113,11 @@ private func runHourlyRefresh<C: Clock>(
     try await clock.sleep(until: nextRefresh, tolerance: nil)
     nextRefresh = nextRefresh.advanced(by: interval)
     guard let cogs = cogs() else { return }
-    guard let zip = cogs.peek(currentZipCode) else { continue }
+    guard let zip = cogs.peek(currentZipCodeCog) else { continue }
 
     // Refresh starts graph-owned work and returns immediately. A request
     // failure becomes the forecast's `.failure` status, so it cannot terminate
     // this scheduling loop and silently disable later ticks.
-    cogs.refresh(weatherForecast[zip])
+    cogs.refresh(weatherForecastCogs[zip])
   }
 }

@@ -4,8 +4,8 @@
 ///
 /// ```swift
 /// // WeatherState.swift
-/// fileprivate let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
-/// let weatherReport = weatherReportSource.readOnly
+/// fileprivate let weatherReportSourceCogs = ManualCogBox<Weather?, ZipCode>(nil)
+/// let weatherReportCogs = weatherReportSourceCogs.readOnly
 /// ```
 ///
 /// The projection holds the source box's descriptor identity but no keys,
@@ -22,17 +22,17 @@ public struct CogBoxProjection<Value, Key: Hashable> {
   /// The source box this projection reads.
   ///
   /// Internal so callers cannot recover or construct a writable source box.
-  internal let source: ManualCogBox<Value, Key>
+  internal let sourceCogs: ManualCogBox<Value, Key>
 
   /// The read-only value reference naming this box's state for one key.
   ///
-  /// `readOnlyBox[5]` and `sourceBox[5]` name the same state.
+  /// `readOnlyCogs[5]` and `sourceCogs[5]` name the same state.
   /// Building the projected reference allocates no descriptor or graph state.
   ///
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A read-only value reference for that key.
   public subscript(key: Key) -> CogProjection<Value> {
-    CogProjection(source: source[key])
+    CogProjection(sourceCog: sourceCogs[key])
   }
 }
 
@@ -45,6 +45,6 @@ extension ManualCogBox {
   /// the source descriptor-and-key identity, equality behavior, starting value,
   /// and context-local state; only write capability is removed.
   public var readOnly: CogBoxProjection<Value, Key> {
-    CogBoxProjection(source: self)
+    CogBoxProjection(sourceCogs: self)
   }
 }

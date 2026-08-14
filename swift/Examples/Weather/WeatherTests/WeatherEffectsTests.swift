@@ -22,26 +22,26 @@ import Testing
   }
   #expect(alerts.isEmpty)
 
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let firstNiceRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(firstNiceRun, with: WeatherReading(.clear, 75))
   }
   #expect(alerts == ["It is nice outside!"])
 
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let stillNiceRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(stillNiceRun, with: WeatherReading(.partlyCloudy, 80))
   }
   #expect(alerts == ["It is nice outside!"])
 
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let rainRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(rainRun, with: WeatherReading(.rain, 55))
   }
-  cogs.refresh(weatherForecast[.newYork])
+  cogs.refresh(weatherForecastCogs[.newYork])
   let secondNiceRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(secondNiceRun, with: WeatherReading(.clear, 70))
@@ -99,7 +99,7 @@ import Testing
   try await completed.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherForecast[.newYork])?.weather == refreshedWeather)
+  #expect(cogs.peek(weatherForecastCogs[.newYork])?.weather == refreshedWeather)
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
@@ -114,8 +114,8 @@ import Testing
   let cogs = Cogs.forTesting()
   cogs.seedCurrentZip(.newYork)
 
-  #expect(cogs.peek(refreshInterval) == nil)
-  #expect(cogs.peek(receivesHourlyUpdates[.newYork]) == false)
+  #expect(cogs.peek(refreshIntervalCog) == nil)
+  #expect(cogs.peek(receivesHourlyUpdatesCogs[.newYork]) == false)
 
   WeatherEffects(
     notifier: Notifier { _ in },
@@ -124,11 +124,11 @@ import Testing
   )
   .install(in: cogs)
 
-  #expect(cogs.peek(refreshInterval) == .seconds(5))
-  #expect(cogs.peek(refreshInterval)?.cadenceDescription == "5 seconds")
-  #expect(cogs.peek(refreshInterval)?.shortCadenceDescription == "5 sec")
-  #expect(cogs.peek(receivesHourlyUpdates[.newYork]) == true)
-  #expect(cogs.peek(receivesHourlyUpdates[.seattle]) == false)
+  #expect(cogs.peek(refreshIntervalCog) == .seconds(5))
+  #expect(cogs.peek(refreshIntervalCog)?.cadenceDescription == "5 seconds")
+  #expect(cogs.peek(refreshIntervalCog)?.shortCadenceDescription == "5 sec")
+  #expect(cogs.peek(receivesHourlyUpdatesCogs[.newYork]) == true)
+  #expect(cogs.peek(receivesHourlyUpdatesCogs[.seattle]) == false)
 
 }
 
@@ -163,7 +163,7 @@ import Testing
   try await failed.wait()
   try await clock.waitForScheduledSleep()
 
-  let failedStatus = cogs.status.peek(weatherForecast[.newYork])
+  let failedStatus = cogs.status.peek(weatherForecastCogs[.newYork])
   if failedStatus.kind == .failure, failedStatus.hasSucceeded {
     #expect(failedStatus.value == initialReading)
   } else {
@@ -178,7 +178,7 @@ import Testing
   try await succeeded.wait()
   try await clock.waitForScheduledSleep()
 
-  #expect(cogs.peek(weatherForecast[.newYork])?.weather == refreshedWeather)
+  #expect(cogs.peek(weatherForecastCogs[.newYork])?.weather == refreshedWeather)
 
   clock.finish()
 }

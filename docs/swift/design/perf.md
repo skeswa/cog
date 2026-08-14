@@ -234,7 +234,7 @@ order — maps to the storage plan in four passes:
 
 1. **Accumulate:** writer subscripts update the pending value column and add
    each slot to a reused touched list. Reading through the writer sees staged
-   values, so `c[count] += 1` works. Every access checks the turn ID.
+   values, so `c[countCog] += 1` works. Every access checks the turn ID.
 2. **Commit sources (flush steps 1–2):** compare pending with current, keep
    real changes, increase `changedAt`, and push flags. Do not run selectors.
 3. **Settle hot roots (flush step 3):** pull UI-boundary rows, active exports,

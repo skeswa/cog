@@ -188,7 +188,7 @@ let weatherSeedTargets = weatherReportSource
 
 extension Cogs {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
-        commit { c in c[weatherReportSource[zip]] = report }
+        commit { c in c[weatherReportSourceCogs[zip]] = report }
     }
 }
 #endif
@@ -264,16 +264,16 @@ The graph connects to the engine through a **reconciler** that compares
 desired state with the engine's actual state:
 
 ```swift
-let episodesToDownload = Cog { c in
-    c[subscribedEpisodes]
+let episodesToDownloadCog = Cog { c in
+    c[subscribedEpisodesCog]
         .filter { episode in
-            c[autoDownloadPolicy].wants(episode)
-                && !c[downloadState[episode.id]].isDownloadedOrInFlight
+            c[autoDownloadPolicyCog].wants(episode)
+                && !c[downloadStateCogs[episode.id]].isDownloadedOrInFlight
         }
         .map(\.id)
 }
 
-group.add(cogs.watch(episodesToDownload, initial: .run,
+group.add(cogs.watch(episodesToDownloadCog, initial: .run,
                      name: "downloads.reconcile") { _, wanted in
     engine.reconcile(desired: wanted)
 })

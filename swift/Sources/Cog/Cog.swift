@@ -4,11 +4,14 @@
 /// function of the cogs it reads:
 ///
 /// ```swift
-/// let isNiceOutsideHere = Cog<Bool> { c in
-///   guard let zip = c[currentZipCode] else { return false }
-///   return c[isNiceOutside[zip]]
+/// let isNiceOutsideHereCog = Cog<Bool> { c in
+///   guard let zip = c[currentZipCog] else { return false }
+///   return c[isNiceOutsideCogs[zip]]
 /// }
 /// ```
+///
+/// The final `Cog` suffix marks the declaration itself as one keyless value
+/// reference; the unsuffixed value returned by a read keeps its domain name.
 ///
 /// The selector reads through its ``Reader``. Each `c[valueReference]` records a
 /// dependency, so changes can update this value. Reads from captured values,

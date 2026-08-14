@@ -6,21 +6,24 @@
 /// ``Cogs``:
 ///
 /// ```swift
-/// let fetchedWeather = AsyncCogBox<Weather?, ZipCode>(
+/// let fetchedWeatherCogs = AsyncCogBox<Weather?, ZipCode>(
 ///   default: nil,
 ///   name: "weather.fetch"
 /// ) {
 ///   c, zip in
-///   let service = c[weatherService]
+///   let service = c[weatherServiceCog]
 ///   return .run { try await service.weather(for: zip) }
 /// }
 /// ```
 ///
-/// Value reads of a key are total: `c[fetchedWeather[zip]]` returns the last
+/// The plural final `Cogs` suffix distinguishes this box from the individual
+/// ``AsyncCog`` value references it produces.
+///
+/// Value reads of a key are total: `c[fetchedWeatherCogs[zip]]` returns the last
 /// accepted success for that key, resting on the declaration's explicit
 /// default until one exists. Each
 /// key's full request lifecycle reads through the `status` lens,
-/// `c.status[fetchedWeather[zip]]`.
+/// `c.status[fetchedWeatherCogs[zip]]`.
 ///
 /// Building `box[key]` creates no state and allocates no new descriptor. Equal
 /// keys produce the same declaration-and-key identity, while unequal keys are

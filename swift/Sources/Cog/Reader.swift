@@ -3,8 +3,8 @@
 /// This is the `c` in `Cog { c in ... }`.
 ///
 /// ```swift
-/// let subtotal = Cog<Money> { c in
-///   c[cart].items.reduce(.zero) { $0 + $1.price }
+/// let subtotalCog = Cog<Money> { c in
+///   c[cartCog].items.reduce(.zero) { $0 + $1.price }
 /// }
 /// ```
 ///
@@ -208,7 +208,7 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
   public subscript<Read>(_ valueReference: CogProjection<Read>) -> Read {
-    self[valueReference.source]
+    self[valueReference.sourceCog]
   }
 
   /// Peeks at a source without depending on it.
@@ -262,7 +262,7 @@ public struct Reader<Value> {
   ///   edge.
   /// - Returns: The value its source holds in the latest completed turn.
   public func peek<Read>(_ valueReference: CogProjection<Read>) -> Read {
-    peek(valueReference.source)
+    peek(valueReference.sourceCog)
   }
 
   /// The value this cog retained after its previous completed run.

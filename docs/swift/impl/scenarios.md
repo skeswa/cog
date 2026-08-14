@@ -229,7 +229,7 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ### 4.1 The writer
 
-- **TURN-01.** Inside one commit, `c[count] += 1` works: the writer reads
+- **TURN-01.** Inside one commit, `c[countCog] += 1` works: the writer reads
   back the value it just staged.
 - **TURN-02.** I write the same source twice in one commit. The last
   write wins, and downstream sees exactly one change.
@@ -699,7 +699,7 @@ renderable, and whether any generation has succeeded.
   One injected grace window releases the internal value projection and its
   now-unobserved async dependency together, cancelling pending work without a
   second grace window.
-- **ASYNC-26.** A keyed async box exposes the documented `c[forecast[zip]]`
+- **ASYNC-26.** A keyed async box exposes the documented `c[forecastCogs[zip]]`
   value spelling. Equal keys share one value-projection state, different keys
   stay independent, and an equal success does not notify that key's value
   consumer.
@@ -708,7 +708,7 @@ renderable, and whether any generation has succeeded.
   debug and release instead of starting a nested system turn. (Proof: exit
   test.)
 - **ASYNC-28.** I read a derived cog backed by an async cog through the UI
-  boundary, including the documented `cogs[forecast]` value spelling. Its
+  boundary, including the documented `cogs[forecastCog]` value spelling. Its
   initial pending publication does not re-enter the derived computation or
   flush reactions mid-derivation: the read returns the current value, records
   one named pending turn, and later work completion updates it.

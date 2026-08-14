@@ -70,6 +70,6 @@ extension Cogs {
   /// - Parameter valueReference: The read-only source projection to observe.
   /// - Returns: Its source value from the latest completed turn.
   public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
-    self[valueReference.source]
+    self[valueReference.sourceCog]
   }
 }

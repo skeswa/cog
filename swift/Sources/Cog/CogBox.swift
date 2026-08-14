@@ -7,10 +7,13 @@
 /// key:
 ///
 /// ```swift
-/// let isSunny = CogBox<Bool, ZipCode> { c, zip in
-///   c[weatherReport[zip]]?.kind == .clear
+/// let isSunnyCogs = CogBox<Bool, ZipCode> { c, zip in
+///   c[weatherReportCogs[zip]]?.kind == .clear
 /// }
 /// ```
+///
+/// The plural final `Cogs` suffix distinguishes the box from any one keyed
+/// ``Cog`` it produces.
 ///
 /// Constructing or subscripting a box is inert. A context creates and computes
 /// a key's state on its first tracked, UI, or one-shot read. Copies retain

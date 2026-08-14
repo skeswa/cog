@@ -141,12 +141,12 @@ import Testing
 
 @MainActor
 @Test func counterStartsClean() {
-  let count = ManualCog<Int>(0)
+  let countCog = ManualCog<Int>(0)
   let cogs = Cogs.forTesting()
 
-  #expect(cogs.peek(count) == 0)
-  cogs.commit { c in c[count] = 1 }
-  #expect(cogs.peek(count) == 1)
+  #expect(cogs.peek(countCog) == 0)
+  cogs.commit { c in c[countCog] = 1 }
+  #expect(cogs.peek(countCog) == 1)
 }
 ```
 
@@ -203,6 +203,11 @@ These choices are settled; §10 of the core document has the full record.
   key. Boxes create keyed value references without allocating new descriptors. The exact
   in-memory value-reference layout is not settled; benchmarks will compare inline keys,
   interned keys, and generic keyed value references.
+- State declaration names expose that shape at the use site: one keyless value
+  reference ends in `Cog` (`currentZipCog`), while a box ends in plural `Cogs`
+  (`weatherForecastCogs`). Qualifiers such as `Source` precede the suffix. The
+  app runtime remains the ordinary local `cogs`; values read from the graph use
+  unsuffixed domain names.
 - Async reads are total and value-first: `c[valueReference]` returns the last
   accepted success, resting on the declaration's default until one exists, and
   the request lifecycle reads through the `status` lens (`c.status[...]`,

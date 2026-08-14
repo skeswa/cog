@@ -307,7 +307,7 @@ The class-state build. Correctness first; no perf tricks.
   subscripts, `peek`, and `curr` on the read capability; a MainActor-confined
   tracking slot. Non-tracking peeks still settle and return the latest value.
 - Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
-  `Writer` subscripts read and write, so `c[count] += 1` works; unforgeable
+  `Writer` subscripts read and write, so `c[countCog] += 1` works; unforgeable
   turn IDs; idle → accumulating → flushing; nested commits join; commits
   during a flush wait in a FIFO queue.
 - Flush: the six normative steps of §3.2. Equality-gate staged writes, push

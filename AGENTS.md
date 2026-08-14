@@ -194,6 +194,13 @@ that runtime.
 
 ## Conventions
 
+- **Suffix Swift state declarations by shape.** Name every keyless value
+  reference `thingCog`, with `Cog` as the final word; this includes manual,
+  derived, async, and read-only projection declarations. Name every box
+  `thingCogs`, with plural `Cogs` as the final word. Put narrower qualifiers
+  before the suffix (`weatherServiceSourceCog`, `weatherReportSourceCogs`).
+  The app runtime remains the ordinary local `cogs`, and ordinary values read
+  from the graph receive normal domain names without either suffix.
 - **Make Swift source explain its contracts.** Every Swift source file and
   every internal-or-higher declaration needs substantive documentation
   comments. Explain the semantics a maintainer cannot infer from a signature:
