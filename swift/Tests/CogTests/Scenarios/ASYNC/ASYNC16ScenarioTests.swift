@@ -50,7 +50,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
 @Test func `ASYNC-16 concurrent work runs off actor and newest result commits on MainActor`()
   async throws
 {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = Async16ControlledWork()
   let forecast = AsyncCog<Async16Run>(
@@ -70,7 +70,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   let (statuses, statusContinuation) = AsyncStream.makeStream(
     of: CogStatus<Async16Run>.self
   )
-  let token = cogs.run { c in
+  m.run { c in
     let status = c.status[forecast]
     if status.kind == .success {
       MainActor.preconditionIsolated("AsyncCog concurrent result publication")
@@ -118,5 +118,4 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   } else {
     Issue.record("Expected the newest concurrent result to commit")
   }
-  withExtendedLifetime(token) {}
 }

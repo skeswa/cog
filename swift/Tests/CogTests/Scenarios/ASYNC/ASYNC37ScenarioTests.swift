@@ -41,14 +41,17 @@ private final class Async37ControlledWork {
   // nothing, the sibling key's work completes untouched, and re-reading the
   // released key starts fresh.
   let clock = TestClock()
-  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async37ControlledWork()
   let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, key in
     .run { await work.run(for: key) }
   }
+  let awayWatcherAlive = ManualCog<Bool>(true)
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let homeToken = cogs.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
-  let awayToken = cogs.run { c in _ = c.status[forecasts["away"]] }
+  m.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
+  m.whenever(awayWatcherAlive) { s in
+    s.run { c in _ = c.status[forecasts["away"]] }
+  }
   var homeIterator = homeStatuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
@@ -62,7 +65,7 @@ private final class Async37ControlledWork {
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  awayToken.cancel()
+  cogs.commit(awayWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
@@ -94,5 +97,4 @@ private final class Async37ControlledWork {
   #expect(freshPending.kind == .pending)
   #expect(!freshPending.hasSucceeded)
   #expect(await startIterator.next() == "away")
-  withExtendedLifetime((homeToken, awayToken)) {}
 }

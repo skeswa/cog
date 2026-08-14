@@ -10,7 +10,7 @@ import Testing
   // dependency change replaces the generation the same way. The handle
   // resolves as superseded at replacement and never drifts forward to the
   // dependency-started run, whose result alone may commit.
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = AsyncStatusControlledWork<Int>()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
@@ -18,7 +18,7 @@ import Testing
     return work.makeWork()
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -75,5 +75,4 @@ import Testing
     return
   }
   #expect(finalSuccess.value == 30)
-  withExtendedLifetime(token) {}
 }

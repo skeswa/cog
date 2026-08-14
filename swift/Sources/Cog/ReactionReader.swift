@@ -1,6 +1,6 @@
 /// The read capability inside one run of a reaction.
 ///
-/// This is the `c` in `cogs.run { c in ... }`. Reading through the subscript
+/// This is the `c` in `m.run { c in ... }`. Reading through the subscript
 /// both returns the latest settled value and records it as a dependency of the
 /// reaction run in progress. A later turn reruns the reaction only when one of
 /// those dependencies changes.

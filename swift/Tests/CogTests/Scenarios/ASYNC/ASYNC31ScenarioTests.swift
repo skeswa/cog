@@ -46,13 +46,13 @@ private nonisolated struct Async31Failure: Error {}
 
 @MainActor
 @Test func `ASYNC-31 an explicit default makes every value spelling total`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
   let forecast = AsyncCog<Int>(default: -1, name: "forecast") { _ in
     work.makeWork()
   }
   let (values, continuation) = AsyncStream.makeStream(of: Int.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  m.run { c in continuation.yield(c[forecast]) }
   var valueIterator = values.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -80,18 +80,17 @@ private nonisolated struct Async31Failure: Error {}
   try await failed.wait()
   #expect(cogs.peek(forecast) == 42)
 
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-31 an Optional value rests at an explicit nil default`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
   let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { _ in
     .run { try await work.performRun() }
   }
   let (values, continuation) = AsyncStream.makeStream(of: Int?.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
+  m.run { c in continuation.yield(c[forecast]) }
   var valueIterator = values.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -110,12 +109,11 @@ private nonisolated struct Async31Failure: Error {}
   }
   #expect(loaded == 7)
   #expect(cogs.peek(forecast) == 7)
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-31 keyed declarations rest every key on the same default`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
   let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, _ in
     work.makeWork()

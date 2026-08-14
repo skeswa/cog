@@ -27,15 +27,15 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
 
 @MainActor
 @Test func `ASYNC-12 box keys fetch and publish status independently`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async12ControlledWork<String>()
   let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, zip in
     .run { await work.run(for: zip) }
   }
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   let (awayStatuses, awayContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let homeToken = cogs.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
-  let awayToken = cogs.run { c in awayContinuation.yield(c.status[forecasts["away"]]) }
+  m.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
+  m.run { c in awayContinuation.yield(c.status[forecasts["away"]]) }
   var homeIterator = homeStatuses.makeAsyncIterator()
   var awayIterator = awayStatuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
@@ -81,5 +81,4 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
     Issue.record("The away key did not complete independently")
   }
 
-  withExtendedLifetime((homeToken, awayToken)) {}
 }

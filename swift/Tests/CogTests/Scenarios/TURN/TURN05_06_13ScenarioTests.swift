@@ -44,7 +44,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-05 a commit inside a commit flushes once when the outer body ends`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let left = ManualCog<Int>(0)
   let right = ManualCog<Int>(0)
   var selectorRuns = 0
@@ -57,7 +57,7 @@ extension Cogs {
   // Registered before the turn under test on purpose: a registration made
   // inside an accumulating body would run immediately and again at that turn's
   // flush, putting a run in `events` that means nothing here.
-  let token = cogs.run { c in events.append("react:\(c[total])") }
+  m.run { c in events.append("react:\(c[total])") }
   #expect(events == ["react:0"])
   events.removeAll()
   selectorRuns = 0
@@ -90,16 +90,15 @@ extension Cogs {
   // One run, and it saw both writes together — never 1 and then 3.
   #expect(events == ["react:3"])
   #expect(selectorRuns == 1)
-  _ = token
 }
 
 @MainActor
 @Test func `TURN-13 sibling commits each flush and react before the next begins`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let counter = ManualCog<Int>(0)
   var events: [String] = []
 
-  let token = cogs.run { c in events.append("react:\(c[counter])") }
+  m.run { c in events.append("react:\(c[counter])") }
   events.removeAll()
 
   // One event handler, two commits back to back, nothing suspended between.
@@ -119,14 +118,13 @@ extension Cogs {
   // The interleave is the claim: the first turn is completely over — flushed
   // and reacted, at its own value — before the second body starts.
   #expect(events == ["body:1", "react:1", "body:2", "react:2"])
-  _ = token
 }
 
 #if DEBUG
 
 @MainActor
 @Test func `TURN-05 nested commits are one turn in history`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let checking = ManualCog<Int>(5)
   let savings = ManualCog<Int>(0)
 
@@ -152,7 +150,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-06 a turn is named by its op or by the name I pass`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let price = ManualCog<Int>(10)
 
   cogs.applyDiscount(price)
@@ -166,12 +164,12 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-06 a joined commit contributes no name and a queued one keeps its own`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let trigger = ManualCog<Int>(0)
   let note = ManualCog<Int>(0)
   let followup = ManualCog<Int>(0)
 
-  let token = cogs.run { c in
+  m.run { c in
     guard c[trigger] == 1 else { return }
     cogs.recordFollowup(followup)
   }
@@ -186,12 +184,11 @@ extension Cogs {
   // gave it rather than inheriting the turn that queued it.
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.map(\.name) == ["outer", "followup.record"])
-  _ = token
 }
 
 @MainActor
 @Test func `TURN-13 sibling commits are two named turns in history`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let counter = ManualCog<Int>(0)
 
   cogs.stepOne(counter)

@@ -9,16 +9,16 @@ import Testing
   // A reaction chain queues turns during a flush. Each queued turn is its own
   // history entry in execution order, and every write attributes to the turn
   // that made it — entries from different turns never interleave.
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let trigger = ManualCog<Int>(0, name: "trigger")
   let middle = ManualCog<Int>(0, name: "middle")
   let leaf = ManualCog<Int>(0, name: "leaf")
 
-  let starter = cogs.run { c in
+  m.run { c in
     guard c[trigger] == 1 else { return }
     cogs.commit("chain.middle") { c in c[middle] = 1 }
   }
-  let escalator = cogs.run { c in
+  m.run { c in
     guard c[middle] == 1 else { return }
     cogs.commit("chain.leaf") { c in c[leaf] = 1 }
   }
@@ -38,7 +38,6 @@ import Testing
   // backward, so no queued turn's entries split another's.
   let ordinals = entries.map(\.turn)
   #expect(ordinals == ordinals.sorted())
-  _ = (starter, escalator)
 }
 
 #endif

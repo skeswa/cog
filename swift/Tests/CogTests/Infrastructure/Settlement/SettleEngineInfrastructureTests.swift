@@ -142,7 +142,7 @@ import Testing
   let root = Cog<Int> { c in c[middle] + 1 }
   #expect(cogs?.peek(root) == 3)
 
-  let token = cogs?.run { c in _ = c[root] }
+  let token = cogs?.runForTesting { c in _ = c[root] }
   let retainedStates = cogs.map { Array($0.states.values) } ?? []
   let retainedReaction = token?.reaction
 
@@ -158,4 +158,16 @@ import Testing
   )
   #expect(retainedReaction?.dependencies.isEmpty == true)
   _ = token
+}
+
+extension Cogs {
+  /// Registers a bare reaction through the internal door.
+  ///
+  /// Infrastructure tests exercise settlement machinery directly; the public
+  /// registration surface lives on `MechanismController`.
+  fileprivate func runForTesting(
+    _ body: @escaping @MainActor (ReactionReader) -> Void
+  ) -> ReactionToken {
+    register(label: CogLabel(name: nil, fileID: #fileID, line: #line), body: body)
+  }
 }

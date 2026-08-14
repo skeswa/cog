@@ -72,34 +72,14 @@ extension Cogs {
   /// it is escaping for queued-turn storage.
   ///
   /// - Parameters:
-  ///   - name: The turn name recorded for diagnostics and history. By default,
-  ///     this is the op method that called `commit`.
+  ///   - name: The turn name recorded for diagnostics and history. The
+  ///     defaulted ``CogOps/commit(_:_:)`` sugar passes the calling
+  ///     op's `#function`.
   ///   - body: The synchronous writes that make up the turn. The writer it
   ///     receives is valid only while that body is executing.
-  public func commit(_ name: String = #function, _ body: @escaping (Writer) -> Void) {
+  public func commit(named name: String, _ body: @escaping (Writer) -> Void) {
     withTurn(name) { turn in
       body(Writer(cogs: self, turnID: turn.id))
-    }
-  }
-
-  /// Commits one value to one manual source.
-  ///
-  /// This is the compact form for the common single-write operation. It keeps
-  /// ``commit(_:_:)`` as Cog's sole application write boundary while avoiding
-  /// a one-line writer closure at every domain setter. Multi-source and
-  /// read-modify-write operations continue to use the writer form.
-  ///
-  /// - Parameters:
-  ///   - valueReference: The state-owned source to update.
-  ///   - value: The value to publish at the commit boundary.
-  ///   - name: The turn name recorded for diagnostics and history.
-  public func commit<Value>(
-    _ valueReference: ManualCog<Value>,
-    to value: Value,
-    name: String = #function
-  ) {
-    commit(name) { writer in
-      writer[valueReference] = value
     }
   }
 

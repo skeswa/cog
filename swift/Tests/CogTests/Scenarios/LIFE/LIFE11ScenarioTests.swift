@@ -8,10 +8,7 @@ import Testing
   // grace expiry releases that key alone. The watched sibling never recomputes
   // and keeps answering warm; the released key recreates from current values.
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogs.forTesting(
-    clock: clock,
-    whileObservedGrace: .seconds(10)
-  )
+  let workWatcherAlive = ManualCog<Bool>(true)
   let sources = ManualCogBox<Int, String>(1)
   var runsByKey: [String: Int] = [:]
   let derived = CogBox<Int, String> { c, key in
@@ -19,13 +16,19 @@ import Testing
     return c[sources[key]] * 10
   }
 
-  let homeToken = cogs.run { c in _ = c[derived["home"]] }
-  let workToken = cogs.run { c in _ = c[derived["work"]] }
+  let (cogs, m) = probedContext(
+    clock: clock,
+    whileObservedGrace: .seconds(10)
+  )
+  m.run { c in _ = c[derived["home"]] }
+  m.whenever(workWatcherAlive) { s in
+    s.run { c in _ = c[derived["work"]] }
+  }
   #expect(runsByKey == ["home": 1, "work": 1])
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  workToken.cancel()
+  cogs.commit(workWatcherAlive, to: false)
   cogs.commit { c in c[sources["work"]] = 2 }
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
@@ -37,5 +40,4 @@ import Testing
 
   #expect(cogs.peek(derived["work"]) == 20)
   #expect(runsByKey == ["home": 1, "work": 2])
-  withExtendedLifetime((homeToken, workToken)) {}
 }

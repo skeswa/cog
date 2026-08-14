@@ -127,13 +127,26 @@ let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
   name: "weather.receivesHourlyUpdates"
 )
 
-extension Cogs {
+extension CogOps {
   /// Selects the ZIP used by the alert reaction and periodic refresh loop.
+  ///
+  /// One definition serves both capabilities: views and app code call it on
+  /// `cogs`, and the weather mechanism could call it on its controller.
   func selectCurrentLocation(_ zip: ZipCode?) {
     commit(currentZipSourceCog, to: zip)
   }
 
+  /// Publishes the cadence owned by the bootstrap-registered mechanism.
+  func setRefreshInterval(_ interval: Duration?) {
+    commit(refreshIntervalSourceCog, to: interval)
+  }
+}
+
+extension Cogs {
   /// A tracked SwiftUI binding to the singular current-location source.
+  ///
+  /// The getter is a UI-boundary read, so this stays on the runtime rather
+  /// than the shared op surface.
   var currentZipBinding: Binding<ZipCode?> {
     Binding(
       get: {
@@ -142,11 +155,6 @@ extension Cogs {
       },
       set: { self.selectCurrentLocation($0) }
     )
-  }
-
-  /// Publishes the cadence owned by the installed effects group.
-  func setRefreshInterval(_ interval: Duration?) {
-    commit(refreshIntervalSourceCog, to: interval)
   }
 }
 

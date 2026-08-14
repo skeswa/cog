@@ -30,11 +30,11 @@ private final class Async10ControlledWork {
 
 @MainActor
 @Test func `ASYNC-10 refresh cycles a settled async cog again`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async10ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -70,16 +70,15 @@ private final class Async10ControlledWork {
   } else {
     Issue.record("The refresh handle did not complete with its exact success")
   }
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-21 refresh replaces in-flight latest work`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async10ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -138,5 +137,4 @@ private final class Async10ControlledWork {
   } else {
     Issue.record("The newest refresh handle did not complete with success")
   }
-  withExtendedLifetime(token) {}
 }

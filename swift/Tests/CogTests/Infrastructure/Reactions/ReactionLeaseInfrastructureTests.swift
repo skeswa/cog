@@ -12,7 +12,7 @@ import Testing
   let doubled = Cog<Int> { c in c[source] * 2 }
   var seen: [(Int, Int)] = []
 
-  let token = cogs.run { c in
+  let token = cogs.runForTesting { c in
     _ = c[trigger]
     seen.append((c.peek(projectedSource), c.peek(doubled)))
   }
@@ -36,12 +36,12 @@ import Testing
   let inner = Cog<Int> { c in c[source] + 1 }
   let root = Cog<Int> { c in c[inner] + 1 }
 
-  let first = cogs.run { c in
+  let first = cogs.runForTesting { c in
     _ = c[root]
     _ = c[root]
     _ = c[source]
   }
-  let second = cogs.run { c in _ = c[root] }
+  let second = cogs.runForTesting { c in _ = c[root] }
 
   let rootState = cogs.derivedState(for: root)
   let innerState = cogs.derivedState(for: inner)
@@ -72,7 +72,7 @@ import Testing
   let right = Cog<Int> { _ in 2 }
   let anchor = Cog<Int> { _ in 3 }
 
-  let token = cogs.run { c in
+  let token = cogs.runForTesting { c in
     _ = c[anchor]
     let selected = c[chooseLeft] ? left : right
     _ = c[selected]
@@ -111,7 +111,7 @@ import Testing
   let afterCancellation = Cog<Int> { _ in 2 }
   var token: ReactionToken?
 
-  token = cogs.run { c in
+  token = cogs.runForTesting { c in
     let triggerValue = c[trigger]
     _ = c[beforeCancellation]
     if triggerValue > 0 {
@@ -140,7 +140,7 @@ import Testing
   weak let releasedContext = cogs
   let root = Cog<Int> { _ in 1 }
   let rootState = cogs?.derivedState(for: root)
-  let token = cogs?.run { c in _ = c[root] }
+  let token = cogs?.runForTesting { c in _ = c[root] }
   let reaction = token?.reaction
 
   #expect(rootState?.externalLeaseCount == 1)
@@ -154,4 +154,16 @@ import Testing
 
   token?.cancel()
   #expect(rootState?.externalLeaseCount == 0)
+}
+
+extension Cogs {
+  /// Registers a bare reaction through the internal door.
+  ///
+  /// Infrastructure tests exercise registration machinery directly; the
+  /// public registration surface lives on `MechanismController`.
+  fileprivate func runForTesting(
+    _ body: @escaping @MainActor (ReactionReader) -> Void
+  ) -> ReactionToken {
+    register(label: CogLabel(name: nil, fileID: #fileID, line: #line), body: body)
+  }
 }

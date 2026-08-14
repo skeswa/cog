@@ -20,15 +20,28 @@
 /// `Cogs.forTesting()` from the `CogTesting` product.
 @MainActor
 public final class Cogs {
-  /// The effect group owned for exactly this app runtime's lifetime.
+  /// The mechanisms this runtime operates, in bootstrap list order.
   ///
-  /// Register process-lifetime reactions and tasks here so the app entry point
-  /// retains only `Cogs`. Features needing an earlier cancellation boundary
-  /// create and own a separate ``EffectGroup``. A long-running task that reads
-  /// this runtime should capture it weakly, promoting it only around each unit
-  /// of graph work; otherwise the root group and task would retain one another
-  /// through `Cogs` in isolated tests and previews.
-  public let effects = EffectGroup()
+  /// The runtime retains the exact mechanism values supplied at bootstrap so
+  /// a class-owned resource cannot disappear while one of its reactions or
+  /// tasks is still registered. Teardown cancels every scope first and
+  /// releases these values only afterward.
+  private var mechanisms: [any Mechanism] = []
+
+  /// Each bootstrap mechanism's registration scope, parallel to `mechanisms`.
+  ///
+  /// A scope owns its mechanism's reactions, tasks, open `whenever` children,
+  /// and controller. Nothing else may register effects: the public `Cogs`
+  /// surface deliberately has no reaction, watch, or effect-group API (§6.3).
+  private var mechanismScopes: [MechanismScope] = []
+
+  /// One package-only deinit signal consumed by deterministic cleanup tests.
+  ///
+  /// Fired at the end of `isolated deinit`, after mechanism scopes have been
+  /// cancelled and graph dependency chains broken, so a test that dropped its
+  /// last context reference off the MainActor can await actor-correct
+  /// teardown instead of polling.
+  private var deinitCleanupAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// The monotonic clock used by context-owned timing work.
   ///
@@ -200,11 +213,21 @@ public final class Cogs {
 
   /// Breaks graph-owned dependency chains before stored properties release.
   ///
-  /// Strong dependency chains can make ARC recurse during teardown. This flat
-  /// pass breaks them before stored properties are released. Lifetime states
-  /// prepare first so an async state cancels its task and invalidates that
-  /// task's generation before the context releases the graph around it.
+  /// Mechanism scopes cancel first — unregistering reactions, requesting task
+  /// cancellation, and releasing controllers — and the retained mechanism
+  /// values are released only afterward, so a class-owned resource outlives
+  /// its last registration (§6.2). Strong dependency chains can make ARC
+  /// recurse during teardown, so a flat pass then breaks them before stored
+  /// properties are released. Lifetime states prepare first so an async state
+  /// cancels its task and invalidates that task's generation before the
+  /// context releases the graph around it.
   isolated deinit {
+    for scope in mechanismScopes {
+      scope.cancel()
+    }
+    mechanismScopes.removeAll()
+    mechanisms.removeAll()
+
     for state in states.values {
       (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()
       (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
@@ -212,6 +235,75 @@ public final class Cogs {
     for reaction in reactions {
       reaction.releaseDependenciesForContextTeardown()
     }
+    deinitCleanupAcknowledgement?()
+  }
+}
+
+// MARK: - Mechanisms
+
+extension Cogs {
+  /// Operates the runtime's mechanisms, exactly once, in list order.
+  ///
+  /// Only `bootstrapApp(mechanisms:)` and the `CogTesting` factory call this,
+  /// which is what makes registration bootstrap-only: there is no later
+  /// installation API. Each mechanism receives its own scope and curated
+  /// controller; `operate` runs synchronously, so every mechanism is live —
+  /// and its operate-time writes settled — before the factory returns.
+  ///
+  /// Two mechanisms sharing a name fail fast in debug and release builds,
+  /// because history attribution and task naming depend on the name being
+  /// unambiguous.
+  package func operateMechanisms(_ list: [any Mechanism]) {
+    guard !list.isEmpty else { return }
+    guard mechanisms.isEmpty else {
+      // `fatalError`, not `preconditionFailure`: optimized builds drop
+      // `preconditionFailure` messages.
+      fatalError(
+        """
+        This context already operated its mechanisms. Mechanisms are \
+        specified once, at bootstrap; there is no later installation step.
+        """
+      )
+    }
+
+    var seenNames: Set<String> = []
+    for mechanism in list {
+      let name = mechanism.name
+      guard seenNames.insert(name).inserted else {
+        fatalError(
+          """
+          Two mechanisms in one bootstrap list are both named "\(name)". \
+          Mechanism names attribute debug history, task names, and \
+          diagnostics, so each mechanism needs its own. Give one of them an \
+          explicit `name`.
+          """
+        )
+      }
+    }
+
+    for mechanism in list {
+      let scope = MechanismScope()
+      let controller = MechanismController(
+        cogs: self, namePath: mechanism.name, scope: scope)
+      scope.retain(controller: controller)
+      mechanisms.append(mechanism)
+      mechanismScopes.append(scope)
+      mechanism.operate(controller)
+    }
+  }
+
+  /// Installs the package-only signal emitted after isolated deinit cleanup.
+  ///
+  /// `CogTesting` uses this acknowledgement instead of sleeping or polling
+  /// graph storage when a test drops its last context reference on another
+  /// executor. Production clients cannot install the hook.
+  ///
+  /// - Parameter body: The MainActor callback invoked after teardown
+  ///   finishes.
+  package func acknowledgeDeinitCleanup(
+    with body: @escaping @MainActor @Sendable () -> Void
+  ) {
+    deinitCleanupAcknowledgement = body
   }
 }
 

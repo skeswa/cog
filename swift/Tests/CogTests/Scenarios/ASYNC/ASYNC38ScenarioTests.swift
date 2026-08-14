@@ -14,7 +14,7 @@ private nonisolated enum Async38Error: Error {
   // even with an equal error — cycles pending and failure as fresh turns. The
   // value projection keeps its own gate: the renderable value never changed,
   // so value consumers never rerun.
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = AsyncStatusControlledWork<Int>()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
   var valueRuns = 0
@@ -23,8 +23,8 @@ private nonisolated enum Async38Error: Error {
     return c[forecast]
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let statusToken = cogs.run { c in continuation.yield(c.status[forecast]) }
-  let valueToken = cogs.run { c in _ = c[projected] }
+  m.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in _ = c[projected] }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -72,5 +72,4 @@ private nonisolated enum Async38Error: Error {
   // The renderable value rested at the default throughout, so the value
   // consumer's single tracking run was its only run.
   #expect(valueRuns == 1)
-  withExtendedLifetime((statusToken, valueToken)) {}
 }

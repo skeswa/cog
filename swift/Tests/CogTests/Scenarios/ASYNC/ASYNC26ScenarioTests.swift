@@ -40,7 +40,7 @@ private final class Async26ControlledWork {
 
 @MainActor
 @Test func `ASYNC-26 keyed value reads have stable per-key equality`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async26ControlledWork()
   let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, key in
     work.makeWork(for: key)
@@ -51,15 +51,15 @@ private final class Async26ControlledWork {
   var firstHomeRuns = 0
   var secondHomeRuns = 0
 
-  let firstHomeToken = cogs.run { c in
+  m.run { c in
     firstHomeRuns += 1
     firstHomeContinuation.yield(c[forecasts["home"]])
   }
-  let secondHomeToken = cogs.run { c in
+  m.run { c in
     secondHomeRuns += 1
     secondHomeContinuation.yield(c[forecasts["home"]])
   }
-  let awayToken = cogs.run { c in awayContinuation.yield(c[forecasts["away"]]) }
+  m.run { c in awayContinuation.yield(c[forecasts["away"]]) }
   var firstHomeIterator = firstHomeValues.makeAsyncIterator()
   var secondHomeIterator = secondHomeValues.makeAsyncIterator()
   var awayIterator = awayValues.makeAsyncIterator()
@@ -115,5 +115,4 @@ private final class Async26ControlledWork {
   #expect(firstHomeRuns == 2)
   #expect(secondHomeRuns == 2)
 
-  withExtendedLifetime((firstHomeToken, secondHomeToken, awayToken)) {}
 }

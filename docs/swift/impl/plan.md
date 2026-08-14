@@ -320,7 +320,7 @@ The class-state build. Correctness first; no perf tricks.
 - Mechanisms and reactions: the `Mechanism` protocol with a defaulted `name`
   and `operate(_:)`; the curated `MechanismController` with `run`,
   `watch(_:initial:name:)`, `task(name:)`, `whenever`, untracked `peek`, and
-  the shared `CogOperating` ops surface — never raw `Cogs`; bootstrap-only
+  the shared `CogOps` ops surface — never raw `Cogs`; bootstrap-only
   registration in array order with duplicate-name rejection; state-gated
   `whenever` scopes whose fall cancels their registrations and whose rise
   re-runs the body fresh, with terminal, idempotent scope cancellation kept

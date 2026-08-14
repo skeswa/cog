@@ -7,7 +7,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-19 every changed UI boundary is noticed before any reaction runs`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let first = ManualCog<Int>(0, name: "pair.first")
   let second = ManualCog<Int>(0, name: "pair.second")
 
@@ -16,7 +16,7 @@ import Testing
   } onChange: {
   }
 
-  let reaction = cogs.run { c in
+  m.run { c in
     _ = c[first]
     _ = c[second]
   }
@@ -33,12 +33,11 @@ import Testing
   #expect(noticeIndexes.count == 2)
   #expect(effectIndexes.count == 1)
   #expect(noticeIndexes.allSatisfy { $0 < effectIndexes[0] })
-  _ = reaction
 }
 
 @MainActor
 @Test func `HIST-06 history names each changed keyed UI notice`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let weather = ManualCogBox<String?, String>(nil, name: "weather")
   let zip = "90210"
 

@@ -44,7 +44,7 @@ private final class Async07WorkProbe {
 
 @MainActor
 @Test func `ASYNC-07 dependency changes replace explicit and default latest work`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
   let defaultLatest = AsyncCog<Int>(default: 0, name: "default") { c in
@@ -55,7 +55,7 @@ private final class Async07WorkProbe {
     let value = c[request]
     return probe.work(name: "explicit", request: value)
   }
-  let token = cogs.run { c in
+  m.run { c in
     _ = c[defaultLatest]
     _ = c[explicitLatest]
   }
@@ -76,12 +76,11 @@ private final class Async07WorkProbe {
   let replacements = [await startIterator.next(), await startIterator.next()].compactMap { $0 }
   #expect(Set(replacements.map(\.name)) == ["default", "explicit"])
   #expect(replacements.allSatisfy { $0.request == 1 })
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-09 replaced cancellation publishes no failure status`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
@@ -89,7 +88,7 @@ private final class Async07WorkProbe {
     return probe.work(name: "forecast", request: value)
   }
   var statuses: [CogStatus<Int>] = []
-  let token = cogs.run { c in statuses.append(c.status[forecast]) }
+  m.run { c in statuses.append(c.status[forecast]) }
   var startIterator = probe.starts.makeAsyncIterator()
   var cancellationIterator = probe.cancellations.makeAsyncIterator()
 
@@ -103,5 +102,4 @@ private final class Async07WorkProbe {
       status.kind != .failure
     }
   )
-  withExtendedLifetime(token) {}
 }

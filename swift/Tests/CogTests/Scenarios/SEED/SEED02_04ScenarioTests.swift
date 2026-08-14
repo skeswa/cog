@@ -25,13 +25,16 @@ import Testing
 
 @MainActor
 @Test func `SEED-02 seed does not run a reaction`() {
-  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
-  let token = cogs.run { c in
-    seen.append(c[source])
-  }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in
+        seen.append(c[source])
+      }
+    }
+  ])
   #expect(seen == [1])
 
   cogs.seed(source, to: 2)
@@ -43,7 +46,6 @@ import Testing
   // the next real turn and observes the latest value.
   cogs.commit("seed.followup") { c in c[source] = 3 }
   #expect(seen == [1, 3])
-  _ = token
 }
 
 @MainActor
@@ -66,7 +68,6 @@ import Testing
     let digits: String
   }
 
-  let cogs = Cogs.forTesting()
   let zip = ZipCode(digits: "90210")
   let currentZipSource = ManualCog<ZipCode?>(nil)
   let weatherReportSource = ManualCogBox<Weather?, ZipCode>(nil)
@@ -79,11 +80,15 @@ import Testing
     return c[weatherReportSource[currentZip]]?.isNice == true
   }
 
-  let token = cogs.run { c in
-    if c[isNiceOutsideHere] {
-      alerts.append("It is nice outside!")
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in
+        if c[isNiceOutsideHere] {
+          alerts.append("It is nice outside!")
+        }
+      }
     }
-  }
+  ])
 
   // Installation stopped at the nil ZIP and never captured a weather edge.
   #expect(weatherReads == 0)
@@ -106,7 +111,6 @@ import Testing
 
   #expect(weatherReads == 1)
   #expect(alerts == ["It is nice outside!"])
-  _ = token
 }
 
 #endif

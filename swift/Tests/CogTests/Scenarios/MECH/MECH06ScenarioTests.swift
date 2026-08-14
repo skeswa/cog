@@ -2,43 +2,45 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let hourlyRefreshCount = ManualCog<Int>(0)
+@MainActor private let hourlyRefreshCountCog = ManualCog<Int>(0)
 
-@MainActor extension Cogs {
+@MainActor extension CogOps {
   fileprivate func refreshCurrentLocation() {
     commit("location.hourlyRefresh") { c in
-      c[hourlyRefreshCount] += 1
-    }
-  }
-}
-
-@MainActor private struct HourlyEffects {
-  let clock: TestClock
-  let refreshes: AsyncStream<Void>.Continuation
-
-  func install(in cogs: Cogs) {
-    cogs.effects.task(name: "location.hourlyRefresh.timer") {
-      while true {
-        try await clock.sleep(for: .seconds(3_600))
-        await cogs.refreshCurrentLocation()
-        refreshes.yield()
-      }
+      c[hourlyRefreshCountCog] += 1
     }
   }
 }
 
 @MainActor
-@Test func `GROUP-06 an injected clock drives a named hourly turn`() async throws {
+@Test func `MECH-06 an injected clock drives a named hourly turn`() async throws {
   let clock = TestClock()
-  let cogs = Cogs.forTesting(clock: clock)
   let (refreshEvents, refreshContinuation) = AsyncStream.makeStream(
     of: Void.self,
     bufferingPolicy: .bufferingNewest(1)
   )
-  HourlyEffects(clock: clock, refreshes: refreshContinuation).install(in: cogs)
+
+  let cogs = Cogs.forTesting(
+    clock: clock,
+    mechanisms: [
+      // The app entry point retains only `Cogs`; the timer is a mechanism
+      // task whose long-running body holds its controller weakly and
+      // promotes it around each unit of graph work.
+      MechanismProbe(name: "Location") { m in
+        m.task(name: "hourlyRefresh") { [weak m] in
+          while true {
+            try await clock.sleep(for: .seconds(3_600))
+            guard let m else { return }
+            await m.refreshCurrentLocation()
+            refreshContinuation.yield()
+          }
+        }
+      }
+    ]
+  )
 
   try await clock.waitForScheduledSleep()
-  #expect(cogs.peek(hourlyRefreshCount) == 0)
+  #expect(cogs.peek(hourlyRefreshCountCog) == 0)
 
   clock.advance(by: .seconds(3_600))
   var refreshIterator = refreshEvents.makeAsyncIterator()
@@ -47,10 +49,10 @@ import Testing
     return
   }
 
-  #expect(cogs.peek(hourlyRefreshCount) == 1)
+  #expect(cogs.peek(hourlyRefreshCountCog) == 1)
   #if DEBUG
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
-  #expect(turns.map(\.name) == ["location.hourlyRefresh"])
+  #expect(turns.map(\.name) == ["Location.location.hourlyRefresh"])
   #endif
 
   // "Every hour" is a loop, not a first firing: the task re-arms its sleep,
@@ -62,10 +64,14 @@ import Testing
     return
   }
 
-  #expect(cogs.peek(hourlyRefreshCount) == 2)
+  #expect(cogs.peek(hourlyRefreshCountCog) == 2)
   #if DEBUG
   let secondTurns = cogs.debugHistory.entries.filter { $0.event == .turn }
-  #expect(secondTurns.map(\.name) == ["location.hourlyRefresh", "location.hourlyRefresh"])
+  #expect(
+    secondTurns.map(\.name) == [
+      "Location.location.hourlyRefresh", "Location.location.hourlyRefresh",
+    ]
+  )
   #endif
 
   try await clock.waitForScheduledSleep()

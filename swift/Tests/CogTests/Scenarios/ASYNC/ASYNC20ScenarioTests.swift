@@ -27,7 +27,7 @@ private final class Async20ControlledWork {
 
 @MainActor
 @Test func `ASYNC-20 equal reload changes status but not value consumers`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = Async20ControlledWork()
   let forecast = AsyncCog<Int>(default: 0) { c in
@@ -40,8 +40,8 @@ private final class Async20ControlledWork {
     return c[forecast]
   }
   let (statuses, statusContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let fullStatusToken = cogs.run { c in statusContinuation.yield(c.status[forecast]) }
-  let valueConsumerToken = cogs.run { c in _ = c[valueConsumer] }
+  m.run { c in statusContinuation.yield(c.status[forecast]) }
+  m.run { c in _ = c[valueConsumer] }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -82,5 +82,4 @@ private final class Async20ControlledWork {
   }
   #expect(valueConsumerRuns == 2)
 
-  withExtendedLifetime((fullStatusToken, valueConsumerToken)) {}
 }

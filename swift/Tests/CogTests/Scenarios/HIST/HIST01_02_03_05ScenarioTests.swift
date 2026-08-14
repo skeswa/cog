@@ -123,13 +123,16 @@ extension Cogs {
 
 @MainActor
 @Test func `HIST-05 a named watch's run lands in history under its effect name`() {
-  let cogs = Cogs.forTesting()
   let temperature = ManualCog<Int>(60)
   var alerts = 0
 
-  let token = cogs.watch(temperature, initial: .skip, name: "weather.niceAlert") { _, _ in
-    alerts += 1
-  }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe(name: "Weather") { m in
+      m.watch(temperature, initial: .skip, name: "niceAlert") { _, _ in
+        alerts += 1
+      }
+    }
+  ])
 
   cogs.commit("warm up") { c in c[temperature] = 80 }
 
@@ -137,26 +140,28 @@ extension Cogs {
   #expect(alerts == 1)
 
   let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
-  #expect(effects.contains { $0.name == "weather.niceAlert" })
+  // The given name composes beneath the mechanism's name.
+  #expect(effects.contains { $0.name == "Weather.niceAlert" })
   // The run belongs to the turn that woke it, not to the install before it.
-  #expect(effects.last?.name == "weather.niceAlert")
+  #expect(effects.last?.name == "Weather.niceAlert")
   #expect(effects.last?.turn == 1)
-  _ = token
 }
 
 @MainActor
 @Test func `HIST-05 an unnamed registration lands under its file and line`() {
-  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
 
-  let token = cogs.run { c in _ = c[source] }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in _ = c[source] }
+    }
+  ])
 
   let effects = cogs.debugHistory.entries.filter { $0.event == .effect }
   #expect(effects.count == 1)
   // No `name:` was given, so the label falls back to the registration site.
   // This test only checks that the fallback belongs to this registration.
   #expect(effects.first?.name.contains("HIST01_02_03_05ScenarioTests.swift") == true)
-  _ = token
 }
 
 @MainActor

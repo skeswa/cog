@@ -50,7 +50,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
   // ASYNC-16 proves a stale concurrent result cannot commit; this proves the
   // replaced background task is also told to stop. Without the cancellation
   // request, off-actor work would keep burning until it finished on its own.
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = Async36ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
@@ -60,7 +60,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
     }
   }
   let (statuses, statusContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let token = cogs.run { c in statusContinuation.yield(c.status[forecast]) }
+  m.run { c in statusContinuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
@@ -87,5 +87,4 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
     return
   }
   #expect(completed.value == 11)
-  withExtendedLifetime(token) {}
 }

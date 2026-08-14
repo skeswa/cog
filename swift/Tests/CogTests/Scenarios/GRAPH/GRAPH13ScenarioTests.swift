@@ -11,7 +11,7 @@ import Testing
   var pairsSeen: [String] = []
   var reactionPairs: [String] = []
 
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let a = ManualCog<Int>(1)
   let b = Cog<Int> { c in c[a] * 10 }
   let d = Cog<String> { c in
@@ -22,7 +22,7 @@ import Testing
     return pair
   }
 
-  let token = cogs.run { c in reactionPairs.append(c[d]) }
+  m.run { c in reactionPairs.append(c[d]) }
   #expect(reactionPairs == ["1:10"])
   #expect(pairsSeen == ["1:10"])
 
@@ -31,5 +31,4 @@ import Testing
   #expect(cogs.peek(d) == "2:20")
   #expect(pairsSeen == ["1:10", "2:20"])
   #expect(reactionPairs == ["1:10", "2:20"])
-  _ = token
 }

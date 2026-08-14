@@ -6,13 +6,14 @@ struct WeatherApp: App {
   @State private var cogs: Cogs
 
   init() {
-    let cogs = Cogs.bootstrapApp()
+    let cogs = Cogs.bootstrapApp(mechanisms: [
+      WeatherMechanism(
+        notifier: .live,
+        hourlyRefreshInterval: .seconds(5)
+      )
+    ])
     cogs.selectCurrentLocation(.newYork)
     _cogs = State(initialValue: cogs)
-    WeatherEffects(
-      notifier: .live,
-      hourlyRefreshInterval: .seconds(5)
-    ).install(in: cogs)
   }
 
   var body: some Scene {
