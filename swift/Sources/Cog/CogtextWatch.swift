@@ -19,7 +19,7 @@ extension Cogs {
   /// The watch runs when the value changes: a new accepted success, gated by
   /// equality when the declaration is `Equatable`. Reload pending and failure
   /// turns that retain the same value stay quiet; watch through
-  /// ``Cogs/meta`` to observe every metadata turn instead. The returned
+  /// ``Cogs/status`` to observe every status turn instead. The returned
   /// token holds a `whileObserved` lease reaching the async state through the
   /// projection; the last release cancels the watch and begins ordinary grace
   /// when no other durable consumer remains.
@@ -226,15 +226,16 @@ extension Cogs {
   }
 }
 
-/// Metadata watches: the lens spelling of single-value reactions for async
+/// Status watches: the lens spelling of single-value reactions for async
 /// request lifecycles.
-extension Cogs.Meta {
-  /// Registers a reaction that watches an async cog's full metadata.
+extension Cogs.Status {
+  /// Registers a reaction that watches an async cog's full status.
   ///
   /// Installation settles the exact async state, records it as the watch's one
-  /// tracked dependency, and captures that metadata as the baseline. A first read
-  /// can start work, so the baseline is normally
-  /// ``CogMeta/pending(value:hasSucceeded:)``. ``CogWatchStart/skip`` suppresses only the
+  /// tracked dependency, and captures that status as the baseline. A first read
+  /// can start work, so the baseline normally has
+  /// ``CogStatus/kind`` equal to ``CogStatus/Kind/pending``.
+  /// ``CogWatchStart/skip`` suppresses only the
   /// initial body call; it does not skip the read or subscription. If that cold
   /// read establishes pending while the reaction is tracking, Cog defers the
   /// graph-owned pending flush until installation exits rather than reentering
@@ -242,15 +243,15 @@ extension Cogs.Meta {
   ///
   /// Pending, success, and failure are published in separate turns. After each
   /// such turn settles, the watch runs in registration order and receives its
-  /// previous and current metadata — including an equal-success reload the value
+  /// previous and current status — including an equal-success reload the value
   /// watch beside this lens would gate away. Because it is a durable reaction
   /// consumer, the returned token holds a `whileObserved` lease on the async
   /// state. The last token release cancels the watch and begins ordinary grace
   /// when no other durable consumer remains.
   ///
   /// - Parameters:
-  ///   - valueReference: The async value whose full metadata should be watched.
-  ///   - initial: Whether installation calls `body` with the baseline metadata as
+  ///   - valueReference: The async value whose full status should be watched.
+  ///   - initial: Whether installation calls `body` with the baseline status as
   ///     both arguments.
   ///   - name: What Cog should call this effect in debug history. Defaults to
   ///     the file and line of the registration.
@@ -258,8 +259,8 @@ extension Cogs.Meta {
   ///     default.
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
-  ///   - body: Synchronous effect code, given the metadata before this change and
-  ///     the metadata after it. The body runs on the MainActor; commits it requests
+  ///   - body: Synchronous effect code, given the status before this change and
+  ///     the status after it. The body runs on the MainActor; commits it requests
   ///     during a flush become later FIFO turns.
   /// - Returns: A handle that keeps the registration and its async-state lease
   ///   alive. Releasing its last reference cancels the watch.
@@ -270,12 +271,12 @@ extension Cogs.Meta {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ body: @escaping @MainActor (CogMeta<Value>, CogMeta<Value>) -> Void
+    _ body: @escaping @MainActor (CogStatus<Value>, CogStatus<Value>) -> Void
   ) -> ReactionToken {
     cogs.watchTracked(
       label: CogLabel(name: name, fileID: fileID, line: line),
       initial: initial,
-      read: { c in c.meta[valueReference] },
+      read: { c in c.status[valueReference] },
       body: body
     )
   }

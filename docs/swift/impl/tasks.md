@@ -751,13 +751,14 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 
 _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
 
-- **M3-01** _(Behavior)_ — Add `CogMeta` with total `value`, `hasSucceeded`,
-  and loading semantics, with exhaustive metadata accessor tests.
+- **M3-01** _(Behavior)_ — Add `CogStatus` with a three-valued `kind`, total
+  `value`, `hasSucceeded`, and loading semantics, with exhaustive status
+  accessor tests.
   _Depends: M2-20._
   _Verify: `mise run test --filter ASYNC-04`._
   _Greens: ASYNC-04._
 - **M3-02** _(Behavior)_ — On first tracked read, start work, publish pending
-  as a turn, and expose no initial metadata case.
+  as a turn, and expose no initial status case.
   _Depends: M3-01._
   _Verify: `mise run test --filter ASYNC-01`._
   _Greens: ASYNC-01._
@@ -801,7 +802,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-11`._
   _Greens: ASYNC-11._
-- **M3-07** _(Behavior)_ — Fetch and track `AsyncCogBox` metadata independently by key.
+- **M3-07** _(Behavior)_ — Fetch and track `AsyncCogBox` status independently by key.
   _Depends: M3-05a._
   _Verify: `mise run test --filter ASYNC-12`._
   _Greens: ASYNC-12._
@@ -884,7 +885,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter LIFE-10`._
   _Greens: LIFE-10._
 - **M3-10k** _(Infrastructure)_ — Replace Weather's imperative request sources
-  and async op with one keyed `AsyncCogBox`; render metadata and total values, and
+  and async op with one keyed `AsyncCogBox`; render status and total values, and
   route initial, retry, and hourly demand through `refresh` with deterministic
   example tests.
   _Depends: M3-04, M3-07, M3-08b, M3-10b._
@@ -950,14 +951,14 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   changelog excerpt.
   _Depends: M4-05d._
   _Verify: published GitHub Release points at the approved tag._
-- **M4-06** _(Behavior)_ — Complete and flatten `CogMeta` with total `value`,
-  `hasSucceeded`, `error`, and `isLoading`, documented and proven right in
-  every case.
+- **M4-06** _(Behavior)_ — Complete and flatten `CogStatus` with `kind`, total
+  `value`, `hasSucceeded`, `error`, and `isLoading`, documented and proven
+  right in every lifecycle state.
   _Depends: M3-11._
   _Verify: `mise run test --filter ASYNC-30`._
   _Greens: ASYNC-30._
 - **M4-07a** _(Decision)_ — Record the value-first async read model: total
-  value reads over declaration defaults, the `meta` lens on every read
+  value reads over declaration defaults, the `status` lens on every read
   capability, and an explicit default at every declaration; land the §5.1 and §10
   amendments with the scenario and task deltas they require.
   _Depends: M3-11._
@@ -969,8 +970,9 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M4-07a._
   _Verify: `mise run test --filter ASYNC-31` and `mise run test:compilefail`._
   _Greens: ASYNC-31, ASYNC-34._
-- **M4-07c** _(Behavior)_ — Add the `meta` lens to every read capability
-  with value-spelling parity, refusing synchronous state at compile time.
+- **M4-07c** _(Behavior)_ — Add the `status` lens to every read capability
+  with value-spelling parity and field-level SwiftUI Observation, refusing
+  synchronous state at compile time.
   _Depends: M4-07a._
   _Verify: `mise run test --filter ASYNC-32` and `mise run test:compilefail`._
   _Greens: ASYNC-32, ASYNC-33._
@@ -980,7 +982,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M4-07b, M4-07c._
   _Verify: `mise run test`, `mise run test:compilefail`, and
   `mise run fmt:check`._
-- **M4-07e** _(Infrastructure)_ — Adopt value-first reads and the `meta`
+- **M4-07e** _(Infrastructure)_ — Adopt value-first reads and the `status`
   lens in the Weather example and its tests.
   _Depends: M4-07d._
   _Verify: `mise run build:weather` and `mise run test:weather`._
@@ -1253,7 +1255,7 @@ ArenaDirtyPropagationInfrastructure`._
   boundary.
   _Depends: M6-10fa, M6-10g._
   _Verify: `COG_TEST_CORE=arena mise run test --filter SEED-07`._
-- **M6-10ha** _(Infrastructure)_ — Pass async metadata creation, first work,
+- **M6-10ha** _(Infrastructure)_ — Pass async status creation, first work,
   results, projections, dependency capture, keys, isolation, and task naming
   through arena values.
   _Depends: M6-10ba._

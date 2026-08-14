@@ -17,7 +17,7 @@ Four principles guide every API and implementation choice:
 2. **Every state read should be correct.** A read must match the latest
    committed source state after settling every dependency it needs. It must
    not expose a torn update, stale derived value, or half-finished change.
-   Uncertain async state must be explicit in `CogMeta`.
+   Uncertain async state must be explicit in `CogStatus`.
 3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
    allocation, reference counting, locks, and UI updates. Measure competing
    implementations instead of guessing.
@@ -205,17 +205,18 @@ These choices are settled; §10 of the core document has the full record.
   interned keys, and generic keyed value references.
 - Async reads are total and value-first: `c[valueReference]` returns the last
   accepted success, resting on the declaration's default until one exists, and
-  the request lifecycle reads through the `meta` lens (`c.meta[...]`,
-  `cogs.meta[...]`), which exists only for async references. Every declaration
+  the request lifecycle reads through the `status` lens (`c.status[...]`,
+  `cogs.status[...]`), which exists only for async references. Every declaration
   states the resting invariant with `default:`, including `default: nil` for
   optional values.
 - Async selectors read dependencies synchronously, then return `Work.run` or
   `Work.stream`. The first read starts work and publicly begins at
-  `pending(value: default, hasSucceeded: false)`; there is no observable
-  `initial` case. `CogMeta.value` is total in every case, while `hasSucceeded`
-  keeps a successful optional `nil` distinct from the resting default. The
-  focused accessors are `value`, `hasSucceeded`, `error`, and `isLoading`.
-  `.latest` is the default policy.
+  `kind == .pending`, `value == default`, and `hasSucceeded == false`; there is
+  no observable `initial` kind. `CogStatus.value` is total in every kind, while
+  `hasSucceeded` keeps a successful optional `nil` distinct from the resting
+  default. SwiftUI observes `kind`, `value`, `hasSucceeded`, `error`, and
+  `isLoading` independently, registering only fields a body reads. `.latest`
+  is the default policy.
   Streams allow only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
@@ -251,9 +252,9 @@ These choices are settled; §10 of the core document has the full record.
   stale. A synchronous derived or async peek is transient demand: without a
   durable consumer it renews normal `whileObserved` grace, and expiry releases
   the state. Peeking or refreshing a never-read async value starts exactly one
-  initial run at `pending(value: default, hasSucceeded: false)` without a dependency,
-  subscription, or Observation boundary; expiry also cancels its work and
-  rejects late results. Exported
+  initial run with `kind == .pending`, `value == default`, and
+  `hasSucceeded == false` without a dependency, subscription, or Observation
+  boundary; expiry also cancels its work and rejects late results. Exported
   streams (`cogs.values(of:)`) start from the current settled value and never
   make a commit wait: `.newest(1)` may skip turns for a slow reader,
   `.oldest(n)` delivers the oldest n in order and drops newer while full, and
@@ -291,7 +292,7 @@ These choices are settled; §10 of the core document has the full record.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, and persistence helpers. Also open are several edge
-behaviors: what a stream's metadata does when its sequence ends or throws, whether
+behaviors: what a stream's status does when its sequence ends or throws, whether
 equal stream elements commit distinct turns, whether a failed `.queue` run
 stops the queue, and debounce/throttle timing modifiers (deferred backlog).
 Value-reference layout, edge layout, and hash tables also remain open until

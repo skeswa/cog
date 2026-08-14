@@ -7,7 +7,7 @@
 /// create its own.
 ///
 /// Reads settle every dependency needed by the returned value. Application
-/// writes and runtime-owned async metadata changes publish as ordered turns;
+/// writes and runtime-owned async status changes publish as ordered turns;
 /// notifications and reactions run only after the active value computation has
 /// finished. UI subscripts participate in Swift Observation, selector and
 /// reaction readers record graph edges, and `peek` deliberately does neither.
@@ -48,7 +48,7 @@ public final class Cogs {
   /// One test-only signal after an async result reaches its commit eligibility check.
   ///
   /// Cancellation and ignored-cancellation scenarios need to prove that a
-  /// result was rejected, which produces no public metadata event to await. The
+  /// result was rejected, which produces no public status event to await. The
   /// `CogTesting` seam installs this callback as a deterministic negative-event
   /// acknowledgement. Production code never installs one.
   private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
@@ -437,7 +437,7 @@ extension Cogs {
   /// Lookup and work start are deliberately separate. Merely resolving the
   /// descriptor-and-key slot allocates state but does not run the selector;
   /// settlement by a tracked read, peek, or refresh creates the first pending
-  /// metadata and starts work.
+  /// status and starts work.
   internal func asyncState<Value>(for valueReference: AsyncCog<Value>) -> AsyncCogState<Value> {
     asyncState(descriptor: valueReference.descriptor, key: valueReference.key)
   }
@@ -452,11 +452,11 @@ extension Cogs {
     states[state.stateIdentity] === state
   }
 
-  /// Resolves the async state named by an internal latest-value projection.
+  /// Resolves the async state named by an internal value projection.
   ///
   /// The projection captures the original async descriptor and forwards its
   /// own key here. Reusing that descriptor-and-key identity makes
-  /// the value projection observes the same metadata state as the full async
+  /// the value projection observes the same status state as the full async
   /// value instead of creating a mirror or a second task.
   internal func asyncState<Value>(
     descriptor: AsyncCogDescriptor<Value>,
@@ -543,7 +543,7 @@ extension Cogs {
   /// replacing work already in flight. The returned value is fully settled at
   /// the latest completed turn, just like a tracked read; only future
   /// invalidation is intentionally omitted. No Swift Observation boundary or
-  /// reaction lease is created. Use ``Cogs/meta`` to peek the request
+  /// reaction lease is created. Use ``Cogs/status`` to peek the request
   /// lifecycle instead.
   ///
   /// - Parameter valueReference: The async declaration and optional key to inspect.

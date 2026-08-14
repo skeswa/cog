@@ -101,26 +101,25 @@ private final class Async13ControlledWork {
   work.finish(0, with: 100)
   try await lateChecked.wait()
 
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let secondToken = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
-  guard let freshPending = await phaseIterator.next() else {
-    Issue.record("The recreated phase stream ended before pending")
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let secondToken = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
+  guard let freshPending = await statusIterator.next() else {
+    Issue.record("The recreated status stream ended before pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = freshPending {
-  } else {
+  if freshPending.kind != .pending || freshPending.hasSucceeded {
     Issue.record("Recreated work did not start from fresh pending state")
   }
   #expect(await startIterator.next() == 1)
 
   work.finish(1, with: 200)
-  guard let freshSuccess = await phaseIterator.next() else {
-    Issue.record("The recreated phase stream ended before success")
+  guard let freshSuccess = await statusIterator.next() else {
+    Issue.record("The recreated status stream ended before success")
     return
   }
-  if case .success(let value) = freshSuccess {
-    #expect(value == 200)
+  if freshSuccess.kind == .success {
+    #expect(freshSuccess.value == 200)
   } else {
     Issue.record("Expected only the recreated work's result")
   }

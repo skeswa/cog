@@ -1,5 +1,5 @@
 // A turn is one synchronous, atomic state publication. Application turns begin
-// at `Cogs.commit`; graph-owned system turns publish async metadata through the
+// at `Cogs.commit`; graph-owned system turns publish async status through the
 // same flush machinery without pretending to be application writes.
 //
 // For example, if a commit writes `firstName` and `lastName`, its body stages
@@ -24,7 +24,7 @@ internal final class CogTurnID {}
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
-/// Manual values and async metadata both conform to the pending-source contract,
+/// Manual values and async status both conform to the pending-source contract,
 /// so one ordered flush can assign a single revision before invalidation reaches
 /// Observation boundaries and reactions.
 internal final class CogTurn {
@@ -128,10 +128,10 @@ extension Cogs {
 
   /// Runs one graph-owned turn without applying the public commit guard.
   ///
-  /// Async metadata publication originates from derived computation itself. It is
+  /// Async status publication originates from derived computation itself. It is
   /// still a named turn, but it is not an application write and therefore may
   /// be requested while the async selector is on the computation path. This
-  /// exception is internal-only: it must stage runtime-owned metadata, never
+  /// exception is internal-only: it must stage runtime-owned status, never
   /// invoke an application operation or expose a writer.
   ///
   /// If another turn is active, queue rather than nest a flush. That preserves

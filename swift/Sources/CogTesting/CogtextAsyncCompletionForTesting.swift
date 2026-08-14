@@ -12,7 +12,7 @@ extension Cogs {
   ///
   /// This one-shot seam makes a negative public behavior deterministic. A test
   /// can resume controlled stale work, await the acknowledgement, and then
-  /// inspect public metadata knowing no publication is still racing, without
+  /// inspect public status knowing no publication is still racing, without
   /// sleeps, polling, or access to the generation counter. Install at most one
   /// acknowledgement at a time. The seam consumes it after one eligibility
   /// decision; a later result needs a new acknowledgement and a new call.

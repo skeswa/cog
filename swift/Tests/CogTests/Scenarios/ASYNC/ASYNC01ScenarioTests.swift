@@ -27,19 +27,16 @@ private final class Async01WorkProbe {
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { probe.run() }
   }
-  var phases: [CogMeta<Int>] = []
+  var statuses: [CogStatus<Int>] = []
 
   let token = cogs.run { c in
-    phases.append(c.meta[forecast])
+    statuses.append(c.status[forecast])
   }
 
-  #expect(phases.count == 1)
-  if let phase = phases.first {
-    switch phase {
-    case .pending(_, hasSucceeded: false):
-      break
-    default:
-      Issue.record("The first visible phase was not pending without a previous value")
+  #expect(statuses.count == 1)
+  if let status = statuses.first {
+    if status.kind != .pending || status.hasSucceeded {
+      Issue.record("The first visible status was not pending without a previous value")
     }
   }
 

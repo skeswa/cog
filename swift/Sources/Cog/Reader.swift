@@ -12,7 +12,7 @@
 /// replaces the dependency set, so branches and early returns work as expected.
 /// Reads made outside this reader are invisible to Cog.
 ///
-/// An ``AsyncCog`` selector receives a `Reader<CogMeta<Value>>`. Its tracked
+/// An ``AsyncCog`` selector receives a `Reader<CogStatus<Value>>`. Its tracked
 /// reads finish synchronously while the selector builds ``Work``; code in the
 /// work closure runs after dependency capture and cannot add edges through this
 /// reader.
@@ -88,7 +88,7 @@ public struct Reader<Value> {
   /// any derived read — a first read creates the async state, starts its
   /// work, and returns the default while that work runs. Equality gating on
   /// the projection keeps this selector quiet when a reload succeeds with an
-  /// equal value; read `c.meta[valueReference]` instead where the request
+  /// equal value; read `c.status[valueReference]` instead where the request
   /// lifecycle itself matters. If initial demand establishes pending during
   /// this selector, Cog defers the graph-owned pending flush until tracking
   /// and settlement exit, so Observation and reactions cannot reenter this
@@ -100,43 +100,43 @@ public struct Reader<Value> {
     self[valueReference.valueCog]
   }
 
-  /// The metadata lens over this reader: the same tracked-read capability,
-  /// returning full ``CogMeta`` values for async references.
+  /// The status lens over this reader: the same tracked-read capability,
+  /// returning full ``CogStatus`` values for async references.
   ///
-  /// `c.meta[asyncValue]` records a dependency on the async state itself, so
+  /// `c.status[asyncValue]` records a dependency on the async state itself, so
   /// later pending, success, and failure turns each rerun this selector even
   /// when the successful value is unchanged — the opposite gating from the
   /// value read beside it. The lens deliberately has no spelling for manual
-  /// or derived cogs: synchronous state has no request metadata, and asking for it is a
+  /// or derived cogs: synchronous state has no request status, and asking for it is a
   /// type error rather than a degenerate success.
-  public var meta: Meta {
-    Meta(cogs: cogs, state: state)
+  public var status: Status {
+    Status(cogs: cogs, state: state)
   }
 
-  /// The tracked metadata-reading facet of one selector run.
+  /// The tracked status-reading facet of one selector run.
   ///
   /// A lens is as transient as the reader that made it: it borrows the same
   /// context and computing consumer, enforces the same active-tracking
   /// requirement on every access, and is invalid outside its selector run.
   @MainActor
-  public struct Meta {
+  public struct Status {
     /// The context whose graph this run reads.
     private let cogs: Cogs
 
-    /// The computing consumer receiving metadata dependencies.
+    /// The computing consumer receiving status dependencies.
     private let state: any CogReaderState<Value>
 
-    /// Borrows the reader's capability for metadata spellings.
+    /// Borrows the reader's capability for status spellings.
     internal init(cogs: Cogs, state: any CogReaderState<Value>) {
       self.cogs = cogs
       self.state = state
     }
 
-    /// Reads an async cog's full metadata and depends on its exact state.
+    /// Reads an async cog's full status and depends on its exact state.
     ///
     /// Cog settles the producer before recording the edge. A first read
     /// therefore selects its work and returns pending, while a dirty producer
-    /// selects its replacement work before this selector observes the metadata.
+    /// selects its replacement work before this selector observes the status.
     /// Recording the edge makes later pending, success, and failure turns
     /// invalidate this selector and keeps a `whileObserved` producer reachable
     /// through the derived dependency graph. If initial demand establishes
@@ -144,40 +144,40 @@ public struct Reader<Value> {
     /// until tracking and settlement exit, so Observation and reactions cannot
     /// reenter this run.
     ///
-    /// - Parameter valueReference: The async value whose metadata to read.
-    /// - Returns: Its newest settled metadata in this context.
-    public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogMeta<Read> {
+    /// - Parameter valueReference: The async value whose status to read.
+    /// - Returns: Its newest settled status in this context.
+    public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
       cogs.requireTracking(state)
 
       let producer = cogs.asyncState(for: valueReference)
-      let meta = producer.settledMeta(in: cogs)
+      let status = producer.settledStatus(in: cogs)
       state.recordDependency(on: producer)
-      return meta
+      return status
     }
 
-    /// Peeks at an async cog's metadata without recording a dependency.
+    /// Peeks at an async cog's status without recording a dependency.
     ///
     /// The read still settles the exact state, starting initial work or
     /// selecting replacement work when needed. It records no edge from this
-    /// selector, so later metadata turns do not rerun it, and with no other
+    /// selector, so later status turns do not rerun it, and with no other
     /// durable consumer the one-shot read starts or renews the async state's
     /// ordinary `whileObserved` grace.
     ///
-    /// - Parameter valueReference: The async value whose metadata to read
+    /// - Parameter valueReference: The async value whose status to read
     ///   without tracking it.
-    /// - Returns: Its newest settled metadata in this context.
-    public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogMeta<Read> {
+    /// - Returns: Its newest settled status in this context.
+    public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
       cogs.requireTracking(state)
-      return cogs.meta.peek(valueReference)
+      return cogs.status.peek(valueReference)
     }
   }
 
   /// Reads one async descriptor for an internal projection selector.
   ///
-  /// The `.latest` projection has the descriptor and key rather than another
+  /// The internal value projection has the descriptor and key rather than another
   /// public value reference. This path resolves that same exact async state,
   /// settles it before recording the projection's dependency, and returns the
-  /// metadata from which the projection derives its total value. Keeping
+  /// status from which the projection derives its total value. Keeping
   /// the operation here preserves the public reader's tracking and escaped-use
   /// checks for the package-only projection implementation. A cold read follows
   /// the same deferred system-turn rule as the public async subscript, so the
@@ -186,17 +186,17 @@ public struct Reader<Value> {
   /// - Parameters:
   ///   - descriptor: The async declaration shared with the projection.
   ///   - key: The keyed state to read, or `nil` for a keyless declaration.
-  /// - Returns: The exact async state's newest settled metadata.
-  internal func asyncMeta<Read>(
+  /// - Returns: The exact async state's newest settled status.
+  internal func asyncStatus<Read>(
     from descriptor: AsyncCogDescriptor<Read>,
     key: AnyHashable?
-  ) -> CogMeta<Read> {
+  ) -> CogStatus<Read> {
     cogs.requireTracking(state)
 
     let producer = cogs.asyncState(descriptor: descriptor, key: key)
-    let meta = producer.settledMeta(in: cogs)
+    let status = producer.settledStatus(in: cogs)
     state.recordDependency(on: producer)
-    return meta
+    return status
   }
 
   /// Reads a source exposed through `.readOnly`, and depends on it.

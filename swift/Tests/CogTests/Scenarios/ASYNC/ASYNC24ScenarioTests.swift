@@ -36,12 +36,14 @@ private final class Async24ControlledWork {
     let selectedRequest = c[request]
     return .run { await work.run(for: selectedRequest) }
   }
-  let (initialPhases, initialContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let initialToken = cogs.run { c in initialContinuation.yield(c.meta[forecast]) }
-  var initialPhaseIterator = initialPhases.makeAsyncIterator()
+  let (initialStatuses, initialContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let initialToken = cogs.run { c in initialContinuation.yield(c.status[forecast]) }
+  var initialStatusIterator = initialStatuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(_, hasSucceeded: false)) = await initialPhaseIterator.next() else {
+  guard let initialPending = await initialStatusIterator.next(),
+    initialPending.kind == .pending, !initialPending.hasSucceeded
+  else {
     Issue.record("Expected initial pending without a previous value")
     return
   }
@@ -56,18 +58,22 @@ private final class Async24ControlledWork {
   work.succeed(0, with: 100)
   try await staleChecked.wait()
 
-  let (returningPhases, returningContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let returningToken = cogs.run { c in returningContinuation.yield(c.meta[forecast]) }
-  var returningPhaseIterator = returningPhases.makeAsyncIterator()
+  let (returningStatuses, returningContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let returningToken = cogs.run { c in returningContinuation.yield(c.status[forecast]) }
+  var returningStatusIterator = returningStatuses.makeAsyncIterator()
 
-  guard case .some(.pending(_, hasSucceeded: false)) = await returningPhaseIterator.next() else {
+  guard let returningPending = await returningStatusIterator.next(),
+    returningPending.kind == .pending, !returningPending.hasSucceeded
+  else {
     Issue.record("A returning consumer observed the invalidated run's result")
     return
   }
   #expect(await startIterator.next() == 1)
 
   work.succeed(1, with: 200)
-  guard case .some(.success(200)) = await returningPhaseIterator.next() else {
+  guard let returningSuccess = await returningStatusIterator.next(),
+    returningSuccess.kind == .success, returningSuccess.value == 200
+  else {
     Issue.record("Expected only work selected from the newest source value to commit")
     return
   }

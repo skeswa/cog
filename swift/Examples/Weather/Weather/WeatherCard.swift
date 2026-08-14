@@ -27,7 +27,7 @@ struct WeatherCard: View {
 struct WeatherCardContent: View {
   /// The context whose Observation boundaries this body registers.
   let cogs: Cogs
-  /// The exact keyed metadata and derivations this body tracks.
+  /// The exact keyed status and derivations this body tracks.
   let zip: ZipCode
   #if DEBUG
   /// Captures each complete render snapshot without changing production behavior.
@@ -36,17 +36,19 @@ struct WeatherCardContent: View {
 
   /// Renders pending, success, and failure without discarding a prior success.
   ///
-  /// The card reads one total `CogMeta` value for both retained content and
+  /// The card reads one total `CogStatus` value for both retained content and
   /// request chrome. Its value rests at `nil`, survives reload and failure,
-  /// and its flags describe the current request without a parallel lifecycle read.
+  /// and its kind describes the current request without a parallel lifecycle
+  /// read. SwiftUI observes only those two fields; the unused error and flags
+  /// do not participate in this body's invalidation.
   /// `isNiceOutside` demonstrates a separately equality-gated derivation over
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let metadata = cogs.meta[weatherForecast[zip]]
-    let report = metadata.value?.weather
+    let forecastStatus = cogs.status[weatherForecast[zip]]
+    let report = forecastStatus.value?.weather
     let nice = cogs[isNiceOutside[zip]]
-    let status = WeatherLoadStatus(metadata)
+    let loadStatus = WeatherLoadStatus(forecastStatus)
     let receivesUpdates = cogs[receivesHourlyUpdates[zip]]
     let cadence = cogs[refreshInterval]?.shortCadenceDescription
     #if DEBUG
@@ -111,10 +113,10 @@ struct WeatherCardContent: View {
 
           Spacer(minLength: 8)
 
-          RefreshButton(zip: zip, status: status)
+          RefreshButton(zip: zip, status: loadStatus)
         }
 
-        if status == .failed {
+        if loadStatus == .failed {
           Label(
             "Couldn't update. Your last forecast is still shown.",
             systemImage: "exclamationmark.circle"
@@ -123,7 +125,7 @@ struct WeatherCardContent: View {
           .foregroundStyle(.red)
         }
       } else {
-        EmptyForecast(zip: zip, status: status)
+        EmptyForecast(zip: zip, status: loadStatus)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,7 +145,7 @@ struct WeatherCardContent: View {
 private struct EmptyForecast: View {
   /// The key used by retry copy and action.
   let zip: ZipCode
-  /// The card-sized presentation mapping of the full async metadata.
+  /// The card-sized presentation mapping of the full async status.
   let status: WeatherLoadStatus
 
   /// Shows progress for pending and a retry path for failure or idle state.
@@ -183,8 +185,8 @@ private struct EmptyForecast: View {
 ///
 /// `refresh` returns an exact-generation handle after publishing pending and
 /// starting graph-owned work. This button deliberately discards it because the
-/// card already renders authoritative metadata; imperative callers can await
-/// the handle without creating a second request state. The metadata disables
+/// card already renders authoritative status; imperative callers can await
+/// the handle without creating a second request state. The status disables
 /// replacement while this UI action is pending; other graph callers retain
 /// `.latest` replacement semantics.
 private struct RefreshButton: View {
@@ -196,7 +198,7 @@ private struct RefreshButton: View {
   /// The current display state used for labeling and disabling the action.
   let status: WeatherLoadStatus
 
-  /// Demands a refresh and reflects its metadata in the button label.
+  /// Demands a refresh and reflects its status in the button label.
   var body: some View {
     Button {
       cogs.refresh(weatherForecast[zip])

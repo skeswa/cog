@@ -80,7 +80,7 @@ private final class Async07WorkProbe {
 }
 
 @MainActor
-@Test func `ASYNC-09 replaced cancellation publishes no failure metadata`() async {
+@Test func `ASYNC-09 replaced cancellation publishes no failure status`() async {
   let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let probe = Async07WorkProbe()
@@ -88,8 +88,8 @@ private final class Async07WorkProbe {
     let value = c[request]
     return probe.work(name: "forecast", request: value)
   }
-  var phases: [CogMeta<Int>] = []
-  let token = cogs.run { c in phases.append(c.meta[forecast]) }
+  var statuses: [CogStatus<Int>] = []
+  let token = cogs.run { c in statuses.append(c.status[forecast]) }
   var startIterator = probe.starts.makeAsyncIterator()
   var cancellationIterator = probe.cancellations.makeAsyncIterator()
 
@@ -99,9 +99,8 @@ private final class Async07WorkProbe {
   #expect(await startIterator.next() == Async07RunEvent(name: "forecast", request: 1))
 
   #expect(
-    phases.allSatisfy { phase in
-      if case .failure = phase { return false }
-      return true
+    statuses.allSatisfy { status in
+      status.kind != .failure
     }
   )
   withExtendedLifetime(token) {}

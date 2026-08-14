@@ -47,7 +47,7 @@ extension Cogs {
   /// that work runs; settlement happens before boundary access, so the cold
   /// pending publication cannot reenter this read or send a redundant
   /// baseline notice. Equality gating keeps the UI consumer quiet when a
-  /// reload succeeds with an equal value; read ``Cogs/meta`` where the
+  /// reload succeeds with an equal value; read ``Cogs/status`` where the
   /// request lifecycle itself drives chrome.
   ///
   /// This is UI tracking, not a selector or reaction dependency edge. Creating

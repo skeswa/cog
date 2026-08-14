@@ -34,7 +34,7 @@ internal protocol CogConsumer: AnyObject {
 ///
 /// The outer optional records whether a previous value exists; it must not
 /// collapse a real optional `nil`. Async state uses the same contract to expose
-/// its previously published metadata to `Reader.curr` machinery. The value belongs
+/// its previously published status to `Reader.curr` machinery. The value belongs
 /// to the consumer's latest completed selector run; a reader may consult it only
 /// while that same consumer occupies the context tracking slot.
 @MainActor

@@ -69,9 +69,8 @@ private final class AsyncColdDemandControlledWork {
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let initial = cogs.meta.peek(forecast)
-  if case .pending(_, hasSucceeded: false) = initial {
-  } else {
+  let initial = cogs.status.peek(forecast)
+  if initial.kind != .pending || initial.hasSucceeded {
     Issue.record("A cold one-shot peek did not return pending without a previous value")
   }
   #expect(selectorRuns == 1)
@@ -82,9 +81,8 @@ private final class AsyncColdDemandControlledWork {
 
   clock.advance(by: .seconds(4))
   for _ in 0..<32 {
-    let repeated = cogs.meta.peek(forecast)
-    if case .pending(_, hasSucceeded: false) = repeated {
-    } else {
+    let repeated = cogs.status.peek(forecast)
+    if repeated.kind != .pending || repeated.hasSucceeded {
       Issue.record("A repeated peek did not retain the current pending generation")
     }
     try await clock.waitForScheduledSleep()
@@ -118,9 +116,8 @@ private final class AsyncColdDemandControlledWork {
   #expect(staleResultTurns.isEmpty)
   #endif
 
-  let fresh = cogs.meta.peek(forecast)
-  if case .pending(_, hasSucceeded: false) = fresh {
-  } else {
+  let fresh = cogs.status.peek(forecast)
+  if fresh.kind != .pending || fresh.hasSucceeded {
     Issue.record("A later read did not recreate fresh pending work")
   }
   #expect(selectorRuns == 2)
@@ -135,8 +132,9 @@ private final class AsyncColdDemandControlledWork {
   work.finish(1, with: 200)
   try await freshChecked.wait()
 
-  if case .success(let value) = cogs.meta.peek(forecast) {
-    #expect(value == 200)
+  let completed = cogs.status.peek(forecast)
+  if completed.kind == .success {
+    #expect(completed.value == 200)
   } else {
     Issue.record("The recreated work did not publish its fresh result")
   }

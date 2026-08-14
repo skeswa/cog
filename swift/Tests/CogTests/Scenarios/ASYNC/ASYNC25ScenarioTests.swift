@@ -79,7 +79,7 @@ private final class Async25ControlledWork {
 
   let secondConsumer = cogs.run { c in _ = c[forecast] }
   guard selectorRuns == 2 else {
-    Issue.record("The latest projection and async dependency were not both recreated")
+    Issue.record("The value projection and async dependency were not both recreated")
     work.finish(0, with: 100)
     return
   }

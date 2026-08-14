@@ -10,14 +10,15 @@
 /// returns `Value` — the last accepted success, or the declaration's resting
 /// default before one exists — so async state reads in the same shape as a
 /// manual or derived cog wherever only the value matters. The request
-/// lifecycle is read through the `meta` lens on the same capability
-/// (`c.meta[valueReference]`), which returns the full ``CogMeta``.
+/// lifecycle is read through the `status` lens on the same capability
+/// (`c.status[valueReference]`), which returns the full ``CogStatus``.
 ///
-/// Demand may come from a tracked value or metadata read, one-shot `peek`, or
+/// Demand may come from a tracked value or status read, one-shot `peek`, or
 /// `refresh`. Initial demand establishes
-/// ``CogMeta/pending(value:hasSucceeded:)`` with the resting default and
-/// `hasSucceeded == false`, then starts the selected work. A value read returns
-/// that default, a metadata read returns pending, and `refresh` returns an
+/// ``CogStatus/kind`` at ``CogStatus/Kind/pending`` with the
+/// resting default and `hasSucceeded == false`, then starts the selected work.
+/// A value read returns that default, a status read returns those atomic fields,
+/// and `refresh` returns an
 /// exact-generation ``CogRefresh``. Cog records pending as a graph-owned turn, but
 /// if demand occurs while a selector or reaction is being evaluated, it
 /// defers that turn's flush until evaluation exits. Observation and reactions
@@ -41,7 +42,7 @@ public struct AsyncCog<Value> {
   /// Stable derived-declaration identity for the total value projection.
   ///
   /// Value reads of this reference resolve through this derived declaration:
-  /// its selector reads the async state's metadata and extracts its total
+  /// its selector reads the async state's status and extracts its total
   /// value, which already rests on the declaration default before success.
   /// One projection descriptor is shared by every copy and — through boxes —
   /// every key, exactly like `descriptor` itself.
@@ -57,7 +58,7 @@ public struct AsyncCog<Value> {
   /// advances the state's generation, and accepts a completion only from the
   /// newest generation. Cancellation is advisory: even if old work ignores
   /// it and finishes, its value cannot overwrite newer state, and replacement
-  /// cancellation does not become failure metadata.
+  /// cancellation does not become failure status.
   ///
   /// The selector runs on the MainActor whenever Cog needs a fresh operation.
   /// Returning ``Work`` closes dependency capture before that operation can
@@ -84,12 +85,13 @@ public struct AsyncCog<Value> {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
       policy: policy,
       default: defaultValue,
+      equals: nil,
       selector: { c, _ in selector(c) },
       lifetime: .whileObserved(grace: nil),
       label: label
@@ -137,9 +139,9 @@ public struct AsyncCog<Value> {
   ///
   /// The projection retains the async descriptor so its selector can resolve
   /// the same key in each context. When `Value` is itself optional, a retained
-  /// successful `nil` still reads as `nil`, while the metadata's
+  /// successful `nil` still reads as `nil`, while the status's
   /// `hasSucceeded` flag preserves "succeeded with nothing" distinctly from
-  /// the resting default. `equals` applies only to the projected value; the async state's metadata
+  /// the resting default. `equals` applies only to the projected value; the async state's status
   /// publication remains independent.
   internal static func makeValueDescriptor(
     for descriptor: AsyncCogDescriptor<Value>,
@@ -149,7 +151,7 @@ public struct AsyncCog<Value> {
   ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
       selector: { c, key in
-        c.asyncMeta(from: descriptor, key: key).value
+        c.asyncStatus(from: descriptor, key: key).value
       },
       equals: equals,
       lifetime: lifetime,
@@ -169,7 +171,7 @@ extension AsyncCog where Value: Equatable {
   /// This overload has the same scheduling, cancellation, actor, and lifetime
   /// behavior as the unconstrained initializer. The added `Equatable` rule is
   /// intentionally narrow: when work succeeds with an equal value, value
-  /// consumers remain quiet, while metadata consumers still observe pending
+  /// consumers remain quiet, while status consumers still observe pending
   /// and success as distinct turns.
   ///
   /// - Parameters:
@@ -187,12 +189,13 @@ extension AsyncCog where Value: Equatable {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
       policy: policy,
       default: defaultValue,
+      equals: { oldValue, newValue in oldValue == newValue },
       selector: { c, _ in selector(c) },
       lifetime: .whileObserved(grace: nil),
       label: label

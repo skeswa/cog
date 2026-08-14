@@ -44,15 +44,15 @@ let refreshInterval = refreshIntervalSource.readOnly
 /// The keyed forecast every card reads, resting at `nil` until a ZIP's first
 /// accepted reading.
 ///
-/// Each ZIP code gets independent metadata, a dependency set, generation, and
+/// Each ZIP code gets independent status, a dependency set, generation, and
 /// task. The declaration explicitly rests at `nil`: a value read
 /// (`cogs[weatherForecast[zip]]`) is total, returning `nil` before the first
 /// success and the last accepted reading afterward, while request chrome opts
-/// into `cogs.meta[weatherForecast[zip]]`. The selector synchronously
+/// into `cogs.status[weatherForecast[zip]]`. The selector synchronously
 /// captures the current service as a Cog dependency; replacing that service
 /// in a test invalidates every demanded forecast. The returned work runs away
 /// from the MainActor, while Cog brings its pending, success, and failure
-/// metadata back to the graph as ordered turns.
+/// status back to the graph as ordered turns.
 let weatherForecast = AsyncCogBox<WeatherReading?, ZipCode>(
   default: nil,
   name: "weather.forecast"
@@ -66,7 +66,7 @@ let weatherForecast = AsyncCogBox<WeatherReading?, ZipCode>(
 /// Whether the latest successful reading for a ZIP depicts a sunny condition.
 ///
 /// The plain value read keeps this derivation stable across reload pending
-/// and failure metadata; it changes only when the accepted reading does.
+/// and failure status; it changes only when the accepted reading does.
 let isSunny = CogBox<Bool, ZipCode>(
   { c, zip in
     switch c[weatherForecast[zip]]?.weather.kind {

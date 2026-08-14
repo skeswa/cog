@@ -43,16 +43,15 @@ private final class Async02ControlledWork {
     .run { try await work.run() }
   }
   let refresh = cogs.refresh(forecast)
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var iterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var iterator = statuses.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {
-    Issue.record("The phase stream ended before pending")
+    Issue.record("The status stream ended before pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = pending {
-  } else {
+  if pending.kind != .pending || pending.hasSucceeded {
     Issue.record("Expected initial pending without a previous value")
   }
 
@@ -60,13 +59,12 @@ private final class Async02ControlledWork {
   work.fail(with: Async02Error.offline)
 
   guard let failure = await iterator.next() else {
-    Issue.record("The phase stream ended before failure")
+    Issue.record("The status stream ended before failure")
     return
   }
-  switch failure {
-  case .failure(let error, _, hasSucceeded: false):
-    #expect(error as? Async02Error == .offline)
-  default:
+  if failure.kind == .failure, !failure.hasSucceeded {
+    #expect(failure.error as? Async02Error == .offline)
+  } else {
     Issue.record("Expected failure without a previous value")
   }
   switch await refresh.outcome {
@@ -92,16 +90,15 @@ private final class Async02ControlledWork {
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var iterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var iterator = statuses.makeAsyncIterator()
 
   guard let pending = await iterator.next() else {
-    Issue.record("The phase stream ended before pending")
+    Issue.record("The status stream ended before pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = pending {
-  } else {
+  if pending.kind != .pending || pending.hasSucceeded {
     Issue.record("Expected initial pending without a previous value")
   }
 
@@ -109,21 +106,21 @@ private final class Async02ControlledWork {
   work.succeed(with: 42)
 
   guard let success = await iterator.next() else {
-    Issue.record("The phase stream ended before success")
+    Issue.record("The status stream ended before success")
     return
   }
-  if case .success(let value) = success {
-    #expect(value == 42)
+  if success.kind == .success {
+    #expect(success.value == 42)
   } else {
     Issue.record("Expected success")
   }
 
   #if DEBUG
-  let phaseTurns = cogs.debugHistory.entries.filter {
+  let statusTurns = cogs.debugHistory.entries.filter {
     $0.event == .turn && ($0.name == "forecast pending" || $0.name == "forecast success")
   }
-  #expect(phaseTurns.map(\.name) == ["forecast pending", "forecast success"])
-  #expect(phaseTurns[0].turn != phaseTurns[1].turn)
+  #expect(statusTurns.map(\.name) == ["forecast pending", "forecast success"])
+  #expect(statusTurns[0].turn != statusTurns[1].turn)
   #endif
   withExtendedLifetime(token) {}
 }

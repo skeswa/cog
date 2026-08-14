@@ -13,7 +13,7 @@ import Testing
 /// evaluates `body` reentrantly, because SwiftUI cannot: Cog's flush is
 /// synchronous on the MainActor, so a real body evaluation only happens after
 /// the turn completes. A turn that mutates several of the card's boundaries —
-/// a forecast's metadata and its
+/// a forecast's status and its
 /// `isNice` derivation — therefore invalidates once, exactly like a frame.
 /// Tests call ``renderFrame()`` at their settle points to evaluate the body
 /// and re-arm.
@@ -88,7 +88,7 @@ private final class TrackedWeatherCard {
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(newYorkRun, with: newYorkReading)
   }
-  // One metadata read supplies retained content and request chrome. The
+  // One status read supplies retained content and request chrome. The
   // success turn invalidates that boundary once.
   #expect(newYorkCard.invalidations == 1)
   #expect(sanFranciscoCard.invalidations == 0)
@@ -102,7 +102,7 @@ private final class TrackedWeatherCard {
   sanFranciscoCard.renderFrame()
 
   cogs.refresh(weatherForecast[.sanFrancisco])
-  // Reload pending notices the metadata boundary, and the frame counts once.
+  // Reload pending notices the status boundary, and the frame counts once.
   #expect(sanFranciscoCard.invalidations == 2)
   sanFranciscoCard.renderFrame()
   let changedRun = try #require(await starts.next())
@@ -135,7 +135,7 @@ private final class TrackedWeatherCard {
         report: sanFranciscoReading.weather,
         isNice: false
       ),
-      // The changed success turn mutates metadata and `isNice`
+      // The changed success turn mutates status and `isNice`
       // together; the frame renders once and must see them from the same
       // settled turn rather than a mixed set.
       WeatherCardSnapshot(

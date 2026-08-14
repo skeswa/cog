@@ -163,10 +163,9 @@ import Testing
   try await failed.wait()
   try await clock.waitForScheduledSleep()
 
-  if case .failure(_, value: .some(let reading), hasSucceeded: true) =
-    cogs.meta.peek(weatherForecast[.newYork])
-  {
-    #expect(reading == initialReading)
+  let failedStatus = cogs.status.peek(weatherForecast[.newYork])
+  if failedStatus.kind == .failure, failedStatus.hasSucceeded {
+    #expect(failedStatus.value == initialReading)
   } else {
     Issue.record("The failed hourly refresh should retain the previous reading")
   }

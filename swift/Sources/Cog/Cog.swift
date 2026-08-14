@@ -112,7 +112,7 @@ public struct Cog<Value> {
 
   /// Builds a reference for an existing descriptor-and-key identity.
   ///
-  /// ``CogBox`` and async latest projections use this path so subscripting
+  /// ``CogBox`` and async value projections use this path so subscripting
   /// packages identity without allocating another descriptor or graph state.
   internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
     self.descriptor = descriptor

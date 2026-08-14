@@ -26,31 +26,29 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
 }
 
 @MainActor
-@Test func `ASYNC-12 box keys fetch and publish metadata independently`() async {
+@Test func `ASYNC-12 box keys fetch and publish status independently`() async {
   let cogs = Cogs.forTesting()
   let work = Async12ControlledWork<String>()
   let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, zip in
     .run { await work.run(for: zip) }
   }
-  let (homePhases, homeContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let (awayPhases, awayContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let homeToken = cogs.run { c in homeContinuation.yield(c.meta[forecasts["home"]]) }
-  let awayToken = cogs.run { c in awayContinuation.yield(c.meta[forecasts["away"]]) }
-  var homeIterator = homePhases.makeAsyncIterator()
-  var awayIterator = awayPhases.makeAsyncIterator()
+  let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let (awayStatuses, awayContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let homeToken = cogs.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
+  let awayToken = cogs.run { c in awayContinuation.yield(c.status[forecasts["away"]]) }
+  var homeIterator = homeStatuses.makeAsyncIterator()
+  var awayIterator = awayStatuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
   guard let homePending = await homeIterator.next(), let awayPending = await awayIterator.next()
   else {
-    Issue.record("Both keyed phase streams must begin with pending")
+    Issue.record("Both keyed status streams must begin with pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = homePending {
-  } else {
+  if homePending.kind != .pending || homePending.hasSucceeded {
     Issue.record("The home key did not begin pending without a previous value")
   }
-  if case .pending(_, hasSucceeded: false) = awayPending {
-  } else {
+  if awayPending.kind != .pending || awayPending.hasSucceeded {
     Issue.record("The away key did not begin pending without a previous value")
   }
 
@@ -59,26 +57,26 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
 
   work.succeed("home", with: 72)
   guard let homeSuccess = await homeIterator.next() else {
-    Issue.record("The home phase stream ended before success")
+    Issue.record("The home status stream ended before success")
     return
   }
-  if case .success(let value) = homeSuccess {
-    #expect(value == 72)
+  if homeSuccess.kind == .success {
+    #expect(homeSuccess.value == 72)
   } else {
     Issue.record("The home key did not succeed independently")
   }
-  if case .pending(_, hasSucceeded: false) = cogs.meta.peek(forecasts["away"]) {
-  } else {
+  let awayPendingAfterHome = cogs.status.peek(forecasts["away"])
+  if awayPendingAfterHome.kind != .pending || awayPendingAfterHome.hasSucceeded {
     Issue.record("The away key did not remain pending while home succeeded")
   }
 
   work.succeed("away", with: 41)
   guard let awaySuccess = await awayIterator.next() else {
-    Issue.record("The away phase stream ended before success")
+    Issue.record("The away status stream ended before success")
     return
   }
-  if case .success(let value) = awaySuccess {
-    #expect(value == 41)
+  if awaySuccess.kind == .success {
+    #expect(awaySuccess.value == 41)
   } else {
     Issue.record("The away key did not complete independently")
   }

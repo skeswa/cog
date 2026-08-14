@@ -111,7 +111,7 @@ extension Cogs {
   ///
   /// Call refresh from event handling or a reaction. A request made by a
   /// reaction queues its system turn until reaction tracking finishes, so
-  /// metadata publication cannot reenter the active consumer. Calling it while any
+  /// status publication cannot reenter the active consumer. Calling it while any
   /// derived or async selector is computing instead traps before the target
   /// state is created, using the same diagnostic as a commit during derivation.
   ///

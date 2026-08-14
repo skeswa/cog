@@ -100,7 +100,7 @@ Execution constraints from the design docs:
   (§3.2).
 - Lazy pull plus pushed dirty flags; CLEAN, CHECK, DIRTY with versions;
   equality gates; dependencies recaptured every run.
-- `CogMeta` begins publicly at `pending` with a total value and
+- `CogStatus.kind` begins publicly at `pending` with a total value and
   `hasSucceeded`; async
   selectors are synchronous and return `Work`; `.latest` is the default;
   streams are `.latest`-only.
@@ -424,22 +424,23 @@ isolation; and named effect runs in history.
 
 Limit this milestone to the async pieces needed for 0.1.0:
 
-- `CogMeta<Value>` with a total `value`, `hasSucceeded`, and loading/error
-  accessors, plus the value projection so async and manual values read alike.
-  There is no observable `initial` case: first read starts work, publishes
-  `pending(value: default, hasSucceeded: false)` as a turn, and returns that
-  metadata.
+- `CogStatus<Value>` with a three-valued `kind`, total `value`, `hasSucceeded`,
+  and loading/error accessors, plus the value projection so async and manual
+  values read alike. SwiftUI observes each field independently. There is no
+  observable `initial` kind: first read starts work, publishes
+  `kind == .pending`, `value == default`, and `hasSucceeded == false` as a turn,
+  and returns that status.
 - `AsyncCog` and `AsyncCogBox`: synchronous tracked selectors returning
   `Work.run`; the `.latest` policy with generation numbers (the MainActor
   commits a result only if its generation is still current); each visible
-  metadata change is its own turn; replaced-cancelled work publishes no failure.
+  status change is its own turn; replaced-cancelled work publishes no failure.
 - Safe release: cancel and advance the generation on `.whileObserved` expiry
   (§5.3).
 - A `cogs.refresh(valueReference)` op returning an exact-generation
   `CogRefresh` outcome; task names from descriptor labels for Instruments.
 - A one-shot peek or refresh of a never-read async value reference creates its
-  state and starts exactly one initial run at
-  `pending(value: default, hasSucceeded: false)`. It
+  state and starts exactly one initial run with `kind == .pending`,
+  `value == default`, and `hasSucceeded == false`. It
   installs no durable consumer: the call renews ordinary `whileObserved`
   grace, after which release cancels the work and rejects late results if no
   consumer arrived. Refresh does not initialize and then replace the first
@@ -447,7 +448,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
 - A one-shot peek of synchronous derived state is the same kind of transient
   demand: it installs no durable consumer, renews ordinary `whileObserved`
   grace, and releases and recreates from current dependencies after expiry.
-- Tests: cancellation, stale-generation rejection, metadata-per-turn sequencing,
+- Tests: cancellation, stale-generation rejection, status-per-turn sequencing,
   dependency changes mid-flight, omitted-policy `.latest` behavior, release
   while pending, initial pending-to-failure turns, reload pending-to-failure
   turns with the last successful value, MainActor-by-default and `@concurrent`
@@ -458,7 +459,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
   of one-shot synchronous derived demand. Use injected clocks and
   continuations; do not sleep.
 - Revise `swift/Examples/Weather` around the completed slice: one keyed
-  `AsyncCogBox` owns forecast request metadata and tasks; cards retain the last
+  `AsyncCogBox` owns forecast request status and tasks; cards retain the last
   successful reading through reload and failure; initial loads, retries, and
   hourly updates use `refresh`; deterministic example tests prove per-ZIP
   invalidation, untorn atomic readings, failure retention, replacement, and
@@ -474,12 +475,13 @@ query caching.
 - Read swift-state-graph source before freezing public names; credit prior
   art; compare tracked reads with capture lists. Adjust names if warranted;
   update §10.
-- Complete and simplify the `CogMeta` surface — a total `value`,
-  `hasSucceeded`, `error`, and `isLoading` (§5.1) — so
-  the public-name review and 0.1.0 freeze cover the whole metadata surface
+- Complete and simplify the `CogStatus` surface — a three-valued `kind`, total
+  `value`, `hasSucceeded`, `error`, and `isLoading`, independently observed at
+  the SwiftUI boundary (§5.1) — so
+  the public-name review and 0.1.0 freeze cover the whole status surface
   without `Previous` or weaker optional accessors (ASYNC-30).
 - Adopt value-first async reads before the freeze: total `c[...]` value reads
-  resting on an explicit declaration `default:`, the `meta` lens on every read
+  resting on an explicit declaration `default:`, the `status` lens on every read
   capability, and no separate `.latest` projection (§5.1; ASYNC-31 through
   ASYNC-34, with the existing async suite respelled).
 - Return exact-generation `CogRefresh` handles; make `Cogs` the sole public

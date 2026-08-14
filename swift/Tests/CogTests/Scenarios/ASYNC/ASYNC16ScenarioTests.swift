@@ -67,21 +67,21 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
       )
     }
   }
-  let (phases, phaseContinuation) = AsyncStream.makeStream(
-    of: CogMeta<Async16Run>.self
+  let (statuses, statusContinuation) = AsyncStream.makeStream(
+    of: CogStatus<Async16Run>.self
   )
   let token = cogs.run { c in
-    let phase = c.meta[forecast]
-    if case .success = phase {
+    let status = c.status[forecast]
+    if status.kind == .success {
       MainActor.preconditionIsolated("AsyncCog concurrent result publication")
     }
-    phaseContinuation.yield(phase)
+    statusContinuation.yield(status)
   }
-  var phaseIterator = phases.makeAsyncIterator()
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard await phaseIterator.next() != nil else {
-    Issue.record("The phase stream ended before initial pending")
+  guard await statusIterator.next() != nil else {
+    Issue.record("The status stream ended before initial pending")
     return
   }
   #expect(
@@ -90,8 +90,8 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   )
 
   cogs.commit("change request") { c in c[request] = 1 }
-  guard await phaseIterator.next() != nil else {
-    Issue.record("The phase stream ended before replacement pending")
+  guard await statusIterator.next() != nil else {
+    Issue.record("The status stream ended before replacement pending")
     return
   }
   #expect(
@@ -103,18 +103,18 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
   work.finish(0)
   try await staleChecked.wait()
-  if case .pending(_, hasSucceeded: false) = cogs.meta.peek(forecast) {
-  } else {
+  let statusAfterStaleCompletion = cogs.status.peek(forecast)
+  if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.hasSucceeded {
     Issue.record("The stale concurrent result escaped the generation check")
   }
 
   work.finish(1)
-  guard let completed = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before success")
+  guard let completed = await statusIterator.next() else {
+    Issue.record("The status stream ended before success")
     return
   }
-  if case .success(let run) = completed {
-    #expect(run == Async16Run(request: 1, ranWithoutActorIsolation: true))
+  if completed.kind == .success {
+    #expect(completed.value == Async16Run(request: 1, ranWithoutActorIsolation: true))
   } else {
     Issue.record("Expected the newest concurrent result to commit")
   }

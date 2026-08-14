@@ -95,7 +95,7 @@ struct WeatherEffects {
 
 /// Sleeps on deadline-based cadence and refreshes the currently selected key.
 ///
-/// Refresh is synchronous graph demand, so service failures become metadata
+/// Refresh is synchronous graph demand, so service failures become status
 /// and never throw out of this loop. The weak runtime lookup also lets an
 /// isolated test or preview release its `Cogs`; clock cancellation and runtime
 /// release are the loop's only terminal paths.
@@ -116,7 +116,7 @@ private func runHourlyRefresh<C: Clock>(
     guard let zip = cogs.peek(currentZipCode) else { continue }
 
     // Refresh starts graph-owned work and returns immediately. A request
-    // failure becomes the forecast's `.failure` metadata, so it cannot terminate
+    // failure becomes the forecast's `.failure` status, so it cannot terminate
     // this scheduling loop and silently disable later ticks.
     cogs.refresh(weatherForecast[zip])
   }

@@ -40,68 +40,67 @@ private final class Async19ControlledWork {
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
   work.succeed(0, with: 10)
 
-  guard let firstSuccess = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before success")
+  guard let firstSuccess = await statusIterator.next() else {
+    Issue.record("The status stream ended before success")
     return
   }
-  if case .success(let value) = firstSuccess {
-    #expect(value == 10)
+  if firstSuccess.kind == .success {
+    #expect(firstSuccess.value == 10)
   } else {
     Issue.record("Expected the first work to succeed")
   }
 
   cogs.commit("first reload") { c in c[request] = 1 }
-  guard let failedReloadPending = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before reload pending")
+  guard let failedReloadPending = await statusIterator.next() else {
+    Issue.record("The status stream ended before reload pending")
     return
   }
-  if case .pending(value: let value, hasSucceeded: true) = failedReloadPending {
-    #expect(value == 10)
+  if failedReloadPending.kind == .pending, failedReloadPending.hasSucceeded {
+    #expect(failedReloadPending.value == 10)
   } else {
     Issue.record("Expected reload pending to retain the last success")
   }
   #expect(await startIterator.next() == 1)
   work.fail(1, with: Async19Error.offline)
 
-  guard let failure = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before failure")
+  guard let failure = await statusIterator.next() else {
+    Issue.record("The status stream ended before failure")
     return
   }
-  switch failure {
-  case .failure(let error, let value, hasSucceeded: true):
-    #expect(error as? Async19Error == .offline)
-    #expect(value == 10)
-  default:
+  if failure.kind == .failure, failure.hasSucceeded {
+    #expect(failure.error as? Async19Error == .offline)
+    #expect(failure.value == 10)
+  } else {
     Issue.record("Expected failure to retain the last success")
   }
 
   cogs.commit("second reload") { c in c[request] = 2 }
-  guard let repeatedReload = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before repeated reload pending")
+  guard let repeatedReload = await statusIterator.next() else {
+    Issue.record("The status stream ended before repeated reload pending")
     return
   }
-  if case .pending(value: let value, hasSucceeded: true) = repeatedReload {
-    #expect(value == 10)
+  if repeatedReload.kind == .pending, repeatedReload.hasSucceeded {
+    #expect(repeatedReload.value == 10)
   } else {
     Issue.record("Expected a later reload to retain success rather than failure")
   }
   #expect(await startIterator.next() == 2)
 
   #if DEBUG
-  let phaseTurns = cogs.debugHistory.entries.filter {
+  let statusTurns = cogs.debugHistory.entries.filter {
     $0.event == .turn && $0.name.hasPrefix("forecast ")
   }
   #expect(
-    phaseTurns.map(\.name) == [
+    statusTurns.map(\.name) == [
       "forecast pending",
       "forecast success",
       "forecast pending",
@@ -109,7 +108,7 @@ private final class Async19ControlledWork {
       "forecast pending",
     ]
   )
-  #expect(Set(phaseTurns.map(\.turn)).count == 5)
+  #expect(Set(statusTurns.map(\.turn)).count == 5)
   #endif
   withExtendedLifetime(token) {}
 }

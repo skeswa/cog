@@ -26,7 +26,7 @@ public struct CogBox<Value, Key: Hashable> {
 
   /// Builds a keyed facade over an existing derived declaration.
   ///
-  /// Async latest projections use this path to expose their shared projection
+  /// Async value projections use this path to expose their shared projection
   /// descriptor with normal keyed-`Cog` spelling. It allocates neither a new
   /// descriptor nor context state.
   internal init(descriptor: DerivedCogDescriptor<Value>) {

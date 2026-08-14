@@ -18,10 +18,8 @@ import Testing
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  if case .pending(value: nil, hasSucceeded: false) =
-    cogs.meta.peek(weatherForecast[.newYork])
-  {
-  } else {
+  let initialStatus = cogs.status.peek(weatherForecast[.newYork])
+  if initialStatus.kind != .pending || initialStatus.value != nil || initialStatus.hasSucceeded {
     Issue.record("A forecast's first demand should synchronously return initial pending")
   }
   let initialRun = try #require(await starts.next())
@@ -68,13 +66,13 @@ import Testing
 }
 
 @MainActor
-@Test func aFailedRefreshKeepsTheLastForecastInItsMetadata() async throws {
+@Test func aFailedRefreshKeepsTheLastForecastInItsStatus() async throws {
   let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  _ = cogs.meta.peek(weatherForecast[.newYork])
+  _ = cogs.status.peek(weatherForecast[.newYork])
   let initialRun = try #require(await starts.next())
   let lastGoodReading = WeatherReading(.cloudy, 60)
   try await resolveWeatherRequest(in: cogs) {
@@ -82,10 +80,9 @@ import Testing
   }
 
   let failedRefresh = cogs.refresh(weatherForecast[.newYork])
-  if case .pending(value: .some(let reading), hasSucceeded: true) =
-    cogs.meta.peek(weatherForecast[.newYork])
-  {
-    #expect(reading == lastGoodReading)
+  let pendingStatus = cogs.status.peek(weatherForecast[.newYork])
+  if pendingStatus.kind == .pending, pendingStatus.hasSucceeded {
+    #expect(pendingStatus.value == lastGoodReading)
   } else {
     Issue.record("Reload pending should retain the last successful reading")
   }
@@ -99,11 +96,10 @@ import Testing
   }
   #expect(refreshError is RefreshFailure)
 
-  if case .failure(let error, value: .some(let reading), hasSucceeded: true) =
-    cogs.meta.peek(weatherForecast[.newYork])
-  {
-    #expect(error is RefreshFailure)
-    #expect(reading == lastGoodReading)
+  let failedStatus = cogs.status.peek(weatherForecast[.newYork])
+  if failedStatus.kind == .failure, failedStatus.hasSucceeded {
+    #expect(failedStatus.error is RefreshFailure)
+    #expect(failedStatus.value == lastGoodReading)
   } else {
     Issue.record("Failure should retain the last successful reading")
   }
@@ -117,7 +113,7 @@ import Testing
   var starts = requests.starts.makeAsyncIterator()
   cogs.seedWeatherService(requests.service)
 
-  _ = cogs.meta.peek(weatherForecast[.newYork])
+  _ = cogs.status.peek(weatherForecast[.newYork])
   let replacedRun = try #require(await starts.next())
 
   let currentRefresh = cogs.refresh(weatherForecast[.newYork])
@@ -127,10 +123,10 @@ import Testing
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(replacedRun, with: WeatherReading(.rain, 55))
   }
-  if case .pending(value: nil, hasSucceeded: false) =
-    cogs.meta.peek(weatherForecast[.newYork])
+  let statusAfterStaleCompletion = cogs.status.peek(weatherForecast[.newYork])
+  if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.value != nil
+    || statusAfterStaleCompletion.hasSucceeded
   {
-  } else {
     Issue.record("A replaced request must not publish its late success")
   }
 
@@ -142,8 +138,9 @@ import Testing
     Issue.record("The current refresh handle did not complete successfully")
     return
   }
-  if case .success(let reading) = cogs.meta.peek(weatherForecast[.newYork]) {
-    #expect(reading == currentReading)
+  let currentStatus = cogs.status.peek(weatherForecast[.newYork])
+  if currentStatus.kind == .success {
+    #expect(currentStatus.value == currentReading)
   } else {
     Issue.record("The latest request should publish success")
   }
@@ -159,7 +156,7 @@ import Testing
     let checked = MainActorCleanupAcknowledgement()
     cogs.acknowledgeNextAsyncCompletionCheck(with: checked)
     if request == 0 {
-      _ = cogs.meta.peek(weatherForecast[.newYork])
+      _ = cogs.status.peek(weatherForecast[.newYork])
     } else {
       let refresh = cogs.refresh(weatherForecast[.newYork])
       guard case .success = await refresh.outcome else {
@@ -169,7 +166,8 @@ import Testing
     }
     try await checked.wait()
 
-    guard case .success(let reading?) = cogs.meta.peek(weatherForecast[.newYork]) else {
+    let status = cogs.status.peek(weatherForecast[.newYork])
+    guard status.kind == .success, let reading = status.value else {
       Issue.record("The demo request did not publish a reading")
       return
     }

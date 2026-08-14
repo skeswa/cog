@@ -66,7 +66,7 @@ actor WeatherRequestController {
     continuations.removeValue(forKey: run.id)?.resume(returning: reading)
   }
 
-  /// Resumes one selected run with the error Cog should publish as metadata.
+  /// Resumes one selected run with the error Cog should publish as status.
   func fail(_ run: WeatherRequestRun, with error: any Error) {
     continuations.removeValue(forKey: run.id)?.resume(throwing: error)
   }
@@ -75,7 +75,7 @@ actor WeatherRequestController {
 /// Resolves controlled work and waits until Cog has accepted or rejected it.
 ///
 /// The acknowledgement closes the race between an operation returning and its
-/// metadata publication. Callers can inspect public graph state immediately after
+/// status publication. Callers can inspect public graph state immediately after
 /// this function returns without yielding or polling.
 @MainActor
 func resolveWeatherRequest(

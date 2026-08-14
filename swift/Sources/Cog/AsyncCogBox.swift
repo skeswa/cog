@@ -2,7 +2,7 @@
 ///
 /// A box owns one declaration descriptor and builds lightweight ``AsyncCog``
 /// value references for its keys. Each descriptor-and-key pair has its own
-/// metadata, dependencies, generation, lifetime state, and work task in a
+/// status, dependencies, generation, lifetime state, and work task in a
 /// ``Cogs``:
 ///
 /// ```swift
@@ -19,8 +19,8 @@
 /// Value reads of a key are total: `c[fetchedWeather[zip]]` returns the last
 /// accepted success for that key, resting on the declaration's explicit
 /// default until one exists. Each
-/// key's full request lifecycle reads through the `meta` lens,
-/// `c.meta[fetchedWeather[zip]]`.
+/// key's full request lifecycle reads through the `status` lens,
+/// `c.status[fetchedWeather[zip]]`.
 ///
 /// Building `box[key]` creates no state and allocates no new descriptor. Equal
 /// keys produce the same declaration-and-key identity, while unequal keys are
@@ -79,13 +79,14 @@ public struct AsyncCogBox<Value, Key: Hashable> {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>, Key) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
       policy: policy,
       default: defaultValue,
+      equals: nil,
       lifetime: lifetime,
       label: label,
       selector: selector
@@ -102,7 +103,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// The value reference naming this box's async value for one key.
   ///
   /// Equal keys name the same state. Different keys fetch and advance their
-  /// metadata independently while sharing this box's declaration descriptors.
+  /// status independently while sharing this box's declaration descriptors.
   /// Subscripting is inert: the returned reference creates state and starts
   /// work only when a context reads, peeks, or refreshes it.
   ///
@@ -127,13 +128,15 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   internal static func makeDescriptor(
     policy: LatestPolicy,
     default defaultValue: Value,
+    equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
     label: CogLabel,
-    selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
+    selector: @escaping @MainActor (Reader<CogStatus<Value>>, Key) -> Work<Value>
   ) -> AsyncCogDescriptor<Value> {
     AsyncCogDescriptor(
       policy: policy,
       default: defaultValue,
+      equals: equals,
       selector: { c, erasedKey in
         guard let key = erasedKey as? Key else {
           fatalError(
@@ -159,7 +162,7 @@ extension AsyncCogBox where Value: Equatable {
   ///
   /// Scheduling, cancellation, state identity, actor execution, and lifetime
   /// are identical to the unconstrained initializer. Equality affects only
-  /// each key's value projection: metadata consumers still observe pending and
+  /// each key's value projection: status consumers still observe pending and
   /// success turns even when the successful value is unchanged.
   ///
   /// - Parameters:
@@ -178,13 +181,14 @@ extension AsyncCogBox where Value: Equatable {
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
-    _ selector: @escaping @MainActor (Reader<CogMeta<Value>>, Key) -> Work<Value>
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>, Key) -> Work<Value>
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
       policy: policy,
       default: defaultValue,
+      equals: { oldValue, newValue in oldValue == newValue },
       lifetime: lifetime,
       label: label,
       selector: selector

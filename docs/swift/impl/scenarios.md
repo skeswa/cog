@@ -570,46 +570,50 @@ _Milestone M3, except ASYNC-30 through ASYNC-34 (M4). Design: §5.1, §5.2
 Async state is honest: it always says whether it is loading, what value is
 renderable, and whether any generation has succeeded.
 
-### 13.1 Metadata
+### 13.1 Status
 
 - **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
-  work and publishes a pending turn; a `meta` read returns
-  `.pending(value: default, hasSucceeded: false)`, while a value read returns
-  that same declared resting default. There is no observable `initial` case.
-- **ASYNC-02.** The work throws. Metadata becomes failure holding the
+  work and publishes a pending turn; a `status` read returns
+  `kind == .pending`, `value == default`, and `hasSucceeded == false`, while a
+  value read returns that same declared resting default. There is no observable
+  `initial` kind.
+- **ASYNC-02.** The work throws. Status becomes failure holding the
   error, its total renderable value, and whether an earlier success exists.
 - **ASYNC-03.** An async cog whose value is optional succeeded with
   `nil`. When it reloads, `value` remains `nil` and `hasSucceeded` remains
   true — clearly different from the resting `nil` before any success.
-- **ASYNC-04.** `value`, `hasSucceeded`, and `isLoading` are right in every case:
+- **ASYNC-04.** `value`, `hasSucceeded`, and `isLoading` are right in every
+  lifecycle state:
   the default and loading before success; the old value and loading while
   reloading; the value and not loading on success; the last good value
   and not loading on failure.
 - **ASYNC-05.** The plain value read lets me read an async cog in the same
   shape as a manual cog: the resting default before the first success, then
   the last accepted success.
-- **ASYNC-06.** A metadata watcher sees each visible metadata change as its own
+- **ASYNC-06.** A status watcher sees each visible status change as its own
   turn: first pending, then success, two separate turns.
-- **ASYNC-30.** `value`, `hasSucceeded`, `error`, and `isLoading` form the
-  accessor set: `value` remains total while `error` reports only the current
-  failure; a reload retrying after a failure has no error and retains its
-  renderable value. Loading and prior success remain orthogonal, and a
-  successful `nil` stays distinct from "never succeeded" through
-  `hasSucceeded`.
+- **ASYNC-30.** `kind`, `value`, `hasSucceeded`, `error`, and `isLoading` form
+  the accessor set: `kind` carries pending, success, or failure; `value`
+  remains total while `error` reports only the current failure; a reload
+  retrying after a failure has no error and retains its renderable value.
+  Loading and prior success remain orthogonal, and a successful `nil` stays
+  distinct from "never succeeded" through `hasSucceeded`.
 - **ASYNC-31.** Every async cog rests on a declared default, and value reads
   are total. Every declaration states the resting value with `default:`, and
   an `Optional` spells `default: nil`. In every value spelling — `c[...]`,
   `cogs[...]`, and their peeks — the read returns the default before any
   success and the last accepted success afterward, through reload pending
   and failure alike.
-- **ASYNC-32.** The `meta` lens carries the same read family as the value
-  spelling beside it: tracked `c.meta[...]` and `cogs.meta[...]` reads,
-  `meta.peek` one-shots, and `cogs.meta.watch`, with identical demand,
-  tracking, and lifetime rules. While an equal-success reload leaves a value
-  consumer quiet, the lens still shows its consumers every pending, success,
-  and failure turn.
-- **ASYNC-33.** The `meta` lens refuses synchronous state: asking
-  `cogs.meta` or a selector's `c.meta` for a manual or derived cog does
+- **ASYNC-32.** The `status` lens carries the same read family as the value
+  spelling beside it: tracked `c.status[...]` and `cogs.status[...]` reads,
+  `status.peek` one-shots, and `cogs.status.watch`, with identical demand,
+  tracking, and lifetime rules. `CogStatus.kind` carries pending, success, or
+  failure, while SwiftUI Observation independently tracks only the `kind`,
+  `value`, `hasSucceeded`, `error`, and `isLoading` fields a body actually
+  reads. While an equal-success reload leaves a value consumer quiet, the lens
+  still shows its consumers every pending, success, and failure turn.
+- **ASYNC-33.** The `status` lens refuses synchronous state: asking
+  `cogs.status` or a selector's `c.status` for a manual or derived cog does
   not compile. (Proof: compile-fail.)
 - **ASYNC-34.** An async declaration without `default:` does not compile.
   Optional values are not special: they state `default: nil` explicitly.
@@ -623,9 +627,9 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-08.** The old work finishes anyway, ignoring cancellation. Its
   result is thrown away. Only the newest run may commit.
 - **ASYNC-09.** Work that was cancelled because it was replaced publishes
-  no failure metadata.
+  no failure status.
 - **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
-  though no dependency changed, the metadata cycles again, and the returned
+  though no dependency changed, the status cycles again, and the returned
   handle completes only when that exact generation succeeds or fails.
 - **ASYNC-11.** Only what the selector reads with `c[...]` before
   returning counts as a dependency. Values the work closure touches after
@@ -640,7 +644,7 @@ renderable, and whether any generation has succeeded.
   commits nothing. An exact refresh handle waiting on that generation resolves
   as `released` rather than hanging or following a recreated state.
 - **ASYNC-14.** After a release, reading the value reference again starts fresh work
-  and fresh metadata, unpolluted by anything from before.
+  and fresh status, unpolluted by anything from before.
 
 ### 13.4 Work isolation and retained values
 
@@ -652,16 +656,16 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-17.** The internal task that runs an async cog's work carries
   the descriptor's name and key, so Instruments can show it. (Checked
   through an internal seam.)
-- **ASYNC-18.** Initial work throws. A metadata watcher and history see pending
+- **ASYNC-18.** Initial work throws. A status watcher and history see pending
   with the resting default and `hasSucceeded == false`, then failure with the
   same pair, as two distinct turns.
 - **ASYNC-19.** Work succeeds, then a dependency change starts a reload
-  that fails. A metadata watcher and history see success, pending with that
+  that fails. A status watcher and history see success, pending with that
   success as its value, then failure with the same retained value,
   each as its own turn. A further reload's pending still carries that
   success — the last good value, never the failure.
 - **ASYNC-20.** A reload succeeds with a value equal to the one it had.
-  Metadata watchers see the pending and success turns, but value consumers see
+  Status watchers see the pending and success turns, but value consumers see
   no change: no recompute, no re-render.
 - **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
@@ -673,9 +677,9 @@ renderable, and whether any generation has succeeded.
 
 - **ASYNC-22.** I use one-shot `cogs.peek` on a never-read async cog. It
   starts one suspended run, publishes
-  `.pending(value: default, hasSucceeded: false)`, returns
+  `kind == .pending`, `value == default`, and `hasSucceeded == false`, returns
   its spelling's view — the resting default from a value peek, that pending
-  metadata from `cogs.meta.peek` — and installs no durable consumer. Another
+  status from `cogs.status.peek` — and installs no durable consumer. Another
   peek sees that same generation instead of starting a second run and renews
   its grace window. With no durable consumer, injected grace expiry cancels
   and releases the state; a late result commits nothing, and a later read
@@ -742,7 +746,7 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open questions 8, 9, and 14): what metadata a stream
+_Pending (core §10, open questions 8, 9, and 14): what status a stream
 publishes when its sequence ends naturally, whether a throwing sequence
 publishes a failure, and whether consecutive equal elements each commit a
 turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._

@@ -46,20 +46,20 @@ private final class Async18ControlledWork {
     .run { try await work.run() }
   }
   let (observations, continuation) = AsyncStream.makeStream(of: Async18Observation.self)
-  let token = cogs.meta.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
-    switch (old, new) {
-    case (.pending(_, hasSucceeded: false), .pending(_, hasSucceeded: false)):
+  let token = cogs.status.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
+    if old.kind == .pending, !old.hasSucceeded,
+      new.kind == .pending, !new.hasSucceeded
+    {
       continuation.yield(.initialPendingWithoutSuccess)
-    case (
-      .pending(_, hasSucceeded: false),
-      .failure(let error, _, hasSucceeded: false)
-    ):
-      guard let error = error as? Async18Error else {
+    } else if old.kind == .pending, !old.hasSucceeded,
+      new.kind == .failure, !new.hasSucceeded
+    {
+      guard let error = new.error as? Async18Error else {
         continuation.yield(.unexpectedTransition)
         return
       }
       continuation.yield(.pendingToFailureWithoutSuccess(error))
-    default:
+    } else {
       continuation.yield(.unexpectedTransition)
     }
   }
@@ -73,11 +73,11 @@ private final class Async18ControlledWork {
   #expect(await iterator.next() == .pendingToFailureWithoutSuccess(.offline))
 
   #if DEBUG
-  let phaseTurns = cogs.debugHistory.entries.filter {
+  let statusTurns = cogs.debugHistory.entries.filter {
     $0.event == .turn && ($0.name == "forecast pending" || $0.name == "forecast failure")
   }
-  #expect(phaseTurns.map(\.name) == ["forecast pending", "forecast failure"])
-  #expect(Set(phaseTurns.map(\.turn)).count == 2)
+  #expect(statusTurns.map(\.name) == ["forecast pending", "forecast failure"])
+  #expect(Set(statusTurns.map(\.turn)).count == 2)
   #endif
 
   withExtendedLifetime(token) {}

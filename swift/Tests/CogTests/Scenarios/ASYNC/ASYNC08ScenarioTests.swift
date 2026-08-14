@@ -32,15 +32,15 @@ private final class Async08ControlledWork {
     let currentRequest = c[request]
     return .run { await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
   cogs.commit("change request") { c in c[request] = 1 }
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 1)
 
   let staleChecked = MainActorCleanupAcknowledgement()
@@ -48,19 +48,18 @@ private final class Async08ControlledWork {
   work.finish(0, with: 100)
   try await staleChecked.wait()
 
-  let afterStale = cogs.meta.peek(forecast)
-  if case .pending(_, hasSucceeded: false) = afterStale {
-  } else {
-    Issue.record("A stale result changed the newest run's pending phase")
+  let afterStale = cogs.status.peek(forecast)
+  if afterStale.kind != .pending || afterStale.hasSucceeded {
+    Issue.record("A stale result changed the newest run's pending status")
   }
 
   work.finish(1, with: 200)
-  guard let success = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before the newest result")
+  guard let success = await statusIterator.next() else {
+    Issue.record("The status stream ended before the newest result")
     return
   }
-  if case .success(let value) = success {
-    #expect(value == 200)
+  if success.kind == .success {
+    #expect(success.value == 200)
   } else {
     Issue.record("Expected only the newest result to commit")
   }

@@ -33,35 +33,35 @@ private final class Async10ControlledWork {
   let cogs = Cogs.forTesting()
   let work = Async10ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
   work.finish(0, with: 10)
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
 
   let refresh = cogs.refresh(forecast)
-  guard let reload = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before refresh pending")
+  guard let reload = await statusIterator.next() else {
+    Issue.record("The status stream ended before refresh pending")
     return
   }
-  if case .pending(value: let value, hasSucceeded: true) = reload {
-    #expect(value == 10)
+  if reload.kind == .pending, reload.hasSucceeded {
+    #expect(reload.value == 10)
   } else {
     Issue.record("Expected refresh pending with the settled value")
   }
   #expect(await startIterator.next() == 1)
   work.finish(1, with: 20)
 
-  guard let success = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before refreshed success")
+  guard let success = await statusIterator.next() else {
+    Issue.record("The status stream ended before refreshed success")
     return
   }
-  if case .success(let value) = success {
-    #expect(value == 20)
+  if success.kind == .success {
+    #expect(success.value == 20)
   } else {
     Issue.record("Expected refreshed success")
   }
@@ -78,31 +78,29 @@ private final class Async10ControlledWork {
   let cogs = Cogs.forTesting()
   let work = Async10ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
   let supersededRefresh = cogs.refresh(forecast)
-  guard let replacementPending = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before replacement pending")
+  guard let replacementPending = await statusIterator.next() else {
+    Issue.record("The status stream ended before replacement pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = replacementPending {
-  } else {
+  if replacementPending.kind != .pending || replacementPending.hasSucceeded {
     Issue.record("Expected in-flight refresh pending without a previous value")
   }
   #expect(await startIterator.next() == 1)
 
   let newestRefresh = cogs.refresh(forecast)
-  guard let newestPending = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before newest pending")
+  guard let newestPending = await statusIterator.next() else {
+    Issue.record("The status stream ended before newest pending")
     return
   }
-  if case .pending(_, hasSucceeded: false) = newestPending {
-  } else {
+  if newestPending.kind != .pending || newestPending.hasSucceeded {
     Issue.record("Expected the newest refresh to remain initial pending")
   }
   #expect(await startIterator.next() == 2)
@@ -115,8 +113,8 @@ private final class Async10ControlledWork {
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
   work.finish(0, with: 100)
   try await staleChecked.wait()
-  if case .pending(_, hasSucceeded: false) = cogs.meta.peek(forecast) {
-  } else {
+  let statusAfterStaleCompletion = cogs.status.peek(forecast)
+  if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.hasSucceeded {
     Issue.record("The replaced run committed after refresh")
   }
 
@@ -126,12 +124,12 @@ private final class Async10ControlledWork {
   try await replacedChecked.wait()
 
   work.finish(2, with: 200)
-  guard let success = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before replacement success")
+  guard let success = await statusIterator.next() else {
+    Issue.record("The status stream ended before replacement success")
     return
   }
-  if case .success(let value) = success {
-    #expect(value == 200)
+  if success.kind == .success {
+    #expect(success.value == 200)
   } else {
     Issue.record("Expected only refreshed work to commit")
   }

@@ -33,40 +33,39 @@ private final class Async03ControlledWork {
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }
-  let (phases, continuation) = AsyncStream.makeStream(of: CogMeta<Int?>.self)
-  let token = cogs.run { c in continuation.yield(c.meta[forecast]) }
-  var phaseIterator = phases.makeAsyncIterator()
+  let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int?>.self)
+  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
   work.succeed(0, with: nil)
 
-  guard let firstSuccess = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before the first success")
+  guard let firstSuccess = await statusIterator.next() else {
+    Issue.record("The status stream ended before the first success")
     return
   }
-  if case .success(let value) = firstSuccess {
-    #expect(value == nil)
+  if firstSuccess.kind == .success {
+    #expect(firstSuccess.value == nil)
   } else {
     Issue.record("Expected a successful nil value")
   }
 
   cogs.commit("change request") { c in c[request] = 1 }
 
-  guard let reload = await phaseIterator.next() else {
-    Issue.record("The phase stream ended before reload pending")
+  guard let reload = await statusIterator.next() else {
+    Issue.record("The status stream ended before reload pending")
     return
   }
-  switch reload {
-  case .pending(let value, hasSucceeded: true):
-    #expect(value == nil)
-  default:
+  if reload.kind == .pending, reload.hasSucceeded {
+    #expect(reload.value == nil)
+  } else {
     Issue.record("Expected reload pending with an explicit previous nil")
   }
 
   #expect(await startIterator.next() == 1)
   work.succeed(1, with: 7)
-  _ = await phaseIterator.next()
+  _ = await statusIterator.next()
   withExtendedLifetime(token) {}
 }

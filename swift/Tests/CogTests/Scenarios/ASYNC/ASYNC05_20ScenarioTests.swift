@@ -55,7 +55,7 @@ private final class Async05_20ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-20 equal reload changes metadata but not value consumers`() async {
+@Test func `ASYNC-20 equal reload changes status but not value consumers`() async {
   let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
   let work = Async05_20ControlledWork()
@@ -68,13 +68,15 @@ private final class Async05_20ControlledWork {
     valueConsumerRuns += 1
     return c[forecast]
   }
-  let (phases, phaseContinuation) = AsyncStream.makeStream(of: CogMeta<Int>.self)
-  let fullPhaseToken = cogs.run { c in phaseContinuation.yield(c.meta[forecast]) }
+  let (statuses, statusContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
+  let fullStatusToken = cogs.run { c in statusContinuation.yield(c.status[forecast]) }
   let valueConsumerToken = cogs.run { c in _ = c[valueConsumer] }
-  var phaseIterator = phases.makeAsyncIterator()
+  var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
-  guard case .some(.pending(_, hasSucceeded: false)) = await phaseIterator.next() else {
+  guard let initialPending = await statusIterator.next(),
+    initialPending.kind == .pending, !initialPending.hasSucceeded
+  else {
     Issue.record("Expected initial pending without a previous value")
     return
   }
@@ -82,14 +84,18 @@ private final class Async05_20ControlledWork {
 
   #expect(await startIterator.next() == 0)
   work.succeed(0, with: 42)
-  guard case .some(.success(42)) = await phaseIterator.next() else {
+  guard let firstSuccess = await statusIterator.next(),
+    firstSuccess.kind == .success, firstSuccess.value == 42
+  else {
     Issue.record("Expected the first success")
     return
   }
   #expect(valueConsumerRuns == 2)
 
   cogs.commit { c in c[request] = 1 }
-  guard case .some(.pending(value: 42, hasSucceeded: true)) = await phaseIterator.next() else {
+  guard let reloadPending = await statusIterator.next(),
+    reloadPending.kind == .pending, reloadPending.value == 42, reloadPending.hasSucceeded
+  else {
     Issue.record("Expected reload pending with the last successful value")
     return
   }
@@ -97,11 +103,13 @@ private final class Async05_20ControlledWork {
 
   #expect(await startIterator.next() == 1)
   work.succeed(1, with: 42)
-  guard case .some(.success(42)) = await phaseIterator.next() else {
+  guard let reloadSuccess = await statusIterator.next(),
+    reloadSuccess.kind == .success, reloadSuccess.value == 42
+  else {
     Issue.record("Expected the equal reload success")
     return
   }
   #expect(valueConsumerRuns == 2)
 
-  withExtendedLifetime((fullPhaseToken, valueConsumerToken)) {}
+  withExtendedLifetime((fullStatusToken, valueConsumerToken)) {}
 }
