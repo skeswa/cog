@@ -488,7 +488,9 @@ commit for a loud domain operation.
 - **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
   and no reaction runs.
 - **SEED-03.** Seeding still marks dependents dirty: a derived cog read
-  after the seed recomputes from the seeded value.
+  after the seed recomputes from the seeded value. A seed obeys the
+  source's equality rule the way a write does — seeding an equal value is
+  not a change.
 - **SEED-04.** The §6.6 alert story, verbatim: install a nice-weather
   alert reaction, seed the zip and cloudy weather (no alert), then stub
   sunny weather with a real commit. The alert fires exactly once, even
