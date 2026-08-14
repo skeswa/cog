@@ -492,9 +492,11 @@ query caching.
 - Close the behavior-coverage corners the scenario audit surfaced before the
   freeze: commit-boundary settlement and the shortcut diamond (TURN-15,
   GRAPH-13), the keyed cycle release trap and the debug seed-misuse guard
-  (CYCLE-07, SEED-08), and mid-flush group self-cancellation, per-key
+  (CYCLE-07, SEED-08), mid-flush group self-cancellation, per-key
   lifetime, queued-turn history, and per-render Observation retracking
-  (GROUP-11, LIFE-11, HIST-07, UI-16).
+  (GROUP-11, LIFE-11, HIST-07, UI-16), and the async refresh-supersession,
+  concurrent-cancellation, keyed-release, and failure-honesty corners
+  (ASYNC-35 through ASYNC-39).
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that
   consumes the repo URL.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin

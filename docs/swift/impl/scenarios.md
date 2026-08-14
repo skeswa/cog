@@ -593,7 +593,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
 
 ## 13. ASYNC — Async values, first slice
 
-_Milestone M3, except ASYNC-30 through ASYNC-34 (M4). Design: §5.1, §5.2
+_Milestone M3, except ASYNC-30 through ASYNC-39 (M4). Design: §5.1, §5.2
 (`.latest` only), §5.3._
 
 Async state is honest: it always says whether it is loading, what value is
@@ -644,6 +644,15 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-34.** An async declaration without `default:` does not compile.
   Optional values are not special: they state `default: nil` explicitly.
   (Proof: compile-fail.)
+- **ASYNC-38.** A retry after a failure fails again, even with an equal
+  error. The status lens shows every turn — pending, failure, pending,
+  failure, each its own turn — while value consumers stay quiet: the
+  renderable value never changed, so nothing downstream reruns.
+- **ASYNC-39.** Work that is still the newest run — and whose task Cog never
+  cancelled — rethrows a `CancellationError` from some inner operation. That
+  is an ordinary failure holding the error, never a silent forever-pending
+  state; only Cog's own replacement or release cancellation publishes
+  nothing (ASYNC-09, ASYNC-13).
 
 ### 13.2 Latest wins
 
@@ -662,6 +671,11 @@ renderable, and whether any generation has succeeded.
   an `await` do not retrigger it.
 - **ASYNC-12.** Two keys of an `AsyncCogBox` fetch independently. One can
   be loading while the other has succeeded.
+- **ASYNC-35.** A dependency changes while an explicit refresh's work is in
+  flight. The handle resolves as `superseded` at replacement — a dependency
+  change supersedes a refresh exactly as a newer refresh does — and never
+  drifts forward: the superseded generation's late result commits nothing,
+  and only the dependency-started run may commit.
 
 ### 13.3 Safe release
 
@@ -671,6 +685,11 @@ renderable, and whether any generation has succeeded.
   as `released` rather than hanging or following a recreated state.
 - **ASYNC-14.** After a release, reading the value reference again starts fresh work
   and fresh status, unpolluted by anything from before.
+- **ASYNC-37.** One key of an `AsyncCogBox` loses its last consumer while a
+  sibling key stays watched. Grace expiry cancels and releases only that
+  key's work and state: its late result commits nothing, the sibling's work
+  completes and commits untouched, and reading the released key starts
+  fresh work and status.
 
 ### 13.4 Work isolation and retained values
 
@@ -699,6 +718,10 @@ renderable, and whether any generation has succeeded.
   newest run may commit — a refresh replaces work the same way a
   dependency change does. Its exact handle resolves as `superseded` when a
   still newer refresh replaces it; it never drifts forward to that newer run.
+- **ASYNC-36.** `@concurrent` work replaced by a dependency change receives
+  cooperative cancellation off the actor — replacement is a stop request to
+  the old task, not merely a ban on its result — and the replacement's
+  result still commits on the MainActor.
 
 ### 13.5 Cold one-shot demand
 

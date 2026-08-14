@@ -938,7 +938,8 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 - **M4-05b** _(Gate)_ — Prepare the 0.1.0 release candidate without mutating
   remote state: format, ledgers, matrices, release, simulator, Weather, floor,
   docs, changelog, and revision-based scratch consumption.
-  _Depends: M4-04c, M4-05a, M4-06, M4-07e, M4-08, M4-09, M4-10, M4-11._
+  _Depends: M4-04c, M4-05a, M4-06, M4-07e, M4-08, M4-09, M4-10, M4-11,
+  M4-12, M4-13._
   _Verify: the complete 0.1.0 checklist with immutable CI links._
 - **M4-05c** _(Release)_ — Create and push the bare annotated `0.1.0` tag.
   _Depends: M4-05b._
@@ -1010,6 +1011,17 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M3-11._
   _Verify: `mise run test --filter 'GROUP-11|LIFE-11|HIST-07|UI-16'`._
   _Greens: GROUP-11, LIFE-11, HIST-07, UI-16._
+- **M4-12** _(Behavior)_ — Prove refresh-handle supersession by dependency
+  change, consecutive-failure status turns, and honest `CancellationError`
+  failures from uncancelled current runs.
+  _Depends: M4-07d._
+  _Verify: `mise run test --filter 'ASYNC-35|ASYNC-38|ASYNC-39'`._
+  _Greens: ASYNC-35, ASYNC-38, ASYNC-39._
+- **M4-13** _(Behavior)_ — Prove cooperative cancellation of replaced
+  `@concurrent` work and per-key release independence for keyed async boxes.
+  _Depends: M4-07d._
+  _Verify: `mise run test --filter 'ASYNC-36|ASYNC-37'`._
+  _Greens: ASYNC-36, ASYNC-37._
 
 ## M5 tasks
 
@@ -1284,14 +1296,14 @@ ArenaDirtyPropagationInfrastructure`._
   through arena values.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[1-6]|1[125678]|20|26|3[012])'`._
+'ASYNC-(0[1-6]|1[125678]|20|26|3[01289])'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
   generation rejection, previous-value carry, cold one-shot demand,
   non-reentrant system turns, bounded grace scheduling, and release/recreation
   through arena generations.
   _Depends: M6-10eb, M6-10ha._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[7-9]|10|1[349]|2[1-5]|2[7-9])'`._
+'ASYNC-(0[7-9]|10|1[349]|2[1-5]|2[7-9]|3[5-7])'`._
 - **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
   the arena core selected in place of the simple one, leaving the default
   core untouched; expose simple-versus-arena checking as
