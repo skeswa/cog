@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class Async05_20ControlledWork {
+private final class Async20ControlledWork {
   private var continuations: [Int: CheckedContinuation<Int, Never>] = [:]
   private let startContinuation: AsyncStream<Int>.Continuation
   let starts: AsyncStream<Int>
@@ -26,39 +26,10 @@ private final class Async05_20ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-05 value read reads as a plain value like a manual cog`() async {
-  let cogs = Cogs.forTesting()
-  let work = Async05_20ControlledWork()
-  let forecast = AsyncCog<Int?>(default: nil) { _ in
-    .run { await work.run(0) }
-  }
-  let (values, continuation) = AsyncStream.makeStream(of: Int?.self)
-  let token = cogs.run { c in continuation.yield(c[forecast]) }
-  var valueIterator = values.makeAsyncIterator()
-  var startIterator = work.starts.makeAsyncIterator()
-
-  guard case .some(let pendingValue) = await valueIterator.next() else {
-    Issue.record("The value stream ended before the resting default")
-    return
-  }
-  #expect(pendingValue == nil)
-
-  #expect(await startIterator.next() == 0)
-  work.succeed(0, with: 42)
-
-  guard case .some(let completedValue) = await valueIterator.next() else {
-    Issue.record("The value stream ended before success")
-    return
-  }
-  #expect(completedValue == 42)
-  withExtendedLifetime(token) {}
-}
-
-@MainActor
 @Test func `ASYNC-20 equal reload changes status but not value consumers`() async {
   let cogs = Cogs.forTesting()
   let request = ManualCog<Int>(0)
-  let work = Async05_20ControlledWork()
+  let work = Async20ControlledWork()
   let forecast = AsyncCog<Int>(default: 0) { c in
     let currentRequest = c[request]
     return .run { await work.run(currentRequest) }

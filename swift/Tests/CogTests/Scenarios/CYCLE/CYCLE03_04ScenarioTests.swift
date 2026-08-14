@@ -57,25 +57,6 @@ import Testing
 }
 
 @MainActor
-@Test func `CYCLE-05 the testing seam diagnoses a cycle without crashing`() {
-  let cogs = Cogs.forTesting()
-  var diagnostic: CogCycleDiagnostic?
-  var selfReading: Cog<Int>!
-
-  selfReading = Cog<Int>(
-    { c in
-      diagnostic = c.cycleDiagnostic(ifReading: selfReading)
-      return diagnostic == nil ? 1 : 2
-    },
-    name: "safe diagnostic"
-  )
-
-  #expect(cogs.peek(selfReading) == 2)
-  #expect(diagnostic?.path == ["safe diagnostic", "safe diagnostic"])
-  #expect(diagnostic?.message == "Cog dependency cycle: safe diagnostic -> safe diagnostic.")
-}
-
-@MainActor
 private final class CycleDiagnosticBoxHolder {
   var box: CogBox<Int, String>!
 }

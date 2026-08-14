@@ -81,7 +81,7 @@ exits 0 when `--filter` selects nothing, so a raw filtered run can report a
 green for work it never ran. The wrapper enumerates the built tests before the
 run and checks the executed-test count after it, and gives each leg its own
 scratch path. Arguments pass through, as in
-`mise run test --filter 'DECL-01|ONE-04' --parallel`.
+`mise run test --filter 'DECL-01|ONE-05' --parallel`.
 
 The four legs are {MainActor-default, nonisolated} ×
 {`NonisolatedNonsendingByDefault` on, off}, selected through

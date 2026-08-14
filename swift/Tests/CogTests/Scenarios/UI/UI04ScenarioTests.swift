@@ -32,7 +32,7 @@ import os
 }
 
 @MainActor
-@Test func `UI-15 an equal manual write sends no Observation notice`() {
+@Test func `UI-04 an equal manual write sends no Observation notice`() {
   let cogs = Cogs.forTesting()
   let status = ManualCog<String>("ready")
   let notices = OSAllocatedUnfairLock(initialState: 0)

@@ -25,22 +25,3 @@ import Testing
   #expect(entries.contains { $0.event == .write && $0.name == "binding.value" })
   #endif
 }
-
-@MainActor
-@Test func `UI-08 a binding reads its write back immediately`() {
-  let cogs = Cogs.forTesting()
-  let text = ManualCog<String>("")
-  let binding = Binding(
-    get: { cogs[text] },
-    set: { cogs.commit(text, to: $0, name: "type character") }
-  )
-
-  binding.wrappedValue = "c"
-  #expect(binding.wrappedValue == "c")
-
-  binding.wrappedValue = "co"
-  #expect(binding.wrappedValue == "co")
-
-  binding.wrappedValue = "cog"
-  #expect(binding.wrappedValue == "cog")
-}

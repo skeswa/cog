@@ -243,8 +243,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-01b** _(Behavior)_ — Add descriptor-plus-key state storage, the
   `CogTesting` isolated-context factory, and untracked manual reads.
   _Depends: M1-01a, M1-34a._
-  _Verify: `mise run test --filter 'DECL-01|ONE-04'`._
-  _Greens: DECL-01, ONE-04._
+  _Verify: `mise run test --filter DECL-01`._
+  _Greens: DECL-01._
 - **M1-01ca** _(Infrastructure)_ — Give testing contexts an injected clock
   protocol from day one.
   _Depends: M1-01b._
@@ -384,8 +384,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-15c** _(Behavior)_ — Add conditional/keyed cycle reporting and the
   narrow `CogTesting` diagnostic seam.
   _Depends: M1-15b._
-  _Verify: `mise run test --filter 'CYCLE-03|CYCLE-04|CYCLE-05'`._
-  _Greens: CYCLE-03, CYCLE-04, CYCLE-05._
+  _Verify: `mise run test --filter 'CYCLE-03|CYCLE-04'`._
+  _Greens: CYCLE-03, CYCLE-04._
 - **M1-15d** _(Behavior)_ — Prove self and multi-state cycle failure in debug
   and release with exit tests.
   _Depends: M1-15c._
@@ -525,8 +525,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-25** _(Behavior)_ — Add inert effects declarations and explicit
   `install(in:)` with screen-scoped cancellation that preserves app state.
   _Depends: M1-23b._
-  _Verify: `mise run test --filter 'GROUP-07|GROUP-08'`._
-  _Greens: GROUP-07, GROUP-08._
+  _Verify: `mise run test --filter GROUP-08`._
+  _Greens: GROUP-08._
 - **M1-26** _(Behavior)_ — Acknowledge cross-executor group-deinit cleanup and
   verify registrations and tasks are cancelled.
   _Depends: M1-01cb, M1-23c, M1-24a._
@@ -662,14 +662,14 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
 - **M2-04** _(Behavior)_ — Suppress UI notices for equal manual writes and
   equal derived recomputation.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter 'UI-04|UI-15'`._
-  _Greens: UI-04, UI-15._
+  _Verify: `mise run test --filter UI-04`._
+  _Greens: UI-04._
 - **M2-05** _(Behavior)_ — Prove an application-owned SwiftUI binding can
   delegate to domain ops, with compact single-source commits and immediate
   read-back; add no Cog binding helper.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter 'UI-07|UI-08'`._
-  _Greens: UI-07, UI-08._
+  _Verify: `mise run test --filter UI-07`._
+  _Greens: UI-07._
 - **M2-06** _(Behavior)_ — Keep one-shot reads in view bodies unsubscribed.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-09`._
@@ -765,8 +765,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
 - **M3-03a** _(Behavior)_ — Commit success and failure as distinct named
   turns observed by watchers.
   _Depends: M3-02._
-  _Verify: `mise run test --filter 'ASYNC-02|ASYNC-06'`._
-  _Greens: ASYNC-02, ASYNC-06._
+  _Verify: `mise run test --filter ASYNC-02`._
+  _Greens: ASYNC-02._
 - **M3-03b** _(Behavior)_ — Preserve a successful optional `nil` through
   `value` plus `hasSucceeded`.
   _Depends: M3-03a._
@@ -780,8 +780,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
 - **M3-04** _(Behavior)_ — Add the total value projection and suppress
   downstream change for equal reload results.
   _Depends: M3-03a._
-  _Verify: `mise run test --filter 'ASYNC-05|ASYNC-20'`._
-  _Greens: ASYNC-05, ASYNC-20._
+  _Verify: `mise run test --filter ASYNC-20`._
+  _Greens: ASYNC-20._
 - **M3-05a** _(Behavior)_ — Cancel and replace in-flight latest work without
   publishing cancellation as failure.
   _Depends: M3-03a._

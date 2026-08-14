@@ -71,7 +71,7 @@ Actions hardening contract.
 Tests always run through the `mise` wrapper rather than `swift test`, because
 SwiftPM exits 0 when `--filter` selects nothing and the wrapper fails instead.
 Pass arguments straight through:
-`mise run test --filter 'DECL-01|ONE-04' --parallel`.
+`mise run test --filter 'DECL-01|ONE-05' --parallel`.
 
 `AGENTS.md` and `CLAUDE.md` carry the full command reference, the repository
 layout, and the version-control conventions.

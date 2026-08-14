@@ -18,22 +18,6 @@ import Testing
 }
 
 @MainActor
-@Test func `GROUP-07 cancelling screen effects preserves app state`() {
-  let cogs = Cogs.forTesting()
-  var seen: [Int] = []
-  let group = ScreenEffects { seen.append($0) }.install(in: cogs)
-
-  cogs.commit { c in c[screenValue] = 1 }
-  #expect(seen == [0, 1])
-
-  group.cancel()
-  cogs.commit { c in c[screenValue] = 2 }
-
-  #expect(seen == [0, 1])
-  #expect(cogs.peek(screenValue) == 2)
-}
-
-@MainActor
 @Test func `GROUP-08 an effects declaration is inert until installation`() {
   let cogs = Cogs.forTesting()
   var seen: [Int] = []

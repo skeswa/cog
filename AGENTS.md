@@ -115,7 +115,7 @@ The example app uses the same pinned Xcode as the library:
   action.
 
 Extra arguments pass straight through, as in
-`mise run test --filter 'DECL-01|ONE-04' --parallel`. **Never run a filtered
+`mise run test --filter 'DECL-01|ONE-05' --parallel`. **Never run a filtered
 `swift test` yourself.** SwiftPM exits 0 when `--filter` selects nothing, so a
 raw filtered run can report a green for work it never ran. The wrapper guards
 twice — it enumerates the built tests before the run and checks the

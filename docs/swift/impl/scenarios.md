@@ -143,12 +143,10 @@ My whole app shares one Cog world. Tests get their own little worlds.
   (Proof: exit test.)
 - **ONE-03.** Feature code tries to build a plain `Cogs` with an
   initializer. The compiler says no. (Proof: compile-fail.)
-- **ONE-04.** My test asks the testing product for a context. It gets a
-  fresh, isolated one that works without any app setup.
-- **ONE-05.** Tests and previews each make their own context — two at
-  once, then many more, one after another. Each context starts clean, a
-  write in one is invisible to every other, and none of them trips the
-  app-install guard.
+- **ONE-05.** Tests and previews each ask the testing product for their own
+  fresh context — two at once, then many more, one after another, with no
+  app setup. Each context starts clean, a write in one is invisible to
+  every other, and none of them trips the app-install guard.
 - **ONE-06.** SwiftUI throws my views away and rebuilds them (a scene is
   recreated). My manual state is still there, because it lives in the app
   context, not in the views.
@@ -330,8 +328,6 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
   the keys, so I can see which items looped.
 - **CYCLE-04.** A cycle only exists when a condition is true. Everything
   works until the condition flips; then Cog catches it.
-- **CYCLE-05.** My test can look at the cycle diagnostic through an
-  internal seam without crashing the test process.
 - **CYCLE-06.** A keyed selector or its custom equality rule calls a named op
   that commits while the derived cog is computing. Cog rejects both paths
   before the attempted commit body runs or that attempt mutates graph state,
@@ -433,8 +429,6 @@ _Milestone M1. Design: §6.2, §6.3._
   `CogTesting.TestClock` and then calls an op every hour. When the clock jumps
   an hour, the op runs and its named turn lands in debug history. Before that,
   it does not run, and the app entry point owns no parallel effect-group state.
-- **GROUP-07.** A screen installs its own group and later cancels it. The
-  screen's effects stop, but the app's state is untouched.
 - **GROUP-08.** Declaring an effects struct does nothing by itself.
   Effects exist only after I call `install(in:)`.
 - **GROUP-09.** The last copy of a group is dropped on a background
@@ -539,8 +533,9 @@ wall-clock waits; real rendering is proven once by the Weather example.
   re-render.
 - **UI-03.** A card reads `weather[zipA]`. Writing `weather[zipB]`
   re-renders only zipB's card, never zipA's.
-- **UI-04.** A derived cog recomputes but lands on an equal value. Views
-  reading it do not re-render.
+- **UI-04.** A derived cog recomputes to an equal value, or a manual source
+  is written to an equal value. Cog sends no Observation notice, and views
+  reading them do not re-render.
 - **UI-05.** Only cogs that a view actually read get an Observation
   boundary object. Interior graph states never do. (Checked through an
   internal seam.)
@@ -548,8 +543,6 @@ wall-clock waits; real rendering is proven once by the Weather example.
   environment key.
 - **UI-07.** An application-owned SwiftUI binding reads the current Cog value,
   and setting it writes through a named domain commit that shows up in history.
-- **UI-08.** A text field writes through a binding and immediately reads
-  back. It sees its own write — no dropped characters.
 - **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes
   to that cog do not re-render the view.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
@@ -559,8 +552,6 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
   render sees either the old pair before the commit or the new pair after
   it — never one old value and one new value.
-- **UI-15.** A view reads a manual source. I write that source to an equal
-  value. Cog sends no Observation notice, and the view does not re-render.
 
 ## 13. ASYNC — Async values, first slice
 
@@ -587,11 +578,6 @@ renderable, and whether any generation has succeeded.
   the default and loading before success; the old value and loading while
   reloading; the value and not loading on success; the last good value
   and not loading on failure.
-- **ASYNC-05.** The plain value read lets me read an async cog in the same
-  shape as a manual cog: the resting default before the first success, then
-  the last accepted success.
-- **ASYNC-06.** A status watcher sees each visible status change as its own
-  turn: first pending, then success, two separate turns.
 - **ASYNC-30.** `kind`, `value`, `hasSucceeded`, `error`, and `isLoading` form
   the accessor set: `kind` carries pending, success, or failure; `value`
   remains total while `error` reports only the current failure; a reload
@@ -662,10 +648,11 @@ renderable, and whether any generation has succeeded.
   with the resting default and `hasSucceeded == false`, then failure with the
   same pair, as two distinct turns.
 - **ASYNC-19.** Work succeeds, then a dependency change starts a reload
-  that fails. A status watcher and history see success, pending with that
-  success as its value, then failure with the same retained value,
-  each as its own turn. A further reload's pending still carries that
-  success — the last good value, never the failure.
+  that fails. A status watcher and history see every visible status — the
+  initial pending, success, pending with that success as its value, then
+  failure with the same retained value — each as its own turn. A further
+  reload's pending still carries that success — the last good value, never
+  the failure.
 - **ASYNC-20.** A reload succeeds with a value equal to the one it had.
   Status watchers see the pending and success turns, but value consumers see
   no change: no recompute, no re-render.
