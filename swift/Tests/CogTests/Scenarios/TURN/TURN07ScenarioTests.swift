@@ -49,6 +49,30 @@ import Testing
   expectEscapedWriterMessage(in: result, mentioning: "reading count")
 }
 
+@MainActor
+@Test func `TURN-07 a writer captured into an async task traps after its commit`() async {
+  // The story's second escape route: not a stashed variable but a capture into
+  // a task whose body runs only after the commit ended. The trap must fire on
+  // that asynchronous use exactly as it does on the synchronous one.
+  let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+    let lateWrite = await MainActor.run { () -> Task<Void, Never> in
+      let cogs = Cogs.forTesting()
+      let count = ManualCog<Int>(0, name: "count")
+
+      var escaped: Task<Void, Never>?
+      cogs.commit { c in
+        escaped = Task { @MainActor in
+          c[count] = 1
+        }
+      }
+      return escaped!
+    }
+    await lateWrite.value
+  }
+
+  expectEscapedWriterMessage(in: result, mentioning: "writing to count")
+}
+
 // MARK: - The message
 
 /// Checks that the trap said the two things the trap's own file and line

@@ -54,6 +54,7 @@ import Testing
   let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
   let note = ManualCog<String>("old")
+  let retryLimit = ManualCog<Int>(3)
 
   cogs.commit { c in
     c[count] = 3
@@ -62,6 +63,10 @@ import Testing
   cogs.commit { c in
     c[note] = "new"
     #expect(c[count] == 3)
+
+    // A source no turn has ever written also counts as current state: the
+    // writer sees its declaration's starting value, not a hole.
+    #expect(c[retryLimit] == 3)
   }
 }
 

@@ -53,6 +53,21 @@ import Testing
   #expect(turns.map(\.name) == ["location.hourlyRefresh"])
   #endif
 
+  // "Every hour" is a loop, not a first firing: the task re-arms its sleep,
+  // and the next injected hour drives a second op and a second named turn.
+  try await clock.waitForScheduledSleep()
+  clock.advance(by: .seconds(3_600))
+  guard await refreshIterator.next() != nil else {
+    Issue.record("The hourly refresh task ended before its second run")
+    return
+  }
+
+  #expect(cogs.peek(hourlyRefreshCount) == 2)
+  #if DEBUG
+  let secondTurns = cogs.debugHistory.entries.filter { $0.event == .turn }
+  #expect(secondTurns.map(\.name) == ["location.hourlyRefresh", "location.hourlyRefresh"])
+  #endif
+
   try await clock.waitForScheduledSleep()
   clock.finish()
 }

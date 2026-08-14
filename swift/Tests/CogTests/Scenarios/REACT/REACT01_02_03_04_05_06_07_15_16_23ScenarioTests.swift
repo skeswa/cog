@@ -113,6 +113,41 @@ extension Cogs {
 }
 
 @MainActor
+@Test func `REACT-05 cancellation does not reorder the surviving reactions`() {
+  // A registration made after another's cancellation still runs last: slot
+  // reuse must not let a newcomer inherit a cancelled reaction's place in the
+  // registration order.
+  let cogs = Cogs.forTesting()
+  let source = ManualCog<Int>(0)
+  var order: [Int] = []
+
+  let first = cogs.run { c in
+    _ = c[source]
+    order.append(1)
+  }
+  let second = cogs.run { c in
+    _ = c[source]
+    order.append(2)
+  }
+  let third = cogs.run { c in
+    _ = c[source]
+    order.append(3)
+  }
+
+  second.cancel()
+  let fourth = cogs.run { c in
+    _ = c[source]
+    order.append(4)
+  }
+
+  order.removeAll()
+  cogs.commit { c in c[source] = 1 }
+
+  #expect(order == [1, 3, 4])
+  _ = (first, third, fourth)
+}
+
+@MainActor
 @Test func `REACT-06 every run replaces the reaction dependency set`() {
   let cogs = Cogs.forTesting()
   let useX = ManualCog<Bool>(true)
@@ -256,4 +291,32 @@ extension Cogs {
   )
   #expect(maximumDepth == 1)
   _ = (first, second, sideObserver, third)
+}
+
+@MainActor
+@Test func `REACT-16 a watch sees every queued write-back value with true old-new pairs`() {
+  // The same FIFO chain observed through `watch` instead of `run`: each queued
+  // turn is its own delivery, no intermediate value is skipped, and every old
+  // half really is the previous turn's value.
+  let cogs = Cogs.forTesting()
+  let trigger = ManualCog<Int>(0)
+  let count = ManualCog<Int>(0)
+  var deliveries: [String] = []
+
+  let starter = cogs.run { c in
+    guard c[trigger] == 1 else { return }
+    cogs.setFromReaction(count, to: 1)
+  }
+  let escalator = cogs.run { c in
+    guard c[count] == 1 else { return }
+    cogs.setFromReaction(count, to: 2)
+  }
+  let token = cogs.watch(count, initial: .skip, name: "watch.chain") { old, new in
+    deliveries.append("\(old)->\(new)")
+  }
+
+  cogs.commit { c in c[trigger] = 1 }
+
+  #expect(deliveries == ["0->1", "1->2"])
+  _ = (starter, escalator, token)
 }

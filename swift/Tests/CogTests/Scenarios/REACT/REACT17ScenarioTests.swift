@@ -73,6 +73,86 @@ import Testing
 }
 
 @MainActor
+@Test func `REACT-17 a chain at the threshold stays warning-free`() {
+  // Pins the lower edge of "about 64": a chain of exactly 64 uninterrupted
+  // turns is quiet, so the warning cannot silently regress toward warning on
+  // ordinary short chains.
+  let cogs = Cogs.forTesting()
+  let ping = ManualCog<Int>(0)
+  let pong = ManualCog<Int>(0)
+
+  let pingReaction = cogs.run { c in
+    let value = c[ping]
+    guard value > 0, value < 64 else { return }
+    cogs.commit("react17.edge.\(value + 1)") { c in
+      c[pong] = value + 1
+    }
+  }
+  let pongReaction = cogs.run { c in
+    let value = c[pong]
+    guard value > 0, value < 64 else { return }
+    cogs.commit("react17.edge.\(value + 1)") { c in
+      c[ping] = value + 1
+    }
+  }
+
+  cogs.commit("react17.edge.1") { c in c[ping] = 1 }
+
+  // Sixty-four turns ran as one chain, and none of them warned.
+  #expect(cogs.peek(ping) == 63)
+  #expect(cogs.peek(pong) == 64)
+  #expect(cogs.turnChainDiagnostic.warningCount == 0)
+  #expect(cogs.turnChainDiagnostic.lastWarning == nil)
+  #expect(cogs.turnChainDiagnostic.isIdle)
+  _ = (pingReaction, pongReaction)
+}
+
+@MainActor
+@Test func `REACT-17 a cause-heavy chain truncates its causal trace honestly`() throws {
+  // Enough reactions per turn overflow the bounded causal trace before the
+  // turn threshold. The warning still fires once, keeps its bounded prefix,
+  // and says that it truncated instead of silently dropping causes.
+  let cogs = Cogs.forTesting()
+  let ping = ManualCog<Int>(0)
+  let pong = ManualCog<Int>(0)
+  var passives: [ReactionToken] = []
+
+  for _ in 0..<4 {
+    passives.append(
+      cogs.run { c in
+        _ = c[ping]
+        _ = c[pong]
+      }
+    )
+  }
+  let pingReaction = cogs.run { c in
+    let value = c[ping]
+    guard value > 0, value < 65 else { return }
+    cogs.commit("react17.heavy.\(value + 1)") { c in
+      c[pong] = value + 1
+    }
+  }
+  let pongReaction = cogs.run { c in
+    let value = c[pong]
+    guard value > 0, value < 65 else { return }
+    cogs.commit("react17.heavy.\(value + 1)") { c in
+      c[ping] = value + 1
+    }
+  }
+
+  cogs.commit("react17.heavy.1") { c in c[ping] = 1 }
+
+  let diagnostic = cogs.turnChainDiagnostic
+  let warning = try #require(diagnostic.lastWarning)
+  #expect(diagnostic.warningCount == 1)
+  #expect(diagnostic.isIdle)
+  #expect(warning.uninterruptedTurnCount == 65)
+  #expect(warning.causalChainIsTruncated)
+  #expect(warning.causalChain.count == 256)
+  _ = (pingReaction, pongReaction, passives)
+}
+
+@MainActor
 @Test func `REACT-17 turns separated by idle do not form one turn chain`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)

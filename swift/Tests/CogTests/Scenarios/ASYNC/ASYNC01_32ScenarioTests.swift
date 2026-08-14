@@ -86,6 +86,49 @@ private final class Async32ControlledWork {
 }
 
 @MainActor
+@Test func `ASYNC-32 a skipping status watch is quiet at install and delivers old and new`()
+  async
+{
+  // The lens carries the whole watch family, so `initial: .skip` follows
+  // REACT-08's rule: installation demands the state (work starts) but calls
+  // nothing; the first status turn delivers the pending it skipped as the old
+  // half and the new status as the new half.
+  let cogs = Cogs.forTesting()
+  let work = Async32ControlledWork()
+  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+    work.makeWork()
+  }
+  let (deliveries, continuation) = AsyncStream.makeStream(
+    of: (old: CogStatus<Int>, new: CogStatus<Int>).self
+  )
+  var deliveryCount = 0
+
+  let token = cogs.status.watch(forecast, initial: .skip, name: "watch.status.skip") {
+    old, new in
+    deliveryCount += 1
+    continuation.yield((old: old, new: new))
+  }
+  var startIterator = work.starts.makeAsyncIterator()
+
+  // Installation started the work but called nothing.
+  #expect(await startIterator.next() == 0)
+  #expect(deliveryCount == 0)
+
+  work.succeed(0, with: 42)
+  var deliveryIterator = deliveries.makeAsyncIterator()
+  guard let first = await deliveryIterator.next() else {
+    Issue.record("The skipping status watch stream ended before its first delivery")
+    return
+  }
+  #expect(first.old.kind == .pending)
+  #expect(first.old.value == 0)
+  #expect(!first.old.hasSucceeded)
+  #expect(first.new.kind == .success)
+  #expect(first.new.value == 42)
+  withExtendedLifetime(token) {}
+}
+
+@MainActor
 @Test func `ASYNC-32 a status watch sees turns an equal-success value watch gates away`()
   async
 {

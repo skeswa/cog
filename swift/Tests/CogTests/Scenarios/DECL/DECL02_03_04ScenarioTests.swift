@@ -235,6 +235,29 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
 }
 
 @MainActor
+@Test func `DECL-04 unequal keys with colliding hashes stay separate states`() {
+  // "Equal" means `==`, never "hashes alike": a key type whose every value
+  // shares one hash still gets one state per distinct key. This is the case
+  // that catches an identity-by-hash implementation.
+  struct CollidingKey: Hashable {
+    let id: Int
+
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(0)
+    }
+  }
+
+  let cogs = Cogs.forTesting()
+  let ledgers = ManualCogBox<Ledger, CollidingKey> { _ in Ledger() }
+
+  cogs.peek(ledgers[CollidingKey(id: 1)]).entries.append("first")
+
+  #expect(cogs.peek(ledgers[CollidingKey(id: 2)]).entries == [])
+  #expect(cogs.peek(ledgers[CollidingKey(id: 1)]) !== cogs.peek(ledgers[CollidingKey(id: 2)]))
+  #expect(cogs.peek(ledgers[CollidingKey(id: 1)]).entries == ["first"])
+}
+
+@MainActor
 @Test func `DECL-04 one key is one piece of state per context, not per process`() {
   // The value reference is the same value reference in both contexts; the
   // state is not the same state.

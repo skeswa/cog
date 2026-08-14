@@ -167,3 +167,38 @@ import Testing
   #expect(cogs.peek(value) == 3)
   #expect(runs == 2)
 }
+
+@MainActor
+@Test func `TURN-12 a non-Equatable keyed write is changed for its key alone`() {
+  struct Reading {
+    let value: Int
+  }
+
+  var homeRuns = 0
+  var workRuns = 0
+
+  let cogs = Cogs.forTesting()
+  let readings = ManualCogBox<Reading, String>(Reading(value: 3))
+  let home = Cog<Int> { c in
+    homeRuns += 1
+    return c[readings["home"]].value
+  }
+  let work = Cog<Int> { c in
+    workRuns += 1
+    return c[readings["work"]].value
+  }
+
+  #expect(cogs.peek(home) == 3)
+  #expect(cogs.peek(work) == 3)
+  #expect(homeRuns == 1)
+  #expect(workRuns == 1)
+
+  // The safe treat-every-write-as-changed rule applies per key: the written
+  // key recomputes, and the untouched sibling key does not.
+  cogs.commit { c in c[readings["home"]] = Reading(value: 3) }
+
+  #expect(cogs.peek(home) == 3)
+  #expect(cogs.peek(work) == 3)
+  #expect(homeRuns == 2)
+  #expect(workRuns == 1)
+}

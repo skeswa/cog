@@ -77,6 +77,30 @@ extension Cogs {
 }
 
 @MainActor
+@Test func `HIST-02 keyed writes and recomputations record their keys`() {
+  // A keyed entry names the exact state, `label[key]`, so history can tell
+  // which item of a box wrote or ran — the same rendering turns and task
+  // names use.
+  let cogs = Cogs.forTesting()
+  let temperatures = ManualCogBox<Int, String>(60, name: "temperature")
+  let weather = CogBox<String, String>(
+    { c, key in "temp: \(c[temperatures[key]])" },
+    name: "weather"
+  )
+
+  #expect(cogs.peek(weather["home"]) == "temp: 60")
+
+  cogs.commit("warm up") { c in c[temperatures["home"]] = 80 }
+  #expect(cogs.peek(weather["home"]) == "temp: 80")
+
+  let entries = cogs.debugHistory.entries
+  #expect(entries.filter { $0.event == .write }.map(\.name) == ["temperature[home]"])
+  #expect(
+    entries.filter { $0.event == .recompute }.map(\.name) == ["weather[home]", "weather[home]"]
+  )
+}
+
+@MainActor
 @Test func `HIST-02 a diamond records one recomputation for each state that ran`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(1)

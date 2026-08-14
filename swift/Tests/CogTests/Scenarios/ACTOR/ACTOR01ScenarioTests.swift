@@ -34,6 +34,23 @@ import Testing
 }
 
 @MainActor
+@Test func `ACTOR-01 watch handlers execute on the MainActor`() {
+  let cogs = Cogs.forTesting()
+  let source = ManualCog<Int>(1)
+  var deliveries: [String] = []
+
+  let token = cogs.watch(source, initial: .run) { old, new in
+    MainActor.preconditionIsolated("Cog watch handler")
+    deliveries.append("\(old)->\(new)")
+  }
+
+  cogs.commit { c in c[source] = 2 }
+
+  #expect(deliveries == ["1->1", "1->2"])
+  _ = token
+}
+
+@MainActor
 @Test func `ACTOR-01 reactions execute on the MainActor`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
