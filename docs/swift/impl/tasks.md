@@ -403,15 +403,24 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-15c, M1-31a._
   _Verify: `mise run test --filter 'DECL-10|DECL-11'`._
   _Greens: DECL-10, DECL-11._
+- **M1-35a** _(Infrastructure)_ — Add the `Mechanism` protocol with its
+  defaulted `name`, the curated final-class `MechanismController` shell
+  (registration entry points, untracked `peek`, and the `CogOperating`
+  conformance), the internal per-mechanism registration scope containers that
+  retain their controller without letting it own the runtime, and
+  `Cogs.forTesting(mechanisms:)` operating each mechanism at creation.
+  _Depends: M1-01b._
+  _Verify: `mise run test --filter MechanismShellInfrastructure`._
 - **M1-16a** _(Decision)_ — Settle when a reaction registered during a flush
   performs its initial tracking run; update §10, snapshot, scenarios, and
   tasks, using the `M1-16e*` branch for any new behavior tasks.
   _Depends: M1-13a._
   _Verify: recorded decision, final-gate dependency update, and
   `mise run tasks:check`._
-- **M1-16b** _(Behavior)_ — Add immediate reaction registration, changed
-  dependency wake-up, and unrelated-turn quietness.
-  _Depends: M1-07b, M1-16a._
+- **M1-16b** _(Behavior)_ — Add immediate reaction registration through the
+  mechanism controller, changed dependency wake-up, and unrelated-turn
+  quietness.
+  _Depends: M1-07b, M1-16a, M1-35a._
   _Verify: `mise run test --filter 'REACT-01|REACT-02|REACT-03'`._
   _Greens: REACT-01, REACT-02, REACT-03._
 - **M1-16c** _(Behavior)_ — Add settled reads, registration order, and
@@ -440,16 +449,16 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-16c._
   _Verify: `mise run test --filter 'REACT-08|REACT-09'`._
   _Greens: REACT-08, REACT-09._
-- **M1-18a** _(Behavior)_ — Add idempotent cancellation and shared-copy
-  identity for `ReactionToken`.
+- **M1-35b** _(Infrastructure)_ — Make internal registration handles and
+  mechanism scopes cancel terminally and idempotently: cancelling a scope
+  unregisters its reactions exactly once, a registration arriving at a
+  cancelled scope is cancelled synchronously without retention, and no
+  operation reopens a cancelled scope. (Replaces the retired public-token
+  and effect-group tasks `M1-18a`, `M1-18b`, `M1-23b`, `M1-23c`, `M1-23da`,
+  and `M1-22`, whose terminal semantics survive as these internal
+  invariants.)
   _Depends: M1-16b._
-  _Verify: `mise run test --filter 'REACT-10|REACT-11|REACT-13'`._
-  _Greens: REACT-10, REACT-11, REACT-13._
-- **M1-18b** _(Behavior)_ — Cancel the registration when the last token copy
-  deinitializes.
-  _Depends: M1-18a._
-  _Verify: `mise run test --filter REACT-12`._
-  _Greens: REACT-12._
+  _Verify: `mise run test --filter ScopeCancellationInfrastructure`._
 - **M1-19a** _(Behavior)_ — Give reactions a read-only controller and add its
   compile-fail write fixture.
   _Depends: M1-03, M1-16b._
@@ -479,66 +488,113 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-20b, M1-31a._
   _Verify: `mise run test --filter REACT-17`._
   _Greens: REACT-17._
-- **M1-22** _(Behavior)_ — Acknowledge cross-executor token-deinit cleanup on
-  the MainActor.
-  _Depends: M1-01cb, M1-18b._
-  _Verify: `mise run test --filter REACT-18`._
-  _Greens: REACT-18._
-- **M1-31c** _(Behavior)_ — Record named watch/effect runs in history.
+- **M1-31c** _(Behavior)_ — Record named watch runs in history under their
+  mechanism's name.
   _Depends: M1-17, M1-31a._
   _Verify: `mise run test --filter HIST-05`._
   _Greens: HIST-05._
-- **M1-23a** _(Decision)_ — Settle adding a token to an already-cancelled
-  `EffectGroup`; update §10, snapshot, scenarios, and tasks, using the
-  `M1-23d*` branch for any new behavior tasks.
-  _Depends: M1-18a._
+- **M1-36** _(Decision)_ — Adopt the mechanism redesign: bootstrap-only
+  registration through `Cogs.bootstrapApp(mechanisms:)`, the curated
+  controller with state-gated `whenever` scopes, ops shared through
+  `CogOperating`, and withdrawal of the public `run`/`watch`/`EffectGroup`/
+  `ReactionToken` surface. Update §10, the snapshot, scenarios, and tasks.
+  (This decision retired the completed public-token and effect-group tasks
+  `M1-18a`, `M1-18b`, `M1-22`, `M1-23a`, `M1-23b`, `M1-23c`, `M1-23da`,
+  `M1-24a`, `M1-24b`, `M1-25`, and `M1-26` along with the GROUP scenario
+  family; the `M1-35*` and `M1-37*` tasks carry the replacement work.)
+  _Depends: M1-16b._
   _Verify: recorded decision, final-gate dependency update, and
   `mise run tasks:check`._
-- **M1-23b** _(Behavior)_ — Add group ownership, `add`, shared copies, and
-  idempotent explicit cancellation.
-  _Depends: M1-23a._
-  _Verify: `mise run test --filter 'GROUP-01|GROUP-03|GROUP-05'`._
-  _Greens: GROUP-01, GROUP-03, GROUP-05._
-- **M1-23c** _(Behavior)_ — Cancel all owned effects when the final group copy
-  deinitializes.
-  _Depends: M1-23b._
-  _Verify: `mise run test --filter GROUP-04`._
-  _Greens: GROUP-04._
-- **M1-23da** _(Behavior)_ — Cancel a reaction token synchronously when any
-  copy adds it to an already-cancelled group, without retaining the token or
-  reopening that group.
-  _Depends: M1-23b._
-  _Verify: `mise run test --filter GROUP-10`._
-  _Greens: GROUP-10._
-- **M1-24a** _(Behavior)_ — Add `group.task(name:)`, propagate explicit group
-  cancellation, and return an already-cancelled task when the group is
-  terminal.
-  _Depends: M1-23b._
-  _Verify: `mise run test --filter GROUP-02`._
-  _Greens: GROUP-02._
-- **M1-24b** _(Behavior)_ — Drive the named app-runtime hourly task with
-  `CogTesting.TestClock` and record its turn in history without a second
-  app-level effect owner.
-  _Depends: M1-01ca, M1-24a, M1-31a._
-  _Verify: `mise run test --filter GROUP-06`._
-  _Greens: GROUP-06._
-- **M1-25** _(Behavior)_ — Add inert effects declarations and explicit
-  `install(in:)` with screen-scoped cancellation that preserves app state.
-  _Depends: M1-23b._
-  _Verify: `mise run test --filter GROUP-08`._
-  _Greens: GROUP-08._
-- **M1-26** _(Behavior)_ — Acknowledge cross-executor group-deinit cleanup and
-  verify registrations and tasks are cancelled.
-  _Depends: M1-01cb, M1-23c, M1-24a._
-  _Verify: `mise run test --filter GROUP-09`._
-  _Greens: GROUP-09._
+- **M1-35c** _(Infrastructure)_ — Add `m.task(name:)` ownership inside
+  mechanism scopes: a task belongs to the scope that started it, receives
+  cancellation when that scope ends, and composes its name under the
+  mechanism's.
+  _Depends: M1-35b._
+  _Verify: `mise run test --filter MechanismTaskInfrastructure`._
+- **M1-37a** _(Behavior)_ — Operate bootstrap mechanisms synchronously in
+  list order, settle operate-time writes before the factory returns, and
+  expose an earlier mechanism's committed values to a later mechanism's
+  `operate`.
+  _Depends: M1-16c._
+  _Verify: `mise run test --filter 'MECH-01|MECH-02'`._
+  _Greens: MECH-01, MECH-02._
+- **M1-37b** _(Behavior)_ — Keep declared mechanisms inert until bootstrap
+  lists them; a mechanism left off the list never runs.
+  _Depends: M1-16b._
+  _Verify: `mise run test --filter MECH-03`._
+  _Greens: MECH-03._
+- **M1-37c** _(Behavior)_ — Reject two same-named mechanisms in one
+  bootstrap list with a clear error in debug and release.
+  _Depends: M1-35a._
+  _Verify: `mise run test --filter MECH-04` and
+  `mise run test:release --filter MECH-04`._
+  _Greens: MECH-04._
+- **M1-37d** _(Behavior)_ — Derive the default mechanism name from the type
+  name and compose watch and task names beneath it in debug history and task
+  names.
+  _Depends: M1-17, M1-31a, M1-35c._
+  _Verify: `mise run test --filter MECH-05`._
+  _Greens: MECH-05._
+- **M1-37e** _(Behavior)_ — Drive the named mechanism hourly task with
+  `CogTesting.TestClock` and record its turn in history while the app entry
+  point retains only `Cogs`.
+  _Depends: M1-01ca, M1-31a, M1-35c._
+  _Verify: `mise run test --filter MECH-06`._
+  _Greens: MECH-06._
+- **M1-37f** _(Behavior)_ — Add the `whenever` gated scope: run the body
+  immediately on a true gate, tear registrations and tasks down when the
+  gate falls, and re-run the body fresh on the next rise.
+  _Depends: M1-16c, M1-35c._
+  _Verify: `mise run test --filter 'MECH-07|MECH-08'`._
+  _Greens: MECH-07, MECH-08._
+- **M1-37g** _(Behavior)_ — Cancel nested `whenever` scopes with their
+  parent.
+  _Depends: M1-37f._
+  _Verify: `mise run test --filter MECH-09`._
+  _Greens: MECH-09._
+- **M1-37h** _(Behavior)_ — Acknowledge cross-executor context-deinit
+  cleanup and verify mechanism registrations are gone and owned tasks are
+  cancelled.
+  _Depends: M1-01cb, M1-37f._
+  _Verify: `mise run test --filter MECH-10`._
+  _Greens: MECH-10._
+- **M1-37i** _(Behavior)_ — Run the `forTesting` seeding closure before any
+  `operate`, so `initial: .run` watches observe seeded values on
+  registration.
+  _Depends: M1-17, M1-30a._
+  _Verify: `mise run test --filter MECH-12`._
+  _Greens: MECH-12._
+- **M1-37j** _(Behavior)_ — Share one `CogOperating` op definition between
+  `Cogs` and the mechanism controller, attributing the mechanism's call to
+  its mechanism in history.
+  _Depends: M1-31a, M1-35a._
+  _Verify: `mise run test --filter MECH-13`._
+  _Greens: MECH-13._
+- **M1-37k** _(Behavior)_ — Reject direct reaction registration on the
+  runtime at compile time; registration exists only on the controller.
+  _Depends: M1-16b._
+  _Verify: `mise run test:compilefail`._
+  _Greens: MECH-14._
+- **M1-37l** _(Behavior)_ — Retain each supplied mechanism value for its
+  runtime's lifetime, then cancel its scope before releasing the value and
+  any class-owned resource during context teardown.
+  _Depends: M1-37h._
+  _Verify: `mise run test --filter MECH-15`._
+  _Greens: MECH-15._
+- **M1-37m** _(Behavior)_ — Support delegate-driven work through a weak
+  mechanism-controller callback on a retained class mechanism: hop a live
+  callback to the MainActor and attribute its op, then prove a callback after
+  context teardown is inert and does not retain the context.
+  _Depends: M1-37j, M1-37l._
+  _Verify: `mise run test --filter MECH-16`._
+  _Greens: MECH-16._
 - **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
   manual `.app` and synchronous-derived `.whileObserved` defaults.
   _Depends: M1-05b, M1-08a._
   _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
 - **M1-27b** _(Infrastructure)_ — Track registered reactions as external
   lifetime leases, including dependency retracking and cancellation.
-  _Depends: M1-16c, M1-18a, M1-27a._
+  _Depends: M1-16c, M1-27a, M1-35b._
   _Verify: `mise run test --filter ReactionLeaseInfrastructure`._
 - **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
   testing override, then release an unobserved derived cog after injected
@@ -612,9 +668,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-33c** _(Gate)_ — Run the complete host-runnable M1 suite in all four
   build-settings legs.
   _Depends: M1-05c, M1-06c, M1-09c, M1-10, M1-11, M1-12b, M1-13b,
-  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-22, M1-23da, M1-24b, M1-25,
-  M1-26, M1-28b, M1-28c, M1-28d, M1-30b, M1-30c,
-  M1-31b, M1-31c, M1-33b, M1-34b._
+  M1-14, M1-15d, M1-15ea, M1-16ea, M1-19a, M1-19b, M1-21, M1-28b, M1-28c,
+  M1-28d, M1-30b, M1-30c, M1-31b, M1-31c, M1-33b, M1-34b, M1-37a, M1-37b,
+  M1-37c, M1-37d, M1-37e, M1-37g, M1-37i, M1-37k, M1-37m._
   _Verify: `mise run test:matrix` and `mise run test:compilefail`._
   _Greens: LEG-01._
 - **M1-32** _(Gate)_ — Prove the completed M1 suite and every-build guards in
@@ -713,11 +769,11 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   sources, `fileprivate` access, derived values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
-- **M2-14b** _(Infrastructure)_ — Install Weather's app-lifetime reaction and
-  injected-clock hourly task through `cogs.effects`, reserving separately
-  owned `EffectGroup` values for shorter lifetimes.
+- **M2-14b** _(Infrastructure)_ — Register Weather's mechanism at bootstrap:
+  its nice-weather reaction and injected-clock hourly task, with any shorter
+  lifetime expressed as a `whenever` gate.
   _Depends: M2-14a._
-  _Verify: Weather scheme builds and its effect installation tests pass._
+  _Verify: Weather scheme builds and its mechanism tests pass._
 - **M2-15** _(Infrastructure)_ — Build Weather cards, bindings, and per-ZIP
   tracked reads.
   _Depends: M2-14a._
@@ -1006,12 +1062,12 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M3-11._
   _Verify: `mise run test --filter SEED-08`._
   _Greens: SEED-08._
-- **M4-11** _(Behavior)_ — Prove mid-flush group self-cancellation, per-key
+- **M4-11** _(Behavior)_ — Prove mid-flush gated-scope teardown, per-key
   derived lifetime independence, whole-and-ordered queued-turn history, and
   per-render Observation retracking.
   _Depends: M3-11._
-  _Verify: `mise run test --filter 'GROUP-11|LIFE-11|HIST-07|UI-16'`._
-  _Greens: GROUP-11, LIFE-11, HIST-07, UI-16._
+  _Verify: `mise run test --filter 'MECH-11|LIFE-11|HIST-07|UI-16'`._
+  _Greens: MECH-11, LIFE-11, HIST-07, UI-16._
 - **M4-12** _(Behavior)_ — Prove refresh-handle supersession by dependency
   change, consecutive-failure status turns, and honest `CancellationError`
   failures from uncancelled current runs.
@@ -1248,20 +1304,20 @@ ArenaDirtyPropagationInfrastructure`._
   _Verify: `COG_TEST_CORE=arena mise run test --filter CYCLE` and
   `COG_TEST_CORE=arena mise run test:release --filter CYCLE`._
 - **M6-10ca** _(Infrastructure)_ — Pass reaction tracking, ordering,
-  equality, watch, token, and cleanup behavior, plus MainActor confinement
+  equality, watch, and cleanup behavior, plus MainActor confinement
   and non-`Sendable` values, through the arena selector.
   _Depends: M6-10ba._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-(0[1-9]|1[0-4]|18|2[1-3])|ACTOR-0[13]'`._
+'REACT-(0[1-9]|14|2[1-3])|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
   and the turn-chain diagnostic through the arena selector.
   _Depends: M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-15|REACT-16|REACT-17'`._
-- **M6-10d** _(Infrastructure)_ — Pass terminal effect-group cancellation and
-  task behavior through the arena core selector.
+- **M6-10d** _(Infrastructure)_ — Pass mechanism bootstrap, gated-scope
+  cancellation, and task behavior through the arena core selector.
   _Depends: M6-10cb._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter GROUP`._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter MECH`._
 - **M6-10ea** _(Infrastructure)_ — Pass lifetime policies, external reaction
   leases, and UI pinning through arena lease counts.
   _Depends: M6-08b, M6-10ca._

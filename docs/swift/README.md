@@ -40,8 +40,10 @@ The design lives in [design/](./design/); the implementation effort lives in
 2. **[design/exploration.md](./design/exploration.md): core design (§1–§5,
    §7–§11).** The graph, public API, write rules, async state, SwiftUI
    boundary, open questions, and spike plan.
-3. **[design/effects.md](./design/effects.md): effects (§6).** Reactions,
-   timers, lifecycle, testing, and work that can outlive the app process.
+3. **[design/mechanisms.md](./design/mechanisms.md): mechanisms (§6).** The
+   bundled home for every side effect: reactions, timers, gated scopes,
+   bootstrap registration, testing, and work that can outlive the app
+   process.
 4. **[design/rx.md](./design/rx.md): Rx mapping (§5.4).** How common stream
    operators map to state dependencies, async policies, and real event
    streams.
@@ -94,12 +96,14 @@ pinned version and the runner topology.
 
 ## Production, tests, and previews
 
-Production depends on `Cog` only. Call `Cogs.bootstrapApp()` exactly once,
-at app launch, and retain the context it returns as the app's ownership handle.
-Use that object at the composition root to install app-lifetime effects and the
-SwiftUI environment above every scene. A rebuilt scene receives the existing
-context; it never bootstraps another one. Features cannot construct a `Cogs`
-directly, and there is deliberately no ambient `Cogs.app` lookup.
+Production depends on `Cog` only. Call `Cogs.bootstrapApp(mechanisms:)`
+exactly once, at app launch, listing every mechanism the app runs, and retain
+the context it returns as the app's ownership handle. When bootstrap returns,
+every mechanism is live; there is no later installation step. Use the retained
+object at the composition root to install the SwiftUI environment above every
+scene. A rebuilt scene receives the existing context; it never bootstraps
+another one. Features cannot construct a `Cogs` directly, and there is
+deliberately no ambient `Cogs.app` lookup.
 
 ```swift
 import Cog
@@ -111,7 +115,9 @@ struct WeatherApp: App {
   private let cogs: Cogs
 
   init() {
-    cogs = Cogs.bootstrapApp()
+    cogs = Cogs.bootstrapApp(mechanisms: [
+      WeatherMechanism(notifier: .live),
+    ])
   }
 
   var body: some Scene {
@@ -131,9 +137,12 @@ identities only. Tests and previews host their view hierarchy under the same
 modifier with an isolated context.
 
 An ordinary test or preview-support target depends on `CogTesting`. Create one
-fresh context for that test or preview runtime. Use it directly at non-view
-test boundaries, or install it above a hosted view hierarchy with
-`.cogEnvironment(cogs)`. It starts isolated, never occupies the
+fresh context for that test or preview runtime with
+`Cogs.forTesting(seeding:mechanisms:)`; both parameters default to nothing, and
+the seeding closure runs before any mechanism's `operate`, so a test arranges
+state first and then watches mechanisms come alive against it. Use the context
+directly at non-view test boundaries, or install it above a hosted view
+hierarchy with `.cogEnvironment(cogs)`. It starts isolated, never occupies the
 production-install slot, and needs no reset or uninstall. Multiple tests and
 previews may each create a context, but creating a second one partway through
 a single runtime would split the state under test.
@@ -176,13 +185,14 @@ registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
 and non-nestable: do not put `await` in it, and do not use it as general test or
 preview setup.
 
-## Where things stand (2026-08-13)
+## Where things stand (2026-08-14)
 
 These choices are settled; §10 of the core document has the full record.
 
 - `commit` is the only write entry point. Its scalar overload keeps ordinary
   setters compact; its writer overload makes related writes atomic. Ops are
-  normal `Cogs` methods. `fileprivate` and `.readOnly` control which code may
+  normal methods in `CogOperating` extensions, so `Cogs` and a mechanism's
+  controller share every op. `fileprivate` and `.readOnly` control which code may
   name writable state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
@@ -235,27 +245,37 @@ These choices are settled; §10 of the core document has the full record.
   Streams allow only `.latest`.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
-- `Cogs` owns state, reactions, and its app-lifetime `effects` group. A
-  shorter-lived feature owns a separate final-class `EffectGroup`; those
-  handles cancel safely more than once. A
-  cancelled group is terminal; adding a reaction token afterward synchronously
-  cancels the token without retaining it, and a task requested afterward is
-  already cancelled when `task` returns. Neither operation reopens the group.
+- Side effects bundle into first-class `Mechanism` values — a protocol with a
+  defaulted `name` and one `operate(_:)` requirement — specified only at
+  bootstrap and operated synchronously in array order before bootstrap
+  returns. `operate` receives a curated `MechanismController`, never raw
+  `Cogs`: registration (`run`, `watch`, `task`, `whenever`), untracked
+  `peek`, and the shared ops surface. A lifetime shorter than the app is a
+  state-gated `whenever` scope: the gate's fall cancels everything the scope
+  registered, and its next rise re-runs the body fresh. There is no public
+  reaction token or effect group, and no late registration API; view-lifetime
+  work stays with SwiftUI `.task` and `values`. The runtime retains each
+  supplied mechanism value until teardown, when it cancels the mechanism's
+  scope before releasing that value. Delegate work that may arrive later uses
+  a weak controller callback, never raw `Cogs`; the callback becomes inert
+  when its scope ends.
 - Production creates one app-wide `Cogs` and injects it above all scenes.
   Screens and features share it. Tests and previews create one isolated
   context for their runtime.
-- Production construction is guarded. `Cogs.bootstrapApp()` creates the one
-  production context and fails fast on a second call; the plain initializer is
-  `package`, so feature code cannot name it. The `CogTesting` product adds
-  `Cogs.forTesting()` for a test or preview runtime, which never registers
-  as the production context.
-- The context returned by `bootstrapApp()` is the app's ownership handle. The
-  app retains it, uses it at non-view composition boundaries such as
-  app-lifetime effect installation, and injects it above every scene. Every
-  consuming view resolves it directly through `\.cogs`; no view accepts or
-  forwards it. Ops are instance methods on the context, and there is no ambient
-  `Cogs.app`. Tests of production installation use a synchronous scoped fixture
-  from `CogTesting`, so they cannot leak global install state across the suite.
+- Production construction is guarded. `Cogs.bootstrapApp(mechanisms:)`
+  creates the one production context, operates its mechanisms, and fails fast
+  on a second call; the plain initializer is `package`, so feature code cannot
+  name it. The `CogTesting` product adds `Cogs.forTesting(seeding:mechanisms:)`
+  for a test or preview runtime, which seeds before any `operate` and never
+  registers as the production context.
+- The context returned by `bootstrapApp(mechanisms:)` is the app's ownership
+  handle. The app retains it, passes explicit context only at non-view
+  composition boundaries such as isolated test harnesses, and injects it above
+  every scene. Every consuming view resolves it directly through `\.cogs`; no
+  view accepts or forwards it. Ops extend `CogOperating`, and there is no
+  ambient `Cogs.app`. Tests of production installation use a synchronous scoped
+  fixture from `CogTesting`, so they cannot leak global install state across
+  the suite.
 - Manual state and states seen by the UI live for the app context by default.
   Graph-only derived and async states may be released when unused. Query caches
   have their own retention rules. A `whileObserved` declaration with no
@@ -279,8 +299,9 @@ These choices are settled; §10 of the core document has the full record.
   one-shot shim internally acknowledges re-arming for deterministic tests, but
   its small disarmed race remains a documented platform limitation.
 - Debug-only `CogTesting.seed` stages a value and pushes dirty flags like a
-  write, but records no turn, sends no notices, and runs no reactions. Tests
-  may seed after effects install; the next real turn settles what the seed
+  write, but records no turn, sends no notices, and runs no reactions. The
+  factory's seeding phase precedes every mechanism's `operate`; seeding after
+  bootstrap remains safe, because the next real turn settles what the seed
   dirtied. Apps importing only `Cog` cannot seed.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.

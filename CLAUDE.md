@@ -62,7 +62,8 @@ every scenario covered by exactly one task.
   design. Historical background only; never normative and never edited.
 - `docs/swift/` — living Swift documents. Start with `README.md`, the map.
   Design docs live in `docs/swift/design/`: `exploration.md` covers the core
-  architecture and API; `effects.md` covers effects and background work;
+  architecture and API; `mechanisms.md` covers mechanisms — the bootstrap-registered
+  home for every side effect — and background work;
   `rx.md` maps Rx concepts; `perf.md` covers the data-oriented implementation
   and benchmark plan. Implementation docs live in `docs/swift/impl/`:
   `plan.md` is the implementation plan with milestones, tooling, CI, and
@@ -218,7 +219,8 @@ that runtime.
   initializer. Intermediate views pass domain values and identities only.
   Tests and previews host views under the same environment modifier. Explicit
   `Cogs` parameters remain appropriate at non-view composition boundaries such
-  as app-lifetime effect installation and isolated test harnesses.
+  as isolated test harnesses; side effects register as mechanisms in the
+  bootstrap call rather than through any later installation.
 - **Make Swift source explain its contracts.** Every Swift source file and
   every internal-or-higher declaration needs substantive documentation
   comments. Explain the semantics a maintainer cannot infer from a signature:
@@ -262,8 +264,8 @@ that runtime.
   an API or implementation choice also applies to Android without recording an
   Android decision.
 - **Preserve shared Swift section numbering.** The companion docs were split
-  from `exploration.md`: `effects.md` is §6 and `rx.md` is §5.4. A reference
-  such as “§6.4” resolves in `effects.md`. Do not renumber these sections.
+  from `exploration.md`: `mechanisms.md` is §6 and `rx.md` is §5.4. A reference
+  such as “§6.4” resolves in `mechanisms.md`. Do not renumber these sections.
 - **Preserve shared Kotlin section numbering.** The Kotlin companion docs use
   the same map: `effects.md` is §6 and `flows.md` is §5.4.
 - **Dated files are frozen; undated files are living.** Living design docs use

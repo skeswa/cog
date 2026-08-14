@@ -30,7 +30,7 @@ scenario to exactly one task.
 - Testing posture (settled 2026-08-10): every test is fully optimistic, as
   fast and cheap as possible, and as implementation agnostic as possible.
   The normative statement is the "Testing constraints" section of
-  [scenarios.md](./scenarios.md). The mechanisms it requires — an injected
+  [scenarios.md](./scenarios.md). The machinery it requires — an injected
   clock on testing contexts that drives `whileObserved` grace timing, named
   diagnostic seams exposed through `CogTesting`, Swift Testing exit tests
   for trap guarantees, and one batched expected-failure fixture pass for
@@ -184,7 +184,7 @@ the smallest repair task is inserted before a failed gate is rerun.
 | Plan milestone                   | Task ledger                     | Decisions before dependent work                                                    | Closing path                                                                                                                   |
 | -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                           | `M0-10`                                                                                                                        |
-| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-23a`                                             | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-36`                                              | `M1-33c` host matrix, then `M1-32` release gate                                                                                |
 | M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available        |
 | M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                 | `M3-11`                                                                                                                        |
 | M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review; `M4-07a` value-first async reads                      | `M4-05b` candidate → `M4-05c` tag → `M4-05d` verification → `M4-05e` GitHub Release                                            |
@@ -317,22 +317,29 @@ The class-state build. Correctness first; no perf tricks.
   `equals:`, or assume-changed; edges reused and removed on recapture.
 - Cycles: computing-mark detection; the full descriptor-and-key path in
   the diagnostic; an internal seam so tests inspect without crashing (§2.4).
-- Reactions and effects: `cogs.run`; `cogs.watch(_:initial:name:)`;
-  final-class `ReactionToken`; `EffectGroup` with `add` and `task(name:)`;
-  cancel is idempotent, terminal, shared across copies, and runs on deinit; a
-  reaction token added after cancellation is cancelled synchronously without
-  retention, and a task requested afterward returns already cancelled;
-  write-back queues new FIFO turns;
-  a debug turn-chain guard (about 64 turns) prints the causes through an
-  internal diagnostic seam (§6.4).
+- Mechanisms and reactions: the `Mechanism` protocol with a defaulted `name`
+  and `operate(_:)`; the curated `MechanismController` with `run`,
+  `watch(_:initial:name:)`, `task(name:)`, `whenever`, untracked `peek`, and
+  the shared `CogOperating` ops surface — never raw `Cogs`; bootstrap-only
+  registration in array order with duplicate-name rejection; state-gated
+  `whenever` scopes whose fall cancels their registrations and whose rise
+  re-runs the body fresh, with terminal, idempotent scope cancellation kept
+  as an internal invariant; runtime retention of each supplied mechanism value,
+  with scope cancellation before value release; weak controller callbacks for
+  delegate work that may outlive a scope; registration names composed under
+  the mechanism name; write-back queues new FIFO turns; a debug turn-chain
+  guard (about 64 turns) prints the causes through an internal diagnostic seam
+  (§6.2–§6.4).
 - Lifetime: `.app`; `.whileObserved(grace:)` with the `resetToInitial`
   manual opt-in; per-kind defaults from §5.3. A
   declaration without an explicit grace uses its context default: 30 seconds
   in production and an explicit testing override when elapsed time is under
   test. Internal graph edges never count as lifetime leases.
 - Bootstrap: guard production installation so a second install fails fast.
-  `M1-34a` settled the helper spellings on 2026-08-11: `Cogs.bootstrapApp()`
-  from `Cog` and `Cogs.forTesting()` from `CogTesting`, with a `package`
+  `M1-34a` settled the helper spellings on 2026-08-11, amended on 2026-08-14
+  by the mechanism redesign: `Cogs.bootstrapApp(mechanisms:)` from `Cog` and
+  `Cogs.forTesting(seeding:mechanisms:)` from `CogTesting` — the seeding
+  closure runs before any `operate` — with a `package`
   initializer so neither can be bypassed. Add the `CogTesting` isolated-context factory for tests and
   previews. Introduce its injected clock and cleanup-acknowledgement seams
   independently near the start of M1; `whileObserved` grace timing runs on the
@@ -362,9 +369,12 @@ MainActor execution and non-`Sendable` values; second-production-context
 rejection; scene recreation without manual-state loss; equality-gated
 notifications; manual lifetime; `whileObserved` release and recreate without
 graph edges acting as leases; seed-then-turn settling (the §6.6 alert test
-verbatim); sibling commits as separate turns; off-MainActor token and group
-deinit with deterministic MainActor cleanup acknowledgements; preview
-isolation; and named effect runs in history.
+verbatim); sibling commits as separate turns; off-MainActor context deinit
+tearing down mechanism scopes with deterministic MainActor cleanup
+acknowledgements; preview isolation; bootstrap ordering, duplicate-name
+rejection, `whenever` gating, retained mechanism-resource lifetime, and
+weak external callbacks that become inert at teardown; and named,
+mechanism-attributed runs in history.
 
 <a id="plan-m2"></a>
 
@@ -382,7 +392,8 @@ isolation; and named effect runs in history.
   API cannot diagnose a missing UI consumer without false positives. Ship no
   warning or private-SPI heuristic; §7 and §10 record the deferred diagnostic.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
-  `fileprivate` sources plus ops, app-runtime effects, and bindings.
+  `fileprivate` sources plus ops, a bootstrap-registered weather mechanism,
+  and bindings.
   Verify per-ZIP invalidation, equality-gated derived notices, and a view that
   reads two values changed in one commit without ever rendering a torn pair.
   Verify that boundary notices and their history entries precede reaction
@@ -391,10 +402,10 @@ isolation; and named effect runs in history.
   on the macOS 26 host (files behind `#if canImport(AppKit)`).
 - Weather proceeds in two branches. `M2-14a` creates the app and state layer,
   allowing `M2-15` UI work to proceed independently. `M2-14b` joins that app
-  to the complete `Cogs.effects` and `EffectGroup` contract after M1's terminal cancellation,
-  task ownership, explicit installation, hourly-clock, and deinit-cleanup
-  leaves are green. `M2-16` joins both branches; the example never carries a
-  local lifecycle substitute or a partially implemented public group.
+  to the complete `Mechanism` contract after M1's bootstrap-registration,
+  gated-scope, task-ownership, hourly-clock, and deinit-cleanup leaves are
+  green. `M2-16` joins both branches; the example never carries a local
+  lifecycle substitute or a partially implemented mechanism surface.
 - Read spelling: `M2-17a` originally compared an explicit method, a subscript,
   and callable value references in a small tracked-view prototype. The settled
   spelling is now `c[valueReference]` for tracked selector and reaction reads,
@@ -464,7 +475,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
   successful reading through reload and failure; initial loads, retries, and
   hourly updates use `refresh`; deterministic example tests prove per-ZIP
   invalidation, untorn atomic readings, failure retention, replacement, and
-  effect ordering without wall-clock waits or polling.
+  reaction ordering without wall-clock waits or polling.
 
 Deferred to M7: `.queue`, `.exhaustLatest`, `.merged`, `.stream`, exports,
 query caching.
@@ -486,16 +497,17 @@ query caching.
   capability, and no separate `.latest` projection (§5.1; ASYNC-31 through
   ASYNC-34, with the existing async suite respelled).
 - Return exact-generation `CogRefresh` handles; make `Cogs` the sole public
-  runtime and root effect owner; delegate bindings to domain operations; and
+  runtime, with every side effect a bootstrap-registered mechanism; delegate
+  bindings to domain operations; and
   ship `CogTesting.TestClock` for deterministic application schedules.
 - `Cog.docc`: landing page, Getting Started, and an article on the
   one-context rule and testing with `CogTesting`. Start `CHANGELOG.md`.
 - Close the behavior-coverage corners the scenario audit surfaced before the
   freeze: commit-boundary settlement and the shortcut diamond (TURN-15,
   GRAPH-13), the keyed cycle release trap and the debug seed-misuse guard
-  (CYCLE-07, SEED-08), mid-flush group self-cancellation, per-key
+  (CYCLE-07, SEED-08), mid-flush gated-scope teardown, per-key
   lifetime, queued-turn history, and per-render Observation retracking
-  (GROUP-11, LIFE-11, HIST-07, UI-16), and the async refresh-supersession,
+  (MECH-11, LIFE-11, HIST-07, UI-16), and the async refresh-supersession,
   concurrent-cancellation, keyed-release, and failure-honesty corners
   (ASYNC-35 through ASYNC-39).
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that

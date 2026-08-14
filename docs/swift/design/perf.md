@@ -193,9 +193,9 @@ Keep these rules until a benchmark disproves them:
   dependency caches or the first stack entries. `Span` can expose borrowed
   slab views to tests and debug tools without public pointers.
 
-Reaction tokens and `EffectGroup` remain final-class handles. Copies must
-share one idempotent cancellation resource, which fits SwiftUI state and
-ordinary collections.
+Internal registration handles and mechanism scopes remain final-class
+values. Copies must share one idempotent cancellation resource; none of
+these handles is public API (§6.2–§6.3).
 
 ## 6. Create Observation boundaries only when needed
 

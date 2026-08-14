@@ -24,7 +24,7 @@ Cog is the library.
   also covered by exactly one task in [tasks.md](./tasks.md); a task's
   _Greens:_ line is the coverage ledger. Section numbers
   resolve per the shared map: §6 lives in
-  [effects.md](../design/effects.md), §5.4 in [rx.md](../design/rx.md), perf
+  [mechanisms.md](../design/mechanisms.md), §5.4 in [rx.md](../design/rx.md), perf
   §n in [perf.md](../design/perf.md), everything else in
   [exploration.md](../design/exploration.md).
 - Every scenario carries a proof mode naming the check class that greens it:
@@ -111,7 +111,7 @@ justifies a slow, flaky, or core-coupled test.
  5. GRAPH  Derived values stay right and lazy
  6. CYCLE  Cycles and mistakes
  7. REACT  Reactions
- 8. GROUP  Effect groups and timers
+ 8. MECH   Mechanisms and timers
  9. LIFE   How long state lives
 10. SEED   Test helpers: seed and stub
 11. HIST   Debug history
@@ -356,11 +356,12 @@ _Milestone M1, except REACT-19 (M2) and REACT-20 (M7). Design: §3.3, §6.2,
 §6.4._
 
 A reaction watches state and does something outside the graph when it
-changes.
+changes. Reactions register only through a mechanism's controller (§6.2);
+these stories run inside a small test mechanism's `operate`.
 
 ### 7.1 Running
 
-- **REACT-01.** I register a reaction with `cogs.run`. It runs once right
+- **REACT-01.** I register a reaction with `m.run`. It runs once right
   away, so Cog learns what it reads.
 - **REACT-02.** A turn changes something my reaction reads. The reaction
   runs again.
@@ -378,18 +379,9 @@ changes.
   more. Their initial tracking runs do not re-enter it: they wait behind every
   reaction already scheduled for that flush, keep registration order, and run
   before any write-back turn queued by those reactions.
-- **REACT-08.** `watch(_, initial: .skip)` does not call me at install
-  time; the first real change calls me with the old and new values.
-- **REACT-09.** `watch(_, initial: .run)` calls me once at install time.
-
-### 7.2 Tokens
-
-- **REACT-10.** I cancel a reaction token. The reaction never runs again.
-- **REACT-11.** I cancel the same token twice. Nothing bad happens.
-- **REACT-12.** I drop the last copy of a token. The reaction is
-  cancelled by deinit.
-- **REACT-13.** I copy a token. Both copies mean the same registration;
-  cancelling either one stops the reaction.
+- **REACT-08.** `m.watch(_, initial: .skip)` does not call me at
+  registration; the first real change calls me with the old and new values.
+- **REACT-09.** `m.watch(_, initial: .run)` calls me once at registration.
 
 ### 7.3 Writing back
 
@@ -406,11 +398,6 @@ changes.
   exposing the warning and its causal chain of turns and reactions through
   the diagnostic seam, and the context is idle again before the op that
   started the chain returns — asserted directly, never awaited.
-- **REACT-18.** The last copy of a reaction token is dropped on a
-  background executor. I await an internal acknowledgement that deinit
-  cleanup reached the MainActor, then commit a dependency change. The
-  reaction does not run; immediate stopping still requires explicit
-  `cancel()`.
 - **REACT-19.** Within one flush, every changed UI boundary is notified
   before any reaction runs — flush step 4 before step 5. (Checked through
   history or an internal seam once M2 boundaries exist.)
@@ -424,42 +411,79 @@ changes.
 - **REACT-22.** A reaction reads a manual source. I write that source to
   an equal value. The reaction does not run.
 
-## 8. GROUP — Effect groups and timers
+## 8. MECH — Mechanisms and timers
 
-_Milestone M1, except GROUP-11 (M4). Design: §6.2, §6.3._
+_Milestone M1, except MECH-11 (M4). Design: §6.2, §6.3._
 
-`Cogs` owns app-lifetime effects; an `EffectGroup` owns any shorter scope.
+Every side effect lives in a named mechanism specified at bootstrap; a
+shorter lifetime is a `whenever` gate expressed in state. (The GROUP family —
+public effect groups and reaction tokens — retired on 2026-08-14 when
+mechanisms replaced them; REACT-10 through REACT-13 and REACT-18 retired with
+it. Retired IDs stay retired.)
 
-- **GROUP-01.** I add a watch token to a group. Cancelling the group
-  stops the watch.
-- **GROUP-02.** I start a task with `group.task`. Cancelling the group
-  cancels the task. A task requested after the group is cancelled is already
-  cancelled when `group.task` returns and does not reopen the group.
-- **GROUP-03.** I cancel a group twice. Nothing bad happens.
-- **GROUP-04.** I drop the last copy of a group. Everything it owned is
-  cancelled.
-- **GROUP-05.** I copy a group. Both copies own the same effects;
-  cancelling either stops them all.
-- **GROUP-06.** An app-runtime task in `cogs.effects` sleeps on the reusable
-  `CogTesting.TestClock` and then calls an op every hour. When the clock jumps
-  an hour, the op runs and its named turn lands in debug history. Before that,
-  it does not run, and the app entry point owns no parallel effect-group state.
-- **GROUP-08.** Declaring an effects struct does nothing by itself.
-  Effects exist only after I call `install(in:)`.
-- **GROUP-09.** The last copy of a group is dropped on a background
-  executor. I await an internal acknowledgement that deinit cleanup reached
-  the MainActor, then verify its reaction registrations are gone and every
-  owned task has received cancellation. Immediate stopping still requires
-  explicit `cancel()`.
-- **GROUP-10.** I cancel a group, then add a live reaction token through a
-  copied handle. The token is cancelled synchronously before `add` returns,
-  is not retained, and the shared group stays terminal. A second live token
-  added through another copy is also cancelled, and adding an already-cancelled
-  token to that cancelled group is harmless.
-- **GROUP-11.** A reaction owned by a group cancels its own group while the
-  flush that woke it is still running. Cancellation completes safely
-  mid-flush: a sibling watch later in that same flush never runs again,
-  every owned task receives cancellation, and the app's state is untouched.
+- **MECH-01.** I bootstrap with a list of mechanisms. Each `operate` runs
+  synchronously in list order, and when bootstrap returns every mechanism is
+  live: a commit on the very next line wakes their reactions, and reactions
+  from two mechanisms run in list order when one turn wakes both.
+- **MECH-02.** A mechanism configures state and seeds demand during
+  `operate` through ops on its controller. Those turns settle before
+  bootstrap returns, and a mechanism later in the list observes the earlier
+  mechanism's committed values during its own `operate`.
+- **MECH-03.** Declaring a mechanism does nothing by itself. Its reactions
+  and tasks exist only when it is listed at bootstrap; a mechanism left off
+  the list never runs.
+- **MECH-04.** Two mechanisms in one bootstrap list share a name. Cog stops
+  bootstrap right away with a clear error, in debug builds and release
+  builds. (Proof: exit test.)
+- **MECH-05.** A mechanism without a custom `name` is known by its type name
+  with a trailing "Mechanism" dropped, and every registration name composes
+  under it: its `hourlyRefresh` task appears as `Weather.hourlyRefresh` in
+  debug history and task names.
+- **MECH-06.** An app-lifetime task started with `m.task` sleeps on the
+  reusable `CogTesting.TestClock` and then calls an op every hour. When the
+  clock jumps an hour, the op runs and its named turn lands in debug history.
+  Before that, it does not run, and the app entry point retains only `Cogs`.
+- **MECH-07.** A `whenever` gate already reads true when its mechanism
+  operates. The scope body runs immediately, and its registrations are live
+  when bootstrap returns.
+- **MECH-08.** A `whenever` gate starts false and a later turn raises it:
+  the scope body runs then. Another turn lowers it: the scope's reactions
+  never run again and its tasks receive cancellation. A further rise runs
+  the body again from scratch, with fresh registrations.
+- **MECH-09.** A `whenever` scope nests inside another. Lowering the outer
+  gate cancels the inner scope's reactions and tasks along with the outer
+  scope's own.
+- **MECH-10.** An isolated test context's last reference is dropped, from
+  the MainActor or a background executor. I await an internal
+  acknowledgement that deinit cleanup reached the MainActor, then verify
+  every mechanism's reaction registrations are gone and every owned task has
+  received cancellation.
+- **MECH-11.** One turn both changes state a scoped reaction reads and
+  lowers that scope's gate. Teardown completes safely at the scope's place
+  in the flush: the woken sibling reaction in that scope never runs after
+  teardown, every owned task receives cancellation, and the app's state is
+  untouched.
+- **MECH-12.** `Cogs.forTesting(seeding:mechanisms:)` runs my seeding
+  closure before any `operate`, so an `initial: .run` watch observes the
+  seeded values on its registration run instead of the declaration defaults.
+- **MECH-13.** I define an op once as a `CogOperating` extension. App code
+  calls it on `cogs` and a mechanism calls it on `m`; both produce the same
+  named turn, and the mechanism's call is attributed to its mechanism in
+  debug history.
+- **MECH-14.** I try to register a reaction directly on the runtime, as in
+  `cogs.run { ... }`. The compiler says no: reactions register only through
+  a mechanism's controller. (Proof: compile-fail.)
+- **MECH-15.** I bootstrap with a class mechanism that owns a resource, then
+  drop my own reference to the mechanism. The runtime retains that exact
+  mechanism and its resource while the context lives. When the context ends,
+  its scope's reactions and tasks are cancelled first, and only then is the
+  mechanism released.
+- **MECH-16.** A retained class mechanism constructs its delegate-owned engine
+  with a `[weak m]` callback. A callback from a background executor hops to the
+  MainActor, calls an op through the controller, and records the mechanism
+  attribution. After the context is torn down, the engine can invoke the
+  callback again, but the controller no longer promotes, no op runs, and the
+  callback does not retain the context.
 
 ## 9. LIFE — How long state lives
 
@@ -514,10 +538,11 @@ commit for a loud domain operation.
   after the seed recomputes from the seeded value. A seed obeys the
   source's equality rule the way a write does — seeding an equal value is
   not a change.
-- **SEED-04.** The §6.6 alert story, verbatim: install a nice-weather
-  alert reaction, seed the zip and cloudy weather (no alert), then stub
-  sunny weather with a real commit. The alert fires exactly once, even
-  though the reaction's first run never read the weather.
+- **SEED-04.** The §6.6 alert story, verbatim: bootstrap a weather
+  mechanism whose alert reaction watches for nice weather, seeding the zip
+  and cloudy weather first (no alert), then stub sunny weather with a real
+  commit. The alert fires exactly once, even though the reaction's first
+  run never read the weather.
 - **SEED-05.** `CogTesting.seed` exists only in debug builds. A release build
   has no way to seed. (Proof: release configuration.)
 - **SEED-06.** I try to seed a derived cog. The compiler says no: only
@@ -544,7 +569,7 @@ When I wonder what happened, the debug history can tell me.
   benchmark territory, not a unit-test assertion.)
 - **HIST-04.** Release builds pay nothing for history. (Proof: release configuration.)
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
-  history under that effect name.
+  history under that name, composed beneath its mechanism's name.
 - **HIST-06.** Once M2 boundaries exist, history records each changed UI
   notice with the cog's human-readable label.
 - **HIST-07.** Several commits queue during a flush. History shows each
@@ -631,7 +656,7 @@ renderable, and whether any generation has succeeded.
   and failure alike.
 - **ASYNC-32.** The `status` lens carries the same read family as the value
   spelling beside it: tracked `c.status[...]` and `cogs.status[...]` reads,
-  `status.peek` one-shots, and `cogs.status.watch`, with identical demand,
+  `status.peek` one-shots, and `m.status.watch`, with identical demand,
   tracking, and lifetime rules. `CogStatus.kind` carries pending, success, or
   failure. A body first binds `let forecast = cogs.status[forecastCog]`; that
   binding observes no field, and SwiftUI Observation independently tracks only
