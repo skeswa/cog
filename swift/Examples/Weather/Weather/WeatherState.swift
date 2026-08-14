@@ -127,7 +127,7 @@ let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
   name: "weather.receivesHourlyUpdates"
 )
 
-extension CogOperating {
+extension CogOps {
   /// Selects the ZIP used by the alert reaction and periodic refresh loop.
   ///
   /// One definition serves both capabilities: views and app code call it on

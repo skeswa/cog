@@ -1,14 +1,14 @@
 /// The shared operation surface of the app runtime and a mechanism's
 /// controller.
 ///
-/// An op is an ordinary method written once in an `extension CogOperating` and
+/// An op is an ordinary method written once in an `extension CogOps` and
 /// callable on both capabilities: application code and views call it on the
 /// retained `Cogs`, while a mechanism calls it on the controller its `operate`
 /// received. One definition therefore serves every legitimate write site
 /// without handing mechanisms the raw runtime (§3.2, §6.2).
 ///
 /// ```swift
-/// extension CogOperating {
+/// extension CogOps {
 ///   func selectCurrentLocation(_ zip: ZipCode) {
 ///     commit(currentZipSourceCog, to: zip)
 ///   }
@@ -21,7 +21,7 @@
 /// capabilities are ``Cogs`` and ``MechanismController``, and ops written
 /// against this protocol are what keeps them interchangeable.
 @MainActor
-public protocol CogOperating {
+public protocol CogOps {
   /// Opens one named turn and runs `body` against its staged writes.
   ///
   /// This is the primitive beneath every op. Call the defaulted
@@ -60,7 +60,7 @@ public protocol CogOperating {
   func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value>
 }
 
-extension CogOperating {
+extension CogOps {
   /// Opens one turn named after the calling op and stages `body`'s writes.
   ///
   /// `commit` is the only write entry point. The writer overload groups
@@ -104,4 +104,4 @@ extension CogOperating {
 /// The requirements are implemented where each primitive lives: the commit
 /// boundary beside ``Writer``, the peeks beside state storage, and refresh
 /// beside async demand.
-extension Cogs: CogOperating {}
+extension Cogs: CogOps {}

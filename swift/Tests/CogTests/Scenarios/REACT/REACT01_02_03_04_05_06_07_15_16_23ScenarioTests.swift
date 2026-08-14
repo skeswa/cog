@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-extension CogOperating {
+extension CogOps {
   fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
     commit("reaction.writeback") { c in c[source] = value }
   }

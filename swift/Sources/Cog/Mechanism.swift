@@ -49,7 +49,7 @@ public protocol Mechanism {
   ///
   /// Called exactly once, during bootstrap, in array order. The controller is
   /// the mechanism's entire relationship with the graph: registration, gated
-  /// `whenever` scopes, untracked reads, and the shared ``CogOperating`` op
+  /// `whenever` scopes, untracked reads, and the shared ``CogOps`` op
   /// surface. Writes made here commit as ordinary named turns and settle
   /// before bootstrap returns, so a later mechanism observes the result.
   ///

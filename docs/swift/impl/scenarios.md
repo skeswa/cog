@@ -466,7 +466,7 @@ it. Retired IDs stay retired.)
 - **MECH-12.** `Cogs.forTesting(seeding:mechanisms:)` runs my seeding
   closure before any `operate`, so an `initial: .run` watch observes the
   seeded values on its registration run instead of the declaration defaults.
-- **MECH-13.** I define an op once as a `CogOperating` extension. App code
+- **MECH-13.** I define an op once as a `CogOps` extension. App code
   calls it on `cogs` and a mechanism calls it on `m`; both produce the same
   named turn, and the mechanism's call is attributed to its mechanism in
   debug history.

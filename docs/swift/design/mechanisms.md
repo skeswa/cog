@@ -102,7 +102,7 @@ its pieces have narrow jobs:
   not cooperatively returned yet.
 - `m.peek` makes an untracked read (§2.4); an `operate`-time read never
   becomes a dependency, because `operate` is registration, not a reaction.
-- Ops are available on `m` directly, because ops extend `CogOperating` and
+- Ops are available on `m` directly, because ops extend `CogOps` and
   the controller conforms (§3.2). `m.commit` and `m.refresh` are the
   primitives beneath them.
 - Every registration is attributed. `watch`, `run`, and `task` names compose
@@ -294,7 +294,7 @@ and any loud domain helpers:
 let currentZipSeedTargetCog = currentZipSourceCog
 let weatherSeedTargetsCogs = weatherReportSourceCogs
 
-extension CogOperating {
+extension CogOps {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
         commit { c in c[weatherReportSourceCogs[zip]] = report }
     }

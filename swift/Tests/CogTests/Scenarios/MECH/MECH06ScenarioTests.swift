@@ -4,7 +4,7 @@ import Testing
 
 @MainActor private let hourlyRefreshCountCog = ManualCog<Int>(0)
 
-@MainActor extension CogOperating {
+@MainActor extension CogOps {
   fileprivate func refreshCurrentLocation() {
     commit("location.hourlyRefresh") { c in
       c[hourlyRefreshCountCog] += 1

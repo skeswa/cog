@@ -191,7 +191,7 @@ These choices are settled; §10 of the core document has the full record.
 
 - `commit` is the only write entry point. Its scalar overload keeps ordinary
   setters compact; its writer overload makes related writes atomic. Ops are
-  normal methods in `CogOperating` extensions, so `Cogs` and a mechanism's
+  normal methods in `CogOps` extensions, so `Cogs` and a mechanism's
   controller share every op. `fileprivate` and `.readOnly` control which code may
   name writable state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
@@ -272,7 +272,7 @@ These choices are settled; §10 of the core document has the full record.
   handle. The app retains it, passes explicit context only at non-view
   composition boundaries such as isolated test harnesses, and injects it above
   every scene. Every consuming view resolves it directly through `\.cogs`; no
-  view accepts or forwards it. Ops extend `CogOperating`, and there is no
+  view accepts or forwards it. Ops extend `CogOps`, and there is no
   ambient `Cogs.app`. Tests of production installation use a synchronous scoped
   fixture from `CogTesting`, so they cannot leak global install state across
   the suite.

@@ -3,7 +3,7 @@
 ///
 /// The controller carries registration (``run(fileID:line:_:)``,
 /// `watch`, ``task(name:_:)``, and gated ``whenever`` scopes), untracked
-/// ``peek`` reads, and the shared ``CogOperating`` op surface. There is
+/// ``peek`` reads, and the shared ``CogOps`` op surface. There is
 /// deliberately no raw ``Cogs`` here: a mechanism that could reach the runtime
 /// could also leak it past its own discipline, and routing every act through
 /// the controller is what makes attribution and isolated testing exact (§6.2).
@@ -559,7 +559,7 @@ extension MechanismController {
 
 // MARK: - Ops
 
-extension MechanismController: CogOperating {
+extension MechanismController: CogOps {
   /// Opens one turn attributed to this mechanism.
   ///
   /// The turn name composes under the controller's name path, so history

@@ -405,7 +405,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Greens: DECL-10, DECL-11._
 - **M1-35a** _(Infrastructure)_ — Add the `Mechanism` protocol with its
   defaulted `name`, the curated final-class `MechanismController` shell
-  (registration entry points, untracked `peek`, and the `CogOperating`
+  (registration entry points, untracked `peek`, and the `CogOps`
   conformance), the internal per-mechanism registration scope containers that
   retain their controller without letting it own the runtime, and
   `Cogs.forTesting(mechanisms:)` operating each mechanism at creation.
@@ -496,7 +496,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-36** _(Decision)_ — Adopt the mechanism redesign: bootstrap-only
   registration through `Cogs.bootstrapApp(mechanisms:)`, the curated
   controller with state-gated `whenever` scopes, ops shared through
-  `CogOperating`, and withdrawal of the public `run`/`watch`/`EffectGroup`/
+  `CogOps`, and withdrawal of the public `run`/`watch`/`EffectGroup`/
   `ReactionToken` surface. Update §10, the snapshot, scenarios, and tasks.
   (This decision retired the completed public-token and effect-group tasks
   `M1-18a`, `M1-18b`, `M1-22`, `M1-23a`, `M1-23b`, `M1-23c`, `M1-23da`,
@@ -564,7 +564,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-17, M1-30a._
   _Verify: `mise run test --filter MECH-12`._
   _Greens: MECH-12._
-- **M1-37j** _(Behavior)_ — Share one `CogOperating` op definition between
+- **M1-37j** _(Behavior)_ — Share one `CogOps` op definition between
   `Cogs` and the mechanism controller, attributing the mechanism's call to
   its mechanism in history.
   _Depends: M1-31a, M1-35a._

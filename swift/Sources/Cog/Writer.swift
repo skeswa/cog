@@ -73,7 +73,7 @@ extension Cogs {
   ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. The
-  ///     defaulted ``CogOperating/commit(_:_:)`` sugar passes the calling
+  ///     defaulted ``CogOps/commit(_:_:)`` sugar passes the calling
   ///     op's `#function`.
   ///   - body: The synchronous writes that make up the turn. The writer it
   ///     receives is valid only while that body is executing.

@@ -5,7 +5,7 @@ import Testing
 @MainActor private let stepCountCog = ManualCog<Int>(0)
 
 // One op definition on the shared protocol serves both capabilities.
-@MainActor extension CogOperating {
+@MainActor extension CogOps {
   fileprivate func advanceStep() {
     commit { c in c[stepCountCog] += 1 }
   }
