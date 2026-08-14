@@ -29,15 +29,18 @@ private final class Async24ControlledWork {
 @MainActor
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let request = ManualCog<Int>(0)
   let work = Async24ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
     let selectedRequest = c[request]
     return .run { await work.run(for: selectedRequest) }
   }
+  let initialWatcherAlive = ManualCog<Bool>(true)
   let (initialStatuses, initialContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let initialToken = cogs.run { c in initialContinuation.yield(c.status[forecast]) }
+  m.whenever(initialWatcherAlive) { s in
+    s.run { c in initialContinuation.yield(c.status[forecast]) }
+  }
   var initialStatusIterator = initialStatuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -49,7 +52,7 @@ private final class Async24ControlledWork {
   }
   #expect(await startIterator.next() == 0)
 
-  initialToken.cancel()
+  cogs.commit(initialWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   cogs.commit("change request while cold") { c in c[request] = 1 }
 
@@ -59,7 +62,7 @@ private final class Async24ControlledWork {
   try await staleChecked.wait()
 
   let (returningStatuses, returningContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let returningToken = cogs.run { c in returningContinuation.yield(c.status[forecast]) }
+  m.run { c in returningContinuation.yield(c.status[forecast]) }
   var returningStatusIterator = returningStatuses.makeAsyncIterator()
 
   guard let returningPending = await returningStatusIterator.next(),
@@ -78,5 +81,4 @@ private final class Async24ControlledWork {
     return
   }
 
-  withExtendedLifetime((initialToken, returningToken)) {}
 }

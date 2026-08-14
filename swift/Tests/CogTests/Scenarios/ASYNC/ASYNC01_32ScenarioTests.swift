@@ -32,7 +32,7 @@ private final class Async32ControlledWork {
 
 @MainActor
 @Test func `ASYNC-01 ASYNC-32 the status lens carries tracked reads with value parity`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -41,7 +41,7 @@ private final class Async32ControlledWork {
 
   // A tracked selector-side status read demands the state exactly like a value
   // read would, and delivers every later status turn to its consumer.
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -82,7 +82,6 @@ private final class Async32ControlledWork {
     Issue.record("The tracked status read did not observe success")
     return
   }
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
@@ -93,7 +92,7 @@ private final class Async32ControlledWork {
   // REACT-08's rule: installation demands the state (work starts) but calls
   // nothing; the first status turn delivers the pending it skipped as the old
   // half and the new status as the new half.
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -103,7 +102,7 @@ private final class Async32ControlledWork {
   )
   var deliveryCount = 0
 
-  let token = cogs.status.watch(forecast, initial: .skip, name: "watch.status.skip") {
+  m.status.watch(forecast, initial: .skip, name: "watch.status.skip") {
     old, new in
     deliveryCount += 1
     continuation.yield((old: old, new: new))
@@ -125,14 +124,13 @@ private final class Async32ControlledWork {
   #expect(!first.old.hasSucceeded)
   #expect(first.new.kind == .success)
   #expect(first.new.value == 42)
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-32 a status watch sees turns an equal-success value watch gates away`()
   async
 {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -140,11 +138,11 @@ private final class Async32ControlledWork {
   let (statusEvents, statusContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   var valueEvents: [Int] = []
 
-  let statusToken = cogs.status.watch(forecast, initial: .run, name: "watch.status") {
+  m.status.watch(forecast, initial: .run, name: "watch.status") {
     _, new in
     statusContinuation.yield(new)
   }
-  let valueToken = cogs.watch(forecast, initial: .run, name: "watch.value") { _, new in
+  m.watch(forecast, initial: .run, name: "watch.value") { _, new in
     valueEvents.append(new)
   }
   var statusIterator = statusEvents.makeAsyncIterator()
@@ -187,12 +185,11 @@ private final class Async32ControlledWork {
   }
   #expect(valueEvents == [0, 42])
 
-  withExtendedLifetime((statusToken, valueToken)) {}
 }
 
 @MainActor
 @Test func `ASYNC-32 SwiftUI observes only the status fields its body reads`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
   let forecastCog = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()

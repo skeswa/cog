@@ -6,34 +6,39 @@ import Testing
 
 @MainActor
 @Test func `REACT-17 a finite reaction loop warns and returns idle`() throws {
-  let cogs = Cogs.forTesting()
   let ping = ManualCog<Int>(0)
   let pong = ManualCog<Int>(0)
   var reactionRuns = 0
+  var pingReactionLine: UInt = 0
+  var pongReactionLine: UInt = 0
 
-  let pingReactionLine = UInt(#line) + 1
-  let pingReaction = cogs.run { c in
-    let value = c[ping]
-    guard value > 0 else { return }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      pingReactionLine = UInt(#line) + 1
+      m.run { c in
+        let value = c[ping]
+        guard value > 0 else { return }
 
-    reactionRuns += 1
-    guard value < 65 else { return }
-    cogs.commit("react17.turn.\(value + 1)") { c in
-      c[pong] = value + 1
+        reactionRuns += 1
+        guard value < 65 else { return }
+        m.commit("react17.turn.\(value + 1)") { c in
+          c[pong] = value + 1
+        }
+      }
+
+      pongReactionLine = UInt(#line) + 1
+      m.run { c in
+        let value = c[pong]
+        guard value > 0 else { return }
+
+        reactionRuns += 1
+        guard value < 65 else { return }
+        m.commit("react17.turn.\(value + 1)") { c in
+          c[ping] = value + 1
+        }
+      }
     }
-  }
-
-  let pongReactionLine = UInt(#line) + 1
-  let pongReaction = cogs.run { c in
-    let value = c[pong]
-    guard value > 0 else { return }
-
-    reactionRuns += 1
-    guard value < 65 else { return }
-    cogs.commit("react17.turn.\(value + 1)") { c in
-      c[ping] = value + 1
-    }
-  }
+  ])
 
   #expect(cogs.turnChainDiagnostic.warningCount == 0)
   #expect(cogs.turnChainDiagnostic.isIdle)
@@ -63,13 +68,11 @@ import Testing
   let pongReactionName = "\(#fileID):\(pongReactionLine)"
   let expectedChain = (1...65).flatMap { turn -> [CogTurnChainCause] in
     [
-      .turn("react17.turn.\(turn)"),
+      .turn(turn == 1 ? "react17.turn.1" : "Probe.react17.turn.\(turn)"),
       .reaction(turn.isMultiple(of: 2) ? pongReactionName : pingReactionName),
     ]
   }
   #expect(warning.causalChain == expectedChain)
-
-  _ = (pingReaction, pongReaction)
 }
 
 @MainActor
@@ -77,24 +80,27 @@ import Testing
   // Pins the lower edge of "about 64": a chain of exactly 64 uninterrupted
   // turns is quiet, so the warning cannot silently regress toward warning on
   // ordinary short chains.
-  let cogs = Cogs.forTesting()
   let ping = ManualCog<Int>(0)
   let pong = ManualCog<Int>(0)
 
-  let pingReaction = cogs.run { c in
-    let value = c[ping]
-    guard value > 0, value < 64 else { return }
-    cogs.commit("react17.edge.\(value + 1)") { c in
-      c[pong] = value + 1
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in
+        let value = c[ping]
+        guard value > 0, value < 64 else { return }
+        m.commit("react17.edge.\(value + 1)") { c in
+          c[pong] = value + 1
+        }
+      }
+      m.run { c in
+        let value = c[pong]
+        guard value > 0, value < 64 else { return }
+        m.commit("react17.edge.\(value + 1)") { c in
+          c[ping] = value + 1
+        }
+      }
     }
-  }
-  let pongReaction = cogs.run { c in
-    let value = c[pong]
-    guard value > 0, value < 64 else { return }
-    cogs.commit("react17.edge.\(value + 1)") { c in
-      c[ping] = value + 1
-    }
-  }
+  ])
 
   cogs.commit("react17.edge.1") { c in c[ping] = 1 }
 
@@ -104,7 +110,6 @@ import Testing
   #expect(cogs.turnChainDiagnostic.warningCount == 0)
   #expect(cogs.turnChainDiagnostic.lastWarning == nil)
   #expect(cogs.turnChainDiagnostic.isIdle)
-  _ = (pingReaction, pongReaction)
 }
 
 @MainActor
@@ -112,33 +117,33 @@ import Testing
   // Enough reactions per turn overflow the bounded causal trace before the
   // turn threshold. The warning still fires once, keeps its bounded prefix,
   // and says that it truncated instead of silently dropping causes.
-  let cogs = Cogs.forTesting()
   let ping = ManualCog<Int>(0)
   let pong = ManualCog<Int>(0)
-  var passives: [ReactionToken] = []
 
-  for _ in 0..<4 {
-    passives.append(
-      cogs.run { c in
-        _ = c[ping]
-        _ = c[pong]
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      for _ in 0..<4 {
+        m.run { c in
+          _ = c[ping]
+          _ = c[pong]
+        }
       }
-    )
-  }
-  let pingReaction = cogs.run { c in
-    let value = c[ping]
-    guard value > 0, value < 65 else { return }
-    cogs.commit("react17.heavy.\(value + 1)") { c in
-      c[pong] = value + 1
+      m.run { c in
+        let value = c[ping]
+        guard value > 0, value < 65 else { return }
+        m.commit("react17.heavy.\(value + 1)") { c in
+          c[pong] = value + 1
+        }
+      }
+      m.run { c in
+        let value = c[pong]
+        guard value > 0, value < 65 else { return }
+        m.commit("react17.heavy.\(value + 1)") { c in
+          c[ping] = value + 1
+        }
+      }
     }
-  }
-  let pongReaction = cogs.run { c in
-    let value = c[pong]
-    guard value > 0, value < 65 else { return }
-    cogs.commit("react17.heavy.\(value + 1)") { c in
-      c[ping] = value + 1
-    }
-  }
+  ])
 
   cogs.commit("react17.heavy.1") { c in c[ping] = 1 }
 
@@ -149,7 +154,6 @@ import Testing
   #expect(warning.uninterruptedTurnCount == 65)
   #expect(warning.causalChainIsTruncated)
   #expect(warning.causalChain.count == 256)
-  _ = (pingReaction, pongReaction, passives)
 }
 
 @MainActor

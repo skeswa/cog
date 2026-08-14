@@ -25,7 +25,7 @@ private final class Async08ControlledWork {
 
 @MainActor
 @Test func `ASYNC-08 stale cancellation-ignoring result is rejected`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = Async08ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
@@ -33,7 +33,7 @@ private final class Async08ControlledWork {
     return .run { await work.run(for: currentRequest) }
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -63,5 +63,4 @@ private final class Async08ControlledWork {
   } else {
     Issue.record("Expected only the newest result to commit")
   }
-  withExtendedLifetime(token) {}
 }

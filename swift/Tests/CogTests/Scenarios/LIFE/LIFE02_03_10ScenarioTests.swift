@@ -12,22 +12,27 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
 @MainActor
 @Test func `LIFE-02 an unobserved derived cog is released after injected grace`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogs.forTesting(
-    clock: clock,
-    whileObservedGrace: .seconds(10)
-  )
+  let watcherAlive = ManualCog<Bool>(true)
   var selectorRuns = 0
   let derived = Cog<Int> { _ in
     selectorRuns += 1
     return 10
   }
 
-  let token = cogs.run { c in _ = c[derived] }
+  let (cogs, m) = probedContext(
+    clock: clock,
+    whileObservedGrace: .seconds(10)
+  )
+  m.whenever(watcherAlive) { s in
+    s.run { c in _ = c[derived] }
+  }
   #expect(selectorRuns == 1)
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  token.cancel()
+  // Lowering the gate tears the watching reaction down: the last watcher
+  // leaves and grace begins.
+  cogs.commit(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
@@ -35,7 +40,6 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
   #expect(released.hasBeenAcknowledged)
   #expect(cogs.peek(derived) == 10)
   #expect(selectorRuns == 2)
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
@@ -43,10 +47,7 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
   async throws
 {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogs.forTesting(
-    clock: clock,
-    whileObservedGrace: .seconds(10)
-  )
+  let watcherAlive = ManualCog<Bool>(true)
   let source = ManualCog<Int>(1)
   var previousValues: [Int?] = []
   let derived = Cog<Int> { c in
@@ -54,12 +55,18 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
     return c[source]
   }
 
-  let token = cogs.run { c in _ = c[derived] }
+  let (cogs, m) = probedContext(
+    clock: clock,
+    whileObservedGrace: .seconds(10)
+  )
+  m.whenever(watcherAlive) { s in
+    s.run { c in _ = c[derived] }
+  }
   #expect(previousValues == [nil])
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  token.cancel()
+  cogs.commit(watcherAlive, to: false)
   cogs.commit { c in c[source] = 2 }
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
@@ -67,7 +74,6 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
 
   #expect(cogs.peek(derived) == 2)
   #expect(previousValues == [nil, nil])
-  withExtendedLifetime(token) {}
 }
 
 @MainActor

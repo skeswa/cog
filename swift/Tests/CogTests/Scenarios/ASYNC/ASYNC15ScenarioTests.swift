@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `ASYNC-15 async work runs on the MainActor by default`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let (started, startedContinuation) = AsyncStream.makeStream(
     of: Void.self,
     bufferingPolicy: .bufferingNewest(1)
@@ -17,12 +17,11 @@ import Testing
     }
   }
 
-  let token = cogs.run { c in _ = c[forecast] }
+  m.run { c in _ = c[forecast] }
   var startedIterator = started.makeAsyncIterator()
   guard await startedIterator.next() != nil else {
     Issue.record("The async work ended before it started")
     return
   }
 
-  withExtendedLifetime(token) {}
 }

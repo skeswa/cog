@@ -26,7 +26,7 @@ private final class Async03ControlledWork {
 
 @MainActor
 @Test func `ASYNC-03 reload preserves an explicit previous nil`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = Async03ControlledWork()
   let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { c in
@@ -34,7 +34,7 @@ private final class Async03ControlledWork {
     return .run { try await work.run(for: currentRequest) }
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int?>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   var startIterator = work.starts.makeAsyncIterator()
 
@@ -67,5 +67,4 @@ private final class Async03ControlledWork {
   #expect(await startIterator.next() == 1)
   work.succeed(1, with: 7)
   _ = await statusIterator.next()
-  withExtendedLifetime(token) {}
 }

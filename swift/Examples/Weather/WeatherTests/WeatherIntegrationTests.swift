@@ -139,16 +139,21 @@ private final class TrackedWeatherCard {
 
 @MainActor
 @Test func asyncNoticesPrecedeEffectsAndEqualDerivedValuesStayQuiet() async throws {
-  let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
-  cogs.seedCurrentZip(.newYork)
-  cogs.seedWeatherService(requests.service)
   var alerts: [String] = []
-  WeatherEffects(
-    notifier: Notifier { alerts.append($0) },
-    initialZipCodes: []
-  ).install(in: cogs)
+  let cogs = Cogs.forTesting(
+    seeding: { cogs in
+      cogs.seedCurrentZip(.newYork)
+      cogs.seedWeatherService(requests.service)
+    },
+    mechanisms: [
+      WeatherMechanism(
+        notifier: Notifier { alerts.append($0) },
+        initialZipCodes: []
+      )
+    ]
+  )
   let card = TrackedWeatherCard(cogs: cogs, zip: .newYork)
   card.start()
 

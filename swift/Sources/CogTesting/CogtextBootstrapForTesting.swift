@@ -21,15 +21,22 @@ extension Cogs {
   /// temporary install. Do not nest calls; the inner bootstrap is rejected as
   /// a second app install.
   ///
-  /// - Parameter body: What to run while the app context is installed. It
-  ///   receives the context ``Cogs/bootstrapApp()`` just made.
+  /// - Parameters:
+  ///   - mechanisms: The mechanism list handed to the real bootstrap, in the
+  ///     order their registrations should hold. Defaults to none.
+  ///   - body: What to run while the app context is installed. It receives
+  ///     the context ``Cogs/bootstrapApp(mechanisms:)`` just made, its
+  ///     mechanisms already live.
   /// - Returns: The value returned by `body`.
   /// - Throws: Any error thrown by `body`, after uninstalling the temporary
   ///   app context.
   @discardableResult
-  public static func withBootstrappedApp<R>(_ body: (Cogs) throws -> R) rethrows -> R {
+  public static func withBootstrappedApp<R>(
+    mechanisms: [any Mechanism] = [],
+    _ body: (Cogs) throws -> R
+  ) rethrows -> R {
     defer { Cogs.uninstallApp() }
-    return try body(Cogs.bootstrapApp())
+    return try body(Cogs.bootstrapApp(mechanisms: mechanisms))
   }
 
   /// Whether `context` is the exact object in the production-install slot.

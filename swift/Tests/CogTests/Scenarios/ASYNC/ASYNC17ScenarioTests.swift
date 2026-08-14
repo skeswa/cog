@@ -4,12 +4,12 @@ import Testing
 
 @MainActor
 @Test func `ASYNC-17 async task name includes its descriptor and key`() async {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let forecast = AsyncCogBox<String?, Int>(default: nil, name: "forecast") { _, _ in
     .run { CogTaskDiagnostic.currentTaskName }
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<String?>.self)
-  let token = cogs.run { c in continuation.yield(c.status[forecast[90_210]]) }
+  m.run { c in continuation.yield(c.status[forecast[90_210]]) }
   var iterator = statuses.makeAsyncIterator()
 
   guard await iterator.next() != nil else {
@@ -26,5 +26,4 @@ import Testing
   } else {
     Issue.record("Expected work to return its runtime task name")
   }
-  withExtendedLifetime(token) {}
 }

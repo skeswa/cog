@@ -1,6 +1,7 @@
-import Cog
 import CogTesting
 import Testing
+
+@testable import Cog
 
 // MARK: - Watch projection infrastructure
 
@@ -13,9 +14,14 @@ import Testing
   let projection = source.readOnly
   var deliveries: [String] = []
 
-  let token = cogs.watch(projection, initial: .skip) { old, new in
-    deliveries.append("\(old)->\(new)")
-  }
+  let token = cogs.watchTracked(
+    label: CogLabel(name: nil, fileID: #fileID, line: #line),
+    initial: .skip,
+    read: { c in c[projection] },
+    body: { old, new in
+      deliveries.append("\(old)->\(new)")
+    }
+  )
 
   cogs.commit { c in c[source] = 2 }
 

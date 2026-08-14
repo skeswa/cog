@@ -9,7 +9,6 @@ import Testing
 
 @MainActor
 @Test func `REACT-21 an equal recomputation leaves a watching reaction quiet`() {
-  let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(2)
   var parityRuns = 0
   let isEven = Cog<Bool> { c in
@@ -18,10 +17,14 @@ import Testing
   }
   var reactionRuns = 0
 
-  let token = cogs.run { c in
-    _ = c[isEven]
-    reactionRuns += 1
-  }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in
+        _ = c[isEven]
+        reactionRuns += 1
+      }
+    }
+  ])
 
   #expect(parityRuns == 1)
   #expect(reactionRuns == 1)
@@ -41,20 +44,21 @@ import Testing
   // A recomputation that does change the value still wakes it.
   #expect(parityRuns == 3)
   #expect(reactionRuns == 2)
-
-  _ = token
 }
 
 @MainActor
 @Test func `REACT-22 an equal write leaves a reading reaction quiet`() {
-  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(7)
   var reactionRuns = 0
 
-  let token = cogs.run { c in
-    _ = c[source]
-    reactionRuns += 1
-  }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.run { c in
+        _ = c[source]
+        reactionRuns += 1
+      }
+    }
+  ])
 
   #expect(reactionRuns == 1)
 
@@ -66,27 +70,26 @@ import Testing
   cogs.commit("write a different value") { c in c[source] = 8 }
 
   #expect(reactionRuns == 2)
-
-  _ = token
 }
 
 @MainActor
 @Test func `REACT-22 an equal write leaves a watch quiet`() {
   // The same promise through the watch spelling, whose delivery of an old and
   // a new value would be meaningless if an equal write could reach it.
-  let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(7)
   var deliveries: [String] = []
 
-  let token = cogs.watch(source, initial: .skip) { old, new in
-    deliveries.append("\(old)->\(new)")
-  }
+  let cogs = Cogs.forTesting(mechanisms: [
+    MechanismProbe { m in
+      m.watch(source, initial: .skip) { old, new in
+        deliveries.append("\(old)->\(new)")
+      }
+    }
+  ])
 
   cogs.commit { c in c[source] = 7 }
   #expect(deliveries.isEmpty)
 
   cogs.commit { c in c[source] = 8 }
   #expect(deliveries == ["7->8"])
-
-  _ = token
 }

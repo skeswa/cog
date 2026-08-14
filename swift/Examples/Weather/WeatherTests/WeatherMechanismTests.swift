@@ -5,17 +5,19 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func niceWeatherEffectSkipsInstallationAndAlertsOnFalseToTrueTransitions() async throws {
-  let cogs = Cogs.forTesting()
+@Test func niceWeatherReactionSkipsBootstrapAndAlertsOnFalseToTrueTransitions() async throws {
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
   var alerts: [String] = []
   let notifier = Notifier { alerts.append($0) }
 
-  cogs.seedCurrentZip(.newYork)
-  cogs.seedWeatherService(requests.service)
-
-  WeatherEffects(notifier: notifier, initialZipCodes: []).install(in: cogs)
+  let cogs = Cogs.forTesting(
+    seeding: { cogs in
+      cogs.seedCurrentZip(.newYork)
+      cogs.seedWeatherService(requests.service)
+    },
+    mechanisms: [WeatherMechanism(notifier: notifier, initialZipCodes: [])]
+  )
   let initialRun = try #require(await starts.next())
   try await resolveWeatherRequest(in: cogs) {
     await requests.succeed(initialRun, with: WeatherReading(.cloudy, 60))
@@ -51,37 +53,40 @@ import Testing
   let effectNames = cogs.debugHistory.entries
     .filter { $0.event == .effect }
     .map(\.name)
-  #expect(effectNames.contains("weather.niceAlert"))
+  #expect(effectNames.contains("Weather.niceAlert"))
 }
 
 @MainActor
-@Test func installedEffectsDoNotRetainAnIsolatedRuntime() async throws {
-  var cogs: Cogs? = Cogs.forTesting()
-  let effectsReleased = MainActorCleanupAcknowledgement()
-  cogs?.effects.acknowledgeDeinitCleanup(with: effectsReleased)
-
-  WeatherEffects(notifier: Notifier { _ in }, initialZipCodes: [])
-    .install(in: try #require(cogs))
+@Test func bootstrappedMechanismsDoNotRetainAnIsolatedRuntime() async throws {
+  var cogs: Cogs? = Cogs.forTesting(mechanisms: [
+    WeatherMechanism(notifier: Notifier { _ in }, initialZipCodes: [])
+  ])
+  let teardownReleased = MainActorCleanupAcknowledgement()
+  cogs?.acknowledgeDeinitCleanup(with: teardownReleased)
 
   cogs = nil
-  try await effectsReleased.wait()
+  try await teardownReleased.wait()
 }
 
 @MainActor
 @Test func injectedClockRunsTheHourlyWeatherOperation() async throws {
   let clock = TestClock()
-  let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
-  cogs.seedWeatherService(requests.service)
-  cogs.seedCurrentZip(.newYork)
   let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
-  WeatherEffects(
-    notifier: Notifier { _ in },
-    clock: clock,
-    initialZipCodes: []
+  let cogs = Cogs.forTesting(
+    seeding: { cogs in
+      cogs.seedWeatherService(requests.service)
+      cogs.seedCurrentZip(.newYork)
+    },
+    mechanisms: [
+      WeatherMechanism(
+        notifier: Notifier { _ in },
+        clock: clock,
+        initialZipCodes: []
+      )
+    ]
   )
-  .install(in: cogs)
 
   let initialRun = try #require(await starts.next())
   #expect(initialRun.zip == .newYork)
@@ -110,19 +115,22 @@ import Testing
 }
 
 @MainActor
-@Test func installingEffectsPublishesTheCadenceTheLoopActuallyKeeps() {
-  let cogs = Cogs.forTesting()
-  cogs.seedCurrentZip(.newYork)
-
-  #expect(cogs.peek(refreshIntervalCog) == nil)
-  #expect(cogs.peek(receivesHourlyUpdatesCogs[.newYork]) == false)
-
-  WeatherEffects(
-    notifier: Notifier { _ in },
-    initialZipCodes: [],
-    hourlyRefreshInterval: .seconds(5)
+@Test func bootstrappingTheMechanismPublishesTheCadenceTheLoopActuallyKeeps() {
+  let cogs = Cogs.forTesting(
+    seeding: { cogs in
+      cogs.seedCurrentZip(.newYork)
+      // Seeding precedes `operate`, so this observes the resting defaults.
+      #expect(cogs.peek(refreshIntervalCog) == nil)
+      #expect(cogs.peek(receivesHourlyUpdatesCogs[.newYork]) == false)
+    },
+    mechanisms: [
+      WeatherMechanism(
+        notifier: Notifier { _ in },
+        initialZipCodes: [],
+        hourlyRefreshInterval: .seconds(5)
+      )
+    ]
   )
-  .install(in: cogs)
 
   #expect(cogs.peek(refreshIntervalCog) == .seconds(5))
   #expect(cogs.peek(refreshIntervalCog)?.cadenceDescription == "5 seconds")
@@ -135,18 +143,22 @@ import Testing
 @MainActor
 @Test func aFailedHourlyRefreshDoesNotStopLaterOnes() async throws {
   let clock = TestClock()
-  let cogs = Cogs.forTesting()
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
-  cogs.seedWeatherService(requests.service)
-  cogs.seedCurrentZip(.newYork)
   let refreshedWeather = Weather(kind: .clear, temperatureF: 75)
-  WeatherEffects(
-    notifier: Notifier { _ in },
-    clock: clock,
-    initialZipCodes: []
+  let cogs = Cogs.forTesting(
+    seeding: { cogs in
+      cogs.seedWeatherService(requests.service)
+      cogs.seedCurrentZip(.newYork)
+    },
+    mechanisms: [
+      WeatherMechanism(
+        notifier: Notifier { _ in },
+        clock: clock,
+        initialZipCodes: []
+      )
+    ]
   )
-  .install(in: cogs)
 
   let initialRun = try #require(await starts.next())
   let initialReading = WeatherReading(.cloudy, 60)

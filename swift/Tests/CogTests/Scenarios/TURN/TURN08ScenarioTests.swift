@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-08 queued commits finish one full flush at a time in FIFO order`() {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let trigger = ManualCog<Int>(0)
   let value = ManualCog<Int>(0)
   var events: [String] = []
@@ -15,7 +15,7 @@ import Testing
     return result
   }
 
-  let queueingReaction = cogs.run { c in
+  m.run { c in
     guard c[trigger] == 1 else { return }
 
     for next in 1...3 {
@@ -26,7 +26,7 @@ import Testing
     }
   }
 
-  let observingReaction = cogs.run { c in
+  m.run { c in
     events.append("react:\(c[doubled])")
   }
 
@@ -49,5 +49,4 @@ import Testing
       "react:6",
     ]
   )
-  _ = (queueingReaction, observingReaction)
 }

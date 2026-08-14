@@ -49,7 +49,7 @@ private final class Async25ControlledWork {
 @MainActor
 @Test func `ASYNC-25 value-only demand releases its pending chain after one grace`() async throws {
   let clock = DerivedLifetimeTestClock()
-  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
@@ -59,13 +59,16 @@ private final class Async25ControlledWork {
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let firstConsumer = cogs.run { c in _ = c[forecast] }
+  let firstWatcherAlive = ManualCog<Bool>(true)
+  m.whenever(firstWatcherAlive) { s in
+    s.run { c in _ = c[forecast] }
+  }
   #expect(selectorRuns == 1)
   #expect(await startIterator.next() == 0)
 
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  firstConsumer.cancel()
+  cogs.commit(firstWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
@@ -77,7 +80,7 @@ private final class Async25ControlledWork {
   }
   #expect(await cancellationIterator.next() == 0)
 
-  let secondConsumer = cogs.run { c in _ = c[forecast] }
+  m.run { c in _ = c[forecast] }
   guard selectorRuns == 2 else {
     Issue.record("The value projection and async dependency were not both recreated")
     work.finish(0, with: 100)
@@ -101,5 +104,4 @@ private final class Async25ControlledWork {
   cogs.acknowledgeNextAsyncCompletionCheck(with: freshChecked)
   work.finish(1, with: 200)
   try await freshChecked.wait()
-  withExtendedLifetime((firstConsumer, secondConsumer)) {}
 }

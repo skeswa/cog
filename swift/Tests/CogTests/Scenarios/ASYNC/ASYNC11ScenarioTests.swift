@@ -59,7 +59,7 @@ private final class Async11WorkProbe {
 
 @MainActor
 @Test func `ASYNC-11 only synchronous selector reads become dependencies`() async throws {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let selectorInput = ManualCog<Int>(10)
   let workInput = ManualCog<Int>(20)
   let probe = Async11WorkProbe()
@@ -77,7 +77,7 @@ private final class Async11WorkProbe {
     }
   }
 
-  let token = cogs.run { c in _ = c[result] }
+  m.run { c in _ = c[result] }
   #expect(selectorValues == [10])
 
   await probe.waitUntilSuspended(1)
@@ -101,5 +101,4 @@ private final class Async11WorkProbe {
       .init(selectorValue: 11, workValue: 22),
     ]
   )
-  withExtendedLifetime(token) {}
 }

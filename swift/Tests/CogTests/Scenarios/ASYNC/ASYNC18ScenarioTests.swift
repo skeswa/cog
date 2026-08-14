@@ -40,13 +40,13 @@ private final class Async18ControlledWork {
 @Test func `ASYNC-18 initial pending and failure are separate turns without previous values`()
   async
 {
-  let cogs = Cogs.forTesting()
+  let (cogs, m) = probedContext()
   let work = Async18ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
   let (observations, continuation) = AsyncStream.makeStream(of: Async18Observation.self)
-  let token = cogs.status.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
+  m.status.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
     if old.kind == .pending, !old.hasSucceeded,
       new.kind == .pending, !new.hasSucceeded
     {
@@ -80,5 +80,4 @@ private final class Async18ControlledWork {
   #expect(Set(statusTurns.map(\.turn)).count == 2)
   #endif
 
-  withExtendedLifetime(token) {}
 }

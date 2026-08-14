@@ -25,5 +25,5 @@ import Testing
   // what makes this test fail if the guard ever regresses to a silent trap.
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
   #expect(stderr.contains("Cog is already bootstrapped"))
-  #expect(stderr.contains("Cogs.forTesting()"))
+  #expect(stderr.contains("Cogs.forTesting(seeding:mechanisms:)"))
 }

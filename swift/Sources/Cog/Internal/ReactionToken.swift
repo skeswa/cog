@@ -1,32 +1,26 @@
-/// The lifetime handle for one reaction or watch registration.
+/// The internal lifetime handle for one reaction or watch registration.
 ///
-/// Keep the token alive for as long as the reaction should run. Releasing the
-/// last reference cancels the registration. Call ``cancel()`` when it must stop
-/// at a specific point.
-///
-/// ```swift
-/// let token = cogs.run { c in
-///   let unreadCount = c[unreadCountCog]
-///   updateBadge(unreadCount)
-/// }
-/// defer { token.cancel() }
-/// ```
+/// Registration handles are not public API: a registration lives until its
+/// owning ``MechanismScope`` ends, and shorter lifetimes are `whenever` gates
+/// expressed in state (§6.2). The scope keeps the token alive; releasing the
+/// last reference cancels the registration, and ``cancel()`` stops it at a
+/// specific point during scope teardown.
 ///
 /// A token is a MainActor-isolated reference type. Additional references share
 /// one registration rather than copying it. The owning ``Cogs`` keeps the
 /// registration in execution order, while the last token reference controls
 /// when its body, dependency edges, and `whileObserved` leases are removed.
+///
+/// This class stays non-generic so its `isolated deinit` can cancel
+/// synchronously when released on the MainActor.
 @MainActor
-public final class ReactionToken {
+internal final class ReactionToken {
   /// The exact context-owned registration controlled by every token reference.
   ///
   /// The context also retains the registration to preserve execution order,
   /// but token lifetime determines whether it remains active: deinitialization
   /// cancels the registration before releasing this reference.
   internal let reaction: CogReaction
-
-  /// One package-only deinit signal consumed by deterministic cleanup tests.
-  private var deinitCleanupAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// Wraps a newly registered reaction without creating another registration.
   ///
@@ -47,20 +41,8 @@ public final class ReactionToken {
   ///
   /// Every reference to this token shares one terminal registration;
   /// cancelling through any reference stops it for all of them.
-  public func cancel() {
+  internal func cancel() {
     reaction.cancel()
-  }
-
-  /// Installs the package-only signal emitted after isolated deinit cleanup.
-  ///
-  /// `CogTesting` uses this to await actor-correct ARC cleanup without polling
-  /// graph storage. Production clients cannot install the hook.
-  ///
-  /// - Parameter body: The MainActor acknowledgement invoked after cancellation.
-  package func acknowledgeDeinitCleanup(
-    with body: @escaping @MainActor @Sendable () -> Void
-  ) {
-    deinitCleanupAcknowledgement = body
   }
 
   /// Cancels the registration once the last handle to it goes away.
@@ -71,6 +53,5 @@ public final class ReactionToken {
   /// before the next statement.
   isolated deinit {
     reaction.cancel()
-    deinitCleanupAcknowledgement?()
   }
 }

@@ -41,18 +41,21 @@ private final class Async13ControlledWork {
 @MainActor
 @Test func `ASYNC-13 release cancels pending work and rejects its late result`() async throws {
   let clock = TestClock()
-  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let watcherAlive = ManualCog<Bool>(true)
   let refresh = cogs.refresh(forecast)
-  let token = cogs.run { c in _ = c[forecast] }
+  m.whenever(watcherAlive) { s in
+    s.run { c in _ = c[forecast] }
+  }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
   #expect(await startIterator.next() == 0)
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  token.cancel()
+  cogs.commit(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
@@ -74,23 +77,25 @@ private final class Async13ControlledWork {
   }
   #expect(resultTurns.isEmpty)
   #endif
-  withExtendedLifetime(token) {}
 }
 
 @MainActor
 @Test func `ASYNC-14 reading after release starts fresh unpolluted work`() async throws {
   let clock = TestClock()
-  let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
-  let firstToken = cogs.run { c in _ = c[forecast] }
+  let firstWatcherAlive = ManualCog<Bool>(true)
+  m.whenever(firstWatcherAlive) { s in
+    s.run { c in _ = c[forecast] }
+  }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
   #expect(await startIterator.next() == 0)
   let released = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextDerivedRelease(with: released)
-  firstToken.cancel()
+  cogs.commit(firstWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
@@ -102,7 +107,7 @@ private final class Async13ControlledWork {
   try await lateChecked.wait()
 
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  let secondToken = cogs.run { c in continuation.yield(c.status[forecast]) }
+  m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
   guard let freshPending = await statusIterator.next() else {
     Issue.record("The recreated status stream ended before pending")
@@ -123,5 +128,4 @@ private final class Async13ControlledWork {
   } else {
     Issue.record("Expected only the recreated work's result")
   }
-  withExtendedLifetime((firstToken, secondToken)) {}
 }
