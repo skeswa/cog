@@ -326,6 +326,44 @@ extension Cogs {
     nextLifetimeReleaseCheckAcknowledgement = acknowledgement
   }
 
+  /// How many exact states a UI read has pinned with an Observation boundary.
+  ///
+  /// A diagnostic seam for `CogTesting`, not UI API. It reports only the count
+  /// of boundary-pinned states — never the states, their storage, or the
+  /// boundary objects — so behavior tests (UI-05) can hold "only what a view
+  /// read pays for a boundary" without coupling to state representation.
+  package var observationBoundaryCountForTesting: Int {
+    observationStates.count
+  }
+
+  /// Whether this source's exact state currently owns an Observation boundary.
+  ///
+  /// Purely a lookup: a state never demanded in this context reports `false`
+  /// without being created, so probing cannot disturb laziness or lifetime.
+  package func hasObservationBoundaryForTesting<Value>(
+    for valueReference: ManualCog<Value>
+  ) -> Bool {
+    hasObservationBoundary(
+      CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
+  }
+
+  /// Whether this derived cog's exact state currently owns an Observation
+  /// boundary.
+  ///
+  /// Purely a lookup: a state never demanded in this context reports `false`
+  /// without being created, so probing cannot disturb laziness or lifetime.
+  package func hasObservationBoundaryForTesting<Value>(
+    for valueReference: Cog<Value>
+  ) -> Bool {
+    hasObservationBoundary(
+      CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
+  }
+
+  /// Shared identity lookup behind the boundary probes above.
+  private func hasObservationBoundary(_ identity: CogStateIdentity) -> Bool {
+    (states[identity] as? any CogObservationState)?.observationBoundary != nil
+  }
+
   /// Removes the exact still-unobserved state after its grace task resumes.
   ///
   /// Both identity and generation matter. The descriptor-and-key slot may have

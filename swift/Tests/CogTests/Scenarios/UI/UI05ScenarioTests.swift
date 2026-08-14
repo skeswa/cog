@@ -1,7 +1,11 @@
+import Cog
 import CogTesting
 import Testing
 
-@testable import Cog
+// Boundary allocation is proved through the CogTesting seam — a count and a
+// per-reference membership probe — never by looking at state storage, so this
+// scenario survives value-reference layout and core swaps (COUNT-09 through
+// COUNT-11).
 
 @MainActor
 @Test func `UI-05 only states read through the UI boundary allocate boundary objects`() {
@@ -12,19 +16,17 @@ import Testing
 
   #expect(cogs[displayed] == "value: 6")
 
-  let sourceState = cogs.manualState(for: source)
-  let interiorState = cogs.derivedState(for: interior)
-  let displayedState = cogs.derivedState(for: displayed)
+  // The UI read settled the whole chain, but only the value the view actually
+  // read pays for a boundary; interior graph states never do.
+  #expect(cogs.observationBoundaryCount == 1)
+  #expect(cogs.hasObservationBoundary(for: displayed))
+  #expect(!cogs.hasObservationBoundary(for: interior))
+  #expect(!cogs.hasObservationBoundary(for: source))
 
-  #expect(displayedState.observationBoundary != nil)
-  #expect(interiorState.observationBoundary == nil)
-  #expect(sourceState.observationBoundary == nil)
-  #expect(cogs.observationStates.count == 1)
-  #expect(cogs.observationStates[0] === displayedState)
-
+  // Reading the source through the boundary makes it exactly the second
+  // boundary owner; the interior state still has none.
   #expect(cogs[source] == 2)
-  #expect(sourceState.observationBoundary != nil)
-  #expect(interiorState.observationBoundary == nil)
-  #expect(cogs.observationStates.count == 2)
-  #expect(cogs.observationStates[1] === sourceState)
+  #expect(cogs.observationBoundaryCount == 2)
+  #expect(cogs.hasObservationBoundary(for: source))
+  #expect(!cogs.hasObservationBoundary(for: interior))
 }
