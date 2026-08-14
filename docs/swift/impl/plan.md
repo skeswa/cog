@@ -489,6 +489,12 @@ query caching.
   ship `CogTesting.TestClock` for deterministic application schedules.
 - `Cog.docc`: landing page, Getting Started, and an article on the
   one-context rule and testing with `CogTesting`. Start `CHANGELOG.md`.
+- Close the behavior-coverage corners the scenario audit surfaced before the
+  freeze: commit-boundary settlement and the shortcut diamond (TURN-15,
+  GRAPH-13), the keyed cycle release trap and the debug seed-misuse guard
+  (CYCLE-07, SEED-08), and mid-flush group self-cancellation, per-key
+  lifetime, queued-turn history, and per-render Observation retracking
+  (GROUP-11, LIFE-11, HIST-07, UI-16).
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that
   consumes the repo URL.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin

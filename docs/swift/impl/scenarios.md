@@ -225,7 +225,7 @@ Every read I make is correct: the latest committed state, fully settled.
 
 ## 4. TURN — Writing state and turns
 
-_Milestone M1. Design: §3.2, §2.2._
+_Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
 
 `commit` is the only door for writes, and every commit is one named turn.
 
@@ -240,6 +240,10 @@ _Milestone M1. Design: §3.2, §2.2._
 - **TURN-04.** While a commit body is still running, a normal read (not
   through the writer) still sees the old values. Staged values are
   visible only to the writer.
+- **TURN-15.** While a commit body is still running, I read a derived cog
+  that is not yet settled. It settles from committed values — never this
+  turn's staged writes — and after the commit it recomputes from the newly
+  committed values.
 
 ### 4.2 Turns join, queue, and end
 
@@ -273,7 +277,7 @@ _Milestone M1. Design: §3.2, §2.2._
 
 ## 5. GRAPH — Derived values stay right and lazy
 
-_Milestone M1. Design: §2.2, §2.4, §5.4._
+_Milestone M1, except GRAPH-13 (M4). Design: §2.2, §2.4, §5.4._
 
 Cog recomputes only what is needed, only when it is needed, and never shows a
 half-finished picture.
@@ -288,6 +292,9 @@ half-finished picture.
   correctly from top to bottom without exhausting the stack.
 - **GRAPH-04.** One source feeds many derived cogs. Each one I read is
   right, and only the ones I read recompute.
+- **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,
+  so the two paths differ in length. I change A once. D recomputes once,
+  seeing A and B from the same turn — never new A beside old B.
 
 ### 5.2 Equal values stop the wave
 
@@ -320,7 +327,7 @@ half-finished picture.
 
 ## 6. CYCLE — Cycles and mistakes
 
-_Milestone M1. Design: §2.4, perf §3.4._
+_Milestone M1, except CYCLE-07 (M4). Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
 
@@ -338,6 +345,10 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
   in debug and release. The message names the cog, key, and attempted turn and
   tells me to invoke the op outside derived computation, from event handling
   or a reaction. (Proof: exit test.)
+- **CYCLE-07.** The keyed cycle from CYCLE-03 reaches the real trap instead
+  of the diagnostic seam. The crash message walks the whole path with each
+  cog's key, in debug and release builds, so the two renderings cannot
+  drift apart. (Proof: exit test.)
 
 ## 7. REACT — Reactions
 
@@ -415,7 +426,7 @@ changes.
 
 ## 8. GROUP — Effect groups and timers
 
-_Milestone M1. Design: §6.2, §6.3._
+_Milestone M1, except GROUP-11 (M4). Design: §6.2, §6.3._
 
 `Cogs` owns app-lifetime effects; an `EffectGroup` owns any shorter scope.
 
@@ -445,11 +456,15 @@ _Milestone M1. Design: §6.2, §6.3._
   is not retained, and the shared group stays terminal. A second live token
   added through another copy is also cancelled, and adding an already-cancelled
   token to that cancelled group is harmless.
+- **GROUP-11.** A reaction owned by a group cancels its own group while the
+  flush that woke it is still running. Cancellation completes safely
+  mid-flush: a sibling watch later in that same flush never runs again,
+  every owned task receives cancellation, and the app's state is untouched.
 
 ## 9. LIFE — How long state lives
 
-_Milestone M1 (UI pinning lands with M2; async release with M3). Design: §5.3,
-perf §7._
+_Milestone M1 (UI pinning lands with M2; async release with M3; LIFE-11 with
+M4). Design: §5.3, perf §7._
 
 State lives as long as its kind says, and coming back is always safe. Grace
 periods default to 30 seconds in production. Tests override that context
@@ -480,10 +495,14 @@ test waits wall-clock time.
   cog. It settles current state without a durable consumer, starts or renews
   one ordinary grace window, and releases after expiry. A later peek recreates
   it from current dependencies.
+- **LIFE-11.** One key of a derived box loses its last watcher while a
+  sibling key stays watched. After the grace period only that key's state is
+  released: the watched key never recomputes and keeps answering warm, and
+  reading the released key recreates it from current values.
 
 ## 10. SEED — Test helpers: seed and stub
 
-_Milestone M1, except SEED-07 (M2). Design: §6.6, §4._
+_Milestone M1, except SEED-07 (M2) and SEED-08 (M4). Design: §6.6, §4._
 
 My tests import `CogTesting` to set up state quietly with `seed`, or use a real
 commit for a loud domain operation.
@@ -506,10 +525,15 @@ commit for a loud domain operation.
 - **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
   read. Seeding sends no UI notice; the next real turn still settles and
   notices the value dirtied by the seed.
+- **SEED-08.** I call `seed` at the wrong time — inside a commit body, or
+  from a selector or reaction. Cog stops me right away with a clear error
+  saying seed is only for idle test setup. The guard is debug-only surface
+  proven by debug exit tests; a release build has no seed at all (SEED-05).
 
 ## 11. HIST — Debug history
 
-_Milestone M1, except HIST-06 (M2). Design: §2.3, §6.2, perf §8._
+_Milestone M1, except HIST-06 (M2) and HIST-07 (M4). Design: §2.3, §6.2,
+perf §8._
 
 When I wonder what happened, the debug history can tell me.
 
@@ -523,11 +547,15 @@ When I wonder what happened, the debug history can tell me.
   history under that effect name.
 - **HIST-06.** Once M2 boundaries exist, history records each changed UI
   notice with the cog's human-readable label.
+- **HIST-07.** Several commits queue during a flush. History shows each
+  queued turn as its own entry, in execution order, and attributes every
+  write to the turn that made it; entries from different turns never
+  interleave.
 
 ## 12. UI — SwiftUI and UIKit boundary
 
-_Milestone M2, in `CogBoundaryTests` and the Weather example. Design: §3.4,
-§7, §9, perf §6._
+_Milestone M2, except UI-16 (M4), in `CogBoundaryTests` and the Weather
+example. Design: §3.4, §7, §9, perf §6._
 
 My views update when — and only when — the values they read change. Boundary
 tests assert Observation notices and re-render counters, never pixels or
@@ -558,6 +586,10 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
   render sees either the old pair before the commit or the new pair after
   it — never one old value and one new value.
+- **UI-16.** A view's first render reads cogs A and B; its next render
+  reads only B. Changing A no longer re-renders the view, and changing B
+  still does — each render tracks only what it read, the way GRAPH-09
+  retracks a selector.
 
 ## 13. ASYNC — Async values, first slice
 

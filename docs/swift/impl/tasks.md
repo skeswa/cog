@@ -938,7 +938,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
 - **M4-05b** _(Gate)_ — Prepare the 0.1.0 release candidate without mutating
   remote state: format, ledgers, matrices, release, simulator, Weather, floor,
   docs, changelog, and revision-based scratch consumption.
-  _Depends: M4-04c, M4-05a, M4-06, M4-07e._
+  _Depends: M4-04c, M4-05a, M4-06, M4-07e, M4-08, M4-09, M4-10, M4-11._
   _Verify: the complete 0.1.0 checklist with immutable CI links._
 - **M4-05c** _(Release)_ — Create and push the bare annotated `0.1.0` tag.
   _Depends: M4-05b._
@@ -986,6 +986,30 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   lens in the Weather example and its tests.
   _Depends: M4-07d._
   _Verify: `mise run build:weather` and `mise run test:weather`._
+- **M4-08** _(Behavior)_ — Prove commit-boundary settlement and
+  shortcut-diamond consistency: a derived cog settled mid-commit computes
+  from committed values, and an uneven diamond settles once with no torn
+  pair.
+  _Depends: M3-11._
+  _Verify: `mise run test --filter 'TURN-15|GRAPH-13'`._
+  _Greens: TURN-15, GRAPH-13._
+- **M4-09** _(Behavior)_ — Prove the keyed cycle release trap renders every
+  key in its crash message, in debug and release.
+  _Depends: M3-11._
+  _Verify: `mise run test --filter CYCLE-07` and
+  `mise run test:release --filter CYCLE-07`._
+  _Greens: CYCLE-07._
+- **M4-10** _(Behavior)_ — Prove the debug seed-misuse guard traps clearly
+  from a commit body and from a selector.
+  _Depends: M3-11._
+  _Verify: `mise run test --filter SEED-08`._
+  _Greens: SEED-08._
+- **M4-11** _(Behavior)_ — Prove mid-flush group self-cancellation, per-key
+  derived lifetime independence, whole-and-ordered queued-turn history, and
+  per-render Observation retracking.
+  _Depends: M3-11._
+  _Verify: `mise run test --filter 'GROUP-11|LIFE-11|HIST-07|UI-16'`._
+  _Greens: GROUP-11, LIFE-11, HIST-07, UI-16._
 
 ## M5 tasks
 
@@ -1235,10 +1259,10 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10ea._
   _Verify: `COG_TEST_CORE=arena mise run test --filter LIFE`._
 - **M6-10fa** _(Infrastructure)_ — Pass the M1 `CogTesting` debug-seed
-  semantics through arena dirty propagation without turns, reactions, or
-  history.
+  semantics, including the seed-misuse trap, through arena dirty propagation
+  without turns, reactions, or history.
   _Depends: M6-09, M6-10cb._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'SEED-0[1-4]'`,
+  _Verify: `COG_TEST_CORE=arena mise run test --filter 'SEED-0[1-4]|SEED-08'`,
   `mise run test:compilefail`, and the release absence check._
 - **M6-10g** _(Infrastructure)_ — Pass UI boundary behavior and
   UI-before-reaction flush ordering through the arena core selector.
