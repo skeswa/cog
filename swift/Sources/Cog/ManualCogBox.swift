@@ -21,8 +21,9 @@
 /// declarations remain distinct even for equal keys. Another context creates
 /// its own state for every demanded key.
 ///
-/// Building `box[key]` creates no graph state or descriptor. It is cheap to use
-/// inline, as in `c[weatherReportCogs[zip]]`.
+/// Building `box[key]` creates no graph state or descriptor. It is cheap to form
+/// at the read site and unwrap into its domain local, as in
+/// `let weatherReport = c[weatherReportCogs[zip]]`.
 ///
 /// Each demanded key has app lifetime in its context, like ``ManualCog``.
 /// Writes occur through ``Writer`` inside turns and equality is applied only to

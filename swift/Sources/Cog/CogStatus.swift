@@ -12,6 +12,9 @@
 /// getter rather than when `cogs.status[valueReference]` creates this value.
 /// A body therefore invalidates only when a status field it actually read
 /// changes.
+/// Bind the status to the async declaration's unsuffixed domain name before
+/// reading those fields; the local's `CogStatus` type carries its status shape
+/// without a `Status` name suffix.
 ///
 /// Obtaining a status through a read capability is still demand: the lens
 /// settles the async state and starts initial work before returning this value.

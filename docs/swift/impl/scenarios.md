@@ -608,10 +608,12 @@ renderable, and whether any generation has succeeded.
   spelling beside it: tracked `c.status[...]` and `cogs.status[...]` reads,
   `status.peek` one-shots, and `cogs.status.watch`, with identical demand,
   tracking, and lifetime rules. `CogStatus.kind` carries pending, success, or
-  failure, while SwiftUI Observation independently tracks only the `kind`,
-  `value`, `hasSucceeded`, `error`, and `isLoading` fields a body actually
-  reads. While an equal-success reload leaves a value consumer quiet, the lens
-  still shows its consumers every pending, success, and failure turn.
+  failure. A body first binds `let forecast = cogs.status[forecastCog]`; that
+  binding observes no field, and SwiftUI Observation independently tracks only
+  the `kind`, `value`, `hasSucceeded`, `error`, and `isLoading` fields the body
+  later reads from `forecast`. While an equal-success reload leaves a value
+  consumer quiet, the lens still shows its consumers every pending, success,
+  and failure turn.
 - **ASYNC-33.** The `status` lens refuses synchronous state: asking
   `cogs.status` or a selector's `c.status` for a manual or derived cog does
   not compile. (Proof: compile-fail.)

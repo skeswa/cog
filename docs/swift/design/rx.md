@@ -17,8 +17,9 @@ A derived cog depends on what it read during its last run:
 
 ```swift
 let weatherHereCog = Cog { c in
-    guard let zip = c[currentZipCog] else { return nil as Weather? }
-    return c[weatherReportCogs[zip]]
+    guard let currentZip = c[currentZipCog] else { return nil as Weather? }
+    let weatherReport = c[weatherReportCogs[currentZip]]
+    return weatherReport
 }
 ```
 
@@ -28,8 +29,10 @@ follows a changing set:
 
 ```swift
 let shouldPackHatCog = Cog { c in
-    c[vacationZipCodesCog].contains { zip in
-        c[shouldWearHatCogs[zip]]
+    let vacationZipCodes = c[vacationZipCodesCog]
+    return vacationZipCodes.contains { zip in
+        let shouldWearHat = c[shouldWearHatCogs[zip]]
+        return shouldWearHat
     }
 }
 ```
@@ -54,8 +57,8 @@ events.
 
 ```swift
 let forecastCog = AsyncCog<Forecast?>(.latest) { c in
-    let zip = c[currentZipCog]
-    return .run { try await api.forecast(for: zip) }
+    let currentZip = c[currentZipCog]
+    return .run { try await api.forecast(for: currentZip) }
 }
 ```
 
@@ -68,8 +71,8 @@ observations.
 
 ```swift
 let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
-    let accuracy = c[desiredAccuracyCog]
-    return .stream(locationService.updates(accuracy: accuracy))
+    let desiredAccuracy = c[desiredAccuracyCog]
+    return .stream(locationService.updates(accuracy: desiredAccuracy))
 }
 ```
 

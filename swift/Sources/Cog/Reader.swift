@@ -4,11 +4,14 @@
 ///
 /// ```swift
 /// let subtotalCog = Cog<Money> { c in
-///   c[cartCog].items.reduce(.zero) { $0 + $1.price }
+///   let cart = c[cartCog]
+///   return cart.items.reduce(.zero) { $0 + $1.price }
 /// }
 /// ```
 ///
-/// `c[valueReference]` returns a value and records its dependency. Each run
+/// Application selectors bind each read to the value reference's unsuffixed
+/// domain name before using it. `c[valueReference]` returns a value and records
+/// its dependency. Each run
 /// replaces the dependency set, so branches and early returns work as expected.
 /// Reads made outside this reader are invisible to Cog.
 ///

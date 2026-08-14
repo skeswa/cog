@@ -45,10 +45,20 @@ let refreshIntervalCog = refreshIntervalSourceCog.readOnly
 /// accepted reading.
 ///
 /// Each ZIP code gets independent status, a dependency set, generation, and
-/// task. The declaration explicitly rests at `nil`: a value read
-/// (`cogs[weatherForecastCogs[zip]]`) is total, returning `nil` before the first
-/// success and the last accepted reading afterward, while request chrome opts
-/// into `cogs.status[weatherForecastCogs[zip]]`. The selector synchronously
+/// task. The declaration explicitly rests at `nil`:
+///
+/// ```swift
+/// let weatherForecast = cogs[weatherForecastCogs[zip]]
+/// ```
+///
+/// is total, returning `nil` before the first success and the last accepted
+/// reading afterward. Request chrome uses the same local name:
+///
+/// ```swift
+/// let weatherForecast = cogs.status[weatherForecastCogs[zip]]
+/// ```
+///
+/// The selector synchronously
 /// captures the current service as a Cog dependency; replacing that service
 /// in a test invalidates every demanded forecast. The returned work runs away
 /// from the MainActor, while Cog brings its pending, success, and failure
@@ -57,9 +67,9 @@ let weatherForecastCogs = AsyncCogBox<WeatherReading?, ZipCode>(
   default: nil,
   name: "weather.forecast"
 ) { c, zip in
-  let service = c[weatherServiceCog]
+  let weatherService = c[weatherServiceCog]
   return .run { @concurrent in
-    try await service.forecast(for: zip)
+    try await weatherService.forecast(for: zip)
   }
 }
 
@@ -69,7 +79,8 @@ let weatherForecastCogs = AsyncCogBox<WeatherReading?, ZipCode>(
 /// and failure status; it changes only when the accepted reading does.
 let isSunnyCogs = CogBox<Bool, ZipCode>(
   { c, zip in
-    switch c[weatherForecastCogs[zip]]?.weather.kind {
+    let weatherForecast = c[weatherForecastCogs[zip]]
+    return switch weatherForecast?.weather.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
@@ -83,11 +94,12 @@ let isSunnyCogs = CogBox<Bool, ZipCode>(
 /// so the app has one definition of "nice" and equality gates both consumers.
 let isNiceOutsideCogs = CogBox<Bool, ZipCode>(
   { c, zip in
-    guard let reading = c[weatherForecastCogs[zip]] else { return false }
-    guard c[isSunnyCogs[zip]] else { return false }
-    return reading.weather.temperatureF > 60
-      && reading.weather.temperatureF < 90
-      && !reading.advisories.contains(.heat)
+    guard let weatherForecast = c[weatherForecastCogs[zip]] else { return false }
+    let isSunny = c[isSunnyCogs[zip]]
+    guard isSunny else { return false }
+    return weatherForecast.weather.temperatureF > 60
+      && weatherForecast.weather.temperatureF < 90
+      && !weatherForecast.advisories.contains(.heat)
   },
   name: "weather.isNice"
 )
@@ -98,8 +110,9 @@ let isNiceOutsideCogs = CogBox<Bool, ZipCode>(
 /// `nil` deliberately makes the reaction inactive without demanding a forecast.
 let isNiceOutsideHereCog = Cog<Bool>(
   { c in
-    guard let zip = c[currentZipCodeCog] else { return false }
-    return c[isNiceOutsideCogs[zip]]
+    guard let currentZipCode = c[currentZipCodeCog] else { return false }
+    let isNiceOutside = c[isNiceOutsideCogs[currentZipCode]]
+    return isNiceOutside
   },
   name: "weather.isNiceHere"
 )
@@ -107,7 +120,9 @@ let isNiceOutsideHereCog = Cog<Bool>(
 /// Whether one card is the currently selected target of an installed refresh loop.
 let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
   { c, zip in
-    c[refreshIntervalCog] != nil && c[currentZipCodeCog] == zip
+    let refreshInterval = c[refreshIntervalCog]
+    let currentZipCode = c[currentZipCodeCog]
+    return refreshInterval != nil && currentZipCode == zip
   },
   name: "weather.receivesHourlyUpdates"
 )
@@ -121,7 +136,10 @@ extension Cogs {
   /// A tracked SwiftUI binding to the singular current-location source.
   var currentZipBinding: Binding<ZipCode?> {
     Binding(
-      get: { self[currentZipCodeCog] },
+      get: {
+        let currentZipCode = self[currentZipCodeCog]
+        return currentZipCode
+      },
       set: { self.selectCurrentLocation($0) }
     )
   }

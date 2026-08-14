@@ -6,7 +6,8 @@
 ///
 /// ```swift
 /// let token = cogs.run { c in
-///   updateBadge(c[unreadCountCog])
+///   let unreadCount = c[unreadCountCog]
+///   updateBadge(unreadCount)
 /// }
 /// defer { token.cancel() }
 /// ```

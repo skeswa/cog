@@ -10,6 +10,20 @@
 /// reads and explicit watches track the complete status. The lens deliberately
 /// has no spelling for manual or derived cogs: synchronous state has no request
 /// status, so asking for it is a type error rather than a degenerate success.
+///
+/// Bind the result to the declaration's unsuffixed domain name, just like a
+/// plain value read:
+///
+/// ```swift
+/// let forecast = cogs.status[forecastCog]
+/// if forecast.kind == .failure {
+///   showRetry(forecast.error)
+/// }
+/// ```
+///
+/// The `CogStatus` type carries the lifecycle distinction; a `forecastStatus`
+/// suffix is unnecessary. Creating the local observes no status field. The
+/// later getters above independently register only `kind` and `error`.
 extension Cogs {
   /// The lens for UI-boundary and one-shot status reads.
   ///

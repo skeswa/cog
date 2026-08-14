@@ -201,6 +201,16 @@ that runtime.
   before the suffix (`weatherServiceSourceCog`, `weatherReportSourceCogs`).
   The app runtime remains the ordinary local `cogs`, and ordinary values read
   from the graph receive normal domain names without either suffix.
+- **Unwrap Swift state reads into domain locals.** In application code and
+  user-facing examples, bind each value-producing `c[...]`, `cogs[...]`, or
+  status/peek read to a local before using it. Name that local by removing the
+  declaration's final `Cog` or `Cogs`. For a status read, write
+  `let forecast = cogs.status[forecastCog]`; do not add a `forecastStatus`
+  suffix even though its type is `CogStatus`. Read status fields from that
+  local. Creating it observes no field by itself, so SwiftUI still tracks only
+  the fields the body uses. This rule applies in views, selectors, reactions,
+  and operations. Writer lvalues, commands that accept a value reference, and
+  low-level tests isolating an exact read expression need not invent a local.
 - **Make Swift source explain its contracts.** Every Swift source file and
   every internal-or-higher declaration needs substantive documentation
   comments. Explain the semantics a maintainer cannot infer from a signature:

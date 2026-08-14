@@ -142,7 +142,7 @@ private final class Async32ControlledWork {
 @Test func `ASYNC-32 SwiftUI observes only the status fields its body reads`() async throws {
   let cogs = Cogs.forTesting()
   let work = Async32ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecastCog = AsyncCog<Int>(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
   let kindNotices = OSAllocatedUnfairLock(initialState: 0)
@@ -152,27 +152,32 @@ private final class Async32ControlledWork {
   let loadingNotices = OSAllocatedUnfairLock(initialState: 0)
 
   let initialKind = withObservationTracking {
-    cogs.status[forecast].kind
+    let forecast = cogs.status[forecastCog]
+    return forecast.kind
   } onChange: {
     kindNotices.withLock { $0 += 1 }
   }
   let initialValue = withObservationTracking {
-    cogs.status[forecast].value
+    let forecast = cogs.status[forecastCog]
+    return forecast.value
   } onChange: {
     valueNotices.withLock { $0 += 1 }
   }
   let initiallySucceeded = withObservationTracking {
-    cogs.status[forecast].hasSucceeded
+    let forecast = cogs.status[forecastCog]
+    return forecast.hasSucceeded
   } onChange: {
     successNotices.withLock { $0 += 1 }
   }
   let initialError = withObservationTracking {
-    cogs.status[forecast].error
+    let forecast = cogs.status[forecastCog]
+    return forecast.error
   } onChange: {
     errorNotices.withLock { $0 += 1 }
   }
   let initiallyLoading = withObservationTracking {
-    cogs.status[forecast].isLoading
+    let forecast = cogs.status[forecastCog]
+    return forecast.isLoading
   } onChange: {
     loadingNotices.withLock { $0 += 1 }
   }

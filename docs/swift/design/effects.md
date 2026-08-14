@@ -25,7 +25,7 @@ that boundary clear makes application behavior easier to read.
 | Continue after process death          | Durable state, an engine, and a reconciler (§6.7)   |
 
 For example, “check the weather when the ZIP changes” produces state, so it
-belongs in the `fetchedWeather` async cog from §5.1. “Alert me when the
+belongs in the `fetchedWeatherCogs` async box from §5.1. “Alert me when the
 weather becomes nice” leaves the graph, so it is a reaction.
 
 ### 6.2 App-lifetime and scoped effect groups
@@ -38,7 +38,7 @@ struct WeatherEffects {
     var clock: any Clock<Duration> = ContinuousClock()
 
     func install(in cogs: Cogs) {
-        cogs.effects.add(cogs.watch(isNiceOutsideHere, initial: .skip,
+        cogs.effects.add(cogs.watch(isNiceOutsideHereCog, initial: .skip,
                                     name: "weather.niceAlert") { was, nice in
             if nice && !was {
                 notifier.alert("It is nice outside!")
@@ -183,8 +183,8 @@ and any loud domain helpers:
 ```swift
 // WeatherState.swift
 #if DEBUG
-let currentZipSeedTarget = currentZipSource
-let weatherSeedTargets = weatherReportSource
+let currentZipSeedTargetCog = currentZipSourceCog
+let weatherSeedTargetsCogs = weatherReportSourceCogs
 
 extension Cogs {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
@@ -227,7 +227,8 @@ or linking test setup into the app target.
     #expect(notifier.alerts == ["It is nice outside!"])
 
     clock.advance(by: .seconds(3_600))
-    #expect(cogs.peek(currentZipCode) != nil)
+    let currentZip = cogs.peek(currentZipCog)
+    #expect(currentZip != nil)
     clock.finish()
 }
 ```
@@ -265,10 +266,13 @@ desired state with the engine's actual state:
 
 ```swift
 let episodesToDownloadCog = Cog { c in
-    c[subscribedEpisodesCog]
+    let subscribedEpisodes = c[subscribedEpisodesCog]
+    let autoDownloadPolicy = c[autoDownloadPolicyCog]
+    return subscribedEpisodes
         .filter { episode in
-            c[autoDownloadPolicyCog].wants(episode)
-                && !c[downloadStateCogs[episode.id]].isDownloadedOrInFlight
+            let downloadState = c[downloadStateCogs[episode.id]]
+            return autoDownloadPolicy.wants(episode)
+                && !downloadState.isDownloadedOrInFlight
         }
         .map(\.id)
 }
@@ -365,7 +369,7 @@ of too many turns.
     reaction run. The dirty push is required, not an optimization. Without it,
     a reaction registered before the seed would keep the dependency set from
     its registration run and never rerun: in the test above, the alert
-    reaction initially depends only on `currentZipCode` (no ZIP means the
+    reaction initially depends only on `currentZipCog` (no ZIP means the
     selector returns early), so a later weather turn would find no subscriber
     edge to follow and the alert would never fire.
 

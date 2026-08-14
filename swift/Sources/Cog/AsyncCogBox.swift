@@ -11,8 +11,8 @@
 ///   name: "weather.fetch"
 /// ) {
 ///   c, zip in
-///   let service = c[weatherServiceCog]
-///   return .run { try await service.weather(for: zip) }
+///   let weatherService = c[weatherServiceCog]
+///   return .run { try await weatherService.weather(for: zip) }
 /// }
 /// ```
 ///

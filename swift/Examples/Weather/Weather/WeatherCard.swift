@@ -45,14 +45,17 @@ struct WeatherCardContent: View {
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let forecastStatus = cogs.status[weatherForecastCogs[zip]]
-    let report = forecastStatus.value?.weather
-    let nice = cogs[isNiceOutsideCogs[zip]]
-    let loadStatus = WeatherLoadStatus(forecastStatus)
-    let receivesUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
-    let cadence = cogs[refreshIntervalCog]?.shortCadenceDescription
+    let weatherForecast = cogs.status[weatherForecastCogs[zip]]
+    let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
+    let receivesHourlyUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
+    let refreshInterval = cogs[refreshIntervalCog]
+    let report = weatherForecast.value?.weather
+    let loadStatus = WeatherLoadStatus(weatherForecast)
+    let cadence = refreshInterval?.shortCadenceDescription
     #if DEBUG
-    let _ = renderProbe?(WeatherCardSnapshot(zip: zip, report: report, isNice: nice))
+    let _ = renderProbe?(
+      WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
+    )
     #endif
 
     VStack(alignment: .leading, spacing: 14) {
@@ -68,7 +71,7 @@ struct WeatherCardContent: View {
 
         Spacer()
 
-        if receivesUpdates, let cadence {
+        if receivesHourlyUpdates, let cadence {
           Label("Every \(cadence)", systemImage: "timer")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tint)
@@ -106,8 +109,8 @@ struct WeatherCardContent: View {
 
         HStack(spacing: 12) {
           Label(
-            nice ? "Good outdoor weather" : "Better indoors",
-            systemImage: nice ? "figure.walk" : "house"
+            isNiceOutside ? "Good outdoor weather" : "Better indoors",
+            systemImage: isNiceOutside ? "figure.walk" : "house"
           )
           .font(.subheadline.weight(.medium))
 
@@ -135,7 +138,10 @@ struct WeatherCardContent: View {
     )
     .overlay {
       RoundedRectangle(cornerRadius: 20)
-        .stroke(receivesUpdates ? Color.accentColor.opacity(0.55) : .clear, lineWidth: 1.5)
+        .stroke(
+          receivesHourlyUpdates ? Color.accentColor.opacity(0.55) : .clear,
+          lineWidth: 1.5
+        )
     }
     .accessibilityElement(children: .contain)
   }

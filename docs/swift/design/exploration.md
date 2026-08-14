@@ -293,6 +293,25 @@ a box ends in plural `Cogs`. Any narrower role comes first, as in
 the ordinary local `cogs`, and a value read from the graph takes an ordinary
 domain name without either suffix.
 
+Application code unwraps every graph read into that ordinary domain name
+before using it. Removing the declaration suffix makes references and values
+visually distinct, keeps dependent reads in lexical data-flow order, and
+prevents graph access from hiding inside a larger expression:
+
+```swift
+let someWords = cogs[someWordsCog]
+let anotherThing = cogs[anotherThingCogs[someWords]]
+let hereIsAnother = cogs.status[hereIsAnotherCog]
+```
+
+The rule is the same in SwiftUI bodies, selectors, reactions, and operations,
+and for one-shot peeks. A status local deliberately does not add `Status` to
+the domain name: its static `CogStatus` type carries that distinction. Binding
+the returned status observes no field by itself; reading `hereIsAnother.kind`
+or `.value` afterward still registers only that field at the SwiftUI boundary.
+Writer lvalues and commands such as `refresh` that accept a value reference
+are not value unwrapping and remain direct.
+
 ```swift
 // WeatherState.swift
 
@@ -304,27 +323,31 @@ fileprivate let heatAdvisorySourceCogs = ManualCogBox<Bool, ZipCode>(false)
 fileprivate let currentZipSourceCog = ManualCog<ZipCode?>(nil)
 
 let weatherReportCogs = weatherReportSourceCogs.readOnly
+let heatAdvisoryCogs = heatAdvisorySourceCogs.readOnly
 let currentZipCog = currentZipSourceCog.readOnly
 
 let isSunnyCogs = CogBox<Bool, ZipCode> { c, zip in
-    switch c[weatherReportCogs[zip]]?.kind {
+    let weatherReport = c[weatherReportCogs[zip]]
+    return switch weatherReport?.kind {
     case .clear, .partlyCloudy: true
     default: false
     }
 }
 
 let isNiceOutsideCogs = CogBox<Bool, ZipCode> { c, zip in
-    guard let report = c[weatherReportCogs[zip]] else { return false }
-    guard c[isSunnyCogs[zip]] else { return false }
-    let advisory = c[heatAdvisorySourceCogs[zip]]
-    return report.temperatureF > 60
-        && report.temperatureF < 90
-        && !advisory
+    guard let weatherReport = c[weatherReportCogs[zip]] else { return false }
+    let isSunny = c[isSunnyCogs[zip]]
+    guard isSunny else { return false }
+    let heatAdvisory = c[heatAdvisoryCogs[zip]]
+    return weatherReport.temperatureF > 60
+        && weatherReport.temperatureF < 90
+        && !heatAdvisory
 }
 
 let isNiceOutsideHereCog = Cog { c in
-    guard let zip = c[currentZipCog] else { return false }
-    return c[isNiceOutsideCogs[zip]]
+    guard let currentZip = c[currentZipCog] else { return false }
+    let isNiceOutside = c[isNiceOutsideCogs[currentZip]]
+    return isNiceOutside
 }
 ```
 
@@ -427,7 +450,8 @@ give write control and turn names, so v1 does not need them.
 
 ```swift
 let token = cogs.run { c in
-    if c[isNiceOutsideHereCog] {
+    let isNiceOutsideHere = c[isNiceOutsideHereCog]
+    if isNiceOutsideHere {
         notifier.alert("It is nice outside!")
     }
 }
@@ -451,13 +475,13 @@ struct WeatherCard: View {
     let zip: ZipCode
 
     var body: some View {
-        let report = cogs[weatherReportCogs[zip]]
-        let nice = cogs[isNiceOutsideCogs[zip]]
+        let weatherReport = cogs[weatherReportCogs[zip]]
+        let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
 
         VStack {
-            Text(report.map { "\(Int($0.temperatureF.rounded()))°F" }
+            Text(weatherReport.map { "\(Int($0.temperatureF.rounded()))°F" }
                  ?? "No weather report yet")
-            Text(nice ? "Go outside!" : "Stay in.")
+            Text(isNiceOutside ? "Go outside!" : "Stay in.")
             Button("Check the weather") {
                 Task { try await cogs.checkWeather(zip) }
             }
@@ -603,8 +627,8 @@ let fetchedWeatherCogs = AsyncCogBox<Weather?, ZipCode>(
     .latest,
     default: nil
 ) { c, zip in
-    let service = c[weatherServiceCog]
-    return .run { try await service.weather(for: zip) }
+    let weatherService = c[weatherServiceCog]
+    return .run { try await weatherService.weather(for: zip) }
 }
 ```
 
@@ -620,11 +644,17 @@ starts, so no read can silently stop tracking after an `await`. Changing a
 dependency reruns the selector and creates new work; the policy in §5.2
 decides what happens to the old work.
 
-Read the value normally, or opt into the lifecycle through the `status` lens:
+Read the value normally:
 
 ```swift
-c[fetchedWeatherCogs[zip]]          // Weather? — total value read
-c.status[fetchedWeatherCogs[zip]]   // CogStatus<Weather?> — the request itself
+let fetchedWeather = c[fetchedWeatherCogs[zip]] // Weather? — total value
+```
+
+Or opt into the lifecycle through the `status` lens while keeping the same
+unsuffixed domain name:
+
+```swift
+let fetchedWeather = c.status[fetchedWeatherCogs[zip]] // CogStatus<Weather?>
 ```
 
 Every read capability carries the same pair: `c[...]`, `c.peek(...)`, and
@@ -964,6 +994,11 @@ keeps its slot and points at the table above instead of renumbering the rest.
     qualifiers precede that suffix. The runtime stays `cogs`, and values read
     from it keep ordinary domain names. See §3.1 and "Identity and names?"
     above.
+24. **Read unwrapping:** settled on August 14, 2026. Application code binds
+    each graph read to the declaration's unsuffixed domain name before using
+    it. A full `CogStatus` follows the same rule rather than adding `Status`;
+    reading fields from the local preserves field-level SwiftUI Observation.
+    See §3.1.
 
 ---
 

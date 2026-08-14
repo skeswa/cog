@@ -208,6 +208,12 @@ These choices are settled; §10 of the core document has the full record.
   (`weatherForecastCogs`). Qualifiers such as `Source` precede the suffix. The
   app runtime remains the ordinary local `cogs`; values read from the graph use
   unsuffixed domain names.
+- Application read sites make that boundary explicit by immediately binding
+  each graph read to its unsuffixed domain local. This applies to selectors and
+  reactions as well as SwiftUI. For example, a status read is
+  `let weatherForecast = cogs.status[weatherForecastCogs[zip]]`. It still uses
+  `weatherForecast`, not `weatherForecastStatus`; its `CogStatus` type carries
+  the distinction. Later field access preserves field-level Observation.
 - Async reads are total and value-first: `c[valueReference]` returns the last
   accepted success, resting on the declaration's default until one exists, and
   the request lifecycle reads through the `status` lens (`c.status[...]`,

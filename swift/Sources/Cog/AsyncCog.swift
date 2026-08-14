@@ -15,6 +15,9 @@
 /// manual or derived cog wherever only the value matters. The request
 /// lifecycle is read through the `status` lens on the same capability
 /// (`c.status[valueReference]`), which returns the full ``CogStatus``.
+/// Bind either form to the declaration's unsuffixed domain name before use;
+/// even a full status read is `let forecast = c.status[forecastCog]`, not
+/// `forecastStatus`.
 ///
 /// Demand may come from a tracked value or status read, one-shot `peek`, or
 /// `refresh`. Initial demand establishes

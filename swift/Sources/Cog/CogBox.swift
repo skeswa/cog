@@ -8,7 +8,8 @@
 ///
 /// ```swift
 /// let isSunnyCogs = CogBox<Bool, ZipCode> { c, zip in
-///   c[weatherReportCogs[zip]]?.kind == .clear
+///   let weatherReport = c[weatherReportCogs[zip]]
+///   return weatherReport?.kind == .clear
 /// }
 /// ```
 ///
