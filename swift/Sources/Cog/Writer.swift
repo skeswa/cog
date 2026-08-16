@@ -111,6 +111,12 @@ extension Cogs {
     let state = manualState(for: valueReference)
     state.pendingValue = .some(value)
     turn.touch(state)
+
+    // Writing an ephemeral source is transient demand, exactly like a one-shot
+    // read: it renews grace but installs no consumer, so a source only ever
+    // written and never observed still goes away instead of accumulating keys
+    // forever. `.app` sources — every source that did not opt in — ignore this.
+    scheduleLifetimeReleaseIfUnobserved(state)
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.

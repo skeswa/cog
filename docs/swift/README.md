@@ -280,7 +280,11 @@ These choices are settled; §10 of the core document has the full record.
   Graph-only derived and async states may be released when unused. Query caches
   have their own retention rules. A `whileObserved` declaration with no
   explicit grace uses the context default: 30 seconds in production, with an
-  explicit `CogTesting` override for deterministic timed tests.
+  explicit `CogTesting` override for deterministic timed tests. An ephemeral
+  source opts out of app lifetime with
+  `lifetime: .whileObserved(resetToInitial: true)`, which is the only spelling
+  Cog accepts for a source: releasing one can only start it over, so the
+  contradictory `false` traps at the declaration.
 - Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
   `cogs.peek` outside) skip
   the dependency edge but still settle the value they return; they are never

@@ -641,7 +641,12 @@ extension Cogs {
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
   public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
-    manualState(for: valueReference).currentValue
+    let state = manualState(for: valueReference)
+    // An `.app` source ignores this. An ephemeral one treats a one-shot read as
+    // the transient demand it is: real enough to renew grace, not durable
+    // enough to keep the value alive on its own.
+    scheduleLifetimeReleaseIfUnobserved(state)
+    return state.currentValue
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
