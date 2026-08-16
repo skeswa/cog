@@ -52,7 +52,7 @@ extension Cogs {
   ///
   /// This is UI tracking, not a selector or reaction dependency edge. Creating
   /// the boundary pins the projection — and, through its dependency, the async
-  /// state — against `whileObserved` release. Use ``peek(_:)`` for a one-shot
+  /// state — against `whileObserved` release. Use ``peek(_:)-(AsyncCog<Value>)`` for a one-shot
   /// read that should not invalidate UI and does not keep the async state
   /// durably observed.
   ///

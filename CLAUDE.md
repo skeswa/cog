@@ -92,7 +92,11 @@ run alone:
 - `mise run fmt:check` — `fmt:check:md` and `fmt:check:swift`
   (`swift format lint --strict`). Writes nothing.
 
-`.oxfmtrc.json` excludes the frozen `docs/dump-2026-08-06.md` from formatting.
+`.oxfmtrc.json` excludes two things from formatting: the frozen
+`docs/dump-2026-08-06.md`, and every `swift/Sources/**/*.docc/**` catalog file.
+DocC markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
+symbol links into single-backtick code spans, which silently turns every
+documentation link into plain text.
 
 Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 

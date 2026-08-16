@@ -39,7 +39,7 @@ public protocol CogOps {
 
   /// Reads a source's current value without creating a dependency edge.
   ///
-  /// See ``Cogs/peek(_:)-swift.method`` for the settlement and lifetime
+  /// See ``Cogs/peek(_:)-(ManualCog<Value>)`` for the settlement and lifetime
   /// contract; both conformances share it exactly.
   func peek<Value>(_ valueReference: ManualCog<Value>) -> Value
 
