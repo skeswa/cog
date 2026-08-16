@@ -13,7 +13,10 @@ accordingly:
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
-## [Unreleased]
+## [0.1.0] - 2026-08-16
+
+The first usable release: declarations, one app-wide runtime, turns, the
+SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
 
 ### Added
 
@@ -48,4 +51,4 @@ Kotlin releases through Maven coordinates and is not versioned here.
   effect runs, with zero cost in release builds.
 - DocC documentation and the `swift/Examples/Weather` example app.
 
-[unreleased]: https://github.com/skeswa/cog/commits/main
+[0.1.0]: https://github.com/skeswa/cog/releases/tag/0.1.0
