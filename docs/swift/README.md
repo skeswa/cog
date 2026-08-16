@@ -50,13 +50,17 @@ The design lives in [design/](./design/); the implementation effort lives in
 5. **[design/perf.md](./design/perf.md): implementation and benchmarks.** The
    planned data-oriented core and the tests that must choose its physical
    layout.
-6. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
+6. **[design/prior-art.md](./design/prior-art.md): prior-art review.** The
+   swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
+   two libraries line up, tracked reads versus capture lists, and the
+   name-by-name decisions that came out of it.
+7. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the
    release process.
-7. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
+8. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
    scenario tree that drives red-green implementation: every behavior the
    library promises, written as small user stories and grouped by milestone.
-8. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
+9. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
    into dependency-aware tasks of half an engineering day or less, each with
    explicit closing verification; every scenario is covered by exactly one
    task's _Greens:_ line.
