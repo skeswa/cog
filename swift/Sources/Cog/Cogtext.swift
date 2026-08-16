@@ -16,7 +16,7 @@
 /// to pass between arbitrary executors: enter the MainActor before reading,
 /// refreshing, registering reactions, or committing operations.
 ///
-/// Call ``bootstrapApp()`` once when an app launches. Tests and previews use
+/// Call ``bootstrapApp(mechanisms:)`` once when an app launches. Tests and previews use
 /// `Cogs.forTesting()` from the `CogTesting` product.
 @MainActor
 public final class Cogs {

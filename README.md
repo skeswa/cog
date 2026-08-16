@@ -62,6 +62,7 @@ mise run test:simulator # boundary tests on the latest iOS simulator
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
 mise run tasks:check    # validate the Swift implementation task ledger
+mise run docs           # build the DocC archive into .build/docs
 ```
 
 `mise run test:compilefail` type-checks the expected-failure fixtures under
@@ -139,7 +140,8 @@ The topology:
   `/Applications/Xcode_<version>.app`. Every job scans `/Applications/
 Xcode*.app` and reads each bundle's `version.plist`, which is the only
   spelling that works in both lanes. Changing the pin means changing
-  `COG_XCODE_VERSION` in `swift-ci.yml` and this record together.
+  `COG_XCODE_VERSION` in `swift-ci.yml`, in `swift-docs.yml`, and this record
+  together.
 
   **A full Xcode is required; the Command Line Tools are not enough.** CLT
   carries `swift` and `swift-format`, so building and linting succeed, but
@@ -285,8 +287,22 @@ the same-repo guard on every self-hosted job, least-privilege `permissions:`
 blocks, `persist-credentials: false`, and job timeouts — lives in the
 workflows themselves and is enforced by `mise run workflows:check`.
 
+That contract allows exactly one write grant, and it is written down rather
+than waived: the `deploy` job of `swift-docs.yml` holds `pages: write` and
+`id-token: write`, because GitHub Pages cannot be published with a read-only
+token. Two things bound it. The exception names that one file, that one job id,
+and those two scopes in `PERMISSION_EXCEPTIONS`
+(`tools/lib/workflows/checks.mjs`), so a second job cannot inherit it and an
+extra scope on the same job still fails. And it is granted only to a
+GitHub-hosted job, so a write-scoped token never reaches the persistent Mac
+mini — moving that job to `cog-mini` turns the exception off rather than
+carrying it along. Fixtures cover both the granted case and each way of
+overreaching it.
+
 ## Documentation
 
+- **[CHANGELOG.md](./CHANGELOG.md):** what changed in each Swift release, and
+  what a 0.x minor is allowed to break.
 - **[Swift design](./docs/swift/README.md):** the reading order, current
   decisions, open questions, and implementation plan for SwiftUI.
 - **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose

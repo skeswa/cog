@@ -34,6 +34,38 @@ const HOSTED_RUNNER_IMAGE = /^(ubuntu|macos|windows)-[\w.-]+$/i;
 /** Permission values that are not a write grant. */
 const READ_ONLY_PERMISSIONS = new Set(["read", "none"]);
 
+/**
+ * The only jobs allowed a write scope, and exactly which scopes.
+ *
+ * GitHub Pages deployment cannot be done with a read-only token: `deploy-pages`
+ * needs `pages: write` to publish and `id-token: write` for the OIDC exchange
+ * that proves the deployment came from this workflow. Rather than drop the
+ * least-privilege check to accommodate it, the exception is written here, at
+ * the exact scope, so review sees a named grant instead of a weakened rule —
+ * which is the whole reason this checker exists.
+ *
+ * Two conditions still hold for an exception, enforced below: the extra scope
+ * must appear in this table verbatim, and the job must run on a GitHub-hosted
+ * runner, so a write-scoped token never reaches the persistent Mac mini.
+ *
+ * Keyed by workflow file name, which is unique within `.github/workflows` and
+ * lets the fixtures exercise the same table the real workflows use.
+ */
+const PERMISSION_EXCEPTIONS = new Map([
+  [
+    "swift-docs.yml",
+    new Map([
+      [
+        "deploy",
+        new Map([
+          ["pages", "write"],
+          ["id-token", "write"],
+        ]),
+      ],
+    ]),
+  ],
+]);
+
 /** The action whose checkout token must not be left on disk. */
 const CHECKOUT_ACTION = "actions/checkout";
 
@@ -129,6 +161,11 @@ function selfHostedGuard(workflow) {
  * the grant written down where the job is read, so a missing block is an
  * error rather than an inherited default.
  *
+ * The single exception is Pages deployment; see `PERMISSION_EXCEPTIONS`. It
+ * applies to a job's own block only. A workflow-level write grant would hand
+ * the scope to every job in the file, including one added later, so it stays
+ * an error however the job is named.
+ *
  * @param {import("./model.mjs").Workflow} workflow
  * @returns {Diagnostic[]}
  */
@@ -164,7 +201,8 @@ function leastPrivilegePermissions(workflow) {
       });
       continue;
     }
-    for (const problem of gradePermissions(own, job.permissionsLine)) {
+    const allowed = permissionExceptionFor(workflow, job);
+    for (const problem of gradePermissions(own, job.permissionsLine, allowed)) {
       diagnostics.push({
         path: workflow.path,
         line: problem.line,
@@ -526,7 +564,7 @@ function escapeRegExp(value) {
  * @param {number} line
  * @returns {{line: number, message: string}[]}
  */
-function gradePermissions(node, line) {
+function gradePermissions(node, line, allowed = null) {
   if (node.kind === "scalar") {
     const value = node.text.trim();
     if (value === "{}") return [];
@@ -549,12 +587,33 @@ function gradePermissions(node, line) {
   for (const entry of node.entries) {
     const value = text(entry.value)?.trim() ?? "";
     if (READ_ONLY_PERMISSIONS.has(value)) continue;
+    if (allowed?.get(entry.key) === value) continue;
     problems.push({
       line: entry.line,
       message: `grants \`${entry.key}: ${value}\`; only \`read\` or \`none\` is allowed`,
     });
   }
   return problems;
+}
+
+/**
+ * The write scopes this exact job may hold, or `null` for the usual rule.
+ *
+ * An exception is granted only to a hosted job: the table names the scope, and
+ * the runner classification keeps the resulting write-scoped token off the
+ * persistent self-hosted runner. A job that matches the table by name but runs
+ * somewhere else is graded like any other job, so moving it to the mini turns
+ * the exception off rather than carrying it along.
+ *
+ * @param {import("./model.mjs").Workflow} workflow
+ * @param {import("./model.mjs").Job} job
+ * @returns {Map<string, string> | null}
+ */
+function permissionExceptionFor(workflow, job) {
+  const fileName = workflow.path.split("/").pop() ?? workflow.path;
+  const allowed = PERMISSION_EXCEPTIONS.get(fileName)?.get(job.id);
+  if (allowed === undefined) return null;
+  return classifyRunner(job.runsOn).selfHosted ? null : allowed;
 }
 
 /**

@@ -74,6 +74,17 @@ const CASES = [
     mentions: ["contents: write", "id-token: write", "write-all", "no effective `permissions:`"],
   },
   {
+    name: "the Pages deploy exception is granted, and only to its own job",
+    workflow: resolve(FIXTURES, "swift-docs.yml"),
+    checks: [],
+  },
+  {
+    name: "the Pages exception does not stretch to extra scopes, other jobs, or the mini",
+    workflow: resolve(FIXTURES, "pages-exception-abused/swift-docs.yml"),
+    checks: ["least-privilege-permissions", "self-hosted-guard"],
+    mentions: ["`deploy`", "contents: write", "`smuggler`", "`deploy-mini`", "pages: write"],
+  },
+  {
     name: "tags, branches, short and uppercase SHAs, and an unpinned image",
     workflow: resolve(FIXTURES, "unpinned-action.yml"),
     checks: ["sha-pinned-actions"],

@@ -25,7 +25,7 @@ extension EnvironmentValues {
 extension EnvironmentValues {
   /// The app-wide Cog context installed above this view hierarchy.
   ///
-  /// At app launch, keep the value returned by ``Cogs/bootstrapApp()`` and
+  /// At app launch, keep the value returned by ``Cogs/bootstrapApp(mechanisms:)`` and
   /// install it above every scene:
   ///
   /// ```swift
@@ -72,7 +72,7 @@ extension View {
   /// Installs the app-wide Cog context above a SwiftUI view hierarchy.
   ///
   /// Call this at the composition root with the single context returned by
-  /// ``Cogs/bootstrapApp()``. Descendants inherit that exact reference, so
+  /// ``Cogs/bootstrapApp(mechanisms:)``. Descendants inherit that exact reference, so
   /// multiple scenes share one authoritative graph. Tests and previews may use
   /// their one isolated testing context instead.
   ///

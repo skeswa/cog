@@ -54,8 +54,9 @@ every scenario covered by exactly one task.
   matrix, simulator tests, the Weather build and tests, release tests,
   compile-fail
   fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
-  fork lane) and `markdown.yml` (Oxfmt and the workflow-contract check on
-  GitHub-hosted ubuntu).
+  fork lane), `swift-docs.yml` (the DocC archive on the mini, published to
+  GitHub Pages from a hosted job on tag push), and `markdown.yml` (Oxfmt and
+  the workflow-contract check on GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
   task definitions, formatter configuration, and the license.
 - `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
@@ -92,7 +93,11 @@ run alone:
 - `mise run fmt:check` — `fmt:check:md` and `fmt:check:swift`
   (`swift format lint --strict`). Writes nothing.
 
-`.oxfmtrc.json` excludes the frozen `docs/dump-2026-08-06.md` from formatting.
+`.oxfmtrc.json` excludes two things from formatting: the frozen
+`docs/dump-2026-08-06.md`, and every `swift/Sources/**/*.docc/**` catalog file.
+DocC markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
+symbol links into single-backtick code spans, which silently turns every
+documentation link into plain text.
 
 Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 
@@ -130,13 +135,28 @@ wrapper mode of its own — `mainactor-nnbd-on`, `mainactor-nnbd-off`,
 per job. `COG_TEST_MANIFEST_CACHE=none` is an escape hatch for a stale
 manifest cache; it is not needed today.
 
+Documentation is a task of its own, because swift-docc-plugin is env-gated
+behind `COG_DOCC=1` so ordinary consumers resolve this package with no
+dependencies:
+
+- `mise run docs` — builds the DocC archive into `.build/docs/Cog.doccarchive`,
+  transformed for static hosting under `--hosting-base-path cog`. It deletes
+  the `Package.resolved` the gated resolve writes; that file carries the
+  plugin's pins and must never be committed, and `swift-docs.yml` fails the
+  build if one survives.
+
 Document and workflow checks, each of which runs its own fixture suite first
 because a broken checker cannot validate anything:
 
 - `mise run tasks:check` — validates `docs/swift/impl/tasks.md` against
   `scenarios.md` and `plan.md`.
 - `mise run workflows:check` — validates the GitHub Actions hardening
-  contract over `.github/workflows`.
+  contract over `.github/workflows`. The contract allows exactly one write
+  grant: the `deploy` job of `swift-docs.yml` may hold `pages: write` and
+  `id-token: write`, because Pages deployment cannot be done with a read-only
+  token. The exception is a named entry in `PERMISSION_EXCEPTIONS`
+  (`tools/lib/workflows/checks.mjs`), applies only to that job on a
+  GitHub-hosted runner, and is covered by fixtures on both sides.
 
 Every change must leave `mise run fmt:check` green, and any change under
 `docs/swift/impl/` must also leave `mise run tasks:check` green.

@@ -75,7 +75,7 @@ public struct AsyncCog<Value> {
   /// - Parameters:
   ///   - policy: How new work interacts with an in-flight run. `.latest` is
   ///     currently the only policy and is therefore the default.
-  ///   - default: The honest resting value a value read returns before any
+  ///   - defaultValue: The honest resting value a value read returns before any
   ///     generation succeeds. Choose one that renders truthfully while work is
   ///     in flight; when no such value exists, make `Value` optional and pass
   ///     `nil` explicitly.
@@ -183,7 +183,7 @@ extension AsyncCog where Value: Equatable {
   /// - Parameters:
   ///   - policy: The replacement policy for in-flight work. Only `.latest` is
   ///     currently available.
-  ///   - default: The honest resting value returned before the first success.
+  ///   - defaultValue: The honest resting value returned before the first success.
   ///   - name: A stable label for turns, diagnostics, and task tools.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.

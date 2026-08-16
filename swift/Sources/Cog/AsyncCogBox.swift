@@ -66,7 +66,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   ///   - policy: How new work for one key interacts with that key's in-flight
   ///     run. `.latest` is the first slice's default and only policy. Sibling
   ///     keys never replace one another's work.
-  ///   - default: The honest resting value every key's value read returns
+  ///   - defaultValue: The honest resting value every key's value read returns
   ///     before that key's first success. Choose one that renders truthfully
   ///     while work is in flight; when no such value exists, make `Value`
   ///     optional and pass `nil` explicitly.
@@ -171,7 +171,7 @@ extension AsyncCogBox where Value: Equatable {
   /// - Parameters:
   ///   - policy: How replacement work interacts with an in-flight run for the
   ///     same key. Only `.latest` is currently available.
-  ///   - default: The honest resting value every key returns before its first
+  ///   - defaultValue: The honest resting value every key returns before its first
   ///     success.
   ///   - name: A stable declaration label; rendered keyed labels include the key.
   ///   - fileID: The declaration's file. Leave this at its default.

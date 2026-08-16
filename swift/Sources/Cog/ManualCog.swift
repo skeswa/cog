@@ -128,7 +128,7 @@ extension ManualCog where Value: Equatable {
   /// Declares an `Equatable` source whose equal writes are not changes.
   ///
   /// This overload is selected automatically when `Value` conforms to
-  /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to substitute a
+  /// `Equatable`. Use ``init(_:equals:lifetime:name:fileID:line:)`` to substitute a
   /// domain-specific equality rule. Equality is applied once to the turn's
   /// final staged value, so equal writes and within-turn reversions produce no
   /// downstream work.

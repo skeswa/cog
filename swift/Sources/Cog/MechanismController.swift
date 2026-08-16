@@ -2,8 +2,8 @@
 /// with the graph.
 ///
 /// The controller carries registration (``run(fileID:line:_:)``,
-/// `watch`, ``task(name:_:)``, and gated ``whenever`` scopes), untracked
-/// ``peek`` reads, and the shared ``CogOps`` op surface. There is
+/// `watch`, ``task(name:_:)``, and gated ``whenever(_:name:fileID:line:_:)-(Cog<Bool>,_,_,_,_)`` scopes), untracked
+/// ``peek(_:)-(ManualCog<Value>)`` reads, and the shared ``CogOps`` op surface. There is
 /// deliberately no raw ``Cogs`` here: a mechanism that could reach the runtime
 /// could also leak it past its own discipline, and routing every act through
 /// the controller is what makes attribution and isolated testing exact (§6.2).
@@ -105,7 +105,7 @@ extension MechanismController {
   /// its caller.
   ///
   /// The registration lives until this controller's scope ends; there is no
-  /// public token. A shorter lifetime is a ``whenever`` gate expressed in
+  /// public token. A shorter lifetime is a ``whenever(_:name:fileID:line:_:)-(Cog<Bool>,_,_,_,_)`` gate expressed in
   /// state.
   ///
   /// - Parameters:
@@ -571,7 +571,7 @@ extension MechanismController: CogOps {
     cogtext.commit(named: "\(namePath).\(name)", body)
   }
 
-  /// Reads a source without creating a dependency edge; see ``Cogs/peek(_:)-swift.method``.
+  /// Reads a source without creating a dependency edge; see ``Cogs/peek(_:)-(ManualCog<Value>)``.
   ///
   /// An `operate`-time read never becomes a dependency, because `operate` is
   /// registration, not a reaction.
