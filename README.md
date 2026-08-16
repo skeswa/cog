@@ -287,6 +287,8 @@ workflows themselves and is enforced by `mise run workflows:check`.
 
 ## Documentation
 
+- **[CHANGELOG.md](./CHANGELOG.md):** what changed in each Swift release, and
+  what a 0.x minor is allowed to break.
 - **[Swift design](./docs/swift/README.md):** the reading order, current
   decisions, open questions, and implementation plan for SwiftUI.
 - **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose

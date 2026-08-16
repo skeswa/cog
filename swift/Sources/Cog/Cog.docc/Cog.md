@@ -48,7 +48,8 @@ Three ideas carry most of the library:
 ### Where to go next
 
 <doc:GettingStarted> takes an app from an empty `Package.swift` to a value on
-screen.
+screen. <doc:OneGraph> explains why an app has exactly one graph, and what that
+means for tests and previews.
 
 ### Prior art
 
@@ -64,6 +65,11 @@ boxes make keyed value references from one declaration, and async state is a
 first-class kind with its own status and policies.
 
 ## Topics
+
+### Essentials
+
+- <doc:GettingStarted>
+- <doc:OneGraph>
 
 ### Declaring state
 
