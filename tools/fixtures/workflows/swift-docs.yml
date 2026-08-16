@@ -1,0 +1,44 @@
+name: Pages exception, granted
+
+# Fixture: the one write grant the contract allows.
+#
+# `PERMISSION_EXCEPTIONS` names this file, this job id, and these two scopes,
+# and the job is GitHub-hosted, so `least-privilege-permissions` must stay
+# quiet here. Nothing else may fire either — the exception widens one scope
+# list, not the rest of the contract.
+#
+# `other` is in the file to prove the exception is per job: it holds the same
+# read-only block every other job in the repository holds, and would fail if
+# the exception leaked to its neighbours.
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+
+  other:
+    name: Something else in the same file
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Report
+        run: echo done

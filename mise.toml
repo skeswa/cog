@@ -109,3 +109,33 @@ run = "node {{config_root}}/tools/check-workflows.mjs"
 [tasks."workflows:check:fixtures"]
 description = "Run the workflow-contract checker against its fixtures"
 run = "node {{config_root}}/tools/test-workflows.mjs"
+
+# The DocC archive. swift-docc-plugin is env-gated behind `COG_DOCC=1` so that
+# an ordinary consumer resolves this package with no dependencies at all; that
+# gate is exactly why the docs build needs a task of its own rather than a
+# remembered incantation.
+#
+# Two details are not optional. `--hosting-base-path cog` is what makes the
+# archive work under `skeswa.github.io/cog/` instead of a root domain. And the
+# resolve writes a `Package.resolved` carrying the plugin's pins next to
+# `Package.swift`, which must never be committed — the task deletes it, and
+# `swift-docs.yml` fails the build if one survives anyway.
+
+[tasks."docs"]
+description = "Build the Cog DocC archive into .build/docs"
+run = """
+set -euo pipefail
+rm -rf "{{config_root}}/.build/docs"
+mkdir -p "{{config_root}}/.build/docs"
+COG_DOCC=1 swift package \
+  --package-path "{{config_root}}" \
+  --scratch-path "{{config_root}}/.build/docc" \
+  --allow-writing-to-directory "{{config_root}}/.build/docs" \
+  generate-documentation \
+  --target Cog \
+  --disable-indexing \
+  --transform-for-static-hosting \
+  --hosting-base-path cog \
+  --output-path "{{config_root}}/.build/docs/Cog.doccarchive"
+rm -f "{{config_root}}/Package.resolved"
+"""
