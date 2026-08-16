@@ -29,9 +29,9 @@ public struct CogScenario {
   /// once. Duplicate work has to fail this comparison to be worth running.
   public let expectedRuns: Int
 
-  /// Builds the graph, drives its turns, and increments `counter` inside its
-  /// own selectors.
-  private let body: @MainActor (Cogs, CogRunCounter) -> Void
+  /// Builds the graph, drives its turns, increments `counter` inside its own
+  /// selectors, and returns the value it finished on.
+  private let body: @MainActor (Cogs, CogRunCounter) -> Int
 
   /// Creates a scenario from its shape and its derived expectation.
   ///
@@ -42,12 +42,13 @@ public struct CogScenario {
   ///   - expectedRuns: Selector runs the shape must cost, computed from the
   ///     caller's parameters rather than measured.
   ///   - body: Builds declarations, reads them, and commits turns. It receives
-  ///     the context to run in and the counter its selectors increment.
+  ///     the context to run in and the counter its selectors increment, and
+  ///     returns the value its root cog finished on.
   public init(
     name: String,
     layout: CogValueReferenceLayout,
     expectedRuns: Int,
-    body: @escaping @MainActor (Cogs, CogRunCounter) -> Void
+    body: @escaping @MainActor (Cogs, CogRunCounter) -> Int
   ) {
     self.name = name
     self.layout = layout
@@ -68,12 +69,13 @@ public struct CogScenario {
   /// - Returns: The name, layout, and the two counts to compare.
   public func run(in cogs: Cogs) -> CogScenarioResult {
     let counter = CogRunCounter()
-    body(cogs, counter)
+    let finalValue = body(cogs, counter)
     return CogScenarioResult(
       name: name,
       layout: layout,
       actualRuns: counter.runs,
-      expectedRuns: expectedRuns
+      expectedRuns: expectedRuns,
+      finalValue: finalValue
     )
   }
 }
@@ -95,6 +97,13 @@ public nonisolated struct CogScenarioResult: Sendable, Equatable {
   /// Selector runs the shape should have cost.
   public let expectedRuns: Int
 
+  /// The value the scenario's root cog held when the run finished.
+  ///
+  /// Counting runs alone would pass a graph that ran the right number of times
+  /// and computed the wrong answer, so every ported case also carries the
+  /// arithmetic its upstream original asserts on.
+  public let finalValue: Int
+
   /// Whether Cog did exactly the work the shape requires — no more, no less.
   ///
   /// Exact equality in both directions on purpose. Too many runs is duplicate
@@ -104,10 +113,17 @@ public nonisolated struct CogScenarioResult: Sendable, Equatable {
   public var isExact: Bool { actualRuns == expectedRuns }
 
   /// Creates a result. Scenarios produce these; callers compare them.
-  public init(name: String, layout: CogValueReferenceLayout, actualRuns: Int, expectedRuns: Int) {
+  public init(
+    name: String,
+    layout: CogValueReferenceLayout,
+    actualRuns: Int,
+    expectedRuns: Int,
+    finalValue: Int
+  ) {
     self.name = name
     self.layout = layout
     self.actualRuns = actualRuns
     self.expectedRuns = expectedRuns
+    self.finalValue = finalValue
   }
 }

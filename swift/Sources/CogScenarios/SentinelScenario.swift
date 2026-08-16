@@ -62,12 +62,13 @@ extension CogScenario {
 
       // The first read settles all three. Reading through `peek` keeps the
       // scenario free of a UI boundary, so what is counted is graph work.
-      _ = cogs.peek(sumCog)
+      var sum = cogs.peek(sumCog)
 
       for turn in 1...max(turns, 1) where turns > 0 {
         cogs.commit("sentinel.turn") { c in c[sourceCog] = turn }
-        _ = cogs.peek(sumCog)
+        sum = cogs.peek(sumCog)
       }
+      return sum
     }
   }
 }
