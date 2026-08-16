@@ -57,12 +57,17 @@ public struct ManualCogBox<Value, Key: Hashable> {
   ///
   /// - Parameters:
   ///   - startingValue: The value a key's reads see until something writes it.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: Value,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -70,6 +75,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
     self.descriptor = ManualCogDescriptor(
       startingValue: startingValue,
       equals: nil,
+      lifetime: lifetime.stateLifetime,
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -85,12 +91,17 @@ public struct ManualCogBox<Value, Key: Hashable> {
   ///   - startingValue: The shared initial value installed lazily for every key.
   ///   - equals: MainActor comparison for the old and final staged value of a
   ///     written key. Return `true` to keep the old value.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: The diagnostic and history label for the keyed declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: Value,
     equals: @escaping @MainActor (Value, Value) -> Bool,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -98,6 +109,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
     self.descriptor = ManualCogDescriptor(
       startingValue: startingValue,
       equals: equals,
+      lifetime: lifetime.stateLifetime,
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -124,12 +136,17 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// - Parameters:
   ///   - startingValue: What a key's reads see until something writes that
   ///     key.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: What Cog should call this cog in diagnostics and debug history.
   ///     Defaults to the file and line of the declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: @escaping @MainActor (Key) -> Value,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -139,6 +156,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       startingValue: startingValue,
       equals: nil,
+      lifetime: lifetime.stateLifetime,
       label: label
     )
   }
@@ -154,12 +172,17 @@ public struct ManualCogBox<Value, Key: Hashable> {
   ///   - startingValue: MainActor factory for a key's initial value.
   ///   - equals: MainActor comparison of that key's latest completed and final
   ///     staged values.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: The diagnostic and history label for the keyed declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: @escaping @MainActor (Key) -> Value,
     equals: @escaping @MainActor (Value, Value) -> Bool,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -167,6 +190,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
     self.descriptor = Self.makeDescriptor(
       startingValue: startingValue,
       equals: equals,
+      lifetime: lifetime.stateLifetime,
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -192,6 +216,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
   private static func makeDescriptor(
     startingValue: @escaping @MainActor (Key) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
+    lifetime: CogStateLifetime,
     label: CogLabel
   ) -> ManualCogDescriptor<Value> {
     ManualCogDescriptor(
@@ -211,6 +236,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
         return startingValue(key)
       },
       equals: equals,
+      lifetime: lifetime,
       label: label
     )
   }
@@ -225,11 +251,16 @@ extension ManualCogBox where Value: Equatable {
   ///
   /// - Parameters:
   ///   - startingValue: The initial value shared by all lazily created keys.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: The diagnostic and history label for the keyed declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: Value,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -237,6 +268,7 @@ extension ManualCogBox where Value: Equatable {
     self.descriptor = ManualCogDescriptor(
       startingValue: startingValue,
       equals: { oldValue, newValue in oldValue == newValue },
+      lifetime: lifetime.stateLifetime,
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
@@ -248,11 +280,16 @@ extension ManualCogBox where Value: Equatable {
   ///
   /// - Parameters:
   ///   - startingValue: MainActor factory for each key's initial value.
+  ///   - lifetime: How long each of this declaration's states lives. Sources
+  ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
+  ///     release and reset with
+  ///     ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``.
   ///   - name: The diagnostic and history label for the keyed declaration.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
     _ startingValue: @escaping @MainActor (Key) -> Value,
+    lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line
@@ -260,6 +297,7 @@ extension ManualCogBox where Value: Equatable {
     self.descriptor = Self.makeDescriptor(
       startingValue: startingValue,
       equals: { oldValue, newValue in oldValue == newValue },
+      lifetime: lifetime.stateLifetime,
       label: CogLabel(name: name, fileID: fileID, line: line)
     )
   }
