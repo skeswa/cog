@@ -333,6 +333,10 @@ These choices are settled; §10 of the core document has the full record.
   infrastructure. Core swaps integrate by behavior group, and every release
   separates its candidate gate, tag, and post-release verification. The
   normative rules are in impl/tasks.md.
+- Public names are frozen for 0.1.0 as they stand. The chartered prior-art
+  review reconsidered thirteen of them against swift-state-graph and renamed
+  none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
+  reasoning, and the one name with a revisit trigger.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, and persistence helpers. Also open are several edge
@@ -341,6 +345,25 @@ equal stream elements commit distinct turns, whether a failed `.queue` run
 stops the queue, and debounce/throttle timing modifiers (deferred backlog).
 Value-reference layout, edge layout, and hash tables also remain open until
 benchmarks choose them.
+
+## Prior art
+
+Cog is not the first Swift graph. Before freezing its public names it read
+[swift-state-graph](https://github.com/VergeGroup/swift-state-graph), by
+Hiroshi Kimura (muukii) and the VergeGroup authors, and credits it for arriving
+first at the shape both libraries share: a dependency graph with dirty marking,
+recomputation deferred to the read that needs it, and a library that meets
+SwiftUI at `@Observable` instead of replacing it. Cog's own lineage for the
+graph algorithms — SolidJS, Reactively, and the js-reactivity-benchmark
+scenarios — is credited in [design/perf.md](./design/perf.md).
+
+Cog diverges deliberately in five places: one app-wide `Cogs` owns every state
+instead of state living on the objects that declare it; the reader is a value
+passed to a selector rather than ambient thread-local tracking; lifetime is
+declared per state kind rather than left to ARC; boxes make keyed value
+references from one declaration; and async state, with its status and policies,
+is a first-class state kind. [design/prior-art.md](./design/prior-art.md) is the
+full review.
 
 ## Next steps
 
