@@ -515,10 +515,15 @@ query caching.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin
   instructions, and DocC are in place. Benchmark numbers are not required.
   The value-reference layout may change in 0.2 because 0.x minors may break.
-- Once the immutable `0.1.0` tag exists, M5 scenario scaffolding may start
-  while Pages and GitHub Release verification finish; the M5 gate still waits
-  for the published 0.1.0 GitHub Release. Later commits cannot change the tag,
-  so this overlap shortens the critical path without weakening either release.
+- Once the 0.1.0 release candidate is approved, M5 scenario scaffolding may
+  start while the tag, Pages, and GitHub Release verification finish; the M5
+  gate still waits for the published 0.1.0 GitHub Release. The safety property
+  the overlap needs is that the approved commit is immutable, which `M4-05b`
+  establishes — a tag is only a name for a commit that already exists, so
+  later M5 commits cannot change what it will name. This shortens the critical
+  path without weakening either release. If M5 work uncovers a defect that
+  must ship in 0.1.0, it re-enters through a fresh `M4-05b` candidate rather
+  than by moving a tag.
 
 <a id="plan-m5"></a>
 

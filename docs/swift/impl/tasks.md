@@ -1086,9 +1086,11 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 - **M5-01a** _(Infrastructure)_ — Scaffold `CogScenarios` graph builders,
   in-selector counters, expected counts, and value-reference layout parameterization.
-  Start after the approved tag exists; Pages and GitHub Release verification
-  may finish in parallel because later commits cannot change that tag.
-  _Depends: M4-05c._
+  Start once a release candidate is approved. What makes the overlap safe is
+  that the approved commit is immutable, not that a ref points at it yet, so
+  tagging, Pages, and GitHub Release verification may all finish in parallel
+  with M5.
+  _Depends: M4-05b._
   _Verify: one sentinel graph reports its actual and expected counts._
 - **M5-01b** _(Infrastructure)_ — Add `CogScenarioTests` and run the sentinel
   graph as a normal test.
