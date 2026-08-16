@@ -33,17 +33,46 @@ should also keep the common API simple.
 
 ## Status
 
-Swift implementation is underway. Its M0 scaffolding is complete and the M1
-simple correctness core is being built now; the SwiftUI boundary, async work,
-and later performance core remain ahead. The Android library has not been
+The Swift library is real and usable. The simple correctness core, the SwiftUI
+boundary, mechanisms, declared lifetimes, and the first async slice have all
+landed, with the Weather example app built on them; the benchmark port and the
+data-oriented performance core remain ahead. The Android library has not been
 started.
 
-The Swift package, tooling, test matrix, and CI are live. The
-[Swift context guide](./docs/swift/README.md#production-tests-and-previews)
-shows the current production-bootstrap and isolated-test call sites.
+The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
+shows the production-bootstrap and isolated-test call sites, and
+[CHANGELOG.md](./CHANGELOG.md) records what each release contains.
 
 The earlier Dart and Flutter experiment has been removed from the current
 tree. It remains available in the repository history.
+
+## Using Cog in an app
+
+Cog for Swift resolves with no dependencies of its own. Add it to a
+`Package.swift`:
+
+```swift
+dependencies: [
+  .package(
+    url: "https://github.com/skeswa/cog.git",
+    .upToNextMinor(from: "0.1.0")
+  )
+]
+```
+
+or, in Xcode, add the same URL under **File ▸ Add Package Dependencies** with
+the **Up to Next Minor Version** rule.
+
+Pin to a **minor**, not a major. Cog is in 0.x, where a minor release may break
+source compatibility and says so in the changelog, while a patch release only
+adds or fixes. `.upToNextMajor` would take those breaking minors silently.
+
+Depend on the `Cog` product from an app target, and on `CogTesting` from test
+and preview-support targets. Cog requires iOS 17 or macOS 14 and Swift 6.2.
+The documentation lives at
+[skeswa.github.io/cog](https://skeswa.github.io/cog/documentation/cog/), and
+[Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
+takes an app from this pin to a value on screen.
 
 ## Working in this repository
 
