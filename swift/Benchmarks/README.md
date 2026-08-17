@@ -58,11 +58,111 @@ that disagreed about which graph they ran would make both meaningless.
 The numbers it prints are not measurements. They have no pinned environment
 behind them, and nothing here gates on them yet.
 
+## Supported tool matrix
+
+Settled by `M5-05ba` on 2026-08-17, against the upstream sources at tag
+`1.36.2`. Everything here was read out of the package itself rather than
+recalled, because a pin taken from memory is not a pin.
+
+### The harness
+
+| Fact                       | Value                                                    | Why it is written down                                                                                                                                                                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Canonical repository       | `https://github.com/ordo-one/benchmark`                  | **Renamed.** It was `ordo-one/package-benchmark` as recently as the 1.32.0 release notes. GitHub redirects, but a redirect is not a pin, and SwiftPM derives package _identity_ from the URL's last component — so the two spellings are two different identities.                                     |
+| SwiftPM identity           | `benchmark`                                              | What `.product(name:package:)` must name.                                                                                                                                                                                                                                                              |
+| Product                    | `.product(name: "Benchmark", package: "benchmark")`      | The library.                                                                                                                                                                                                                                                                                           |
+| Build-tool plugin          | `.plugin(name: "BenchmarkPlugin", package: "benchmark")` | Required on every benchmark executable target; it generates the discovery boilerplate.                                                                                                                                                                                                                 |
+| Command plugin             | `BenchmarkCommandPlugin`                                 | Vended by the dependency; no target entry needed.                                                                                                                                                                                                                                                      |
+| Minimum compatible version | **1.35.0**                                               | The release that replaced jemalloc with the custom malloc interposer. Earlier versions get their malloc metrics from jemalloc, which is the Swift ≤6.2 path — and `mallocCountTotal == 0` is this project's headline threshold, so a version without the interposer is not merely older, it is silent. |
+| Pinned version             | **`.exact("1.36.2")`**                                   | See below.                                                                                                                                                                                                                                                                                             |
+| Upstream platform floor    | macOS 13, iOS 16                                         | Below Cog's macOS 14 floor, so it constrains nothing.                                                                                                                                                                                                                                                  |
+| Upstream tools version     | `swift-tools-version: 6.3`                               | So **this package needs a Swift 6.3+ toolchain**. That does not touch the shipped library's Swift 6.2 floor: nothing depends on this package, so its toolchain requirement is not a consumer's problem.                                                                                                |
+
+`.exact`, not `.upToNextMinor`, and the reason is upstream's own words: the
+baseline representation stored in `.benchmarkBaselines` "is not stable and is
+not viewed as public API and may break over time." Malloc metrics are
+explicitly documented as not comparable across backends. A recorded baseline is
+therefore a statement about one harness version, and a floating pin would let a
+resolve quietly invalidate every threshold in the repository. Upgrading is a
+deliberate, reviewed event that comes with re-baselining — which is exactly the
+rule perf.md already states for the allocator path.
+
+### Layout constraint
+
+Benchmark sources **must** live in a directory named `Benchmarks` at the root of
+the package that declares them. Here that means `swift/Benchmarks/Benchmarks/<Name>/`
+— the doubled path is upstream's discovery rule, not a typo.
+
+### Exact metric names
+
+Read from `Sources/Benchmark/BenchmarkMetric.swift` at `1.36.2`.
+
+| Group                        | Cases                                                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| ARC                          | `.objectAllocCount`, `.retainCount`, `.releaseCount`, `.retainReleaseDelta`                                                                     |
+| Malloc (interposer backend)  | `.mallocCountTotal`, `.mallocCountSmall`, `.mallocCountLarge`, `.freeCountTotal`, `.mallocBytesCount`, `.mallocFreeDelta`, `.memoryLeakedBytes` |
+| Malloc (jemalloc only, ≤6.2) | `.allocatedResidentMemory`, `.memoryLeaked` — do not use                                                                                        |
+| Memory                       | `.peakMemoryResident`, `.peakMemoryResidentDelta`, `.peakMemoryVirtual`                                                                         |
+| Time and work                | `.wallClock`, `.cpuUser`, `.cpuSystem`, `.cpuTotal`, `.throughput`, `.instructions`                                                             |
+| Custom                       | `.custom(_:polarity:useScalingFactor:)`                                                                                                         |
+
+Two traps worth naming. `.objectAllocCount` exists in the source but is
+**missing from upstream's `Metrics.md`**; the source is authoritative. And
+`.mallocCountSmall` / `.mallocCountLarge` split on jemalloc's size classes under
+the old backend and on a fixed 16 KiB threshold under the interposer, so those
+two are not comparable across the backend boundary even within one project.
+
+### Baseline CLI
+
+| Purpose                                                  | Command                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Run                                                      | `swift package benchmark`                                                             |
+| List                                                     | `swift package benchmark list`                                                        |
+| Record or update a baseline                              | `swift package --allow-writing-to-package-directory benchmark baseline update <name>` |
+| Baseline versus baseline, or baseline versus a fresh run | `swift package benchmark baseline check <name> [<other>]`                             |
+| Human-readable comparison                                | `swift package benchmark baseline compare <a> [<b>]`                                  |
+| Absolute static thresholds                               | `swift package benchmark thresholds update\|check\|read`                              |
+
+The absolute-threshold gate this project needs — `mallocCountTotal == 0` and
+generous absolute wall-clock ceilings — is `thresholds check` at 1.36.2.
+`baseline check --check-absolute` still works but upstream marks the flag
+deprecated in favour of the `thresholds` verb. perf.md §9 anticipated exactly
+this by saying baselines use "the CLI spelling proven by the compatibility
+probe"; this is that spelling.
+
+Writing anything into the package directory (`baseline update`, `init`) needs
+`--allow-writing-to-package-directory`.
+
+### Left to the next probe
+
+`M5-05bb` owns three things this decision could not settle by reading source:
+
+1. **ARC metrics on macOS.** They are collected two different ways. On Linux
+   with Swift 6.3 the package uses a runtime interposer; everywhere else,
+   including this project's macOS runner, it installs
+   `swift_runtime_set_{alloc_object,retain,release}_hook`. Whether those hooks
+   are live in the Swift runtime Xcode 26.6 ships is an empirical question, and
+   PERF-02 depends on the answer.
+2. **The malloc backend on the pinned toolchain.** The interposer is on by
+   default and opts out through the `MallocInterposer` trait or
+   `BENCHMARK_DISABLE_MALLOC_INTERPOSER` (with `BENCHMARK_DISABLE_JEMALLOC`
+   kept as a backward-compatible alias). Which backend is actually active in
+   the pinned environment decides whether the malloc thresholds mean anything.
+3. **MainActor benchmarks.** Upstream's Swift 6 guidance is a
+   `@Sendable () -> Void` benchmarks closure, and Cog's graph is
+   MainActor-confined. Whether that needs an isolation shim — and only if the
+   probe proves one necessary — is `M5-05bb` into `M5-05c`.
+
+Also for `M5-05c`: once the dependency is a version rather than a path,
+SwiftPM writes `swift/Benchmarks/Package.resolved`. Commit it. A measurement
+tool whose resolve is not reproducible produces numbers that are not either.
+This is a different file from the root `Package.resolved`, which must never be
+committed and which `swift-docs.yml` fails the build over.
+
 ## What is coming
 
 | Task               | Adds                                                                                                       |
 | ------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `M5-05ba`          | verified pins: benchmark package repository and minimum version, exact ARC metric names, baseline CLI      |
 | `M5-05bb`          | allocator behavior across Swift 6.2/6.3, MainActor compatibility, VM-versus-bare-metal noise on the runner |
 | `M5-05c`           | the pinned dependency, the selected allocator configuration, and one real MainActor benchmark              |
 | `M5-06`            | zero-allocation steady-turn and `box[key]` creation benchmarks                                             |
