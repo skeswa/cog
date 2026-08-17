@@ -23,6 +23,16 @@ internal final class CogReaction: CogState, CogConsumer {
   /// Whether cancellation or context teardown has retired `arenaSlot`.
   private var arenaSlotIsReleased = false
 
+  /// Unique direct arena roots whose durable counts this reaction owns.
+  ///
+  /// The list is cold registration bookkeeping. Propagation still walks only
+  /// integer edges and scalar columns; keeping exact generation-bearing slots
+  /// here lets cancellation balance counts before returning the terminal row.
+  private(set) var arenaLeasedDependencies: ContiguousArray<CogArenaSlot> = []
+
+  /// Reused next-set buffer for allocation-free steady reaction retracking.
+  private var arenaLeaseScratch: ContiguousArray<CogArenaSlot> = []
+
   /// Number of active body frames retaining this terminal through FIFO write-back.
   ///
   /// A reaction can trigger a later turn that reruns it before the outer call
@@ -130,6 +140,15 @@ internal final class CogReaction: CogState, CogConsumer {
   /// This bypasses normal grace scheduling because no state in the context can
   /// survive the same isolated deinitialization pass.
   func releaseDependenciesForContextTeardown() {
+    #if COG_CORE_ARENA
+    if let cogs {
+      cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies)
+    } else {
+      arenaLeasedDependencies.removeAll(keepingCapacity: true)
+    }
+    arenaLeaseScratch.removeAll(keepingCapacity: true)
+    #endif
+
     // The context is already ending, so balance the inert counts directly and
     // never enter the normal release path that later schedules grace work.
     for dependency in leasedDependencies {
@@ -241,6 +260,16 @@ internal final class CogReaction: CogState, CogConsumer {
 
     reconcileExternalLeases(in: cogs)
 
+    #if COG_CORE_ARENA
+    if !isCancelled {
+      cogs.arenaCore.reconcileReactionLeases(
+        for: arenaSlot,
+        current: &arenaLeasedDependencies,
+        scratch: &arenaLeaseScratch
+      )
+    }
+    #endif
+
     markChecked(at: cogs.revision)
     #if COG_CORE_ARENA
     cogs.arenaCore.completeReactionRun(arenaSlot)
@@ -280,6 +309,15 @@ internal final class CogReaction: CogState, CogConsumer {
 
   /// Releases every lease at explicit cancellation or final token cleanup.
   private func releaseExternalLeases() {
+    #if COG_CORE_ARENA
+    if let cogs {
+      cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies)
+    } else {
+      arenaLeasedDependencies.removeAll(keepingCapacity: true)
+    }
+    arenaLeaseScratch.removeAll(keepingCapacity: true)
+    #endif
+
     if let cogs {
       for dependency in leasedDependencies {
         cogs.releaseExternalLease(on: dependency)

@@ -71,6 +71,13 @@ internal final class CogArenaStorage {
   /// Observation-boundary index per row, or ``noIndex`` until a UI read.
   var boundary: ContiguousArray<Int32> = []
 
+  /// Durable external consumers retaining each `whileObserved` row.
+  ///
+  /// Direct reaction roots and the first UI boundary each contribute one.
+  /// Internal graph edges deliberately do not: they can defer an expired
+  /// release, but they never turn dependency reachability into observation.
+  var leaseCount: ContiguousArray<UInt32> = []
+
   /// Occupant generation per row, advanced before an index may be reused.
   var generation: ContiguousArray<UInt16> = []
 
@@ -112,6 +119,7 @@ internal final class CogArenaStorage {
     subs.append(.none)
     descriptor.append(Self.noIndex)
     boundary.append(Self.noIndex)
+    leaseCount.append(0)
     generation.append(0)
     liveCount += 1
     return CogArenaSlot(index: slot, generation: 0)
@@ -170,5 +178,6 @@ internal final class CogArenaStorage {
     subs[index] = .none
     descriptor[index] = Self.noIndex
     boundary[index] = Self.noIndex
+    leaseCount[index] = 0
   }
 }

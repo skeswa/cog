@@ -27,6 +27,7 @@ import Testing
   #expect(arena.subs == [.none, .none])
   #expect(arena.descriptor == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
   #expect(arena.boundary == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
+  #expect(arena.leaseCount == [0, 0])
   #expect(arena.generation == [0, 0])
 }
 
@@ -75,6 +76,7 @@ import Testing
   arena.subs[index] = CogEdgeIndex(rawValue: 14)
   arena.descriptor[index] = 15
   arena.boundary[index] = 16
+  arena.leaseCount[index] = 17
 
   arena.release(first)
   let reused = arena.allocate()
@@ -87,6 +89,7 @@ import Testing
   #expect(arena.subs[index] == .none)
   #expect(arena.descriptor[index] == CogArenaStorage.noIndex)
   #expect(arena.boundary[index] == CogArenaStorage.noIndex)
+  #expect(arena.leaseCount[index] == 0)
   #expect(arena.generation[index] == reused.generation)
 }
 
@@ -105,6 +108,7 @@ import Testing
   arena.subs[firstIndex] = CogEdgeIndex(rawValue: 22)
   arena.descriptor[firstIndex] = 23
   arena.boundary[firstIndex] = 24
+  arena.leaseCount[firstIndex] = 25
 
   #expect(arena.flags[secondIndex] == .occupied)
   #expect(arena.changedAt[secondIndex] == 0)
@@ -113,6 +117,7 @@ import Testing
   #expect(arena.subs[secondIndex] == .none)
   #expect(arena.descriptor[secondIndex] == CogArenaStorage.noIndex)
   #expect(arena.boundary[secondIndex] == CogArenaStorage.noIndex)
+  #expect(arena.leaseCount[secondIndex] == 0)
 }
 
 @MainActor

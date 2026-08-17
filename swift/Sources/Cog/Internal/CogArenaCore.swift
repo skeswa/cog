@@ -46,6 +46,12 @@ private final class CogArenaDescriptorRecord {
   /// Whether rows are manual sources or synchronous derived values.
   let kind: CogArenaDescriptorKind
 
+  /// Retention policy shared by every row belonging to this descriptor.
+  ///
+  /// Keeping it on the descriptor dispatch record avoids repeating an enum in
+  /// every scalar row. Only the cold lease and release paths load it.
+  let lifetime: CogStateLifetime
+
   /// Concrete ``CogArenaValueColumn`` restored by checked generic setup.
   let column: AnyObject
 
@@ -68,6 +74,7 @@ private final class CogArenaDescriptorRecord {
     label: CogLabel,
     index: Int32,
     kind: CogArenaDescriptorKind,
+    lifetime: CogStateLifetime,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
@@ -76,6 +83,7 @@ private final class CogArenaDescriptorRecord {
     self.label = label
     self.index = index
     self.kind = kind
+    self.lifetime = lifetime
     self.column = column
     self.commitSource = commitSource
     self.recompute = recompute
@@ -367,6 +375,33 @@ internal final class CogArenaCore {
     return arena.boundary[arena.index(of: slot)] != CogArenaStorage.noIndex
   }
 
+  /// Descriptor lifetime restored by an installed manual arena row.
+  ///
+  /// This internal diagnostic lets infrastructure tests prove that the arena
+  /// dispatch record, rather than only the declaration object, carries policy.
+  func lifetimePolicy<Value>(for valueReference: ManualCog<Value>) -> CogStateLifetime {
+    let location = manualLocation(for: valueReference)
+    return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
+  }
+
+  /// Descriptor lifetime restored by an installed derived arena row.
+  func lifetimePolicy<Value>(for valueReference: Cog<Value>) -> CogStateLifetime {
+    let location = derivedLocation(for: valueReference)
+    return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
+  }
+
+  /// Durable reaction and UI owners of one installed manual arena row.
+  func leaseCount<Value>(for valueReference: ManualCog<Value>) -> UInt32 {
+    let location = manualLocation(for: valueReference)
+    return arena.leaseCount[arena.index(of: location.slot)]
+  }
+
+  /// Durable reaction and UI owners of one installed derived arena row.
+  func leaseCount<Value>(for valueReference: Cog<Value>) -> UInt32 {
+    let location = derivedLocation(for: valueReference)
+    return arena.leaseCount[arena.index(of: location.slot)]
+  }
+
   /// Settles and notifies the boundary roots changed in this arena revision.
   ///
   /// The count snapshot preserves the simple core's baseline rule: a boundary
@@ -492,6 +527,63 @@ internal final class CogArenaCore {
     return withDependencyCapture(for: reaction, body)
   }
 
+  /// Reconciles the durable leases owned by one completed reaction run.
+  ///
+  /// Only unique, directly read `whileObserved` producers enter the next set.
+  /// Acquisitions happen before removals, so retracking a still-read root never
+  /// exposes a false zero-count instant to the lifetime engine. Both buffers
+  /// belong to the reaction object and trade roles after the pass, retaining
+  /// their high-water capacities across steady runs.
+  func reconcileReactionLeases(
+    for reaction: CogArenaSlot,
+    current: inout ContiguousArray<CogArenaSlot>,
+    scratch: inout ContiguousArray<CogArenaSlot>
+  ) {
+    _ = requireReactionRow(reaction)
+    scratch.removeAll(keepingCapacity: true)
+
+    var cursor = edges.firstDependency(of: reaction.index, in: arena)
+    while cursor != .none {
+      let dependency = edges.dependency(at: cursor)
+      guard dependency.consumer == reaction.index else {
+        fatalError("Cog found another consumer's edge in an arena reaction lease list.")
+      }
+      let producerRow = liveRow(dependency.producer)
+      let record = descriptorRecord(forRow: producerRow)
+      if case .whileObserved = record.lifetime {
+        let producer = CogArenaSlot(
+          index: dependency.producer,
+          generation: arena.generation[producerRow]
+        )
+        if !scratch.contains(producer) {
+          scratch.append(producer)
+        }
+      }
+      cursor = dependency.next
+    }
+
+    for producer in scratch where !current.contains(producer) {
+      incrementLease(on: producer)
+    }
+    for producer in current where !scratch.contains(producer) {
+      decrementLease(on: producer)
+    }
+
+    swap(&current, &scratch)
+    scratch.removeAll(keepingCapacity: true)
+  }
+
+  /// Releases every durable root owned by a cancelled arena reaction.
+  ///
+  /// Grace scheduling follows in M6-10eb; this task establishes the balanced
+  /// scalar ownership count that scheduling will consume.
+  func releaseReactionLeases(_ leases: inout ContiguousArray<CogArenaSlot>) {
+    for producer in leases {
+      decrementLease(on: producer)
+    }
+    leases.removeAll(keepingCapacity: true)
+  }
+
   /// Whether propagation left CHECK or DIRTY work on one reaction terminal.
   func reactionNeedsSettlement(_ reaction: CogArenaSlot) -> Bool {
     needsSettlement(requireReactionRow(reaction))
@@ -559,6 +651,9 @@ internal final class CogArenaCore {
     }
     guard edges.firstSubscriber(of: reaction.index, in: arena) == .none else {
       fatalError("Cog found subscribers on an arena reaction terminal.")
+    }
+    guard arena.leaseCount[row] == 0 else {
+      fatalError("Cog found durable leases on an arena reaction terminal.")
     }
     edges.removeDependencySuffix(of: reaction, after: .none, in: arena)
     guard arena.deps[row] == .none, arena.subs[row] == .none else {
@@ -680,6 +775,7 @@ internal final class CogArenaCore {
       identity: descriptor.identity,
       label: descriptor.label,
       kind: .manual,
+      lifetime: descriptor.lifetime,
       column: column,
       commitSource: { slot, revision, propagation in
         column.commitSource(at: slot, revision: revision, propagatingWith: propagation)
@@ -710,6 +806,7 @@ internal final class CogArenaCore {
       identity: descriptor.identity,
       label: descriptor.label,
       kind: .derived,
+      lifetime: descriptor.lifetime,
       column: column,
       commitSource: nil,
       recompute: { core, cogs, slot, key in
@@ -724,6 +821,7 @@ internal final class CogArenaCore {
     identity: ObjectIdentifier,
     label: CogLabel,
     kind: CogArenaDescriptorKind,
+    lifetime: CogStateLifetime,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
@@ -736,6 +834,7 @@ internal final class CogArenaCore {
       label: label,
       index: Int32(records.count),
       kind: kind,
+      lifetime: lifetime,
       column: column,
       commitSource: commitSource,
       recompute: recompute
@@ -796,6 +895,9 @@ internal final class CogArenaCore {
     guard arena.boundary[row] == CogArenaStorage.noIndex else {
       fatalError("Cog tried to release an arena state pinned by a UI boundary.")
     }
+    guard arena.leaseCount[row] == 0 else {
+      fatalError("Cog tried to release an arena state with durable leases.")
+    }
     guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
       fatalError("Cog tried to release an arena state with live subscribers.")
     }
@@ -841,9 +943,34 @@ internal final class CogArenaCore {
       fatalError("Cog exhausted its Int32 Observation boundary index space.")
     }
     let boundary = CogObservationBoundary()
+    incrementLease(on: slot)
     arena.boundary[row] = Int32(observationEntries.count)
     observationEntries.append(CogArenaObservationEntry(slot: slot, boundary: boundary))
     return boundary
+  }
+
+  /// Adds one durable owner to a releasable row without permitting wraparound.
+  ///
+  /// App-lifetime rows need no count: their descriptor policy alone keeps them
+  /// resident. The count therefore stays a precise ownership proof only for
+  /// rows whose zero transition can later begin grace.
+  private func incrementLease(on slot: CogArenaSlot) {
+    let row = arena.index(of: slot)
+    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
+    guard arena.leaseCount[row] < UInt32.max else {
+      fatalError("A Cog arena state's durable lifetime lease count overflowed.")
+    }
+    arena.leaseCount[row] += 1
+  }
+
+  /// Removes one durable owner without hiding a reaction bookkeeping imbalance.
+  private func decrementLease(on slot: CogArenaSlot) {
+    let row = arena.index(of: slot)
+    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
+    guard arena.leaseCount[row] > 0 else {
+      fatalError("A Cog arena state's durable lifetime lease count underflowed.")
+    }
+    arena.leaseCount[row] -= 1
   }
 
   /// Resolves one row's descriptor record without retaining it in the walk.
