@@ -448,7 +448,11 @@ extension Cogs {
   /// boundary objects — so behavior tests (UI-05) can hold "only what a view
   /// read pays for a boundary" without coupling to state representation.
   package var observationBoundaryCountForTesting: Int {
+    #if COG_CORE_ARENA
+    arenaCore.observationBoundaryCount
+    #else
     observationStates.count
+    #endif
   }
 
   /// Whether this source's exact state currently owns an Observation boundary.
@@ -476,7 +480,11 @@ extension Cogs {
 
   /// Shared identity lookup behind the boundary probes above.
   private func hasObservationBoundary(_ identity: CogStateIdentity) -> Bool {
+    #if COG_CORE_ARENA
+    arenaCore.hasObservationBoundary(for: identity)
+    #else
     (states[identity] as? any CogObservationState)?.observationBoundary != nil
+    #endif
   }
 
   /// Removes the exact still-unobserved state after its grace task resumes.

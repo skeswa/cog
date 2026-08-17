@@ -14,9 +14,13 @@ extension Cogs {
   /// - Parameter valueReference: The source identity to observe.
   /// - Returns: Its value from the latest completed turn.
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    return arenaCore.observedManualValue(for: valueReference)
+    #else
     let state = manualState(for: valueReference)
     state.accessObservationBoundary(in: self)
     return state.currentValue
+    #endif
   }
 
   /// Reads a derived cog and registers its exact state with the active UI
@@ -32,10 +36,14 @@ extension Cogs {
   /// - Parameter valueReference: The derived identity to settle and observe.
   /// - Returns: Its newest fully settled value.
   public subscript<Value>(_ valueReference: Cog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    return arenaCore.observedDerivedValue(for: valueReference, in: self)
+    #else
     let state = derivedState(for: valueReference)
     let value = state.settledValue(in: self)
     state.accessObservationBoundary(in: self)
     return value
+    #endif
   }
 
   /// Reads an async cog's value through the Observation boundary.

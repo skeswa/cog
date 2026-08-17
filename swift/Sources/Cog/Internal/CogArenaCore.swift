@@ -109,6 +109,19 @@ private nonisolated struct CogArenaDependencyCapture {
   var previous: CogSelectedArenaEdgeStorage.Cursor
 }
 
+/// One lazily created Observation boundary pinned to an exact slot lifetime.
+///
+/// The scalar arena row stores this entry's index. Keeping the boundary object
+/// and generation-bearing slot together lets the cold UI flush validate that
+/// a permanent boundary was never detached from its original state.
+private nonisolated struct CogArenaObservationEntry {
+  /// State lifetime whose UI reads and changes this boundary represents.
+  let slot: CogArenaSlot
+
+  /// Registrar-backed object exposed only through phantom Observation reads.
+  let boundary: CogObservationBoundary
+}
+
 /// Context-owned data-oriented graph machinery behind the arena selector.
 ///
 /// Stable public references still name descriptors and keys. This context maps
@@ -143,6 +156,13 @@ internal final class CogArenaCore {
 
   /// Nested selector scopes, outermost first.
   private var captures: ContiguousArray<CogArenaDependencyCapture> = []
+
+  /// UI-read roots in boundary creation order.
+  ///
+  /// Interior and unread rows never enter this table. Entries are permanent in
+  /// v1, making the boundary itself the durable UI lease while the row's scalar
+  /// `boundary` column keeps hot storage to one optional index.
+  private var observationEntries: ContiguousArray<CogArenaObservationEntry> = []
 
   /// Derived rows whose settlement has entered but not completed, outermost first.
   ///
@@ -242,6 +262,60 @@ internal final class CogArenaCore {
     let location = derivedLocation(for: valueReference)
     settle(location.slot, in: cogs)
     return location.column.current(at: location.slot)
+  }
+
+  /// Reads one source through its lazily allocated Observation boundary.
+  ///
+  /// Resolving the value first installs the arena row; boundary access then
+  /// records the exact public read without creating a graph dependency.
+  func observedManualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
+    let location = manualLocation(for: valueReference)
+    accessObservationBoundary(for: location.slot)
+    return location.column.current(at: location.slot)
+  }
+
+  /// Settles and reads one derived row through its Observation boundary.
+  ///
+  /// Settlement precedes registration so cold computation establishes the
+  /// consumer's baseline before later completed turns can invalidate it.
+  func observedDerivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
+    let location = derivedLocation(for: valueReference)
+    settle(location.slot, in: cogs)
+    accessObservationBoundary(for: location.slot)
+    return location.column.current(at: location.slot)
+  }
+
+  /// Number of arena rows permanently pinned by a UI boundary.
+  var observationBoundaryCount: Int {
+    observationEntries.count
+  }
+
+  /// Whether an already-created descriptor-and-key row owns a UI boundary.
+  ///
+  /// The lookup is observational: an unknown identity returns `false` without
+  /// allocating a row, descriptor record, value cell, or boundary.
+  func hasObservationBoundary(for identity: CogStateIdentity) -> Bool {
+    guard let slot = slots[identity], arena.contains(slot) else { return false }
+    return arena.boundary[arena.index(of: slot)] != CogArenaStorage.noIndex
+  }
+
+  /// Settles and notifies the boundary roots changed in this arena revision.
+  ///
+  /// The count snapshot preserves the simple core's baseline rule: a boundary
+  /// created while another root settles joins the next flush and cannot receive
+  /// a notice for a change that predates its first observed value.
+  func flushObservationBoundaries(in cogs: Cogs) {
+    let boundaryCount = observationEntries.count
+    for entry in observationEntries.prefix(boundaryCount) {
+      let row = arena.index(of: entry.slot)
+      let record = descriptorRecord(forRow: row)
+      if record.kind == .derived, needsSettlement(row) {
+        settle(entry.slot, in: cogs)
+      }
+
+      guard arena.changedAt[row] == revision else { continue }
+      entry.boundary.notifyValueChange()
+    }
   }
 
   /// Whether one source bridge changed in this turn after arena publication.
@@ -465,6 +539,39 @@ internal final class CogArenaCore {
     record.install(key: key, at: row)
     slots[identity] = slot
     return slot
+  }
+
+  /// Records one ordinary UI value access on a slot's stable boundary.
+  private func accessObservationBoundary(for slot: CogArenaSlot) {
+    ensureObservationBoundary(for: slot).accessValue()
+  }
+
+  /// Returns the slot's existing boundary or creates its sole cold entry.
+  ///
+  /// The row stores only an `Int32` index. The ordered table owns the registrar
+  /// object and exact slot generation, so graph walks never load a reference
+  /// merely because a different row crossed the UI boundary.
+  private func ensureObservationBoundary(for slot: CogArenaSlot) -> CogObservationBoundary {
+    let row = arena.index(of: slot)
+    let existingIndex = arena.boundary[row]
+    if existingIndex != CogArenaStorage.noIndex {
+      guard existingIndex >= 0, Int(existingIndex) < observationEntries.count else {
+        fatalError("Cog found an arena row with an invalid Observation boundary index.")
+      }
+      let entry = observationEntries[Int(existingIndex)]
+      guard entry.slot == slot else {
+        fatalError("Cog found an Observation boundary attached to another arena slot lifetime.")
+      }
+      return entry.boundary
+    }
+
+    guard observationEntries.count <= Int(Int32.max) else {
+      fatalError("Cog exhausted its Int32 Observation boundary index space.")
+    }
+    let boundary = CogObservationBoundary()
+    arena.boundary[row] = Int32(observationEntries.count)
+    observationEntries.append(CogArenaObservationEntry(slot: slot, boundary: boundary))
+    return boundary
   }
 
   /// Resolves one row's descriptor record without retaining it in the walk.

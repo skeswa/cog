@@ -195,6 +195,9 @@ extension Cogs {
   /// current baseline and joins the next flush; notifying it in the same pass
   /// could report a change predating its first observed value.
   internal func flushObservationBoundaries() {
+    #if COG_CORE_ARENA
+    arenaCore.flushObservationBoundaries(in: self)
+    #else
     let boundaryCount = observationStates.count
     for state in observationStates.prefix(boundaryCount) {
       if state.settleState != .clean,
@@ -217,5 +220,6 @@ extension Cogs {
         state.observationBoundary?.notifyValueChange()
       }
     }
+    #endif
   }
 }
