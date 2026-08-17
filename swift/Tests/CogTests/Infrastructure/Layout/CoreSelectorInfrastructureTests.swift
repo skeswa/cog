@@ -14,9 +14,9 @@ import Testing
 #error("Package.swift defined no core implementation for the test target")
 #endif
 
-#if COG_LEG_CORE_SIMPLE && COG_LEG_EDGE_POOL
+#if COG_LEG_CORE_SIMPLE && (COG_LEG_EDGE_POOL || COG_LEG_EDGE_PREFIX)
 #error("Package.swift selected an arena edge beside the simple test core")
-#elseif COG_LEG_CORE_ARENA && !COG_LEG_EDGE_POOL
+#elseif COG_LEG_CORE_ARENA && !COG_LEG_EDGE_POOL && !COG_LEG_EDGE_PREFIX
 #error("Package.swift defined no edge implementation for the arena test core")
 #endif
 
@@ -33,6 +33,8 @@ private let compiledTestCore: String = {
 private let compiledTestEdge: String? = {
   #if COG_LEG_EDGE_POOL
   "pool"
+  #elseif COG_LEG_EDGE_PREFIX
+  "prefix"
   #else
   nil
   #endif

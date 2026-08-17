@@ -20,19 +20,19 @@ private nonisolated struct CogArenaInvalidationFrame {
   let strength: CogArenaInvalidationStrength
 }
 
-/// Pushes arena invalidation flags over indexed subscriber edges.
+/// Pushes arena invalidation flags over one concrete indexed edge candidate.
 ///
 /// The context owns one instance and reuses its contiguous LIFO buffer across
 /// turns. The walk carries only row indices and a scalar strength, so even deep
 /// graphs use no recursion, state references, weak loads, or per-turn work-item
 /// allocation after the buffer has reached its high-water mark.
 @MainActor
-internal final class CogArenaDirtyPropagation {
+internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStorageProtocol> {
   /// Scalar rows whose flags this walk mutates.
   private let arena: CogArenaStorage
 
-  /// Shared candidate pool supplying each producer's subscriber chain.
-  private let edges: CogLinkedEdgePool
+  /// Selected candidate supplying each producer's subscriber chain.
+  private let edges: EdgeStorage
 
   /// Reused LIFO work storage; successful walks always drain it to zero.
   private var stack: ContiguousArray<CogArenaInvalidationFrame> = []
@@ -43,8 +43,8 @@ internal final class CogArenaDirtyPropagation {
   /// Retained high-water storage, exposed to prove later walks reuse it.
   var stackCapacity: Int { stack.capacity }
 
-  /// Binds one invalidator to an arena and the edge pool containing its graph.
-  init(arena: CogArenaStorage, edges: CogLinkedEdgePool) {
+  /// Binds one invalidator to an arena and the edge storage containing its graph.
+  init(arena: CogArenaStorage, edges: EdgeStorage) {
     self.arena = arena
     self.edges = edges
   }
@@ -85,17 +85,11 @@ internal final class CogArenaDirtyPropagation {
       fatalError("Cog found an arena edge whose producer row was out of range.")
     }
 
-    var cursor = arena.subs[Int(producerRow)]
+    var cursor = edges.firstSubscriber(of: producerRow, in: arena)
     while cursor != .none {
-      guard edges.contains(cursor) else {
-        fatalError("Cog found a released entry in an arena subscriber list.")
-      }
-      let edge = edges.edges[Int(cursor.rawValue)]
-      guard edge.dep == producerRow else {
-        fatalError("Cog found another producer's edge in an arena subscriber list.")
-      }
-      stack.append(CogArenaInvalidationFrame(row: edge.sub, strength: strength))
-      cursor = edge.nextSub
+      let subscriber = edges.subscriber(at: cursor)
+      stack.append(CogArenaInvalidationFrame(row: subscriber.consumer, strength: strength))
+      cursor = subscriber.next
     }
   }
 
@@ -134,4 +128,8 @@ internal final class CogArenaDirtyPropagation {
     arena.flags[row] = flags
     return true
   }
+
+  // Written out, and `nonisolated`, because generic classes under the
+  // package's MainActor default otherwise crash the pinned release optimizer.
+  nonisolated deinit {}
 }

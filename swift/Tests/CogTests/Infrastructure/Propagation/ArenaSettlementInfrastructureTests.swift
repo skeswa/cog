@@ -39,7 +39,7 @@ import Testing
 }
 
 @MainActor
-@Test func `ArenaSettlementInfrastructure recapture reuses the abandoned pool entry`() {
+@Test func `ArenaSettlementInfrastructure recapture keeps candidate storage bounded`() {
   let cogs = Cogs.forTesting()
   let useFirst = ManualCog<Bool>(true)
   let first = ManualCog<Int>(1)

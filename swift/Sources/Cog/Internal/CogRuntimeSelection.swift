@@ -33,14 +33,19 @@ internal nonisolated enum CogEdgeImplementation: String, Sendable {
   /// Shared linked edges owned by one indexed pool.
   case pool
 
+  /// Per-state dependency and subscriber arrays with prefix recapture.
+  case prefix
+
   /// The edge candidate selected by `COG_TEST_EDGE`, or `nil` for simple.
   static var compiled: CogEdgeImplementation? {
-    #if COG_CORE_SIMPLE && COG_EDGE_POOL
+    #if COG_CORE_SIMPLE && (COG_EDGE_POOL || COG_EDGE_PREFIX)
     #error("Package.swift selected an arena edge beside the simple core")
     #elseif COG_CORE_SIMPLE
     nil
     #elseif COG_CORE_ARENA && COG_EDGE_POOL
     .pool
+    #elseif COG_CORE_ARENA && COG_EDGE_PREFIX
+    .prefix
     #elseif COG_CORE_ARENA
     #error("Package.swift defined no edge implementation for the arena core")
     #else

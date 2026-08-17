@@ -31,7 +31,7 @@ private final class CogArenaDescriptorRecord {
   let column: AnyObject
 
   /// Publishes a pending source value, or `nil` for derived descriptors.
-  let commitSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?
+  let commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?
 
   /// Reruns one derived row, or `nil` for manual descriptors.
   let recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
@@ -50,7 +50,7 @@ private final class CogArenaDescriptorRecord {
     index: Int32,
     kind: CogArenaDescriptorKind,
     column: AnyObject,
-    commitSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
+    commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
   ) {
     self.identity = identity
@@ -103,10 +103,10 @@ private nonisolated struct CogArenaDependencyCapture {
   let consumer: CogArenaSlot
 
   /// Next prior dependency available for static-prefix reuse.
-  var cursor: CogEdgeIndex
+  var cursor: CogSelectedArenaEdgeStorage.Cursor
 
   /// Last dependency accepted in selector read order.
-  var previous: CogEdgeIndex
+  var previous: CogSelectedArenaEdgeStorage.Cursor
 }
 
 /// Context-owned data-oriented graph machinery behind the arena selector.
@@ -120,11 +120,11 @@ internal final class CogArenaCore {
   /// Scalar state rows shared by every descriptor column.
   let arena: CogArenaStorage
 
-  /// Baseline indexed edge candidate.
-  let edges: CogLinkedEdgePool
+  /// Concrete indexed edge representation selected for this build.
+  let edges: CogSelectedArenaEdgeStorage
 
   /// Reused iterative push engine over `edges`.
-  let propagation: CogArenaDirtyPropagation
+  let propagation: CogSelectedArenaDirtyPropagation
 
   /// Latest graph revision assigned by the enclosing context turn.
   private(set) var revision: UInt32 = 0
@@ -169,10 +169,15 @@ internal final class CogArenaCore {
     return cycleStep(forRow: liveRow(rawRow)).name
   }
 
-  /// Creates one empty arena graph and binds its pool propagator.
+  /// The innermost active row names used by the cold-nesting diagnostic.
+  func innermostComputingNames(_ count: Int) -> [String] {
+    computingPath.suffix(count).map { cycleStep(forRow: liveRow($0)).name }
+  }
+
+  /// Creates one empty arena graph and binds its selected edge propagator.
   init() {
     let arena = CogArenaStorage()
-    let edges = CogLinkedEdgePool()
+    let edges = CogSelectedArenaEdgeStorage()
     self.arena = arena
     self.edges = edges
     self.propagation = CogArenaDirtyPropagation(arena: arena, edges: edges)
@@ -237,6 +242,36 @@ internal final class CogArenaCore {
     let location = derivedLocation(for: valueReference)
     settle(location.slot, in: cogs)
     return location.column.current(at: location.slot)
+  }
+
+  /// Whether one source bridge changed in this turn after arena publication.
+  func reactionBridgeNeedsCheck<Value>(_ valueReference: ManualCog<Value>) -> Bool {
+    let location = manualLocation(for: valueReference)
+    let row = arena.index(of: location.slot)
+    return arena.changedAt[row] == revision
+  }
+
+  /// Reports whether one already-published source changed in this arena revision.
+  func settleReactionBridge<Value>(_ valueReference: ManualCog<Value>) -> Bool {
+    let location = manualLocation(for: valueReference)
+    return arena.changedAt[arena.index(of: location.slot)] == revision
+  }
+
+  /// Whether one derived bridge changed or still carries pull work this turn.
+  func reactionBridgeNeedsCheck<Value>(_ valueReference: Cog<Value>) -> Bool {
+    let location = derivedLocation(for: valueReference)
+    let row = arena.index(of: location.slot)
+    return needsSettlement(row) || arena.changedAt[row] == revision
+  }
+
+  /// Pulls one bridged derived row and reports a change in this arena revision.
+  func settleReactionBridge<Value>(
+    _ valueReference: Cog<Value>,
+    in cogs: Cogs
+  ) -> Bool {
+    let location = derivedLocation(for: valueReference)
+    settle(location.slot, in: cogs)
+    return arena.changedAt[arena.index(of: location.slot)] == revision
   }
 
   /// Reads and records one manual dependency for the active arena selector.
@@ -385,7 +420,7 @@ internal final class CogArenaCore {
     label: CogLabel,
     kind: CogArenaDescriptorKind,
     column: AnyObject,
-    commitSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
+    commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
   ) -> CogArenaDescriptorRecord {
     guard records.count <= Int(Int32.max) else {
@@ -443,6 +478,16 @@ internal final class CogArenaCore {
 
   /// Pulls one derived row current through reusable scalar enter/exit frames.
   private func settle(_ root: CogArenaSlot, in cogs: Cogs) {
+    cogs.settleDepth += 1
+    defer { cogs.settleDepth -= 1 }
+    if cogs.settleDepth > Cogs.maximumSettleDepth {
+      fatalError(
+        cogs.coldSettleDepthMessage(
+          innermostComputingNames: innermostComputingNames(8)
+        )
+      )
+    }
+
     let rootRow = arena.index(of: root)
     let boundary = pullFrames.count
     pullFrames.append(CogArenaPullFrame(row: Int32(rootRow), phase: .enter))
@@ -486,33 +531,33 @@ internal final class CogArenaCore {
 
   /// Appends stale producers of `consumerRow` for settlement before its exit.
   private func appendDependencies(of consumerRow: Int32) {
-    var cursor = arena.deps[Int(consumerRow)]
+    var cursor = edges.firstDependency(of: consumerRow, in: arena)
     while cursor != .none {
-      let edge = edges.edge(at: cursor)
-      guard edge.sub == consumerRow else {
+      let dependency = edges.dependency(at: cursor)
+      guard dependency.consumer == consumerRow else {
         fatalError("Cog found another consumer's edge in an arena dependency list.")
       }
-      let producerRow = liveRow(edge.dep)
+      let producerRow = liveRow(dependency.producer)
       if needsSettlement(producerRow) {
-        pullFrames.append(CogArenaPullFrame(row: edge.dep, phase: .enter))
+        pullFrames.append(CogArenaPullFrame(row: dependency.producer, phase: .enter))
       }
-      cursor = edge.nextDep
+      cursor = dependency.next
     }
   }
 
   /// Whether any dependency changed after this consumer was last current.
   private func dependencyChanged(for consumerRow: Int32) -> Bool {
     let checkedAt = arena.checkedAt[Int(consumerRow)]
-    var cursor = arena.deps[Int(consumerRow)]
+    var cursor = edges.firstDependency(of: consumerRow, in: arena)
     while cursor != .none {
-      let edge = edges.edge(at: cursor)
-      guard edge.sub == consumerRow else {
+      let dependency = edges.dependency(at: cursor)
+      guard dependency.consumer == consumerRow else {
         fatalError("Cog found another consumer's edge in an arena dependency list.")
       }
-      if arena.changedAt[liveRow(edge.dep)] > checkedAt {
+      if arena.changedAt[liveRow(dependency.producer)] > checkedAt {
         return true
       }
-      cursor = edge.nextDep
+      cursor = dependency.next
     }
     return false
   }
@@ -557,7 +602,7 @@ internal final class CogArenaCore {
     captures.append(
       CogArenaDependencyCapture(
         consumer: consumer,
-        cursor: arena.deps[row],
+        cursor: edges.firstDependency(of: Int32(row), in: arena),
         previous: .none
       )
     )
@@ -587,14 +632,14 @@ internal final class CogArenaCore {
     }
 
     if capture.cursor != .none {
-      let edge = edges.edge(at: capture.cursor)
-      if edge.dep == producer.index, edge.sub == consumer.index {
+      let dependency = edges.dependency(at: capture.cursor)
+      if dependency.producer == producer.index, dependency.consumer == consumer.index {
         edges.updateVersion(
           of: capture.cursor,
           to: arena.changedAt[arena.index(of: producer)]
         )
         capture.previous = capture.cursor
-        capture.cursor = edge.nextDep
+        capture.cursor = dependency.next
         captures[captureIndex] = capture
         return
       }

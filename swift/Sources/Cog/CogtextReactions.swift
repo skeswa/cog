@@ -33,6 +33,10 @@ extension Cogs {
   /// tail. The index walk is deliberate: iterating a snapshot would lose those
   /// newly appended runs or force reentrancy.
   internal func flushReactions() {
+    #if COG_CORE_ARENA
+    prepareArenaReactionBridgesForFlush()
+    #endif
+
     // Initial runs registered earlier in the flush wait behind every reaction
     // this turn already made reachable. Registrations made while this loop is
     // running append directly to the same tail.

@@ -125,10 +125,10 @@ internal final class CogArenaValueColumn<Value> {
   /// CHECK. An equal final staged value consumes pending storage but preserves
   /// both versions and sends no propagation.
   @discardableResult
-  func commitSource(
+  func commitSource<EdgeStorage: CogArenaEdgeStorageProtocol>(
     at slot: CogArenaSlot,
     revision: UInt32,
-    propagatingWith propagation: CogArenaDirtyPropagation
+    propagatingWith propagation: CogArenaDirtyPropagation<EdgeStorage>
   ) -> Bool {
     guard propagation.belongs(to: arena) else {
       fatalError("Cog tried to propagate a value through another arena context.")

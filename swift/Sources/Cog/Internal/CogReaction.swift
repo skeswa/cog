@@ -130,10 +130,16 @@ internal final class CogReaction: CogState, CogConsumer {
     guard !isCancelled, settleState != .clean else { return }
 
     for dependency in dependencies {
-      guard dependency.settleState != .clean,
-        let derived = dependency as? any DerivedCogSettleState
-      else { continue }
-      cogs.settle(derived)
+      guard dependency.settleState != .clean else { continue }
+      #if COG_CORE_ARENA
+      if let bridge = dependency as? CogArenaReactionBridge {
+        bridge.settle(in: cogs)
+        continue
+      }
+      #endif
+      if let derived = dependency as? any DerivedCogSettleState {
+        cogs.settle(derived)
+      }
     }
 
     let dependencyChanged = dependencies.contains {

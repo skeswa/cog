@@ -49,9 +49,15 @@ public struct ReactionReader {
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
     cogs.requireTracking(reaction)
 
+    #if COG_CORE_ARENA
+    let value = cogs.peek(valueReference)
+    reaction.recordDependency(on: cogs.arenaReactionBridge(for: valueReference))
+    return value
+    #else
     let producer = cogs.manualState(for: valueReference)
     reaction.recordDependency(on: producer)
     return producer.currentValue
+    #endif
   }
 
   /// Reads a derived cog and records it as a dependency of this reaction run.
@@ -67,9 +73,15 @@ public struct ReactionReader {
   public subscript<Value>(_ valueReference: Cog<Value>) -> Value {
     cogs.requireTracking(reaction)
 
+    #if COG_CORE_ARENA
+    let value = cogs.peek(valueReference)
+    reaction.recordDependency(on: cogs.arenaReactionBridge(for: valueReference))
+    return value
+    #else
     let producer = cogs.derivedState(for: valueReference)
     reaction.recordDependency(on: producer)
     return producer.settledValue(in: cogs)
+    #endif
   }
 
   /// Reads an async cog's value and records it as a reaction dependency.

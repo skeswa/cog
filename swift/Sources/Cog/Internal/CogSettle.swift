@@ -322,7 +322,11 @@ extension Cogs {
     if settleDepth > Self.maximumSettleDepth {
       // `fatalError`, not `preconditionFailure`: the message is composed, and
       // an optimized build drops composed `preconditionFailure` messages.
-      fatalError(coldSettleDepthMessage())
+      fatalError(
+        coldSettleDepthMessage(
+          innermostComputingNames: settleStack.innermostComputingNames(8)
+        )
+      )
     }
 
     // A nested pull appends above this checkpoint and pops only its own frames.
@@ -387,9 +391,8 @@ extension Cogs {
   /// Names the innermost declarations so the caller can see which chain
   /// stacked, and says the two things that actually resolve it: read from the
   /// source end, or shorten the chain.
-  private func coldSettleDepthMessage() -> String {
-    let innermost = settleStack.innermostComputingNames(8)
-    let chain = innermost.joined(separator: " -> ")
+  internal func coldSettleDepthMessage(innermostComputingNames: [String]) -> String {
+    let chain = innermostComputingNames.joined(separator: " -> ")
     return """
       Reading a Cog needed \(settleDepth) nested computations, past the limit \
       of \(Self.maximumSettleDepth). Cog computes a derived cog the first time \

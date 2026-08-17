@@ -78,6 +78,11 @@ public final class Cogs {
   /// Public references remain unchanged; sync source and derived paths route
   /// here while later M6 tasks migrate the remaining runtime capabilities.
   internal let arenaCore: CogArenaCore
+
+  /// Transitional terminals joining arena rows to class-backed reactions.
+  ///
+  /// M6-10ca removes these when reactions themselves receive indexed rows.
+  internal var arenaReactionBridges: [CogStateIdentity: CogArenaReactionBridge] = [:]
   #endif
 
   /// One enter/exit buffer reused by iterative settle walks.
