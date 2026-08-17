@@ -50,9 +50,8 @@ public struct ReactionReader {
     cogs.requireTracking(reaction)
 
     #if COG_CORE_ARENA
-    let value = cogs.peek(valueReference)
-    reaction.recordDependency(on: cogs.arenaReactionBridge(for: valueReference))
-    return value
+    guard !reaction.isCancelled else { return cogs.peek(valueReference) }
+    return cogs.arenaCore.read(valueReference, for: reaction.arenaSlot)
     #else
     let producer = cogs.manualState(for: valueReference)
     reaction.recordDependency(on: producer)
@@ -74,9 +73,8 @@ public struct ReactionReader {
     cogs.requireTracking(reaction)
 
     #if COG_CORE_ARENA
-    let value = cogs.peek(valueReference)
-    reaction.recordDependency(on: cogs.arenaReactionBridge(for: valueReference))
-    return value
+    guard !reaction.isCancelled else { return cogs.peek(valueReference) }
+    return cogs.arenaCore.read(valueReference, for: reaction.arenaSlot, in: cogs)
     #else
     let producer = cogs.derivedState(for: valueReference)
     reaction.recordDependency(on: producer)

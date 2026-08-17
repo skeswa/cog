@@ -185,6 +185,13 @@ internal final class CogArenaCore {
   /// Reused enter/exit storage for iterative warm settlement.
   private var pullFrames: ContiguousArray<CogArenaPullFrame> = []
 
+  /// Reused roots copied from one reaction terminal before its dependencies settle.
+  ///
+  /// Pulling a producer may recapture edges elsewhere in the shared pool. The
+  /// snapshot keeps reaction traversal independent of those mutations without
+  /// allocating again after reaching its high-water mark.
+  private var reactionPullRoots: ContiguousArray<CogArenaSlot> = []
+
   /// Nested selector scopes, outermost first.
   private var captures: ContiguousArray<CogArenaDependencyCapture> = []
 
@@ -444,34 +451,103 @@ internal final class CogArenaCore {
   }
   #endif
 
-  /// Whether one source bridge changed in this turn after arena publication.
-  func reactionBridgeNeedsCheck<Value>(_ valueReference: ManualCog<Value>) -> Bool {
-    let location = manualLocation(for: valueReference)
-    let row = arena.index(of: location.slot)
-    return arena.changedAt[row] == revision
+  /// Allocates one value-less terminal row for a reaction registration.
+  ///
+  /// The reaction object still owns its closure and cancellation identity, but
+  /// dependency and subscriber topology terminates at this generated slot. A
+  /// terminal has no descriptor, value column, boundary, or subscribers.
+  func allocateReaction() -> CogArenaSlot {
+    let slot = arena.allocate()
+    arena.checkedAt[arena.index(of: slot)] = revision
+    return slot
   }
 
-  /// Reports whether one already-published source changed in this arena revision.
-  func settleReactionBridge<Value>(_ valueReference: ManualCog<Value>) -> Bool {
-    let location = manualLocation(for: valueReference)
-    return arena.changedAt[arena.index(of: location.slot)] == revision
+  /// Reconciles one reaction terminal's ordered arena dependency prefix.
+  ///
+  /// Nested derived settlement temporarily pushes selector captures above this
+  /// one. The generated slot therefore participates in the same concrete edge
+  /// storage without a class-backed bridge or a second selector run.
+  func captureReactionDependencies<Result>(
+    for reaction: CogArenaSlot,
+    _ body: () -> Result
+  ) -> Result {
+    _ = requireReactionRow(reaction)
+    return withDependencyCapture(for: reaction, body)
   }
 
-  /// Whether one derived bridge changed or still carries pull work this turn.
-  func reactionBridgeNeedsCheck<Value>(_ valueReference: Cog<Value>) -> Bool {
-    let location = derivedLocation(for: valueReference)
-    let row = arena.index(of: location.slot)
-    return needsSettlement(row) || arena.changedAt[row] == revision
+  /// Whether propagation left CHECK or DIRTY work on one reaction terminal.
+  func reactionNeedsSettlement(_ reaction: CogArenaSlot) -> Bool {
+    needsSettlement(requireReactionRow(reaction))
   }
 
-  /// Pulls one bridged derived row and reports a change in this arena revision.
-  func settleReactionBridge<Value>(
-    _ valueReference: Cog<Value>,
-    in cogs: Cogs
-  ) -> Bool {
-    let location = derivedLocation(for: valueReference)
-    settle(location.slot, in: cogs)
-    return arena.changedAt[arena.index(of: location.slot)] == revision
+  /// Settles a reaction's arena producers and reports whether its body must run.
+  ///
+  /// Producer slots are copied into reused storage before pulls begin because a
+  /// derived recomputation may recapture other lists in the shared edge pool.
+  /// Equal recomputations leave their older `changedAt`, allowing this terminal
+  /// to backdate and stay quiet exactly like an ordinary derived consumer.
+  func settleReactionDependencies(_ reaction: CogArenaSlot, in cogs: Cogs) -> Bool {
+    let reactionRow = requireReactionRow(reaction)
+    guard needsSettlement(reactionRow) else { return false }
+    guard reactionPullRoots.isEmpty else {
+      fatalError("Cog tried to reenter arena reaction dependency settlement.")
+    }
+    defer { reactionPullRoots.removeAll(keepingCapacity: true) }
+
+    var cursor = edges.firstDependency(of: reaction.index, in: arena)
+    while cursor != .none {
+      let dependency = edges.dependency(at: cursor)
+      guard dependency.consumer == reaction.index else {
+        fatalError("Cog found another consumer's edge in an arena reaction list.")
+      }
+      let producerRow = liveRow(dependency.producer)
+      if needsSettlement(producerRow) {
+        let record = descriptorRecord(forRow: producerRow)
+        guard record.kind == .derived else {
+          fatalError("Cog found an unsettled manual source behind an arena reaction.")
+        }
+        reactionPullRoots.append(
+          CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
+        )
+      }
+      cursor = dependency.next
+    }
+
+    for producer in reactionPullRoots {
+      settle(producer, in: cogs)
+    }
+
+    let mustRun =
+      arena.flags[reactionRow].contains(.dirty)
+      || dependencyChanged(for: reaction.index)
+    if !mustRun {
+      completeReactionRun(reaction)
+    }
+    return mustRun
+  }
+
+  /// Marks a completed reaction body current and clears its terminal flags.
+  func completeReactionRun(_ reaction: CogArenaSlot) {
+    let row = requireReactionRow(reaction)
+    arena.checkedAt[row] = revision
+    arena.flags[row].remove(.check)
+    arena.flags[row].remove(.dirty)
+  }
+
+  /// Removes one cancelled reaction's edges and returns its terminal slot.
+  func releaseReaction(_ reaction: CogArenaSlot) {
+    let row = requireReactionRow(reaction)
+    guard !captures.contains(where: { $0.consumer == reaction }) else {
+      fatalError("Cog tried to release an arena reaction during dependency capture.")
+    }
+    guard edges.firstSubscriber(of: reaction.index, in: arena) == .none else {
+      fatalError("Cog found subscribers on an arena reaction terminal.")
+    }
+    edges.removeDependencySuffix(of: reaction, after: .none, in: arena)
+    guard arena.deps[row] == .none, arena.subs[row] == .none else {
+      fatalError("Cog tried to release a linked arena reaction terminal.")
+    }
+    arena.release(reaction)
   }
 
   /// Reads and records one manual dependency for the active arena selector.
@@ -515,6 +591,18 @@ internal final class CogArenaCore {
     guard captures.last?.consumer == consumer else {
       fatalError("A Cog reader is valid only inside the selector run that handed it out.")
     }
+  }
+
+  /// Resolves a live descriptor-less row reserved for one reaction terminal.
+  private func requireReactionRow(_ reaction: CogArenaSlot) -> Int {
+    let row = arena.index(of: reaction)
+    guard arena.descriptor[row] == CogArenaStorage.noIndex else {
+      fatalError("Cog tried to use a value-state row as an arena reaction terminal.")
+    }
+    guard arena.boundary[row] == CogArenaStorage.noIndex else {
+      fatalError("Cog found an Observation boundary on an arena reaction terminal.")
+    }
+    return row
   }
 
   /// Resolves or creates one manual row and its typed descriptor column.
