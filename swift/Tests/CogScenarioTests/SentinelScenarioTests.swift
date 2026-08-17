@@ -50,8 +50,9 @@ func `M5ScenarioSentinel costs exactly three runs per settled turn`(turns: Int) 
 
 @MainActor
 @Test func `M5ScenarioSentinel reports the layout it was built with`() {
-  let result = CogScenario.sentinel(turns: 1, layout: .inline).run(in: Cogs.forTesting())
+  let result = CogScenario.sentinel(turns: 1, layout: .compiled).run(in: Cogs.forTesting())
 
-  #expect(result.layout == .inline)
+  #expect(result.layout == .compiled)
+  #expect(result.layout.rawValue == Cogs.valueReferenceLayoutName)
   #expect(result.name == "M5ScenarioSentinel")
 }

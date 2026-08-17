@@ -159,11 +159,13 @@ The isolation matrix is joined by one more build-time selector,
 `COG_TEST_VALUE_REFERENCE_LAYOUT`, which chooses how a keyed value reference
 physically carries its key (perf §4). It is a **library** setting rather than a
 test setting, because the layout is part of the library's representation. Unset
-means `inline`, the correctness core's layout, so an ordinary build is
-unchanged; an unrecognized value is a hard manifest error for the same reason a
-mistyped isolation leg is. `M5-09b` and `M5-09c` add the interned-token and
-generic-keyed candidates by rewriting
-`swift/Sources/Cog/Internal/CogKey.swift` and little else.
+means the selected v1 layout, inline `AnyHashable`, so an ordinary consumer
+never opts into a losing candidate; an unrecognized value is a hard manifest
+error for the same reason a mistyped isolation leg is. The interned-token and
+generic-keyed candidates remain available only for behavior and benchmark
+comparison. Generic uses box-produced keyed reference types and conditional
+runtime overloads because its concrete `Key` necessarily crosses the public
+read surface; it cannot hide entirely behind `CogKey`.
 
 Documentation is a task of its own, because swift-docc-plugin is env-gated
 behind `COG_DOCC=1` so ordinary consumers resolve this package with no

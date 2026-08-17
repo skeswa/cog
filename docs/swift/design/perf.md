@@ -3,8 +3,8 @@
 _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. It does not settle value-reference, edge, hash-table, or
-exclusivity layouts; benchmarks must choose those details.
+an implementation plan. The value-reference comparison in §9.6 selects inline
+`AnyHashable`; edge, hash-table, and exclusivity layouts remain benchmark-gated.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
@@ -140,10 +140,11 @@ case. The same stack supplies cycle diagnostics: mark a state as computing on
 entry, clear it on every exit path, and fail when a read reaches a computing
 state. Format names and keys only on this rare error path.
 
-## 4. Value-reference layout and hashing stay benchmark-gated
+## 4. Inline value references are selected; hashing stays benchmark-gated
 
-A public value reference names a descriptor and key. It never stores a state slot. Its
-exact memory layout is open.
+A public value reference names a descriptor and key. It never stores a state
+slot. The v1 layout carries the key inline as `AnyHashable?`; the public struct
+remains resilient rather than `@frozen`.
 
 The correctness build uses inline `AnyHashable?`. This is several machine
 words on current 64-bit Swift, so it is not a two-word value reference. Keep the public
@@ -167,10 +168,17 @@ The benchmark compares the whole cost of three designs:
 3. **Generic keyed value reference:** fully specialized key storage, but adds the key type
    to the public read surface.
 
-Keyed diamonds and key churn must decide. Hash caching, token interning, and a
-custom identity table remain possible follow-ups only if profiles support
-them. Swift's normal dictionary is already contiguous and specialized for a
-concrete key.
+The keyed-diamond and churn comparison in §9.6 selects **inline
+`AnyHashable`**. Interning narrowed a reference and saved about 2% of executed
+instructions, but did not improve both wall-time workloads: churn regressed 4%
+and still paid an unbounded process-wide table plus a lock on every reference
+construction. The generic candidate was 6% slower on the keyed diamond and
+required a permanent keyed overload surface. Neither displaced the simple
+layout that already creates references with zero allocations.
+
+Hash caching and descriptor-local `Dictionary<Key, Int32>` lookup remain
+possible follow-ups if M6 profiles support them. They can hash the concrete key
+on a cold lookup without changing the selected public representation.
 
 ## 5. ARC, dispatch, and exclusivity rules
 
@@ -426,6 +434,48 @@ Two costs the number does not show, and `M5-09e` has to weigh them:
 
 The complete behavior suite passes unchanged under both layouts, which is
 COUNT-09's promise arriving early for this candidate.
+
+**Value-reference comparison and selection** — `M5-09e`, 2026-08-17, `mactop`
+(Apple Silicon, 12 cores, 24 GB), Darwin 25.4.0, Xcode 26.4 / Apple Swift
+6.3.0, release, harness 1.36.2. All six runs used the same checkout and host
+session. Each candidate was rebuilt through `COG_TEST_VALUE_REFERENCE_LAYOUT`;
+each benchmark retained its shared scenario's exact run-count assertion.
+
+The keyed diamond is 100 keys × 5 arms × 500 turns. Churn keeps a 10-key live
+window across 500 turns and creates 510 keys. These are whole-scenario
+benchmarks, so they report wall clock, instructions, and peak resident memory
+only: each iteration releases a `Cogs`, and M5-11 forbids process-global malloc
+or ARC counting when teardown work can finish after the measured region.
+
+| Layout               | reference size | keyed diamond p50 |   key churn p50 | peak resident (diamond / churn) |
+| -------------------- | -------------: | ----------------: | --------------: | ------------------------------: |
+| inline `AnyHashable` |       48 bytes |   1,547 M / 78 ms | 1,536 M / 94 ms |                     121 / 15 MB |
+| interned token       |       17 bytes |   1,506 M / 77 ms | 1,512 M / 98 ms |                     119 / 15 MB |
+| generic keyed        |       16 bytes |   1,640 M / 83 ms | 1,540 M / 95 ms |                     121 / 15 MB |
+
+The two workload cells are instructions / wall clock. Each percentile came
+from 31–39 samples. Instruction counts were tight within a run; wall clock is
+read as a workload-level direction rather than a future threshold.
+
+**Selected: inline `AnyHashable`.** It is the only candidate with no new
+structural cost, and it already satisfies PERF-06 at zero allocations per
+`box[key]` construction. The interned candidate does execute 1.6–2.7% fewer
+instructions and narrows the reference to 17 bytes, but the reduction does not
+become a consistent wall-time win: keyed-diamond p50 improves by 1 ms while
+churn regresses by 4 ms. Paying an unbounded process-wide key table and a lock
+on every construction for that result would violate the cost order in §1.
+
+The generic candidate is 16 bytes for the measured `Int` key but performs an
+erasure adapter at the current heterogeneous core boundary. It ties inline on
+churn and costs about 6% on both diamond instructions and wall time. More
+importantly, its box-specific keyed reference types require a permanent public
+overload surface across reads, writes, status, refresh, reactions, mechanisms,
+projections, and testing. Perf §4's descriptor-local concrete-key dictionary
+can capture the cold-lookup advantage without that public cost.
+
+The selector and both losing candidates remain test-and-benchmark-only so
+COUNT-09 can continue proving behavior parity and the recorded shapes remain
+reproducible. Unset — every ordinary consumer build — selects inline.
 
 **Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
 family where the UI once read `n` rows and now writes and reads exactly one.
