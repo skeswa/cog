@@ -58,6 +58,16 @@ internal final class CogArenaValueColumn<Value> {
     return value
   }
 
+  /// Returns the completed value when this descriptor has published one.
+  ///
+  /// A cold derived row legitimately has no cell yet. The returned outer
+  /// optional preserves a published optional domain `nil` as `.some(.none)`.
+  func storedValue(at slot: CogArenaSlot) -> Value? {
+    let row = arena.index(of: slot)
+    guard row < currentValues.count else { return .none }
+    return currentValues[row]
+  }
+
   /// Reads this turn's staged value when present, otherwise the current value.
   ///
   /// Writers use this path so multiple mutations in one accumulating turn see

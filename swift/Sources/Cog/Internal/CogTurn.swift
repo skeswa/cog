@@ -39,6 +39,11 @@ internal final class CogTurn {
   /// no-ops. A future measured representation may deduplicate this work.
   private var touchedSources: [any PendingCogSource] = []
 
+  #if COG_CORE_ARENA
+  /// Arena source slots touched once in writer order by this turn.
+  private var touchedArenaSources: ContiguousArray<CogArenaSlot> = []
+  #endif
+
   /// Creates one accumulating turn with its unforgeable writer capability.
   init(id: CogTurnID, name: String) {
     self.id = id
@@ -54,6 +59,16 @@ internal final class CogTurn {
     touchedSources.append(source)
   }
 
+  #if COG_CORE_ARENA
+  /// Registers one arena source whose pending typed cell must be published.
+  ///
+  /// ``CogArenaStateFlags/touched`` performs row-level deduplication before
+  /// this method, keeping the flush list O(changed sources) without hashing.
+  func touchArenaSource(_ source: CogArenaSlot) {
+    touchedArenaSources.append(source)
+  }
+  #endif
+
   /// Publishes all staged slots under one newly assigned graph revision.
   ///
   /// Revision advances even for an empty system turn because the named pending
@@ -61,6 +76,10 @@ internal final class CogTurn {
   /// its staged value changes and which consumers to invalidate.
   func flushPendingSources(in cogs: Cogs) {
     let revision = cogs.advanceRevision()
+    #if COG_CORE_ARENA
+    cogs.arenaCore.flushPendingSources(touchedArenaSources)
+    touchedArenaSources.removeAll(keepingCapacity: true)
+    #endif
     for source in touchedSources {
       source.flushPendingValue(in: cogs, at: revision)
     }

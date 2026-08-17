@@ -25,6 +25,7 @@ import Testing
   #expect(arena.checkedAt == [0, 0])
   #expect(arena.deps == [.none, .none])
   #expect(arena.subs == [.none, .none])
+  #expect(arena.descriptor == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
   #expect(arena.boundary == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
   #expect(arena.generation == [0, 0])
 }
@@ -72,7 +73,8 @@ import Testing
   arena.checkedAt[index] = 92
   arena.deps[index] = CogEdgeIndex(rawValue: 13)
   arena.subs[index] = CogEdgeIndex(rawValue: 14)
-  arena.boundary[index] = 15
+  arena.descriptor[index] = 15
+  arena.boundary[index] = 16
 
   arena.release(first)
   let reused = arena.allocate()
@@ -83,6 +85,7 @@ import Testing
   #expect(arena.checkedAt[index] == 0)
   #expect(arena.deps[index] == .none)
   #expect(arena.subs[index] == .none)
+  #expect(arena.descriptor[index] == CogArenaStorage.noIndex)
   #expect(arena.boundary[index] == CogArenaStorage.noIndex)
   #expect(arena.generation[index] == reused.generation)
 }
@@ -100,13 +103,15 @@ import Testing
   arena.checkedAt[firstIndex] = 8
   arena.deps[firstIndex] = CogEdgeIndex(rawValue: 21)
   arena.subs[firstIndex] = CogEdgeIndex(rawValue: 22)
-  arena.boundary[firstIndex] = 23
+  arena.descriptor[firstIndex] = 23
+  arena.boundary[firstIndex] = 24
 
   #expect(arena.flags[secondIndex] == .occupied)
   #expect(arena.changedAt[secondIndex] == 0)
   #expect(arena.checkedAt[secondIndex] == 0)
   #expect(arena.deps[secondIndex] == .none)
   #expect(arena.subs[secondIndex] == .none)
+  #expect(arena.descriptor[secondIndex] == CogArenaStorage.noIndex)
   #expect(arena.boundary[secondIndex] == CogArenaStorage.noIndex)
 }
 

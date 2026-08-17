@@ -181,6 +181,16 @@ internal final class CogLinkedEdgePool {
     return row < edges.count && edges[row].isLive
   }
 
+  /// Returns one live entry for an indexed arena graph walk.
+  func edge(at index: CogEdgeIndex) -> CogPoolEdge {
+    edges[liveEntryIndex(index)]
+  }
+
+  /// Refreshes the producer version captured by one reused dependency edge.
+  func updateVersion(of index: CogEdgeIndex, to version: UInt32) {
+    edges[liveEntryIndex(index)].version = version
+  }
+
   /// Allocates an entry index from the in-entry free list or grows the pool.
   private func allocateEntry() -> CogEdgeIndex {
     if freeHead != .none {

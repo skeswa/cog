@@ -33,6 +33,9 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 
   /// The state is on the active synchronous computation path.
   static let computing = CogArenaStateFlags(rawValue: 1 << 3)
+
+  /// The accumulating turn has staged this source once.
+  static let touched = CogArenaStateFlags(rawValue: 1 << 4)
 }
 
 /// Context-owned scalar storage for the data-oriented core.
@@ -61,6 +64,9 @@ internal final class CogArenaStorage {
 
   /// Head of each row's subscriber list.
   var subs: ContiguousArray<CogEdgeIndex> = []
+
+  /// Context-local descriptor dispatch index for each occupied row.
+  var descriptor: ContiguousArray<Int32> = []
 
   /// Observation-boundary index per row, or ``noIndex`` until a UI read.
   var boundary: ContiguousArray<Int32> = []
@@ -104,6 +110,7 @@ internal final class CogArenaStorage {
     checkedAt.append(0)
     deps.append(.none)
     subs.append(.none)
+    descriptor.append(Self.noIndex)
     boundary.append(Self.noIndex)
     generation.append(0)
     liveCount += 1
@@ -161,6 +168,7 @@ internal final class CogArenaStorage {
     checkedAt[index] = 0
     deps[index] = .none
     subs[index] = .none
+    descriptor[index] = Self.noIndex
     boundary[index] = Self.noIndex
   }
 }

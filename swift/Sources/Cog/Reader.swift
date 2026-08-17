@@ -32,8 +32,16 @@ public struct Reader<Value> {
   /// The context whose graph this run reads.
   private let cogs: Cogs
 
-  /// The state receiving dependencies and providing `curr`.
+  #if COG_CORE_ARENA
+  /// Transitional class-state consumer used by arena paths not migrated yet.
+  private let state: (any CogReaderState<Value>)?
+
+  /// Arena consumer slot for a migrated data-oriented selector.
+  private let arenaState: CogArenaSlot?
+  #else
+  /// The class state receiving dependencies and providing `curr`.
   private let state: any CogReaderState<Value>
+  #endif
 
   /// Hands a computing state its scoped read capability.
   ///
@@ -48,7 +56,19 @@ public struct Reader<Value> {
   internal init(cogs: Cogs, state: some CogReaderState<Value>) {
     self.cogs = cogs
     self.state = state
+    #if COG_CORE_ARENA
+    self.arenaState = nil
+    #endif
   }
+
+  #if COG_CORE_ARENA
+  /// Hands an arena-derived row its scoped read capability.
+  internal init(cogs: Cogs, arenaState: CogArenaSlot) {
+    self.cogs = cogs
+    self.state = nil
+    self.arenaState = arenaState
+  }
+  #endif
 
   /// Reads a source, and depends on it.
   ///
@@ -59,11 +79,16 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The source to read.
   /// - Returns: The value from the latest completed turn.
   public subscript<Read>(_ valueReference: ManualCog<Read>) -> Read {
+    #if COG_CORE_ARENA
+    let consumer = requiredArenaState()
+    return cogs.arenaCore.read(valueReference, for: consumer)
+    #else
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
-
     let producer = cogs.manualState(for: valueReference)
     state.recordDependency(on: producer)
     return producer.currentValue
+    #endif
   }
 
   /// Reads another derived cog, and depends on it.
@@ -76,11 +101,16 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its value in this context.
   public subscript<Read>(_ valueReference: Cog<Read>) -> Read {
+    #if COG_CORE_ARENA
+    let consumer = requiredArenaState()
+    return cogs.arenaCore.read(valueReference, for: consumer, in: cogs)
+    #else
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
-
     let producer = cogs.derivedState(for: valueReference)
     state.recordDependency(on: producer)
     return producer.settledValue(in: cogs)
+    #endif
   }
 
   /// Reads an async cog's value and depends on it.
@@ -113,7 +143,7 @@ public struct Reader<Value> {
   /// or derived cogs: synchronous state has no request status, and asking for it is a
   /// type error rather than a degenerate success.
   public var status: Status {
-    Status(cogs: cogs, state: state)
+    Status(cogs: cogs, state: requiredSimpleState())
   }
 
   /// The tracked status-reading facet of one selector run.
@@ -194,6 +224,7 @@ public struct Reader<Value> {
     from descriptor: AsyncCogDescriptor<Read>,
     key: CogKey?
   ) -> CogStatus<Read> {
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
 
     let producer = cogs.asyncState(descriptor: descriptor, key: key)
@@ -222,7 +253,12 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The source to read without recording an edge.
   /// - Returns: The value the source holds in the latest completed turn.
   public func peek<Read>(_ valueReference: ManualCog<Read>) -> Read {
+    #if COG_CORE_ARENA
+    cogs.arenaCore.requireTracking(requiredArenaState())
+    #else
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
+    #endif
     return cogs.peek(valueReference)
   }
 
@@ -236,7 +272,12 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The derived cog to read without recording an edge.
   /// - Returns: Its newest settled value in this context.
   public func peek<Read>(_ valueReference: Cog<Read>) -> Read {
+    #if COG_CORE_ARENA
+    cogs.arenaCore.requireTracking(requiredArenaState())
+    #else
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
+    #endif
     return cogs.peek(valueReference)
   }
 
@@ -252,6 +293,7 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The async value to read without tracking it.
   /// - Returns: Its newest settled value in this context.
   public func peek<Read>(_ valueReference: AsyncCog<Read>) -> Read {
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
     return cogs.peek(valueReference)
   }
@@ -278,8 +320,13 @@ public struct Reader<Value> {
   /// - Returns: The cached value from this state's previous completed selector
   ///   run, or `nil` when no run has completed.
   public var curr: Value? {
+    #if COG_CORE_ARENA
+    return cogs.arenaCore.previousValue(for: requiredArenaState(), as: Value.self)
+    #else
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
     return state.readerCurrentValue
+    #endif
   }
 
   /// The cycle a read of `valueReference` would close during this selector run.
@@ -294,7 +341,28 @@ public struct Reader<Value> {
   package func cycleDiagnosticSnapshot<Read>(
     ifReading valueReference: Cog<Read>
   ) -> CogCycleDiagnosticSnapshot? {
+    let state = requiredSimpleState()
     cogs.requireTracking(state)
     return cogs.cycleDiagnosticSnapshot(ifReading: valueReference)
   }
+
+  /// Restores the class-state consumer carried by a simple-core reader.
+  private func requiredSimpleState() -> any CogReaderState<Value> {
+    #if COG_CORE_ARENA
+    guard let state else {
+      fatalError("This Cog reader belongs to an arena selector, not a class-state selector.")
+    }
+    #endif
+    return state
+  }
+
+  #if COG_CORE_ARENA
+  /// Restores the indexed consumer carried by an arena-core reader.
+  private func requiredArenaState() -> CogArenaSlot {
+    guard let arenaState else {
+      fatalError("This Cog reader belongs to a class-state selector, not an arena selector.")
+    }
+    return arenaState
+  }
+  #endif
 }

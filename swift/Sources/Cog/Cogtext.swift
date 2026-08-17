@@ -72,6 +72,14 @@ public final class Cogs {
   /// changed debug seed also advances it.
   internal private(set) var revision: CogVersion = .initial
 
+  #if COG_CORE_ARENA
+  /// Data-oriented graph selected for this build-time arena test leg.
+  ///
+  /// Public references remain unchanged; sync source and derived paths route
+  /// here while later M6 tasks migrate the remaining runtime capabilities.
+  internal let arenaCore: CogArenaCore
+  #endif
+
   /// One enter/exit buffer reused by iterative settle walks.
   internal var settleStack = CogSettleStack()
 
@@ -182,6 +190,9 @@ public final class Cogs {
   ) {
     self.clock = clock
     self.defaultWhileObservedGrace = defaultWhileObservedGrace
+    #if COG_CORE_ARENA
+    self.arenaCore = CogArenaCore()
+    #endif
   }
 
   /// Installs a one-shot acknowledgement for the next async completion check.
@@ -545,6 +556,9 @@ extension Cogs {
   @discardableResult
   internal func advanceRevision() -> CogVersion {
     revision = revision.advanced()
+    #if COG_CORE_ARENA
+    arenaCore.advanceRevision()
+    #endif
     return revision
   }
 
@@ -648,12 +662,16 @@ extension Cogs {
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
   public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    return arenaCore.manualValue(for: valueReference)
+    #else
     let state = manualState(for: valueReference)
     // An `.app` source ignores this. An ephemeral one treats a one-shot read as
     // the transient demand it is: real enough to renew grace, not durable
     // enough to keep the value alive on its own.
     scheduleLifetimeReleaseIfUnobserved(state)
     return state.currentValue
+    #endif
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
@@ -669,10 +687,14 @@ extension Cogs {
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its fully settled value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    return arenaCore.derivedValue(for: valueReference, in: self)
+    #else
     let state = derivedState(for: valueReference)
     let value = state.settledValue(in: self)
     scheduleLifetimeReleaseIfUnobserved(state)
     return value
+    #endif
   }
 
   /// Reads an async cog's current value without creating a dependency edge.
