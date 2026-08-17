@@ -23,8 +23,8 @@ import Testing
   #expect(arena.flags == [.occupied, .occupied])
   #expect(arena.changedAt == [0, 0])
   #expect(arena.checkedAt == [0, 0])
-  #expect(arena.deps == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
-  #expect(arena.subs == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
+  #expect(arena.deps == [.none, .none])
+  #expect(arena.subs == [.none, .none])
   #expect(arena.boundary == [CogArenaStorage.noIndex, CogArenaStorage.noIndex])
   #expect(arena.generation == [0, 0])
 }
@@ -70,8 +70,8 @@ import Testing
   arena.flags[index] = [.occupied, .dirty, .computing]
   arena.changedAt[index] = 91
   arena.checkedAt[index] = 92
-  arena.deps[index] = 13
-  arena.subs[index] = 14
+  arena.deps[index] = CogEdgeIndex(rawValue: 13)
+  arena.subs[index] = CogEdgeIndex(rawValue: 14)
   arena.boundary[index] = 15
 
   arena.release(first)
@@ -81,8 +81,8 @@ import Testing
   #expect(arena.flags[index] == .occupied)
   #expect(arena.changedAt[index] == 0)
   #expect(arena.checkedAt[index] == 0)
-  #expect(arena.deps[index] == CogArenaStorage.noIndex)
-  #expect(arena.subs[index] == CogArenaStorage.noIndex)
+  #expect(arena.deps[index] == .none)
+  #expect(arena.subs[index] == .none)
   #expect(arena.boundary[index] == CogArenaStorage.noIndex)
   #expect(arena.generation[index] == reused.generation)
 }
@@ -98,15 +98,15 @@ import Testing
   arena.flags[firstIndex].insert(.check)
   arena.changedAt[firstIndex] = 7
   arena.checkedAt[firstIndex] = 8
-  arena.deps[firstIndex] = 21
-  arena.subs[firstIndex] = 22
+  arena.deps[firstIndex] = CogEdgeIndex(rawValue: 21)
+  arena.subs[firstIndex] = CogEdgeIndex(rawValue: 22)
   arena.boundary[firstIndex] = 23
 
   #expect(arena.flags[secondIndex] == .occupied)
   #expect(arena.changedAt[secondIndex] == 0)
   #expect(arena.checkedAt[secondIndex] == 0)
-  #expect(arena.deps[secondIndex] == CogArenaStorage.noIndex)
-  #expect(arena.subs[secondIndex] == CogArenaStorage.noIndex)
+  #expect(arena.deps[secondIndex] == .none)
+  #expect(arena.subs[secondIndex] == .none)
   #expect(arena.boundary[secondIndex] == CogArenaStorage.noIndex)
 }
 

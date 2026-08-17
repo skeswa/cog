@@ -40,11 +40,11 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 /// Every array is indexed by the same ``CogArenaSlot/index``. Allocation grows
 /// the columns in lockstep; release clears the complete scalar row, advances
 /// its generation, and makes the index available for LIFO reuse. Typed values
-/// and edges deliberately live elsewhere: later M6 tasks add their measured
-/// representations without changing this row-ownership contract.
+/// and edges deliberately live elsewhere: sibling M6 storage owns their
+/// measured representations without changing this row-ownership contract.
 @MainActor
 internal final class CogArenaStorage {
-  /// Sentinel for no edge head or no Observation boundary.
+  /// Sentinel for no Observation boundary.
   static let noIndex: Int32 = -1
 
   /// Packed liveness, settlement, and computation marks by slot.
@@ -56,11 +56,11 @@ internal final class CogArenaStorage {
   /// Last revision through which each row was proved current.
   var checkedAt: ContiguousArray<UInt32> = []
 
-  /// Head of each row's dependency list, or ``noIndex`` before edges exist.
-  var deps: ContiguousArray<Int32> = []
+  /// Head of each row's dependency list.
+  var deps: ContiguousArray<CogEdgeIndex> = []
 
-  /// Head of each row's subscriber list, or ``noIndex`` before edges exist.
-  var subs: ContiguousArray<Int32> = []
+  /// Head of each row's subscriber list.
+  var subs: ContiguousArray<CogEdgeIndex> = []
 
   /// Observation-boundary index per row, or ``noIndex`` until a UI read.
   var boundary: ContiguousArray<Int32> = []
@@ -102,8 +102,8 @@ internal final class CogArenaStorage {
     flags.append(.occupied)
     changedAt.append(0)
     checkedAt.append(0)
-    deps.append(Self.noIndex)
-    subs.append(Self.noIndex)
+    deps.append(.none)
+    subs.append(.none)
     boundary.append(Self.noIndex)
     generation.append(0)
     liveCount += 1
@@ -159,8 +159,8 @@ internal final class CogArenaStorage {
     flags[index] = occupied ? .occupied : []
     changedAt[index] = 0
     checkedAt[index] = 0
-    deps[index] = Self.noIndex
-    subs[index] = Self.noIndex
+    deps[index] = .none
+    subs[index] = .none
     boundary[index] = Self.noIndex
   }
 }
