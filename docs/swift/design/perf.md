@@ -361,6 +361,30 @@ mebibyte of drift — about two and a half times the worst spread observed, wide
 enough never to cry wolf and narrow enough that a graph grown to twice its
 footprint fails.
 
+**Lazy boundary objects** — `M5-07c`, same session and environment. Nine
+hundred and eighty-eight keyed sources settled with `peek`, twelve keyed
+consumers read through the tracked subscript: exactly a thousand states, and
+exactly twelve values on screen.
+
+| Metric                  | p0     | p100   | samples |
+| ----------------------- | ------ | ------ | ------- |
+| `observationBoundaries` | **12** | **12** | 2,160   |
+
+Twelve, at every percentile, with a thousand states in the graph. PERF-04 as
+worded, and the only figure in §9.6 that is already exactly what the scenario
+asks for rather than a number to ratchet down.
+
+The gate is exact-drift rather than a tolerance, because this is a count of
+live objects rather than a sampled quantity: a core that started giving every
+state a boundary would report 1,000 where the baseline says 12, and there is no
+noise floor to leave room for. Verified in both directions — pointing the
+tracked reads at all 988 sources fails immediately with
+`Difference Δ 976` against `Threshold Δ 0`.
+
+It is a _custom_ metric because no built-in one expresses it. `objectAllocCount`
+counts allocations over a region, and what PERF-04 claims is about what
+survives, not about what was made.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
