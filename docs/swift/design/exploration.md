@@ -1063,7 +1063,11 @@ keeps its slot and points at the table above instead of renumbering the rest.
     conventions and link each finding to its documentation. Unvetted: the
     vehicle, the consumer distribution channel (plugin products on the root
     manifest versus a distribution-only manifest repo), rule severities, and
-    rollout remain open until a `/vette` review accepts the design. Concept
+    rollout remain open until a `/vette` review accepts the design. A first
+    `/vette` pass on August 16, 2026 hardened the rule set: primitives are
+    confined to `CogOps` extensions repo-wide rather than view-scoped,
+    repackaging matches read-fed bodies rather than `Cogs` parameters, and
+    source access aligns with the formatter's file-scope `private`. Concept
     record: issue #318.
 
 ---

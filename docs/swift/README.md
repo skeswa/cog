@@ -58,7 +58,7 @@ The design lives in [design/](./design/); the implementation effort lives in
    first-party linter that turns the usage conventions into an executable
    style guide: a SwiftSyntax tool developed in-repo as a nested
    `swift/Lint` package and shipped behind SwiftPM plugins, the first five
-   rules, and the rollout. A proposal awaiting `/vette`; nothing in it is
+   rules, and the rollout. Hardened by a first `/vette` pass; not yet
    settled.
 8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the

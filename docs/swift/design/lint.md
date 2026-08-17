@@ -7,7 +7,10 @@ This document turns the concept recorded in
 Cog, as an executable style guide — into a concrete design: what the tool is,
 how it reaches an iOS project, and the first five rules. Everything here is a
 proposal. Nothing in this document is settled until it survives a `/vette`
-review and lands in the §10 decision record; §7 lists what remains open.
+review and lands in the core §10 decision record; §7 lists what remains open.
+References beginning "core" resolve in
+[exploration.md](./exploration.md) and its companions; bare § references
+resolve in this document.
 
 ## 1. Why Cog ships a linter
 
@@ -66,7 +69,7 @@ plugins.
   macro sees only the declaration it is attached to — it can never police the
   code that avoids it, which is where anti-patterns live — and a macro drags
   swift-syntax into every consumer's dependency resolution. Cog resolves with
-  zero dependencies and §9 already promises no required macros; both rule
+  zero dependencies and core §9 already promises no required macros; both rule
   macros out as the linter's vehicle. They remain available later as a
   complementary channel at declaration sites Cog owns.
 - **Type-aware backends.** SwiftLint's `analyze` mode is driven by a full
@@ -223,9 +226,10 @@ to a release:
   nothing is developed there.
 
 The proposal leans to channel B, because it preserves the zero-cost resolve
-for ordinary Cog consumers and decouples lint releases from library tags. If
-verification shows artifact fetching is lazy enough — only plugin users pay —
-channel A collapses everything into this repository and should win. Either
+for ordinary Cog consumers and decouples lint releases from library tags.
+Channel A must clear two independent bars: verification that artifact
+fetching is lazy — only plugin users pay — and acceptance that a lint fix
+ships only when Cog tags. Lazy fetching alone does not decide it. Either
 way, all source, rules, fixtures, and docs stay here (§7).
 
 ### 3.4 Diagnostics link to the reason
@@ -234,8 +238,9 @@ A finding is one line in the compiler's grammar, carrying the rule slug and a
 stable documentation URL:
 
 ```
-WeatherCard.swift:186:7: error: [no-primitives-in-views] a view asks the graph
-through a named op, never `refresh` inline — https://skeswa.github.io/cog/lint/no-primitives-in-views
+WeatherCard.swift:186:7: error: [primitives-only-in-ops] `refresh` is a demand
+on the graph; call a named op from a `CogOps` extension —
+https://skeswa.github.io/cog/lint/primitives-only-in-ops
 ```
 
 - Each rule has a DocC article — the violation, why the convention exists,
@@ -243,7 +248,9 @@ through a named op, never `refresh` inline — https://skeswa.github.io/cog/lint
   through the existing `swift-docs.yml` Pages pipeline. The diagnostic is
   the teaching moment; the page is the lesson. This is the same posture as
   Cog's runtime diagnostics (the cycle path, the escaped-writer message):
-  explain, don't merely fail.
+  explain, don't merely fail. The URL shape shown above is illustrative
+  until open question 4 fixes it — DocC static hosting emits
+  `/cog/documentation/…` paths unless a redirect layer is added.
 - The `github` reporter emits workflow-command annotations so violations
   land on the PR diff; the `sarif` reporter carries the URL as `helpUri`
   for code scanning. Xcode renders the URL as copyable text, terminals and
@@ -264,75 +271,107 @@ checker cannot validate anything.
 
 ## 4. The first five rules
 
-| Rule                     | Enforces                                                                  | Confidence                   |
-| ------------------------ | ------------------------------------------------------------------------- | ---------------------------- |
-| `cog-declaration-suffix` | declaration names end in `Cog`/`Cogs` by shape (§3.1; §10 item 23)        | high                         |
-| `no-cogs-in-view-init`   | views never accept, store, or forward `Cogs` (§3.4; §10 item 25)          | high                         |
-| `no-primitives-in-views` | views call named ops, never `commit`/`refresh` inline (§3.2; conventions) | high                         |
-| `manual-cog-fileprivate` | writable sources are `fileprivate`/`private` (§4; §10 "Who may write?")   | highest                      |
-| `no-cog-repackaging`     | reads bind to domain locals, never projection bundles (§3.1; conventions) | heuristic; strong forms only |
+Every rule is a thin statement over a shared classification layer, which is
+also the intended implementation shape:
+
+- **Cog declarations.** A variable is classified by its initializer: a call
+  to one of the six declaration types, or a `.readOnly` projection of an
+  already-classified name. Classification yields the shape (keyless or box)
+  and the kind (source, derived, async, projection). It never chases
+  assignments, so the sanctioned debug seed-target re-export
+  (mechanisms §6.6) is out of scope by design, not by luck.
+- **Views.** A type with a written `View` conformance in the file, or a
+  `body` property typed `some View`.
+- **Graph receivers.** `cogs` bound by `@Environment(\.cogs)`, the `c`
+  parameter of selectors, reactions, and commit closures, and a mechanism's
+  controller.
+
+Evasions are documented once, per classifier, not per rule: a typealias, a
+factory function, or a cross-file conformance defeats the classifier, and
+every rule built on it inherits that documented miss as a non-triggering
+fixture.
+
+| Rule                     | Enforces                                                                       | Confidence                   |
+| ------------------------ | ------------------------------------------------------------------------------ | ---------------------------- |
+| `cog-declaration-suffix` | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)   | high                         |
+| `no-cogs-in-view-init`   | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)     | high                         |
+| `primitives-only-in-ops` | primitives are called only inside `CogOps` extensions (core §3.2; conventions) | high                         |
+| `manual-cog-private`     | writable sources are `private` (core §4; core §10 "Who may write?")            | highest                      |
+| `no-cog-repackaging`     | reads bind to domain locals, never projection bundles (core §3.1; conventions) | heuristic; strong forms only |
 
 ### 4.1 `cog-declaration-suffix`
 
-A variable whose initializer calls one of the six declaration types, or
-projects one with `.readOnly`, must end in singular `Cog` (keyless: `Cog`,
-`ManualCog`, `AsyncCog`, `CogProjection`) or plural `Cogs` (boxes: `CogBox`,
-`ManualCogBox`, `AsyncCogBox`, `CogBoxProjection`), with qualifiers before
-the suffix. The rule reads the initializer expression and any written type
-annotation; a name with the wrong suffix, the wrong plurality, or a qualifier
-after the suffix is a violation. Accepted evasions: values returned from
-factory functions and inferred generic returns. A companion rule for the
-unwrap convention — the local bound from a read drops the suffix — is a
-natural v2 candidate once this rule's classification machinery exists.
+A variable the declaration classifier recognizes must end in singular `Cog`
+(keyless: `Cog`, `ManualCog`, `AsyncCog`, `CogProjection`) or plural `Cogs`
+(boxes: `CogBox`, `ManualCogBox`, `AsyncCogBox`, `CogBoxProjection`), with
+qualifiers before the suffix. A name with the wrong suffix, the wrong
+plurality, or a qualifier after the suffix is a violation. A companion rule
+for the unwrap convention — the local bound from a read drops the suffix —
+is a natural v2 candidate on the same classifier.
 
 ### 4.2 `no-cogs-in-view-init`
 
-Inside any type the linter classifies as a view — a written `View`
-conformance in the file, or a `body` property typed `some View` — a stored
-property or initializer parameter whose written type is `Cogs` (including
-optional and generic-argument positions) is a violation; the fix is
+Inside any type the view classifier recognizes, a stored property or
+initializer parameter whose written type is `Cogs` (including optional and
+generic-argument positions) is a violation; the fix is
 `@Environment(\.cogs) private var cogs`. The same written-type check applies
-to `Cogs` parameters on the view's methods. Accepted evasions: conformance
-declared in another file and typealiased spellings; the index-store upgrade
-path (§5) would close the cross-file gap.
+to `Cogs` parameters on the view's methods. Its misses are the view
+classifier's; the index-store upgrade path (§5) would close the cross-file
+gap.
 
-### 4.3 `no-primitives-in-views`
+### 4.3 `primitives-only-in-ops`
 
-Inside a classified view, a call to `.commit(` or `.refresh(` whose receiver
-is `cogs` — or any receiver the environment declaration in that view binds —
-is a violation; the fix is a domain verb in a `CogOps` extension. The
-receiver-name restriction is what keeps precision high: some unrelated type's
-`commit` on another receiver does not trigger. The rule deliberately covers
-`refresh` with the same weight as `commit`; the settled convention treats
-both as demands on the graph, and the missed inline `refresh` in the Weather
-app is this rule's founding counterexample.
+The only sanctioned call site for a primitive is an `extension CogOps` body,
+where it is spelled bare — `commit(...)`, `refresh(...)`, no receiver.
+Everywhere else, a `.commit(` or `.refresh(` call on a classified graph
+receiver is a violation, as is a bare or `self.`-qualified primitive call
+inside an `extension Cogs`; the fix is a domain verb in a `CogOps`
+extension. Test targets are exempt by configuration, because tests
+legitimately drive the graph directly.
 
-### 4.4 `manual-cog-fileprivate`
+This is deliberately broader than a view rule, and needs no view
+classification at all. It catches the inline `refresh` in a view action and
+the initial write in `App.init` — both of issue #318's primitive-shaped
+evidence, where a view-scoped rule provably misses the second because `App`
+is not a `View` — plus a `Binding` setter inside an `extension Cogs`
+helper. A nested `Writer` commit stays legal for free: it is lexically
+inside the op's `extension CogOps` body.
 
-A declaration initialized with `ManualCog` or `ManualCogBox` must be
-`fileprivate` at file scope or `private` inside a type. Any other access
-level — including the implicit `internal` of a bare `let` — is a violation;
-the fix is to mark the source `fileprivate` and expose `.readOnly` or a
-derived cog. Access modifiers are literal tokens and the declaration form is
-unambiguous, so this rule has essentially no false-positive surface; it is
-the natural first rule to implement end to end.
+### 4.4 `manual-cog-private`
+
+A declaration the classifier recognizes as `ManualCog` or `ManualCogBox`
+must be `private`. Any other access level — including the implicit
+`internal` of a bare `let` — is a violation; the fix is to mark the source
+`private` and expose `.readOnly` or a derived cog. The spelling agrees with
+the formatter: `.swift-format` enforces `FileScopedDeclarationPrivacy`,
+which rewrites file-scope `fileprivate` to the semantically identical
+`private`, so a linter demanding `fileprivate` would fight a check CI
+already runs. The core record's wording — "`fileprivate`, or `private`
+inside a type" (core §4; core §10 "Who may write?") — predates that
+formatter rule and takes the matching one-word spelling amendment when this
+design is accepted. Access modifiers are literal tokens and the declaration
+form is unambiguous, so the rule has essentially no false-positive surface;
+it is the natural first rule to implement end to end.
 
 ### 4.5 `no-cog-repackaging`
 
 The heuristic rule, scoped to the strong forms of the anti-pattern:
 
-- a non-`View` type with an initializer parameter of written type `Cogs`;
 - an `extension Cogs` or `extension CogOps` member that returns a non-`View`,
   non-`Binding` value assembled from two or more graph reads;
 - a function or initializer whose body consists solely of `cogs[...]` /
-  `c[...]` reads feeding a memberwise initializer.
+  `c[...]` reads feeding stored properties or a memberwise initializer.
 
-Genuinely derived values belong in a derived cog; values merely read together
-belong on their own lines in the body that reads them. Because "merely
-repackages" is ultimately a judgment, this rule confines itself to the
-patterns above and accepts both misses and the occasional flagged judgment
-call; its documentation page explains the boundary, and its severity is a
-candidate for `warning` rather than `error` (§7).
+A `Cogs` initializer parameter is not itself a violation: the settled record
+sanctions explicit context at non-view composition boundaries such as
+isolated test harnesses (core §10, "Production context access?"), so the
+rule matches what a body does with its reads, not how the runtime arrived.
+Genuinely derived values belong in a derived cog; values merely read
+together belong on their own lines in the body that reads them. Because
+"merely repackages" is ultimately a judgment, this rule confines itself to
+the patterns above and accepts both misses and the occasional flagged
+judgment call; its documentation page explains the boundary, and its
+severity is a candidate for `warning` rather than `error` (§7).
 
 ## 5. Non-goals for v1
 
@@ -358,9 +397,9 @@ Phased, with the same discipline as the main plan — each phase lands green
 and the design is not implementation until it is accepted:
 
 1. **Vette.** This document goes through `/vette`; accepted decisions land
-   in §10 and the platform snapshot, and issue #318 gets the outcome.
+   in core §10 and the platform snapshot, and issue #318 gets the outcome.
 2. **Skeleton.** The nested `swift/Lint` package: layout, the CLI over one
-   rule (`manual-cog-fileprivate`, the smallest correct rule), the fixture
+   rule (`manual-cog-private`, the smallest correct rule), the fixture
    harness, the isolation check proving its dependencies cannot enter the
    shipped root package (the `swift/Benchmarks` gate, reused), and the
    artifact-bundle release pipeline with checksummed binaries.
@@ -378,10 +417,11 @@ finding (§2.4) seeds a future Kotlin design document.
 
 ## 7. Open questions
 
-1. **Distribution channel.** Verify whether SwiftPM and Xcode fetch a root
-   manifest's binary artifact for consumers who never apply the plugin. Lazy
-   fetching decides for channel A (everything in this repository); eager
-   fetching confirms channel B's distribution-only manifest repo (§3.3).
+1. **Distribution channel.** Two independent criteria: verify whether
+   SwiftPM and Xcode fetch a root manifest's binary artifact for consumers
+   who never apply the plugin, and decide whether tag-coupled lint releases
+   are acceptable. Channel A needs both answers favorable; eager fetching
+   alone confirms channel B's distribution-only manifest repo (§3.3).
 2. **Naming.** `coglint` as the binary and `swift/Lint` as the package
    directory are working names, as is the distribution repo's name if
    channel B wins; the product names in §3.2 follow them.
@@ -399,7 +439,8 @@ finding (§2.4) seeds a future Kotlin design document.
    lint fix ships between Cog tags.
 6. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
    companion, `@Environment(\.cogs)` declared per-view, initial state in
-   `operate`, `fatalError` over `preconditionFailure`, `nonisolated deinit`
+   `operate` (whose `commit` form `primitives-only-in-ops` already catches),
+   `fatalError` over `preconditionFailure`, `nonisolated deinit`
    on generic classes, no `@testable import Cog` in scenario tests — are
    queued behind the first five, several of them library-internal rather
    than consumer-facing.
