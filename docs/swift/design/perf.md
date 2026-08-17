@@ -385,6 +385,31 @@ It is a _custom_ metric because no built-in one expresses it. `objectAllocCount`
 counts allocations over a region, and what PERF-04 claims is about what
 survives, not about what was made.
 
+**Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
+family where the UI once read `n` rows and now writes and reads exactly one.
+Every other row is pinned to the app context and untouched, so anything that
+scales with `n` is a turn doing work it has no business doing.
+
+| Pinned keys | retains/turn | releases/turn | mallocs/turn | wall clock/turn |
+| ----------- | ------------ | ------------- | ------------ | --------------- |
+| 1           | 68           | 95            | 7            | 2.7 µs          |
+| 100         | 167          | 194           | 7            | 4.8 µs          |
+| 500         | 567          | 594           | 7            | 14 µs           |
+
+**Exactly one retain and one release per pinned key per turn**, and about 23 ns
+of wall clock — linear across all three points, and identical at every
+percentile. Allocations do not scale at all: seven per turn regardless, so
+nothing is _allocated_ per pinned key.
+
+So **a turn currently costs O(pinned keys), not O(changed keys)**. A screen that
+has scrolled past ten thousand rows pays ten thousand retain and release pairs
+on every write, for rows nobody is looking at. That is the cost PERF-07 exists
+to bound; it is now bounded and pinned against drift, and it is a direct target
+for M6, where §5's "no ARC, locks, or existentials in graph walks" and §7's
+dirty-set propagation are the rules that turn it into O(changed). All three
+points stay in the suite so M6 can show the slope going flat rather than merely
+showing one number get smaller.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
