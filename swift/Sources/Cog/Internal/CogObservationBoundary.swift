@@ -210,7 +210,7 @@ extension Cogs {
       #if DEBUG
       let changedBySeed = state.observationBoundary?.consumeDeferredChange() ?? false
       guard changedThisTurn || changedBySeed else { continue }
-      historyLog.recordNotice(label: state.label, key: state.observationKey)
+      recordHistoryNotice(label: state.label, key: state.observationKey)
       #else
       guard changedThisTurn else { continue }
       #endif

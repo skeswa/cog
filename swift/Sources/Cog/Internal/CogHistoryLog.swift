@@ -2,14 +2,14 @@
 
 /// What Cog remembers about recent turns, in a ring that never grows.
 ///
-/// The context owns and reuses this fixed-size ring. Labels render only for
-/// display (perf §8). The arena core will replace records with integer slots
-/// without changing call sites. MainActor confinement gives event insertion a
-/// total order: each outer turn is recorded before its body, and graph work it
-/// causes then appears in actual flush order. Lazy reads and initial reaction
-/// runs outside a turn attach to the latest ordinal (or zero before the first
-/// turn) without inventing a turn. The entire recorder is excluded from release
-/// builds.
+/// The simple core's context owns and reuses this fixed-size ring. Labels render
+/// only for display (perf §8); the arena core uses ``CogArenaHistoryLog``'s
+/// integer records behind the same recording facade. MainActor confinement
+/// gives event insertion a total order: each outer turn is recorded before its
+/// body, and graph work it causes then appears in actual flush order. Lazy reads
+/// and initial reaction runs outside a turn attach to the latest ordinal (or
+/// zero before the first turn) without inventing a turn. The entire recorder is
+/// excluded from release builds.
 internal struct CogHistoryLog {
   /// How many entries the ring holds.
   ///

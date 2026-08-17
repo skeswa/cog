@@ -170,11 +170,13 @@ public final class Cogs {
   /// for `CogTesting`.
   internal var turnChainTracker = CogTurnChainTracker()
 
+  #if COG_CORE_SIMPLE
   /// What this context has done lately (§2.3, perf §8).
   ///
-  /// All history storage, types, and call sites compile out of release builds
-  /// (`HIST-04`).
+  /// The arena core owns its integer recorder instead. Both histories and all
+  /// recording call sites compile out of release builds (`HIST-04`).
   internal var historyLog = CogHistoryLog()
+  #endif
   #endif
 
   /// Creates an empty context.

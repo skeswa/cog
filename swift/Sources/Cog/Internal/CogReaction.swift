@@ -165,7 +165,7 @@ internal final class CogReaction: CogState, CogConsumer {
 
     // Record every reaction run, including a watch's quiet `.skip` install.
     #if DEBUG
-    cogs.historyLog.recordEffect(label: label)
+    cogs.recordHistoryEffect(label: label)
     cogs.turnChainTracker.recordReaction(label: label)
     #endif
 

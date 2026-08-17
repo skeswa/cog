@@ -285,7 +285,7 @@ extension Cogs {
     // Record when the turn is created. Nested commits do not reach this point,
     // and the entry precedes the work it caused.
     #if DEBUG
-    historyLog.recordTurn(named: name)
+    recordHistoryTurn(named: name)
     turnChainTracker.recordTurn(named: name)
     #endif
 

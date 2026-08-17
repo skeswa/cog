@@ -105,7 +105,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
     // Record only writes that changed state. Reverted writes are invisible to
     // the graph and should not evict useful history entries.
     #if DEBUG
-    cogs.historyLog.recordWrite(label: label, key: key)
+    cogs.recordHistoryWrite(label: label, key: key)
     #endif
 
     markChanged(at: revision)

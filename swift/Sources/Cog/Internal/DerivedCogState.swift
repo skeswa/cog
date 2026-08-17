@@ -211,7 +211,7 @@ internal final class DerivedCogState<Value>:
     // Record at the selector call so lazy first runs and equal reruns appear in
     // history.
     #if DEBUG
-    cogs.historyLog.recordRecompute(label: label, key: key)
+    cogs.recordHistoryRecompute(label: label, key: key)
     #endif
 
     let previousValue = cachedValue

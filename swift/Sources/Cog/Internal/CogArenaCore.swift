@@ -195,6 +195,14 @@ internal final class CogArenaCore {
   /// `boundary` column keeps hot storage to one optional index.
   private var observationEntries: ContiguousArray<CogArenaObservationEntry> = []
 
+  #if DEBUG
+  /// Fixed-capacity integer history owned by the arena context.
+  ///
+  /// This property and every use compile out of release. Arena state events
+  /// enter it by descriptor index; labels resolve only through `historySnapshot`.
+  private var historyLog = CogArenaHistoryLog()
+  #endif
+
   /// Derived rows whose settlement has entered but not completed, outermost first.
   ///
   /// This stays separate from `pullFrames`: an exit frame is popped before its
@@ -270,7 +278,12 @@ internal final class CogArenaCore {
         fatalError("Cog tried to flush a non-source arena row as pending state.")
       }
 
-      _ = commit(slot, revision, propagation)
+      let changed = commit(slot, revision, propagation)
+      #if DEBUG
+      if changed {
+        recordHistoryState(event: .write, slot: slot)
+      }
+      #endif
       arena.flags[row].remove(.touched)
     }
   }
@@ -345,6 +358,9 @@ internal final class CogArenaCore {
       }
 
       guard arena.changedAt[row] == revision else { continue }
+      #if DEBUG
+      recordHistoryState(event: .notice, slot: entry.slot)
+      #endif
       entry.boundary.notifyValueChange()
     }
   }
@@ -392,6 +408,41 @@ internal final class CogArenaCore {
 
     _ = arena.index(of: released)
   }
+
+  #if DEBUG
+  /// Records one outer turn in the arena-owned total history order.
+  func recordHistoryTurn(named name: String) {
+    historyLog.recordTurn(named: name)
+  }
+
+  /// Records a class-backed state event while its capability is still bridged.
+  func recordHistoryState(event: CogHistoryEvent, label: CogLabel, key: CogKey?) {
+    historyLog.recordState(event: event, label: label, key: key)
+  }
+
+  /// Records one reaction or watch body beside arena graph events.
+  func recordHistoryEffect(label: CogLabel) {
+    historyLog.recordEffect(label: label)
+  }
+
+  /// Public debug snapshot with descriptor labels resolved off the hot path.
+  var historySnapshot: CogHistory {
+    historyLog.snapshot { descriptorIndex in
+      descriptorRecord(at: descriptorIndex).label
+    }
+  }
+
+  /// Records an arena row as integer descriptor identity plus its erased key.
+  private func recordHistoryState(event: CogHistoryEvent, slot: CogArenaSlot) {
+    let row = arena.index(of: slot)
+    let record = descriptorRecord(forRow: row)
+    historyLog.recordState(
+      event: event,
+      descriptor: record.index,
+      key: record.key(at: row)
+    )
+  }
+  #endif
 
   /// Whether one source bridge changed in this turn after arena publication.
   func reactionBridgeNeedsCheck<Value>(_ valueReference: ManualCog<Value>) -> Bool {
@@ -699,6 +750,16 @@ internal final class CogArenaCore {
     return records[Int(descriptorIndex)].takeUnretainedValue()
   }
 
+  #if DEBUG
+  /// Resolves one descriptor dispatch index while materializing debug history.
+  private func descriptorRecord(at rawIndex: Int32) -> CogArenaDescriptorRecord {
+    guard rawIndex >= 0, Int(rawIndex) < records.count else {
+      fatalError("Cog found an invalid arena descriptor index in debug history.")
+    }
+    return records[Int(rawIndex)].takeUnretainedValue()
+  }
+  #endif
+
   /// Pulls one derived row current through reusable scalar enter/exit frames.
   private func settle(_ root: CogArenaSlot, in cogs: Cogs) {
     cogs.settleDepth += 1
@@ -793,6 +854,9 @@ internal final class CogArenaCore {
     key: CogKey?,
     in cogs: Cogs
   ) {
+    #if DEBUG
+    recordHistoryState(event: .recompute, slot: slot)
+    #endif
     let previousValue = column.storedValue(at: slot)
     let value = withDependencyCapture(for: slot) {
       descriptor.compute(Reader(cogs: cogs, arenaState: slot), key: key)
