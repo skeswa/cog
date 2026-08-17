@@ -152,6 +152,42 @@ internal final class CogArenaValueColumn<Value> {
     return true
   }
 
+  #if DEBUG
+  /// Publishes one equality-approved testing seed without a pending turn cell.
+  ///
+  /// The caller compares the candidate before advancing the context revision,
+  /// so this path must install the supplied value exactly once and must not run
+  /// the descriptor comparator again. It marks arena subscribers for later
+  /// settlement but does not flush reactions, boundaries, or debug history.
+  func publishSeed<EdgeStorage: CogArenaEdgeStorageProtocol>(
+    _ value: Value,
+    at slot: CogArenaSlot,
+    revision: UInt32,
+    propagatingWith propagation: CogArenaDirtyPropagation<EdgeStorage>
+  ) {
+    guard propagation.belongs(to: arena) else {
+      fatalError("Cog tried to propagate a testing seed through another arena context.")
+    }
+    let row = installedRow(for: slot)
+    guard case .none = pendingValues[row] else {
+      fatalError("Cog tried to seed an arena source with a pending turn value.")
+    }
+    guard revision > arena.checkedAt[row] else {
+      fatalError("Cog tried to publish an arena testing seed with a stale graph revision.")
+    }
+    guard !arena.flags[row].contains(.computing) else {
+      fatalError("Cog tried to seed an arena source while it was computing.")
+    }
+
+    currentValues[row] = .some(value)
+    arena.changedAt[row] = revision
+    arena.checkedAt[row] = revision
+    arena.flags[row].remove(.check)
+    arena.flags[row].remove(.dirty)
+    propagation.invalidateSubscribers(of: slot)
+  }
+  #endif
+
   /// Clears both value cells before the owning arena slot is released.
   ///
   /// Clearing first releases reference-valued payloads under the context's

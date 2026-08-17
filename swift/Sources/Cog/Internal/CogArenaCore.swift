@@ -308,6 +308,23 @@ internal final class CogArenaCore {
     return location.column.current(at: location.slot)
   }
 
+  #if DEBUG
+  /// Publishes one pre-compared testing seed at the current arena revision.
+  ///
+  /// ``Cogs.seedForTesting(_:to:)`` owns the idle barrier, equality decision,
+  /// and synchronized revision advance. This method updates only arena value
+  /// and propagation columns, deliberately opening no turn or history event.
+  func publishTestingSeed<Value>(_ value: Value, for valueReference: ManualCog<Value>) {
+    let location = manualLocation(for: valueReference)
+    location.column.publishSeed(
+      value,
+      at: location.slot,
+      revision: revision,
+      propagatingWith: propagation
+    )
+  }
+  #endif
+
   /// Pulls one derived value current without recording a dependency.
   func derivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
     let location = derivedLocation(for: valueReference)
