@@ -15,6 +15,12 @@ private nonisolated enum CogArenaDescriptorKind {
 /// one descriptor-level function, never a per-state closure or existential.
 @MainActor
 private final class CogArenaDescriptorRecord {
+  /// Process identity of the public declaration represented by this record.
+  let identity: ObjectIdentifier
+
+  /// Human-readable declaration label used only when rendering diagnostics.
+  let label: CogLabel
+
   /// Dense context-local dispatch index stored on every row of this descriptor.
   let index: Int32
 
@@ -39,12 +45,16 @@ private final class CogArenaDescriptorRecord {
 
   /// Creates one immutable descriptor dispatch record.
   init(
+    identity: ObjectIdentifier,
+    label: CogLabel,
     index: Int32,
     kind: CogArenaDescriptorKind,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
   ) {
+    self.identity = identity
+    self.label = label
     self.index = index
     self.kind = kind
     self.column = column
@@ -133,6 +143,31 @@ internal final class CogArenaCore {
 
   /// Nested selector scopes, outermost first.
   private var captures: ContiguousArray<CogArenaDependencyCapture> = []
+
+  /// Derived rows whose settlement has entered but not completed, outermost first.
+  ///
+  /// This stays separate from `pullFrames`: an exit frame is popped before its
+  /// selector and equality run, while the row must remain visibly computing
+  /// until both have completed.
+  private var computingPath: ContiguousArray<Int32> = []
+
+  /// Whether traversal, selector capture, and post-selector publication are idle.
+  ///
+  /// Graph-owned system turns use this complete barrier rather than looking at
+  /// frames alone, because a nested cold pull can empty its own frame suffix
+  /// while an enclosing selector remains active.
+  var isSettlementIdle: Bool {
+    pullFrames.isEmpty && captures.isEmpty && computingPath.isEmpty
+  }
+
+  /// Rendered name of the innermost derived row still computing.
+  ///
+  /// The application commit guard reads this before opening a turn, covering
+  /// both selector execution and custom equality just like the simple core.
+  var innermostComputingName: String? {
+    guard let rawRow = computingPath.last else { return nil }
+    return cycleStep(forRow: liveRow(rawRow)).name
+  }
 
   /// Creates one empty arena graph and binds its pool propagator.
   init() {
@@ -303,6 +338,7 @@ internal final class CogArenaCore {
     )
     let record = makeRecord(
       identity: descriptor.identity,
+      label: descriptor.label,
       kind: .manual,
       column: column,
       commitSource: { slot, revision, propagation in
@@ -332,6 +368,7 @@ internal final class CogArenaCore {
     )
     let record = makeRecord(
       identity: descriptor.identity,
+      label: descriptor.label,
       kind: .derived,
       column: column,
       commitSource: nil,
@@ -345,6 +382,7 @@ internal final class CogArenaCore {
   /// Registers one descriptor and returns its dense dispatch record.
   private func makeRecord(
     identity: ObjectIdentifier,
+    label: CogLabel,
     kind: CogArenaDescriptorKind,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
@@ -354,6 +392,8 @@ internal final class CogArenaCore {
       fatalError("Cog exhausted its Int32 arena descriptor index space.")
     }
     let record = CogArenaDescriptorRecord(
+      identity: identity,
+      label: label,
       index: Int32(records.count),
       kind: kind,
       column: column,
@@ -417,10 +457,16 @@ internal final class CogArenaCore {
           fatalError("Cog found an invalid manual source in the arena pull walk.")
         }
 
+        if let cycle = cyclePath(ifEnteringRow: row) {
+          fatalError(cycle.message)
+        }
+
+        beginComputing(row)
         pullFrames.append(CogArenaPullFrame(row: frame.row, phase: .exit))
         appendDependencies(of: frame.row)
 
       case .exit:
+        defer { endComputing(row) }
         let record = descriptorRecord(forRow: row)
         let mustRecompute = arena.flags[row].contains(.dirty) || dependencyChanged(for: frame.row)
         if mustRecompute {
@@ -576,6 +622,67 @@ internal final class CogArenaCore {
   /// Whether one row carries CHECK or DIRTY work.
   private func needsSettlement(_ row: Int) -> Bool {
     arena.flags[row].contains(.check) || arena.flags[row].contains(.dirty)
+  }
+
+  /// Returns the closed active-path suffix when `row` is already computing.
+  ///
+  /// The packed row bit is the common fast path. Only a detected cycle scans
+  /// and renders the ordered path, so ordinary settlement does no identity or
+  /// key work beyond the scalar flag check.
+  private func cyclePath(ifEnteringRow row: Int) -> CogCyclePath? {
+    guard arena.flags[row].contains(.computing) else { return nil }
+    let rawRow = Int32(row)
+    guard let first = computingPath.firstIndex(of: rawRow) else {
+      fatalError("An arena row was marked computing without an active path entry.")
+    }
+    let steps =
+      computingPath[first...].map { cycleStep(forRow: liveRow($0)) }
+      + [cycleStep(forRow: row)]
+    return CogCyclePath(steps: steps)
+  }
+
+  /// Marks and appends one row after cycle detection has succeeded.
+  private func beginComputing(_ row: Int) {
+    guard cyclePath(ifEnteringRow: row) == nil else {
+      fatalError("Cog tried to enter an arena derived cycle without reporting it.")
+    }
+    arena.flags[row].insert(.computing)
+    computingPath.append(Int32(row))
+  }
+
+  /// Clears the innermost row while enforcing balanced nested settlement.
+  private func endComputing(_ row: Int) {
+    guard computingPath.last == Int32(row) else {
+      fatalError("Cog tried to finish arena derived computation out of path order.")
+    }
+    computingPath.removeLast()
+    arena.flags[row].remove(.computing)
+  }
+
+  /// Erases one row into the renderer shared by both runtime cores.
+  private func cycleStep(forRow row: Int) -> CogCycleStep {
+    let record = descriptorRecord(forRow: row)
+    return CogCycleStep(
+      descriptor: record.identity,
+      label: record.label,
+      key: record.key(at: row)
+    )
+  }
+
+  /// Diagnoses a hypothetical derived read without creating a row or edge.
+  ///
+  /// The lookup is intentionally observational. A missing descriptor-and-key
+  /// identity returns `nil`, preserving lazy row creation and later edge order.
+  func cycleDiagnosticSnapshot<Value>(
+    ifReading valueReference: Cog<Value>
+  ) -> CogCycleDiagnosticSnapshot? {
+    let identity = CogStateIdentity(
+      descriptor: valueReference.descriptor.identity,
+      key: valueReference.key
+    )
+    guard let slot = slots[identity] else { return nil }
+    let row = arena.index(of: slot)
+    return cyclePath(ifEnteringRow: row)?.snapshot
   }
 
   /// Validates one raw edge row and returns its native array index.

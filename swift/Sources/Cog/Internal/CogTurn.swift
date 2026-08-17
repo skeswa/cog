@@ -124,7 +124,14 @@ extension Cogs {
   /// frame leaves its derived state on the computing path through recomputation.
   internal var canRunSystemTurnImmediately: Bool {
     guard case .idle = turnPhase else { return false }
-    return settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil
+    guard settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil else {
+      return false
+    }
+    #if COG_CORE_ARENA
+    return arenaCore.isSettlementIdle
+    #else
+    return true
+    #endif
   }
 
   /// Rejects an application operation before it can open a turn during derivation.
@@ -133,8 +140,12 @@ extension Cogs {
   /// whole selector region—including dependency reconciliation and equality—
   /// read-only and prevents a failed attempt from partially mutating the graph.
   internal func requireOutsideDerivedComputation(forTurnNamed name: String) {
-    if let computing = settleStack.innermostComputingState {
-      let cogName = CogCycleStep(state: computing).name
+    #if COG_CORE_ARENA
+    let computingName = arenaCore.innermostComputingName
+    #else
+    let computingName = settleStack.innermostComputingState.map { CogCycleStep(state: $0).name }
+    #endif
+    if let cogName = computingName {
       fatalError(
         """
         Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \

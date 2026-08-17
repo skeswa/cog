@@ -14,9 +14,17 @@ internal struct CogCycleStep {
 
   /// Captures diagnostic identity from one active derived state.
   init(state: any DerivedCogSettleState) {
-    self.descriptor = state.descriptorIdentity
-    self.label = state.label
-    self.key = state.key
+    self.init(descriptor: state.descriptorIdentity, label: state.label, key: state.key)
+  }
+
+  /// Captures diagnostic identity from a data-oriented arena row.
+  ///
+  /// Keeping this initializer state-free lets both cores share the path and
+  /// message renderer without making an arena row impersonate a class state.
+  init(descriptor: ObjectIdentifier, label: CogLabel, key: CogKey?) {
+    self.descriptor = descriptor
+    self.label = label
+    self.key = key
   }
 
   /// The declaration label plus key as it appears in a cycle path.
@@ -40,6 +48,11 @@ internal struct CogCyclePath {
   /// Captures the ordered states without retaining those state objects.
   init(states: [any DerivedCogSettleState]) {
     self.steps = states.map(CogCycleStep.init(state:))
+  }
+
+  /// Captures an already-erased path produced by the arena computing stack.
+  init(steps: [CogCycleStep]) {
+    self.steps = steps
   }
 
   /// The fatal diagnostic rendered from the captured steps.
@@ -76,11 +89,15 @@ extension Cogs {
   package func cycleDiagnosticSnapshot<Value>(
     ifReading valueReference: Cog<Value>
   ) -> CogCycleDiagnosticSnapshot? {
+    #if COG_CORE_ARENA
+    return arenaCore.cycleDiagnosticSnapshot(ifReading: valueReference)
+    #else
     let identity = CogStateIdentity(
       descriptor: valueReference.descriptor.identity, key: valueReference.key)
     guard let state = states[identity] as? any DerivedCogSettleState else {
       return nil
     }
     return settleStack.cyclePath(ifEntering: state)?.snapshot
+    #endif
   }
 }

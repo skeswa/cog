@@ -341,8 +341,12 @@ public struct Reader<Value> {
   package func cycleDiagnosticSnapshot<Read>(
     ifReading valueReference: Cog<Read>
   ) -> CogCycleDiagnosticSnapshot? {
+    #if COG_CORE_ARENA
+    cogs.arenaCore.requireTracking(requiredArenaState())
+    #else
     let state = requiredSimpleState()
     cogs.requireTracking(state)
+    #endif
     return cogs.cycleDiagnosticSnapshot(ifReading: valueReference)
   }
 
