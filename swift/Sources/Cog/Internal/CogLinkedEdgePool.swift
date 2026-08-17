@@ -174,6 +174,51 @@ internal final class CogLinkedEdgePool {
     return removed
   }
 
+  /// Removes the dependency suffix after one preserved consumer prefix.
+  ///
+  /// `previous` is the last edge reused by the current selector run, or
+  /// `.none` when its new dependency list shares no prefix with the old one.
+  /// The consumer list is cut once; every abandoned entry then unlinks from
+  /// its producer in O(1) and joins the in-entry free list. The preserved
+  /// prefix remains in selector read order and becomes the append tail.
+  @discardableResult
+  func removeDependencySuffix(
+    of consumer: CogArenaSlot,
+    after previous: CogEdgeIndex,
+    in arena: CogArenaStorage
+  ) -> Int {
+    let consumerRow = arena.index(of: consumer)
+    let firstRemoved: CogEdgeIndex
+
+    if previous == .none {
+      firstRemoved = arena.deps[consumerRow]
+      arena.deps[consumerRow] = .none
+    } else {
+      let previousRow = liveEntryIndex(previous)
+      guard edges[previousRow].sub == consumer.index else {
+        fatalError("Cog tried to preserve another consumer's dependency prefix.")
+      }
+      firstRemoved = edges[previousRow].nextDep
+      edges[previousRow].nextDep = .none
+    }
+
+    var cursor = firstRemoved
+    var removed = 0
+    while cursor != .none {
+      let row = liveEntryIndex(cursor)
+      let edge = edges[row]
+      guard edge.sub == consumer.index else {
+        fatalError("Cog found another consumer's edge in a dependency suffix.")
+      }
+      let next = edge.nextDep
+      unlinkSubscriber(cursor, edge: edge, in: arena)
+      recycle(cursor, at: row)
+      removed += 1
+      cursor = next
+    }
+    return removed
+  }
+
   /// Whether `index` currently names a live linked entry.
   func contains(_ index: CogEdgeIndex) -> Bool {
     guard index.rawValue >= 0 else { return false }

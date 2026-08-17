@@ -519,8 +519,12 @@ internal final class CogArenaCore {
       guard let finished = captures.popLast(), finished.consumer == consumer else {
         fatalError("Cog finished arena dependency capture out of order.")
       }
-      guard finished.cursor == .none else {
-        fatalError("Cog changed an arena dependency set before recapture was enabled.")
+      if finished.cursor != .none {
+        edges.removeDependencySuffix(
+          of: consumer,
+          after: finished.previous,
+          in: arena
+        )
       }
     }
     return body()
@@ -538,25 +542,33 @@ internal final class CogArenaCore {
 
     if capture.cursor != .none {
       let edge = edges.edge(at: capture.cursor)
-      guard edge.dep == producer.index, edge.sub == consumer.index else {
-        fatalError("Cog changed an arena dependency prefix before recapture was enabled.")
+      if edge.dep == producer.index, edge.sub == consumer.index {
+        edges.updateVersion(
+          of: capture.cursor,
+          to: arena.changedAt[arena.index(of: producer)]
+        )
+        capture.previous = capture.cursor
+        capture.cursor = edge.nextDep
+        captures[captureIndex] = capture
+        return
       }
-      edges.updateVersion(
-        of: capture.cursor,
-        to: arena.changedAt[arena.index(of: producer)]
-      )
-      capture.previous = capture.cursor
-      capture.cursor = edge.nextDep
-    } else {
-      let added = edges.add(
-        producer: producer,
-        consumer: consumer,
+
+      edges.removeDependencySuffix(
+        of: consumer,
         after: capture.previous,
-        version: arena.changedAt[arena.index(of: producer)],
         in: arena
       )
-      capture.previous = added
+      capture.cursor = .none
     }
+
+    let added = edges.add(
+      producer: producer,
+      consumer: consumer,
+      after: capture.previous,
+      version: arena.changedAt[arena.index(of: producer)],
+      in: arena
+    )
+    capture.previous = added
 
     captures[captureIndex] = capture
   }

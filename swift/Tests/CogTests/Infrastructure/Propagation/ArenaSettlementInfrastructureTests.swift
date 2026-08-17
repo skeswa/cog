@@ -37,4 +37,31 @@ import Testing
   #expect(middleRuns == 2)
   #expect(leafRuns == 1)
 }
+
+@MainActor
+@Test func `ArenaSettlementInfrastructure recapture reuses the abandoned pool entry`() {
+  let cogs = Cogs.forTesting()
+  let useFirst = ManualCog<Bool>(true)
+  let first = ManualCog<Int>(1)
+  let second = ManualCog<Int>(2)
+  var runs = 0
+  let selected = Cog<Int> { c in
+    runs += 1
+    return c[useFirst] ? c[first] : c[second]
+  }
+
+  #expect(cogs.peek(selected) == 1)
+  #expect(cogs.arenaCore.edges.entryCount == 2)
+  #expect(cogs.arenaCore.edges.liveCount == 2)
+
+  cogs.commit { c in c[useFirst] = false }
+  #expect(cogs.peek(selected) == 2)
+  #expect(cogs.arenaCore.edges.entryCount == 2)
+  #expect(cogs.arenaCore.edges.liveCount == 2)
+
+  cogs.commit { c in c[first] = 10 }
+  #expect(cogs.peek(selected) == 2)
+  #expect(runs == 2)
+  #expect(cogs.states.isEmpty)
+}
 #endif

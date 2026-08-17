@@ -164,6 +164,60 @@ import Testing
 }
 
 @MainActor
+@Test func `LinkedEdgePoolInfrastructure cuts and recycles one dependency suffix`() {
+  let arena = CogArenaStorage()
+  let pool = CogLinkedEdgePool()
+  let firstProducer = arena.allocate()
+  let secondProducer = arena.allocate()
+  let thirdProducer = arena.allocate()
+  let replacementProducer = arena.allocate()
+  let consumer = arena.allocate()
+
+  let first = pool.add(
+    producer: firstProducer,
+    consumer: consumer,
+    after: .none,
+    version: 1,
+    in: arena
+  )
+  let second = pool.add(
+    producer: secondProducer,
+    consumer: consumer,
+    after: first,
+    version: 1,
+    in: arena
+  )
+  let third = pool.add(
+    producer: thirdProducer,
+    consumer: consumer,
+    after: second,
+    version: 1,
+    in: arena
+  )
+
+  #expect(pool.removeDependencySuffix(of: consumer, after: first, in: arena) == 2)
+  #expect(dependencyChain(of: consumer, in: arena, pool: pool) == [first])
+  #expect(subscriberChain(of: firstProducer, in: arena, pool: pool) == [first])
+  #expect(subscriberChain(of: secondProducer, in: arena, pool: pool).isEmpty)
+  #expect(subscriberChain(of: thirdProducer, in: arena, pool: pool).isEmpty)
+  #expect(!pool.contains(second))
+  #expect(!pool.contains(third))
+
+  let replacement = pool.add(
+    producer: replacementProducer,
+    consumer: consumer,
+    after: first,
+    version: 2,
+    in: arena
+  )
+
+  #expect(replacement == third)
+  #expect(pool.entryCount == 3)
+  #expect(pool.liveCount == 2)
+  #expect(dependencyChain(of: consumer, in: arena, pool: pool) == [first, replacement])
+}
+
+@MainActor
 @Test func `LinkedEdgePoolInfrastructure churn reuses one bounded pool`() {
   let arena = CogArenaStorage()
   let pool = CogLinkedEdgePool()
