@@ -108,6 +108,40 @@ internal final class CogArenaValueColumn<Value> {
     return true
   }
 
+  /// Publishes one manual source commit and pushes its arena invalidation wave.
+  ///
+  /// The supplied revision belongs to the enclosing turn. A real change marks
+  /// the source current at that revision before any consumer sees DIRTY or
+  /// CHECK. An equal final staged value consumes pending storage but preserves
+  /// both versions and sends no propagation.
+  @discardableResult
+  func commitSource(
+    at slot: CogArenaSlot,
+    revision: UInt32,
+    propagatingWith propagation: CogArenaDirtyPropagation
+  ) -> Bool {
+    guard propagation.belongs(to: arena) else {
+      fatalError("Cog tried to propagate a value through another arena context.")
+    }
+    guard hasPendingValue(at: slot) else { return false }
+
+    let row = arena.index(of: slot)
+    guard revision > arena.checkedAt[row] else {
+      fatalError("Cog tried to publish an arena source with a stale graph revision.")
+    }
+    guard commit(at: slot) else { return false }
+    guard !arena.flags[row].contains(.computing) else {
+      fatalError("Cog tried to publish an arena source while it was computing.")
+    }
+
+    arena.changedAt[row] = revision
+    arena.checkedAt[row] = revision
+    arena.flags[row].remove(.check)
+    arena.flags[row].remove(.dirty)
+    propagation.invalidateSubscribers(of: slot)
+    return true
+  }
+
   /// Clears both value cells before the owning arena slot is released.
   ///
   /// Clearing first releases reference-valued payloads under the context's
