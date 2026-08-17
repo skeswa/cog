@@ -341,6 +341,26 @@ an imbalance — the extra releases are objects created before the measured
 region and freed inside it — but it does mean a change that halves retains
 without touching releases has moved less than half the traffic.
 
+**Thousand-state footprint, simple core** — `M5-07b`, same session and
+environment. Five hundred keyed sources and five hundred keyed consumers, built
+and settled in a fresh context: a thousand states from two declarations, which
+is how a screen actually reaches that number.
+
+| Percentile | resident-memory growth per build |
+| ---------- | -------------------------------- |
+| p50        | 0.87–1.28 MB across five runs    |
+| p100       | 1.28–1.56 MB across five runs    |
+
+**About 1.4 MB for a thousand states — roughly 1.4 KB each.**
+
+Stated as a range on purpose. This is the one metric in §9.6 that is _sampled_
+rather than counted: resident memory is page-granular, and the delta only grows
+on the iterations where the peak actually advances, so p0 reads zero on every
+run once the allocator already holds the pages. The threshold is accordingly a
+mebibyte of drift — about two and a half times the worst spread observed, wide
+enough never to cry wolf and narrow enough that a graph grown to twice its
+footprint fails.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
