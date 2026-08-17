@@ -289,7 +289,15 @@ half-finished picture.
 - **GRAPH-02.** A diamond: A feeds B and C, which both feed D. I change A
   once. D recomputes once, using B and C from the same turn.
 - **GRAPH-03.** A chain deep enough to overflow a recursive walk settles
-  correctly from top to bottom without exhausting the stack.
+  correctly from top to bottom without exhausting the stack, once its links
+  have been computed. Invalidating the source and re-settling the whole chain
+  uses the iterative walk and no meaningful stack.
+- **GRAPH-14.** I read the top of a very deep chain whose links have never
+  been computed. Cog computes each link the first time it is read, and a
+  first read that needs an uncomputed dependency computes it inline, so this
+  one read nests. Past a bound Cog fails with a clear error naming the chain
+  and what to do instead, rather than exhausting the stack. (Proof: exit
+  test.)
 - **GRAPH-04.** One source feeds many derived cogs. Each one I read is
   right, and only the ones I read recompute.
 - **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,

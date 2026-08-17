@@ -996,7 +996,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   remote state: format, ledgers, matrices, release, simulator, Weather, floor,
   docs, changelog, and revision-based scratch consumption.
   _Depends: M4-04c, M4-05a, M4-06, M4-07e, M4-08, M4-09, M4-10, M4-11,
-  M4-12, M4-13._
+  M4-12, M4-13, M4-14._
   _Verify: the complete 0.1.0 checklist with immutable CI links._
 - **M4-05c** _(Release)_ — Create and push the bare annotated `0.1.0` tag.
   _Depends: M4-05b._
@@ -1079,6 +1079,21 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Depends: M4-07d._
   _Verify: `mise run test --filter 'ASYNC-36|ASYNC-37'`._
   _Greens: ASYNC-36, ASYNC-37._
+- **M4-14** _(Behavior)_ — Bound the nesting a cold first read may cause and
+  fail with a clear error naming the chain, in debug and release, instead of
+  exhausting the stack. A first read of a never-computed dependency computes
+  it inline, because a state's dependency set is only known once its selector
+  has run, so the iterative walk cannot flatten a chain it has not seen yet.
+  Measured on a 2026-08-16 macOS host: about 1,360 stack bytes per cold link
+  in release and 4,176 in debug, over an eleven-frame cycle per link, giving
+  roughly 6,100 links on an 8 MiB main stack and roughly 770 in release — or
+  240 in debug — on iOS's 1 MiB main stack. The bound is fixed rather than
+  measured at runtime so the same graph fails the same way on every platform
+  and configuration.
+  _Depends: M1-11._
+  _Verify: `mise run test --filter GRAPH-14` and
+  `mise run test:release --filter GRAPH-14`._
+  _Greens: GRAPH-14._
 
 ## M5 tasks
 
@@ -1233,7 +1248,11 @@ by the `M6-05a` edge gate rather than an `M6-10` filter._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
 ArenaDirtyPropagationInfrastructure`._
 - **M6-07ab** _(Infrastructure)_ — Pull and settle chain, diamond, and broad
-  graphs with versions and equality backdating.
+  graphs with versions and equality backdating. Collapse the cold first-read
+  frame cycle `M4-14` measured while rewriting this walk: nine of its eleven
+  frames per cold link are Cog's own, so removing the existential witness hop
+  and the `recompute`/`run`/`tracking` layering raises the `M4-14` bound
+  without changing its shape.
   _Depends: M6-07aa._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
 'GRAPH-01|GRAPH-02|GRAPH-04|GRAPH-05'`._

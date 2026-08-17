@@ -509,7 +509,13 @@ query caching.
   lifetime, queued-turn history, and per-render Observation retracking
   (MECH-11, LIFE-11, HIST-07, UI-16), and the async refresh-supersession,
   concurrent-cancellation, keyed-release, and failure-honesty corners
-  (ASYNC-35 through ASYNC-39).
+  (ASYNC-35 through ASYNC-39). The M5 port then surfaced one more, and it is
+  the kind this list exists for: GRAPH-03 promised a deep chain settles
+  without exhausting the stack, but its test computed each link as it built
+  it, so it only ever proved the invalidation walk. A _first_ read of a deep
+  chain nests, because a state's dependency set is only known once its
+  selector has run. GRAPH-03 now says which walk it proves, and `M4-14` bounds
+  the other one with a diagnostic instead of a stack smash (GRAPH-14).
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that
   consumes the repo URL.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin
@@ -581,7 +587,10 @@ query caching.
   per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
-  perf.md; only then settle the layout.
+  perf.md; only then settle the layout. Because this rewrite owns the settle
+  walk, it also carries the cold first-read frame cycle `M4-14` measured: nine
+  of the eleven frames per cold link are Cog's own, so collapsing them raises
+  that bound for free.
 - Behind the same tests and public API: SoA columns (`flags`, `changedAt`,
   `checkedAt`, `deps`, `subs`, `boundary`, `generation`); typed
   per-descriptor value columns with pending and current values; the
