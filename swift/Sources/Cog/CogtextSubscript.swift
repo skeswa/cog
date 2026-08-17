@@ -68,15 +68,7 @@ extension Cogs {
   /// - Returns: Its newest settled value in this context.
   public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
     #if COG_CORE_ARENA
-    // Async state remains class-backed until its own arena migration. Keep its
-    // internal value projection in that same representation for this UI read:
-    // an arena-to-class dependency would otherwise need a temporary bridge,
-    // while the class projection already supplies the required value equality,
-    // pending baseline, and Observation boundary semantics.
-    let state = derivedState(for: valueReference.valueCog)
-    let value = state.settledValue(in: self)
-    state.accessObservationBoundary(in: self)
-    return value
+    return self[valueReference.valueCog]
     #else
     self[valueReference.valueCog]
     #endif

@@ -143,7 +143,11 @@ public struct Reader<Value> {
   /// or derived cogs: synchronous state has no request status, and asking for it is a
   /// type error rather than a degenerate success.
   public var status: Status {
+    #if COG_CORE_ARENA
+    Status(cogs: cogs, arenaState: requiredArenaState())
+    #else
     Status(cogs: cogs, state: requiredSimpleState())
+    #endif
   }
 
   /// The tracked status-reading facet of one selector run.
@@ -156,14 +160,26 @@ public struct Reader<Value> {
     /// The context whose graph this run reads.
     private let cogs: Cogs
 
-    /// The computing consumer receiving status dependencies.
+    #if COG_CORE_ARENA
+    /// The computing arena row receiving status dependencies.
+    private let arenaState: CogArenaSlot
+    #else
+    /// The computing class-state consumer receiving status dependencies.
     private let state: any CogReaderState<Value>
+    #endif
 
     /// Borrows the reader's capability for status spellings.
+    #if COG_CORE_ARENA
+    internal init(cogs: Cogs, arenaState: CogArenaSlot) {
+      self.cogs = cogs
+      self.arenaState = arenaState
+    }
+    #else
     internal init(cogs: Cogs, state: any CogReaderState<Value>) {
       self.cogs = cogs
       self.state = state
     }
+    #endif
 
     /// Reads an async cog's full status and depends on its exact state.
     ///
@@ -180,12 +196,21 @@ public struct Reader<Value> {
     /// - Parameter valueReference: The async value whose status to read.
     /// - Returns: Its newest settled status in this context.
     public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
+      #if COG_CORE_ARENA
+      return cogs.arenaCore.readAsyncStatus(
+        descriptor: valueReference.descriptor,
+        key: valueReference.key,
+        for: arenaState,
+        in: cogs
+      )
+      #else
       cogs.requireTracking(state)
 
       let producer = cogs.asyncState(for: valueReference)
       let status = producer.settledStatus(in: cogs)
       state.recordDependency(on: producer)
       return status
+      #endif
     }
 
     /// Peeks at an async cog's status without recording a dependency.
@@ -200,7 +225,11 @@ public struct Reader<Value> {
     ///   without tracking it.
     /// - Returns: Its newest settled status in this context.
     public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
+      #if COG_CORE_ARENA
+      cogs.arenaCore.requireTracking(arenaState)
+      #else
       cogs.requireTracking(state)
+      #endif
       return cogs.status.peek(valueReference)
     }
   }
@@ -224,6 +253,14 @@ public struct Reader<Value> {
     from descriptor: AsyncCogDescriptor<Read>,
     key: CogKey?
   ) -> CogStatus<Read> {
+    #if COG_CORE_ARENA
+    return cogs.arenaCore.readAsyncStatus(
+      descriptor: descriptor,
+      key: key,
+      for: requiredArenaState(),
+      in: cogs
+    )
+    #else
     let state = requiredSimpleState()
     cogs.requireTracking(state)
 
@@ -231,6 +268,7 @@ public struct Reader<Value> {
     let status = producer.settledStatus(in: cogs)
     state.recordDependency(on: producer)
     return status
+    #endif
   }
 
   /// Reads a source exposed through `.readOnly`, and depends on it.
@@ -293,8 +331,12 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The async value to read without tracking it.
   /// - Returns: Its newest settled value in this context.
   public func peek<Read>(_ valueReference: AsyncCog<Read>) -> Read {
+    #if COG_CORE_ARENA
+    cogs.arenaCore.requireTracking(requiredArenaState())
+    #else
     let state = requiredSimpleState()
     cogs.requireTracking(state)
+    #endif
     return cogs.peek(valueReference)
   }
 

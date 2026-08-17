@@ -1,3 +1,5 @@
+#if COG_CORE_SIMPLE
+
 /// The live state behind one ``AsyncCog`` value reference in one context.
 ///
 /// This is derived state with a split computation: the synchronous selector
@@ -472,3 +474,5 @@ internal final class AsyncCogState<Value>:
   // Written out, and `nonisolated`, per the generic-class release rule.
   nonisolated deinit {}
 }
+
+#endif

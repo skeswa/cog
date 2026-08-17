@@ -287,11 +287,13 @@ extension Cogs {
   }
 
   /// Resolves a generic candidate's keyed async reference for infrastructure tests.
+  #if COG_CORE_SIMPLE
   internal func asyncState<Value, Key: Hashable>(
     for valueReference: AsyncCogBox<Value, Key>.ValueReference
   ) -> AsyncCogState<Value> {
     asyncState(for: valueReference.simpleCoreReference)
   }
+  #endif
 }
 
 extension Reader {

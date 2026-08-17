@@ -75,8 +75,8 @@ public final class Cogs {
   #if COG_CORE_ARENA
   /// Data-oriented graph selected for this build-time arena test leg.
   ///
-  /// Public references remain unchanged; sync source and derived paths route
-  /// here while later M6 tasks migrate the remaining runtime capabilities.
+  /// Public references remain unchanged; manual, synchronous derived, async,
+  /// reaction, lifetime, Observation, and history paths share its scalar rows.
   internal let arenaCore: CogArenaCore
   #endif
 
@@ -642,7 +642,8 @@ extension Cogs {
     }
   }
 
-  /// Resolves an async value reference to its state in this context.
+  #if COG_CORE_SIMPLE
+  /// Resolves an async value reference to its simple-core state in this context.
   ///
   /// Lookup and work start are deliberately separate. Merely resolving the
   /// descriptor-and-key slot allocates state but does not run the selector;
@@ -676,6 +677,7 @@ extension Cogs {
       AsyncCogState(descriptor: descriptor, key: key)
     }
   }
+  #endif
 
   /// Gets the state for `identity`, or files the result of `create`.
   ///

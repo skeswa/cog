@@ -197,15 +197,16 @@ extension Cogs {
   internal func flushObservationBoundaries() {
     #if COG_CORE_ARENA
     arenaCore.flushObservationBoundaries(in: self)
-    #endif
+    #else
     flushClassObservationBoundaries()
+    #endif
   }
 
-  /// Flushes UI roots whose capability has not migrated into arena rows yet.
+  /// Flushes the simple core's class-backed UI roots.
   ///
-  /// Async state and its value projection remain class-backed during the sync
-  /// arena vertical slice. They still cross the same completed-turn boundary:
-  /// every arena and transitional class notice finishes before reactions run.
+  /// Manual, synchronous derived, and async states all use this path when the
+  /// correctness core is selected. The arena build compiles the call out and
+  /// flushes its descriptor-dispatched scalar roots instead.
   private func flushClassObservationBoundaries() {
     let boundaryCount = observationStates.count
     for state in observationStates.prefix(boundaryCount) {

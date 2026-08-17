@@ -122,9 +122,15 @@ extension Cogs {
   @discardableResult
   public func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value> {
     requireOutsideDerivedComputation(forTurnNamed: #function)
+    #if COG_CORE_ARENA
+    let refresh = arenaCore.refresh(valueReference, in: self)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    return refresh
+    #else
     let state = asyncState(for: valueReference)
     let refresh = state.refresh(in: self)
     scheduleLifetimeReleaseIfUnobserved(state)
     return refresh
+    #endif
   }
 }
