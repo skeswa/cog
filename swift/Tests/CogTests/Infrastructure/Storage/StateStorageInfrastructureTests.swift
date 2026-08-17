@@ -57,9 +57,9 @@ import Testing
   let cogs = Cogs.forTesting()
   let weather = ManualCog<Int>(0)
 
-  let here = ManualCog(descriptor: weather.descriptor, key: 90210)
-  let there = ManualCog(descriptor: weather.descriptor, key: 10001)
-  let hereAgain = ManualCog(descriptor: weather.descriptor, key: 90210)
+  let here = ManualCog(descriptor: weather.descriptor, key: CogKey(90210))
+  let there = ManualCog(descriptor: weather.descriptor, key: CogKey(10001))
+  let hereAgain = ManualCog(descriptor: weather.descriptor, key: CogKey(90210))
 
   #expect(cogs.manualState(for: here) !== cogs.manualState(for: there))
   #expect(cogs.manualState(for: here) === cogs.manualState(for: hereAgain))
@@ -70,7 +70,7 @@ import Testing
 @Test func `StateStorageInfrastructure keeps a keyless declaration separate from its keys`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
-  let keyed = ManualCog(descriptor: source.descriptor, key: 0)
+  let keyed = ManualCog(descriptor: source.descriptor, key: CogKey(0))
 
   #expect(cogs.manualState(for: source) !== cogs.manualState(for: keyed))
   #expect(cogs.states.count == 2)
@@ -110,7 +110,7 @@ import Testing
 @Test func `StateStorageInfrastructure starts a state at its declaration's starting value`() {
   let cogs = Cogs.forTesting()
   let retryLimit = ManualCog<Int>(3)
-  let keyed = ManualCog(descriptor: retryLimit.descriptor, key: 90210)
+  let keyed = ManualCog(descriptor: retryLimit.descriptor, key: CogKey(90210))
 
   #expect(cogs.manualState(for: retryLimit).currentValue == 3)
   #expect(cogs.manualState(for: keyed).currentValue == 3)
@@ -120,11 +120,11 @@ import Testing
 @Test func `StateStorageInfrastructure keeps a state's label and key for diagnostics`() {
   let cogs = Cogs.forTesting()
   let weather = ManualCog<Int>(0, name: "weather")
-  let keyed = ManualCog(descriptor: weather.descriptor, key: 90210)
+  let keyed = ManualCog(descriptor: weather.descriptor, key: CogKey(90210))
 
   let state = cogs.manualState(for: keyed)
 
   #expect("\(state.label)" == "weather")
-  #expect(state.key == AnyHashable(90210))
+  #expect(state.key == CogKey(90210))
   #expect(cogs.manualState(for: weather).key == nil)
 }

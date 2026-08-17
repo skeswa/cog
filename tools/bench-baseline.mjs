@@ -49,19 +49,16 @@ const baselineDirectory = join(benchmarkPackage, ".benchmarkBaselines");
 /** The benchmark whose whole job is to allocate, so a silent zero cannot hide. */
 const WITNESS_BENCHMARK = "perf-witness-allocating";
 
-// Baselines cover the benchmarks that carry gates — the `perf-` allocation
-// family — and not the whole-scenario timing benchmarks.
+// Baselines cover every benchmark in the package.
 //
-// Two reasons, and the second one is a known defect rather than a preference.
-// Allocation counts are exact and gated; wall-clock numbers over a whole
-// scenario graph are neither, so including them would only add noise to a
-// comparison that has nothing to say about them. And `kairo-diamond` crashes
-// the harness roughly one run in six under full instrumentation — about 2,200
-// mallocs per iteration at a couple of thousand iterations a second — while
-// the same 20,000 iterations of the same scenario run clean outside the
-// harness. `M5-11` owns diagnosing that; until it does, a gate that fails one
-// run in six is not a gate.
-const GATED_BENCHMARKS = "perf-.*";
+// `M5-08a` narrowed this to the `perf-` family as a stopgap, because the
+// whole-scenario benchmark crashed the harness roughly one run in six.
+// `M5-11` found the cause — a call through a null `swift_release_hook` while
+// Cog's cancelled grace sleepers completed on another thread — and bounded it
+// where it belongs, by taking the counting metrics off a benchmark whose
+// measured region is not quiescent. With the cause addressed rather than
+// filtered around, narrowing the baseline would only be hiding benchmarks from
+// a gate for no reason.
 
 /** Baseline used when the caller names none. */
 const DEFAULT_BASELINE = "local";
@@ -183,8 +180,6 @@ function update(name) {
     "baseline",
     "update",
     name,
-    "--filter",
-    GATED_BENCHMARKS,
     "--no-progress",
   ]);
 
@@ -269,16 +264,7 @@ function check(name) {
   assertWitnessMeasured();
 
   console.log(`==> checking against baseline '${name}'`);
-  run("swift", [
-    "package",
-    "benchmark",
-    "baseline",
-    "check",
-    name,
-    "--filter",
-    GATED_BENCHMARKS,
-    "--no-progress",
-  ]);
+  run("swift", ["package", "benchmark", "baseline", "check", name, "--no-progress"]);
   console.log(`bench-baseline: OK — no metric drifted past its threshold`);
 }
 

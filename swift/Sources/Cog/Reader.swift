@@ -192,7 +192,7 @@ public struct Reader<Value> {
   /// - Returns: The exact async state's newest settled status.
   internal func asyncStatus<Read>(
     from descriptor: AsyncCogDescriptor<Read>,
-    key: AnyHashable?
+    key: CogKey?
   ) -> CogStatus<Read> {
     cogs.requireTracking(state)
 

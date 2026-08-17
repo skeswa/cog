@@ -249,6 +249,82 @@ function listElements(body) {
 }
 
 /**
+ * Collects every element of the manifest's `librarySettings`, following one
+ * level of composition.
+ *
+ * `librarySettings` is not always a bare array literal. Since `M5-09a` it is
+ * `baseLibrarySettings + valueReferenceLayoutSettings`, because the
+ * value-reference layout is chosen by an environment variable and cannot be
+ * written as a literal — and M6 adds core and edge selectors the same way.
+ * Reading only the literal would silently drop those defines, which is exactly
+ * the drift between fixtures and library this whole function exists to prevent.
+ *
+ * So two shapes are understood, and nothing else:
+ *
+ *   - `let name: [SwiftSetting] = [ … ]` — the literal's elements.
+ *   - `A + B` — each identifier resolved as a literal above, plus every
+ *     `identifier.append(element)` statement anywhere in the manifest, which is
+ *     how a `switch` builds a settings list.
+ *
+ * Anything else aborts, for the same reason an unrecognized setting does.
+ *
+ * @param {string} source The manifest text.
+ * @returns {string[]} Setting expressions, in no particular order.
+ */
+function librarySettingElements(source) {
+  const anchor = source.indexOf("let librarySettings");
+  if (anchor === -1) fail("Package.swift no longer declares `librarySettings`");
+  const assign = source.indexOf("=", anchor);
+  if (assign === -1) fail("`librarySettings` has no initializer");
+
+  // The initializer runs to the end of its line unless it opens a literal.
+  const lineEnd = source.indexOf("\n", assign);
+  const initializer = source.slice(assign + 1, lineEnd === -1 ? undefined : lineEnd).trim();
+
+  if (initializer.startsWith("[")) {
+    const body = bracketedList(source, assign);
+    if (body === null) fail("cannot read the `librarySettings` array literal");
+    return listElements(body);
+  }
+
+  const names = initializer.split("+").map((name) => name.trim());
+  if (names.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
+    fail(
+      "unknown-setting: Package.swift initializes `librarySettings` from " +
+        `\`${initializer}\`, which tools/check-compile-fail.mjs only understands as ` +
+        "an array literal or a `+` chain of settings-array names. Teach it that " +
+        "shape so the fixtures stay in sync with the library.",
+    );
+  }
+
+  /** @type {string[]} */
+  const elements = [];
+  for (const name of names) {
+    const declaration = new RegExp(`(?:let|var)\\s+${name}\\s*:\\s*\\[SwiftSetting\\]\\s*=`).exec(
+      source,
+    );
+    if (declaration === null) {
+      fail(
+        `unknown-setting: Package.swift's \`librarySettings\` names \`${name}\`, which ` +
+          "is not declared as a `[SwiftSetting]` array in the same file.",
+      );
+    }
+    const body = bracketedList(source, declaration.index + declaration[0].length - 1);
+    if (body !== null) elements.push(...listElements(body));
+
+    // A settings list built by a `switch` appends to itself.
+    const appended = new RegExp(`${name}\\.append\\(([^\\n]*)\\)\\s*$`, "gm");
+    let match;
+    while ((match = appended.exec(source)) !== null) elements.push(match[1].trim());
+  }
+
+  if (elements.length === 0) {
+    fail("`librarySettings` resolved to no settings at all, which cannot be right");
+  }
+  return elements;
+}
+
+/**
  * Translates the manifest's `librarySettings` and `.macOS` platform into the
  * `swiftc` flags a fixture must be type-checked with.
  *
@@ -263,17 +339,9 @@ function compilerSettingsFromManifest() {
     fail(`cannot read ${repoPath(MANIFEST)}: ${error.message}`);
   }
 
-  const settingsAnchor = source.indexOf("let librarySettings");
-  if (settingsAnchor === -1) fail("Package.swift no longer declares `librarySettings`");
-  // Skip past the `: [SwiftSetting]` type annotation to the initializer.
-  const settingsAssign = source.indexOf("=", settingsAnchor);
-  if (settingsAssign === -1) fail("`librarySettings` has no initializer");
-  const settingsBody = bracketedList(source, settingsAssign);
-  if (settingsBody === null) fail("cannot read the `librarySettings` array literal");
-
   /** @type {string[]} */
   const flags = [];
-  for (const element of listElements(settingsBody)) {
+  for (const element of librarySettingElements(source)) {
     let match;
     if ((match = /^\.swiftLanguageMode\(\.v(\d+)\)$/.exec(element))) {
       flags.push("-swift-version", match[1]);

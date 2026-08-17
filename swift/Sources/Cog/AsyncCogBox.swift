@@ -117,7 +117,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
     AsyncCog(
       descriptor: descriptor,
       valueDescriptor: valueDescriptor,
-      key: AnyHashable(key)
+      key: CogKey(key)
     )
   }
 
@@ -141,11 +141,11 @@ public struct AsyncCogBox<Value, Key: Hashable> {
       default: defaultValue,
       equals: equals,
       selector: { c, erasedKey in
-        guard let key = erasedKey as? Key else {
+        guard let key = erasedKey?.erased.base as? Key else {
           fatalError(
             """
             A state of \(label) was asked to make work for \
-            \(String(describing: erasedKey)), which is not a \(Key.self). Only this \
+            \(String(describing: erasedKey?.erased)), which is not a \(Key.self). Only this \
             box builds value references for its own declaration, so this context's state \
             storage is corrupt.
             """

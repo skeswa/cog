@@ -117,6 +117,8 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
 
+- `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
+  Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
   `swift/Benchmarks` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator
@@ -151,6 +153,15 @@ wrapper mode of its own — `mainactor-nnbd-on`, `mainactor-nnbd-off`,
 `nonisolated-nnbd-on`, `nonisolated-nnbd-off` — which CI uses to run one leg
 per job. `COG_TEST_MANIFEST_CACHE=none` is an escape hatch for a stale
 manifest cache; it is not needed today.
+The isolation matrix is joined by one more build-time selector,
+`COG_TEST_VALUE_REFERENCE_LAYOUT`, which chooses how a keyed value reference
+physically carries its key (perf §4). It is a **library** setting rather than a
+test setting, because the layout is part of the library's representation. Unset
+means `inline`, the correctness core's layout, so an ordinary build is
+unchanged; an unrecognized value is a hard manifest error for the same reason a
+mistyped isolation leg is. `M5-09b` and `M5-09c` add the interned-token and
+generic-keyed candidates by rewriting
+`swift/Sources/Cog/Internal/CogKey.swift` and little else.
 
 Documentation is a task of its own, because swift-docc-plugin is env-gated
 behind `COG_DOCC=1` so ordinary consumers resolve this package with no

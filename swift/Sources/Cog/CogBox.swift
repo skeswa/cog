@@ -107,7 +107,7 @@ public struct CogBox<Value, Key: Hashable> {
   /// - Parameter key: The hashable value completing this state's identity.
   /// - Returns: A lightweight derived value reference for that key.
   public subscript(key: Key) -> Cog<Value> {
-    Cog(descriptor: descriptor, key: key)
+    Cog(descriptor: descriptor, key: CogKey(key))
   }
 
   /// Builds the single type-erased descriptor shared by all keys.
@@ -123,11 +123,11 @@ public struct CogBox<Value, Key: Hashable> {
   ) -> DerivedCogDescriptor<Value> {
     DerivedCogDescriptor(
       selector: { c, erasedKey in
-        guard let key = erasedKey as? Key else {
+        guard let key = erasedKey?.erased.base as? Key else {
           fatalError(
             """
             A state of \(label) was asked to compute for \
-            \(String(describing: erasedKey)), which is not a \(Key.self). \
+            \(String(describing: erasedKey?.erased)), which is not a \(Key.self). \
             Only this box builds value references for its own declaration, so this \
             context's state storage is corrupt.
             """

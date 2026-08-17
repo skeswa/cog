@@ -66,7 +66,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// runtime call path. ``AsyncCogBox`` installs the adapter that restores its
   /// concrete `Key` before user code runs. Explicit `@MainActor` keeps selector
   /// execution on the graph's actor under every client isolation default.
-  private let selector: @MainActor (Reader<CogStatus<Value>>, AnyHashable?) -> Work<Value>
+  private let selector: @MainActor (Reader<CogStatus<Value>>, CogKey?) -> Work<Value>
 
   /// Records the declaration choices shared by every state created from it.
   ///
@@ -76,7 +76,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
     policy: LatestPolicy,
     default defaultValue: Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
-    selector: @escaping @MainActor (Reader<CogStatus<Value>>, AnyHashable?) -> Work<Value>,
+    selector: @escaping @MainActor (Reader<CogStatus<Value>>, CogKey?) -> Work<Value>,
     lifetime: CogStateLifetime = .whileObserved(grace: nil),
     label: CogLabel
   ) {
@@ -102,7 +102,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// returns the description of work to start; it does not launch a task,
   /// publish pending, or mutate status. ``AsyncCogState`` performs those steps
   /// after the selector has returned and its dependency set is complete.
-  func makeWork(_ reader: Reader<CogStatus<Value>>, key: AnyHashable?) -> Work<Value> {
+  func makeWork(_ reader: Reader<CogStatus<Value>>, key: CogKey?) -> Work<Value> {
     selector(reader, key)
   }
 

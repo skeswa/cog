@@ -27,11 +27,21 @@ enum AllocationHarness {
   /// The context under measurement, created once per benchmark setup.
   static var cogs: Cogs?
 
-  /// Builds and fully settles the graph, outside any measured region.
+  /// Builds and fully settles the graph once, outside any measured region.
   ///
-  /// Settling here is what makes the measured region *steady*: the first read
-  /// of a derived cog computes it, and computing is not what PERF-01 is about.
+  /// Settling is what makes the measured region *steady*: the first read of a
+  /// derived cog computes it, and computing is not what PERF-01 is about.
+  ///
+  /// Once, not once per iteration, and that is load-bearing twice over. A
+  /// steady turn is "same graph shape, new values", so a benchmark that built
+  /// a fresh context each time would be measuring construction in its setup.
+  /// And tearing a context down is not instantaneous — releasing one cancels
+  /// whatever it still owns, and that cancellation completes on another thread
+  /// shortly afterwards. Malloc and ARC counting is process-global, so a
+  /// thousand context teardowns would keep dropping allocations into whichever
+  /// benchmark happened to be measuring next (`M5-11`).
   static func settle() {
+    guard cogs == nil else { return }
     let context = Cogs.forTesting()
     blackHole(context[doubledCog])
     blackHole(context.peek(keyedSourceCogs[0]))
@@ -70,8 +80,8 @@ enum AllocationHarness {
   /// demonstrably allocates — so a suite whose every threshold is zero passes
   /// just as happily when nothing is being measured at all. This benchmark is
   /// the control: it must always report a large non-zero malloc count, and
-  /// `M5-08a` is responsible for asserting that floor when it wires baselines,
-  /// because upstream thresholds are upper bounds and cannot express one.
+  /// `mise run bench:baseline:check` asserts that floor before it compares
+  /// anything, because upstream thresholds cannot express a floor themselves.
   static func allocateDeliberately(_ count: Int) {
     for iteration in 1...max(count, 1) {
       blackHole(WitnessBox(value: iteration))
@@ -85,17 +95,45 @@ private final class WitnessBox {
   init(value: Int) { self.value = value }
 }
 
-/// An allocation ceiling that must hold at every reported percentile.
+/// How far an allocation count may drift from its baseline before the gate
+/// fires, at every reported percentile.
 ///
-/// Allocation counts are not timings. They came back byte-identical from p0 to
-/// p100 across more than a thousand samples, so there is no distribution to
-/// leave headroom for and a ceiling that only bound p90 would be leaving the
-/// tail unguarded for no reason.
-private func allocationCeiling(_ limit: Int) -> BenchmarkThresholds {
-  BenchmarkThresholds(
+/// Two things about upstream's thresholds are easy to get wrong, and `M5-11`
+/// got both wrong first and then measured its way out.
+///
+/// They are **tolerances on the difference from a baseline**, not ceilings on
+/// a value, despite being spelled `absolute`. Confirmed empirically: a
+/// "ceiling" tightened below the measured cost left the check green. Absolute
+/// ceilings are a different command — `thresholds check` against static
+/// threshold files — and those belong to `M6-11d` with the timing gates.
+///
+/// They compare **raw sums, not the scaled per-operation figures the table
+/// prints**. These benchmarks scale by `.kilo`, so the seven mallocs a steady
+/// turn shows in the report are 7,000 in a threshold comparison, and one extra
+/// allocation per operation is a drift of 1,000.
+///
+/// That second fact is what makes this number chooseable rather than guessed.
+/// Process-global malloc counting is reliable, upstream says, "only for
+/// single-threaded benchmarks with quiescent background allocation", and this
+/// process is not quiescent: across forty-plus measured runs, strays appear at
+/// **two raw allocations**, at any percentile, in roughly one run in seven.
+/// Meanwhile the smallest regression that could possibly matter — one
+/// allocation added per operation — is **1,000**.
+///
+/// So the two populations are three orders of magnitude apart, and 100 sits
+/// between them with room on both sides: fifty times the largest noise ever
+/// observed, and a tenth of the smallest real regression. A tolerance of zero
+/// is the tempting choice and the wrong one; it failed roughly one run in
+/// seven, and a gate that cries wolf teaches everyone to rerun.
+///
+/// The absolute numbers this pins against live in perf.md §9.6 — that a steady
+/// turn costs seven mallocs and `box[key]` costs none.
+private func allocationDrift() -> BenchmarkThresholds {
+  let tolerance = 100
+  return BenchmarkThresholds(
     absolute: [
-      .p0: limit, .p25: limit, .p50: limit, .p75: limit, .p90: limit, .p99: limit,
-      .p100: limit,
+      .p0: tolerance, .p25: tolerance, .p50: tolerance, .p75: tolerance, .p90: tolerance,
+      .p99: tolerance, .p100: tolerance,
     ]
   )
 }
@@ -122,11 +160,11 @@ let allocationBenchmarks: @Sendable () -> Void = {
     .releaseCount: measuredNotGated,
   ]
 
-  // PERF-01. The ceiling is the **measured** cost of a turn on the simple
-  // core — seven mallocs, seven object allocations — not zero. Zero is what
-  // the data-oriented core has to reach (perf.md §9.6); until it does, a
-  // ceiling at the current cost is what keeps the number from drifting upward
-  // unnoticed, which a zero threshold nobody can satisfy would not.
+  // PERF-01. A steady turn costs seven mallocs and seven object allocations
+  // on the simple core, not zero. Zero is what the data-oriented core has to
+  // reach (perf.md §9.6); until it does, pinning the count against any drift
+  // is what keeps the cost from creeping upward unnoticed, which a zero
+  // threshold nobody can satisfy would not.
   Benchmark(
     "perf-01-steady-turn",
     configuration: .init(
@@ -135,9 +173,9 @@ let allocationBenchmarks: @Sendable () -> Void = {
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
       thresholds: ungated.merging([
-        .mallocCountTotal: allocationCeiling(7),
-        .objectAllocCount: allocationCeiling(7),
-      ]) { _, ceiling in ceiling }
+        .mallocCountTotal: allocationDrift(),
+        .objectAllocCount: allocationDrift(),
+      ]) { _, gate in gate }
     )
   ) { benchmark in
     await AllocationHarness.settle()
@@ -147,8 +185,8 @@ let allocationBenchmarks: @Sendable () -> Void = {
     benchmark.stopMeasurement()
   }
 
-  // PERF-06. Zero, exactly as the scenario words it, and measured to be zero
-  // at every percentile.
+  // PERF-06. Measured at zero, exactly as the scenario words it, at every
+  // percentile — so here the drift gate and the scenario's own claim coincide.
   Benchmark(
     "perf-06-value-reference",
     configuration: .init(
@@ -157,9 +195,9 @@ let allocationBenchmarks: @Sendable () -> Void = {
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
       thresholds: ungated.merging([
-        .mallocCountTotal: allocationCeiling(0),
-        .objectAllocCount: allocationCeiling(0),
-      ]) { _, ceiling in ceiling }
+        .mallocCountTotal: allocationDrift(),
+        .objectAllocCount: allocationDrift(),
+      ]) { _, gate in gate }
     )
   ) { benchmark in
     let count = benchmark.scaledIterations.count

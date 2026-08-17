@@ -33,9 +33,9 @@ public struct ManualCog<Value> {
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// The correctness core stores an inline `AnyHashable?`. The type is not
+  /// A `CogKey?`, whose physical layout `CogKey` chooses (perf §4). The type is not
   /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
-  internal let key: AnyHashable?
+  internal let key: CogKey?
 
   /// Declares a source of state that starts at `startingValue`.
   ///
@@ -118,7 +118,7 @@ public struct ManualCog<Value> {
   /// ``ManualCogBox`` uses this path so repeated subscripting stays inert and
   /// lightweight. Context state is still created only when the reference is
   /// first read or written.
-  internal init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
+  internal init(descriptor: ManualCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
   }

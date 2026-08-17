@@ -10,7 +10,7 @@ internal struct CogCycleStep {
   /// Human-readable declaration label rendered if the cycle is reported.
   let label: CogLabel
   /// Erased state key, or `nil` for a keyless declaration.
-  let key: AnyHashable?
+  let key: CogKey?
 
   /// Captures diagnostic identity from one active derived state.
   init(state: any DerivedCogSettleState) {
@@ -22,7 +22,7 @@ internal struct CogCycleStep {
   /// The declaration label plus key as it appears in a cycle path.
   var name: String {
     guard let key else { return "\(label)" }
-    return "\(label)[\(key.base)]"
+    return "\(label)[\(key.erased.base)]"
   }
 }
 

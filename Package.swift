@@ -8,7 +8,7 @@ import PackageDescription
 ///
 /// The library flags never vary. Only the *test* targets change shape across
 /// the isolation matrix (see `testSettings` below).
-let librarySettings: [SwiftSetting] = [
+let baseLibrarySettings: [SwiftSetting] = [
   .swiftLanguageMode(.v6),
   .defaultIsolation(MainActor.self),
   .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
@@ -81,6 +81,54 @@ default:
     """
   )
 }
+
+// MARK: - The value-reference layout seam
+
+// How a keyed value reference physically carries its key is open until
+// benchmarks settle it (perf §4, §9). `M5-09a` puts that choice behind
+// `swift/Sources/Cog/Internal/CogKey.swift` and selects it here, the same way
+// the isolation matrix above is selected: read an environment variable, lower
+// it to a define, and fail loudly on anything unrecognized.
+//
+// This is a *library* setting rather than a test setting, because the layout is
+// part of the library's representation — a test cannot choose it for code it did
+// not compile. It is still test-and-benchmark-only in intent: unset means
+// `inline`, which is the correctness core's layout, so an ordinary consumer
+// resolving this package gets exactly the build they would have got before the
+// seam existed.
+//
+// A typo is a hard error rather than a fall back to `inline`, for the reason the
+// isolation legs give: a mistyped candidate would otherwise buy a green from a
+// layout that never ran.
+
+let requestedValueReferenceLayout =
+  Context.environment["COG_TEST_VALUE_REFERENCE_LAYOUT"] ?? "inline"
+
+var valueReferenceLayoutSettings: [SwiftSetting] = []
+
+/// The layout, mirrored into the *test* targets so a test can compare what the
+/// environment asked for with what the library was actually built as.
+var valueReferenceLayoutTestSettings: [SwiftSetting] = []
+
+switch requestedValueReferenceLayout {
+case "inline":
+  valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_INLINE"))
+  valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE"))
+default:
+  fatalError(
+    """
+    COG_TEST_VALUE_REFERENCE_LAYOUT was \(requestedValueReferenceLayout), which is not a \
+    value-reference layout candidate. Expected inline, or leave it unset for inline.
+    """
+  )
+}
+
+/// Library settings plus the selected value-reference layout.
+///
+/// The base flags never vary; only the layout define does, and only because
+/// `COG_TEST_VALUE_REFERENCE_LAYOUT` asked it to.
+let librarySettings: [SwiftSetting] = baseLibrarySettings + valueReferenceLayoutSettings
+testSettings += valueReferenceLayoutTestSettings
 
 // MARK: - Optional dependencies
 

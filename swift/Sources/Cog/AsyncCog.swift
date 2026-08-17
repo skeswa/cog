@@ -55,7 +55,7 @@ public struct AsyncCog<Value> {
   internal let valueDescriptor: DerivedCogDescriptor<Value>
 
   /// The state-identity key, or `nil` for this keyless public declaration.
-  internal let key: AnyHashable?
+  internal let key: CogKey?
 
   /// Declares one keyless asynchronous value with an explicit resting default.
   ///
@@ -122,7 +122,7 @@ public struct AsyncCog<Value> {
   internal init(
     descriptor: AsyncCogDescriptor<Value>,
     valueDescriptor: DerivedCogDescriptor<Value>,
-    key: AnyHashable?
+    key: CogKey?
   ) {
     self.descriptor = descriptor
     self.valueDescriptor = valueDescriptor

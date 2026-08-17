@@ -18,7 +18,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
   /// Which state of `descriptor` this is, or `nil` for a keyless declaration.
   ///
   /// Used to print names such as `weather[90210]` (§2.4).
-  let key: AnyHashable?
+  let key: CogKey?
 
   /// What this source holds in the latest completed turn or changed debug seed.
   ///
@@ -49,7 +49,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
   var observationBoundary: CogObservationBoundary?
 
   /// The erased key rendered with UI notice history for this boundary.
-  var observationKey: AnyHashable? { key }
+  var observationKey: CogKey? { key }
 
   var label: CogLabel { descriptor.label }
 
@@ -115,7 +115,7 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
   /// Creates the state at its declaration's starting value for this key.
   ///
   /// A per-key starting closure runs here once. Later writes replace its value.
-  init(descriptor: ManualCogDescriptor<Value>, key: AnyHashable?) {
+  init(descriptor: ManualCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
     self.currentValue = descriptor.startingValue(forKey: key)

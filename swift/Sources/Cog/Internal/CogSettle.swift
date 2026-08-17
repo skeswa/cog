@@ -133,7 +133,7 @@ internal protocol DerivedCogSettleState: CogState {
   var descriptorIdentity: ObjectIdentifier { get }
 
   /// The key half of this state's identity, or `nil` for a keyless declaration.
-  var key: AnyHashable? { get }
+  var key: CogKey? { get }
 
   /// Whether this state is on the context's active derived-computation path.
   var isComputing: Bool { get set }
@@ -220,7 +220,7 @@ internal struct CogSettleStack {
   func innermostComputingNames(_ count: Int) -> [String] {
     computingPath.suffix(count).map { state in
       guard let key = state.key else { return "\(state.label)" }
-      return "\(state.label)[\(key.base)]"
+      return "\(state.label)[\(key.erased.base)]"
     }
   }
 

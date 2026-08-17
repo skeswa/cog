@@ -20,7 +20,7 @@ internal final class AsyncCogState<Value>:
   ///
   /// Together with descriptor object identity, this is stable for the full
   /// lifetime of the state and names its context storage slot and task.
-  let key: AnyHashable?
+  let key: CogKey?
 
   /// The declaration half of the context's descriptor-and-key storage identity.
   var descriptorIdentity: ObjectIdentifier { descriptor.identity }
@@ -60,7 +60,7 @@ internal final class AsyncCogState<Value>:
   var observationBoundary: CogObservationBoundary?
 
   /// The erased key rendered with UI notices for this boundary.
-  var observationKey: AnyHashable? { key }
+  var observationKey: CogKey? { key }
   var label: CogLabel { descriptor.label }
 
   /// The declaration's lifetime policy, shared by every key of a box.
@@ -141,7 +141,7 @@ internal final class AsyncCogState<Value>:
   var readerCurrentValue: CogStatus<Value>? { status }
 
   /// Creates an uncomputed, task-free state for one context storage identity.
-  init(descriptor: AsyncCogDescriptor<Value>, key: AnyHashable?) {
+  init(descriptor: AsyncCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
   }
@@ -466,7 +466,7 @@ internal final class AsyncCogState<Value>:
   /// success, and failure history names.
   private var renderedName: String {
     guard let key else { return "\(label)" }
-    return "\(label)[\(key.base)]"
+    return "\(label)[\(key.erased.base)]"
   }
 
   // Written out, and `nonisolated`, per the generic-class release rule.

@@ -49,7 +49,7 @@ public struct CogHistoryEntry {
       return name
     case .cog(let label, let key):
       guard let key else { return "\(label)" }
-      return "\(label)[\(key.base)]"
+      return "\(label)[\(key.erased.base)]"
     case .effect(let label):
       return "\(label)"
     }

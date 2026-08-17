@@ -24,7 +24,7 @@ internal final class DerivedCogState<Value>:
   /// Used to print names such as `isNiceOutside[90210]` (§2.4).
   /// Together with descriptor object identity, the key also determines storage
   /// identity and remains fixed until this state is released.
-  let key: AnyHashable?
+  let key: CogKey?
 
   /// The declaration half of this state's stable descriptor-and-key identity.
   var descriptorIdentity: ObjectIdentifier { descriptor.identity }
@@ -67,7 +67,7 @@ internal final class DerivedCogState<Value>:
   var observationBoundary: CogObservationBoundary?
 
   /// The erased key rendered with UI notice history for this boundary.
-  var observationKey: AnyHashable? { key }
+  var observationKey: CogKey? { key }
 
   /// The declaration label used for diagnostics, history, and UI notices.
   var label: CogLabel { descriptor.label }
@@ -116,7 +116,7 @@ internal final class DerivedCogState<Value>:
   }
 
   /// Creates the state without computing anything.
-  init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
+  init(descriptor: DerivedCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
     self.cachedValue = .none

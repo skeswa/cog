@@ -293,10 +293,13 @@ interposer. Scaled per operation, and byte-identical from p0 to p100 across
 The steady turn does not reach zero on the simple core, which is the expected
 state of the class-state build rather than a defect: §9.1 builds it from class
 states and edge arrays, and §5's no-ARC, no-existential rules are what the
-data-oriented core adopts in M6. PERF-01's ceiling is therefore the measured
-cost, ratcheting downward only, so the number cannot drift upward unnoticed
-while M6 is being built. Zero remains the target M6 has to reach, and `M6-11d`
-is where it becomes the gate.
+data-oriented core adopts in M6. PERF-01 is therefore pinned against _drift_
+rather than against zero — `mise run bench:baseline:check` fails if a steady
+turn's allocation count moves from the recorded baseline by more than 100 raw
+allocations, where one extra allocation per turn is 1,000 (`M5-11` explains the
+units and the noise floor). The cost cannot creep upward unnoticed while M6 is
+being built. Zero remains the target M6 has to reach, and `M6-11d` is where it
+becomes an absolute gate.
 
 Attribution, from the same session, so M6 knows where to look:
 
@@ -312,6 +315,115 @@ Attribution, from the same session, so M6 knows where to look:
 The `peek` figure is worth keeping in view: it is lifetime machinery, not graph
 work, and it is why PERF-01 measures the **tracked** read. A UI read is the
 tracked one, and a UI read is what a steady turn serves.
+
+**Propagation ARC traffic, simple core** — `M5-07a`, same session and
+environment. Two fans over one source, differing only in how many consumers
+hang off it, so subtracting one from the other attributes traffic to
+propagation rather than to the commit boundary. Both deterministic at every
+percentile.
+
+| Shape                                | retains | releases | object allocs | mallocs |
+| ------------------------------------ | ------- | -------- | ------------- | ------- |
+| 1 consumer (`perf-01-steady-turn`)   | 65      | 92       | 7             | 7       |
+| 16 consumers (`perf-02-propagation`) | 1,116   | 2,032    | 26            | 26      |
+| **Marginal, per consumer**           | **≈70** | **≈129** | ≈1.3          | ≈1.3    |
+
+So settling and reading one changed consumer costs about seventy retains and a
+hundred and thirty releases. PERF-02 asks for none of it, and none of it is
+what §5's "no ARC, locks, or existentials in graph walks" rule buys — in M6,
+not here. The simple core walks class states held through existentials, and
+every hop retains. Until the arena core lands, PERF-02 is pinned against drift
+from these numbers, so the traffic cannot grow unnoticed; `M6-11d` is where
+zero becomes the gate.
+
+Worth noting for M6: releases outnumber retains roughly two to one. That is not
+an imbalance — the extra releases are objects created before the measured
+region and freed inside it — but it does mean a change that halves retains
+without touching releases has moved less than half the traffic.
+
+**Thousand-state footprint, simple core** — `M5-07b`, same session and
+environment. Five hundred keyed sources and five hundred keyed consumers, built
+and settled in a fresh context: a thousand states from two declarations, which
+is how a screen actually reaches that number.
+
+| Percentile | resident-memory growth per build |
+| ---------- | -------------------------------- |
+| p50        | 0.87–1.28 MB across five runs    |
+| p100       | 1.28–1.56 MB across five runs    |
+
+**About 1.4 MB for a thousand states — roughly 1.4 KB each.**
+
+Stated as a range on purpose. This is the one metric in §9.6 that is _sampled_
+rather than counted: resident memory is page-granular, and the delta only grows
+on the iterations where the peak actually advances, so p0 reads zero on every
+run once the allocator already holds the pages. The threshold is accordingly a
+mebibyte of drift — about two and a half times the worst spread observed, wide
+enough never to cry wolf and narrow enough that a graph grown to twice its
+footprint fails.
+
+**Lazy boundary objects** — `M5-07c`, same session and environment. Nine
+hundred and eighty-eight keyed sources settled with `peek`, twelve keyed
+consumers read through the tracked subscript: exactly a thousand states, and
+exactly twelve values on screen.
+
+| Metric                  | p0     | p100   | samples |
+| ----------------------- | ------ | ------ | ------- |
+| `observationBoundaries` | **12** | **12** | 2,160   |
+
+Twelve, at every percentile, with a thousand states in the graph. PERF-04 as
+worded, and the only figure in §9.6 that is already exactly what the scenario
+asks for rather than a number to ratchet down.
+
+The gate is exact-drift rather than a tolerance, because this is a count of
+live objects rather than a sampled quantity: a core that started giving every
+state a boundary would report 1,000 where the baseline says 12, and there is no
+noise floor to leave room for. Verified in both directions — pointing the
+tracked reads at all 988 sources fails immediately with
+`Difference Δ 976` against `Threshold Δ 0`.
+
+It is a _custom_ metric because no built-in one expresses it. `objectAllocCount`
+counts allocations over a region, and what PERF-04 claims is about what
+survives, not about what was made.
+
+**Value-reference layout: baseline recorded, candidates pending** —
+`M5-09a`, 2026-08-17. The layout choice now lives behind one internal type,
+`CogKey`, selected at build time by `COG_TEST_VALUE_REFERENCE_LAYOUT` and
+verified by an infrastructure test that compares what the environment asked for,
+what the test target compiled, and what the _library_ compiled — the third
+comparison being the one that matters, since the layout is a library setting
+chosen by a test runner.
+
+The recorded baseline candidate is **inline `AnyHashable`**, the correctness
+core's layout: one existential box per reference, keys of three words or fewer
+stored inline and larger ones allocating. Every number in §9.6 above was
+measured under it, including PERF-06's zero-allocation `box[key]` creation, so
+the interned-token and generic-keyed candidates have something exact to be
+measured against rather than a remembered impression.
+
+**Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
+family where the UI once read `n` rows and now writes and reads exactly one.
+Every other row is pinned to the app context and untouched, so anything that
+scales with `n` is a turn doing work it has no business doing.
+
+| Pinned keys | retains/turn | releases/turn | mallocs/turn | wall clock/turn |
+| ----------- | ------------ | ------------- | ------------ | --------------- |
+| 1           | 68           | 95            | 7            | 2.7 µs          |
+| 100         | 167          | 194           | 7            | 4.8 µs          |
+| 500         | 567          | 594           | 7            | 14 µs           |
+
+**Exactly one retain and one release per pinned key per turn**, and about 23 ns
+of wall clock — linear across all three points, and identical at every
+percentile. Allocations do not scale at all: seven per turn regardless, so
+nothing is _allocated_ per pinned key.
+
+So **a turn currently costs O(pinned keys), not O(changed keys)**. A screen that
+has scrolled past ten thousand rows pays ten thousand retain and release pairs
+on every write, for rows nobody is looking at. That is the cost PERF-07 exists
+to bound; it is now bounded and pinned against drift, and it is a direct target
+for M6, where §5's "no ARC, locks, or existentials in graph walks" and §7's
+dirty-set propagation are the rules that turn it into O(changed). All three
+points stay in the suite so M6 can show the slope going flat rather than merely
+showing one number get smaller.
 
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`

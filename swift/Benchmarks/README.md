@@ -35,9 +35,14 @@ From this directory:
 swift package benchmark
 ```
 
-`mise run bench` wraps it from the repository root once `M5-08b` adds it. The
-plugin always builds release; a debug measurement of a graph library measures
-the optimizer's absence.
+Or `mise run bench` from the repository root, which wraps exactly this and
+passes extra arguments through. The plugin always builds release; a debug
+measurement of a graph library measures the optimizer's absence.
+
+CI builds this package in release on every Swift change (`bench-build`) but
+does **not** run it. A number taken on a machine simultaneously running four
+test legs is a number about contention; `M6-11d` is where measurement joins CI,
+with the thresholds and serialization that needs.
 
 ## What is here today
 
@@ -220,35 +225,86 @@ numbers meant to outlive a session belong in
 [`perf.md`](../../docs/swift/design/perf.md) §9.6 with their environment
 written beside them.
 
-### Known flakiness — `M5-11`
+### Determinism — `M5-11`, settled 2026-08-17
 
-Two intermittent failures were measured while wiring this up, and neither is
-fixed yet:
+`M5-08a` shipped a gate that failed roughly one run in six. It now passes
+**32 consecutive runs**, and both causes were diagnosed rather than papered
+over.
 
-- **`kairo-diamond` crashes the harness roughly one run in six** under full
-  instrumentation — about 2,200 mallocs per iteration at a couple of thousand
-  iterations a second, exiting with signal 11. The same scenario runs 20,000
-  iterations clean outside the harness, and the low-allocation `perf-` family
-  never crashes, so the finger points at instrumentation under a high
-  allocation rate rather than at Cog.
-- **`perf-06-value-reference` occasionally reports a malloc deviation** against
-  its zero ceiling. Upstream documents malloc counting as process-global and
-  "only reliable for single-threaded benchmarks with quiescent background
-  allocation", which would explain it.
+**The crash was a null ARC hook.** `kairo-diamond` exited with SIGSEGV, and the
+crash report named the frame exactly:
 
-The gated baseline is therefore filtered to the `perf-` family as a stopgap: a
-gate that fails one run in six is not a gate. `M5-11` owns diagnosing both and
-either fixing them or bounding them explicitly, and `M5-10` cannot close over
-it.
+```text
+EXC_BAD_ACCESS (SIGSEGV) KERN_INVALID_ADDRESS at 0x0
+  0x0
+  _swift_release_hook
+  _swift_release_adapter
+  …
+  completeTaskWithClosure
+```
+
+A call _through_ a null release hook, from the concurrency runtime finishing a
+task while the harness tore its ARC hooks down between iterations. The tasks
+are Cog's own and are not a leak: that benchmark builds and drops a whole
+`Cogs` per iteration, each `peek` renews a `whileObserved` grace sleeper, and
+dropping the context cancels them — with the cancellation completing on another
+thread a moment later. A whole-scenario benchmark is therefore, by
+construction, not the "single-threaded benchmark with quiescent background
+allocation" upstream says its process-global counters require.
+
+Bounded where it belongs: **`kairo-diamond` carries no counting metrics** —
+wall clock, instructions, and peak memory only. Measured 0 failures in 20 runs
+without them against 2 in 12 with them. The allocation benchmarks keep their
+ARC and malloc metrics; their measured regions are small and quiescent, and
+they never crashed once across dozens of runs.
+
+The same non-quiescence is why the allocation benchmarks now register **first**
+and the scenario benchmark last, and why `AllocationHarness.settle()` builds
+its context once instead of once per iteration. Counting is process-global, so
+a context torn down in one benchmark drops allocations into whichever benchmark
+measures next.
+
+**The deviation was a threshold read two ways.** Two corrections came out of
+this, both worth knowing before writing another threshold:
+
+- Upstream's `absolute` thresholds are **tolerances on the difference from a
+  baseline**, not ceilings on a value. Proven by tightening a "ceiling" below
+  the measured cost and watching the check stay green. Absolute ceilings are
+  `thresholds check` against static threshold files — `M6-11d`'s job.
+- They compare **raw sums, not the scaled per-operation figures the table
+  prints**. At `scalingFactor: .kilo`, the seven mallocs a steady turn reports
+  are 7,000 to a threshold, and one extra allocation per operation is a drift
+  of 1,000.
+
+That second fact makes the tolerance chooseable instead of guessed. Strays from
+background allocation measured at **2 raw**, at any percentile, in roughly one
+run in seven; the smallest regression that could matter is **1,000**. The
+tolerance is **100** — fifty times the largest noise ever seen, a tenth of the
+smallest real regression. A tolerance of zero is the tempting choice and the
+wrong one: it failed about one run in seven, and a gate that cries wolf teaches
+everyone to rerun.
+
+Both directions are verified. 32 consecutive `bench:baseline:check` runs pass;
+adding a single allocation per steady turn fails immediately at p0 with
+`Difference Δ 1000` against `Threshold Δ 100`.
+
+**Still open upstream.** The null-hook crash is a robustness bug in the
+harness — a hook pointer read and called without guarding teardown — and it is
+bounded here, not fixed. Any future benchmark whose measured region drops a
+`Cogs`, spawns tasks, or otherwise leaves work on another thread should stay
+off the ARC and malloc metrics for the same reason.
 
 ## What is coming
 
-| Task               | Adds                                                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| `M5-05c`           | the pinned dependency, the selected allocator configuration, and one real MainActor benchmark |
-| `M5-06`            | zero-allocation steady-turn and `box[key]` creation benchmarks                                |
-| `M5-07a`–`M5-07d`  | ARC traffic, peak memory, boundary-object counts, pinned-key notice traffic                   |
-| `M5-08a`, `M5-08b` | pinned-environment baselines, `mise run bench`, and the non-gating `bench-build` CI job       |
+Everything M5 planned for this package has landed. What remains is
+representation work, and it arrives as new _shapes_ rather than new machinery:
+
+| Task               | Adds                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                                 |
+| `M5-09e`           | keyed diamonds and key churn measured under all three layouts, so perf.md can settle the choice                                                        |
+| `M6-05b`           | mostly-static and high-churn graphs under all three arena edge layouts                                                                                 |
+| `M6-11a`–`M6-11d`  | comparison adapters for raw `@Observable` and swift-state-graph, and CI gating with the timing thresholds this package deliberately does not carry yet |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
-here when `M5-07a` establishes it.
+here when a count moves and the question becomes which line moved it.

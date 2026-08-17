@@ -31,8 +31,9 @@
 /// closure are MainActor-isolated.
 ///
 /// Keys may be any `Hashable` type. Prefer a small domain type such as
-/// `ZipCode` or `Document.ID` over `String` or `Int`. Cog stores keys as
-/// `AnyHashable`; keys larger than three words may allocate.
+/// `ZipCode` or `Document.ID` over `String` or `Int`. The baseline layout
+/// stores keys as `AnyHashable`, where anything larger than three words may
+/// allocate; `CogKey` is where that choice lives (perf §4).
 @MainActor
 public struct ManualCogBox<Value, Key: Hashable> {
   /// Stable declaration identity and behavior shared by every key and box copy.
@@ -205,7 +206,7 @@ public struct ManualCogBox<Value, Key: Hashable> {
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A value reference for that key, usable anywhere a ``ManualCog`` is.
   public subscript(key: Key) -> ManualCog<Value> {
-    ManualCog(descriptor: descriptor, key: key)
+    ManualCog(descriptor: descriptor, key: CogKey(key))
   }
 
   /// Builds the descriptor shared by the per-key initializer overloads.
@@ -220,14 +221,14 @@ public struct ManualCogBox<Value, Key: Hashable> {
     label: CogLabel
   ) -> ManualCogDescriptor<Value> {
     ManualCogDescriptor(
-      startingValueForKey: { key in
-        guard let key = key as? Key else {
+      startingValueForKey: { erasedKey in
+        guard let key = erasedKey?.erased.base as? Key else {
           // `fatalError`, not `preconditionFailure`: the message is composed,
           // and an optimized `preconditionFailure` drops composed messages.
           fatalError(
             """
             A state of \(label) was asked to start at a value for \
-            \(String(describing: key)), which is not a \(Key.self). Only this \
+            \(String(describing: erasedKey?.erased)), which is not a \(Key.self). Only this \
             box builds value references for its own declaration, so this context's state \
             storage is corrupt.
             """

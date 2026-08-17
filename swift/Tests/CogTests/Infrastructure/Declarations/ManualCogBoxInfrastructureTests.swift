@@ -26,8 +26,8 @@ import Testing
 @Test func `ManualCogBoxInfrastructure puts the key on the value reference`() {
   let weather = ManualCogBox<Int, Int>(0)
 
-  #expect(weather[90210].key == AnyHashable(90210))
-  #expect(weather[10001].key == AnyHashable(10001))
+  #expect(weather[90210].key == CogKey(90210))
+  #expect(weather[10001].key == CogKey(10001))
   #expect(weather[90210].key == weather[90210].key)
   #expect(weather[90210].key != weather[10001].key)
 }
@@ -83,7 +83,8 @@ import Testing
 
   _ = cogs.peek(here)
   #expect(cogs.states.count == 1)
-  #expect(cogs.states[CogStateIdentity(descriptor: there.descriptor.identity, key: 10001)] == nil)
+  #expect(
+    cogs.states[CogStateIdentity(descriptor: there.descriptor.identity, key: CogKey(10001))] == nil)
 }
 
 @MainActor
@@ -94,7 +95,7 @@ import Testing
   let state = cogs.manualState(for: weather[90210])
 
   #expect("\(state.label)" == "weather")
-  #expect(state.key == AnyHashable(90210))
+  #expect(state.key == CogKey(90210))
 }
 
 // MARK: - Starting values
@@ -103,16 +104,16 @@ import Testing
 @Test func `ManualCogBoxInfrastructure answers a constant starting value for any key`() {
   let box = ManualCogBox<Int, Int>(3)
 
-  #expect(box.descriptor.startingValue(forKey: 90210) == 3)
-  #expect(box.descriptor.startingValue(forKey: 10001) == 3)
+  #expect(box.descriptor.startingValue(forKey: CogKey(90210)) == 3)
+  #expect(box.descriptor.startingValue(forKey: CogKey(10001)) == 3)
 }
 
 @MainActor
 @Test func `ManualCogBoxInfrastructure answers a per-key starting value from the closure`() {
   let box = ManualCogBox<Int, Int> { key in key * 2 }
 
-  #expect(box.descriptor.startingValue(forKey: 5) == 10)
-  #expect(box.descriptor.startingValue(forKey: 6) == 12)
+  #expect(box.descriptor.startingValue(forKey: CogKey(5)) == 10)
+  #expect(box.descriptor.startingValue(forKey: CogKey(6)) == 12)
 }
 
 @MainActor
