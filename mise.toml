@@ -47,6 +47,16 @@ run = "node {{config_root}}/tools/swift-test.mjs default"
 description = "Run the Swift tests across all four isolation-matrix legs"
 run = "node {{config_root}}/tools/swift-test.mjs matrix"
 
+[tasks."test:value-references"]
+description = "Run the Swift tests across all value-reference layouts"
+run = """
+set -euo pipefail
+for layout in inline interned generic; do
+  echo "==> value-reference layout ${layout}"
+  COG_TEST_VALUE_REFERENCE_LAYOUT="${layout}" node "{{config_root}}/tools/swift-test.mjs" default
+done
+"""
+
 [tasks."test:release"]
 description = "Run the Swift tests on the default leg in release configuration"
 run = "node {{config_root}}/tools/swift-test.mjs release"

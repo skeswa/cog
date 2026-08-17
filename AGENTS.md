@@ -110,6 +110,8 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
+- `mise run test:value-references` — the full behavior suite under the
+  `inline`, `interned`, and `generic` value-reference layouts.
 - `mise run test:release` — the default leg in release configuration.
 - `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
   simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
