@@ -320,9 +320,10 @@ for reproduction.
 ## Runtime comparison adapters
 
 `M6-11a` adds a common integer-named graph adapter and ports the Kairo diamond,
-deep, broad, and unstable workloads through it. Each workload builds and drives
-the same shape for Cog and raw Observation, then checks its final value and
-exact computation count before the harness may report a number. This keeps an
+deep, broad, and unstable workloads through it. `M6-11b` adds the
+swift-state-graph adapter to that same surface. Each workload builds and drives
+the same shape for every runtime, then checks its final value and exact
+computation count before the harness may report a number. This keeps an
 incorrect or unexpectedly duplicated computation from hiding inside timing.
 
 The raw adapter is deliberately literal: mutable values are `@Observable`
@@ -336,10 +337,20 @@ implementation rather than the standard library's registrar. The unstable
 workload's repeated branch reads therefore run repeatedly under raw
 Observation; its checked count records that semantic difference explicitly.
 
+The swift-state-graph adapter uses the library's primitives directly:
+`Stored<Int>`, `Computed<Int>`, `wrappedValue`, and `withGraphTransaction`.
+Root reads use the same Swift Observation tracking scope as the other adapters.
+The benchmark package pins swift-state-graph **0.28.0**
+(`e602fcdb19342a38c135543e7228b3fd60753dc7`), the tagged release whose source
+the adapter was reviewed against. The dependency and its macro toolchain remain
+inside this separate package; the shipped Cog package still resolves no
+dependencies.
+
 The exact-name workloads are:
 
 - `perf-10-cog-{diamond,deep,broad,unstable}`; and
-- `perf-10-observation-{diamond,deep,broad,unstable}`.
+- `perf-10-observation-{diamond,deep,broad,unstable}`; and
+- `perf-10-state-graph-{diamond,deep,broad,unstable}`.
 
 Set `COG_TEST_CORE=simple` or `COG_TEST_CORE=arena` when building the benchmark
 package to choose which implementation the `cog` adapter measures. The adapter
@@ -352,11 +363,11 @@ adapter. No comparison-only branch enters either core.
 Everything M5 planned for this package has landed. What remains is
 representation work, and it arrives as new _shapes_ rather than new machinery:
 
-| Task               | Adds                                                                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                            |
-| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1                                               |
-| `M6-11b`–`M6-11d`  | the swift-state-graph adapter, pinned four-runtime results, and CI gating with the timing thresholds this package deliberately does not carry yet |
+| Task               | Adds                                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes            |
+| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1               |
+| `M6-11c`, `M6-11d` | pinned four-runtime results and CI gating with the timing thresholds this package deliberately does not carry yet |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
 here when a count moves and the question becomes which line moved it.

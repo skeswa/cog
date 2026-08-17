@@ -10,6 +10,9 @@ enum RuntimeComparisonHarness {
 
     /// Swift's registrar and property instrumentation without a graph layer.
     case observation
+
+    /// swift-state-graph's stored and memoized computed node graph.
+    case stateGraph = "state-graph"
   }
 
   /// Builds, runs, and checks one complete comparison sample.
@@ -18,6 +21,7 @@ enum RuntimeComparisonHarness {
       switch backend {
       case .cog: CogRuntimeComparisonGraph()
       case .observation: RawObservationComparisonGraph()
+      case .stateGraph: StateGraphRuntimeComparisonGraph()
       }
     let result = workload.run(on: graph)
     result.check()
@@ -44,7 +48,7 @@ let runtimeComparisonBenchmarks: @Sendable () -> Void = {
   ]
 
   for workload in RuntimeComparisonWorkload.allCases {
-    for backend in [RuntimeComparisonHarness.Backend.cog, .observation] {
+    for backend in [RuntimeComparisonHarness.Backend.cog, .observation, .stateGraph] {
       Benchmark(
         "perf-10-\(backend.rawValue)-\(workload.rawValue)",
         configuration: .init(
