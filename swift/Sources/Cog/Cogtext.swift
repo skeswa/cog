@@ -597,7 +597,7 @@ extension Cogs {
   /// value instead of creating a mirror or a second task.
   internal func asyncState<Value>(
     descriptor: AsyncCogDescriptor<Value>,
-    key: AnyHashable?
+    key: CogKey?
   ) -> AsyncCogState<Value> {
     state(CogStateIdentity(descriptor: descriptor.identity, key: key)) {
       AsyncCogState(descriptor: descriptor, key: key)

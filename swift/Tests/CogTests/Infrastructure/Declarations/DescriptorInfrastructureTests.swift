@@ -79,13 +79,13 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 @Test func `DescriptorInfrastructure builds a keyed value reference without a second descriptor`() {
   // `box[key]` builds a new value reference for the same declaration.
   let source = ManualCog<Int>(0)
-  let keyed = ManualCog(descriptor: source.descriptor, key: 5)
-  let sameKeyAgain = ManualCog(descriptor: source.descriptor, key: 5)
+  let keyed = ManualCog(descriptor: source.descriptor, key: CogKey(5))
+  let sameKeyAgain = ManualCog(descriptor: source.descriptor, key: CogKey(5))
 
   #expect(keyed.descriptor.identity == source.descriptor.identity)
-  #expect(keyed.key == AnyHashable(5))
+  #expect(keyed.key == CogKey(5))
   #expect(keyed.key == sameKeyAgain.key)
-  #expect(keyed.key != AnyHashable(6))
+  #expect(keyed.key != CogKey(6))
 }
 
 // MARK: - Starting values

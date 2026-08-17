@@ -49,17 +49,17 @@ internal struct CogHistoryLog {
   }
 
   /// Records a staged value that changed at the commit boundary.
-  mutating func recordWrite(label: CogLabel, key: AnyHashable?) {
+  mutating func recordWrite(label: CogLabel, key: CogKey?) {
     record(CogHistoryEntry(event: .write, turn: turn, subject: .cog(label, key)))
   }
 
   /// Records one run of a derived cog's selector.
-  mutating func recordRecompute(label: CogLabel, key: AnyHashable?) {
+  mutating func recordRecompute(label: CogLabel, key: CogKey?) {
     record(CogHistoryEntry(event: .recompute, turn: turn, subject: .cog(label, key)))
   }
 
   /// Records one changed UI boundary notice.
-  mutating func recordNotice(label: CogLabel, key: AnyHashable?) {
+  mutating func recordNotice(label: CogLabel, key: CogKey?) {
     record(CogHistoryEntry(event: .notice, turn: turn, subject: .cog(label, key)))
   }
 
@@ -90,7 +90,7 @@ internal enum CogHistorySubject {
   /// A named outer turn, recorded before its staging body begins.
   case turn(String)
   /// One descriptor label and optional key involved in graph propagation.
-  case cog(CogLabel, AnyHashable?)
+  case cog(CogLabel, CogKey?)
   /// One reaction or watch label whose body ran.
   case effect(CogLabel)
 }

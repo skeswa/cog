@@ -179,5 +179,5 @@ private func escapedWriterMessage<Value>(
 @MainActor
 private func escapedWriterTargetName<Value>(_ valueReference: ManualCog<Value>) -> String {
   guard let key = valueReference.key else { return "\(valueReference.descriptor.label)" }
-  return "\(valueReference.descriptor.label)[\(key.base)]"
+  return "\(valueReference.descriptor.label)[\(key.erased.base)]"
 }

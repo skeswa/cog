@@ -124,7 +124,7 @@ internal protocol CogObservationState: CogState {
   /// The permanent UI boundary after first access, or `nil` before any UI read.
   var observationBoundary: CogObservationBoundary? { get set }
   /// The erased state key included in debug notice history.
-  var observationKey: AnyHashable? { get }
+  var observationKey: CogKey? { get }
   /// Sends the field-appropriate Observation mutations for this state's change.
   func notifyObservationChange()
 }

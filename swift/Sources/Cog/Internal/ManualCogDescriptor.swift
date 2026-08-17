@@ -46,7 +46,7 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// ``ManualCogBox`` wraps the typed closure before storing it here, so key
   /// erasure never reaches user code.
   init(
-    startingValueForKey: @escaping @MainActor (AnyHashable?) -> Value,
+    startingValueForKey: @escaping @MainActor (CogKey?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime = .app,
     label: CogLabel
@@ -64,7 +64,7 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// initializer unless a future releasable-manual policy recreates the state.
   ///
   /// - Parameter key: The state's key, or `nil` for a keyless declaration.
-  func startingValue(forKey key: AnyHashable?) -> Value {
+  func startingValue(forKey key: CogKey?) -> Value {
     switch start {
     case .constant(let value):
       return value
@@ -97,5 +97,5 @@ internal enum ManualCogStartingValue<Value> {
   case constant(Value)
 
   /// Each state starts at what this returns for its own key.
-  case perKey(@MainActor (AnyHashable?) -> Value)
+  case perKey(@MainActor (CogKey?) -> Value)
 }

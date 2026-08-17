@@ -46,9 +46,9 @@ public struct Cog<Value> {
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// The correctness core stores an inline `AnyHashable?`. The type is not
+  /// A `CogKey?`, whose physical layout `CogKey` chooses (perf §4). The type is not
   /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
-  internal let key: AnyHashable?
+  internal let key: CogKey?
 
   /// Declares one keyless value computed by `selector`.
   ///
@@ -119,7 +119,7 @@ public struct Cog<Value> {
   ///
   /// ``CogBox`` and async value projections use this path so subscripting
   /// packages identity without allocating another descriptor or graph state.
-  internal init(descriptor: DerivedCogDescriptor<Value>, key: AnyHashable?) {
+  internal init(descriptor: DerivedCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
   }

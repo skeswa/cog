@@ -385,6 +385,21 @@ It is a _custom_ metric because no built-in one expresses it. `objectAllocCount`
 counts allocations over a region, and what PERF-04 claims is about what
 survives, not about what was made.
 
+**Value-reference layout: baseline recorded, candidates pending** —
+`M5-09a`, 2026-08-17. The layout choice now lives behind one internal type,
+`CogKey`, selected at build time by `COG_TEST_VALUE_REFERENCE_LAYOUT` and
+verified by an infrastructure test that compares what the environment asked for,
+what the test target compiled, and what the _library_ compiled — the third
+comparison being the one that matters, since the layout is a library setting
+chosen by a test runner.
+
+The recorded baseline candidate is **inline `AnyHashable`**, the correctness
+core's layout: one existential box per reference, keys of three words or fewer
+stored inline and larger ones allocating. Every number in §9.6 above was
+measured under it, including PERF-06's zero-allocation `box[key]` creation, so
+the interned-token and generic-keyed candidates have something exact to be
+measured against rather than a remembered impression.
+
 **Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
 family where the UI once read `n` rows and now writes and reads exactly one.
 Every other row is pinned to the app context and untouched, so anything that

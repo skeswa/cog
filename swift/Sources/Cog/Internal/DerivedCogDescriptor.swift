@@ -21,7 +21,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// Explicit `@MainActor` keeps the closure isolated under any caller default
   /// (§1.2, §2.5, §7). Synchronous selectors cannot throw in v1, which makes a
   /// throwing declaration fail to compile (`DECL-12`).
-  private let selector: @MainActor (Reader<Value>, AnyHashable?) -> Value
+  private let selector: @MainActor (Reader<Value>, CogKey?) -> Value
 
   /// Whether two computed values count as the same state, or `nil` when every
   /// recomputation must conservatively count as a change.
@@ -29,7 +29,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
 
   /// Declares a derived value computed by `selector`.
   init(
-    selector: @escaping @MainActor (Reader<Value>, AnyHashable?) -> Value,
+    selector: @escaping @MainActor (Reader<Value>, CogKey?) -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime = .whileObserved(grace: nil),
     label: CogLabel
@@ -45,7 +45,7 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// Keyless and keyed declarations share this call site. The state must have
   /// installed its tracking scope and active-computation marker first; this
   /// descriptor deliberately cannot start settlement or publish a result.
-  func compute(_ reader: Reader<Value>, key: AnyHashable?) -> Value {
+  func compute(_ reader: Reader<Value>, key: CogKey?) -> Value {
     selector(reader, key)
   }
 

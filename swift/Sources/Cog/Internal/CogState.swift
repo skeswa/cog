@@ -44,13 +44,13 @@ internal protocol CogState: AnyObject {
 /// The type is `nonisolated` because `Hashable` requires nonisolated equality.
 /// It is still built on the MainActor.
 ///
-/// The correctness core uses `AnyHashable?`; benchmarks may change the layout
-/// (perf §4, §9).
+/// The key's physical layout is `CogKey`'s to choose, selected at build time
+/// and open until benchmarks settle it (perf §4, §9).
 internal nonisolated struct CogStateIdentity: Hashable {
   /// The declaration, by process identity.
   let descriptor: ObjectIdentifier
 
   /// Which state of `descriptor` this names, or `nil` for a keyless
   /// declaration.
-  let key: AnyHashable?
+  let key: CogKey?
 }
