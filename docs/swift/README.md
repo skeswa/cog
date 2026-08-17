@@ -54,12 +54,11 @@ The design lives in [design/](./design/); the implementation effort lives in
    swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
    two libraries line up, tracked reads versus capture lists, and the
    name-by-name decisions that came out of it.
-7. **[design/lint.md](./design/lint.md): lint tooling.** The proposed
+7. **[design/lint.md](./design/lint.md): lint tooling.** The accepted
    first-party linter that turns the usage conventions into an executable
    style guide: a SwiftSyntax tool developed in-repo as a nested
-   `swift/Lint` package and shipped behind SwiftPM plugins, the first five
-   rules, and the rollout. Hardened by a first `/vette` pass; not yet
-   settled.
+   `swift/Lint` package and shipped behind SwiftPM plugins, the first six
+   rules, their Cog-coupled release, and the rollout.
 8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the
    release process.
@@ -343,13 +342,20 @@ These choices are settled; §10 of the core document has the full record.
   review reconsidered thirteen of them against swift-state-graph and renamed
   none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
   reasoning, and the one name with a revisit trigger.
+- First-party lint tooling is settled as a syntax-only `coglint` developed in
+  a nested package and shipped as a prebuilt binary behind SwiftPM plugins. Its
+  six initial rules cover declarations, view/runtime boundaries, primitive
+  ownership, bootstrap-time state, source privacy, and multi-read runtime
+  helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
+  the root manifest is the v1 distribution unless an unused-artifact fetch
+  measurement selects the version-coupled manifest-repository fallback.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, persistence helpers, and the first-party lint tooling
-proposed in [design/lint.md](./design/lint.md). Also open are several edge
-behaviors: what a stream's status does when its sequence ends or throws, whether
-equal stream elements commit distinct turns, whether a failed `.queue` run
-stops the queue, and debounce/throttle timing modifiers (deferred backlog).
+debug-history tools, persistence helpers, the lint products' final names and
+severity policy, and the stable rule-page URL shape. Also open are several
+edge behaviors: what a stream's status does when its sequence ends or throws,
+whether equal stream elements commit distinct turns, whether a failed `.queue`
+run stops the queue, and debounce/throttle timing modifiers (deferred backlog).
 Value-reference layout, edge layout, and hash tables also remain open until
 benchmarks choose them.
 

@@ -1056,20 +1056,24 @@ keeps its slot and points at the table above instead of renumbering the rest.
     replaces the effects-struct `install(in:)` convention. See "Mechanism
     lifecycle?", "Mechanism controller?", and "Op, transaction, or turn?"
     above.
-27. **Lint tooling:** [lint.md](./lint.md) (August 16, 2026) proposes a
-    first-party `coglint` — a standalone SwiftSyntax linter developed in this
-    repository as a nested `swift/Lint` package under the same isolation gate
-    the plan gives `swift/Benchmarks`, delivered as a prebuilt binary behind
-    SwiftPM plugins, starting with five rules that enforce settled
-    conventions and link each finding to its documentation. Unvetted: the
-    vehicle, the consumer distribution channel (plugin products on the root
-    manifest versus a distribution-only manifest repo), rule severities, and
-    rollout remain open until a `/vette` review accepts the design. A first
-    `/vette` pass on August 16, 2026 hardened the rule set: primitives are
-    confined to `CogOps` extensions repo-wide rather than view-scoped,
-    repackaging matches read-fed bodies rather than `Cogs` parameters, and
-    the source-access rule accepts `private` and `fileprivate` alike,
-    leaving spelling to the formatter. Concept record: issue #318.
+27. **Lint tooling:** settled on August 17, 2026 after two `/vette` reviews.
+    [lint.md](./lint.md) specifies a standalone syntax-only `coglint`,
+    developed in this repository as a nested `swift/Lint` package under the
+    same isolation gate as `swift/Benchmarks` and delivered as a prebuilt
+    binary behind SwiftPM build-tool and command plugins. The first six rules
+    enforce declaration suffixes, no `Cogs` through view initializers,
+    primitives only in `CogOps`, initial app state through a mechanism,
+    private writable sources, and no multi-read value helper on `Cogs` or
+    `CogOps`. Classification combines written nominal types with initializer
+    evidence, so an explicit type plus `.init` is not an accidental evasion;
+    the multi-read rule stays lexical instead of becoming a data-flow engine.
+    Cog, `coglint`, and the rule articles in `Cog.docc` share one version and
+    release. V1 vends the plugins from the root manifest unless a measured
+    unused-artifact cost selects a distribution-only manifest repository;
+    that fallback remains generated, version-coupled, and published only
+    after the matching rule pages. Product names, severities, the stable URL
+    shape, later rules, and Kotlin timing remain open. Concept record: issue
+    #318.
 
 ---
 
