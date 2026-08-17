@@ -202,8 +202,8 @@ These choices are settled; §10 of the core document has the full record.
 - `commit` is the only write entry point. Its scalar overload keeps ordinary
   setters compact; its writer overload makes related writes atomic. Ops are
   normal methods in `CogOps` extensions, so `Cogs` and a mechanism's
-  controller share every op. `fileprivate` and `.readOnly` control which code may
-  name writable state. A turn ID stops an escaped writer from writing later.
+  controller share every op. `private` or `fileprivate` plus `.readOnly`
+  control which code may name writable state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
   from reactions wait in a FIFO queue as new turns. A debug turn-chain guard

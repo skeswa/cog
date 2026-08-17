@@ -291,13 +291,13 @@ factory function, or a cross-file conformance defeats the classifier, and
 every rule built on it inherits that documented miss as a non-triggering
 fixture.
 
-| Rule                     | Enforces                                                                       | Confidence                   |
-| ------------------------ | ------------------------------------------------------------------------------ | ---------------------------- |
-| `cog-declaration-suffix` | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)   | high                         |
-| `no-cogs-in-view-init`   | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)     | high                         |
-| `primitives-only-in-ops` | primitives are called only inside `CogOps` extensions (core §3.2; conventions) | high                         |
-| `manual-cog-private`     | writable sources are `private` (core §4; core §10 "Who may write?")            | highest                      |
-| `no-cog-repackaging`     | reads bind to domain locals, never projection bundles (core §3.1; conventions) | heuristic; strong forms only |
+| Rule                     | Enforces                                                                             | Confidence                   |
+| ------------------------ | ------------------------------------------------------------------------------------ | ---------------------------- |
+| `cog-declaration-suffix` | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)         | high                         |
+| `no-cogs-in-view-init`   | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)           | high                         |
+| `primitives-only-in-ops` | primitives are called only inside `CogOps` extensions (core §3.2; conventions)       | high                         |
+| `manual-cog-private`     | writable sources are `private` or `fileprivate` (core §4; core §10 "Who may write?") | highest                      |
+| `no-cog-repackaging`     | reads bind to domain locals, never projection bundles (core §3.1; conventions)       | heuristic; strong forms only |
 
 ### 4.1 `cog-declaration-suffix`
 
@@ -340,18 +340,17 @@ inside the op's `extension CogOps` body.
 ### 4.4 `manual-cog-private`
 
 A declaration the classifier recognizes as `ManualCog` or `ManualCogBox`
-must be `private`. Any other access level — including the implicit
-`internal` of a bare `let` — is a violation; the fix is to mark the source
-`private` and expose `.readOnly` or a derived cog. The spelling agrees with
-the formatter: `.swift-format` enforces `FileScopedDeclarationPrivacy`,
-which rewrites file-scope `fileprivate` to the semantically identical
-`private`, so a linter demanding `fileprivate` would fight a check CI
-already runs. The core record's wording — "`fileprivate`, or `private`
-inside a type" (core §4; core §10 "Who may write?") — predates that
-formatter rule and takes the matching one-word spelling amendment when this
-design is accepted. Access modifiers are literal tokens and the declaration
-form is unambiguous, so the rule has essentially no false-positive surface;
-it is the natural first rule to implement end to end.
+must be `private` or `fileprivate`; either spelling satisfies the rule. Any
+wider access level — including the implicit `internal` of a bare `let` — is
+a violation; the fix is to narrow the source and expose `.readOnly` or a
+derived cog. Accepting both spellings keeps the rule semantic rather than
+stylistic: at file scope the two are identical, and spelling there already
+belongs to the formatter, whose `FileScopedDeclarationPrivacy` pass
+rewrites file-scope `fileprivate` to `private` — a linter taking a side
+would either fight or duplicate that check. Access modifiers are literal
+tokens and the declaration form is unambiguous, so the rule has essentially
+no false-positive surface; it is the natural first rule to implement end to
+end.
 
 ### 4.5 `no-cog-repackaging`
 
