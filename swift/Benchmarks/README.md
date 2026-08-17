@@ -133,27 +133,59 @@ probe"; this is that spelling.
 Writing anything into the package directory (`baseline update`, `init`) needs
 `--allow-writing-to-package-directory`.
 
-### Left to the next probe
+## Allocator and isolation compatibility
 
-`M5-05bb` owns three things this decision could not settle by reading source:
+Settled by `M5-05bb` on 2026-08-17. Full record and raw output:
+[`probes/M5-05bb-allocator-isolation.md`](./probes/M5-05bb-allocator-isolation.md).
 
-1. **ARC metrics on macOS.** They are collected two different ways. On Linux
-   with Swift 6.3 the package uses a runtime interposer; everywhere else,
-   including this project's macOS runner, it installs
-   `swift_runtime_set_{alloc_object,retain,release}_hook`. Whether those hooks
-   are live in the Swift runtime Xcode 26.6 ships is an empirical question, and
-   PERF-02 depends on the answer.
-2. **The malloc backend on the pinned toolchain.** The interposer is on by
-   default and opts out through the `MallocInterposer` trait or
-   `BENCHMARK_DISABLE_MALLOC_INTERPOSER` (with `BENCHMARK_DISABLE_JEMALLOC`
-   kept as a backward-compatible alias). Which backend is actually active in
-   the pinned environment decides whether the malloc thresholds mean anything.
-3. **MainActor benchmarks.** Upstream's Swift 6 guidance is a
-   `@Sendable () -> Void` benchmarks closure, and Cog's graph is
-   MainActor-confined. Whether that needs an isolation shim — and only if the
-   probe proves one necessary — is `M5-05bb` into `M5-05c`.
+| Question                    | Answer                                                                                   | Consequence                                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Malloc backend on Swift 6.3 | The custom interposer, on by default                                                     | Malloc metrics are live and populated                                                                        |
+| ARC counters on macOS       | Live, via `swift_runtime_set_{alloc_object,retain,release}_hook`                         | PERF-02 is measurable by the harness; `xctrace` stays for per-callsite attribution only                      |
+| MainActor benchmarks        | Supported, with a structural shim (below)                                                | No dependency, flag, or unchecked conformance needed                                                         |
+| MainActor hop cost          | **0 mallocs, 0 object allocs**; ~9 µs and a floor of 3 retains / 4 releases              | `mallocCountTotal == 0` is reachable; ARC and wall-clock thresholds measure against a floor rather than zero |
+| VM versus bare metal        | Not applicable — `M0-05a` settled on persistent bare metal, so there is no VM to compare | Baselines are recorded on the `cog-mini` runner under the pinned Xcode, and nowhere else                     |
 
-Also for `M5-05c`: once the dependency is a version rather than a path,
+### The isolation shim
+
+`Benchmark` is not `Sendable` and the benchmarks closure is nonisolated, so the
+obvious spelling does not compile:
+
+```swift
+await MainActor.run { benchmark.startMeasurement() }
+// error: sending 'benchmark' risks causing data races
+```
+
+The shape that works, and the rule for every benchmark here:
+
+> Keep the graph behind a **MainActor-isolated harness type** and let the
+> nonisolated benchmark body `await` into it. Nothing non-`Sendable` crosses in
+> either direction — the handle stays outside, the graph stays inside, and only
+> `Int`s pass between them. Read `benchmark.scaledIterations` outside and pass
+> its `count` in; bracket the `await` with `startMeasurement()` /
+> `stopMeasurement()` so setup stays out of the measured region.
+
+### The silent zero, and the witness that has to exist
+
+With `BENCHMARK_DISABLE_MALLOC_INTERPOSER=1`, the same allocating workload
+reports `mallocCountTotal == 0` while `objectAllocCount` reads 12 right beside
+it. `Free (total)` and `Malloc (bytes total)` disappear from the table
+altogether.
+
+**The headline threshold of this whole plan passes trivially in a misconfigured
+environment.** So `M5-06` and `M5-08a` owe a witness: a benchmark that is known
+to allocate, with a **non-zero** `mallocCountTotal` floor asserted on it, so a
+run with the interposer off fails loudly instead of passing gloriously. A gate
+that only ever asserts zeros cannot tell "no allocations" from "no
+measurement".
+
+Flipping the trait on an existing `.build` fails with
+`missing required module 'MallocInterposerC'`; a clean build succeeds. Treat
+backend changes as clean-build events.
+
+### Still for `M5-05c`
+
+Once the dependency is a version rather than a path,
 SwiftPM writes `swift/Benchmarks/Package.resolved`. Commit it. A measurement
 tool whose resolve is not reproducible produces numbers that are not either.
 This is a different file from the root `Package.resolved`, which must never be
@@ -161,13 +193,12 @@ committed and which `swift-docs.yml` fails the build over.
 
 ## What is coming
 
-| Task               | Adds                                                                                                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `M5-05bb`          | allocator behavior across Swift 6.2/6.3, MainActor compatibility, VM-versus-bare-metal noise on the runner |
-| `M5-05c`           | the pinned dependency, the selected allocator configuration, and one real MainActor benchmark              |
-| `M5-06`            | zero-allocation steady-turn and `box[key]` creation benchmarks                                             |
-| `M5-07a`–`M5-07d`  | ARC traffic, peak memory, boundary-object counts, pinned-key notice traffic                                |
-| `M5-08a`, `M5-08b` | pinned-environment baselines, `mise run bench`, and the non-gating `bench-build` CI job                    |
+| Task               | Adds                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| `M5-05c`           | the pinned dependency, the selected allocator configuration, and one real MainActor benchmark |
+| `M5-06`            | zero-allocation steady-turn and `box[key]` creation benchmarks                                |
+| `M5-07a`–`M5-07d`  | ARC traffic, peak memory, boundary-object counts, pinned-key notice traffic                   |
+| `M5-08a`, `M5-08b` | pinned-environment baselines, `mise run bench`, and the non-gating `bench-build` CI job       |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
 here when `M5-07a` establishes it.
