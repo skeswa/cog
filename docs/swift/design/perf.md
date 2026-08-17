@@ -316,6 +316,31 @@ The `peek` figure is worth keeping in view: it is lifetime machinery, not graph
 work, and it is why PERF-01 measures the **tracked** read. A UI read is the
 tracked one, and a UI read is what a steady turn serves.
 
+**Propagation ARC traffic, simple core** — `M5-07a`, same session and
+environment. Two fans over one source, differing only in how many consumers
+hang off it, so subtracting one from the other attributes traffic to
+propagation rather than to the commit boundary. Both deterministic at every
+percentile.
+
+| Shape                                | retains | releases | object allocs | mallocs |
+| ------------------------------------ | ------- | -------- | ------------- | ------- |
+| 1 consumer (`perf-01-steady-turn`)   | 65      | 92       | 7             | 7       |
+| 16 consumers (`perf-02-propagation`) | 1,116   | 2,032    | 26            | 26      |
+| **Marginal, per consumer**           | **≈70** | **≈129** | ≈1.3          | ≈1.3    |
+
+So settling and reading one changed consumer costs about seventy retains and a
+hundred and thirty releases. PERF-02 asks for none of it, and none of it is
+what §5's "no ARC, locks, or existentials in graph walks" rule buys — in M6,
+not here. The simple core walks class states held through existentials, and
+every hop retains. Until the arena core lands, PERF-02 is pinned against drift
+from these numbers, so the traffic cannot grow unnoticed; `M6-11d` is where
+zero becomes the gate.
+
+Worth noting for M6: releases outnumber retains roughly two to one. That is not
+an imbalance — the extra releases are objects created before the measured
+region and freed inside it — but it does mean a change that halves retains
+without touching releases has moved less than half the traffic.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

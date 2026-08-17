@@ -949,7 +949,11 @@ is needed.
   Allocating nothing (`mallocCountTotal == 0`) is the target; the simple core
   does not reach it, so pinning the count against drift is what stops the cost
   creeping upward until the data-oriented core does.
-- **PERF-02.** Propagation does no retain or release traffic.
+- **PERF-02.** Propagation's retain and release traffic is what perf.md
+  records and no more; the recorded cost only ever ratchets downward. Doing
+  none of it is the target (perf §5); the simple core walks class states, so
+  pinning the traffic against drift is what stops it growing until the
+  data-oriented core reaches zero.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
   baseline threshold recorded in perf.md. While no baseline exists, this
   check is red, never skipped.

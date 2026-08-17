@@ -46,6 +46,7 @@ let benchmarks: @Sendable () -> Void = {
   // Upstream discovers exactly one `benchmarks` closure per target, so every
   // file registers through here.
   allocationBenchmarks()
+  propagationBenchmarks()
 
   // Timing over the shared Kairo diamond, and **no counting metrics at all**.
   //
