@@ -210,6 +210,20 @@ internal struct CogSettleStack {
     frames.popLast()
   }
 
+  /// The innermost `count` steps of the active computation path, outermost
+  /// first, rendered for a diagnostic.
+  ///
+  /// The cold-nesting guard names the chain it stopped in, the way the cycle
+  /// diagnostic names the loop it found. Only the innermost slice: a chain long
+  /// enough to trip the bound is too long to print, and its tail is the part
+  /// that shows the caller which declarations are stacked.
+  func innermostComputingNames(_ count: Int) -> [String] {
+    computingPath.suffix(count).map { state in
+      guard let key = state.key else { return "\(state.label)" }
+      return "\(state.label)[\(key.base)]"
+    }
+  }
+
   /// The cycle that entering `state` would close, or `nil` for a new path step.
   ///
   /// The common path checks one Boolean. A detected cycle scans and copies the
@@ -292,6 +306,25 @@ extension Cogs {
   internal func settle(_ root: any DerivedCogSettleState) {
     defer { drainQueuedTurnsIfPossible() }
 
+    // Cold first reads are the one settle path that cannot be flattened. A
+    // state's dependency set is known only after its selector has run, so the
+    // enter frame of a never-computed state has no parents to schedule; its
+    // selector runs, reads an uncomputed dependency, and that read starts a
+    // whole new walk inside this one. Warm re-settlement never does this,
+    // because the parents are already known and scheduled iteratively.
+    //
+    // The nesting is therefore bounded by the Swift stack rather than by the
+    // frame buffer, and the failure it produces is a stack smash with no
+    // usable backtrace. Counting the walks and trapping first turns that into
+    // a diagnosis (GRAPH-14).
+    settleDepth += 1
+    defer { settleDepth -= 1 }
+    if settleDepth > Self.maximumSettleDepth {
+      // `fatalError`, not `preconditionFailure`: the message is composed, and
+      // an optimized build drops composed `preconditionFailure` messages.
+      fatalError(coldSettleDepthMessage())
+    }
+
     // A nested pull appends above this checkpoint and pops only its own frames.
     let boundary = settleStack.count
     settleStack.pushEnter(root)
@@ -333,5 +366,41 @@ extension Cogs {
         }
       }
     }
+  }
+}
+
+extension Cogs {
+  /// How many settle walks may nest before Cog stops and explains itself.
+  ///
+  /// Fixed rather than derived from the remaining stack, so one graph fails the
+  /// same way everywhere. The real ceilings measured on 2026-08-16 vary by an
+  /// order of magnitude — roughly 6,100 cold links in release on an 8 MiB macOS
+  /// main stack, but roughly 770 in release and 240 in debug on iOS's 1 MiB —
+  /// and a bound that moved with them would let a graph pass in the simulator
+  /// and crash on a phone. This sits below the smallest of them with room to
+  /// spare, and far above any chain of never-read cogs a screen plausibly
+  /// builds.
+  internal static let maximumSettleDepth = 128
+
+  /// What Cog says when a first read nests further than it will follow.
+  ///
+  /// Names the innermost declarations so the caller can see which chain
+  /// stacked, and says the two things that actually resolve it: read from the
+  /// source end, or shorten the chain.
+  private func coldSettleDepthMessage() -> String {
+    let innermost = settleStack.innermostComputingNames(8)
+    let chain = innermost.joined(separator: " -> ")
+    return """
+      Reading a Cog needed \(settleDepth) nested computations, past the limit \
+      of \(Self.maximumSettleDepth). Cog computes a derived cog the first time \
+      something reads it, and a first computation that reads a cog which has \
+      never been computed has to compute that one inline — so reading the far \
+      end of a long chain of never-read cogs nests one computation per link \
+      and would exhaust the stack. The innermost links were: \(chain). Read \
+      the chain from its source end first, so each link is already computed \
+      when the next one reads it, or make the chain shorter. Cogs that have \
+      been computed once never nest again: later changes settle iteratively, \
+      however deep the graph is.
+      """
   }
 }
