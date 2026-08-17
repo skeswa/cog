@@ -194,6 +194,53 @@ every malloc threshold depends on.
 This is a different file from the **root** `Package.resolved`, which must never
 be committed and which `swift-docs.yml` fails the build over.
 
+## Baselines
+
+```console
+mise run bench:baseline:update [name]   # record, with the environment beside it
+mise run bench:baseline:check  [name]   # compare, refusing to cross environments
+```
+
+A benchmark number means nothing without the machine and toolchain that
+produced it, so `update` writes a fingerprint — architecture, host, OS, Xcode,
+Swift, harness and interposer versions, allocator backend — next to the
+baseline, and `check` refuses to compare against a baseline recorded elsewhere.
+A cross-environment comparison does not produce an obviously wrong answer; it
+produces a plausible one, which is worse.
+
+`check` also runs the witness first. `perf-witness-allocating` must report a
+non-zero malloc count, or every zero-allocation threshold in the suite is
+passing because nothing is being measured — see the silent zero above.
+Upstream thresholds are upper bounds and cannot express a floor, so the floor
+lives in `tools/bench-baseline.mjs`.
+
+Baselines live in the git-ignored `.benchmarkBaselines/`. Upstream calls the
+stored format unstable, and a baseline is a statement about one machine;
+numbers meant to outlive a session belong in
+[`perf.md`](../../docs/swift/design/perf.md) §9.6 with their environment
+written beside them.
+
+### Known flakiness — `M5-11`
+
+Two intermittent failures were measured while wiring this up, and neither is
+fixed yet:
+
+- **`kairo-diamond` crashes the harness roughly one run in six** under full
+  instrumentation — about 2,200 mallocs per iteration at a couple of thousand
+  iterations a second, exiting with signal 11. The same scenario runs 20,000
+  iterations clean outside the harness, and the low-allocation `perf-` family
+  never crashes, so the finger points at instrumentation under a high
+  allocation rate rather than at Cog.
+- **`perf-06-value-reference` occasionally reports a malloc deviation** against
+  its zero ceiling. Upstream documents malloc counting as process-global and
+  "only reliable for single-threaded benchmarks with quiescent background
+  allocation", which would explain it.
+
+The gated baseline is therefore filtered to the `perf-` family as a stopgap: a
+gate that fails one run in six is not a gate. `M5-11` owns diagnosing both and
+either fixing them or bounding them explicitly, and `M5-10` cannot close over
+it.
+
 ## What is coming
 
 | Task               | Adds                                                                                          |

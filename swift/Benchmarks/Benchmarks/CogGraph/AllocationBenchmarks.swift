@@ -108,6 +108,19 @@ let allocationBenchmarks: @Sendable () -> Void = {
   let metrics: [BenchmarkMetric] = [
     .mallocCountTotal, .objectAllocCount, .retainCount, .releaseCount, .wallClock,
   ]
+  // Measured, reported, and deliberately not gated. A metric with thresholds
+  // on neither side is skipped by `baseline check`, which is the right answer
+  // for wall clock and ARC in M5: timing gates belong to M6 (`M6-11d`,
+  // generous absolute thresholds), and upstream's default relative threshold
+  // is 5% — tight enough that ordinary jitter would fail a check that has
+  // nothing to say about allocations. A gate that cries wolf is worse than no
+  // gate, because it teaches everyone to rerun.
+  let measuredNotGated = BenchmarkThresholds()
+  let ungated: [BenchmarkMetric: BenchmarkThresholds] = [
+    .wallClock: measuredNotGated,
+    .retainCount: measuredNotGated,
+    .releaseCount: measuredNotGated,
+  ]
 
   // PERF-01. The ceiling is the **measured** cost of a turn on the simple
   // core — seven mallocs, seven object allocations — not zero. Zero is what
@@ -121,10 +134,10 @@ let allocationBenchmarks: @Sendable () -> Void = {
       warmupIterations: 2,
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
-      thresholds: [
+      thresholds: ungated.merging([
         .mallocCountTotal: allocationCeiling(7),
         .objectAllocCount: allocationCeiling(7),
-      ]
+      ]) { _, ceiling in ceiling }
     )
   ) { benchmark in
     await AllocationHarness.settle()
@@ -143,10 +156,10 @@ let allocationBenchmarks: @Sendable () -> Void = {
       warmupIterations: 2,
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
-      thresholds: [
+      thresholds: ungated.merging([
         .mallocCountTotal: allocationCeiling(0),
         .objectAllocCount: allocationCeiling(0),
-      ]
+      ]) { _, ceiling in ceiling }
     )
   ) { benchmark in
     let count = benchmark.scaledIterations.count
@@ -155,16 +168,20 @@ let allocationBenchmarks: @Sendable () -> Void = {
     benchmark.stopMeasurement()
   }
 
-  // The control. See `allocateDeliberately`. No threshold: upstream's are
-  // upper bounds and what this benchmark needs is a floor, which `M5-08a` has
-  // to assert outside the harness.
+  // The control. See `allocateDeliberately`. No ceiling of its own: upstream
+  // thresholds are upper bounds and what this benchmark needs is a floor, which
+  // `mise run bench:baseline:check` asserts outside the harness.
   Benchmark(
     "perf-witness-allocating",
     configuration: .init(
       metrics: metrics,
       warmupIterations: 2,
       scalingFactor: .kilo,
-      maxDuration: .seconds(3)
+      maxDuration: .seconds(3),
+      thresholds: ungated.merging([
+        .mallocCountTotal: measuredNotGated,
+        .objectAllocCount: measuredNotGated,
+      ]) { _, ungatedMetric in ungatedMetric }
     )
   ) { benchmark in
     let count = benchmark.scaledIterations.count

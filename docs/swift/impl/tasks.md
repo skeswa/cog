@@ -1216,9 +1216,25 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   _Depends: M5-09d._
   _Verify: recorded comparison and selected-layout rationale._
   _Greens: PERF-08._
+- **M5-11** _(Infrastructure)_ — Make the benchmark gate deterministic.
+  `M5-08a` measured two intermittent failures on the pinned harness: the
+  whole-scenario `kairo-diamond` benchmark crashes the runner roughly one run
+  in six under full instrumentation, at about 2,200 mallocs per iteration,
+  while 20,000 iterations of the same scenario run clean outside the harness;
+  and `perf-06-value-reference` occasionally reports a malloc deviation
+  against its zero ceiling, which upstream's process-global counting can
+  explain and which a gate cannot tolerate. Diagnose both, then either fix
+  them or bound them explicitly — a workload cap, a metric set, or an upstream
+  issue with a recorded workaround. `M5-08a` filters the gated baseline to the
+  `perf-` family as a stopgap; this task is what lets the filter narrow or
+  widen on evidence rather than on convenience.
+  _Depends: M5-08a._
+  _Verify: thirty consecutive `mise run bench:baseline:check` runs pass, and
+  the disposition of each failure mode is recorded in
+  `swift/Benchmarks/README.md`._
 - **M5-10** _(Gate)_ — Close M5 with scenario tests, benchmark build,
   baselines, records, and the selected value-reference layout green.
-  _Depends: M4-05e, M5-09e._
+  _Depends: M4-05e, M5-09e, M5-11._
   _Verify: `mise run test:matrix`, `mise run bench`, and baseline check._
 
 ## M6 tasks

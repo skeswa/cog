@@ -117,6 +117,16 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
 
+- `mise run bench:baseline:update [name]` — record a benchmark baseline in
+  `swift/Benchmarks` together with the environment that produced it (Xcode,
+  Swift, harness and interposer versions, architecture, host, allocator
+  backend). Defaults to `local`.
+- `mise run bench:baseline:check [name]` — refuse to compare across
+  environments, assert the allocation witness still reports a non-zero malloc
+  count, then check the run against that baseline. Baselines live in the
+  git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
+  outlive a session go in `docs/swift/design/perf.md` §9.6.
+
 The example app uses the same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS

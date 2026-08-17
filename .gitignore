@@ -4,6 +4,13 @@
 .swiftpm/
 Package.resolved.bak
 
+# Benchmark baselines. Upstream calls the stored format unstable, and a
+# baseline is a statement about one machine — numbers meant to outlive a
+# session belong in docs/swift/design/perf.md with their environment beside
+# them. `swift/Benchmarks/Package.resolved` is deliberately NOT ignored.
+.benchmarkBaselines/
+Thresholds/
+
 # Xcode
 DerivedData/
 *.xcuserstate

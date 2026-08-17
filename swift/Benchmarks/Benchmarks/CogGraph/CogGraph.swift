@@ -58,7 +58,20 @@ let benchmarks: @Sendable () -> Void = {
       .instructions,
     ],
     warmupIterations: 2,
-    maxDuration: .seconds(3)
+    maxDuration: .seconds(3),
+    // Reported, never gated. M5 gates allocations, which are exact; timing
+    // gates are M6's (`M6-11d`, generous absolute thresholds), and upstream's
+    // default 5% relative threshold would fail on ordinary jitter.
+    thresholds: [
+      .wallClock: .init(),
+      .mallocCountTotal: .init(),
+      .freeCountTotal: .init(),
+      .peakMemoryResident: .init(),
+      .objectAllocCount: .init(),
+      .retainCount: .init(),
+      .releaseCount: .init(),
+      .instructions: .init(),
+    ]
   )
 
   // Timing over the shared Kairo diamond. Shapes that carry allocation
