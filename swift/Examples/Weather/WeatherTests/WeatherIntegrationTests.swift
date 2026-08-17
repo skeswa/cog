@@ -43,7 +43,7 @@ private final class TrackedWeatherCard {
 
   private func render() {
     withObservationTracking {
-      let weatherCard = WeatherCardReading(cogs: cogs, zip: zip)
+      let weatherCard = cogs.weatherCardReading(for: zip)
       snapshots.append(weatherCard.snapshot)
     } onChange: { [weak self] in
       MainActor.assumeIsolated {

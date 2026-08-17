@@ -12,7 +12,6 @@ struct WeatherApp: App {
         hourlyRefreshInterval: .seconds(5)
       )
     ])
-    cogs.selectCurrentLocation(.newYork)
     _cogs = State(initialValue: cogs)
   }
 

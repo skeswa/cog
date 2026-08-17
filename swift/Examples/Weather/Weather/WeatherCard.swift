@@ -23,7 +23,7 @@ struct WeatherCard: View {
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let weatherCard = WeatherCardReading(cogs: cogs, zip: zip)
+    let weatherCard = cogs.weatherCardReading(for: zip)
 
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
@@ -116,10 +116,11 @@ struct WeatherCard: View {
 
 /// The graph projection consumed by one card render.
 ///
-/// Keeping these reads together lets the body and its Observation test share
-/// the exact same projection without making `Cogs` a view initializer
-/// argument. Constructing the projection inside `body` still registers each
-/// graph and status field read with SwiftUI's active tracking scope.
+/// A plain value: it holds what one render shows, and knows nothing about the
+/// graph it came from. Building it is a method on the runtime
+/// (``Cogs/weatherCardReading(for:)``) rather than an initializer taking one,
+/// so the call site reads `cogs.weatherCardReading(for: zip)` — the same shape
+/// as an op — and no type in this app accepts a `Cogs` argument.
 @MainActor
 struct WeatherCardReading {
   /// The accepted forecast shown while the current request changes kind.
@@ -137,25 +138,35 @@ struct WeatherCardReading {
   let snapshot: WeatherCardSnapshot
   #endif
 
-  /// Reads every graph value the card presents from one settled turn.
+}
+
+extension Cogs {
+  /// Reads every graph value one card render presents, from one settled turn.
   ///
-  /// `Cogs` enters here only after the view resolves it from the environment;
-  /// it is never stored by or forwarded through a view.
-  init(cogs: Cogs, zip: ZipCode) {
-    let weatherForecast = cogs.status[weatherForecastCogs[zip]]
-    let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
-    let receivesHourlyUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
-    let refreshInterval = cogs[refreshIntervalCog]
+  /// Composing several reads as a method on the runtime keeps the call site in
+  /// the same vocabulary as an op, and keeps `Cogs` out of every initializer in
+  /// the app. Called from a view `body`, each read below still registers with
+  /// SwiftUI's active tracking scope, so the card is invalidated by exactly the
+  /// values it showed — and because they are read inside one body, they come
+  /// from one settled turn and cannot tear.
+  ///
+  /// - Parameter zip: Which card's values to read.
+  /// - Returns: The projection that render should show.
+  func weatherCardReading(for zip: ZipCode) -> WeatherCardReading {
+    let weatherForecast = status[weatherForecastCogs[zip]]
+    let isNiceOutside = self[isNiceOutsideCogs[zip]]
+    let receivesHourlyUpdates = self[receivesHourlyUpdatesCogs[zip]]
+    let refreshInterval = self[refreshIntervalCog]
     let report = weatherForecast.value?.weather
 
-    self.report = report
-    self.isNiceOutside = isNiceOutside
-    self.receivesHourlyUpdates = receivesHourlyUpdates
-    self.cadence = refreshInterval?.shortCadenceDescription
-    self.loadStatus = WeatherLoadStatus(weatherForecast)
-    #if DEBUG
-    self.snapshot = WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
-    #endif
+    return WeatherCardReading(
+      report: report,
+      isNiceOutside: isNiceOutside,
+      receivesHourlyUpdates: receivesHourlyUpdates,
+      cadence: refreshInterval?.shortCadenceDescription,
+      loadStatus: WeatherLoadStatus(weatherForecast),
+      snapshot: WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
+    )
   }
 }
 
@@ -219,7 +230,7 @@ private struct RefreshButton: View {
   /// Demands a refresh and reflects its status in the button label.
   var body: some View {
     Button {
-      cogs.refresh(weatherForecastCogs[zip])
+      cogs.refreshForecast(for: zip)
     } label: {
       if status == .refreshing {
         HStack(spacing: 6) {

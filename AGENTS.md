@@ -241,6 +241,34 @@ that runtime.
   `Cogs` parameters remain appropriate at non-view composition boundaries such
   as isolated test harnesses; side effects register as mechanisms in the
   bootstrap call rather than through any later installation.
+- **Wrap every primitive in a named op.** `commit` and `refresh` are how the
+  graph is asked to do something, not what an app calls the asking. Application
+  code — a view action, a button, a mechanism — calls a domain verb from a
+  `CogOps` extension (`cogs.refreshForecast(for: zip)`), never the primitive
+  inline. This keeps the declaration a call site resolves to in the state layer
+  with the rest of it, and it applies to `refresh` for the same reason it
+  applies to `commit`: both are demands on the graph, and neither is domain
+  vocabulary.
+- **Compose multi-value reads as methods on the runtime, not as types that take
+  one.** A view that needs several values at once calls
+  `cogs.weatherCardReading(for: zip)` — a `Cogs` extension returning a plain
+  value — rather than constructing a helper whose initializer accepts `Cogs`.
+  The call site then reads like an op, the projection type stays ignorant of
+  the graph, and no type in an app declares a `Cogs` parameter, so the shape
+  that is forbidden for views is never modelled anywhere near them. Reads made
+  this way still register with the caller's tracking scope, and reads made
+  inside one `body` still come from one settled turn. A projection that is
+  expensive or shared by several views is a derived cog instead, which adds
+  caching and equality gating; a per-render projection of a few values does not
+  need one.
+- **Put initial app state in a mechanism's `operate`, not in the app entry
+  point.** `operate` runs inside bootstrap, so its writes settle before
+  `bootstrapApp` returns and no watcher observes the pre-initial value on the
+  way past. The app entry point bootstraps and retains the runtime; it does not
+  write to it. A test arranges the same starting world by passing the same
+  mechanism to `Cogs.forTesting(mechanisms:)`. `forTesting`'s `seeding:`
+  closure is not the production counterpart of this: it exists to install
+  values without a turn, before anything watches, which is a testing need.
 - **Make Swift source explain its contracts.** Every Swift source file and
   every internal-or-higher declaration needs substantive documentation
   comments. Explain the semantics a maintainer cannot infer from a signature:
