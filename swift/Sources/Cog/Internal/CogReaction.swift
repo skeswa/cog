@@ -142,7 +142,7 @@ internal final class CogReaction: CogState, CogConsumer {
   func releaseDependenciesForContextTeardown() {
     #if COG_CORE_ARENA
     if let cogs {
-      cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies)
+      cogs.arenaCore.releaseReactionLeasesForContextTeardown(&arenaLeasedDependencies)
     } else {
       arenaLeasedDependencies.removeAll(keepingCapacity: true)
     }
@@ -265,7 +265,8 @@ internal final class CogReaction: CogState, CogConsumer {
       cogs.arenaCore.reconcileReactionLeases(
         for: arenaSlot,
         current: &arenaLeasedDependencies,
-        scratch: &arenaLeaseScratch
+        scratch: &arenaLeaseScratch,
+        in: cogs
       )
     }
     #endif
@@ -311,7 +312,7 @@ internal final class CogReaction: CogState, CogConsumer {
   private func releaseExternalLeases() {
     #if COG_CORE_ARENA
     if let cogs {
-      cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies)
+      cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies, in: cogs)
     } else {
       arenaLeasedDependencies.removeAll(keepingCapacity: true)
     }

@@ -255,6 +255,9 @@ public final class Cogs {
     for reaction in reactions {
       reaction.releaseDependenciesForContextTeardown()
     }
+    #if COG_CORE_ARENA
+    arenaCore.prepareForContextTeardown()
+    #endif
     deinitCleanupAcknowledgement?()
   }
 }
@@ -438,6 +441,23 @@ extension Cogs {
     nextLifetimeReleaseCheckAcknowledgement = acknowledgement
   }
 
+  /// Consumes the package-only signal after one grace check completes.
+  ///
+  /// Both storage cores share this context-owned testing seam; the callback
+  /// never enters arena storage or changes release eligibility.
+  internal func acknowledgeLifetimeReleaseCheckIfRequested() {
+    let acknowledgement = nextLifetimeReleaseCheckAcknowledgement
+    nextLifetimeReleaseCheckAcknowledgement = nil
+    acknowledgement?()
+  }
+
+  /// Consumes the package-only signal after one state closure is released.
+  internal func acknowledgeLifetimeReleaseIfRequested() {
+    let acknowledgement = nextLifetimeReleaseAcknowledgement
+    nextLifetimeReleaseAcknowledgement = nil
+    acknowledgement?()
+  }
+
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///
   /// A diagnostic seam for `CogTesting`, not UI API. It reports only the count
@@ -530,9 +550,7 @@ extension Cogs {
     identity: CogStateIdentity,
     generation: UInt64
   ) {
-    let checkAcknowledgement = nextLifetimeReleaseCheckAcknowledgement
-    nextLifetimeReleaseCheckAcknowledgement = nil
-    defer { checkAcknowledgement?() }
+    defer { acknowledgeLifetimeReleaseCheckIfRequested() }
 
     if state.pendingLifetimeReleaseGeneration == generation {
       state.pendingLifetimeReleaseGeneration = nil
@@ -549,9 +567,7 @@ extension Cogs {
 
     releaseUnobservedClosure(startingAt: state)
 
-    let acknowledgement = nextLifetimeReleaseAcknowledgement
-    nextLifetimeReleaseAcknowledgement = nil
-    acknowledgement?()
+    acknowledgeLifetimeReleaseIfRequested()
   }
 
   /// Releases a newly disconnected unobserved dependency closure at the
@@ -706,7 +722,9 @@ extension Cogs {
   ///   declaration's starting value until a turn writes it.
   public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
     #if COG_CORE_ARENA
-    return arenaCore.manualValue(for: valueReference)
+    let value = arenaCore.manualValue(for: valueReference)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    return value
     #else
     let state = manualState(for: valueReference)
     // An `.app` source ignores this. An ephemeral one treats a one-shot read as
@@ -731,7 +749,9 @@ extension Cogs {
   /// - Returns: Its fully settled value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     #if COG_CORE_ARENA
-    return arenaCore.derivedValue(for: valueReference, in: self)
+    let value = arenaCore.derivedValue(for: valueReference, in: self)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    return value
     #else
     let state = derivedState(for: valueReference)
     let value = state.settledValue(in: self)

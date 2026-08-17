@@ -114,6 +114,7 @@ extension Cogs {
 
     #if COG_CORE_ARENA
     arenaCore.writerStage(valueReference, value: value, in: turn)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
     #else
     let state = manualState(for: valueReference)
     state.pendingValue = .some(value)

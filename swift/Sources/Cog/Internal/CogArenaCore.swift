@@ -61,6 +61,13 @@ private final class CogArenaDescriptorRecord {
   /// Reruns one derived row, or `nil` for manual descriptors.
   let recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
 
+  /// Clears this descriptor's typed value cell before a scalar row is reused.
+  ///
+  /// Lifetime expiry starts from an erased slot, so release dispatches once at
+  /// the descriptor boundary instead of storing a closure or existential on
+  /// every arena row.
+  let removeValue: @MainActor (CogArenaSlot) -> Void
+
   /// Erased selector key by global arena row.
   ///
   /// The current vertical slice exercises keyless rows. Keeping keys on the
@@ -77,7 +84,8 @@ private final class CogArenaDescriptorRecord {
     lifetime: CogStateLifetime,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
-    recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
+    recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
+    removeValue: @escaping @MainActor (CogArenaSlot) -> Void
   ) {
     self.identity = identity
     self.label = label
@@ -87,6 +95,7 @@ private final class CogArenaDescriptorRecord {
     self.column = column
     self.commitSource = commitSource
     self.recompute = recompute
+    self.removeValue = removeValue
   }
 
   /// Installs the selector key for one newly allocated row.
@@ -161,6 +170,23 @@ private nonisolated struct CogArenaObservationEntry {
   let boundary: CogObservationBoundary
 }
 
+/// Cold grace-period ownership for one arena row.
+///
+/// The exact arena slot generation rejects a sleeper from a former occupant;
+/// this independent generation rejects a cancelled or renewed sleeper for the
+/// same occupant. Keeping the task out of ``CogArenaStorage`` prevents lifetime
+/// policy from adding a reference-valued column to hot graph walks.
+private struct CogArenaLifetimeEntry {
+  /// Monotonic token advanced before cancellation or replacement.
+  var generation: UInt64 = 0
+
+  /// Generation whose deadline has not yet completed, if any.
+  var pendingGeneration: UInt64?
+
+  /// Sole grace sleeper owned by this exact row occupant.
+  var task: Task<Void, Never>?
+}
+
 /// Context-owned data-oriented graph machinery behind the arena selector.
 ///
 /// Stable public references still name descriptors and keys. This context maps
@@ -209,6 +235,12 @@ internal final class CogArenaCore {
   /// v1, making the boundary itself the durable UI lease while the row's scalar
   /// `boundary` column keeps hot storage to one optional index.
   private var observationEntries: ContiguousArray<CogArenaObservationEntry> = []
+
+  /// Grace metadata indexed by scalar row for installed value states.
+  ///
+  /// Reaction-only rows need no entry. The array grows lazily when a value row
+  /// is installed and entries reset before a released index changes identity.
+  private var lifetimeEntries: ContiguousArray<CogArenaLifetimeEntry> = []
 
   #if DEBUG
   /// Fixed-capacity integer history owned by the arena context.
@@ -338,6 +370,28 @@ internal final class CogArenaCore {
     let location = derivedLocation(for: valueReference)
     settle(location.slot, in: cogs)
     return location.column.current(at: location.slot)
+  }
+
+  /// Renews grace after one transient manual-source demand.
+  ///
+  /// The value operation stays pure so testing seeds and internal tracked reads
+  /// cannot accidentally create a sleeper. Public `peek` and ordinary writes
+  /// call this explicit lifetime half after resolving the same stable identity.
+  func scheduleLifetimeReleaseIfUnobserved<Value>(
+    for valueReference: ManualCog<Value>,
+    in cogs: Cogs
+  ) {
+    let location = manualLocation(for: valueReference)
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
+  }
+
+  /// Renews grace after one transient synchronous-derived demand.
+  func scheduleLifetimeReleaseIfUnobserved<Value>(
+    for valueReference: Cog<Value>,
+    in cogs: Cogs
+  ) {
+    let location = derivedLocation(for: valueReference)
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
   }
 
   /// Reads one source through its lazily allocated Observation boundary.
@@ -537,7 +591,8 @@ internal final class CogArenaCore {
   func reconcileReactionLeases(
     for reaction: CogArenaSlot,
     current: inout ContiguousArray<CogArenaSlot>,
-    scratch: inout ContiguousArray<CogArenaSlot>
+    scratch: inout ContiguousArray<CogArenaSlot>,
+    in cogs: Cogs
   ) {
     _ = requireReactionRow(reaction)
     scratch.removeAll(keepingCapacity: true)
@@ -566,7 +621,7 @@ internal final class CogArenaCore {
       incrementLease(on: producer)
     }
     for producer in current where !scratch.contains(producer) {
-      decrementLease(on: producer)
+      decrementLease(on: producer, schedulingIn: cogs)
     }
 
     swap(&current, &scratch)
@@ -574,12 +629,25 @@ internal final class CogArenaCore {
   }
 
   /// Releases every durable root owned by a cancelled arena reaction.
-  ///
-  /// Grace scheduling follows in M6-10eb; this task establishes the balanced
-  /// scalar ownership count that scheduling will consume.
-  func releaseReactionLeases(_ leases: inout ContiguousArray<CogArenaSlot>) {
+  func releaseReactionLeases(
+    _ leases: inout ContiguousArray<CogArenaSlot>,
+    in cogs: Cogs
+  ) {
     for producer in leases {
-      decrementLease(on: producer)
+      decrementLease(on: producer, schedulingIn: cogs)
+    }
+    leases.removeAll(keepingCapacity: true)
+  }
+
+  /// Balances reaction ownership while the enclosing context is disappearing.
+  ///
+  /// Teardown cancels all arena sleepers in one later pass, so beginning fresh
+  /// grace here would create work that no state in this context can outlive.
+  func releaseReactionLeasesForContextTeardown(
+    _ leases: inout ContiguousArray<CogArenaSlot>
+  ) {
+    for producer in leases {
+      decrementLeaseWithoutScheduling(on: producer)
     }
     leases.removeAll(keepingCapacity: true)
   }
@@ -780,7 +848,8 @@ internal final class CogArenaCore {
       commitSource: { slot, revision, propagation in
         column.commitSource(at: slot, revision: revision, propagatingWith: propagation)
       },
-      recompute: nil
+      recompute: nil,
+      removeValue: { slot in column.remove(at: slot) }
     )
     return (record, column)
   }
@@ -811,7 +880,8 @@ internal final class CogArenaCore {
       commitSource: nil,
       recompute: { core, cogs, slot, key in
         core.recompute(descriptor: descriptor, column: column, slot: slot, key: key, in: cogs)
-      }
+      },
+      removeValue: { slot in column.remove(at: slot) }
     )
     return (record, column)
   }
@@ -824,7 +894,8 @@ internal final class CogArenaCore {
     lifetime: CogStateLifetime,
     column: AnyObject,
     commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
-    recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
+    recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
+    removeValue: @escaping @MainActor (CogArenaSlot) -> Void
   ) -> CogArenaDescriptorRecord {
     guard records.count <= Int(Int32.max) else {
       fatalError("Cog exhausted its Int32 arena descriptor index space.")
@@ -837,7 +908,8 @@ internal final class CogArenaCore {
       lifetime: lifetime,
       column: column,
       commitSource: commitSource,
-      recompute: recompute
+      recompute: recompute,
+      removeValue: removeValue
     )
     recordsByIdentity[identity] = record
     records.append(.passUnretained(record))
@@ -866,18 +938,17 @@ internal final class CogArenaCore {
     let slot = arena.allocate()
     let row = arena.index(of: slot)
     arena.descriptor[row] = record.index
+    resetLifetimeEntry(at: row)
     record.install(key: key, at: row)
     slots[identity] = slot
     return slot
   }
 
-  /// Removes one settled, unobserved derived state from every arena owner.
+  /// Removes one settled, unobserved derived state for the slot-reuse probe.
   ///
-  /// Lifetime integration calls this same sequence once M6 routes lease counts
-  /// through scalar rows. A boundary or subscriber is a durable consumer and
-  /// therefore makes direct release an invariant violation. Dependency edges,
-  /// typed payload, retained key, identity lookup, and scalar slot are cleared
-  /// in that order so no live topology can point at a reusable row.
+  /// Production grace expiry reaches the same erased release sequence. This
+  /// typed entry only proves that the diagnostic names the expected descriptor
+  /// before it deliberately returns the retired token to its caller.
   private func releaseDerivedState<Value>(for valueReference: Cog<Value>) -> CogArenaSlot {
     let identity = CogStateIdentity(
       descriptor: valueReference.descriptor.identity,
@@ -892,26 +963,8 @@ internal final class CogArenaCore {
     guard arena.descriptor[row] == setup.record.index else {
       fatalError("Cog tried to release an arena row through another descriptor.")
     }
-    guard arena.boundary[row] == CogArenaStorage.noIndex else {
-      fatalError("Cog tried to release an arena state pinned by a UI boundary.")
-    }
-    guard arena.leaseCount[row] == 0 else {
-      fatalError("Cog tried to release an arena state with durable leases.")
-    }
-    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
-      fatalError("Cog tried to release an arena state with live subscribers.")
-    }
-    guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
-      fatalError("Cog tried to release an arena state during active graph work.")
-    }
-
-    edges.removeDependencySuffix(of: slot, after: .none, in: arena)
-    setup.column.remove(at: slot)
-    setup.record.removeKey(at: row)
-    guard slots.removeValue(forKey: identity) == slot else {
-      fatalError("Cog removed a different arena slot from state identity storage.")
-    }
-    arena.release(slot)
+    var ignoredDependencies: ContiguousArray<CogArenaSlot> = []
+    releaseValueState(slot, appendingDependenciesTo: &ignoredDependencies)
     return slot
   }
 
@@ -957,20 +1010,215 @@ internal final class CogArenaCore {
   private func incrementLease(on slot: CogArenaSlot) {
     let row = arena.index(of: slot)
     guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
+    cancelPendingLifetimeRelease(on: slot)
     guard arena.leaseCount[row] < UInt32.max else {
       fatalError("A Cog arena state's durable lifetime lease count overflowed.")
     }
     arena.leaseCount[row] += 1
   }
 
-  /// Removes one durable owner without hiding a reaction bookkeeping imbalance.
-  private func decrementLease(on slot: CogArenaSlot) {
+  /// Removes one durable owner and begins grace at the exact zero transition.
+  private func decrementLease(on slot: CogArenaSlot, schedulingIn cogs: Cogs) {
+    decrementLeaseWithoutScheduling(on: slot)
+    let row = arena.index(of: slot)
+    guard arena.leaseCount[row] == 0 else { return }
+    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
+    scheduleLifetimeReleaseIfUnobserved(slot, in: cogs)
+  }
+
+  /// Removes one owner without creating graph work during context teardown.
+  private func decrementLeaseWithoutScheduling(on slot: CogArenaSlot) {
     let row = arena.index(of: slot)
     guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
     guard arena.leaseCount[row] > 0 else {
       fatalError("A Cog arena state's durable lifetime lease count underflowed.")
     }
     arena.leaseCount[row] -= 1
+  }
+
+  /// Starts or renews the sole grace sleeper for one transiently demanded row.
+  ///
+  /// Internal subscribers do not block scheduling. If they still retain the
+  /// state at expiry, the check clears `pendingGeneration` and leaves the row
+  /// for its downstream root's later release cascade.
+  private func scheduleLifetimeReleaseIfUnobserved(
+    _ slot: CogArenaSlot,
+    in cogs: Cogs
+  ) {
+    let row = arena.index(of: slot)
+    let record = descriptorRecord(forRow: row)
+    guard case .whileObserved(let declaredGrace) = record.lifetime else { return }
+    guard arena.leaseCount[row] == 0 else { return }
+    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
+
+    lifetimeEntries[row].task?.cancel()
+    let generation = advanceLifetimeReleaseGeneration(at: row)
+    lifetimeEntries[row].pendingGeneration = generation
+    let grace = declaredGrace ?? cogs.defaultWhileObservedGrace
+    let clock = cogs.clock
+
+    lifetimeEntries[row].task = Task { @MainActor [weak self, weak cogs] in
+      do {
+        try await clock.sleep(for: grace)
+      } catch {
+        return
+      }
+
+      guard let self, let cogs else { return }
+      self.releaseValueStateIfEligible(
+        slot,
+        lifetimeGeneration: generation,
+        in: cogs
+      )
+    }
+  }
+
+  /// Checks one completed grace deadline against its exact row occupant.
+  ///
+  /// The check acknowledgement is consumed even when a lease, boundary,
+  /// subscriber, renewal, release, or slot reuse makes the deadline ineligible.
+  private func releaseValueStateIfEligible(
+    _ slot: CogArenaSlot,
+    lifetimeGeneration: UInt64,
+    in cogs: Cogs
+  ) {
+    defer { cogs.acknowledgeLifetimeReleaseCheckIfRequested() }
+
+    guard arena.contains(slot) else { return }
+    let row = arena.index(of: slot)
+    guard row < lifetimeEntries.count else { return }
+    if lifetimeEntries[row].pendingGeneration == lifetimeGeneration {
+      lifetimeEntries[row].pendingGeneration = nil
+      lifetimeEntries[row].task = nil
+    }
+
+    guard lifetimeEntries[row].generation == lifetimeGeneration else { return }
+    guard arena.leaseCount[row] == 0 else { return }
+    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
+    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
+    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { return }
+
+    releaseUnobservedClosure(startingAt: slot)
+    cogs.acknowledgeLifetimeReleaseIfRequested()
+  }
+
+  /// Releases the root and newly disconnected unobserved dependencies.
+  ///
+  /// A dependency with a future deadline keeps that independent grace. One
+  /// whose own deadline already elapsed while subscribed has no pending token
+  /// and leaves in this same iterative cascade, so internal edges never grant a
+  /// second grace period.
+  private func releaseUnobservedClosure(startingAt root: CogArenaSlot) {
+    var candidates: ContiguousArray<CogArenaSlot> = [root]
+    var index = 0
+
+    while index < candidates.count {
+      let slot = candidates[index]
+      index += 1
+
+      guard arena.contains(slot) else { continue }
+      let row = arena.index(of: slot)
+      guard arena.leaseCount[row] == 0 else { continue }
+      guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { continue }
+      guard arena.boundary[row] == CogArenaStorage.noIndex else { continue }
+      guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { continue }
+      guard slot == root || lifetimeEntries[row].pendingGeneration == nil else { continue }
+
+      releaseValueState(slot, appendingDependenciesTo: &candidates)
+    }
+  }
+
+  /// Removes one exact value row from topology, typed storage, and identity.
+  ///
+  /// Dependencies are captured before edge removal so newly unreferenced
+  /// upstream states can join the same lifetime cascade. Every owner clears
+  /// before the scalar index is returned for reuse.
+  private func releaseValueState(
+    _ slot: CogArenaSlot,
+    appendingDependenciesTo candidates: inout ContiguousArray<CogArenaSlot>
+  ) {
+    let row = arena.index(of: slot)
+    let record = descriptorRecord(forRow: row)
+    guard arena.boundary[row] == CogArenaStorage.noIndex else {
+      fatalError("Cog tried to release an arena state pinned by a UI boundary.")
+    }
+    guard arena.leaseCount[row] == 0 else {
+      fatalError("Cog tried to release an arena state with durable leases.")
+    }
+    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
+      fatalError("Cog tried to release an arena state with live subscribers.")
+    }
+    guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
+      fatalError("Cog tried to release an arena state during active graph work.")
+    }
+
+    var cursor = edges.firstDependency(of: slot.index, in: arena)
+    while cursor != .none {
+      let dependency = edges.dependency(at: cursor)
+      guard dependency.consumer == slot.index else {
+        fatalError("Cog found another consumer's edge in an arena release list.")
+      }
+      let producerRow = liveRow(dependency.producer)
+      candidates.append(
+        CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
+      )
+      cursor = dependency.next
+    }
+
+    let key = record.key(at: row)
+    let identity = CogStateIdentity(descriptor: record.identity, key: key)
+    cancelPendingLifetimeRelease(on: slot)
+    edges.removeDependencySuffix(of: slot, after: .none, in: arena)
+    record.removeValue(slot)
+    record.removeKey(at: row)
+    guard slots.removeValue(forKey: identity) == slot else {
+      fatalError("Cog removed a different arena slot from state identity storage.")
+    }
+    arena.release(slot)
+  }
+
+  /// Cancels a sleeper before a lease, release, or context teardown can race it.
+  private func cancelPendingLifetimeRelease(on slot: CogArenaSlot) {
+    let row = arena.index(of: slot)
+    _ = advanceLifetimeReleaseGeneration(at: row)
+    lifetimeEntries[row].pendingGeneration = nil
+    lifetimeEntries[row].task?.cancel()
+    lifetimeEntries[row].task = nil
+  }
+
+  /// Advances a row's deadline token without permitting stale-token wraparound.
+  private func advanceLifetimeReleaseGeneration(at row: Int) -> UInt64 {
+    guard lifetimeEntries[row].generation < UInt64.max else {
+      fatalError("A Cog arena state's lifetime release generation overflowed.")
+    }
+    lifetimeEntries[row].generation += 1
+    return lifetimeEntries[row].generation
+  }
+
+  /// Installs empty cold metadata for a newly allocated value-row occupant.
+  private func resetLifetimeEntry(at row: Int) {
+    if row >= lifetimeEntries.count {
+      lifetimeEntries.append(
+        contentsOf: repeatElement(CogArenaLifetimeEntry(), count: row + 1 - lifetimeEntries.count)
+      )
+      return
+    }
+
+    lifetimeEntries[row].task?.cancel()
+    lifetimeEntries[row] = CogArenaLifetimeEntry()
+  }
+
+  /// Cancels every arena-owned sleeper before the enclosing context disappears.
+  func prepareForContextTeardown() {
+    for row in lifetimeEntries.indices where lifetimeEntries[row].task != nil {
+      guard lifetimeEntries[row].generation < UInt64.max else {
+        fatalError("A Cog arena state's lifetime release generation overflowed.")
+      }
+      lifetimeEntries[row].generation += 1
+      lifetimeEntries[row].pendingGeneration = nil
+      lifetimeEntries[row].task?.cancel()
+      lifetimeEntries[row].task = nil
+    }
   }
 
   /// Resolves one row's descriptor record without retaining it in the walk.
