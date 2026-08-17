@@ -1335,6 +1335,11 @@ internal final class CogArenaCore {
     in cogs: Cogs
   ) {
     #if DEBUG
+    // Dependency capture ends before equality and publication below. Keep seed
+    // blocked across that complete interval so a selector or comparator cannot
+    // mutate a source and then have this run clean over the resulting dirty mark.
+    cogs.seedBarrierDepth += 1
+    defer { cogs.seedBarrierDepth -= 1 }
     recordHistoryState(event: .recompute, slot: slot)
     #endif
     let previousValue = column.storedValue(at: slot)
