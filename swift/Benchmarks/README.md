@@ -310,8 +310,12 @@ reaction. The measured region neither drops a `Cogs` nor starts grace work, so
 wall clock and instructions can travel beside the process-global malloc,
 object-allocation, retain, and release counters.
 Run each exact benchmark name with `COG_TEST_CORE=arena` and one of
-`COG_TEST_EDGE=pool`, `prefix`, or `inline`; M6-05c records the same-session
-comparison before selecting a candidate.
+`COG_TEST_EDGE=pool`, `prefix`, or `inline`. M6-05c's same-session comparison
+selected the shared pool: it won the expected mostly-static instruction count,
+all candidates tied on p50 wall time and allocations, prefix arrays added ARC
+under churn, and inline-plus-overflow won neither shape. `perf.md` §9.6 records
+the raw comparison and rationale; the selectors retain both losing candidates
+for reproduction.
 
 ## What is coming
 

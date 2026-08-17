@@ -3,8 +3,9 @@
 _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. The value-reference comparison in §9.6 selects inline
-`AnyHashable`; edge, hash-table, and exclusivity layouts remain benchmark-gated.
+an implementation plan. The comparisons in §9.6 select inline `AnyHashable`
+value references and the shared linked edge pool; hash-table and exclusivity
+layouts remain benchmark-gated.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
@@ -97,10 +98,9 @@ Manual, derived, and async states share topology; their descriptors differ in
 how they produce a row. One keyed box stores one compute closure, not one
 closure per key.
 
-### 3.3 Edge layout remains open
+### 3.3 Shared linked edge pool
 
-One candidate translates alien-signals' link object into a 24-byte indexed
-pool entry:
+Cog translates alien-signals' link object into a 24-byte indexed pool entry:
 
 ```swift
 struct Edge {
@@ -116,15 +116,18 @@ dependency list. Indices avoid ARC and weak loads, a free list recycles
 removed edges, and a cursor can reuse edges when a selector reads the same
 dependencies in the same order — zero steady-state allocation and hashing.
 
-This is only a candidate. Benchmarks must compare:
+The M6 comparison measured:
 
 - the shared linked edge pool;
 - per-state arrays with prefix reuse, as in Reactively;
 - small inline dependency storage with overflow, based on Incremental's
   common-case layout.
 
-Alien-signals is strongest on mostly static graphs; Reactively performs well
-when dependencies change often. Cog must measure both.
+The shared pool won the expected mostly-static shape on instructions. The
+prefix candidate won high churn on instructions, but not wall time, while
+adding per-turn ARC. The inline-plus-overflow candidate won neither shape.
+§9.6 records the complete comparison and selection. Both losing candidates
+remain behind test-and-benchmark selectors so the decision stays reproducible.
 
 ### 3.4 Propagation
 
@@ -477,6 +480,46 @@ The selector and both losing candidates remain test-and-benchmark-only so
 COUNT-09 can continue proving behavior parity and the recorded shapes remain
 reproducible. Unset — every ordinary consumer build — selects inline.
 
+**Edge-layout comparison and selection** — `M6-05c`, 2026-08-17, `mactop`
+(Apple Silicon, 12 cores, 24 GB), Darwin 25.4.0, Xcode 26.4 / Apple Swift
+6.3.0, release, harness 1.36.2, malloc interposer 1.4.0. All six runs used the
+same checkout and host session. Each candidate was rebuilt through
+`COG_TEST_CORE=arena` and `COG_TEST_EDGE`; the measured graph stayed alive and
+quiescent across samples so the process-global malloc and ARC counters were
+valid.
+
+Both roots read one stable control and 32 data sources. The mostly-static
+workload changes one value while retaining all 33 edges in the same order. The
+high-churn workload replaces the 32-edge suffix every turn while retaining the
+control edge.
+
+| Layout               | mostly-static p50 |    high-churn p50 | mallocs / objects | static retains / releases | churn retains / releases |
+| -------------------- | ----------------: | ----------------: | ----------------: | ------------------------: | -----------------------: |
+| shared linked pool   | **294 K / 12 µs** |     335 K / 13 µs |             7 / 7 |                 233 / 256 |                228 / 251 |
+| prefix arrays        |     303 K / 12 µs | **321 K / 13 µs** |             7 / 7 |                 233 / 256 |                229 / 252 |
+| inline plus overflow |     304 K / 12 µs |     326 K / 13 µs |             7 / 7 |                 233 / 256 |                228 / 251 |
+
+The workload cells are instructions / wall clock. The static and churn runs
+produced 245–260 and 231–235 samples per candidate, respectively. Instruction
+counts were exact through p90; p100 ranged from 313–331 K for static and
+349–363 K for churn. Wall-clock distributions overlapped.
+
+**Selected: shared linked edge pool.** Mostly-static dependency sets are the
+ordinary graph shape, and the pool executes 3.1–3.4% fewer instructions there
+without moving wall time or allocation counts. Prefix arrays execute 4.2%
+fewer instructions than the pool under deliberately complete suffix churn,
+but all candidates still report 13 µs at p50 and the prefix representation
+adds one retain and one release per turn. That ARC is directly contrary to
+§5's graph-walk rule, and the measured churn result does not justify a nested
+array per state. Inline plus overflow is structurally more complex and wins
+neither workload.
+
+The shared pool is therefore the ordinary arena build. It keeps one compact
+entry per edge, reconciles stable ordered reads in place, and recycles removed
+entries through an index free list without per-edge ARC. Prefix and inline
+remain test-and-benchmark-only so COUNT-09 and PERF-09 can reproduce the
+comparison.
+
 **Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
 family where the UI once read `n` rows and now writes and reads exactly one.
 Every other row is pinned to the app context and untouched, so anything that
@@ -517,8 +560,9 @@ and cannot express one.
   heights. Revisit only if an eager batch mode becomes a requirement.
 - **No locks or atomics in the graph.** Async generation checks live at the
   concurrency boundary, not in graph storage.
-- **No unmeasured representation choice.** Value-reference layout, edge layout, hash
-  tables, and exclusivity attributes wait for benchmarks.
+- **No unmeasured representation choice.** Value-reference and edge layouts
+  are settled by the measurements in §9.6; hash tables and exclusivity
+  attributes wait for benchmarks.
 
 ## Appendix A: costs in current Swift designs
 

@@ -324,8 +324,8 @@ These choices are settled; §10 of the core document has the full record.
   in that region fails immediately in every build, names the cog/key and turn,
   and tells the caller to invoke the op outside derived computation, from event
   handling or a reaction.
-- The runtime will use a data-oriented arena. Public value references remain names, never
-  arena slot handles.
+- The runtime uses a data-oriented arena with a shared linked edge pool. Public
+  value references remain names, never arena slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -357,8 +357,9 @@ severity policy, and the stable rule-page URL shape. Also open are several
 edge behaviors: what a stream's status does when its sequence ends or throws,
 whether equal stream elements commit distinct turns, whether a failed `.queue`
 run stops the queue, and debounce/throttle timing modifiers (deferred backlog).
-Value-reference layout, edge layout, and hash tables also remain open until
-benchmarks choose them.
+Custom hash tables also remain open until benchmarks justify them. Inline
+`AnyHashable` value references and the shared linked edge pool are selected by
+the measurements in design/perf.md §9.6.
 
 ## Prior art
 
