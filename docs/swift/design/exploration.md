@@ -1056,12 +1056,15 @@ keeps its slot and points at the table above instead of renumbering the rest.
     lifecycle?", "Mechanism controller?", and "Op, transaction, or turn?"
     above.
 27. **Lint tooling:** [lint.md](./lint.md) (August 16, 2026) proposes a
-    first-party `coglint` — a standalone SwiftSyntax linter in its own
-    package, delivered as a prebuilt binary behind SwiftPM plugins, starting
-    with five rules that enforce settled conventions and link each finding to
-    its documentation. Unvetted: the vehicle, rule severities, repository
-    placement, and rollout remain open until a `/vette` review accepts the
-    design. Concept record: issue #318.
+    first-party `coglint` — a standalone SwiftSyntax linter developed in this
+    repository as a nested `swift/Lint` package under the same isolation gate
+    the plan gives `swift/Benchmarks`, delivered as a prebuilt binary behind
+    SwiftPM plugins, starting with five rules that enforce settled
+    conventions and link each finding to its documentation. Unvetted: the
+    vehicle, the consumer distribution channel (plugin products on the root
+    manifest versus a distribution-only manifest repo), rule severities, and
+    rollout remain open until a `/vette` review accepts the design. Concept
+    record: issue #318.
 
 ---
 

@@ -56,9 +56,10 @@ The design lives in [design/](./design/); the implementation effort lives in
    name-by-name decisions that came out of it.
 7. **[design/lint.md](./design/lint.md): lint tooling.** The proposed
    first-party linter that turns the usage conventions into an executable
-   style guide: a standalone SwiftSyntax tool behind SwiftPM plugins, the
-   first five rules, and the rollout. A proposal awaiting `/vette`; nothing
-   in it is settled.
+   style guide: a SwiftSyntax tool developed in-repo as a nested
+   `swift/Lint` package and shipped behind SwiftPM plugins, the first five
+   rules, and the rollout. A proposal awaiting `/vette`; nothing in it is
+   settled.
 8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the
    release process.
