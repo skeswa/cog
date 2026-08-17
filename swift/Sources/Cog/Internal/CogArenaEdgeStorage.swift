@@ -127,6 +127,9 @@ internal typealias CogSelectedArenaEdgeStorage = CogLinkedEdgePool
 #elseif COG_EDGE_PREFIX
 /// Concrete edge storage compiled into this arena build.
 internal typealias CogSelectedArenaEdgeStorage = CogPrefixEdgeStorage
+#elseif COG_EDGE_INLINE
+/// Concrete edge storage compiled into this arena build.
+internal typealias CogSelectedArenaEdgeStorage = CogInlineEdgeStorage
 #else
 #error("Package.swift selected no implemented arena edge storage")
 #endif

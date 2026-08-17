@@ -172,11 +172,14 @@ case "arena":
   case "prefix":
     edgeSettings.append(.define("COG_EDGE_PREFIX"))
     edgeTestSettings.append(.define("COG_LEG_EDGE_PREFIX"))
+  case "inline":
+    edgeSettings.append(.define("COG_EDGE_INLINE"))
+    edgeTestSettings.append(.define("COG_LEG_EDGE_INLINE"))
   default:
     fatalError(
       """
       COG_TEST_EDGE was \(requestedEdge ?? "nil"), which is not an implemented arena edge \
-      candidate. Expected pool or prefix, or leave it unset for pool.
+      candidate. Expected pool, prefix, or inline, or leave it unset for pool.
       """
     )
   }

@@ -26,9 +26,8 @@ internal nonisolated enum CogCoreImplementation: String, Sendable {
 
 /// Edge representation compiled for an arena build.
 ///
-/// A simple-core build has no selected arena edge representation. Pool is the
-/// first runnable candidate; later M6 tasks add candidates here only when their
-/// implementations exist.
+/// A simple-core build has no selected arena edge representation. Pool remains
+/// the implicit arena default; the other cases are explicit benchmark candidates.
 internal nonisolated enum CogEdgeImplementation: String, Sendable {
   /// Shared linked edges owned by one indexed pool.
   case pool
@@ -36,9 +35,12 @@ internal nonisolated enum CogEdgeImplementation: String, Sendable {
   /// Per-state dependency and subscriber arrays with prefix recapture.
   case prefix
 
+  /// One inline dependency per state with ordered overflow for additional parents.
+  case inline
+
   /// The edge candidate selected by `COG_TEST_EDGE`, or `nil` for simple.
   static var compiled: CogEdgeImplementation? {
-    #if COG_CORE_SIMPLE && (COG_EDGE_POOL || COG_EDGE_PREFIX)
+    #if COG_CORE_SIMPLE && (COG_EDGE_POOL || COG_EDGE_PREFIX || COG_EDGE_INLINE)
     #error("Package.swift selected an arena edge beside the simple core")
     #elseif COG_CORE_SIMPLE
     nil
@@ -46,6 +48,8 @@ internal nonisolated enum CogEdgeImplementation: String, Sendable {
     .pool
     #elseif COG_CORE_ARENA && COG_EDGE_PREFIX
     .prefix
+    #elseif COG_CORE_ARENA && COG_EDGE_INLINE
+    .inline
     #elseif COG_CORE_ARENA
     #error("Package.swift defined no edge implementation for the arena core")
     #else
