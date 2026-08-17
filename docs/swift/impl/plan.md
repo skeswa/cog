@@ -509,16 +509,27 @@ query caching.
   lifetime, queued-turn history, and per-render Observation retracking
   (MECH-11, LIFE-11, HIST-07, UI-16), and the async refresh-supersession,
   concurrent-cancellation, keyed-release, and failure-honesty corners
-  (ASYNC-35 through ASYNC-39).
+  (ASYNC-35 through ASYNC-39). The M5 port then surfaced one more, and it is
+  the kind this list exists for: GRAPH-03 promised a deep chain settles
+  without exhausting the stack, but its test computed each link as it built
+  it, so it only ever proved the invalidation walk. A _first_ read of a deep
+  chain nests, because a state's dependency set is only known once its
+  selector has run. GRAPH-03 now says which walk it proves, and `M4-14` bounds
+  the other one with a diagnostic instead of a stack smash (GRAPH-14).
 - Verify the four-leg matrix in CI; smoke-test a scratch iOS 17 app that
   consumes the repo URL.
 - Tag `0.1.0` after M1, M2, and M3 are green and LICENSE, README pin
   instructions, and DocC are in place. Benchmark numbers are not required.
   The value-reference layout may change in 0.2 because 0.x minors may break.
-- Once the immutable `0.1.0` tag exists, M5 scenario scaffolding may start
-  while Pages and GitHub Release verification finish; the M5 gate still waits
-  for the published 0.1.0 GitHub Release. Later commits cannot change the tag,
-  so this overlap shortens the critical path without weakening either release.
+- Once the 0.1.0 release candidate is approved, M5 scenario scaffolding may
+  start while the tag, Pages, and GitHub Release verification finish; the M5
+  gate still waits for the published 0.1.0 GitHub Release. The safety property
+  the overlap needs is that the approved commit is immutable, which `M4-05b`
+  establishes — a tag is only a name for a commit that already exists, so
+  later M5 commits cannot change what it will name. This shortens the critical
+  path without weakening either release. If M5 work uncovers a defect that
+  must ship in 0.1.0, it re-enters through a fresh `M4-05b` candidate rather
+  than by moving a tag.
 
 <a id="plan-m5"></a>
 
@@ -576,7 +587,10 @@ query caching.
   per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
-  perf.md; only then settle the layout.
+  perf.md; only then settle the layout. Because this rewrite owns the settle
+  walk, it also carries the cold first-read frame cycle `M4-14` measured: nine
+  of the eleven frames per cold link are Cog's own, so collapsing them raises
+  that bound for free.
 - Behind the same tests and public API: SoA columns (`flags`, `changedAt`,
   `checkedAt`, `deps`, `subs`, `boundary`, `generation`); typed
   per-descriptor value columns with pending and current values; the

@@ -140,6 +140,19 @@ extension CogOps {
   func setRefreshInterval(_ interval: Duration?) {
     commit(refreshIntervalSourceCog, to: interval)
   }
+
+  /// Demands a fresh forecast for one ZIP.
+  ///
+  /// `refresh` is a primitive, like `commit`: it is how the graph is asked to
+  /// do something, not what this app calls the asking. Wrapping it in a named
+  /// op keeps the same rule for demands as for writes — a view says what it
+  /// wants in domain words, and the declaration it resolves to stays here with
+  /// the rest of the state layer.
+  ///
+  /// - Parameter zip: Which ZIP's forecast to reload.
+  func refreshForecast(for zip: ZipCode) {
+    refresh(weatherForecastCogs[zip])
+  }
 }
 
 extension Cogs {

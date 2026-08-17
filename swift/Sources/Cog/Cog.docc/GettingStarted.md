@@ -149,6 +149,36 @@ cogs.commit(temperatureSourceCog, to: 72)
 Both spellings name the turn after the calling function by default, which is
 what debug history shows you later.
 
+The same rule covers ``Cogs/refresh(_:)``. `commit` and `refresh` are how the
+graph is *asked* to do something; they are not what your app calls the asking.
+Wrap them in domain verbs and let views say what they want:
+
+```swift
+extension CogOps {
+  func refreshForecast(for zip: ZipCode) {
+    refresh(forecastCogs[zip])
+  }
+}
+```
+
+When a view needs several values, read each one flatly:
+
+```swift
+var body: some View {
+  let forecast = cogs.status[forecastCogs[zip]]
+  let temperature = cogs[temperatureCogs[zip]]
+  let advice = cogs[adviceCogs[zip]]
+  ...
+}
+```
+
+Resist gathering them into a projection struct. Reads in one `body` already
+come from one settled turn, so they cannot tear, and each registers on its own,
+so an unrelated turn invalidates nothing — a wrapper adds a layer you have to
+read to know what the view depends on, and invites being stored or passed
+onward. If a value is genuinely *derived* rather than merely read alongside
+others, declare a derived cog for it and read that flatly too.
+
 ### Run a side effect
 
 Anything that reacts to state — a network request, a timer, a notification —

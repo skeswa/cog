@@ -75,6 +75,13 @@ public final class Cogs {
   /// One enter/exit buffer reused by iterative settle walks.
   internal var settleStack = CogSettleStack()
 
+  /// How many settle walks are active, counting the outermost.
+  ///
+  /// Only cold first reads nest walks, and each nested walk costs real Swift
+  /// stack. `Cogs.maximumSettleDepth` bounds this so the failure is a
+  /// diagnosis rather than a stack smash (GRAPH-14).
+  internal var settleDepth = 0
+
   /// The structural phase of the current turn, or idle between turns.
   ///
   /// This begins as the small correctness representation from §3.2. The

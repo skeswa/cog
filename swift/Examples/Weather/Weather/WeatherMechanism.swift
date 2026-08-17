@@ -52,6 +52,14 @@ struct WeatherMechanism: Mechanism {
   var clock: any Clock<Duration> = ContinuousClock()
   /// Keys given one transient initial demand during bootstrap.
   var initialZipCodes = ZipCode.examples
+  /// The ZIP selected before anything watches, or `nil` to start unselected.
+  ///
+  /// Initial app state belongs here rather than in the app entry point:
+  /// `operate` runs inside bootstrap, so this write settles before
+  /// `bootstrapApp` returns and no watcher ever observes the unselected value
+  /// on its way past. It is also how a test arranges the same starting world,
+  /// through `Cogs.forTesting(mechanisms:)`.
+  var initialLocation: ZipCode? = .newYork
   /// Distance between periodic refresh deadlines.
   var hourlyRefreshInterval: Duration = .seconds(3_600)
 
@@ -69,8 +77,12 @@ struct WeatherMechanism: Mechanism {
     // describe it instead of repeating a literal that drifts.
     m.setRefreshInterval(hourlyRefreshInterval)
 
+    if let initialLocation {
+      m.selectCurrentLocation(initialLocation)
+    }
+
     for zip in initialZipCodes {
-      m.refresh(weatherForecastCogs[zip])
+      m.refreshForecast(for: zip)
     }
 
     m.watch(
