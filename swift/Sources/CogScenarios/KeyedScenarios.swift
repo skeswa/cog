@@ -99,4 +99,87 @@ extension CogScenario {
       return total
     }
   }
+
+  /// Key churn: a sliding window of live keys over a family that keeps
+  /// growing, with a global change every turn that every live key reads.
+  ///
+  /// The keyed diamond proves one key's write does not wake its siblings. This
+  /// proves the harder half: a key that has fallen out of the read set stops
+  /// costing anything, *even when something it reads changes*. Every turn
+  /// bumps an epoch that every keyed cog reads, so a family that kept dropped
+  /// keys subscribed would recompute all of them and its per-turn cost would
+  /// grow without bound while the live set stayed the same size.
+  ///
+  /// Per turn: the window's keys settle, the one key entering the window
+  /// computes for the first time, and the roster itself runs.
+  ///
+  /// ```text
+  /// expectedRuns = (window + 1) + turns × (window + 2)
+  /// ```
+  ///
+  /// The `window` term counts the *previous* window rather than the new one,
+  /// which is why the per-turn cost is `window + 2` and not `window + 1`.
+  /// Settling a consumer schedules the dependencies it recorded last time
+  /// before rerunning it — the same mechanism COUNT-04 measures — so the key
+  /// leaving the window settles one final time on the turn it leaves. It never
+  /// runs again after that, and no key dropped earlier runs at all, which is
+  /// exactly the claim: the cost is a function of the window, never of how
+  /// many keys the family has ever held.
+  ///
+  /// The roster reads keys `start ..< start + window` and each key is
+  /// `epoch + key`, so after `turns` turns it holds
+  /// `2 × window × turns + window × (window − 1) / 2`.
+  ///
+  /// - Parameters:
+  ///   - window: Live keys at any moment.
+  ///   - turns: Turns after the first read. Each advances the window by one
+  ///     key and bumps the epoch, so the family ends up holding
+  ///     `window + turns` keys and reading `window` of them.
+  ///   - layout: The value-reference layout to build the keyed references
+  ///     with.
+  public static func keyChurn(
+    window: Int = 10,
+    turns: Int = 500,
+    layout: CogValueReferenceLayout = .inline
+  ) -> CogScenario {
+    CogScenario(
+      name: "COUNT-08-KeyChurn",
+      layout: layout,
+      expectedRuns: (window + 1) + turns * (window + 2)
+    ) { cogs, counter in
+      // Read by every key that has ever been created, so a dropped key that
+      // stayed subscribed would have to recompute. Without it, "dropped keys
+      // stop running" would be true of any implementation at all, because
+      // nothing would be asking them to run.
+      let epochSourceCog = ManualCog<Int>(0, name: "churn.epoch")
+      let windowStartSourceCog = ManualCog<Int>(0, name: "churn.windowStart")
+      let entryCogs = CogBox<Int, Int>(
+        { c, key in
+          counter.record()
+          return c[epochSourceCog] + key
+        },
+        name: "churn.entry"
+      )
+      let rosterCog = Cog<Int>(
+        { c in
+          counter.record()
+          let start = c[windowStartSourceCog]
+          var total = 0
+          for key in start..<(start + window) { total += c[entryCogs[key]] }
+          return total
+        },
+        name: "churn.roster"
+      )
+
+      var roster = cogs.peek(rosterCog)
+      for turn in 1...max(turns, 1) where turns > 0 {
+        cogs.commit("churn.turn") { c in
+          c[epochSourceCog] = turn
+          c[windowStartSourceCog] = turn
+        }
+        roster = cogs.peek(rosterCog)
+      }
+      return roster
+    }
+  }
 }

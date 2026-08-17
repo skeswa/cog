@@ -45,6 +45,45 @@ func `COUNT-07 a keyed diamond recomputes only the key that was written`(
 }
 
 @MainActor
+@Test(arguments: [(1, 1), (10, 50), (10, 500), (3, 1000)])
+func `COUNT-08 key churn costs the window, never the family`(
+  window: Int,
+  turns: Int
+) {
+  let scenario = CogScenario.keyChurn(window: window, turns: turns)
+
+  let result = scenario.run(in: Cogs.forTesting())
+
+  // `window + 2` per turn: the previous window settles, the entering key
+  // computes for the first time, and the roster runs. The family holds
+  // `window + turns` keys by the end and every one of them reads the epoch
+  // this turn changed, so a dropped key that stayed subscribed would show up
+  // here immediately.
+  #expect(result.actualRuns == (window + 1) + turns * (window + 2))
+  #expect(result.isExact)
+
+  // The roster reads `start ..< start + window` and each entry is
+  // `epoch + key`, with both epoch and start equal to the turn count.
+  let expectedRoster = 2 * window * turns + window * (window - 1) / 2
+  #expect(result.finalValue == expectedRoster)
+}
+
+@MainActor
+@Test func `COUNT-08 a longer churn costs the same per turn`() {
+  // The formula alone would be satisfied by an implementation whose per-turn
+  // cost grew, as long as the scenario's expectation grew with it. Stated as a
+  // difference it cannot be: a thousand turns of churn over a ten-key window
+  // has created a thousand and ten keys by the end, and each of the last
+  // hundred turns must still cost exactly what each of the first hundred did.
+  let short = CogScenario.keyChurn(window: 10, turns: 100).run(in: Cogs.forTesting())
+  let long = CogScenario.keyChurn(window: 10, turns: 1000).run(in: Cogs.forTesting())
+
+  #expect(short.isExact)
+  #expect(long.isExact)
+  #expect(long.actualRuns - short.actualRuns == 900 * (10 + 2))
+}
+
+@MainActor
 @Test func `COUNT-07 a wider keyed family costs no more per turn`() {
   // The property stated as a comparison, because the formula alone could be
   // satisfied by a scenario that never grew the family. Ten keys and a hundred
