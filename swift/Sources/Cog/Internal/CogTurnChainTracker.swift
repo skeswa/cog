@@ -155,12 +155,18 @@ extension Cogs {
       phaseIsIdle = false
     }
 
+    #if COG_CORE_ARENA
+    let selectedCoreIsIdle = arenaCore.isSettlementIdle
+    #else
+    let selectedCoreIsIdle = settleStack.isEmpty && settleStack.isComputingEmpty
+    #endif
+
     return turnChainTracker.diagnostic(
       isIdle: phaseIsIdle
         && queuedTurns.isEmpty
         && reactionRuns.isEmpty
         && trackedConsumer == nil
-        && settleStack.isEmpty
+        && selectedCoreIsIdle
         && seedBarrierDepth == 0
         && !turnChainTracker.isActive
     )
