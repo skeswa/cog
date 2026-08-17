@@ -24,6 +24,23 @@ public struct CogBoxProjection<Value, Key: Hashable> {
   /// Internal so callers cannot recover or construct a writable source box.
   internal let sourceCogs: ManualCogBox<Value, Key>
 
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  /// A read-only keyed reference that retains the source box's concrete key.
+  ///
+  /// It wraps the generic candidate's writable reference without exposing that
+  /// reference to callers, preserving the same compile-time write boundary as
+  /// ``CogProjection``.
+  public struct ValueReference {
+    /// The hidden writable reference whose state this projection reads.
+    internal let sourceReference: ManualCogBox<Value, Key>.ValueReference
+
+    /// Adapts the candidate after it enters the class-state runtime shell.
+    internal var simpleCoreReference: CogProjection<Value> {
+      CogProjection(sourceCog: sourceReference.simpleCoreReference)
+    }
+  }
+  #endif
+
   /// The read-only value reference naming this box's state for one key.
   ///
   /// `readOnlyCogs[5]` and `sourceCogs[5]` name the same state.
@@ -31,9 +48,15 @@ public struct CogBoxProjection<Value, Key: Hashable> {
   ///
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A read-only value reference for that key.
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  public subscript(key: Key) -> ValueReference {
+    ValueReference(sourceReference: sourceCogs[key])
+  }
+  #else
   public subscript(key: Key) -> CogProjection<Value> {
     CogProjection(sourceCog: sourceCogs[key])
   }
+  #endif
 }
 
 // MARK: - Projecting a source box

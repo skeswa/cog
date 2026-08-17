@@ -26,8 +26,15 @@ import Testing
 @Test func `ManualCogBoxInfrastructure puts the key on the value reference`() {
   let weather = ManualCogBox<Int, Int>(0)
 
+  #if COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC
+  let here: Int = weather[90210].key
+  let there: Int = weather[10001].key
+  #expect(here == 90210)
+  #expect(there == 10001)
+  #else
   #expect(weather[90210].key == CogKey(90210))
   #expect(weather[10001].key == CogKey(10001))
+  #endif
   #expect(weather[90210].key == weather[90210].key)
   #expect(weather[90210].key != weather[10001].key)
 }
@@ -145,9 +152,13 @@ import Testing
   #expect(
     MemoryLayout<ManualCog<Int>>.size == MemoryLayout<AnyObject>.size
       + MemoryLayout<AnyHashable?>.size)
-  #else
+  #elseif COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
   #expect(
     MemoryLayout<ManualCog<Int>>.size == MemoryLayout<AnyObject>.size
       + MemoryLayout<Int?>.size)
+  #else
+  #expect(
+    MemoryLayout<ManualCogBox<Int, Int>.ValueReference>.size
+      == MemoryLayout<AnyObject>.size + MemoryLayout<Int>.size)
   #endif
 }

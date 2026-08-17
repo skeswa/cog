@@ -29,4 +29,20 @@ extension Cogs {
   public func hasObservationBoundary<Value>(for valueReference: Cog<Value>) -> Bool {
     hasObservationBoundaryForTesting(for: valueReference)
   }
+
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  /// Whether a generic candidate's keyed manual source owns a UI boundary.
+  public func hasObservationBoundary<Value, Key: Hashable>(
+    for valueReference: ManualCogBox<Value, Key>.ValueReference
+  ) -> Bool {
+    hasObservationBoundaryForTesting(for: valueReference)
+  }
+
+  /// Whether a generic candidate's keyed derived value owns a UI boundary.
+  public func hasObservationBoundary<Value, Key: Hashable>(
+    for valueReference: CogBox<Value, Key>.ValueReference
+  ) -> Bool {
+    hasObservationBoundaryForTesting(for: valueReference)
+  }
+  #endif
 }

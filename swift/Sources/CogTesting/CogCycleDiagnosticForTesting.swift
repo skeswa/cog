@@ -34,4 +34,21 @@ extension Reader {
   ) -> CogCycleDiagnostic? {
     cycleDiagnosticSnapshot(ifReading: valueReference).map(CogCycleDiagnostic.init)
   }
+
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  /// Returns the cycle that reading one generic candidate keyed value would close.
+  ///
+  /// The key remains concrete at this public testing boundary; Cog erases it
+  /// only after the read enters the current simple correctness core.
+  ///
+  /// - Parameter valueReference: The keyed derived value whose hypothetical
+  ///   read is checked against the active computation path.
+  /// - Returns: The closed path and fatal-error text that a real cyclic read
+  ///   would produce, or `nil` when the read is acyclic.
+  public func cycleDiagnostic<Read, Key: Hashable>(
+    ifReading valueReference: CogBox<Read, Key>.ValueReference
+  ) -> CogCycleDiagnostic? {
+    cycleDiagnosticSnapshot(ifReading: valueReference).map(CogCycleDiagnostic.init)
+  }
+  #endif
 }

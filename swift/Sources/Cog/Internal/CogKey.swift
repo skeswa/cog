@@ -192,6 +192,33 @@ private nonisolated final class CogKeyInternTable: @unchecked Sendable {
   }
 }
 
+#elseif COG_VALUE_REFERENCE_LAYOUT_GENERIC
+
+/// The simple core's erased storage identity in a generic-reference build.
+///
+/// Box-produced value references retain their concrete `Key` type and value;
+/// this type appears only when the class-state correctness core files the
+/// reference in its heterogeneous state dictionary. Keeping that conversion
+/// behind the runtime API makes its cost part of the whole-candidate benchmark
+/// instead of charging `box[key]` construction for existential storage.
+internal nonisolated struct CogKey: Hashable {
+  /// The original key, erased at the correctness-core storage boundary.
+  let erased: AnyHashable
+
+  /// Erases a generic reference's concrete key for heterogeneous state storage.
+  init(_ key: some Hashable) {
+    erased = AnyHashable(key)
+  }
+
+  /// Preserves an already-erased identity without nesting `AnyHashable`.
+  init(erased key: AnyHashable) {
+    erased = key
+  }
+
+  /// This candidate's build-selector spelling.
+  static let layoutName = "generic"
+}
+
 #else
 
 #error("Package.swift defined no value-reference layout for the Cog library")

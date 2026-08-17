@@ -46,6 +46,32 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// Stable value-projection identity shared by all keys and box copies.
   internal let valueDescriptor: DerivedCogDescriptor<Value>
 
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  /// An async value reference that retains this box's concrete key type.
+  ///
+  /// The reference shares the box's status and total-value descriptors. It
+  /// owns no task or state; each context resolves those lazily for `key`.
+  public struct ValueReference {
+    /// The status declaration shared by every key from this box.
+    internal let descriptor: AsyncCogDescriptor<Value>
+
+    /// The total-value projection declaration shared by every key.
+    internal let valueDescriptor: DerivedCogDescriptor<Value>
+
+    /// The exact state key, stored in its specialized concrete type.
+    internal let key: Key
+
+    /// Adapts the candidate after it enters the class-state runtime shell.
+    internal var simpleCoreReference: AsyncCog<Value> {
+      AsyncCog(
+        descriptor: descriptor,
+        valueDescriptor: valueDescriptor,
+        key: CogKey(key)
+      )
+    }
+  }
+  #endif
+
   /// Declares a keyed async derived value with an explicit resting default.
   ///
   /// This creates one async descriptor and one value-projection descriptor,
@@ -113,6 +139,11 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// - Parameter key: The hashable value forming the state identity together
   ///   with this box's descriptor.
   /// - Returns: A lightweight async value reference for that identity.
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  public subscript(key: Key) -> ValueReference {
+    ValueReference(descriptor: descriptor, valueDescriptor: valueDescriptor, key: key)
+  }
+  #else
   public subscript(key: Key) -> AsyncCog<Value> {
     AsyncCog(
       descriptor: descriptor,
@@ -120,6 +151,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
       key: CogKey(key)
     )
   }
+  #endif
 
   /// Builds the box's one async descriptor, wrapping the keyed selector in
   /// the erased-key resolution every state of this declaration shares.

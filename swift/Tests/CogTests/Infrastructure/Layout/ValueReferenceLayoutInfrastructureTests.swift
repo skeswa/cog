@@ -26,10 +26,13 @@ import Testing
 // for: the isolation legs only ever change the test targets, while this changes
 // the code under test.
 
-#if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
+#if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && (COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED || COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC)
 #error("Package.swift defined two value-reference layouts at once")
 #endif
-#if !COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && !COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
+#if COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED && COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC
+#error("Package.swift defined two value-reference layouts at once")
+#endif
+#if !COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && !COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED && !COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC
 #error("Package.swift defined no value-reference layout for the test targets")
 #endif
 
@@ -41,8 +44,10 @@ import Testing
 private let compiledValueReferenceLayout: String = {
   #if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE
   "inline"
-  #else
+  #elseif COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
   "interned"
+  #else
+  "generic"
   #endif
 }()
 

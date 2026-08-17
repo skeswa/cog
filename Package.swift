@@ -117,12 +117,15 @@ case "inline":
 case "interned":
   valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_INTERNED"))
   valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED"))
+case "generic":
+  valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_GENERIC"))
+  valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC"))
 default:
   fatalError(
     """
     COG_TEST_VALUE_REFERENCE_LAYOUT was \(requestedValueReferenceLayout), which is not a \
-    value-reference layout candidate. Expected inline or interned, or leave it unset \
-    for inline.
+    value-reference layout candidate. Expected inline, interned, or generic, or leave \
+    it unset for inline.
     """
   )
 }

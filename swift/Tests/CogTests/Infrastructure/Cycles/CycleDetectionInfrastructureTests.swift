@@ -134,10 +134,19 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
 
   let cycle = cogs.settleStack.cyclePath(ifEntering: home)
   #expect(cycle?.steps.map(\.descriptor).allSatisfy { $0 == box.descriptor.identity } == true)
+  #if COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC
+  #expect(
+    cycle?.steps.map(\.key) == [
+      homeValueReference.simpleCoreReference.key,
+      workValueReference.simpleCoreReference.key,
+      homeValueReference.simpleCoreReference.key,
+    ])
+  #else
   #expect(
     cycle?.steps.map(\.key) == [
       homeValueReference.key, workValueReference.key, homeValueReference.key,
     ])
+  #endif
   #expect(cycle?.message == "Cog dependency cycle: weather[nil] -> weather[10001] -> weather[nil].")
 
   cogs.settleStack.endComputing(work)
