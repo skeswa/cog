@@ -61,11 +61,12 @@ let benchmarks: @Sendable () -> Void = {
     maxDuration: .seconds(3)
   )
 
-  // One benchmark, over the shared Kairo diamond. `M5-06` onward add the
-  // shapes that carry thresholds; this one exists to prove the whole path —
-  // pinned harness, isolation shim, shared scenarios, release build — works
-  // end to end.
+  // Timing over the shared Kairo diamond. Shapes that carry allocation
+  // thresholds live in `AllocationBenchmarks.swift`; upstream discovers exactly
+  // one `benchmarks` closure per target, so every file registers through here.
   Benchmark("kairo-diamond") { _ in
     await GraphHarness.run(.kairoDiamond(width: 5, turns: 100))
   }
+
+  allocationBenchmarks()
 }
