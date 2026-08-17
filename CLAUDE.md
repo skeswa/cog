@@ -117,6 +117,8 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
 
+- `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
+  Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
   `swift/Benchmarks` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator

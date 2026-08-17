@@ -35,9 +35,14 @@ From this directory:
 swift package benchmark
 ```
 
-`mise run bench` wraps it from the repository root once `M5-08b` adds it. The
-plugin always builds release; a debug measurement of a graph library measures
-the optimizer's absence.
+Or `mise run bench` from the repository root, which wraps exactly this and
+passes extra arguments through. The plugin always builds release; a debug
+measurement of a graph library measures the optimizer's absence.
+
+CI builds this package in release on every Swift change (`bench-build`) but
+does **not** run it. A number taken on a machine simultaneously running four
+test legs is a number about contention; `M6-11d` is where measurement joins CI,
+with the thresholds and serialization that needs.
 
 ## What is here today
 
@@ -291,12 +296,15 @@ off the ARC and malloc metrics for the same reason.
 
 ## What is coming
 
-| Task               | Adds                                                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| `M5-05c`           | the pinned dependency, the selected allocator configuration, and one real MainActor benchmark |
-| `M5-06`            | zero-allocation steady-turn and `box[key]` creation benchmarks                                |
-| `M5-07a`–`M5-07d`  | ARC traffic, peak memory, boundary-object counts, pinned-key notice traffic                   |
-| `M5-08a`, `M5-08b` | pinned-environment baselines, `mise run bench`, and the non-gating `bench-build` CI job       |
+Everything M5 planned for this package has landed. What remains is
+representation work, and it arrives as new _shapes_ rather than new machinery:
+
+| Task               | Adds                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                                 |
+| `M5-09e`           | keyed diamonds and key churn measured under all three layouts, so perf.md can settle the choice                                                        |
+| `M6-05b`           | mostly-static and high-churn graphs under all three arena edge layouts                                                                                 |
+| `M6-11a`–`M6-11d`  | comparison adapters for raw `@Observable` and swift-state-graph, and CI gating with the timing thresholds this package deliberately does not carry yet |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
-here when `M5-07a` establishes it.
+here when a count moves and the question becomes which line moved it.

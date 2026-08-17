@@ -110,6 +110,17 @@ run = "node {{config_root}}/tools/check-workflows.mjs"
 description = "Run the workflow-contract checker against its fixtures"
 run = "node {{config_root}}/tools/test-workflows.mjs"
 
+# Benchmarks live in their own SwiftPM package under `swift/Benchmarks`, so
+# every benchmark command runs there rather than at the repository root. The
+# plugin always builds release; a debug measurement of a graph library measures
+# the optimizer's absence. Extra arguments pass straight through, as in
+# `mise run bench --filter perf-01-steady-turn`.
+
+[tasks.bench]
+description = "Run the Cog benchmarks in release"
+dir = "{{config_root}}/swift/Benchmarks"
+run = "swift package benchmark"
+
 # Benchmark baselines, through `tools/bench-baseline.mjs`. The benchmark
 # package is a package of its own, so these tasks run there rather than at the
 # repository root. A baseline is a statement about one machine and one
