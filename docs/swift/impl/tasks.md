@@ -1007,7 +1007,7 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Verify: the remote tag resolves to the approved commit._
 - **M4-05d** _(Gate)_ — Verify Pages and smoke-test exact 0.1.0
   consumption.
-  _Depends: M4-05c._
+  _Depends: M4-15._
   _Verify: live DocC URL and scratch `exact: "0.1.0"` build._
 - **M4-05e** _(Release)_ — Create the 0.1.0 GitHub Release from the verified
   changelog excerpt.
@@ -1098,6 +1098,13 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   _Verify: `mise run test --filter GRAPH-14` and
   `mise run test:release --filter GRAPH-14`._
   _Greens: GRAPH-14._
+- **M4-15** _(Infrastructure)_ — Permit semantic-version tags to deploy
+  through the `github-pages` environment. The first `0.1.0` tag workflow built
+  and uploaded its DocC archive, but environment protection rejected the tag
+  before the deploy job could start.
+  _Depends: M4-05c._
+  _Verify: the environment policy admits tag `0.1.0`, and rerunning the tag
+  workflow completes its deploy job successfully._
 
 ## M5 tasks
 
