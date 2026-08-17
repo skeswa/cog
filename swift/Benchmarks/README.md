@@ -294,6 +294,25 @@ bounded here, not fixed. Any future benchmark whose measured region drops a
 `Cogs`, spawns tasks, or otherwise leaves work on another thread should stay
 off the ARC and malloc metrics for the same reason.
 
+## Edge-layout comparison harnesses
+
+`M6-05b` adds two persistent, quiescent PERF-09 graphs. Both roots read one
+stable control and 32 data sources, keeping selector width constant while the
+dependency behavior changes:
+
+- `perf-09-edge-mostly-static` changes one source value per turn and preserves
+  the complete 33-edge order;
+- `perf-09-edge-high-churn` rotates through 128 sources, preserving the control
+  edge and replacing the 32-edge suffix every turn.
+
+Each graph is built and settled once, then held by one durable mechanism
+reaction. The measured region neither drops a `Cogs` nor starts grace work, so
+wall clock and instructions can travel beside the process-global malloc,
+object-allocation, retain, and release counters.
+Run each exact benchmark name with `COG_TEST_CORE=arena` and one of
+`COG_TEST_EDGE=pool`, `prefix`, or `inline`; M6-05c records the same-session
+comparison before selecting a candidate.
+
 ## What is coming
 
 Everything M5 planned for this package has landed. What remains is
@@ -303,7 +322,6 @@ representation work, and it arrives as new _shapes_ rather than new machinery:
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                                 |
 | `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1                                                    |
-| `M6-05b`           | mostly-static and high-churn graphs under all three arena edge layouts                                                                                 |
 | `M6-11a`–`M6-11d`  | comparison adapters for raw `@Observable` and swift-state-graph, and CI gating with the timing thresholds this package deliberately does not carry yet |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
