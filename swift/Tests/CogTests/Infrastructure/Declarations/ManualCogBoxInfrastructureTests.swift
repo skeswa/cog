@@ -131,8 +131,23 @@ import Testing
 @MainActor
 @Test func `ManualCogBoxInfrastructure builds a value reference out of two inert words of storage`()
 {
-  // This pins the current storage shape, not its runtime allocation cost.
+  // This pins the current storage shape, not its runtime allocation cost — and
+  // the shape is exactly what `COG_TEST_VALUE_REFERENCE_LAYOUT` selects, so the
+  // expectation follows the layout rather than outliving it. Writing one number
+  // for both would either fail under a candidate that does its job or pass
+  // under one that does not.
+  //
+  // The gap is the measurement: a descriptor reference plus an inline
+  // `AnyHashable?` is 48 bytes, and a descriptor reference plus an interned
+  // `Int?` token is 17. That is the size win perf §4 sends the interned
+  // candidate to find, visible here before any benchmark runs.
+  #if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE
   #expect(
     MemoryLayout<ManualCog<Int>>.size == MemoryLayout<AnyObject>.size
       + MemoryLayout<AnyHashable?>.size)
+  #else
+  #expect(
+    MemoryLayout<ManualCog<Int>>.size == MemoryLayout<AnyObject>.size
+      + MemoryLayout<Int?>.size)
+  #endif
 }
