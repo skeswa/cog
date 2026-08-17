@@ -50,6 +50,7 @@ let benchmarks: @Sendable () -> Void = {
   memoryBenchmarks()
   boundaryBenchmarks()
   pinnedKeyBenchmarks()
+  valueReferenceBenchmarks()
 
   // Timing over the shared Kairo diamond, and **no counting metrics at all**.
   //

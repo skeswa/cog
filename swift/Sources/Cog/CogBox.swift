@@ -28,6 +28,25 @@ public struct CogBox<Value, Key: Hashable> {
   /// Stable declaration identity and behavior shared by every key and box copy.
   internal let descriptor: DerivedCogDescriptor<Value>
 
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  /// A derived value reference that retains this box's concrete key type.
+  ///
+  /// The generic candidate returns this inferred type from `box[key]`. It is a
+  /// stable descriptor-and-key name with no context slot or cached value.
+  public struct ValueReference {
+    /// The keyed derived declaration shared by references from this box.
+    internal let descriptor: DerivedCogDescriptor<Value>
+
+    /// The exact state key, stored without existential erasure.
+    internal let key: Key
+
+    /// Adapts the candidate after it enters the class-state runtime shell.
+    internal var simpleCoreReference: Cog<Value> {
+      Cog(descriptor: descriptor, key: CogKey(key))
+    }
+  }
+  #endif
+
   /// Builds a keyed facade over an existing derived declaration.
   ///
   /// Async value projections use this path to expose their shared projection
@@ -106,9 +125,15 @@ public struct CogBox<Value, Key: Hashable> {
   ///
   /// - Parameter key: The hashable value completing this state's identity.
   /// - Returns: A lightweight derived value reference for that key.
+  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
+  public subscript(key: Key) -> ValueReference {
+    ValueReference(descriptor: descriptor, key: key)
+  }
+  #else
   public subscript(key: Key) -> Cog<Value> {
     Cog(descriptor: descriptor, key: CogKey(key))
   }
+  #endif
 
   /// Builds the single type-erased descriptor shared by all keys.
   ///

@@ -2,26 +2,24 @@
 ///
 /// A keyed declaration — `ManualCogBox`, `CogBox`, `AsyncCogBox` — names a
 /// family of states, and `box[key]` builds a lightweight reference to one of
-/// them. How that key is *physically carried* is the open question perf §4
-/// records: inline `AnyHashable`, an interned token, or a generic key
-/// parameter on the value reference itself. Every one of those choices moves
-/// the size of a value reference, the cost of building one, and the cost of
-/// hashing it during state lookup — which is why the choice waits for
-/// benchmarks (perf §9) rather than being argued.
+/// them. Perf §4 and §9.6 select inline `AnyHashable` for the shipping build
+/// after comparing it with an interned token and a generic box-produced
+/// reference. The selector keeps all three implementations available to the
+/// behavior and benchmark suites; an ordinary build always takes the selected
+/// inline branch.
 ///
-/// This type is where the choice lives. Nothing outside it needs to know which
-/// layout is compiled in: value references, state identities, descriptors, and
-/// diagnostics all say `CogKey?` and reach the original key through ``erased``.
-/// `M5-09b` and `M5-09c` add candidates by rewriting this file and little else,
-/// which is the entire point of introducing it before they do.
+/// This type isolates the two erased layouts. Value references, state
+/// identities, descriptors, and diagnostics say `CogKey?` and reach the
+/// original key through ``erased``. The generic candidate necessarily adds
+/// box-produced keyed reference types at the public read surface, then adapts
+/// them to this type only after a runtime capability receives them.
 ///
 /// Selected at build time by `COG_TEST_VALUE_REFERENCE_LAYOUT`, which
 /// `Package.swift` reads and lowers to a `COG_VALUE_REFERENCE_LAYOUT_*` define,
 /// the same way it lowers the isolation matrix. A *build-time* selector rather
 /// than a runtime one because the layout is a representation, and a
 /// representation chosen at runtime would make every build carry the cost of
-/// every candidate. An unset variable means `inline`, so an ordinary
-/// `swift build` gets the correctness core's layout with nothing to configure.
+/// every candidate. An unset variable means the selected `inline` layout.
 ///
 /// `nonisolated` because `Hashable` requires nonisolated equality, matching
 /// ``CogStateIdentity``, which is built on the MainActor and compared anywhere.
@@ -190,6 +188,33 @@ private nonisolated final class CogKeyInternTable: @unchecked Sendable {
     }
     return keysByToken[token]
   }
+}
+
+#elseif COG_VALUE_REFERENCE_LAYOUT_GENERIC
+
+/// The simple core's erased storage identity in a generic-reference build.
+///
+/// Box-produced value references retain their concrete `Key` type and value;
+/// this type appears only when the class-state correctness core files the
+/// reference in its heterogeneous state dictionary. Keeping that conversion
+/// behind the runtime API makes its cost part of the whole-candidate benchmark
+/// instead of charging `box[key]` construction for existential storage.
+internal nonisolated struct CogKey: Hashable {
+  /// The original key, erased at the correctness-core storage boundary.
+  let erased: AnyHashable
+
+  /// Erases a generic reference's concrete key for heterogeneous state storage.
+  init(_ key: some Hashable) {
+    erased = AnyHashable(key)
+  }
+
+  /// Preserves an already-erased identity without nesting `AnyHashable`.
+  init(erased key: AnyHashable) {
+    erased = key
+  }
+
+  /// This candidate's build-selector spelling.
+  static let layoutName = "generic"
 }
 
 #else

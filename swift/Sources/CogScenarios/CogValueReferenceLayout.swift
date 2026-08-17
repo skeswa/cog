@@ -7,15 +7,34 @@
 /// scenario, and so a recorded measurement can never be read without knowing
 /// which representation produced it.
 ///
-/// Only the baseline exists today. `M5-09b` and `M5-09c` add the interned-token
-/// and generic-keyed candidates, and `M5-09a` puts the selection behind
-/// `COG_TEST_VALUE_REFERENCE_LAYOUT`; adding a case here is the whole change a
-/// scenario needs, because run counts are a property of the graph rather than
-/// of the representation.
+/// The root package chooses one case at build time through
+/// `COG_TEST_VALUE_REFERENCE_LAYOUT`. Scenarios record that compiled case as
+/// metadata; run counts remain a property of the graph rather than of the
+/// representation.
 public enum CogValueReferenceLayout: String, Sendable, CaseIterable {
-  /// Inline `AnyHashable` keys: the correctness core's representation.
-  ///
-  /// Named as a candidate rather than assumed, because the layout stays open
-  /// until benchmarks choose it (perf §9, §10).
+  /// Inline `AnyHashable` keys: the selected v1 representation.
   case inline
+
+  /// Process-wide interned key tokens carried by erased value references.
+  case interned
+
+  /// Box-produced value references that retain their concrete key type.
+  case generic
+
+  /// The layout the root Cog package and these shared scenarios compiled with.
+  ///
+  /// Keeping this decision in the compiled target prevents a benchmark from
+  /// labeling a generic build as inline merely because the scenario factory
+  /// predates the build selector.
+  public static var compiled: CogValueReferenceLayout {
+    #if COG_VALUE_REFERENCE_LAYOUT_INLINE
+    .inline
+    #elseif COG_VALUE_REFERENCE_LAYOUT_INTERNED
+    .interned
+    #elseif COG_VALUE_REFERENCE_LAYOUT_GENERIC
+    .generic
+    #else
+    #error("Package.swift defined no value-reference layout for CogScenarios")
+    #endif
+  }
 }

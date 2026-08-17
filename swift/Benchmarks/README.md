@@ -302,7 +302,7 @@ representation work, and it arrives as new _shapes_ rather than new machinery:
 | Task               | Adds                                                                                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                                 |
-| `M5-09e`           | keyed diamonds and key churn measured under all three layouts, so perf.md can settle the choice                                                        |
+| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1                                                    |
 | `M6-05b`           | mostly-static and high-churn graphs under all three arena edge layouts                                                                                 |
 | `M6-11a`–`M6-11d`  | comparison adapters for raw `@Observable` and swift-state-graph, and CI gating with the timing thresholds this package deliberately does not carry yet |
 

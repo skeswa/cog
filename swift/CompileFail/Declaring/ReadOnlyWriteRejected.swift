@@ -8,7 +8,9 @@
 // projections for everyone else. That buys nothing unless the projection is
 // genuinely inert: ``Writer``'s subscript takes a `ManualCog`, and a
 // `CogProjection` is a different type, so every spelling of a write below is a
-// type error at the argument, before any turn exists to reject it.
+// type error at the argument, before any turn exists to reject it. A keyed
+// projection may be a `CogProjection` or a layout-specific box-produced
+// reference; neither is writable.
 //
 // The fixture takes its context and its value reference as parameters. It never builds
 // either, because it does not need to: the rejection happens in the type
@@ -45,7 +47,7 @@ enum ReadOnlyWriteRejected {
     weatherReport: CogBoxProjection<Int, String>
   ) {
     cogs.commit { c in
-      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: to expected argument type 'ManualCog<Int>'
       c[weatherReport["90210"]] = 72
     }
   }

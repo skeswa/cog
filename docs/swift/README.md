@@ -221,11 +221,12 @@ These choices are settled; §10 of the core document has the full record.
   consumer, so Cog does not guess or emit a false-positive missing-consumer
   warning; that diagnostic is deferred until the framework exposes an exact
   public query.
-- Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and key. A value reference
-  is a value; its identity lives in an internal final-class descriptor plus
-  key. Boxes create keyed value references without allocating new descriptors. The exact
-  in-memory value-reference layout is not settled; benchmarks will compare inline keys,
-  interned keys, and generic keyed value references.
+- Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and
+  key. A value reference is a value; its identity lives in an internal
+  final-class descriptor plus key. Boxes create keyed value references without
+  allocating new descriptors. Keyed-diamond and churn benchmarks selected
+  inline `AnyHashable?` for v1; the interned-token and generic-keyed layouts
+  remain test-and-benchmark-only comparison builds.
 - State declaration names expose that shape at the use site: one keyless value
   reference ends in `Cog` (`currentZipCog`), while a box ends in plural `Cogs`
   (`weatherForecastCogs`). Qualifiers such as `Source` precede the suffix. The
@@ -384,6 +385,6 @@ full review.
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. Build the
 simple correctness version first, then the SwiftUI boundary, then a first
-async slice for a usable 0.1.0. Port `js-reactivity-benchmark` and compare value-reference layouts before
-building the data-oriented core, and measure that core against the simple
-version, swift-state-graph, and raw `@Observable`.
+async slice for a usable 0.1.0. The benchmark port selected inline value
+references; next, build the data-oriented core and measure it against the
+simple version, swift-state-graph, and raw `@Observable`.
