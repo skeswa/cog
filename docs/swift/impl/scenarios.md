@@ -3,9 +3,10 @@
 _August 9, 2026_
 
 This is the scenario tree for building Cog test-first. Every behavior the
-library promises is written here as a tiny story. "I" is always the library
-user: an engineer writing an app that needs state management they can trust.
-Cog is the library.
+library promises is written here as a tiny story. "I" is the library user: an
+engineer writing an app that needs state management they can trust. In the
+LINT group, I am that engineer installing Cog's companion tool. Cog is the
+library.
 
 ## How to use this document
 
@@ -28,9 +29,11 @@ Cog is the library.
   §n in [perf.md](../design/perf.md), everything else in
   [exploration.md](../design/exploration.md).
 - Every scenario carries a proof mode naming the check class that greens it:
-  `unit` (a host `swift test` — the default, left unmarked), `compile-fail`,
-  `exit test`, `release configuration`, `simulator`, `floor runtime`,
-  `suite`, and `benchmark` (the default for every scenario in group 18).
+  `unit` (the default, left unmarked) runs through `mise run test` for the root
+  package or `mise run test:lint` for the nested linter package. The other
+  modes are `compile-fail`, `exit test`, `release configuration`, `simulator`,
+  `floor runtime`, `suite`, and `benchmark` (the default for every scenario in
+  group 18).
   Non-unit modes are marked with a trailing `(Proof: ….)` on the scenario.
   The task-ledger checker matches each mode against the owning task's type
   and verification commands — exit tests must be proven in debug and
@@ -99,7 +102,9 @@ justifies a slow, flaky, or core-coupled test.
    `Tests` suffix. Proofs that green no scenario live under
    `Infrastructure/<seam>/`, use the `...InfrastructureTests.swift` suffix,
    and never put a raw scenario ID in a test name. Only infrastructure tests
-   may use `@testable import Cog`.
+   may use `@testable import Cog`. Group 21 is the companion-tool exception:
+   its fixture-backed proofs live under `swift/Lint/Tests` and run through
+   `mise run test:lint`, never inside a root-package Cog test target.
 
 ## The tree
 
@@ -124,6 +129,7 @@ justifies a slow, flaky, or core-coupled test.
 18. PERF   Performance guarantees
 19. LEG    Build-settings matrix
 20. ACTOR  MainActor confinement
+21. LINT   First-party lint tooling
 ```
 
 ---
@@ -999,3 +1005,89 @@ settings.
   graph API without a MainActor hop. The compiler says no. (Proof: compile-fail.)
 - **ACTOR-03.** A manual cog holds a non-`Sendable`, MainActor-bound value,
   and a derived cog reads it without a wrapper or an unchecked conformance.
+
+## 21. LINT — First-party lint tooling
+
+_Milestone M8. Design: [lint.md](../design/lint.md)._
+
+The conventions that make Cog code easy to read fail at the same source
+locations in my editor and CI, without making my app compile the linter.
+
+- **LINT-01.** I run `coglint` on an explicit mix of files and directories.
+  It discovers Swift files in deterministic order, reports each violation at
+  its exact line and column in Xcode's diagnostic grammar with the rule slug
+  and help URL, exits nonzero for errors, and exits zero for clean input.
+- **LINT-02.** Each rule fixture distinguishes triggering and non-triggering
+  examples and exact diagnostic positions. The harness fails if any of those
+  expectations drift, and emits the canonical DocC examples from that same
+  corpus instead of maintaining a second copy.
+- **LINT-03.** `// coglint:disable-next-line <rule>` suppresses exactly that
+  rule on exactly the following line under the settled severity and optional
+  reason policy; it neither leaks farther nor hides another rule.
+- **LINT-04.** The declaration classifier recognizes direct constructors and
+  explicit nominal annotations paired with `.init`, normalizing module
+  qualification, generic arguments, and optional wrapping, and carries shape
+  and writable-source kind through `.readOnly` projections.
+- **LINT-05.** The declaration classifier stays silent for its documented
+  syntax-only evasions: inferred factories, typealiases, the sanctioned
+  debug seed-target re-export, and identity that requires cross-file
+  conformance or data flow.
+- **LINT-06.** `cog-declaration-suffix` requires a recognized keyless
+  declaration to end in singular `Cog`, a recognized box to end in plural
+  `Cogs`, and all narrower qualifiers to precede that suffix.
+- **LINT-07.** `no-cogs-in-view-init` rejects written `Cogs` types in a
+  recognized view's stored properties, initializer parameters, and method
+  parameters, including optional and generic positions, and points to
+  `@Environment(\.cogs)` as the conforming boundary.
+- **LINT-08.** `primitives-only-in-ops` rejects `commit` and `refresh` on
+  classified production graph receivers and rejects bare or
+  `self`-qualified primitives inside `extension Cogs`, including environment,
+  bootstrap-local, selector, reaction, and mechanism-controller spellings.
+- **LINT-09.** `primitives-only-in-ops` allows bare primitives and nested
+  writer work lexically inside `extension CogOps`, and explicit test-target
+  configuration allows tests to drive graph primitives directly.
+- **LINT-10.** `initial-state-in-mechanism` allows a local bound directly from
+  `Cogs.bootstrapApp` to appear only in its retention assignment inside a
+  recognized `App` initializer; named ops, reads, helpers, and primitives
+  before or after retention are violations.
+- **LINT-11.** `initial-state-in-mechanism` allows direct bootstrap retention
+  and service or mechanism construction before bootstrap, while documenting
+  factory-hidden bootstrap and cross-file `App` conformance as accepted
+  syntax-only misses.
+- **LINT-12.** `manual-cog-private` accepts `private` and `fileprivate` on
+  every recognized `ManualCog` and `ManualCogBox` source and rejects implicit
+  internal or any wider access.
+- **LINT-13.** `no-multi-read-cogs-helper` rejects a value-returning member of
+  `extension Cogs` or `extension CogOps` whose immediate lexical body contains
+  two or more direct value, status, or peek reads.
+- **LINT-14.** `no-multi-read-cogs-helper` excludes nested-closure reads,
+  void members, and written `View`, `some View`, or `Binding` returns, and
+  stays silent for helpers outside those extensions and repackaging that
+  requires data-flow analysis.
+- **LINT-15.** The GitHub reporter emits one correctly escaped workflow
+  annotation per finding with the same path, line, column, severity, slug,
+  message, and help URL as the Xcode reporter.
+- **LINT-16.** The SARIF reporter emits schema-valid output with exact source
+  regions and each rule's stable URL as `helpUri`.
+- **LINT-17.** A scratch SwiftPM package and Xcode project apply the
+  build-tool plugin, receive its diagnostics, and receive the same diagnostics
+  again when unchanged inputs take the plugin cache path. (Proof: suite.)
+- **LINT-18.** A scratch consumer invokes the command plugin and observes the
+  same rule engine, target-role behavior, and reporters as the bare CLI.
+  (Proof: suite.)
+- **LINT-19.** The checksummed artifact bundle contains each supported macOS
+  host variant, and SwiftPM selects and executes the matching executable on
+  every supported host. (Proof: suite.)
+- **LINT-20.** The selected Channel A or Channel B manifest keeps swift-syntax
+  and argument-parser out of an ordinary Cog consumer's source dependency
+  graph and satisfies the recorded unused-artifact-fetch result. (Proof: suite.)
+- **LINT-21.** `mise run lint:swift` first runs the linter's own suite, then
+  lints library and Weather production sources with production rules and test
+  sources with the primitive exemption; the repository is clean. (Proof: suite.)
+- **LINT-22.** Every diagnostic's stable URL resolves inside the matching
+  version of `Cog.docc`, and each article's examples match the fixture corpus.
+  (Proof: suite.)
+- **LINT-23.** A scratch iOS 17 consumer resolves the selected lint
+  distribution at exactly 0.4.0, applies the build-tool plugin, executes the
+  matching released binary, and reaches that release's rule documentation.
+  (Proof: suite.)

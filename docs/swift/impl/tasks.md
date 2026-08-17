@@ -55,8 +55,9 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   the scenario set in [scenarios.md](./scenarios.md) — to exactly the task's
   unit- and exit-test-mode `_Greens:_` entries; exit-test scenarios appear in
   both a `test` and a `test:release` filter; compile-fail scenarios require
-  `mise run test:compilefail`; and simulator, floor, benchmark, and suite
-  scenarios name their runs explicitly. The checker enforces these
+  `mise run test:compilefail`; linter unit scenarios use the guarded nested
+  package wrapper `mise run test:lint`; and simulator, floor, benchmark, and
+  suite scenarios name their runs explicitly. The checker enforces these
   expansions, so a filter can never silently drift from its coverage claim
   when a decision task adds scenarios.
 - **_Greens:_ is the coverage ledger.** It means every clause of those
@@ -82,7 +83,10 @@ assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
   recorded not-applicable closure — so no two release sequences can
   interleave, and every _Release_ task sits downstream of a _Gate_. A patch
   release inserts a new candidate → tag → verification → GitHub Release link
-  into the same chain, reusing the M4 template.
+  into the same chain, reusing the M4 template. A binary-backed release may
+  publish its GitHub Release and asset before exact consumption, but asset
+  verification, any conditional sibling tag, and the terminal exact-consumer
+  gate remain separate downstream tasks.
 
 ## M0 tasks
 
@@ -161,9 +165,9 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
   _Verify: `mise run tasks:check` plus missing, duplicate-owner, unreachable,
   and allowed-non-blocking fixtures._
 - **M0-09ac** _(Infrastructure)_ — Validate the plan-to-task contract: exactly
-  one M0–M7 map row, the matching task-section link, only existing
-  same-milestone task IDs, and every explicit `_Non-blocking:_` task named in
-  its row.
+  one map row per declared milestone, the matching task-section link, only
+  existing same-milestone task IDs, and every explicit `_Non-blocking:_` task
+  named in its row.
   _Depends: M0-09ab._
   _Verify: `mise run tasks:check` plus missing-row, wrong-link, unknown-ID,
   cross-milestone-ID, and missing-non-blocking fixtures._
@@ -1598,3 +1602,189 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
 - **M7-16e** _(Release)_ — Publish the 0.3.0 GitHub Release.
   _Depends: M7-16d._
   _Verify: published GitHub Release points at the approved tag._
+
+## M8 tasks
+
+_Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8)._
+
+- **M8-01a** _(Decision)_ — Settle the `coglint` executable, package,
+  plugin-product, artifact, and conditional distribution-repository names.
+  _Depends: M4-05e._
+  _Verify: accepted names recorded in lint.md §7 and the package-layout plan._
+- **M8-01b** _(Decision)_ — Settle per-rule severities and whether a next-line
+  suppression must carry a reason.
+  _Depends: M4-05e._
+  _Verify: accepted severity and suppression table recorded in lint.md._
+- **M8-01c** _(Decision)_ — Settle the stable public URL shape for lint rule
+  articles and any redirect contract it requires.
+  _Depends: M4-05e._
+  _Verify: one accepted URL per initial rule recorded in lint.md and the DocC plan._
+- **M8-01d** _(Decision)_ — Pin the Swift tools, swift-syntax,
+  swift-argument-parser, and supported macOS host architecture versions.
+  _Depends: M4-05e._
+  _Verify: compatibility builds and the accepted pins recorded in lint.md._
+- **M8-01e** _(Decision)_ — Measure unused binary-target fetching in SwiftPM
+  and Xcode, validate the asset-before-consumer release topology, and select
+  the bounded Channel A or Channel B distribution path.
+  _Depends: M8-01a, M8-01d._
+  _Verify: reproducible resolve and fetch logs plus the selected channel and
+  release ordering recorded in lint.md and plan.md._
+
+- **M8-02a** _(Infrastructure)_ — Scaffold the isolated `swift/Lint` package,
+  its source and test targets, and a root-manifest isolation assertion.
+  _Depends: M8-01a, M8-01d._
+  _Verify: nested package build and a dependency-graph check proving its
+  source dependencies do not enter the root package._
+- **M8-02b** _(Infrastructure)_ — Add the guarded `mise run test:lint`
+  wrapper with test enumeration, scenario-filter matching, and authoritative
+  executed-test counts; document the new command in both root instruction
+  files and the root README.
+  _Depends: M8-02a._
+  _Verify: the wrapper's sentinel filter succeeds, an unmatched filter fails,
+  `mise run fmt:check`, and synchronized command documentation._
+- **M8-02c** _(Behavior)_ — Add the fixture harness for triggering and
+  non-triggering inputs, exact positions, accepted evasions, and generated
+  DocC example fragments.
+  _Depends: M8-02b._
+  _Verify: `mise run test:lint --filter LINT-02`._
+  _Greens: LINT-02._
+- **M8-02d** _(Behavior)_ — Implement deterministic CLI path discovery,
+  diagnostic collection, Xcode output, help URLs, and clean/error exit status.
+  _Depends: M8-01b, M8-01c, M8-02c._
+  _Verify: `mise run test:lint --filter LINT-01`._
+  _Greens: LINT-01._
+- **M8-02e** _(Behavior)_ — Implement exact next-line suppression and the
+  explicit production-versus-test target role.
+  _Depends: M8-02d._
+  _Verify: `mise run test:lint --filter LINT-03`._
+  _Greens: LINT-03._
+
+- **M8-03a** _(Behavior)_ — Implement the shared cog-declaration classifier,
+  including normalized written types, initializers, projections, and its
+  deliberate syntax-only evasions.
+  _Depends: M8-02c._
+  _Verify: `mise run test:lint --filter 'LINT-0[45]'`._
+  _Greens: LINT-04, LINT-05._
+- **M8-03b** _(Infrastructure)_ — Implement the shared view, graph-receiver,
+  and app-entry classifiers, including bootstrap locals and documented
+  cross-file misses.
+  _Depends: M8-02c._
+  _Verify: focused nested-package classifier tests._
+
+- **M8-04** _(Behavior)_ — Implement `manual-cog-private` over the shared
+  declaration classifier.
+  _Depends: M8-02d, M8-03a._
+  _Verify: `mise run test:lint --filter LINT-12`._
+  _Greens: LINT-12._
+- **M8-05** _(Behavior)_ — Implement `cog-declaration-suffix`, including
+  shape plurality and qualifier placement.
+  _Depends: M8-02d, M8-03a._
+  _Verify: `mise run test:lint --filter LINT-06`._
+  _Greens: LINT-06._
+- **M8-06** _(Behavior)_ — Implement `no-cogs-in-view-init` over stored,
+  initializer, and method parameter types.
+  _Depends: M8-02d, M8-03b._
+  _Verify: `mise run test:lint --filter LINT-07`._
+  _Greens: LINT-07._
+- **M8-07** _(Behavior)_ — Implement `primitives-only-in-ops`, including
+  production graph receivers, `Cogs` extensions, legal `CogOps` nesting, and
+  the explicit test-target exemption.
+  _Depends: M8-02e, M8-03b._
+  _Verify: `mise run test:lint --filter 'LINT-0[89]'`._
+  _Greens: LINT-08, LINT-09._
+- **M8-08** _(Behavior)_ — Implement `initial-state-in-mechanism`, including
+  prohibited bootstrap-local work and the conforming initialization shapes.
+  _Depends: M8-02d, M8-03b._
+  _Verify: `mise run test:lint --filter 'LINT-1[01]'`._
+  _Greens: LINT-10, LINT-11._
+- **M8-09** _(Behavior)_ — Implement `no-multi-read-cogs-helper` with its
+  exact lexical read count, exclusions, and accepted data-flow misses.
+  _Depends: M8-02d, M8-03b._
+  _Verify: `mise run test:lint --filter 'LINT-1[34]'`._
+  _Greens: LINT-13, LINT-14._
+
+- **M8-10a** _(Behavior)_ — Add the escaped GitHub workflow-command reporter
+  over the shared finding model.
+  _Depends: M8-02d._
+  _Verify: `mise run test:lint --filter LINT-15`._
+  _Greens: LINT-15._
+- **M8-10b** _(Behavior)_ — Add the schema-valid SARIF reporter with exact
+  regions and stable `helpUri` values.
+  _Depends: M8-02d._
+  _Verify: `mise run test:lint --filter LINT-16`._
+  _Greens: LINT-16._
+
+- **M8-11a** _(Behavior)_ — Build and checksum the macOS artifact bundle and
+  prove exact host-variant selection from its metadata.
+  _Depends: M8-04, M8-05, M8-06, M8-07, M8-08, M8-09, M8-10a, M8-10b._
+  _Verify: artifact-bundle build and supported-host selection suite for LINT-19._
+  _Greens: LINT-19._
+- **M8-12a** _(Behavior)_ — Add the build-tool plugin over the local artifact
+  bundle and exercise diagnostics and cache replay in scratch SwiftPM and
+  Xcode consumers.
+  _Depends: M8-11a._
+  _Verify: scratch package and Xcode plugin suite for LINT-17._
+  _Greens: LINT-17._
+- **M8-12b** _(Behavior)_ — Add the command plugin over the same CLI,
+  reporters, and target-role configuration.
+  _Depends: M8-11a._
+  _Verify: scratch command-plugin suite for LINT-18._
+  _Greens: LINT-18._
+- **M8-11b** _(Behavior)_ — Implement the selected Channel A root manifest or
+  Channel B generated sibling manifest and prove its dependency and unused
+  artifact behavior.
+  _Depends: M8-01e, M8-12a, M8-12b._
+  _Verify: ordinary-consumer resolve, fetch, and dependency-graph suite for LINT-20._
+  _Greens: LINT-20._
+
+- **M8-13a** _(Behavior)_ — Generate all six rule articles from fixtures in
+  `Cog.docc` and verify their settled stable URLs.
+  _Depends: M8-04, M8-05, M8-06, M8-07, M8-08, M8-09._
+  _Verify: DocC archive and fixture-parity suite for LINT-22._
+  _Greens: LINT-22._
+- **M8-13b** _(Behavior)_ — Add `mise run lint:swift`, run the linter suite
+  first, split production and test target roles, fix current library and
+  Weather findings, and document the command in both root instruction files
+  and the root README.
+  _Depends: M8-04, M8-05, M8-06, M8-07, M8-08, M8-09._
+  _Verify: repository dogfood suite for LINT-21 plus `mise run fmt:check`._
+  _Greens: LINT-21._
+- **M8-13c** _(Infrastructure)_ — Add the dogfood linter to Swift CI and
+  extend the workflow-contract fixtures for its paths, permissions, and
+  runner policy.
+  _Depends: M8-10a, M8-13b._
+  _Verify: `mise run workflows:check` and a green lint CI job._
+
+- **M8-15a** _(Gate)_ — Run the complete lint fixture, reporter, artifact,
+  plugin, documentation, dogfood, and selected-distribution suite.
+  _Depends: M8-11b, M8-13a, M8-13c._
+  _Verify: `mise run test:lint`, `mise run lint:swift`, `mise run docs`,
+  `mise run workflows:check`, `mise run tasks:check`, and all scratch
+  integration suites._
+- **M8-15b** _(Gate)_ — Prepare the non-mutating 0.4.0 release candidate,
+  including changelog, docs, immutable CI links, and the locally exercised
+  checksummed artifact bundle.
+  _Depends: M8-15a._
+  _Verify: approved release checklist, artifact checksum, and immutable CI links._
+- **M8-15c** _(Release)_ — Create and push the annotated `0.4.0` tag after the
+  0.3.0 GitHub Release completes.
+  _Depends: M7-16e, M8-15b._
+  _Verify: remote tag resolves to the approved commit._
+- **M8-15d** _(Release)_ — Publish the 0.4.0 GitHub Release with the approved
+  checksummed lint artifact attached.
+  _Depends: M8-15c._
+  _Verify: published release points at the approved tag and exposes the named asset._
+- **M8-15e** _(Gate)_ — Verify the 0.4.0 DocC deployment and download and
+  checksum the published lint artifact.
+  _Depends: M8-15d._
+  _Verify: immutable docs URL, asset URL, and checksum evidence._
+- **M8-15f** _(Release)_ — Under Channel B, publish the generated sibling
+  distribution repository's matching 0.4.0 tag last; under Channel A, record
+  the step not applicable.
+  _Depends: M8-15e._
+  _Verify: selected-channel record and, for Channel B, remote sibling tag and manifest._
+- **M8-15g** _(Gate)_ — Prove exact 0.4.0 consumption through the selected
+  distribution channel in a scratch iOS 17 app.
+  _Depends: M8-15f._
+  _Verify: exact-consumer plugin build and documentation-link suite for LINT-23._
+  _Greens: LINT-23._
