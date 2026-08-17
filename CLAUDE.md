@@ -32,8 +32,8 @@ every scenario covered by exactly one task.
   topology record, and documentation entry points.
 - `Package.swift` — the SwiftPM manifest. The package root is the git root;
   every Swift target reaches under `swift/` through an explicit `path:`. The
-  manifest reads `COG_TEST_ISOLATION` and `COG_TEST_NNBD` to select a test
-  leg.
+  manifest reads the isolation, value-reference, core, and edge selectors
+  described under "Commands" below.
 - `swift/Sources/` — `Cog` (the library, a stub today), `CogTesting` (the
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
@@ -166,6 +166,14 @@ generic-keyed candidates remain available only for behavior and benchmark
 comparison. Generic uses box-produced keyed reference types and conditional
 runtime overloads because its concrete `Key` necessarily crosses the public
 read surface; it cannot hide entirely behind `CogKey`.
+M6 adds two internal library selectors without changing public API.
+`COG_TEST_CORE` chooses `simple` (unset/default) or `arena`.
+`COG_TEST_EDGE` belongs only to `arena`; unset currently means its first
+runnable candidate, `pool`. Supplying an edge beside `simple`, or any
+unimplemented spelling, is a hard manifest error so a candidate command cannot
+pass without compiling that candidate. The manifest mirrors both choices into
+test-target defines for selector sentinels, while ordinary consumer builds
+remain on the simple core.
 
 Documentation is a task of its own, because swift-docc-plugin is env-gated
 behind `COG_DOCC=1` so ordinary consumers resolve this package with no

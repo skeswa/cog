@@ -277,11 +277,17 @@ function librarySettingElements(source) {
   const assign = source.indexOf("=", anchor);
   if (assign === -1) fail("`librarySettings` has no initializer");
 
-  // The initializer runs to the end of its line unless it opens a literal.
-  const lineEnd = source.indexOf("\n", assign);
-  const initializer = source.slice(assign + 1, lineEnd === -1 ? undefined : lineEnd).trim();
+  // Swift-format may wrap a long `+` chain after `=` or around an operator.
+  // Read identifiers separated by `+` across whitespace rather than treating
+  // the first physical line as semantic. The expression is still deliberately
+  // restricted to the one-level composition documented above.
+  const remainder = source.slice(assign + 1);
+  const initializerMatch = /^\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*\+\s*[A-Za-z_][A-Za-z0-9_]*)*)/.exec(
+    remainder,
+  );
+  const initializer = initializerMatch?.[1].replace(/\s+/g, " ") ?? "";
 
-  if (initializer.startsWith("[")) {
+  if (remainder.trimStart().startsWith("[")) {
     const body = bracketedList(source, assign);
     if (body === null) fail("cannot read the `librarySettings` array literal");
     return listElements(body);
