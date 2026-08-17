@@ -1,4 +1,23 @@
 #if COG_CORE_ARENA
+/// Primitive result of the package-only arena slot-reuse probe.
+///
+/// `CogTesting` maps this internal representation to its public diagnostic
+/// value. Production API never exposes arena indices or generations, so a
+/// normal value reference remains a stable descriptor-and-key name.
+package nonisolated struct CogArenaSlotReuseSnapshot: Sendable {
+  /// Row returned to the allocator by the released derived state.
+  package let releasedIndex: Int32
+
+  /// Generation carried by the released state's now-stale token.
+  package let releasedGeneration: UInt16
+
+  /// Row allocated to the replacement derived state.
+  package let replacementIndex: Int32
+
+  /// Generation carried by the replacement's live token.
+  package let replacementGeneration: UInt16
+}
+
 /// Production role of one descriptor in the arena vertical slice.
 private nonisolated enum CogArenaDescriptorKind {
   /// A source whose typed column owns current and pending values.
@@ -76,6 +95,18 @@ private final class CogArenaDescriptorRecord {
       fatalError("Cog found an arena descriptor row without key storage.")
     }
     return keys[row]
+  }
+
+  /// Releases the erased key retained for a departing row.
+  ///
+  /// The descriptor record itself remains registered for the context, but a
+  /// removed keyed value must not stay alive merely because its scalar row may
+  /// later be occupied by another descriptor.
+  func removeKey(at row: Int) {
+    guard row < keys.count else {
+      fatalError("Cog tried to remove an arena descriptor row without key storage.")
+    }
+    keys[row] = nil
   }
 }
 
@@ -318,6 +349,50 @@ internal final class CogArenaCore {
     }
   }
 
+  /// Releases one unobserved derived row and allocates a replacement row.
+  ///
+  /// This package diagnostic drives PERF-05 through real descriptor lookup,
+  /// typed-column removal, edge cleanup, identity removal, and arena reuse. The
+  /// replacement is settled before the result returns, proving its new slot
+  /// lifetime carries an independent value rather than stale column storage.
+  func slotReuseSnapshot<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>,
+    in cogs: Cogs
+  ) -> CogArenaSlotReuseSnapshot {
+    _ = derivedValue(for: releasedReference, in: cogs)
+    let released = releaseDerivedState(for: releasedReference)
+
+    let replacement = derivedLocation(for: replacementReference)
+    settle(replacement.slot, in: cogs)
+
+    return CogArenaSlotReuseSnapshot(
+      releasedIndex: released.index,
+      releasedGeneration: released.generation,
+      replacementIndex: replacement.slot.index,
+      replacementGeneration: replacement.slot.generation
+    )
+  }
+
+  /// Runs the PERF-05 reuse path and deliberately resolves the retired token.
+  ///
+  /// Called only inside a debug exit test. The final access must terminate with
+  /// the arena's stale-generation diagnostic rather than reaching the new
+  /// occupant that now owns the same integer row.
+  func trapOnStaleSlotAccess<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>,
+    in cogs: Cogs
+  ) {
+    _ = derivedValue(for: releasedReference, in: cogs)
+    let released = releaseDerivedState(for: releasedReference)
+
+    let replacement = derivedLocation(for: replacementReference)
+    settle(replacement.slot, in: cogs)
+
+    _ = arena.index(of: released)
+  }
+
   /// Whether one source bridge changed in this turn after arena publication.
   func reactionBridgeNeedsCheck<Value>(_ valueReference: ManualCog<Value>) -> Bool {
     let location = manualLocation(for: valueReference)
@@ -538,6 +613,47 @@ internal final class CogArenaCore {
     arena.descriptor[row] = record.index
     record.install(key: key, at: row)
     slots[identity] = slot
+    return slot
+  }
+
+  /// Removes one settled, unobserved derived state from every arena owner.
+  ///
+  /// Lifetime integration calls this same sequence once M6 routes lease counts
+  /// through scalar rows. A boundary or subscriber is a durable consumer and
+  /// therefore makes direct release an invariant violation. Dependency edges,
+  /// typed payload, retained key, identity lookup, and scalar slot are cleared
+  /// in that order so no live topology can point at a reusable row.
+  private func releaseDerivedState<Value>(for valueReference: Cog<Value>) -> CogArenaSlot {
+    let identity = CogStateIdentity(
+      descriptor: valueReference.descriptor.identity,
+      key: valueReference.key
+    )
+    guard let slot = slots[identity] else {
+      fatalError("Cog tried to release an arena derived state that was not installed.")
+    }
+
+    let setup = derivedRecord(for: valueReference.descriptor)
+    let row = arena.index(of: slot)
+    guard arena.descriptor[row] == setup.record.index else {
+      fatalError("Cog tried to release an arena row through another descriptor.")
+    }
+    guard arena.boundary[row] == CogArenaStorage.noIndex else {
+      fatalError("Cog tried to release an arena state pinned by a UI boundary.")
+    }
+    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
+      fatalError("Cog tried to release an arena state with live subscribers.")
+    }
+    guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
+      fatalError("Cog tried to release an arena state during active graph work.")
+    }
+
+    edges.removeDependencySuffix(of: slot, after: .none, in: arena)
+    setup.column.remove(at: slot)
+    setup.record.removeKey(at: row)
+    guard slots.removeValue(forKey: identity) == slot else {
+      fatalError("Cog removed a different arena slot from state identity storage.")
+    }
+    arena.release(slot)
     return slot
   }
 

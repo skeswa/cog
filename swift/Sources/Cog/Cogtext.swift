@@ -487,6 +487,39 @@ extension Cogs {
     #endif
   }
 
+  #if COG_CORE_ARENA
+  /// Exercises derived-state release and replacement through the arena core.
+  ///
+  /// Package-only for `CogTesting`; normal clients never receive slot handles.
+  /// Both declarations are settled through their real typed columns, and the
+  /// returned snapshot contains identity-free allocator facts only.
+  package func arenaSlotReuseForTesting<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>
+  ) -> CogArenaSlotReuseSnapshot {
+    arenaCore.slotReuseSnapshot(
+      releasing: releasedReference,
+      replacingWith: replacementReference,
+      in: self
+    )
+  }
+
+  /// Deliberately touches a released slot after its row has been reused.
+  ///
+  /// This exists solely for PERF-05's debug child process. Successful behavior
+  /// is termination with the stale-generation message, never a normal return.
+  package func trapOnStaleArenaSlotAccessForTesting<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>
+  ) {
+    arenaCore.trapOnStaleSlotAccess(
+      releasing: releasedReference,
+      replacingWith: replacementReference,
+      in: self
+    )
+  }
+  #endif
+
   /// Removes the exact still-unobserved state after its grace task resumes.
   ///
   /// Both identity and generation matter. The descriptor-and-key slot may have
