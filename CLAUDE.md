@@ -46,10 +46,12 @@ every scenario covered by exactly one task.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
 - `swift/Benchmarks/` — a **separate** SwiftPM package, depending on the root
-  by path so a benchmark harness or allocator backend can never enter the
-  dependency graph a consumer resolves. A shell today; the pinned dependency
-  arrives in `M5-05c`. Run it with `swift run -c release CogBenchmarks` from
-  that directory.
+  by path so the benchmark harness and its allocator backend can never enter
+  the dependency graph a consumer resolves. Run it with
+  `swift package benchmark` from that directory. Its `README.md` records the
+  pinned tool matrix and the MainActor isolation shim; `probes/` holds the
+  measurements those pins rest on. Unlike the root package, its
+  `Package.resolved` is committed.
 - `tools/` — pinned Node tooling: `swift-test.mjs`,
   `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own

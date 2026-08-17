@@ -32,31 +32,32 @@ a commit that is not the one being changed.
 From this directory:
 
 ```console
-swift run -c release CogBenchmarks
+swift package benchmark
 ```
 
-Always release. A debug measurement of a graph library measures the optimizer's
-absence.
-
-`mise run bench` wraps this from the repository root once `M5-08b` adds it.
+`mise run bench` wraps it from the repository root once `M5-08b` adds it. The
+plugin always builds release; a debug measurement of a graph library measures
+the optimizer's absence.
 
 ## What is here today
 
-A shell. It runs one small instance of each shared scenario and prints the run
-count against the count the shape requires:
+One target, `CogGraph`, with one benchmark over the shared Kairo diamond. It
+exists to prove the whole path works end to end — pinned harness, isolation
+shim, shared scenarios, release build — and it carries **no thresholds**.
+`M5-06` and `M5-07a`–`M5-07d` add those one measured result at a time, because a
+threshold with no measurement behind it is a guess that fails at the worst
+moment.
 
-```text
-COUNT-01-KairoDiamond [inline]: 66/66 runs (exact), value 55
-COUNT-06-CellxLattice [inline]: 800/800 runs (exact), value 156298667222685
-```
+Benchmarks drive the scenarios from `_CogScenarios`, the same values
+`CogScenarioTests` asserts on. That sharing is the point: a run-count assertion
+and a timing measurement that disagreed about which graph they ran would make
+both meaningless. `GraphHarness.run` also checks each scenario's run count
+before reporting, because a benchmark measures however much work it is given —
+a graph that silently started recomputing twice per turn would otherwise show
+up as a slower number rather than as a defect.
 
-Running scenarios rather than printing a greeting is deliberate: the thing that
-has to keep working is that benchmarks and `CogScenarioTests` drive the _same_
-graphs, out of `_CogScenarios`. A run-count assertion and a timing measurement
-that disagreed about which graph they ran would make both meaningless.
-
-The numbers it prints are not measurements. They have no pinned environment
-behind them, and nothing here gates on them yet.
+Numbers printed from a developer machine are not baselines. Baselines are
+recorded on the pinned runner by `M5-08a`.
 
 ## Supported tool matrix
 
@@ -183,13 +184,15 @@ Flipping the trait on an existing `.build` fails with
 `missing required module 'MallocInterposerC'`; a clean build succeeds. Treat
 backend changes as clean-build events.
 
-### Still for `M5-05c`
+### `Package.resolved` is committed here, and only here
 
-Once the dependency is a version rather than a path,
-SwiftPM writes `swift/Benchmarks/Package.resolved`. Commit it. A measurement
-tool whose resolve is not reproducible produces numbers that are not either.
-This is a different file from the root `Package.resolved`, which must never be
-committed and which `swift-docs.yml` fails the build over.
+`swift/Benchmarks/Package.resolved` is checked in: a measurement tool whose
+resolve is not reproducible produces numbers that are not either. It pins the
+harness at 1.36.2 and, transitively, `malloc-interposer` 1.4.0 — the backend
+every malloc threshold depends on.
+
+This is a different file from the **root** `Package.resolved`, which must never
+be committed and which `swift-docs.yml` fails the build over.
 
 ## What is coming
 
