@@ -161,21 +161,23 @@ extension CogOps {
 }
 ```
 
-When a view needs several values at once, compose the reads as a method on the
-runtime rather than a type that takes one:
+When a view needs several values, read each one flatly:
 
 ```swift
-extension Cogs {
-  func cardReading(for zip: ZipCode) -> CardReading { ... }
+var body: some View {
+  let forecast = cogs.status[forecastCogs[zip]]
+  let temperature = cogs[temperatureCogs[zip]]
+  let advice = cogs[adviceCogs[zip]]
+  ...
 }
 ```
 
-The call site then reads like an op — `cogs.cardReading(for: zip)` — the
-projection stays a plain value that knows nothing about the graph, and nothing
-in your app declares a `Cogs` parameter. Reads made this way still register
-with the caller's tracking, and reads made inside one `body` still come from
-one settled turn. If the projection is expensive or shared by several views,
-make it a derived cog instead and get caching and equality gating with it.
+Resist gathering them into a projection struct. Reads in one `body` already
+come from one settled turn, so they cannot tear, and each registers on its own,
+so an unrelated turn invalidates nothing — a wrapper adds a layer you have to
+read to know what the view depends on, and invites being stored or passed
+onward. If a value is genuinely *derived* rather than merely read alongside
+others, declare a derived cog for it and read that flatly too.
 
 ### Run a side effect
 

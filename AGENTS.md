@@ -249,18 +249,16 @@ that runtime.
   with the rest of it, and it applies to `refresh` for the same reason it
   applies to `commit`: both are demands on the graph, and neither is domain
   vocabulary.
-- **Compose multi-value reads as methods on the runtime, not as types that take
-  one.** A view that needs several values at once calls
-  `cogs.weatherCardReading(for: zip)` — a `Cogs` extension returning a plain
-  value — rather than constructing a helper whose initializer accepts `Cogs`.
-  The call site then reads like an op, the projection type stays ignorant of
-  the graph, and no type in an app declares a `Cogs` parameter, so the shape
-  that is forbidden for views is never modelled anywhere near them. Reads made
-  this way still register with the caller's tracking scope, and reads made
-  inside one `body` still come from one settled turn. A projection that is
-  expensive or shared by several views is a derived cog instead, which adds
-  caching and equality gating; a per-render projection of a few values does not
-  need one.
+- **Read flatly; never repackage reads into a projection type.** A view that
+  needs several values reads each one on its own line and binds it to a domain
+  local, however many there are. Do not gather them into a struct — not one
+  built by an initializer taking `Cogs`, and not one built by a `Cogs`
+  extension. A projection type adds a layer that must be read to know what the
+  view depends on, invites being stored or passed onward, and buys nothing:
+  reads in one `body` already come from one settled turn, and each already
+  registers on its own so unrelated turns invalidate nothing. If a value is
+  genuinely derived rather than merely read together, declare a derived cog and
+  read that flatly too.
 - **Put initial app state in a mechanism's `operate`, not in the app entry
   point.** `operate` runs inside bootstrap, so its writes settle before
   `bootstrapApp` returns and no watcher observes the pre-initial value on the

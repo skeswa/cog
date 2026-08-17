@@ -23,7 +23,17 @@ struct WeatherCard: View {
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
-    let weatherCard = cogs.weatherCardReading(for: zip)
+    // Every value this card shows, read flatly and bound to a domain local.
+    // They come from one settled turn because they are read in one body, so
+    // the card can never render a torn pair — and each read registers on its
+    // own, so an unrelated ZIP's turn invalidates nothing here.
+    let weatherForecast = cogs.status[weatherForecastCogs[zip]]
+    let report = weatherForecast.value?.weather
+    let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
+    let receivesHourlyUpdates = cogs[receivesHourlyUpdatesCogs[zip]]
+    let refreshInterval = cogs[refreshIntervalCog]
+    let cadence = refreshInterval?.shortCadenceDescription
+    let loadStatus = WeatherLoadStatus(weatherForecast)
 
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
@@ -38,7 +48,7 @@ struct WeatherCard: View {
 
         Spacer()
 
-        if weatherCard.receivesHourlyUpdates, let cadence = weatherCard.cadence {
+        if receivesHourlyUpdates, let cadence = cadence {
           Label("Every \(cadence)", systemImage: "timer")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tint)
@@ -49,7 +59,7 @@ struct WeatherCard: View {
         }
       }
 
-      if let report = weatherCard.report {
+      if let report {
         HStack(alignment: .center) {
           Text("\(Int(report.temperatureF.rounded()))°")
             .font(.system(size: 48, weight: .semibold, design: .rounded))
@@ -76,17 +86,17 @@ struct WeatherCard: View {
 
         HStack(spacing: 12) {
           Label(
-            weatherCard.isNiceOutside ? "Good outdoor weather" : "Better indoors",
-            systemImage: weatherCard.isNiceOutside ? "figure.walk" : "house"
+            isNiceOutside ? "Good outdoor weather" : "Better indoors",
+            systemImage: isNiceOutside ? "figure.walk" : "house"
           )
           .font(.subheadline.weight(.medium))
 
           Spacer(minLength: 8)
 
-          RefreshButton(zip: zip, status: weatherCard.loadStatus)
+          RefreshButton(zip: zip, status: loadStatus)
         }
 
-        if weatherCard.loadStatus == .failed {
+        if loadStatus == .failed {
           Label(
             "Couldn't update. Your last forecast is still shown.",
             systemImage: "exclamationmark.circle"
@@ -95,7 +105,7 @@ struct WeatherCard: View {
           .foregroundStyle(.red)
         }
       } else {
-        EmptyForecast(zip: zip, status: weatherCard.loadStatus)
+        EmptyForecast(zip: zip, status: loadStatus)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -106,67 +116,11 @@ struct WeatherCard: View {
     .overlay {
       RoundedRectangle(cornerRadius: 20)
         .stroke(
-          weatherCard.receivesHourlyUpdates ? Color.accentColor.opacity(0.55) : .clear,
+          receivesHourlyUpdates ? Color.accentColor.opacity(0.55) : .clear,
           lineWidth: 1.5
         )
     }
     .accessibilityElement(children: .contain)
-  }
-}
-
-/// The graph projection consumed by one card render.
-///
-/// A plain value: it holds what one render shows, and knows nothing about the
-/// graph it came from. Building it is a method on the runtime
-/// (``Cogs/weatherCardReading(for:)``) rather than an initializer taking one,
-/// so the call site reads `cogs.weatherCardReading(for: zip)` — the same shape
-/// as an op — and no type in this app accepts a `Cogs` argument.
-@MainActor
-struct WeatherCardReading {
-  /// The accepted forecast shown while the current request changes kind.
-  let report: Weather?
-  /// Whether the accepted forecast is suitable for outdoor activity.
-  let isNiceOutside: Bool
-  /// Whether this ZIP participates in the simulated hourly refresh effect.
-  let receivesHourlyUpdates: Bool
-  /// The current refresh interval formatted for compact card chrome.
-  let cadence: String?
-  /// The request lifecycle reduced to the card's presentation vocabulary.
-  let loadStatus: WeatherLoadStatus
-  #if DEBUG
-  /// The atomic projection used by render-invalidation tests.
-  let snapshot: WeatherCardSnapshot
-  #endif
-
-}
-
-extension Cogs {
-  /// Reads every graph value one card render presents, from one settled turn.
-  ///
-  /// Composing several reads as a method on the runtime keeps the call site in
-  /// the same vocabulary as an op, and keeps `Cogs` out of every initializer in
-  /// the app. Called from a view `body`, each read below still registers with
-  /// SwiftUI's active tracking scope, so the card is invalidated by exactly the
-  /// values it showed — and because they are read inside one body, they come
-  /// from one settled turn and cannot tear.
-  ///
-  /// - Parameter zip: Which card's values to read.
-  /// - Returns: The projection that render should show.
-  func weatherCardReading(for zip: ZipCode) -> WeatherCardReading {
-    let weatherForecast = status[weatherForecastCogs[zip]]
-    let isNiceOutside = self[isNiceOutsideCogs[zip]]
-    let receivesHourlyUpdates = self[receivesHourlyUpdatesCogs[zip]]
-    let refreshInterval = self[refreshIntervalCog]
-    let report = weatherForecast.value?.weather
-
-    return WeatherCardReading(
-      report: report,
-      isNiceOutside: isNiceOutside,
-      receivesHourlyUpdates: receivesHourlyUpdates,
-      cadence: refreshInterval?.shortCadenceDescription,
-      loadStatus: WeatherLoadStatus(weatherForecast),
-      snapshot: WeatherCardSnapshot(zip: zip, report: report, isNice: isNiceOutside)
-    )
   }
 }
 

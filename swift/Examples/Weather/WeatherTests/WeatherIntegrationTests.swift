@@ -43,8 +43,19 @@ private final class TrackedWeatherCard {
 
   private func render() {
     withObservationTracking {
-      let weatherCard = cogs.weatherCardReading(for: zip)
-      snapshots.append(weatherCard.snapshot)
+      // The same flat reads the card body performs, in the same order. The
+      // property under test is that two reads inside one render see one
+      // settled turn, so the test has to make those two reads itself rather
+      // than through a shared helper that could settle them differently.
+      let weatherForecast = cogs.status[weatherForecastCogs[zip]]
+      let isNiceOutside = cogs[isNiceOutsideCogs[zip]]
+      snapshots.append(
+        WeatherCardSnapshot(
+          zip: zip,
+          report: weatherForecast.value?.weather,
+          isNice: isNiceOutside
+        )
+      )
     } onChange: { [weak self] in
       MainActor.assumeIsolated {
         guard let self else { return }
