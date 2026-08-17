@@ -143,6 +143,171 @@ extension CogScenario {
       return tail
     }
   }
+
+  /// Kairo's broad propagation: `width` independent two-link arms off one
+  /// source, every one of them read every turn.
+  ///
+  /// The diamond fans in and the deep chain runs long; this one runs *wide*.
+  /// Upstream keeps an effect on every arm, so one write has to reach fifty
+  /// live consumers, and the shape is what catches a propagation that walks
+  /// the subscriber set more than once per consumer — a mistake the diamond
+  /// hides, because there the duplicate arrivals collapse at a single sink.
+  ///
+  /// Each arm is two links, both of which the source's change reaches, so a
+  /// settle costs two runs per arm and every changed turn costs the same
+  /// again:
+  ///
+  /// ```text
+  /// expectedRuns = 2 × width × (1 + turns)
+  /// ```
+  ///
+  /// The `arm`th offset is `source + arm` and its leaf adds one, so the last
+  /// leaf after writing `turn` is `turn + width` — the `i + 50` upstream
+  /// asserts at its default width.
+  ///
+  /// Unlike the diamond there is no single sink to read, so the scenario peeks
+  /// every leaf, which is what upstream's fifty effects do. Reading only the
+  /// last one would settle one arm and leave the other forty-nine cold, and
+  /// the count would then be about a chain rather than about breadth.
+  ///
+  /// - Parameters:
+  ///   - width: Independent arms hanging off the source. Defaults to
+  ///     upstream's 50.
+  ///   - turns: Changing turns after the first read. Defaults to upstream's
+  ///     50.
+  ///   - layout: The value-reference layout to build with. This shape is
+  ///     keyless, so it only travels with the result.
+  public static func kairoBroad(
+    width: Int = 50,
+    turns: Int = 50,
+    layout: CogValueReferenceLayout = .inline
+  ) -> CogScenario {
+    CogScenario(
+      name: "COUNT-03-KairoBroad",
+      layout: layout,
+      expectedRuns: 2 * width * (1 + turns)
+    ) { cogs, counter in
+      let sourceCog = ManualCog<Int>(0, name: "kairo.broad.head")
+      // Two links per arm, and the leaf captures only its own offset, so the
+      // arms stay independent of each other. No flat storage is needed here
+      // the way `kairoDeep` needs it: an arm is two links deep, not fifty, so
+      // releasing one cannot recurse.
+      let leafCogs = (0..<width).map { arm in
+        let offsetCog = Cog<Int>(
+          { c in
+            counter.record()
+            return c[sourceCog] + arm
+          },
+          name: "kairo.broad.offset.\(arm)"
+        )
+        return Cog<Int>(
+          { c in
+            counter.record()
+            return c[offsetCog] + 1
+          },
+          name: "kairo.broad.leaf.\(arm)"
+        )
+      }
+
+      var last = width
+      for leafCog in leafCogs { last = cogs.peek(leafCog) }
+      for turn in 1...max(turns, 1) where turns > 0 {
+        cogs.commit("kairo.broad.turn") { c in c[sourceCog] = turn }
+        for leafCog in leafCogs { last = cogs.peek(leafCog) }
+      }
+      return last
+    }
+  }
+
+  /// Kairo's unstable graph: a consumer whose dependency set flips every turn.
+  ///
+  /// Upstream calls this the worst case, and it is the only ported shape where
+  /// the graph's *edges* change rather than just its values. The sum reads the
+  /// source's parity and then reads `double` or `inverse` accordingly, so one
+  /// of the two branches is a dependency this turn and dead weight the next.
+  ///
+  /// Three selectors run per changed turn, not two, and the third is not a
+  /// mistake:
+  ///
+  /// ```text
+  /// expectedRuns = 2 + 3 × turns
+  /// ```
+  ///
+  /// Settling a consumer schedules the dependencies it recorded *last* time
+  /// before rerunning it, which is exactly what keeps a warm deep chain
+  /// iterative instead of nesting one call frame per link (see `settle` and
+  /// GRAPH-14). When the recorded set is still right — every other ported
+  /// shape — that scheduling costs nothing. Here it settles the branch the
+  /// next run is about to drop, and the branch that run actually reads is
+  /// pulled during it. So a changed turn costs the stale branch, the fresh
+  /// branch, and the sum; only the first settle, which has no recorded set
+  /// yet, costs two.
+  ///
+  /// Trading one speculative run per flipped edge for a call stack that does
+  /// not grow with graph depth is the deliberate choice. The count is here so
+  /// that trade stays exactly one run — a regression that recomputed both
+  /// branches, or rescheduled per read rather than per settle, would show up
+  /// as `iterations` extra runs rather than one.
+  ///
+  /// Each of the `iterations` reads adds the same branch value, so the sum is
+  /// `2 × iterations × head` on an odd head and `-iterations × head` on an
+  /// even one — 40 after `head = 1` at upstream's default, which is upstream's
+  /// own assertion.
+  ///
+  /// - Parameters:
+  ///   - iterations: Reads of the selected branch inside one run. Defaults to
+  ///     upstream's 20. Repeated reads of one cog cost one run, so this scales
+  ///     the arithmetic and not the expectation.
+  ///   - turns: Changing turns after the first read. Defaults to upstream's
+  ///     100.
+  ///   - layout: The value-reference layout to build with. This shape is
+  ///     keyless, so it only travels with the result.
+  public static func kairoUnstable(
+    iterations: Int = 20,
+    turns: Int = 100,
+    layout: CogValueReferenceLayout = .inline
+  ) -> CogScenario {
+    CogScenario(
+      name: "COUNT-04-KairoUnstable",
+      layout: layout,
+      expectedRuns: 2 + 3 * turns
+    ) { cogs, counter in
+      let sourceCog = ManualCog<Int>(0, name: "kairo.unstable.head")
+      let doubleCog = Cog<Int>(
+        { c in
+          counter.record()
+          return c[sourceCog] * 2
+        },
+        name: "kairo.unstable.double"
+      )
+      let inverseCog = Cog<Int>(
+        { c in
+          counter.record()
+          return -c[sourceCog]
+        },
+        name: "kairo.unstable.inverse"
+      )
+      let sumCog = Cog<Int>(
+        { c in
+          counter.record()
+          let head = c[sourceCog]
+          var total = 0
+          for _ in 0..<iterations {
+            total += head.isMultiple(of: 2) ? c[inverseCog] : c[doubleCog]
+          }
+          return total
+        },
+        name: "kairo.unstable.sum"
+      )
+
+      var total = cogs.peek(sumCog)
+      for turn in 1...max(turns, 1) where turns > 0 {
+        cogs.commit("kairo.unstable.turn") { c in c[sourceCog] = turn }
+        total = cogs.peek(sumCog)
+      }
+      return total
+    }
+  }
 }
 
 /// Flat storage for the deep chain's links.
