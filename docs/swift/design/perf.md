@@ -545,6 +545,58 @@ dirty-set propagation are the rules that turn it into O(changed). All three
 points stay in the suite so M6 can show the slope going flat rather than merely
 showing one number get smaller.
 
+**Runtime comparison, before core selection** — `M6-11c`, 2026-08-17,
+`mactop` (Apple Silicon arm64, 12 cores, 24 GB), macOS 26.4.1 / Darwin 25.4.0,
+Xcode 26.4 (17E192) / Apple Swift 6.3.0, release, harness 1.36.2. The external
+adapter is swift-state-graph 0.28.0 at
+`e602fcdb19342a38c135543e7228b3fd60753dc7`; its transitive SwiftSyntax pin is
+603.0.2. All sixteen exact-name runs used the same checkout and host session.
+The simple and arena runs rebuilt Cog through `COG_TEST_CORE`; the arena used
+the selected shared-pool edge layout, and both used inline `AnyHashable` value
+references. StateGraph and raw Observation were captured in the simple-compiled
+executable because neither adapter reaches Cog.
+
+Every sample checked its final value and exact derived-body count before the
+harness accepted the timing. The common shapes are the Kairo ports: a five-arm
+diamond over 500 turns, a 50-link chain over 50 turns, fifty two-link broad
+arms over 50 turns, and an unstable consumer with 20 repeated branch reads over
+100 turns. The three memoized graphs cost 3,006, 2,550, 5,100, and 302 derived
+runs respectively. Raw Observation has no derived cache: its first three counts
+are the same, while unstable costs 2,121 ordinary computed reads. That
+difference is an adapter result, not work hidden from the table.
+
+| Runtime                |      diamond p50 |           deep p50 |        broad p50 |       unstable p50 |
+| ---------------------- | ---------------: | -----------------: | ---------------: | -----------------: |
+| simple Cog             |  99 M / 4.964 ms |    51 M / 2.540 ms |    239 M / 12 ms |    45 M / 2.484 ms |
+| arena Cog              | 103 M / 4.362 ms |    68 M / 2.654 ms | 214 M / 8.905 ms |    31 M / 1.272 ms |
+| swift-state-graph 0.28 |    506 M / 25 ms |      301 M / 14 ms |    715 M / 36 ms |   152 M / 7.479 ms |
+| raw `@Observable`      |  16 M / 0.787 ms | 4.106 M / 0.205 ms |  45 M / 2.130 ms | 7.094 M / 0.327 ms |
+
+Each workload cell is instructions / wall clock. Units preserve the harness's
+displayed precision rather than inventing digits after a rounded millisecond.
+The companion process-level measurements were:
+
+| Runtime                | diamond memory / samples | deep memory / samples | broad memory / samples | unstable memory / samples |
+| ---------------------- | -----------------------: | --------------------: | ---------------------: | ------------------------: |
+| simple Cog             |              13 MB / 595 |         14 MB / 1,163 |            13 MB / 241 |             13 MB / 1,172 |
+| arena Cog              |              13 MB / 684 |         14 MB / 1,122 |            14 MB / 336 |             13 MB / 2,328 |
+| swift-state-graph 0.28 |              13 MB / 118 |           13 MB / 212 |             14 MB / 84 |               13 MB / 400 |
+| raw `@Observable`      |            13 MB / 3,730 |        13 MB / 10,000 |          13 MB / 1,379 |             13 MB / 8,854 |
+
+Memory is p50 peak resident memory for the complete benchmark process, not an
+allocation attributed to one graph; at these sizes its 13–15 MB spread is not
+a useful separator. Sample counts differ because every exact-name benchmark
+ran to the same three-second duration cap.
+
+Recorded without selecting a core: arena wall clock is lower than simple on
+diamond, broad, and unstable and higher on deep; instructions are higher on
+diamond and deep and lower on broad and unstable.
+swift-state-graph is the slowest graph runtime in all four shapes. Raw
+Observation is the lower bound and is fastest even where its uncached unstable
+reads do seven times the derived work. `M6-11d` turns the recorded timing
+distributions into generous gates, and `M6-12a` — not this measurement task —
+weighs the mixed core result and selects the default.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
