@@ -566,10 +566,10 @@ query caching.
   only the verified dependency/backend and add an isolation shim only if the
   probe proves one necessary. The package wraps the same scenarios in
   `Benchmark {}` closures. Metrics per perf §9.4: `.wallClock`;
-  `.mallocCountTotal` with a
-  **threshold of zero** for `box[key]` value-reference creation and a recorded,
-  downward-ratcheting ceiling for steady turns, zero being the target the
-  data-oriented core has to reach;
+  `.mallocCountTotal` **measured at zero** for
+  `box[key]` value-reference creation and pinned against drift from its
+  recorded cost for steady turns, zero being the target the data-oriented core
+  has to reach;
   `.peakMemoryResident` at 1,000 states; notice counts for pinned keyed
   states; and verified ARC retain and release counters. Baselines use the CLI
   spelling proven by the compatibility probe. Every baseline pins its
@@ -827,9 +827,9 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   then prove a scratch iOS 17 app consumes exact 0.1.0 and the DocC site
   deploys before publishing the GitHub Release.
 - M5 (`M5-10`): run-count tests are green under every value-reference candidate selected
-  by `COG_TEST_VALUE_REFERENCE_LAYOUT`; `box[key]` creation holds its
-  `mallocCountTotal == 0` threshold and steady turns hold the ceiling perf.md
-  records; value-reference layout numbers are recorded in perf.md before the choice settles.
+  by `COG_TEST_VALUE_REFERENCE_LAYOUT`; `box[key]` creation measures
+  `mallocCountTotal == 0` and steady turns hold the cost perf.md records;
+  value-reference layout numbers are recorded in perf.md before the choice settles.
 - M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
   arena edge candidate; `mise run test:cores` is green; edge-layout and
   runtime-comparison numbers are recorded before choices settle; the default

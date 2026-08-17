@@ -293,10 +293,13 @@ interposer. Scaled per operation, and byte-identical from p0 to p100 across
 The steady turn does not reach zero on the simple core, which is the expected
 state of the class-state build rather than a defect: §9.1 builds it from class
 states and edge arrays, and §5's no-ARC, no-existential rules are what the
-data-oriented core adopts in M6. PERF-01's ceiling is therefore the measured
-cost, ratcheting downward only, so the number cannot drift upward unnoticed
-while M6 is being built. Zero remains the target M6 has to reach, and `M6-11d`
-is where it becomes the gate.
+data-oriented core adopts in M6. PERF-01 is therefore pinned against _drift_
+rather than against zero — `mise run bench:baseline:check` fails if a steady
+turn's allocation count moves from the recorded baseline by more than 100 raw
+allocations, where one extra allocation per turn is 1,000 (`M5-11` explains the
+units and the noise floor). The cost cannot creep upward unnoticed while M6 is
+being built. Zero remains the target M6 has to reach, and `M6-11d` is where it
+becomes an absolute gate.
 
 Attribution, from the same session, so M6 knows where to look:
 

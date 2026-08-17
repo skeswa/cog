@@ -42,44 +42,60 @@ enum GraphHarness {
 }
 
 let benchmarks: @Sendable () -> Void = {
-  Benchmark.defaultConfiguration = .init(
-    // Everything `M5-05ba` verified and `M5-05bb` proved live on this host.
-    // No thresholds yet: `M5-06` and `M5-07a`–`M5-07d` add them one measured
-    // result at a time, because a threshold without a measurement behind it is
-    // a guess that fails at the worst moment.
-    metrics: [
-      .wallClock,
-      .mallocCountTotal,
-      .freeCountTotal,
-      .peakMemoryResident,
-      .objectAllocCount,
-      .retainCount,
-      .releaseCount,
-      .instructions,
-    ],
-    warmupIterations: 2,
-    maxDuration: .seconds(3),
-    // Reported, never gated. M5 gates allocations, which are exact; timing
-    // gates are M6's (`M6-11d`, generous absolute thresholds), and upstream's
-    // default 5% relative threshold would fail on ordinary jitter.
-    thresholds: [
-      .wallClock: .init(),
-      .mallocCountTotal: .init(),
-      .freeCountTotal: .init(),
-      .peakMemoryResident: .init(),
-      .objectAllocCount: .init(),
-      .retainCount: .init(),
-      .releaseCount: .init(),
-      .instructions: .init(),
-    ]
-  )
+  // Allocation shapes first, on purpose — see the ordering note below.
+  // Upstream discovers exactly one `benchmarks` closure per target, so every
+  // file registers through here.
+  allocationBenchmarks()
 
-  // Timing over the shared Kairo diamond. Shapes that carry allocation
-  // thresholds live in `AllocationBenchmarks.swift`; upstream discovers exactly
-  // one `benchmarks` closure per target, so every file registers through here.
-  Benchmark("kairo-diamond") { _ in
+  // Timing over the shared Kairo diamond, and **no counting metrics at all**.
+  //
+  // `M5-11` traced an intermittent SIGSEGV to this benchmark. The crash report
+  // is unambiguous: a call through a null `swift_release_hook`, from
+  // `completeTaskWithClosure` — the concurrency runtime finishing a task while
+  // the harness tears its ARC hooks down between iterations.
+  //
+  // ```text
+  // EXC_BAD_ACCESS (SIGSEGV) KERN_INVALID_ADDRESS at 0x0
+  //   0x0
+  //   _swift_release_hook
+  //   _swift_release_adapter
+  //   …
+  //   completeTaskWithClosure
+  // ```
+  //
+  // The tasks are Cog's own, and they are not a leak. This scenario builds and
+  // drops a whole `Cogs` per iteration, and each `peek` renews a
+  // `whileObserved` grace sleeper; dropping the context cancels them, and their
+  // cancellation completes on another thread shortly afterwards. So a
+  // whole-scenario benchmark is *by construction* not the "single-threaded
+  // benchmark with quiescent background allocation" upstream says its
+  // process-global counters require.
+  //
+  // Hence the bound rather than a workaround: counting metrics belong on
+  // benchmarks whose measured region is quiescent, and this one's is not.
+  // Measured 0 failures in 20 runs without them, against 2 in 12 with them.
+  //
+  // The same non-quiescence is why this registers **after** the allocation
+  // benchmarks. Counting is process-global, so a context torn down here would
+  // otherwise land its cancelled sleepers inside a later benchmark's measured
+  // region — which is the likeliest explanation for the stray malloc deviation
+  // `M5-08a` saw against `perf-06-value-reference`'s zero ceiling.
+  Benchmark(
+    "kairo-diamond",
+    configuration: .init(
+      metrics: [.wallClock, .instructions, .peakMemoryResident],
+      warmupIterations: 2,
+      maxDuration: .seconds(3),
+      // Reported, never gated. M5 gates allocations, which are exact; timing
+      // gates are M6's (`M6-11d`, generous absolute thresholds), and upstream's
+      // default 5% relative threshold would fail on ordinary jitter.
+      thresholds: [
+        .wallClock: .init(),
+        .instructions: .init(),
+        .peakMemoryResident: .init(),
+      ]
+    )
+  ) { _ in
     await GraphHarness.run(.kairoDiamond(width: 5, turns: 100))
   }
-
-  allocationBenchmarks()
 }

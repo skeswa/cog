@@ -944,11 +944,11 @@ benchmark package, and never constrains the behavior suite. Every scenario
 in this group has proof mode `benchmark` by default; no per-scenario marker
 is needed.
 
-- **PERF-01.** A steady turn — same graph shape, new values — allocates no
-  more than the ceiling recorded in perf.md, and that ceiling only ever
-  ratchets downward. Allocating nothing (`mallocCountTotal == 0`) is the
-  target; the simple core does not reach it, so the recorded ceiling is what
-  stops the cost drifting upward until the data-oriented core does.
+- **PERF-01.** A steady turn — same graph shape, new values — allocates what
+  perf.md records and no more; the recorded cost only ever ratchets downward.
+  Allocating nothing (`mallocCountTotal == 0`) is the target; the simple core
+  does not reach it, so pinning the count against drift is what stops the cost
+  creeping upward until the data-oriented core does.
 - **PERF-02.** Propagation does no retain or release traffic.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
   baseline threshold recorded in perf.md. While no baseline exists, this

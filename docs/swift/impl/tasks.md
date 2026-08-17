@@ -1164,8 +1164,8 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 - **M5-06** _(Behavior)_ — Add zero-allocation steady-turn and `box[key]`
   value-reference creation benchmarks.
   _Depends: M5-05c, M5-02a, M5-04a._
-  _Verify: benchmark filters for PERF-01 and PERF-06 report malloc counts at
-  or below their recorded ceilings, zero for PERF-06._
+  _Verify: benchmark filters for PERF-01 and PERF-06 report the malloc counts
+  perf.md records, zero for PERF-06._
   _Greens: PERF-01, PERF-06._
 - **M5-08a** _(Infrastructure)_ — Add pinned-environment baseline update and
   check commands with metadata recorded beside every baseline.
