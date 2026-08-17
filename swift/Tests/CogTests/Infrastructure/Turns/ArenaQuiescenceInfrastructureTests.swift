@@ -3,7 +3,7 @@ import Testing
 
 @testable import Cog
 
-#if COG_LEG_CORE_ARENA
+#if DEBUG && COG_LEG_CORE_ARENA
 
 // Internal proof that the core-neutral turn-chain snapshot includes arena-only
 // selector state. Public REACT-17 scenarios verify the resulting behavior.
