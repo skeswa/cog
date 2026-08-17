@@ -317,16 +317,46 @@ under churn, and inline-plus-overflow won neither shape. `perf.md` §9.6 records
 the raw comparison and rationale; the selectors retain both losing candidates
 for reproduction.
 
+## Runtime comparison adapters
+
+`M6-11a` adds a common integer-named graph adapter and ports the Kairo diamond,
+deep, broad, and unstable workloads through it. Each workload builds and drives
+the same shape for Cog and raw Observation, then checks its final value and
+exact computation count before the harness may report a number. This keeps an
+incorrect or unexpectedly duplicated computation from hiding inside timing.
+
+The raw adapter is deliberately literal: mutable values are `@Observable`
+stored properties, derived values are ordinary uncached Swift computations,
+root reads use `withObservationTracking`, and writes are ordinary property
+assignments. The tracking callback is empty because the common driver pulls
+the root after each write, but registration and write notification still run.
+Observation does not provide a derived-value graph, cache, or batching
+primitive, and adding those behind the adapter would measure a second graph
+implementation rather than the standard library's registrar. The unstable
+workload's repeated branch reads therefore run repeatedly under raw
+Observation; its checked count records that semantic difference explicitly.
+
+The exact-name workloads are:
+
+- `perf-10-cog-{diamond,deep,broad,unstable}`; and
+- `perf-10-observation-{diamond,deep,broad,unstable}`.
+
+Set `COG_TEST_CORE=simple` or `COG_TEST_CORE=arena` when building the benchmark
+package to choose which implementation the `cog` adapter measures. The adapter
+itself uses only the shared public declarations, and its root reads use Cog's
+public Observation-tracked subscript under the same tracking scope as the raw
+adapter. No comparison-only branch enters either core.
+
 ## What is coming
 
 Everything M5 planned for this package has landed. What remains is
 representation work, and it arrives as new _shapes_ rather than new machinery:
 
-| Task               | Adds                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                                 |
-| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1                                                    |
-| `M6-11a`–`M6-11d`  | comparison adapters for raw `@Observable` and swift-state-graph, and CI gating with the timing thresholds this package deliberately does not carry yet |
+| Task               | Adds                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes                                            |
+| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1                                               |
+| `M6-11b`–`M6-11d`  | the swift-state-graph adapter, pinned four-runtime results, and CI gating with the timing thresholds this package deliberately does not carry yet |
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
 here when a count moves and the question becomes which line moved it.
