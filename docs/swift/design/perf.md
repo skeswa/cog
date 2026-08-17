@@ -400,6 +400,33 @@ measured under it, including PERF-06's zero-allocation `box[key]` creation, so
 the interned-token and generic-keyed candidates have something exact to be
 measured against rather than a remembered impression.
 
+**Interned tokens: implemented, and already a third the size** — `M5-09b`,
+2026-08-17. A key is carried as one `Int` and a process-wide table remembers
+what it stands for.
+
+| Layout               | `MemoryLayout<ManualCog<Int>>.size` |
+| -------------------- | ----------------------------------- |
+| inline `AnyHashable` | 48 bytes                            |
+| interned token       | **17 bytes**                        |
+
+A descriptor reference plus an inline `AnyHashable?` against a descriptor
+reference plus an `Int?`. That is the size win this candidate was sent to find,
+visible before any benchmark runs — and it is why the storage-shape
+infrastructure test now follows the selected layout rather than pinning one
+number for both.
+
+Two costs the number does not show, and `M5-09e` has to weigh them:
+
+- **The table never shrinks.** A screen that churns a thousand keys interns a
+  thousand entries and keeps them for the life of the process. COUNT-08's churn
+  shape is where that shows up.
+- **Interning takes a lock.** Not in a graph walk — equality and hashing touch
+  only the token, which is the point — but every `box[key]` pays it once, which
+  is exactly what PERF-06 measures.
+
+The complete behavior suite passes unchanged under both layouts, which is
+COUNT-09's promise arriving early for this candidate.
+
 **Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
 family where the UI once read `n` rows and now writes and reads exactly one.
 Every other row is pinned to the app context and untouched, so anything that

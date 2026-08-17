@@ -26,19 +26,23 @@ import Testing
 // for: the isolation legs only ever change the test targets, while this changes
 // the code under test.
 
-#if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE
-// One candidate today. `M5-09b` and `M5-09c` add the others, and each one adds
-// its case here — plus the `#error` guards that make a missing or doubled
-// define a build failure rather than a wrong string.
-#else
+#if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
+#error("Package.swift defined two value-reference layouts at once")
+#endif
+#if !COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE && !COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED
 #error("Package.swift defined no value-reference layout for the test targets")
 #endif
 
 /// The layout the manifest mirrored into this target, in the spelling
 /// `COG_TEST_VALUE_REFERENCE_LAYOUT` uses.
+///
+/// `M5-09c` adds its case here alongside the guards above, which are what make
+/// a missing or doubled define a build failure rather than a wrong string.
 private let compiledValueReferenceLayout: String = {
   #if COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE
   "inline"
+  #else
+  "interned"
   #endif
 }()
 
