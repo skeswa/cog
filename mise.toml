@@ -47,6 +47,19 @@ run = "node {{config_root}}/tools/swift-test.mjs default"
 description = "Run the Swift tests across all four isolation-matrix legs"
 run = "node {{config_root}}/tools/swift-test.mjs matrix"
 
+[tasks."test:cores"]
+description = "Run the Swift behavior suite against both core implementations"
+run = """
+set -euo pipefail
+unset COG_TEST_EDGE
+behavior_filter='[A-Z]+-[0-9][0-9]'
+for core in simple arena; do
+  echo "==> core ${core}"
+  COG_TEST_CORE="${core}" node "{{config_root}}/tools/swift-test.mjs" default \
+    --no-parallel --filter "${behavior_filter}"
+done
+"""
+
 [tasks."test:value-references"]
 description = "Run the Swift tests across all value-reference layouts"
 run = """

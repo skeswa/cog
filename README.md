@@ -86,6 +86,7 @@ mise run fmt            # format Markdown, JSON, YAML, and Swift
 mise run fmt:check      # verify formatting, writing nothing
 mise run test           # Swift tests on the default isolation leg
 mise run test:matrix    # all four isolation legs
+mise run test:cores     # full suite under the simple and arena cores
 mise run test:value-references # all three value-reference layouts
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator

@@ -110,6 +110,10 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
+- `mise run test:cores` — the complete behavior suite, serialized to keep its
+  benchmark-sized graph scenarios from starving time-bounded actor tests,
+  under both the explicit `simple` and `arena` core selections without
+  changing the shipping default.
 - `mise run test:value-references` — the full behavior suite under the
   `inline`, `interned`, and `generic` value-reference layouts.
 - `mise run test:release` — the default leg in release configuration.
