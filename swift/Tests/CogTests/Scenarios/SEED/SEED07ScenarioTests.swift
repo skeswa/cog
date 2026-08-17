@@ -19,6 +19,8 @@ import os
     notices.withLock { $0 += 1 }
   }
   #expect(initial == 0)
+  #expect(cogs.observationBoundaryCount == 1)
+  #expect(cogs.hasObservationBoundary(for: seeded))
 
   cogs.seed(seeded, to: 1)
 

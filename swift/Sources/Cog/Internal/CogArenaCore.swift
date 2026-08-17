@@ -354,6 +354,8 @@ internal final class CogArenaCore {
   /// ``Cogs.seedForTesting(_:to:)`` owns the idle barrier, equality decision,
   /// and synchronized revision advance. This method updates only arena value
   /// and propagation columns, deliberately opening no turn or history event.
+  /// An already-installed UI boundary remembers the quiet change so the next
+  /// real turn can emit its one deferred notice without seed doing so itself.
   func publishTestingSeed<Value>(_ value: Value, for valueReference: ManualCog<Value>) {
     let location = manualLocation(for: valueReference)
     location.column.publishSeed(
@@ -362,6 +364,7 @@ internal final class CogArenaCore {
       revision: revision,
       propagatingWith: propagation
     )
+    observationBoundary(for: location.slot)?.deferChange()
   }
   #endif
 
@@ -470,9 +473,13 @@ internal final class CogArenaCore {
         settle(entry.slot, in: cogs)
       }
 
-      guard arena.changedAt[row] == revision else { continue }
+      let changedThisTurn = arena.changedAt[row] == revision
       #if DEBUG
+      let changedBySeed = entry.boundary.consumeDeferredChange()
+      guard changedThisTurn || changedBySeed else { continue }
       recordHistoryState(event: .notice, slot: entry.slot)
+      #else
+      guard changedThisTurn else { continue }
       #endif
       entry.boundary.notifyValueChange()
     }
@@ -973,6 +980,25 @@ internal final class CogArenaCore {
     ensureObservationBoundary(for: slot).accessValue()
   }
 
+  /// Returns an existing boundary after validating its exact slot lifetime.
+  ///
+  /// Unlike ``ensureObservationBoundary(for:)``, this lookup never creates or
+  /// pins a boundary. Debug seed uses it so setup cannot make an unread state
+  /// pay the permanent UI-lifetime cost merely to remember a deferred change.
+  private func observationBoundary(for slot: CogArenaSlot) -> CogObservationBoundary? {
+    let row = arena.index(of: slot)
+    let existingIndex = arena.boundary[row]
+    guard existingIndex != CogArenaStorage.noIndex else { return nil }
+    guard existingIndex >= 0, Int(existingIndex) < observationEntries.count else {
+      fatalError("Cog found an arena row with an invalid Observation boundary index.")
+    }
+    let entry = observationEntries[Int(existingIndex)]
+    guard entry.slot == slot else {
+      fatalError("Cog found an Observation boundary attached to another arena slot lifetime.")
+    }
+    return entry.boundary
+  }
+
   /// Returns the slot's existing boundary or creates its sole cold entry.
   ///
   /// The row stores only an `Int32` index. The ordered table owns the registrar
@@ -980,17 +1006,7 @@ internal final class CogArenaCore {
   /// merely because a different row crossed the UI boundary.
   private func ensureObservationBoundary(for slot: CogArenaSlot) -> CogObservationBoundary {
     let row = arena.index(of: slot)
-    let existingIndex = arena.boundary[row]
-    if existingIndex != CogArenaStorage.noIndex {
-      guard existingIndex >= 0, Int(existingIndex) < observationEntries.count else {
-        fatalError("Cog found an arena row with an invalid Observation boundary index.")
-      }
-      let entry = observationEntries[Int(existingIndex)]
-      guard entry.slot == slot else {
-        fatalError("Cog found an Observation boundary attached to another arena slot lifetime.")
-      }
-      return entry.boundary
-    }
+    if let existing = observationBoundary(for: slot) { return existing }
 
     guard observationEntries.count <= Int(Int32.max) else {
       fatalError("Cog exhausted its Int32 Observation boundary index space.")
