@@ -13,7 +13,7 @@ accordingly:
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
-## [0.1.0] - 2026-08-16
+## [0.1.0] - 2026-08-17
 
 The first usable release: declarations, one app-wide runtime, turns, the
 SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
@@ -33,6 +33,11 @@ SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
 - Lazy pull with dirty flags, versions, and equality gates, so a read settles
   exactly what it needs and an equal write propagates nothing.
 - Cycle detection that names the whole descriptor-and-key path and fails fast.
+- A bound on cold first-read nesting. A first read of a never-computed chain
+  nests, because a cog's dependencies are known only once its selector has run.
+  Past 128 nested computations Cog fails with an error naming the innermost
+  links, in debug and release alike, instead of exhausting the stack. Warm
+  re-settlement is iterative and stays unbounded by graph depth.
 - `Mechanism` and `MechanismController`: bootstrap-only registration of
   reactions, watches, tasks, and state-gated `whenever` scopes, with
   duplicate-name rejection and write-back that queues a new turn.
