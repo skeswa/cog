@@ -54,16 +54,21 @@ The design lives in [design/](./design/); the implementation effort lives in
    swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
    two libraries line up, tracked reads versus capture lists, and the
    name-by-name decisions that came out of it.
-7. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
+7. **[design/lint.md](./design/lint.md): lint tooling.** The proposed
+   first-party linter that turns the usage conventions into an executable
+   style guide: a standalone SwiftSyntax tool behind SwiftPM plugins, the
+   first five rules, and the rollout. A proposal awaiting `/vette`; nothing
+   in it is settled.
+8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the
    release process.
-8. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
+9. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
    scenario tree that drives red-green implementation: every behavior the
    library promises, written as small user stories and grouped by milestone.
-9. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
-   into dependency-aware tasks of half an engineering day or less, each with
-   explicit closing verification; every scenario is covered by exactly one
-   task's _Greens:_ line.
+10. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
+    into dependency-aware tasks of half an engineering day or less, each with
+    explicit closing verification; every scenario is covered by exactly one
+    task's _Greens:_ line.
 
 ## Building and testing
 
@@ -339,7 +344,8 @@ These choices are settled; §10 of the core document has the full record.
   reasoning, and the one name with a revisit trigger.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, and persistence helpers. Also open are several edge
+debug-history tools, persistence helpers, and the first-party lint tooling
+proposed in [design/lint.md](./design/lint.md). Also open are several edge
 behaviors: what a stream's status does when its sequence ends or throws, whether
 equal stream elements commit distinct turns, whether a failed `.queue` run
 stops the queue, and debounce/throttle timing modifiers (deferred backlog).

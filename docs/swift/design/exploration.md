@@ -1055,6 +1055,13 @@ keeps its slot and points at the table above instead of renumbering the rest.
     replaces the effects-struct `install(in:)` convention. See "Mechanism
     lifecycle?", "Mechanism controller?", and "Op, transaction, or turn?"
     above.
+27. **Lint tooling:** [lint.md](./lint.md) (August 16, 2026) proposes a
+    first-party `coglint` — a standalone SwiftSyntax linter in its own
+    package, delivered as a prebuilt binary behind SwiftPM plugins, starting
+    with five rules that enforce settled conventions and link each finding to
+    its documentation. Unvetted: the vehicle, rule severities, repository
+    placement, and rollout remain open until a `/vette` review accepts the
+    design. Concept record: issue #318.
 
 ---
 
