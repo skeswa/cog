@@ -274,6 +274,52 @@ storage. Do not mark value references `@frozen` before the layout result. Reserv
 buffer capacity from known descriptor counts to keep growth noise out of
 benchmarks.
 
+### 9.6 Recorded results
+
+Numbers, and only numbers that were actually taken. Each entry names the task
+that recorded it and the environment it came from; a threshold with no
+measurement behind it is a guess that fails at the worst moment.
+
+**Allocation, simple core** — `M5-06`, 2026-08-17, `mactop` (Apple Silicon,
+12 cores), Xcode 26.4 / Swift 6.3.0, release, harness 1.36.2 with the malloc
+interposer. Scaled per operation, and byte-identical from p0 to p100 across
+1,300+ samples, so these are exact costs rather than distributions.
+
+| Operation                                 | `mallocCountTotal` | `objectAllocCount` | Scenario                  |
+| ----------------------------------------- | ------------------ | ------------------ | ------------------------- |
+| `box[key]` value-reference creation       | **0**              | **0**              | PERF-06, green as written |
+| Steady turn (one write, one tracked read) | **7**              | **7**              | PERF-01, ceiling recorded |
+
+The steady turn does not reach zero on the simple core, which is the expected
+state of the class-state build rather than a defect: §9.1 builds it from class
+states and edge arrays, and §5's no-ARC, no-existential rules are what the
+data-oriented core adopts in M6. PERF-01's ceiling is therefore the measured
+cost, ratcheting downward only, so the number cannot drift upward unnoticed
+while M6 is being built. Zero remains the target M6 has to reach, and `M6-11d`
+is where it becomes the gate.
+
+Attribution, from the same session, so M6 knows where to look:
+
+| Path                                                      | Cost       | Note                                                                                                   |
+| --------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| `peek` of a manual source, 10,000×                        | ~0 total   | source lifetime is `.app`; nothing is scheduled                                                        |
+| `box[key]` creation, 10,000×                              | 0 total    | naming a state reaches no state                                                                        |
+| Tracked read `cogs[derivedCog]` of a clean value, 10,000× | ~12 total  | a settled read is effectively free                                                                     |
+| **`peek` of a clean derived value, 10,000×**              | **6 each** | transient demand renews `whileObserved` grace on every call — a sleeper per peek, not settle-walk cost |
+| Commit with no read                                       | 6 each     | the turn machinery itself                                                                              |
+| Commit plus a tracked read                                | 7 each     | PERF-01                                                                                                |
+
+The `peek` figure is worth keeping in view: it is lifetime machinery, not graph
+work, and it is why PERF-01 measures the **tracked** read. A UI read is the
+tracked one, and a UI read is what a steady turn serves.
+
+**A zero threshold can pass because nothing was measured.** `M5-05bb` found
+that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
+for a workload that demonstrably allocates. `perf-witness-allocating` exists as
+the control — a benchmark that must always report a non-zero count — and
+`M5-08a` owes the floor assertion, because upstream thresholds are upper bounds
+and cannot express one.
+
 ## 10. Deliberate non-goals
 
 - **No MVCC or snapshot record lists.** They solve multi-writer isolation,

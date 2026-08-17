@@ -45,6 +45,13 @@ every scenario covered by exactly one task.
   `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
   SwiftPM target, type-checked in one batched pass.
+- `swift/Benchmarks/` — a **separate** SwiftPM package, depending on the root
+  by path so the benchmark harness and its allocator backend can never enter
+  the dependency graph a consumer resolves. Run it with
+  `swift package benchmark` from that directory. Its `README.md` records the
+  pinned tool matrix and the MainActor isolation shim; `probes/` holds the
+  measurements those pins rest on. Unlike the root package, its
+  `Package.resolved` is committed.
 - `tools/` — pinned Node tooling: `swift-test.mjs`,
   `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
@@ -109,6 +116,16 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
+
+- `mise run bench:baseline:update [name]` — record a benchmark baseline in
+  `swift/Benchmarks` together with the environment that produced it (Xcode,
+  Swift, harness and interposer versions, architecture, host, allocator
+  backend). Defaults to `local`.
+- `mise run bench:baseline:check [name]` — refuse to compare across
+  environments, assert the allocation witness still reports a non-zero malloc
+  count, then check the run against that baseline. Baselines live in the
+  git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
+  outlive a session go in `docs/swift/design/perf.md` §9.6.
 
 The example app uses the same pinned Xcode as the library:
 

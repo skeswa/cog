@@ -110,6 +110,27 @@ run = "node {{config_root}}/tools/check-workflows.mjs"
 description = "Run the workflow-contract checker against its fixtures"
 run = "node {{config_root}}/tools/test-workflows.mjs"
 
+# Benchmark baselines, through `tools/bench-baseline.mjs`. The benchmark
+# package is a package of its own, so these tasks run there rather than at the
+# repository root. A baseline is a statement about one machine and one
+# toolchain: `update` records the environment beside it, and `check` refuses to
+# compare across environments rather than producing a plausible answer. `check`
+# also asserts that the allocation witness still reports a non-zero malloc
+# count, because a suite whose every threshold is zero passes just as happily
+# when nothing is being measured at all (`M5-05bb`).
+#
+# Baselines live in the git-ignored `swift/Benchmarks/.benchmarkBaselines/`:
+# upstream calls that format unstable, and numbers meant to outlive a session
+# belong in perf.md §9.6 with their environment written beside them.
+
+[tasks."bench:baseline:update"]
+description = "Record a benchmark baseline with the environment that produced it"
+run = "node {{config_root}}/tools/bench-baseline.mjs update"
+
+[tasks."bench:baseline:check"]
+description = "Check the current run against a baseline recorded in this environment"
+run = "node {{config_root}}/tools/bench-baseline.mjs check"
+
 # The DocC archive. swift-docc-plugin is env-gated behind `COG_DOCC=1` so that
 # an ordinary consumer resolves this package with no dependencies at all; that
 # gate is exactly why the docs build needs a task of its own rather than a
