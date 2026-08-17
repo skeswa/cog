@@ -284,8 +284,8 @@ should not use both.
 
 ### 6.6 Testing mechanisms
 
-Writable sources are `fileprivate`, so even `@testable import` cannot reach
-them. The owning state file exposes only narrow, debug-only seed capabilities
+Writable sources are `private` or `fileprivate`, so even `@testable import`
+cannot reach them. The owning state file exposes only narrow, debug-only seed capabilities
 and any loud domain helpers:
 
 ```swift

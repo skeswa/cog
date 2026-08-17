@@ -2,8 +2,8 @@
 
 A minimal ledger that must pass every `tools/check-task-ledger.mjs` check. It
 exercises a cross-milestone dependency, letter-suffixed splits, a recursive
-split (`M1-02b` retired into `M1-02ba` and `M1-02bb`), and a gate that names
-only its immediate prerequisites.
+split (`M1-02b` retired into `M1-02ba` and `M1-02bb`), a nested-package lint
+test filter, and a gate that names only its immediate prerequisites.
 
 ## M0 tasks
 
@@ -25,7 +25,7 @@ only its immediate prerequisites.
   _Greens: DECL-02._
 - **M1-02bb** _(Behavior)_ — Add the third behavior.
   _Depends: M1-02ba._
-  _Verify: `mise run test --filter DECL-03`._
+  _Verify: `mise run test:lint --filter DECL-03`._
   _Greens: DECL-03._
 - **M1-03** _(Gate)_ — Close the milestone.
   _Depends: M1-02bb._

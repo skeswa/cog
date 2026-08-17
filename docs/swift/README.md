@@ -54,16 +54,21 @@ The design lives in [design/](./design/); the implementation effort lives in
    swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
    two libraries line up, tracked reads versus capture lists, and the
    name-by-name decisions that came out of it.
-7. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
+7. **[design/lint.md](./design/lint.md): lint tooling.** The accepted
+   first-party linter that turns the usage conventions into an executable
+   style guide: a SwiftSyntax tool developed in-repo as a nested
+   `swift/Lint` package and shipped behind SwiftPM plugins, the first six
+   rules, their Cog-coupled release, and the rollout.
+8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
    turned into milestones, plus the package layout, tooling, CI, and the
    release process.
-8. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
+9. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
    scenario tree that drives red-green implementation: every behavior the
    library promises, written as small user stories and grouped by milestone.
-9. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
-   into dependency-aware tasks of half an engineering day or less, each with
-   explicit closing verification; every scenario is covered by exactly one
-   task's _Greens:_ line.
+10. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
+    into dependency-aware tasks of half an engineering day or less, each with
+    explicit closing verification; every scenario is covered by exactly one
+    task's _Greens:_ line.
 
 ## Building and testing
 
@@ -196,8 +201,8 @@ These choices are settled; §10 of the core document has the full record.
 - `commit` is the only write entry point. Its scalar overload keeps ordinary
   setters compact; its writer overload makes related writes atomic. Ops are
   normal methods in `CogOps` extensions, so `Cogs` and a mechanism's
-  controller share every op. `fileprivate` and `.readOnly` control which code may
-  name writable state. A turn ID stops an escaped writer from writing later.
+  controller share every op. `private` or `fileprivate` plus `.readOnly`
+  control which code may name writable state. A turn ID stops an escaped writer from writing later.
 - One outer `commit` is one turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
   from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
@@ -337,12 +342,20 @@ These choices are settled; §10 of the core document has the full record.
   review reconsidered thirteen of them against swift-state-graph and renamed
   none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
   reasoning, and the one name with a revisit trigger.
+- First-party lint tooling is settled as a syntax-only `coglint` developed in
+  a nested package and shipped as a prebuilt binary behind SwiftPM plugins. Its
+  six initial rules cover declarations, view/runtime boundaries, primitive
+  ownership, bootstrap-time state, source privacy, and multi-read runtime
+  helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
+  the root manifest is the v1 distribution unless an unused-artifact fetch
+  measurement selects the version-coupled manifest-repository fallback.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, and persistence helpers. Also open are several edge
-behaviors: what a stream's status does when its sequence ends or throws, whether
-equal stream elements commit distinct turns, whether a failed `.queue` run
-stops the queue, and debounce/throttle timing modifiers (deferred backlog).
+debug-history tools, persistence helpers, the lint products' final names and
+severity policy, and the stable rule-page URL shape. Also open are several
+edge behaviors: what a stream's status does when its sequence ends or throws,
+whether equal stream elements commit distinct turns, whether a failed `.queue`
+run stops the queue, and debounce/throttle timing modifiers (deferred backlog).
 Value-reference layout, edge layout, and hash tables also remain open until
 benchmarks choose them.
 

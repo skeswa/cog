@@ -552,8 +552,9 @@ one-time untracked read, use `cogs.peek(...)`.
 
 Swift access control replaces the custom lints proposed for Dart:
 
-- Declare writable sources `fileprivate`, or `private` inside a type. Only
-  that file or type can name them.
+- Declare writable sources `private` or `fileprivate`; both are fine, and at
+  file scope the two spellings are identical (the formatter prefers
+  `private` there). Only that file or type can name them.
 - Expose `.readOnly` value references or derived cogs.
 - Put ops, UI adapters, and test seams beside the sources they may write.
 
@@ -897,7 +898,7 @@ singular, and does measurement show less runtime work?
 
 | Question                          | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Who may write?                    | `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Who may write?                    | `private` or `fileprivate` plus `.readOnly` controls source names; a writer turn ID controls when writes are valid (§3.2, §4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Op, transaction, or turn?         | One named `commit`; ops are ordinary methods in `CogOps` extensions, so `Cogs` and a mechanism's controller share every op (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Keyed and keyless API?            | Boxes make value references; keyless cogs are pre-bound value references. Physical layout waits for benchmarks (§3.1; perf §4, §9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Identity and names?               | Descriptor `ObjectIdentifier` for process identity; explicit name or `fileID:line` for people. Public `Cog` and `ManualCog` types are value references over internal final-class descriptors. Declaration variables end in singular `Cog` for one keyless value reference and plural `Cogs` for a box; narrower qualifiers precede the suffix (§2.3, §3.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -1055,6 +1056,24 @@ keeps its slot and points at the table above instead of renumbering the rest.
     replaces the effects-struct `install(in:)` convention. See "Mechanism
     lifecycle?", "Mechanism controller?", and "Op, transaction, or turn?"
     above.
+27. **Lint tooling:** settled on August 17, 2026 after two `/vette` reviews.
+    [lint.md](./lint.md) specifies a standalone syntax-only `coglint`,
+    developed in this repository as a nested `swift/Lint` package under the
+    same isolation gate as `swift/Benchmarks` and delivered as a prebuilt
+    binary behind SwiftPM build-tool and command plugins. The first six rules
+    enforce declaration suffixes, no `Cogs` through view initializers,
+    primitives only in `CogOps`, initial app state through a mechanism,
+    private writable sources, and no multi-read value helper on `Cogs` or
+    `CogOps`. Classification combines written nominal types with initializer
+    evidence, so an explicit type plus `.init` is not an accidental evasion;
+    the multi-read rule stays lexical instead of becoming a data-flow engine.
+    Cog, `coglint`, and the rule articles in `Cog.docc` share one version and
+    release. V1 vends the plugins from the root manifest unless a measured
+    unused-artifact cost selects a distribution-only manifest repository;
+    that fallback remains generated, version-coupled, and published only
+    after the matching rule pages. Product names, severities, the stable URL
+    shape, later rules, and Kotlin timing remain open. Concept record: issue
+    #318.
 
 ---
 

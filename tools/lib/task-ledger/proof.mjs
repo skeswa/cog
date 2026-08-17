@@ -61,6 +61,7 @@ function parseEnvPrefix(before) {
  */
 export const SCENARIO_FILTER_COMMANDS = new Set([
   "test",
+  "test:lint",
   "test:matrix",
   "test:release",
   "test:value-references",
