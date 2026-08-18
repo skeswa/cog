@@ -259,6 +259,9 @@ These choices are settled; §10 of the core document has the full record.
   A stream's natural end publishes no turn and does not restart: its last
   success remains current, while an empty stream remains pending on its
   declared default until dependency change or refresh starts a new generation.
+  An error from the still-current stream publishes failure while retaining
+  that value or default; only cancellation Cog initiated for replacement or
+  release stays silent.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - Side effects bundle into first-class `Mechanism` values — a protocol with a
@@ -367,9 +370,8 @@ These choices are settled; §10 of the core document has the full record.
 Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, persistence helpers, the lint products' final names and
 severity policy, and the stable rule-page URL shape. Also open are several
-edge behaviors: what a stream's status does when its sequence throws, whether
-equal stream elements commit distinct turns, and debounce/throttle timing
-modifiers (deferred backlog).
+edge behaviors: whether equal stream elements commit distinct turns, and
+debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by
 the measurements in design/perf.md §9.6.

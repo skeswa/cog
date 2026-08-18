@@ -839,9 +839,8 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open questions 9 and 14): whether a throwing sequence
-publishes a failure, and whether consecutive equal elements each commit a turn
-or are equality-gated (STREAM-01 versus the TURN-09 rule)._
+_Pending (core §10, open question 14): whether consecutive equal elements each
+commit a turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
 
 - **STREAM-01.** A `.stream` cog commits each element of its sequence as
   its own turn. Watchers see every committed value.
@@ -860,6 +859,18 @@ or are equality-gated (STREAM-01 versus the TURN-09 rule)._
   neither success nor failure: status remains pending on the declared default
   with `hasSucceeded == false`, no completion turn lands, and an explicit
   refresh can start a fresh generation.
+- **STREAM-07.** The still-current stream throws before its first element. Cog
+  publishes one failure holding the error, declared default, and
+  `hasSucceeded == false`; it starts no replacement, and an exact refresh
+  handle for that generation resolves as failure.
+- **STREAM-08.** A refreshed stream emits an element and later throws. The
+  element publishes success and resolves the exact refresh handle as success;
+  the later error publishes failure retaining that value and does not rewrite
+  the handle or restart the stream.
+- **STREAM-09.** Cog replaces or releases a stream and iteration then throws
+  `CancellationError`. Because Cog initiated that cancellation, no failure
+  lands. The same error from a still-current stream Cog never cancelled is an
+  ordinary published failure.
 
 ## 16. EXPORT — Exports and interop
 
