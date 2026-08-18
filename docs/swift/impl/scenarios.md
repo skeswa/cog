@@ -959,7 +959,7 @@ since expected counts derive from the parameters.
 
 ## 18. PERF — Performance guarantees
 
-_Milestones M5 and M6, in the benchmark package. Design: perf §5–§9._
+_Milestones M5, M6, and M9, in the benchmark package. Design: perf §5–§9._
 
 Benchmark-gated: thresholds stay provisional and representation choices stay
 open until perf.md records numbers. This group is the declared exception to
@@ -1000,6 +1000,22 @@ is needed.
   swift-state-graph, and raw `@Observable` in one pinned environment.
   perf.md records wall-clock results and generous absolute regression
   thresholds before timing gates enter CI.
+- **PERF-11.** A pinned keyed state that stops changing costs a turn
+  nothing. A turn that writes and reads one key of a family performs the
+  same retain and release traffic whether one key or a thousand are pinned
+  beside it, on either core, and the notices it delivers keep their order.
+- **PERF-12.** A steady turn's shared machinery allocates nothing: the turn
+  boundary, the writer it hands out, and the arrays a turn accumulates into
+  reuse their storage rather than being rebuilt. The recorded steady-turn
+  allocation count falls to what perf.md records and only ever ratchets
+  downward.
+- **PERF-13.** Settling one node of a deep chain costs what perf.md records
+  and no more — allocations, retains, and releases per node — and the
+  recorded cost only ever ratchets downward.
+- **PERF-14.** After the shared machinery work, the simple and data-oriented
+  cores are remeasured against each other on steady, deep, broad, and
+  unstable shapes in one pinned environment. perf.md records the new
+  comparison, including whether any common-path cost regressed.
 
 ## 19. LEG — Build-settings matrix
 

@@ -719,6 +719,141 @@ Conditional publication disposition:
   release artifact for a `0.2.0` GitHub Release to describe. No release was
   drafted or published; the conditional publication chain terminates here.
 
+**Post-M6 call-site profile** — `M9-01`, 2026-08-18, `mactop` (Apple Silicon
+arm64, 12 cores, 24 GB), macOS 26.4.1 / Darwin 25.4.0 (25E253), Xcode 26.4
+(17E192) / Apple Swift 6.3 (swiftlang-6.3.0.123.5), release configuration with
+debug info. This is the profile `M6-12a` said should precede any large
+post-M6 investment, and the first §9.6 entry that attributes cost to **call
+sites** rather than counting it at the boundary.
+
+Measured outside the benchmark package, in a standalone one-executable harness,
+because the question is where a turn's cost is incurred and the benchmark
+harness cannot say. Allocations and ARC are attributed by a
+`DYLD_INSERT_LIBRARIES` interposer over the malloc family and the Swift retain
+and release entry points — including the bridge-object, unknown-object, and
+Objective-C spellings, without which the pinned-key slope reads flat and the
+measurement lies. Recording is armed for exactly one turn after two hundred
+warm-up turns, so every count below is one turn's cost rather than an average.
+Leaf time comes from `sample` at 1 ms over a six-second window. The harness and
+its exact commands are recorded in
+[`swift/Benchmarks/probes/M9-01-call-site-attribution.md`](../../../swift/Benchmarks/probes/M9-01-call-site-attribution.md).
+
+The method reproduces every recorded count it overlaps: seven mallocs for a
+simple-core steady turn (`M5-06`), five for the arena (`M6-11c`), and one retain
+and one release per pinned key on simple against two on arena (`M5-07d`,
+`M6-11c`). Allocation counts are taken with ARC recording disarmed, because
+arming it costs one allocation of its own — a constant, and the reason the two
+recording modes are separate.
+
+**The seven steady-turn allocations, simple core, by call site.**
+
+| Allocation | Call site                                              | What it is                                        |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------- |
+| 1          | `CogOps.commit(_:to:name:)`, CogOps.swift:96           | escaping closure box for the write sugar          |
+| 2          | `Cogs.commit(named:_:)`, Writer.swift:81               | escaping closure box `withTurn` receives          |
+| 3          | `Cogs.startTurn(named:)`, CogTurn.swift:283            | the `CogTurnID` object                            |
+| 4          | `Cogs.startTurn(named:)`, CogTurn.swift:283            | the `CogTurn` object                              |
+| 5          | `CogTurn.touch(_:)`, CogTurn.swift:59                  | `touchedSources` regrown from empty               |
+| 6          | `Cogs.invalidateSubscribers(of:)`, CogSettle.swift:279 | the invalidation list regrown from empty          |
+| 7          | `DerivedCogState.run(in:)`, DerivedCogState.swift:219  | the dependency list, reallocated by copy-on-write |
+
+**None of the seven is graph representation.** Four are turn machinery that
+exists whichever core is compiled, and three are per-turn arrays that cannot
+reuse their capacity: two are regrown from empty, and the dependency list
+reallocates because `run(in:)` holds the previous list in `previousDependencies`
+while clearing `dependencies`, so `keepingCapacity: true` cannot keep anything. That is why the arena reached five rather
+than zero: the representation swap could only ever move the minority of this
+list it owns. A commit with no read costs the same seven; a tracked read of a
+clean value costs none, so all seven belong to the write.
+
+**Where a steady turn's time goes, simple core.** Leaf attribution over 5,073
+samples; 1.97 µs per turn (2,000,000 turns in 3.94 s, three runs within 1%).
+
+| Bucket                                   |    Share |
+| ---------------------------------------- | -------: |
+| ARC retain and release                   |    23.5% |
+| Generic metadata instantiation           |    19.0% |
+| Actor-isolation checks                   |    12.4% |
+| Exclusivity checks (`swift_beginAccess`) |     8.2% |
+| **Cog's own compiled code**              | **6.1%** |
+| malloc and free                          |     5.5% |
+| Value-witness copies                     |     5.3% |
+| Weak-reference loads                     |     5.1% |
+| Dynamic casts and conformance lookup     |     4.2% |
+| Unattributed runtime and long tail       |    10.8% |
+
+**About six percent of a steady turn is Cog's own code.** The rest is Swift
+runtime machinery, and two of its largest buckets were not in view before this
+profile:
+
+- **Generic metadata and dynamic casts, ~23% together.** `Cogs.state(_:create:)`
+  casts the stored existential back to a concrete `State` on every lookup
+  (Cogtext.swift:764), and `manualState(for:)` and `derivedState(for:)`
+  instantiate `ManualCogState<Value>` and `DerivedCogState<Value>` metadata to
+  do it. The settle walk then casts `state as? any DerivedCogSettleState`
+  **twice per node per turn** — once entering and once exiting
+  (CogSettle.swift:340 and :359) — and once more per boundary
+  (CogObservationBoundary.swift:214). Part of that traffic reaches
+  `_dyld_find_protocol_conformance_on_disk`, the uncached lookup path.
+- **Actor-isolation checks, ~12%.** `CogState.addSubscriber(_:)` pays
+  `swift_task_isCurrentExecutor` and main-executor resolution on every
+  dependency re-record (CogSettle.swift:79–80), as does
+  `CogObservationBoundary.notifyValueChange()`. The per-turn `CogTurn` and
+  `CogTurnID` pair pays them again in `isolated deinit`, so allocation 3 and
+  allocation 4 cost more than their mallocs.
+
+**Pinned-key slope, both cores.** One keyed source written and read; every
+other key pinned and untouched.
+
+| Pinned keys | simple retains / releases | arena retains / releases |
+| ----------: | ------------------------: | -----------------------: |
+|           1 |                  78 / 104 |                  56 / 78 |
+|         100 |                 177 / 203 |                254 / 276 |
+|         500 |                 577 / 603 |            1,054 / 1,076 |
+|       1,000 |             1,077 / 1,103 |            2,054 / 2,076 |
+
+Exactly one retain and one release per pinned key on simple, exactly two on
+arena — the `M6-12a` result, reproduced independently. At a thousand pinned
+keys **79.9% of the turn's leaf samples are ARC**, and the site is one line:
+`flushClassObservationBoundaries` iterates `observationStates`, an array of
+`any CogObservationState`, retaining and releasing every element whether or not
+it changed (CogObservationBoundary.swift:212).
+
+**Per-node settle cost, depth-100 keyed chain.** One source write pulled
+through a hundred derived nodes.
+
+| Core   | mallocs / turn | retains / turn | releases / turn | wall clock / turn |
+| ------ | -------------: | -------------: | --------------: | ----------------: |
+| simple |            107 |          4,176 |           4,902 |            118 µs |
+| arena  |              5 |          1,254 |           1,376 |            101 µs |
+
+Simple pays about **one allocation, forty-one retains, and forty-nine releases
+per node per turn**. Leaf time on that shape is 33.9% ARC, 16.2% generic
+metadata, 7.7% isolation checks, 7.1% dynamic casts, 5.8% weak loads, and 5.4%
+exclusivity, against 5.0% for Cog's own code.
+
+This chain is a keyed `CogBox` recursion, **not** the Kairo deep benchmark that
+`M6-11c` measured a 33% instruction regression on. It is a different shape and
+the two must not be compared; it is recorded because it isolates per-node cost,
+which the Kairo shape does not.
+
+**What the profile settles.** The ranking below is measurement, not the
+code-reading that opened issue #373, and it reorders that issue's routes:
+
+1. The boundary flush is the largest single defect and the one with a name
+   already: it is four-fifths of a turn once a screen has scrolled, and it is
+   `M6-12a`'s stated trigger for reconsidering the core.
+2. Shared turn machinery, not representation, owns the steady turn. Four
+   allocations, two `isolated deinit` executor-check pairs, and three arrays
+   rebuilt from empty are all common-path cost that no core swap can reach.
+3. Existential casts, generic metadata, and dynamic isolation checks are a
+   third of a steady turn and were entirely absent from the code-reading
+   diagnosis. They are shared machinery too.
+
+Any rerun of the simple-versus-arena comparison before those three are fixed
+would measure the same coat on both candidates, which is what `M6-12a` already
+did. `M9-17` reruns it afterwards.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

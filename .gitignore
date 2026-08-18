@@ -1,6 +1,8 @@
-# SwiftPM
+# SwiftPM. `.build-*` covers the alternate scratch paths the probes and test
+# wrappers use, such as the `M9-01` probe's `--scratch-path .build-arena`.
 .build-mechanisms/
 .build/
+.build-*/
 .swiftpm/
 Package.resolved.bak
 

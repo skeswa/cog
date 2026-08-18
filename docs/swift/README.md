@@ -344,7 +344,10 @@ These choices are settled; §10 of the core document has the full record.
   retain/release pairs per key rather than simple's one. Arena remains an
   internal selector-only research and benchmark candidate; M6 recommends no
   0.2.0 release. Public value references remain names, never arena slot
-  handles.
+  handles. M9's call-site profile explains the mixed result: about six percent
+  of a steady turn is Cog's own compiled code, so most of what M6 measured is
+  machinery both cores share, and M9 fixes that before the comparison is
+  rerun.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -415,4 +418,9 @@ implementation as the shipping default and the arena as an internal comparison
 build. M7 is published as 0.3.0. M8 implementation and its complete fixture,
 artifact, plugin, documentation, distribution, and dogfood gate are green; the
 0.4.0 release chain is preparing the binary-backed Cog release before it
-publishes the version-matched Channel B plugin package.
+publishes the version-matched Channel B plugin package. M9 is planned but not
+started: it acts on the post-M6 performance backlog (issue #373) with the
+`M9-01` profile in hand, making pinned-key notice work O(changed), zeroing the
+steady turn's shared machinery, and deleting the runtime lookups that profile
+found on the common path — behind an unchanged public API, and with no release
+of its own unless `M9-18` records that one is warranted.

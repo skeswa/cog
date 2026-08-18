@@ -1878,3 +1878,141 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Depends: M8-15f._
   _Verify: `mise run test:lint-documentation`, `mise run fmt:check`, and
   `mise run tasks:check`._
+
+## M9 tasks
+
+_Plan scope and exit: [M9: Shared turn machinery and O(changed) notices](./plan.md#plan-m9)._
+
+_Every task in this milestone keeps the public API and the recorded M6 core
+disposition unchanged; a task that cannot is a plan change first._
+
+- **M9-01** _(Decision)_ — Profile the steady turn, the settle walk, and the
+  pinned-key flush by call site on both cores, and record in `perf.md` §9.6
+  what the numbers say and which of issue #373's routes M9 schedules against
+  which stay backlog. Keep the harness reproducible beside the other probes,
+  since attribution that cannot be rerun is an anecdote.
+  _Depends: M6-12b._
+  _Verify: recorded `perf.md` §9.6 profile entry with its environment, a
+  runnable probe under `swift/Benchmarks/probes/`, and `mise run fmt:check`._
+- **M9-02** _(Infrastructure)_ — Add a pinned-key slope benchmark that measures
+  the same turn beside one pinned key and beside a thousand in one run, so the
+  claim under test is the difference rather than two numbers a reader has to
+  subtract.
+  _Depends: M9-01._
+  _Verify: `mise run bench --filter perf-11-pinned-key-slope` reports both
+  shapes and their per-key difference._
+- **M9-03** _(Infrastructure)_ — Hoist the arena flush's `changedAt` guard
+  above its boundary-entry copy and descriptor-record fetch, which halves that
+  core's per-key traffic without changing the flush's shape.
+  _Depends: M9-02._
+  _Verify: `COG_TEST_CORE=arena mise run bench --filter
+perf-11-pinned-key-slope` reports the halved slope._
+- **M9-04** _(Infrastructure)_ — Give the simple core a changed-boundary queue:
+  enqueue where a source is already stamped, dedupe with one flag, and flush
+  that queue instead of sweeping `observationStates`. Preserve boundary-creation
+  notice order by sorting the changed set, and keep a boundary created during a
+  flush joining the next one.
+  _Depends: M9-02._
+  _Verify: `mise run test --filter 'UI|SEED|HIST'` and
+  `mise run bench --filter perf-11-pinned-key-slope`._
+- **M9-05** _(Infrastructure)_ — Give the arena core the same changed-boundary
+  queue over `CogArenaDirtyPropagation.mark(row:atLeast:)`, using a spare
+  `CogArenaStateFlags` bit for the dedupe, so the boundary test stays a scalar
+  read on rows the propagation already visits.
+  _Depends: M9-03, M9-04._
+  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
+'UI|SEED|HIST'` and the arena slope benchmark._
+- **M9-06** _(Behavior)_ — Turn the flat pinned-key slope green on both cores
+  and record the measurement and its gate in `perf.md`.
+  _Depends: M9-05._
+  _Verify: benchmark filter for the pinned-key slope on both cores reports no
+  per-key traffic, plus the recorded `perf.md` result and threshold._
+  _Greens: PERF-11._
+- **M9-07** _(Infrastructure)_ — Add a non-escaping fast path for
+  `commit(named:)` and `withTurn`, keeping an escaping overload for the
+  queued-turn path that genuinely stores its body.
+  _Depends: M9-01._
+  _Verify: `mise run test --filter 'ONE|TURN'` and a steady-turn allocation
+  count two lower than the recorded baseline._
+- **M9-08** _(Infrastructure)_ — Replace the per-turn `CogTurnID` and `CogTurn`
+  pair with one reused turn buffer and a monotonically increasing integer
+  token. This removes two allocations and both `isolated deinit`s, whose
+  executor checks the profile found cost more than the allocations did.
+  _Depends: M9-07._
+  _Verify: `mise run test --filter 'TURN|ESC'` and `mise run test:release`,
+  which is where a generic-class deinit regression would appear._
+- **M9-09** _(Infrastructure)_ — Reuse the capacity of the three arrays a turn
+  rebuilds: the touched-source list, the invalidation list, and the dependency
+  list, which reallocates today because `run(in:)` still holds the previous one
+  while clearing it.
+  _Depends: M9-01._
+  _Verify: `mise run test --filter 'GRAPH|TURN'` and a steady-turn allocation
+  count three lower than the recorded baseline._
+- **M9-10** _(Behavior)_ — Turn the zero-allocation steady-turn machinery green
+  and record the new count and its gate in `perf.md`.
+  _Depends: M9-08, M9-09._
+  _Verify: benchmark filter for the steady turn reports the recorded
+  machinery-free malloc count, plus the recorded `perf.md` result._
+  _Greens: PERF-12._
+- **M9-11** _(Infrastructure)_ — Replace the settle walk's
+  `state as? any DerivedCogSettleState` with a stored discriminator on
+  `CogState`, so entering and exiting a node costs no conformance lookup, and
+  drop the same cast from the boundary flush.
+  _Depends: M9-01._
+  _Verify: `mise run test --filter 'GRAPH|CYCLE'` and a deep-chain per-node
+  cost below the recorded baseline._
+- **M9-12** _(Infrastructure)_ — Remove the dynamic cast and the generic
+  metadata instantiation from descriptor-and-key state resolution, keeping the
+  one-concrete-type-per-descriptor invariant provable without paying for it on
+  every lookup.
+  _Depends: M9-01._
+  _Verify: `mise run test --filter 'DECL|KEY'` plus the compile-fail and
+  storage-corruption infrastructure tests that own the invariant._
+- **M9-13** _(Infrastructure)_ — Remove the per-turn dynamic actor-isolation
+  checks from dependency re-recording and boundary notification, which the
+  profile measured at an eighth of a steady turn.
+  _Depends: M9-01._
+  _Verify: `mise run test:matrix` and `mise run test:simulator`, since this
+  changes how isolation is established rather than what it is._
+- **M9-14** _(Infrastructure)_ — Fuse the settle walk's enter and exit
+  dependency traversals, resolve each node's descriptor record once, run the
+  cycle check once per node, and short-circuit clean rows at the call sites
+  that settle them.
+  _Depends: M9-11._
+  _Verify: `mise run test --filter 'GRAPH|CYCLE|COUNT'` and a deep-chain
+  per-node cost below the recorded baseline._
+- **M9-15** _(Behavior)_ — Turn the per-node settle cost green and record the
+  measurement and its gate in `perf.md`.
+  _Depends: M9-12, M9-13, M9-14._
+  _Verify: benchmark filter for the deep chain reports the recorded per-node
+  allocation and ARC cost, plus the recorded `perf.md` result._
+  _Greens: PERF-13._
+- **M9-16** _(Gate)_ — Prove the machinery work changed nothing observable:
+  the complete behavior suite across the isolation matrix, both cores, every
+  value-reference layout, release configuration, and the simulator.
+  _Depends: M9-06, M9-10, M9-15._
+  _Verify: `mise run test:matrix`, `mise run test:cores`,
+  `mise run test:value-references`, `mise run test:release`,
+  `mise run test:simulator`, and `mise run test:compilefail`._
+- **M9-17** _(Behavior)_ — Rerun the pinned runtime comparison of the simple
+  and data-oriented cores on steady, deep, broad, and unstable shapes now that
+  both wear a lighter coat, and record the new comparison in `perf.md`.
+  _Depends: M9-16._
+  _Verify: complete pinned comparison result set recorded in `perf.md`, taken
+  in one session on the pinned benchmark host._
+  _Greens: PERF-14._
+- **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
+  `M6-12a`'s core decision changes, which of issue #373's remaining routes
+  become scheduled work, and whether M9's result warrants a patch release.
+  Add the scenarios and tasks whichever answer requires, including a release
+  link at the end of the serialized chain if one is warranted.
+  _Depends: M9-17._
+  _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
+  and `mise run tasks:check`._
+- **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate
+  green against the new thresholds, the documented decision, and the backlog
+  issue updated to match what was scheduled.
+  _Depends: M9-18._
+  _Verify: `mise run bench:thresholds:check`,
+  `mise run bench:thresholds:sentinel`, `mise run fmt:check`, and
+  `mise run tasks:check`._

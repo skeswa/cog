@@ -226,6 +226,7 @@ the smallest repair task is inserted before a failed gate is rerun.
 | M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                                                |
 | M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                                                |
 | M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks) | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-18` identity repair → `M8-15g` exact-consumer gate |
+| M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks) | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-18` decision, and `M9-19` closeout                                                                                                 |
 
 ## Task bookkeeping
 
@@ -742,6 +743,64 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   last. The terminal scratch consumer must resolve that channel at exactly
   0.4.0, run the matching binary through the plugin, and reach the matching
   rule docs.
+
+<a id="plan-m9"></a>
+
+### M9: Shared turn machinery and O(changed) notices
+
+M9 acts on the post-M6 performance backlog (issue #373) with the profile
+`M6-12a` asked for actually in hand. `M9-01` recorded it — perf.md §9.6,
+"Post-M6 call-site profile" — and it reordered that backlog. The routes worth
+scheduling are the ones in **shared** machinery, which no core swap can reach,
+because about six percent of a steady turn is Cog's own compiled code and the
+rest is Swift runtime work that both cores pay. M9 changes no public API and
+adds no feature; every scenario implemented through M8 passes unchanged, and
+the core selector keeps its M6 disposition throughout.
+
+- **Make the observation-boundary flush O(changed), not O(pinned keys).** This
+  is `M6-12a`'s stated trigger for reconsidering the core, and the profile
+  makes it the largest single defect: at a thousand pinned keys, four-fifths of
+  a turn's leaf samples are ARC from one loop that retains and releases every
+  boundary whether or not it changed. Both cores admit the same rewrite — a
+  changed-boundary queue fed where a source is already stamped, with a dedupe
+  bit — and both must keep notice ordering and the rule that a boundary created
+  during a flush joins the next one. The arena's guard hoist lands first and
+  alone, because it halves that core's slope in one line.
+- **Zero the steady turn's shared machinery.** Four of the simple core's seven
+  steady-turn allocations are the turn boundary itself: two escaping closure
+  boxes and the per-turn `CogTurnID` and `CogTurn` pair, whose `isolated
+deinit`s pay executor checks on top of their mallocs. The remaining three are
+  per-turn arrays that cannot reuse capacity. A non-escaping fast path, a
+  reused turn buffer behind a monotonic token, and capacity reuse remove all
+  seven, for both cores, and they are prerequisite to any future candidate
+  demonstrating zero.
+- **Delete the runtime lookups the profile found on the common path.** Roughly
+  a quarter of a steady turn is generic-metadata instantiation and dynamic
+  conformance lookup, and an eighth is dynamic actor-isolation checking. None
+  of it was in view when issue #373 was opened. The settle walk casts
+  `state as? any DerivedCogSettleState` twice per node per turn, state lookup
+  casts a stored existential back to a concrete generic state on every
+  resolution, and dependency re-recording asks the concurrency runtime which
+  executor it is on. Each has a static replacement.
+- **Fold in the settle-walk cleanups** issue #373 already named — one fused
+  dependency traversal, one descriptor resolution and one cycle check per node,
+  a short circuit for clean rows — since the per-node cost this milestone
+  targets is the sum of those constants.
+- **Remeasure, then decide.** `M9-17` reruns the pinned simple-versus-arena
+  comparison on steady, deep, broad, and unstable shapes only after the shared
+  work lands, because rerunning it first would measure the same coat on both
+  candidates, which is what `M6-12a` already did. `M9-18` records whether that
+  changes the core decision, which of issue #373's remaining routes become
+  scheduled work, and whether M9's result justifies a patch release.
+- **Not in scope.** Instruction-level work (perf §5's borrowed records, unsafe
+  buffers, unchecked exclusivity, `@inlinable` paths), the per-read hashing
+  follow-ups of perf §4, and the per-state footprint probe stay backlog on
+  #373. They are real, but they are tuning below a machinery cost that
+  dominates them; `M9-18` is where they are promoted or left.
+- **No publication.** M9 is a performance milestone behind an unchanged public
+  API, so it carries no release chain. If `M9-18` records that a version is
+  warranted, that decision adds the candidate → tag → verification → release
+  link to the ledger, at the end of the existing serialized chain.
 
 ## Release process
 
