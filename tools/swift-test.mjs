@@ -23,10 +23,17 @@
 // is the first failing leg's; a matrix run stops at that leg.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  assertFiltersSelectTests,
+  assertRunSelectedTests,
+  extractFilters,
+  isXUnitArgument,
+  parseSpecifiers,
+} from "./lib/swift-test-guard.mjs";
 
 /**
  * The four legs of the isolation matrix.
@@ -118,7 +125,7 @@ function runLeg(leg, configuration, filters, passthrough) {
       stdio: ["inherit", "pipe", "inherit"],
     });
     exitOnFailure(listed, leg, "swift test list");
-    assertFiltersSelectTests(filters, parseSpecifiers(listed.stdout), leg);
+    assertFiltersSelectTests(filters, parseSpecifiers(listed.stdout), `leg ${leg.name}`, fail);
   }
 
   // Counting the run itself is the authoritative guard; the pre-run check
@@ -142,7 +149,7 @@ function runLeg(leg, configuration, filters, passthrough) {
   });
   exitOnFailure(tested, leg, "swift test");
   if (reportDirectory !== undefined) {
-    assertRunSelectedTests(filters, reportDirectory, leg);
+    assertRunSelectedTests(filters, reportDirectory, `leg ${leg.name}`, fail);
   }
 }
 
@@ -153,169 +160,6 @@ function legEnvironment(leg) {
     COG_TEST_ISOLATION: leg.isolation,
     COG_TEST_NNBD: leg.nnbd,
   };
-}
-
-/** Collects every `--filter <expr>` and `--filter=<expr>` value, in order. */
-function extractFilters(args) {
-  const filters = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === "--filter") {
-      const value = args[index + 1];
-      if (value === undefined) {
-        fail("`--filter` was passed without an expression");
-      }
-      filters.push(value);
-      index += 1;
-    } else if (argument.startsWith("--filter=")) {
-      filters.push(argument.slice("--filter=".length));
-    }
-  }
-  return filters;
-}
-
-/** Whether an argument is the caller's own xUnit report destination. */
-function isXUnitArgument(argument) {
-  return argument === "--xunit-output" || argument.startsWith("--xunit-output=");
-}
-
-/**
- * Keeps only the test specifiers from `swift test list` stdout.
- *
- * The build log goes to stderr, but SwiftPM is free to add progress chatter,
- * so only lines shaped like a specifier (`Target.<something>`) are kept.
- */
-function parseSpecifiers(stdout) {
-  return stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => /^\S+\.\S/.test(line));
-}
-
-/**
- * Fails before the run when a filter expression selects nothing.
- *
- * Each top-level alternative of a multi-branch expression is checked too. The
- * ledger's filters are unions of scenario IDs (`'HIST-01|HIST-02'`), so a
- * branch that matches nothing is a coverage claim with no test behind it even
- * when its siblings match. Only this pre-run check can see that; the xUnit
- * count afterwards sees a union that did select something.
- */
-function assertFiltersSelectTests(filters, specifiers, leg) {
-  const problems = [];
-  for (const filter of filters) {
-    if (selectionCount(filter, specifiers) === 0) {
-      problems.push(`filter selected no tests: ${filter}`);
-      continue;
-    }
-    const alternatives = topLevelAlternatives(filter);
-    if (alternatives.length < 2) continue;
-    for (const alternative of alternatives) {
-      if (selectionCount(alternative, specifiers) === 0) {
-        problems.push(
-          `filter selected no tests for the alternative ${alternative} ` + `of ${filter}`,
-        );
-      }
-    }
-  }
-  if (problems.length === 0) return;
-
-  for (const problem of problems) {
-    console.error(`error: ${problem}`);
-  }
-  fail(
-    `leg ${leg.name} lists ${specifiers.length} test(s), and SwiftPM exits 0 ` +
-      `on an empty selection, so the run above was refused. Run ` +
-      `\`swift test list\` to see the available tests.`,
-  );
-}
-
-/**
- * Fails after the run when the filtered run executed nothing at all.
- *
- * This is the authoritative guard. `selectionCount` only models SwiftPM's
- * matching against the specifiers `swift test list` prints, but Swift Testing
- * matches against a longer identifier — the specifier followed by
- * `/<file>:<line>:<column>` — so an end-anchored expression can pass the
- * pre-run check and still select nothing. The xUnit report cannot be wrong
- * about what ran.
- */
-function assertRunSelectedTests(filters, reportDirectory, leg) {
-  let reports = 0;
-  let executed = 0;
-  for (const entry of readdirSync(reportDirectory)) {
-    if (!entry.endsWith(".xml")) continue;
-    reports += 1;
-    const report = readFileSync(join(reportDirectory, entry), "utf8");
-    for (const suite of report.matchAll(/<testsuite\b[^>]*\btests="(\d+)"/g)) {
-      executed += Number(suite[1]);
-    }
-  }
-  // No report at all means the toolchain declined to write one. Stay quiet
-  // rather than failing a run this wrapper cannot see into.
-  if (reports === 0 || executed > 0) return;
-
-  for (const filter of filters) {
-    console.error(`error: filter selected no tests: ${filter}`);
-  }
-  fail(
-    `leg ${leg.name} ran zero tests under the expression(s) above, and ` +
-      `SwiftPM reported that empty run as a success.`,
-  );
-}
-
-/** How many known specifiers `pattern` selects, using `swift test` semantics. */
-function selectionCount(pattern, specifiers) {
-  let regex;
-  try {
-    // Unanchored and case-sensitive, matched against the same specifier
-    // strings `swift test list` prints — verified against `swift test
-    // --filter` on this toolchain.
-    regex = new RegExp(pattern);
-  } catch (error) {
-    fail(`\`--filter ${pattern}\` is not a valid expression: ${error.message}`);
-  }
-  return specifiers.filter((specifier) => regex.test(specifier)).length;
-}
-
-/**
- * Splits a pattern on its top-level `|`, ignoring escapes, character classes,
- * and grouped alternations. Empty branches are dropped: an empty pattern
- * matches everything and would make the guard vacuous.
- */
-function topLevelAlternatives(pattern) {
-  const branches = [];
-  let branch = "";
-  let depth = 0;
-  let inCharacterClass = false;
-
-  for (let index = 0; index < pattern.length; index += 1) {
-    const character = pattern[index];
-    if (character === "\\") {
-      branch += character + (pattern[index + 1] ?? "");
-      index += 1;
-    } else if (inCharacterClass) {
-      if (character === "]") inCharacterClass = false;
-      branch += character;
-    } else if (character === "[") {
-      inCharacterClass = true;
-      branch += character;
-    } else if (character === "(") {
-      depth += 1;
-      branch += character;
-    } else if (character === ")") {
-      depth -= 1;
-      branch += character;
-    } else if (character === "|" && depth === 0) {
-      branches.push(branch);
-      branch = "";
-    } else {
-      branch += character;
-    }
-  }
-  branches.push(branch);
-
-  return branches.filter((candidate) => candidate.trim() !== "");
 }
 
 /** Propagates a child process's failure, including death by signal. */

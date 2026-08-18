@@ -57,11 +57,11 @@ every scenario covered by exactly one task.
   swift-syntax and swift-argument-parser pins without exposing them to a Cog
   consumer. Its committed `Package.resolved` fixes those revisions, and its
   scaffold test asks SwiftPM to prove the root dependency graph remains empty.
-- `tools/` — pinned Node tooling: `swift-test.mjs`,
+- `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
   `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
-  `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
-  fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
-  `fixtures/`.
+  `check-task-ledger.mjs`, and `check-workflows.mjs`, plus shared test guards,
+  the checkers' own fixture suites (`test-task-ledger.mjs`,
+  `test-workflows.mjs`), and `fixtures/`.
 - `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
   matrix, simulator tests, the Weather build and tests, release tests,
   compile-fail
@@ -111,7 +111,8 @@ DocC markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
 symbol links into single-backtick code spans, which silently turns every
 documentation link into plain text.
 
-Tests go through `tools/swift-test.mjs`, never `swift test` directly:
+Root-package tests go through `tools/swift-test.mjs`, never `swift test`
+directly:
 
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
@@ -127,6 +128,10 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
+- `mise run test:lint` — run the separate `swift/Lint` package tests. This
+  wrapper enumerates tests before every run and requires a nonzero executed
+  count from its own xUnit report. Extra arguments pass through, as in
+  `mise run test:lint --filter LINT-02`.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
