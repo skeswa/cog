@@ -127,6 +127,20 @@ let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
   name: "weather.receivesHourlyUpdates"
 )
 
+/// The map destination derived from the currently selected refresh location.
+///
+/// This is a real derivation rather than a bundle of reads: it maps a domain
+/// selection to the coordinates a platform camera needs. A visible map leases
+/// it through `values(of:)`; when that view disappears, normal observed
+/// lifetime can release the otherwise unused projection.
+let weatherMapLocationCog = Cog<WeatherMapLocation?>(
+  { c in
+    guard let currentZipCode = c[currentZipCodeCog] else { return nil }
+    return WeatherMapLocation(zip: currentZipCode)
+  },
+  name: "weather.mapLocation"
+)
+
 extension CogOps {
   /// Selects the ZIP used by the alert reaction and periodic refresh loop.
   ///

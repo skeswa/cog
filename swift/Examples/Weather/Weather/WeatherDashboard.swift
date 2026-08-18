@@ -1,4 +1,5 @@
 import Cog
+import MapKit
 import SwiftUI
 
 struct WeatherDashboard: View {
@@ -7,6 +8,7 @@ struct WeatherDashboard: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 16) {
           BackgroundUpdatesCard()
+          WeatherMapCard()
 
           HStack(alignment: .firstTextBaseline) {
             Text("Forecasts")
@@ -32,6 +34,82 @@ struct WeatherDashboard: View {
       .background(Color(uiColor: .systemGroupedBackground))
       .navigationTitle("Cog Weather")
     }
+  }
+}
+
+/// Frames the selected weather location without mirroring it outside Cog.
+///
+/// `MapCameraPosition` is ephemeral platform UI state. While this view is
+/// visible, its structured `.task` applies the current exported destination
+/// and every later change. SwiftUI cancels that task on disappearance, ending
+/// the sequence and releasing its graph lease with the screen that needed it.
+struct WeatherMapCard: View {
+  /// The singular graph inherited from ``WeatherApp``.
+  @Environment(\.cogs) private var cogs
+
+  /// Camera state owned by the platform control rather than the domain graph.
+  @State private var camera: MapCameraPosition = .automatic
+
+  #if DEBUG
+  /// Optional observation of an applied camera value for the simulator proof.
+  ///
+  /// The production call site uses the default `nil`; release builds carry no
+  /// callback storage or invocation.
+  private let didFocus: (@MainActor (WeatherMapLocation) -> Void)?
+
+  /// Creates the real map, optionally exposing its camera boundary to a test.
+  init(didFocus: (@MainActor (WeatherMapLocation) -> Void)? = nil) {
+    self.didFocus = didFocus
+  }
+  #else
+  /// Creates the production map without a debug camera callback.
+  init() {}
+  #endif
+
+  /// Shows every canned city and follows the current refresh selection.
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Label("Selected city", systemImage: "map")
+        .font(.headline)
+
+      Map(position: $camera) {
+        ForEach(WeatherMapLocation.examples, id: \.zip) { location in
+          Marker(location.zip.city, coordinate: location.coordinate)
+        }
+      }
+      .frame(height: 180)
+      .clipShape(RoundedRectangle(cornerRadius: 16))
+      .accessibilityLabel("Weather locations")
+    }
+    .padding(16)
+    .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 20))
+    .task {
+      for await location in cogs.values(of: weatherMapLocationCog) {
+        guard let location else {
+          camera = .automatic
+          continue
+        }
+        withAnimation { camera = .region(location.region) }
+        #if DEBUG
+        didFocus?(location)
+        #endif
+      }
+    }
+  }
+}
+
+extension WeatherMapLocation {
+  /// Core Location coordinate used by the map marker.
+  fileprivate var coordinate: CLLocationCoordinate2D {
+    CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+  }
+
+  /// A city-scale region applied to the map camera.
+  fileprivate var region: MKCoordinateRegion {
+    MKCoordinateRegion(
+      center: coordinate,
+      span: MKCoordinateSpan(latitudeDelta: 0.18, longitudeDelta: 0.18)
+    )
   }
 }
 
