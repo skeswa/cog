@@ -375,8 +375,8 @@ These choices are settled; §10 of the core document has the full record.
   `skeswa/coglint-plugins`.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, persistence helpers, the lint severity policy, and the
-stable rule-page URL shape. Also open are several
+debug-history tools, persistence helpers, and the stable lint rule-page URL
+shape. Also open are several
 edge behaviors: debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by

@@ -100,7 +100,7 @@ for first-party tooling:
 - the bare CLI for run-script phases, pre-commit hooks, and non-SPM setups.
 
 Diagnostics reach the Xcode issue navigator and inline editor annotations by
-printing the classic `path:line:col: warning: message` form, which Xcode
+printing the classic `path:line:col: error: message` form, which Xcode
 parses from plugin output exactly as it parses run-script output. One known
 platform caveat: since Xcode 16.3 a scheme-interaction bug sometimes demotes
 plugin warnings to the report navigator only
@@ -261,9 +261,13 @@ https://skeswa.github.io/cog/lint/primitives-only-in-ops
   land on the PR diff; the `sarif` reporter carries the URL as `helpUri`
   for code scanning. Xcode renders the URL as copyable text, terminals and
   CI logs as a link.
-- Findings default to `error`. A suppression is written
-  `// coglint:disable-next-line <rule>` and is itself lintable — a later
-  rule can require a trailing reason.
+- Every v1 finding is an `error`; v1 has no advisory rules or severity
+  configuration. A suppression is written
+  `// coglint:disable-next-line <rule> -- <reason>`. It names exactly one rule,
+  requires at least one non-whitespace reason character, and applies only to
+  the next physical source line. A malformed directive suppresses nothing, so
+  the underlying error remains visible with the accepted directive form in
+  its diagnostic.
 
 ### 3.5 Fixtures are the spec, the docs, and the tests
 
@@ -304,14 +308,14 @@ factory function, or a cross-file conformance defeats the classifier, and
 every rule built on it inherits that documented miss as a non-triggering
 fixture.
 
-| Rule                         | Enforces                                                                                       | Confidence |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------- |
-| `cog-declaration-suffix`     | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)                   | high       |
-| `no-cogs-in-view-init`       | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)                     | high       |
-| `primitives-only-in-ops`     | primitives are called only inside `CogOps` extensions (core §3.2; conventions)                 | high       |
-| `initial-state-in-mechanism` | an app entry point bootstraps and retains the graph but performs no graph work (mechanisms §6) | highest    |
-| `manual-cog-private`         | writable sources are `private` or `fileprivate` (core §4; core §10 "Who may write?")           | highest    |
-| `no-multi-read-cogs-helper`  | graph reads stay flat instead of hiding behind a multi-read runtime helper (conventions)       | high       |
+| Rule                         | Enforces                                                                                       | Confidence | Severity |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------- | -------- |
+| `cog-declaration-suffix`     | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)                   | high       | error    |
+| `no-cogs-in-view-init`       | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)                     | high       | error    |
+| `primitives-only-in-ops`     | primitives are called only inside `CogOps` extensions (core §3.2; conventions)                 | high       | error    |
+| `initial-state-in-mechanism` | an app entry point bootstraps and retains the graph but performs no graph work (mechanisms §6) | highest    | error    |
+| `manual-cog-private`         | writable sources are `private` or `fileprivate` (core §4; core §10 "Who may write?")           | highest    | error    |
+| `no-multi-read-cogs-helper`  | graph reads stay flat instead of hiding behind a multi-read runtime helper (conventions)       | high       | error    |
 
 ### 4.1 `cog-declaration-suffix`
 
@@ -470,9 +474,27 @@ finding (§2.4) seeds a future Kotlin design document.
    repository says `plugins` because it is generated distribution machinery,
    not the linter's source or an independently owned product.
 
-2. **Severity policy.** Default `error` for the five boundary and declaration
-   rules is proposed; whether `no-multi-read-cogs-helper` starts as `warning`,
-   and whether suppressions must carry a reason, remain open.
+2. **Severity and suppression — settled August 18, 2026.** V1 treats every
+   accepted convention as enforceable and every waiver as reviewable:
+
+   | Surface                      | Accepted policy                                                       |
+   | ---------------------------- | --------------------------------------------------------------------- |
+   | `cog-declaration-suffix`     | `error`                                                               |
+   | `no-cogs-in-view-init`       | `error`                                                               |
+   | `primitives-only-in-ops`     | `error`                                                               |
+   | `initial-state-in-mechanism` | `error`                                                               |
+   | `manual-cog-private`         | `error`                                                               |
+   | `no-multi-read-cogs-helper`  | `error`                                                               |
+   | Next-line suppression        | `// coglint:disable-next-line <rule> -- <non-empty reason>`           |
+   | Malformed suppression        | suppresses nothing; the underlying error explains the accepted syntax |
+
+   A warning would make the same settled convention optional in build-tool
+   and CI use without identifying a meaningful confidence boundary: all six
+   rules operate only over the precise syntax their classifiers accept.
+   Suppression is the exceptional escape hatch, so it names one rule, reaches
+   only the next physical line, and carries the reason in the source review
+   that accepts it. Severity is fixed in v1 rather than configurable.
+
 3. **Stable URL shape.** Rule articles live in `Cog.docc`; whether the public
    path uses DocC's emitted `/cog/documentation/…` form or a redirect-backed
    `/cog/lint/<rule>` form must be fixed before the first diagnostic ships.
