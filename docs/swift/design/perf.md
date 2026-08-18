@@ -715,6 +715,9 @@ Conditional publication disposition:
   deployment and no exact `0.2.0` package version for a scratch consumer to
   resolve. Revision-based substitutes would not prove either post-release
   claim and are deliberately not reported as such.
+- **M6-12e — not applicable.** There is no approved candidate, tag, or verified
+  release artifact for a `0.2.0` GitHub Release to describe. No release was
+  drafted or published; the conditional publication chain terminates here.
 
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
