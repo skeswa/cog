@@ -53,6 +53,7 @@ package enum CogLintRuleRegistry {
     CogDeclarationSuffixRule(),
     NoCogsInViewInitRule(),
     PrimitivesOnlyInOpsRule(),
+    InitialStateInMechanismRule(),
     ManualCogPrivateRule(),
   ]
 }
