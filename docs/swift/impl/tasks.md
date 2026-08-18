@@ -1818,9 +1818,17 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Depends: M8-10a, M8-13b._
   _Verify: `mise run workflows:check` and a green lint CI job._
 
+- **M8-14** _(Infrastructure)_ — Make `lint:swift` portable to a clean
+  checkout by naming only tracked target source roots. Keep missing-input
+  validation strict: remove empty Xcode-created directory operands rather
+  than teaching CogLint to ignore a misspelled path.
+  _Depends: M8-13b._
+  _Verify: `mise run lint:swift` from a clean Git archive and
+  `mise run fmt:check`._
+
 - **M8-15a** _(Gate)_ — Run the complete lint fixture, reporter, artifact,
   plugin, documentation, dogfood, and selected-distribution suite.
-  _Depends: M8-11b, M8-13a, M8-13c._
+  _Depends: M8-11b, M8-13a, M8-13c, M8-14._
   _Verify: `mise run test:lint`, `mise run lint:swift`, `mise run docs`,
   `mise run workflows:check`, `mise run tasks:check`, and all scratch
   integration suites._

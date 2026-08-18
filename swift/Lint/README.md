@@ -32,8 +32,10 @@ mise run test:lint-documentation
 
 `mise run lint:swift` first runs the guarded package suite, then checks root
 library and Weather production targets with the production role and their
-unit/UI test targets with the explicit test role. Compile-fail fixtures and
-benchmark workloads are not target sources and stay outside the dogfood pass.
+tracked unit test targets with the explicit test role. Empty Xcode-created
+target directories are not inputs; CogLint keeps rejecting every named path
+that does not exist. Compile-fail fixtures and benchmark workloads are not
+target sources and stay outside the dogfood pass.
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
 executables, the release `.artifactbundle.zip`, and its SwiftPM checksum under
@@ -90,6 +92,7 @@ requires its xUnit report to contain a nonzero authoritative executed count.
 
 `rootManifestExcludesLintDependencies` removes the opt-in DocC environment
 gate and asks SwiftPM for the root package's JSON dependency graph. The test
-requires that graph to contain only `cog`, while this nested package resolves
-the two exact source dependencies above. That is the executable assertion for
-the one-way package boundary: lint depends on its tools; Cog never does.
+requires a root named `cog` with no dependency children; it does not assume the
+checkout directory supplies that identity. This nested package resolves the
+two exact source dependencies above. That is the executable assertion for the
+one-way package boundary: lint depends on its tools; Cog never does.

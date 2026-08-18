@@ -123,15 +123,12 @@ echo "==> Cog and Weather production targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role production \
   "{{config_root}}/swift/Sources" \
-  "{{config_root}}/swift/Examples/Weather/Weather" \
-  "{{config_root}}/swift/Examples/Weather/WeatherPackage/Sources"
+  "{{config_root}}/swift/Examples/Weather/Weather"
 echo "==> Cog and Weather test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role test \
   "{{config_root}}/swift/Tests" \
-  "{{config_root}}/swift/Examples/Weather/WeatherTests" \
-  "{{config_root}}/swift/Examples/Weather/WeatherUITests" \
-  "{{config_root}}/swift/Examples/Weather/WeatherPackage/Tests"
+  "{{config_root}}/swift/Examples/Weather/WeatherTests"
 """
 
 # CogLint ships as a checksummed SwiftPM artifact bundle with one native

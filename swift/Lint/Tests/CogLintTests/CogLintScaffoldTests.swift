@@ -27,7 +27,10 @@ func parserScaffoldUsesPinnedSyntaxTree() {
 func rootManifestExcludesLintDependencies() throws {
   let graph = try rootDependencyGraph()
 
-  #expect(graph.identity == "cog")
+  // SwiftPM derives a root identity from the checkout directory, so an
+  // archive or consumer cache need not call the directory `cog`. The manifest
+  // name is the stable proof that this is Cog's root package.
+  #expect(graph.name == "cog")
   #expect(graph.dependencies.isEmpty)
   #expect(
     Set(graph.flattenedIdentities).isDisjoint(with: [
@@ -38,6 +41,9 @@ func rootManifestExcludesLintDependencies() throws {
 
 /// One node from SwiftPM's recursive JSON dependency graph.
 private struct DependencyNode: Decodable {
+  /// The package name declared by its manifest.
+  let name: String
+
   /// SwiftPM's canonical package identity, independent of display name.
   let identity: String
 
