@@ -52,6 +52,11 @@ every scenario covered by exactly one task.
   pinned tool matrix and the MainActor isolation shim; `probes/` holds the
   measurements those pins rest on. Unlike the root package, its
   `Package.resolved` is committed.
+- `swift/Lint/` — the **separate** `CogLint` SwiftPM development package. Its
+  package-only `CogLintCore`, `coglint` executable, and tests own the exact
+  swift-syntax and swift-argument-parser pins without exposing them to a Cog
+  consumer. Its committed `Package.resolved` fixes those revisions, and its
+  scaffold test asks SwiftPM to prove the root dependency graph remains empty.
 - `tools/` — pinned Node tooling: `swift-test.mjs`,
   `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
