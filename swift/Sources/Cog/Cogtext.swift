@@ -52,6 +52,12 @@ public final class Cogs {
   /// Grace used when a descriptor selects the context default.
   internal let defaultWhileObservedGrace: Duration
 
+  /// Observation implementation selected for this context.
+  ///
+  /// Production is always automatic. `CogTesting` can force the legacy path on
+  /// a newer host without changing another isolated context or global state.
+  internal let externalObservationTrackingMode: CogExternalObservationTrackingMode
+
   /// One test-only acknowledgement installed through the CogTesting product.
   private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
 
@@ -65,6 +71,13 @@ public final class Cogs {
   /// `CogTesting` seam installs this callback as a deterministic negative-event
   /// acknowledgement. Production code never installs one.
   private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
+
+  /// One test-only signal after the legacy external observer re-arms.
+  ///
+  /// The legacy bridge consumes this callback after installing its next
+  /// one-shot registration and publishing the post-setter value. Production
+  /// never installs one.
+  private var nextExternalObservationRearmAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// The monotonic version assigned to graph work.
   ///
@@ -200,12 +213,17 @@ public final class Cogs {
   ///   - defaultWhileObservedGrace: Grace used by declarations that request
   ///     `whileObserved` without an explicit duration. Each state owns at most
   ///     one such sleeper, which later transient demand cancels and replaces.
+  ///   - externalObservationTrackingMode: Runtime path for linked external
+  ///     Observation state. Production uses automatic availability selection;
+  ///     `CogTesting` may force the legacy path for compatibility proofs.
   package init(
     clock: any Clock<Duration> = ContinuousClock(),
-    defaultWhileObservedGrace: Duration = .seconds(30)
+    defaultWhileObservedGrace: Duration = .seconds(30),
+    externalObservationTrackingMode: CogExternalObservationTrackingMode = .automatic
   ) {
     self.clock = clock
     self.defaultWhileObservedGrace = defaultWhileObservedGrace
+    self.externalObservationTrackingMode = externalObservationTrackingMode
     #if COG_CORE_ARENA
     self.arenaCore = CogArenaCore()
     #endif
@@ -242,6 +260,30 @@ public final class Cogs {
   internal func acknowledgeAsyncCompletionCheckIfRequested() {
     let acknowledgement = nextAsyncCompletionCheckAcknowledgement
     nextAsyncCompletionCheckAcknowledgement = nil
+    acknowledgement?()
+  }
+
+  /// Installs a one-shot signal for the next legacy Observation re-arm.
+  ///
+  /// Only compatibility tests use this package seam. The caller installs it
+  /// after the initial tracked read and before the mutation whose completed
+  /// transition it needs to await.
+  ///
+  /// - Parameter acknowledgement: MainActor callback consumed after the next
+  ///   post-change one-shot registration is installed and its value published.
+  package func acknowledgeNextExternalObservationRearm(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextExternalObservationRearmAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next Observation re-arm.")
+    }
+    nextExternalObservationRearmAcknowledgement = acknowledgement
+  }
+
+  /// Consumes the next legacy re-arm acknowledgement, when one is installed.
+  internal func acknowledgeExternalObservationRearmIfRequested() {
+    let acknowledgement = nextExternalObservationRearmAcknowledgement
+    nextExternalObservationRearmAcknowledgement = nil
     acknowledgement?()
   }
 

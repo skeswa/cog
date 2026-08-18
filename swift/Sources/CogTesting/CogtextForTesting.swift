@@ -42,6 +42,10 @@ extension Cogs {
   ///     supply their own grace. Production and ordinary tests use 30 seconds;
   ///     a lifetime test passes an explicit duration to its controllable
   ///     clock.
+  ///   - externalObservationTracking: The runtime path used for external
+  ///     `@Observable` state. Ordinary tests select automatically. Compatibility
+  ///     proofs can force the legacy one-shot path on a newer host without
+  ///     changing production or another context.
   ///   - seeding: Arrangement run against the new context before any
   ///     mechanism operates. Defaults to none.
   ///   - mechanisms: Every mechanism this isolated runtime runs, operated
@@ -51,10 +55,20 @@ extension Cogs {
   public static func forTesting(
     clock: any Clock<Duration> = ContinuousClock(),
     whileObservedGrace: Duration = .seconds(30),
+    externalObservationTracking: ExternalObservationTrackingForTesting = .automatic,
     seeding: ((Cogs) -> Void)? = nil,
     mechanisms: [any Mechanism] = []
   ) -> Cogs {
-    let cogs = Cogs(clock: clock, defaultWhileObservedGrace: whileObservedGrace)
+    let mode: CogExternalObservationTrackingMode =
+      switch externalObservationTracking {
+      case .automatic: .automatic
+      case .legacy: .legacy
+      }
+    let cogs = Cogs(
+      clock: clock,
+      defaultWhileObservedGrace: whileObservedGrace,
+      externalObservationTrackingMode: mode
+    )
     seeding?(cogs)
     cogs.operateMechanisms(mechanisms)
     return cogs

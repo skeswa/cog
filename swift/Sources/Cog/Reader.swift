@@ -294,6 +294,13 @@ public struct Reader<Value> {
   /// in a named Cog turn. A sibling property therefore creates no invalidation
   /// or selector work.
   ///
+  /// On older runtimes, `withObservationTracking` is one-shot and reports a
+  /// change from `willSet`. Cog defers that callback onto the MainActor, then
+  /// re-arms and reads after the setter completes before publishing. There is
+  /// necessarily a small disarmed window between the callback and re-arm; a
+  /// mutation made inside that window may be missed. Cog guarantees the newest
+  /// post-mutation value only for a mutation made after re-arm completes.
+  ///
   /// The model and property stay on the MainActor with Cog. `Tracked` need not
   /// be `Sendable`: the Observation sequence emits only a wakeup, then Cog
   /// reads and commits the actual value on the captured actor.
