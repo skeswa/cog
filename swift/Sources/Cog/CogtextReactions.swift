@@ -1,10 +1,9 @@
 extension Cogs {
-  /// Registers one reaction body under `label` and schedules its first tracking
-  /// run.
+  /// Registers one effect body under `label` and schedules its first tracking run.
   ///
-  /// Registration is a ``MechanismController`` capability, never public
-  /// context API: reactions have one door, and it is a mechanism's controller
-  /// (§6.3).
+  /// Application reactions remain a ``MechanismController`` capability, never
+  /// public context API: reactions have one application-facing door, and it is
+  /// a mechanism's controller (§6.3).
   ///
   /// Shared by reactions and watches to preserve registration order and initial
   /// run scheduling. Registration owns the body, while the returned token owns
@@ -15,8 +14,34 @@ extension Cogs {
     label: CogLabel,
     body: @escaping @MainActor (ReactionReader) -> Void
   ) -> ReactionToken {
-    let reaction = CogReaction(cogs: self, label: label, body: body)
-    reactions.append(reaction)
+    register(label: label, phase: .effect, body: body)
+  }
+
+  /// Registers one export offer body in the pre-effect flush phase.
+  ///
+  /// This is reserved for ``CogValues``. Keeping it separate from the ordinary
+  /// registration capability makes changed value offers phase 4 work even when
+  /// their iterator registered after a mechanism reaction.
+  internal func registerExport(
+    label: CogLabel,
+    body: @escaping @MainActor (ReactionReader) -> Void
+  ) -> ReactionToken {
+    register(label: label, phase: .export, body: body)
+  }
+
+  /// Installs one phase-classified tracked terminal and schedules its first run.
+  private func register(
+    label: CogLabel,
+    phase: CogReactionPhase,
+    body: @escaping @MainActor (ReactionReader) -> Void
+  ) -> ReactionToken {
+    let reaction = CogReaction(cogs: self, label: label, phase: phase, body: body)
+    switch phase {
+    case .export:
+      exportReactions.append(reaction)
+    case .effect:
+      reactions.append(reaction)
+    }
     if case .flushing = turnPhase {
       reactionRuns.append(.initial(reaction))
     } else {
@@ -25,24 +50,33 @@ extension Cogs {
     return ReactionToken(reaction: reaction)
   }
 
-  /// Runs reachable changed reactions and deferred registrations in stable order.
+  /// Runs reachable exports, then effects, in stable order within each phase.
   ///
-  /// Changed registrations already present at flush start go first in original
-  /// registration order. Initial runs requested earlier in the flush follow,
-  /// and any registration created while this loop runs appends to the same
-  /// tail. The index walk is deliberate: iterating a snapshot would lose those
-  /// newly appended runs or force reentrancy.
+  /// Changed exports are flush step 4, after UI notices and before effects.
+  /// Changed registrations already present at flush start precede deferred
+  /// initial runs inside their phase, and each group keeps registration order.
+  /// A registration created while the indexed loop runs appends to the tail;
+  /// iterating a snapshot would lose that run or force reentrancy.
   internal func flushReactions() {
-    // Initial runs registered earlier in the flush wait behind every reaction
-    // this turn already made reachable. Registrations made while this loop is
-    // running append directly to the same tail.
+    // Initial runs registered earlier in the flush wait behind changed runs in
+    // their own phase. Registrations made while this loop runs append directly
+    // to the same tail because their phase cannot retroactively precede a body
+    // that is already executing.
     let deferredInitialRuns = reactionRuns
     reactionRuns.removeAll(keepingCapacity: true)
 
+    for reaction in exportReactions where reaction.needsFlush(in: self) {
+      reactionRuns.append(.changed(reaction))
+    }
+    for run in deferredInitialRuns where run.phase == .export {
+      reactionRuns.append(run)
+    }
     for reaction in reactions where reaction.needsFlush(in: self) {
       reactionRuns.append(.changed(reaction))
     }
-    reactionRuns.append(contentsOf: deferredInitialRuns)
+    for run in deferredInitialRuns where run.phase == .effect {
+      reactionRuns.append(run)
+    }
 
     var index = 0
     while index < reactionRuns.count {

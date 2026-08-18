@@ -656,6 +656,11 @@ internal final class CogArenaCore {
     historyLog.recordState(event: event, label: label, key: key)
   }
 
+  /// Records one export offer beside arena graph events.
+  func recordHistoryOffer(label: CogLabel) {
+    historyLog.recordOffer(label: label)
+  }
+
   /// Records one reaction or watch body beside arena graph events.
   func recordHistoryEffect(label: CogLabel) {
     historyLog.recordEffect(label: label)

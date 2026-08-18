@@ -33,11 +33,12 @@ should also keep the common API simple.
 
 ## Status
 
-The Swift library is real and usable. The simple correctness core, the SwiftUI
-boundary, mechanisms, declared lifetimes, and the first async slice have all
-landed, with the Weather example app built on them; the benchmark port and the
-data-oriented performance core remain ahead. The Android library has not been
-started.
+The Swift library is real and usable. Its simple shipping core, SwiftUI
+boundary, mechanisms, declared lifetimes, async policies and streams, value
+exports, and external Observation bridge have all landed, with the Weather
+example app built on them. The measured data-oriented core remains an internal
+research candidate rather than the shipping default. The Android library has
+not been started.
 
 The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
 shows the production-bootstrap and isolated-test call sites, and
@@ -55,7 +56,7 @@ Cog for Swift resolves with no dependencies of its own. Add it to a
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.1.0")
+    .upToNextMinor(from: "0.3.0")
   )
 ]
 ```

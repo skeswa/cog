@@ -18,6 +18,9 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
   /// One changed UI boundary emitted its coalesced Observation notice.
   case notice
 
+  /// One changed exported value was offered to a subscriber buffer.
+  case offer
+
   /// A reaction or watch body ran, including its initial tracking run.
   case effect
 }
@@ -42,7 +45,8 @@ public struct CogHistoryEntry {
   /// What Cog calls the subject of this entry.
   ///
   /// Turns use their commit name. Writes and recomputations use the
-  /// declaration label and optional key. Effects use the registration label.
+  /// declaration label and optional key. Offers and effects use the
+  /// registration label.
   public var name: String {
     switch subject {
     case .turn(let name):
@@ -50,7 +54,7 @@ public struct CogHistoryEntry {
     case .cog(let label, let key):
       guard let key else { return "\(label)" }
       return "\(label)[\(key.erased.base)]"
-    case .effect(let label):
+    case .offer(let label), .effect(let label):
       return "\(label)"
     }
   }

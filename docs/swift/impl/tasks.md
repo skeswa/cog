@@ -1510,6 +1510,11 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-03a._
   _Verify: `mise run test --filter POLICY-02`._
   _Greens: POLICY-02._
+- **M7-03c** _(Behavior)_ — Continue a queue after a failed run while keeping
+  failure publication and refresh outcomes bound to their exact runs.
+  _Depends: M7-03b._
+  _Verify: `mise run test --filter POLICY-06`._
+  _Greens: POLICY-06._
 - **M7-04** _(Behavior)_ — Finish current exhaust work and run one catch-up
   from the newest state.
   _Depends: M7-02._
@@ -1527,6 +1532,22 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-01b, M7-01c, M7-01d, M7-02._
   _Verify: `mise run test --filter 'STREAM-01|STREAM-02'`._
   _Greens: STREAM-01, STREAM-02._
+- **M7-06b** _(Behavior)_ — Leave stream state untouched on natural end,
+  including the empty-sequence pending state, until dependency change or
+  explicit refresh starts a new generation.
+  _Depends: M7-06a._
+  _Verify: `mise run test --filter 'STREAM-05|STREAM-06'`._
+  _Greens: STREAM-05, STREAM-06._
+- **M7-06c** _(Behavior)_ — Publish errors from current streams while keeping
+  Cog-initiated cancellation silent and refresh outcomes terminal.
+  _Depends: M7-06a._
+  _Verify: `mise run test --filter 'STREAM-0[7-9]'`._
+  _Greens: STREAM-07, STREAM-08, STREAM-09._
+- **M7-06d** _(Behavior)_ — Apply ordinary state equality to stream elements,
+  including the conservative non-Equatable fallback.
+  _Depends: M7-06a._
+  _Verify: `mise run test --filter 'STREAM-1[01]'`._
+  _Greens: STREAM-10, STREAM-11._
 - **M7-07a** _(Behavior)_ — Cancel and replace streams on dependency change,
   rejecting late elements.
   _Depends: M7-06a._
@@ -1613,14 +1634,13 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Greens: EXPORT-13._
 - **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
-  _Depends: M7-03b, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
-  M7-12, M7-15._
+  _Depends: M7-10c, M7-11a, M7-11b, M7-12, M7-15, M7-17._
   _Verify: complete host, release, simulator, Weather, available floor, and
   compile-fail suites._
   _Greens: COUNT-11._
 - **M7-16b** _(Gate)_ — Prepare the non-mutating 0.3.0 release candidate,
   including benchmarks, docs, and changelog.
-  _Depends: M7-16a._
+  _Depends: M7-18._
   _Verify: approved release checklist with immutable CI links._
 - **M7-16c** _(Release)_ — Create and push the annotated `0.3.0` tag, only
   after the 0.2.0 chain has resolved — published, or closed with `M6-12a`'s
@@ -1633,6 +1653,18 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
 - **M7-16e** _(Release)_ — Publish the 0.3.0 GitHub Release.
   _Depends: M7-16d._
   _Verify: published GitHub Release points at the approved tag._
+- **M7-17** _(Infrastructure)_ — Repair the arena async sidecar so ordered
+  policies and latest streams preserve their selected scheduler and work shape
+  instead of applying latest one-shot semantics to every declaration.
+  _Depends: M7-03c, M7-04, M7-05, M7-06b, M7-06c, M7-06d, M7-07b._
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline COG_TEST_CORE=arena
+COG_TEST_EDGE=pool mise run test --filter
+'POLICY-(01|02|03|04|06)|STREAM-(0[1-9]|1[01])'`._
+- **M7-18** _(Infrastructure)_ — Prepare the 0.3.0 release notes and consumer
+  documentation: changelog, current package pin, status snapshots, and a DocC
+  guide connecting M7 streams, exports, and external Observation tracking.
+  _Depends: M7-16a._
+  _Verify: `mise run docs`, `mise run fmt:check`, and `mise run tasks:check`._
 
 ## M8 tasks
 

@@ -42,6 +42,15 @@ extension Cogs {
     #endif
   }
 
+  /// Records one export offer in the active core's total event order.
+  func recordHistoryOffer(label: CogLabel) {
+    #if COG_CORE_ARENA
+    arenaCore.recordHistoryOffer(label: label)
+    #else
+    historyLog.recordOffer(label: label)
+    #endif
+  }
+
   /// Records one reaction or watch run in the active core's total event order.
   func recordHistoryEffect(label: CogLabel) {
     #if COG_CORE_ARENA

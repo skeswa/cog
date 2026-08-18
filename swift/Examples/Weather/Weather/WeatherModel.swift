@@ -59,6 +59,44 @@ extension ZipCode: CustomStringConvertible {
   var description: String { rawValue }
 }
 
+/// The map destination corresponding to one recognized demo ZIP.
+///
+/// Cog owns the selected destination as a derivation of the authoritative ZIP.
+/// A visible map converts these plain coordinates into `MapCameraPosition`,
+/// which remains view-local platform state rather than a second domain source.
+nonisolated struct WeatherMapLocation: Equatable, Sendable {
+  /// The ZIP whose city the map should frame.
+  let zip: ZipCode
+  /// Latitude of the demo city's map center.
+  let latitude: Double
+  /// Longitude of the demo city's map center.
+  let longitude: Double
+
+  /// Resolves a recognized demo ZIP to its fixed city center.
+  ///
+  /// Arbitrary ZIPs remain valid forecast keys, but the offline example has no
+  /// geocoder. Returning `nil` lets the map fall back to its automatic frame.
+  init?(zip: ZipCode) {
+    self.zip = zip
+    switch zip {
+    case .newYork:
+      latitude = 40.7506
+      longitude = -73.9972
+    case .sanFrancisco:
+      latitude = 37.7898
+      longitude = -122.3942
+    case .seattle:
+      latitude = 47.6101
+      longitude = -122.3344
+    default:
+      return nil
+    }
+  }
+
+  /// Every location the canned dashboard can select and annotate.
+  static let examples = ZipCode.examples.compactMap(Self.init(zip:))
+}
+
 /// The visible meteorological part of one accepted reading.
 nonisolated struct Weather: Equatable, Sendable {
   /// The small condition vocabulary the example can render with system symbols.

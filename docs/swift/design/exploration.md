@@ -664,11 +664,11 @@ state. A real app picks one shape per fact — the two appear side by side here
 only to compare them.
 
 `Work` has two forms: `.run { ... }` returns one value, committed as one turn;
-`.stream(sequence)` commits each sequence element as its own turn. The split
-prevents hidden async tracking bugs: every `c[...]` read happens before the work
-starts, so no read can silently stop tracking after an `await`. Changing a
-dependency reruns the selector and creates new work; the policy in §5.2
-decides what happens to the old work.
+`.stream(sequence)` commits each changed sequence element as its own turn. The
+split prevents hidden async tracking bugs: every `c[...]` read happens before
+the work starts, so no read can silently stop tracking after an `await`.
+Changing a dependency reruns the selector and creates new work; the policy in
+§5.2 decides what happens to the old work.
 
 Read the value normally:
 
@@ -729,6 +729,13 @@ Each visible pending, success, or failure state is a turn. Replacing cancelled
 work does not publish a failure; the replaced `CogRefresh` handle resolves as
 `superseded`.
 
+A failed `.queue` run publishes its failure normally, resolves any refresh
+handle for that exact run as failure, and then starts the next accepted request.
+Failure is a result of one request, not cancellation of the ordered scheduler;
+stopping would silently strand work Cog already accepted and leave the derived
+value behind its newest dependencies. The next run publishes its own pending
+turn with the last successful value (or the declared default) before it runs.
+
 True exhaust behavior drops events while busy. A derived value cannot forget
 dependency changes and still represent current state, so `.exhaustLatest`
 catches up once. True exhaust belongs to imperative ops.
@@ -752,6 +759,35 @@ init(_ policy: OrderedPolicy,
 `.latest` is the only `LatestPolicy`; `.queue`, `.exhaustLatest`, and
 `.merged` are `OrderedPolicy` values. Merged streams may come later if a real
 use case appears.
+
+Natural stream termination is not a fourth lifecycle state or a synthetic
+value. Ending publishes no turn, does not restart the selector, and leaves the
+most recent status intact. A stream that emitted an element therefore rests at
+its last success. An empty stream remains pending on the declared default with
+`hasSucceeded == false`: manufacturing success would claim an element that did
+not exist, while manufacturing failure would turn normal `AsyncSequence`
+completion into an error. A dependency change or explicit refresh starts a new
+generation under the ordinary `.latest` rules. Sources for which an empty end
+is exceptional should express that as a thrown error, whose status is settled
+below.
+
+An error thrown by the still-current stream is an ordinary failure turn. It
+retains the last successful element (or the declared default before one),
+records the error, and does not restart automatically. A refresh handle
+resolves as failure if the sequence throws before its first accepted element;
+once an element has resolved that handle as success, a later stream error does
+not rewrite the already terminal outcome. Cancellation remains cause-sensitive:
+replacement or release initiated by Cog publishes nothing, even when iteration
+surfaces `CancellationError`, while a still-current sequence that Cog never
+cancelled publishes any thrown error—including `CancellationError`—as failure.
+
+Stream elements use the same equality rule as every other Cog state. For an
+`Equatable` value, an element equal to the current success is discarded before
+a graph turn exists: value and status consumers stay quiet, history gains no
+entry, and a later different element still commits normally. Values without an
+equality rule conservatively treat every element as changed. Cog is current
+state, not an event-history transport; callers that must preserve duplicate
+events keep that `AsyncSequence` in an op or reaction instead (§5.4).
 
 ### 5.3 Freshness and lifetime
 
@@ -918,6 +954,7 @@ singular, and does measurement show less runtime work?
 | Never-read async demand?          | A non-tracking peek or refresh creates the state and starts exactly one initial generation with `kind == .pending`, `value == default`, and `hasSucceeded == false` without installing a dependency, subscription, or Observation boundary. The call is transient demand: it renews the ordinary `whileObserved` grace window but does not retain work through completion, and expiry cancels, advances the generation, releases, rejects late results, and resolves an exact refresh handle as `released` (§5.1, §5.3).                                                                                                                                                                                                                                                                                                                                                                   |
 | Async dependency tracking?        | A sync selector returns `Work`; no reads cross `await` (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Default async policy?             | `.latest`. `refresh` returns an exact-generation `CogRefresh`: accepted publication resolves as success or failure, replacement as `superseded`, and lifetime removal as `released` (§5.1–§5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Queued run failure?               | A failed `.queue` run publishes failure and resolves its exact refresh handle, then the next accepted request starts in order. A failure belongs to one request; it does not cancel the scheduler or strand later accepted work (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Exhaust for derived state?        | `.exhaustLatest` catches up once; true drop belongs to ops (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Rx operators and temporary edges? | Dynamic links, async policies, and `.stream`; every edge is recaptured (§5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Mechanism lifecycle?              | A `Mechanism` is the bundled unit of side effects: a protocol with a defaulted `name` and one `operate(_:)` requirement, adopted by structs and classes alike. `Cogs.bootstrapApp(mechanisms:)` is the only registration point; each `operate` runs synchronously in array order inside bootstrap, operate-time writes settle before bootstrap returns, duplicate names fail fast, and no late installation exists. The runtime retains the supplied mechanism values with their scopes; teardown cancels scopes before releasing those values. Registration handles stay internal: a mechanism's top-level registrations live for the app runtime, every shorter lifetime is a state-gated `whenever` scope whose fall cancels its registrations and whose next rise re-runs the body fresh, and scope cancellation remains terminal and idempotent as an internal invariant (§6.2–§6.3). |
@@ -927,6 +964,9 @@ singular, and does measurement show less runtime work?
 | Test seeding?                     | Debug-only `CogTesting.seed` stages a value and pushes dirty flags like a write, but records no turn, sends no notices, and runs no reactions. `Cogs.forTesting(seeding:mechanisms:)` runs its seeding closure after the context exists and before any `operate`, so arranged state precedes mechanism startup; there is no late-start API even for tests. Apps importing only `Cog` cannot seed (§6.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Accumulating versus flushing?     | Nested commits join while accumulating and queue while flushing (§3.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Natural stream termination?       | Natural end publishes no turn and starts no replacement. The most recent status remains: last success after an element, or pending on the declared default with no accepted success after an empty sequence. Dependency change or refresh starts a new generation; a source that treats empty end as exceptional throws (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Throwing stream failure?          | An error from the still-current stream publishes failure, retains the last success or declared default, and starts no replacement. Before a first element it resolves an exact refresh handle as failure; after an element the handle has already resolved as success and does not change. Cog-initiated replacement or release cancellation stays silent, while a `CancellationError` Cog did not initiate is an ordinary failure (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Equal stream elements?            | Stream elements follow ordinary state equality. An `Equatable` element equal to the current success creates no turn, notice, or history entry; a later changed element commits normally. Without an equality rule every element conservatively counts as changed. Duplicate event history belongs in an op or reaction, not a cog (§2.4, §5.2, §5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock. Sources take that policy through a `lifetime:` argument and must say `resetToInitial: true`, because releasing a source can only start it over; the impossible `false` spelling traps at the declaration (§5.3).                                                                                                                                                                                                                                                                                                                                                                                          |
 | State graph count?                | One app-wide `Cogs`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Untracked reads?                  | `c.peek` and one-shot `cogs.peek` skip the dependency edge but still settle the value they return; an untracked read is never stale. Peeking a `whileObserved` synchronous derived or async state is transient demand that renews ordinary grace without installing a durable consumer (§2.4, §5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -972,13 +1012,20 @@ keeps its slot and points at the table above instead of renumbering the rest.
 7. **Persistence helpers:** durable state writes the store first and its cog
    second (§6.7). Open whether this needs `PersistedCog` sugar or stays an op
    pattern, and when GRDB observation should replace seeding.
-8. **Stream termination:** what a `.stream` cog's status does when its
-   sequence ends naturally — stay at the last success forever, or something
-   observable.
-9. **Stream failure:** whether a `.stream` sequence that throws publishes a
-   failure status. §5.2 defines only the replaced-cancelled case.
-10. **`.queue` failure:** whether a failed queued run stops the queue or the
-    next queued run still starts.
+8. **Stream termination:** settled on August 17, 2026. Natural end publishes
+   no turn, starts no replacement, and leaves the most recent status intact:
+   last success after an element, or pending on the declared default after an
+   empty sequence. Dependency change or refresh starts a new generation. See
+   "Scheduling policies" above.
+9. **Stream failure:** settled on August 17, 2026. An error from the
+   still-current sequence publishes failure and starts no replacement;
+   Cog-initiated cancellation stays silent. Exact refresh handles resolve at
+   the first accepted element or an earlier failure and never change afterward.
+   See "Scheduling policies" above.
+10. **`.queue` failure:** settled on August 17, 2026. A failed queued run
+    publishes failure and resolves its exact refresh handle, then the next
+    accepted request starts in order. Failure ends one run, not the queue; Cog
+    never strands work it already accepted. See "Scheduling policies" above.
 11. **Writes from a selector:** settled on August 12, 2026. A commit attempted
     anywhere in a derived computation fails immediately in every build before
     the commit body runs or that attempt mutates graph state. See "Writes from
@@ -991,9 +1038,11 @@ keeps its slot and points at the table above instead of renumbering the rest.
 13. **Timing modifiers:** §5.4 points `debounce` and `throttle` at "a
     reaction modifier or async-cog option," but no design or milestone
     exists. Deferred backlog.
-14. **Equal stream elements:** §5.2 commits each `.stream` element as its own
-    turn, while §3.2 discards equal writes at flush. Decide which rule wins
-    when a sequence yields consecutive equal elements.
+14. **Equal stream elements:** settled on August 17, 2026. Ordinary state
+    equality wins: an equal `Equatable` element creates no turn or notice,
+    while a value without an equality rule treats every element as changed.
+    Duplicate event history stays outside Cog state. See "Scheduling policies"
+    above.
 15. **One-shot reads of cold async cogs:** settled on August 12, 2026. A
     non-tracking peek or refresh is transient initial demand: it starts one
     run at pending without a durable lease, and ordinary `whileObserved`

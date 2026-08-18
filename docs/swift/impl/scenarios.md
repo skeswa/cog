@@ -813,9 +813,6 @@ _Milestone M7. Design: §5.2, §5.4._
 
 When order matters more than speed, I pick a policy that says so.
 
-_Pending (core §10, open question 10): whether a failed `.queue` run stops
-the queue or the next queued run still starts._
-
 - **POLICY-01.** After the initial run succeeds, three quick dependency
   changes under `.queue` make exactly three additional runs, one at a time
   and in input order. Each run starts only after the preceding one
@@ -829,6 +826,12 @@ the queue or the next queued run still starts._
   its own turn when it lands.
 - **POLICY-05.** A `.stream` selector cannot use `.queue`,
   `.exhaustLatest`, or `.merged`. The type system says no. (Proof: compile-fail.)
+- **POLICY-06.** Two refreshes queue behind a settled value. The first run
+  fails, publishes failure while retaining the last success, and resolves
+  only its own handle as failure. The next accepted run then starts, publishes
+  its own pending turn with that retained value, succeeds, and resolves only
+  its own handle as success; one failure never stops the queue or strands
+  later work.
 
 ## 15. STREAM — Streams
 
@@ -836,13 +839,8 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open questions 8, 9, and 14): what status a stream
-publishes when its sequence ends naturally, whether a throwing sequence
-publishes a failure, and whether consecutive equal elements each commit a
-turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
-
-- **STREAM-01.** A `.stream` cog commits each element of its sequence as
-  its own turn. Watchers see every committed value.
+- **STREAM-01.** A `.stream` cog commits each changed element of its sequence
+  as its own turn. Watchers see every committed value.
 - **STREAM-02.** Before the first element arrives, the cog reports
   loading.
 - **STREAM-03.** A dependency changes. The old sequence is cancelled and
@@ -850,6 +848,32 @@ turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
 - **STREAM-04.** An unwatched `.stream` cog is released while its
   sequence is live. The sequence is cancelled, and late elements commit
   nothing.
+- **STREAM-05.** A stream emits a value and then ends naturally. Ending
+  publishes no extra turn or notice, starts no replacement, and leaves the
+  emitted value as the current success. An explicit refresh starts a fresh
+  pending generation.
+- **STREAM-06.** A stream ends naturally without an element. Cog fabricates
+  neither success nor failure: status remains pending on the declared default
+  with `hasSucceeded == false`, no completion turn lands, and an explicit
+  refresh can start a fresh generation.
+- **STREAM-07.** The still-current stream throws before its first element. Cog
+  publishes one failure holding the error, declared default, and
+  `hasSucceeded == false`; it starts no replacement, and an exact refresh
+  handle for that generation resolves as failure.
+- **STREAM-08.** A refreshed stream emits an element and later throws. The
+  element publishes success and resolves the exact refresh handle as success;
+  the later error publishes failure retaining that value and does not rewrite
+  the handle or restart the stream.
+- **STREAM-09.** Cog replaces or releases a stream and iteration then throws
+  `CancellationError`. Because Cog initiated that cancellation, no failure
+  lands. The same error from a still-current stream Cog never cancelled is an
+  ordinary published failure.
+- **STREAM-10.** An `Equatable` stream yields the same value twice, then a
+  different value. The duplicate creates no turn, value or status notice,
+  reaction, or history entry; the later changed element commits normally.
+- **STREAM-11.** A stream value has no equality rule. Cog conservatively
+  commits every element, including two whose fields happen to match, so no
+  implicit reflection or event loss hides a possible change.
 
 ## 16. EXPORT — Exports and interop
 

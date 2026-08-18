@@ -49,7 +49,8 @@ Three ideas carry most of the library:
 
 <doc:GettingStarted> takes an app from an empty `Package.swift` to a value on
 screen. <doc:OneGraph> explains why an app has exactly one graph, and what that
-means for tests and previews.
+means for tests and previews. <doc:StreamsAndExternalState> shows how async
+sequences and external Observation values cross the graph boundary.
 
 ### Prior art
 
@@ -104,8 +105,16 @@ first-class kind with its own status and policies.
 
 - ``CogStatus``
 - ``Work``
+- ``RunWork``
 - ``LatestPolicy``
+- ``OrderedPolicy``
 - ``CogRefresh``
+
+### Moving state across boundaries
+
+- <doc:StreamsAndExternalState>
+- ``CogValues``
+- ``CogValuesBuffering``
 
 ### Side effects
 

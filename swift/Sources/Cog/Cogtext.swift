@@ -52,6 +52,12 @@ public final class Cogs {
   /// Grace used when a descriptor selects the context default.
   internal let defaultWhileObservedGrace: Duration
 
+  /// Observation implementation selected for this context.
+  ///
+  /// Production is always automatic. `CogTesting` can force the legacy path on
+  /// a newer host without changing another isolated context or global state.
+  internal let externalObservationTrackingMode: CogExternalObservationTrackingMode
+
   /// One test-only acknowledgement installed through the CogTesting product.
   private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
 
@@ -65,6 +71,13 @@ public final class Cogs {
   /// `CogTesting` seam installs this callback as a deterministic negative-event
   /// acknowledgement. Production code never installs one.
   private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
+
+  /// One test-only signal after the legacy external observer re-arms.
+  ///
+  /// The legacy bridge consumes this callback after installing its next
+  /// one-shot registration and publishing the post-setter value. Production
+  /// never installs one.
+  private var nextExternalObservationRearmAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// The monotonic version assigned to graph work.
   ///
@@ -105,18 +118,33 @@ public final class Cogs {
   /// preventing nested Observation or reaction propagation.
   internal var queuedTurns: [QueuedCogTurn] = []
 
-  /// Reactions this context owns, in registration order.
+  /// Tracked export terminals this context owns, in registration order.
+  ///
+  /// Keeping the phase physically separate makes the common effect-only flush
+  /// scan each effect once while still giving exports their earlier phase.
+  internal var exportReactions: [CogReaction] = []
+
+  /// Tracked effect terminals this context owns, in registration order.
   ///
   /// The simple core scans this array after each flush and runs marked
   /// reactions. M6 replaces the scan with a measured flat queue without
   /// changing order or behavior.
   internal var reactions: [CogReaction] = []
 
-  /// Work still to run in the active flush's reaction phase.
+  /// Work still to run in the active flush's export and effect phases.
   ///
-  /// Changed reactions run first. Registrations made during the flush append
-  /// their initial run and finish before queued write-back turns.
+  /// Changed exports run before effects. Registrations made during the flush
+  /// append their initial run and finish before queued write-back turns.
   internal var reactionRuns: [CogReactionRun] = []
+
+  /// External observable properties linked into this context, by exact identity.
+  ///
+  /// Each type-erased bridge owns one runtime-appropriate observer and one
+  /// hidden source. Context ownership keeps the link singular across selector
+  /// reruns and lets teardown cancel every observer before graph storage
+  /// releases.
+  internal var externalObservationBridges:
+    [CogExternalObservationIdentity: any CogExternalObservationBridge] = [:]
 
   /// Every state this context has been asked for, filed by descriptor and key.
   ///
@@ -186,12 +214,17 @@ public final class Cogs {
   ///   - defaultWhileObservedGrace: Grace used by declarations that request
   ///     `whileObserved` without an explicit duration. Each state owns at most
   ///     one such sleeper, which later transient demand cancels and replaces.
+  ///   - externalObservationTrackingMode: Runtime path for linked external
+  ///     Observation state. Production uses automatic availability selection;
+  ///     `CogTesting` may force the legacy path for compatibility proofs.
   package init(
     clock: any Clock<Duration> = ContinuousClock(),
-    defaultWhileObservedGrace: Duration = .seconds(30)
+    defaultWhileObservedGrace: Duration = .seconds(30),
+    externalObservationTrackingMode: CogExternalObservationTrackingMode = .automatic
   ) {
     self.clock = clock
     self.defaultWhileObservedGrace = defaultWhileObservedGrace
+    self.externalObservationTrackingMode = externalObservationTrackingMode
     #if COG_CORE_ARENA
     self.arenaCore = CogArenaCore()
     #endif
@@ -231,6 +264,30 @@ public final class Cogs {
     acknowledgement?()
   }
 
+  /// Installs a one-shot signal for the next legacy Observation re-arm.
+  ///
+  /// Only compatibility tests use this package seam. The caller installs it
+  /// after the initial tracked read and before the mutation whose completed
+  /// transition it needs to await.
+  ///
+  /// - Parameter acknowledgement: MainActor callback consumed after the next
+  ///   post-change one-shot registration is installed and its value published.
+  package func acknowledgeNextExternalObservationRearm(
+    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  ) {
+    guard nextExternalObservationRearmAcknowledgement == nil else {
+      fatalError("CogTesting installed two acknowledgements for the next Observation re-arm.")
+    }
+    nextExternalObservationRearmAcknowledgement = acknowledgement
+  }
+
+  /// Consumes the next legacy re-arm acknowledgement, when one is installed.
+  internal func acknowledgeExternalObservationRearmIfRequested() {
+    let acknowledgement = nextExternalObservationRearmAcknowledgement
+    nextExternalObservationRearmAcknowledgement = nil
+    acknowledgement?()
+  }
+
   /// Breaks graph-owned dependency chains before stored properties release.
   ///
   /// Mechanism scopes cancel first — unregistering reactions, requesting task
@@ -248,12 +305,28 @@ public final class Cogs {
     mechanismScopes.removeAll()
     mechanisms.removeAll()
 
+    for bridge in externalObservationBridges.values {
+      bridge.cancel()
+    }
+    externalObservationBridges.removeAll()
+
     for state in states.values {
       (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()
       (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
     }
-    for reaction in reactions {
+    // Mechanism scopes removed their registrations above. Any survivors are
+    // externally owned value subscriptions: clear their raw teardown leases,
+    // then cancel them so their waiting AsyncSequences finish instead of
+    // retaining inert reaction bodies after the graph is gone.
+    let remainingExports = exportReactions
+    for reaction in remainingExports {
       reaction.releaseDependenciesForContextTeardown()
+      reaction.cancel()
+    }
+    let remainingEffects = reactions
+    for reaction in remainingEffects {
+      reaction.releaseDependenciesForContextTeardown()
+      reaction.cancel()
     }
     #if COG_CORE_ARENA
     arenaCore.prepareForContextTeardown()

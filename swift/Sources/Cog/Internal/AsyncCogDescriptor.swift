@@ -41,11 +41,10 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
 
   /// How a new selection interacts with work already in flight.
   ///
-  /// The first slice exposes only `.latest`, so the current state machinery has
-  /// no policy branch yet. Keeping the choice on the descriptor makes it part
-  /// of the declaration, ready for later policies to remain consistent across
-  /// all contexts and keys.
-  let policy: LatestPolicy
+  /// Public construction has already checked the policy against the selector's
+  /// `Work` or `RunWork` result. Keeping one internal tag makes the choice part
+  /// of the declaration and consistent across all contexts and keys.
+  let policy: AsyncSchedulingPolicy
 
   /// The total value exposed before this declaration accepts a success.
   ///
@@ -74,7 +73,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// Construction stores no context and starts no work. State creation remains
   /// lazy in each context and key, preserving independent status and task life.
   init(
-    policy: LatestPolicy,
+    policy: AsyncSchedulingPolicy,
     default defaultValue: Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     selector: @escaping @MainActor (Reader<CogStatus<Value>>, CogKey?) -> Work<Value>,
