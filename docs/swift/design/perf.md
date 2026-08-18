@@ -711,6 +711,10 @@ Conditional publication disposition:
 - **M6-12c — not applicable.** No `0.2.0` candidate was approved, so no
   annotated tag was created or pushed. The remote `refs/tags/0.2.0` remains
   absent.
+- **M6-12d — not applicable.** With no tag, there is no tag-triggered DocC
+  deployment and no exact `0.2.0` package version for a scratch consumer to
+  resolve. Revision-based substitutes would not prove either post-release
+  claim and are deliberately not reported as such.
 
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
