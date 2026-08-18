@@ -24,6 +24,13 @@ struct CogLintCommand: ParsableCommand {
   @Option(help: "Reporter: xcode, github, or sarif")
   var reporter = CogLintReporter.xcode.rawValue
 
+  /// The plugin-owned result record; hidden because direct CLI use needs no cache.
+  @Option(
+    name: .customLong("cache-path"),
+    help: ArgumentHelp("Plugin-owned result cache", visibility: .hidden)
+  )
+  var cachePath: String?
+
   /// Rejects an empty invocation instead of reporting a misleading clean run.
   func validate() throws {
     guard !paths.isEmpty else {
@@ -46,6 +53,35 @@ struct CogLintCommand: ParsableCommand {
     guard let selectedReporter = CogLintReporter(rawValue: reporter) else {
       throw ValidationError("reporter must be `xcode`, `github`, or `sarif`")
     }
+    let selectedCacheURL = cachePath.map { path in
+      path.hasPrefix("/")
+        ? URL(fileURLWithPath: path)
+        : currentDirectory.appending(path: path)
+    }
+    let initialFingerprint = try selectedCacheURL.map { _ in
+      try CogLintCache.fingerprint(
+        paths: paths,
+        relativeTo: currentDirectory,
+        targetRole: selectedRole,
+        reporter: selectedReporter
+      )
+    }
+    if let selectedCacheURL,
+      let initialFingerprint,
+      var cached = CogLintCache.load(from: selectedCacheURL, matching: initialFingerprint)
+    {
+      cached.hitCount += 1
+      try CogLintCache.store(
+        fingerprint: cached.fingerprint,
+        output: cached.output,
+        exitCode: cached.exitCode,
+        hitCount: cached.hitCount,
+        at: selectedCacheURL
+      )
+      try finish(output: cached.output, exitCode: cached.exitCode)
+      return
+    }
+
     let execution = try CogLintEngine.lint(
       paths: paths,
       relativeTo: currentDirectory,
@@ -53,10 +89,32 @@ struct CogLintCommand: ParsableCommand {
       rules: CogLintRuleRegistry.all
     )
     let output = try execution.output(for: selectedReporter)
+    if let selectedCacheURL, let initialFingerprint {
+      let finalFingerprint = try CogLintCache.fingerprint(
+        paths: paths,
+        relativeTo: currentDirectory,
+        targetRole: selectedRole,
+        reporter: selectedReporter
+      )
+      if finalFingerprint == initialFingerprint {
+        try CogLintCache.store(
+          fingerprint: finalFingerprint,
+          output: output,
+          exitCode: execution.exitCode,
+          hitCount: 0,
+          at: selectedCacheURL
+        )
+      }
+    }
+    try finish(output: output, exitCode: execution.exitCode)
+  }
+
+  /// Emits one fresh or cached result and preserves its original process status.
+  private func finish(output: String, exitCode: Int32) throws {
     if !output.isEmpty {
       FileHandle.standardOutput.write(Data(output.utf8))
     }
-    if execution.exitCode != 0 {
+    if exitCode != 0 {
       throw ExitCode.failure
     }
   }

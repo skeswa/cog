@@ -128,6 +128,10 @@ run = "node {{config_root}}/tools/build-coglint-artifact.mjs"
 description = "Prove SwiftPM selects and executes both CogLint host variants"
 run = "node {{config_root}}/tools/test-coglint-artifact.mjs"
 
+[tasks."test:lint-build-tool-plugin"]
+description = "Prove CogLint build-tool diagnostics and cache replay in SwiftPM and Xcode"
+run = "node {{config_root}}/tools/test-coglint-build-tool-plugin.mjs"
+
 # The task ledger is validated by tools/check-task-ledger.mjs, which derives
 # the scenario census from docs/swift/impl/scenarios.md rather than from any
 # hand-maintained count. `tasks:check` runs the checker's own fixture suite

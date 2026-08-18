@@ -137,6 +137,9 @@ directly:
   record its SwiftPM checksum. The version defaults to `0.4.0`.
 - `mise run test:lint-artifact` — rebuild the artifact and prove SwiftPM
   selects and executes each exact metadata variant under arm64 and Rosetta.
+- `mise run test:lint-build-tool-plugin` — apply the local artifact through
+  the build-tool plugin in scratch SwiftPM and Xcode consumers, then prove an
+  unchanged rebuild replays identical diagnostics from each plugin cache.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
