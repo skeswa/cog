@@ -7,5 +7,6 @@ package enum CogLintFixtureRegistry {
     primitivesOnlyInOps,
     initialStateInMechanism,
     manualCogPrivate,
+    noMultiReadCogsHelper,
   ]
 }
