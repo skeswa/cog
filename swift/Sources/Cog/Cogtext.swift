@@ -124,6 +124,14 @@ public final class Cogs {
   /// append their initial run and finish before queued write-back turns.
   internal var reactionRuns: [CogReactionRun] = []
 
+  /// External observable properties linked into this context, by exact identity.
+  ///
+  /// Each type-erased bridge owns one continuous observer and one hidden source.
+  /// Context ownership keeps the link singular across selector reruns and lets
+  /// teardown cancel every observer before graph storage releases.
+  internal var externalObservationBridges:
+    [CogExternalObservationIdentity: any CogExternalObservationBridge] = [:]
+
   /// Every state this context has been asked for, filed by descriptor and key.
   ///
   /// ``CogState`` erases each value type for storage. The value reference
@@ -253,6 +261,11 @@ public final class Cogs {
     }
     mechanismScopes.removeAll()
     mechanisms.removeAll()
+
+    for bridge in externalObservationBridges.values {
+      bridge.cancel()
+    }
+    externalObservationBridges.removeAll()
 
     for state in states.values {
       (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()

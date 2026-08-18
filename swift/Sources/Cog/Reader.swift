@@ -1,3 +1,5 @@
+public import Observation
+
 /// The read capability inside one run of a selector.
 ///
 /// This is the `c` in `Cog { c in ... }`.
@@ -281,6 +283,32 @@ public struct Reader<Value> {
   /// - Returns: The value its source holds in the latest completed turn.
   public subscript<Read>(_ valueReference: CogProjection<Read>) -> Read {
     self[valueReference.sourceCog]
+  }
+
+  /// Links one property of an external observable model into this selector.
+  ///
+  /// The returned value participates in the current selector run exactly like
+  /// a Cog source read. On iOS 26 and its peer 26-era platforms,
+  /// `Observations` tracks only `keyPath`, coalesces mutations until the model
+  /// isolation reaches a suspension boundary, and publishes the newest value
+  /// in a named Cog turn. A sibling property therefore creates no invalidation
+  /// or selector work.
+  ///
+  /// The model and property stay on the MainActor with Cog. `Tracked` need not
+  /// be `Sendable`: the Observation sequence emits only a wakeup, then Cog
+  /// reads and commits the actual value on the captured actor.
+  ///
+  /// - Parameters:
+  ///   - root: The external `@Observable` model to link.
+  ///   - keyPath: The exact property this selector reads and depends on.
+  /// - Returns: The latest value published at an observation boundary, or the
+  ///   model's current value on the first read.
+  public func track<Root: Observable & AnyObject, Tracked>(
+    _ root: Root,
+    _ keyPath: KeyPath<Root, Tracked>
+  ) -> Tracked {
+    let sourceCog = cogs.trackedPropertySource(for: root, keyPath: keyPath)
+    return self[sourceCog]
   }
 
   /// Peeks at a source without depending on it.
