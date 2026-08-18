@@ -1,5 +1,19 @@
 #if COG_CORE_SIMPLE
 
+/// One selected queue request waiting behind the active one-shot run.
+///
+/// Selection has already captured this request's dependencies and operation,
+/// but neither pending publication nor operation execution occurs until the
+/// request reaches the FIFO head. Its generation binds any refresh waiter to
+/// this exact request without making later queued work supersede it.
+private struct AsyncQueuedRun<Value> {
+  /// Stable identity assigned when the selector accepted this request.
+  let generation: UInt64
+
+  /// Deferred one-shot operation captured from that selector run.
+  let operation: @Sendable @isolated(any) () async throws -> sending Value
+}
+
 /// The live state behind one ``AsyncCog`` value reference in one context.
 ///
 /// This is derived state with a split computation: the synchronous selector
@@ -120,16 +134,28 @@ internal final class AsyncCogState<Value>:
   /// no accepted success.
   private var lastSuccess: Value?
 
-  /// The cancellation handle for the newest requested `.latest` generation.
+  /// The cancellation handle for the currently executing generation.
   ///
-  /// Replaced tasks may ignore cancellation and continue running, but they are
-  /// no longer reachable here and their generation cannot publish.
+  /// Latest replacement may detach an older task that ignores cancellation;
+  /// queue policy instead keeps this handle unchanged until the head finishes.
   private var activeTask: Task<Void, Never>?
 
-  /// The monotonically increasing identity of the newest requested work.
+  /// The exact generation currently executing, independent of later queue IDs.
   ///
-  /// Starting replacement work and preparing lifetime release both advance it,
-  /// so cancellation is never the correctness boundary for late completion.
+  /// `.latest` also records this value, but its newest generation remains the
+  /// acceptance check. `.queue` needs the separate field because accepting
+  /// later FIFO entries advances `generation` before the head completes.
+  private var activeRunGeneration: UInt64?
+
+  /// Selected `.queue` requests that have not published pending or started.
+  private var queuedRuns: [AsyncQueuedRun<Value>] = []
+
+  /// The monotonically increasing identity assigned to accepted work.
+  ///
+  /// Latest policy uses the newest ID as its acceptance boundary. Queue policy
+  /// may have several larger IDs waiting while `activeRunGeneration` identifies
+  /// the only request allowed to complete. Lifetime release advances the counter
+  /// so no detached task can revive a removed state.
   private var generation: UInt64 = 0
 
   /// Awaitable explicit-refresh handles, filed by their exact generation.
@@ -234,8 +260,10 @@ internal final class AsyncCogState<Value>:
     cancelPendingLifetimeRelease()
     resolveRefreshes(as: .released)
     _ = advanceGeneration()
+    queuedRuns.removeAll(keepingCapacity: false)
     activeTask?.cancel()
     activeTask = nil
+    activeRunGeneration = nil
   }
 
   /// Recaptures synchronous dependencies and starts the replacement generation.
@@ -277,6 +305,43 @@ internal final class AsyncCogState<Value>:
       previousDependency.removeSubscriber(self)
     }
 
+    let operation = work.operation
+    let runGeneration = advanceGeneration()
+
+    switch descriptor.policy {
+    case .queue:
+      if let refreshWaiter {
+        register(refreshWaiter, for: runGeneration)
+      }
+      let run = AsyncQueuedRun(generation: runGeneration, operation: operation)
+      if activeTask == nil {
+        beginQueuedRun(run, publishingPendingIn: pendingTurn, in: cogs)
+      } else {
+        queuedRuns.append(run)
+        // Selection made this state current even though the request has not
+        // started and therefore must not publish pending yet. Cleaning here is
+        // also what lets a second source turn invalidate the state again and
+        // append another distinct FIFO entry.
+        markChecked(at: cogs.revision)
+      }
+    case .latest, .exhaustLatest, .merged:
+      publishPending(in: cogs, in: pendingTurn)
+      resolveRefreshes(as: .superseded)
+      if let refreshWaiter {
+        register(refreshWaiter, for: runGeneration)
+      }
+      activeTask?.cancel()
+      launch(operation, generation: runGeneration, in: cogs)
+    }
+    return runGeneration
+  }
+
+  /// Publishes pending exactly when an accepted request starts executing.
+  ///
+  /// Queue selection may precede this call by several turns. Delaying pending
+  /// keeps the visible lifecycle aligned with the one active run rather than
+  /// claiming that work waiting in FIFO storage is already in flight.
+  private func publishPending(in cogs: Cogs, in pendingTurn: CogTurn?) {
     let pending = CogStatus<Value>.pending(
       value: lastSuccess ?? descriptor.defaultValue,
       hasSucceeded: lastSuccess != nil
@@ -310,14 +375,28 @@ internal final class AsyncCogState<Value>:
         markChecked(at: cogs.revision)
       }
     }
+  }
 
-    let operation = work.operation
-    resolveRefreshes(as: .superseded)
-    let runGeneration = advanceGeneration()
-    if let refreshWaiter {
-      register(refreshWaiter, for: runGeneration)
+  /// Starts the FIFO head after publishing that run's pending transition.
+  private func beginQueuedRun(
+    _ run: AsyncQueuedRun<Value>,
+    publishingPendingIn pendingTurn: CogTurn? = nil,
+    in cogs: Cogs
+  ) {
+    guard activeTask == nil, activeRunGeneration == nil else {
+      fatalError("An async queue tried to start two runs at once.")
     }
-    activeTask?.cancel()
+    publishPending(in: cogs, in: pendingTurn)
+    launch(run.operation, generation: run.generation, in: cogs)
+  }
+
+  /// Creates the sole task for one accepted one-shot generation.
+  private func launch(
+    _ operation: @escaping @Sendable @isolated(any) () async throws -> sending Value,
+    generation runGeneration: UInt64,
+    in cogs: Cogs
+  ) {
+    activeRunGeneration = runGeneration
     activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
@@ -331,6 +410,9 @@ internal final class AsyncCogState<Value>:
         self.lastSuccess = .some(value)
         self.publish(.success(value), named: "success", in: cogs)
         self.resolveRefresh(for: runGeneration, as: .success(value))
+        if self.descriptor.policy == .queue {
+          self.startNextQueuedRun(in: cogs)
+        }
       } catch {
         guard let cogs else { return }
         defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
@@ -352,7 +434,17 @@ internal final class AsyncCogState<Value>:
         self.resolveRefresh(for: runGeneration, as: .failure(error))
       }
     }
-    return runGeneration
+  }
+
+  /// Removes and starts the next FIFO entry after the head succeeds.
+  ///
+  /// Failure continuation is intentionally left to M7-03c, whose scenario
+  /// decides and proves that independently. This slice establishes serial FIFO
+  /// start order for successful runs without absorbing that later repair.
+  private func startNextQueuedRun(in cogs: Cogs) {
+    guard !queuedRuns.isEmpty else { return }
+    let run = queuedRuns.removeFirst()
+    beginQueuedRun(run, in: cogs)
   }
 
   /// Files one explicit refresh cell under the generation it must follow.
@@ -385,17 +477,22 @@ internal final class AsyncCogState<Value>:
 
   /// Whether work selected from one generation may publish into current state.
   ///
-  /// All three conditions are necessary: the task is still newest, this exact
-  /// object still occupies its descriptor-and-key slot, and no dependency has
-  /// invalidated the selector inputs since work selection. An unobserved state
-  /// stays lazy when a dependency changes, so old work can finish while it is
-  /// DIRTY or CHECK. Rejecting that result and preserving DIRTY forces the next
-  /// consumer to select fresh work instead of letting status publication erase
-  /// the pending invalidation.
+  /// The active generation is newest under replacement policies and the FIFO
+  /// head under queue policy. The stored-object and clean-state checks remain
+  /// independent: an unobserved dirty state rejects work even when its task ID
+  /// still matches, forcing the next consumer to select current dependencies.
   private func acceptsResult(for runGeneration: UInt64, in cogs: Cogs) -> Bool {
-    guard generation == runGeneration, cogs.stillStoresAsyncState(self) else { return false }
+    let generationIsAccepted =
+      switch descriptor.policy {
+      case .queue:
+        activeRunGeneration == runGeneration
+      case .latest, .exhaustLatest, .merged:
+        generation == runGeneration
+      }
+    guard generationIsAccepted, cogs.stillStoresAsyncState(self) else { return false }
     guard settleState == .clean else {
       activeTask = nil
+      activeRunGeneration = nil
       markDirty()
       return false
     }
@@ -422,6 +519,7 @@ internal final class AsyncCogState<Value>:
   /// turn into selector or reaction tracking.
   private func publish(_ status: CogStatus<Value>, named statusName: String, in cogs: Cogs) {
     activeTask = nil
+    activeRunGeneration = nil
     stage(status, named: statusName, in: cogs)
   }
 
