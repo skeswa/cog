@@ -132,6 +132,11 @@ directly:
   wrapper enumerates tests before every run and requires a nonzero executed
   count from its own xUnit report. Extra arguments pass through, as in
   `mise run test:lint --filter LINT-02`.
+- `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
+  `x86_64` CogLint executables, assemble the release artifact bundle, and
+  record its SwiftPM checksum. The version defaults to `0.4.0`.
+- `mise run test:lint-artifact` — rebuild the artifact and prove SwiftPM
+  selects and executes each exact metadata variant under arm64 and Rosetta.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.

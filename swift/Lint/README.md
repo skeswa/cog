@@ -19,7 +19,16 @@ Build the executable and run the guarded tests from the repository root with:
 swift package --package-path swift/Lint build
 swift run --package-path swift/Lint coglint swift/Sources
 mise run test:lint
+mise run build:lint-artifact
+mise run test:lint-artifact
 ```
+
+The artifact build produces separate native macOS 14 `arm64` and `x86_64`
+executables, the release `.artifactbundle.zip`, and its SwiftPM checksum under
+`swift/Lint/Artifacts`. The generated products are ignored. The artifact suite
+rebuilds them and runs a scratch SwiftPM command plugin under both arm64 and
+Rosetta, requiring the selected path to name the matching metadata variant and
+the selected executable to serve its real CLI help.
 
 `coglint` accepts an explicit mix of Swift files and directories. Directories
 are searched recursively, hidden descendants are skipped, overlapping inputs
