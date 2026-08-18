@@ -89,9 +89,9 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// released independently after grace and pending work is cancelled.
   ///
   /// - Parameters:
-  ///   - policy: How new work for one key interacts with that key's in-flight
-  ///     run. `.latest` is the first slice's default and only policy. Sibling
-  ///     keys never replace one another's work.
+  ///   - policy: Latest-generation replacement for one key's one-shot or
+  ///     stream work. Ordered policies use the separate ``RunWork``
+  ///     initializer. Sibling keys never replace one another's work.
   ///   - defaultValue: The honest resting value every key's value read returns
   ///     before that key's first success. Choose one that renders truthfully
   ///     while work is in flight; when no such value exists, make `Value`
@@ -113,12 +113,53 @@ public struct AsyncCogBox<Value, Key: Hashable> {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
-      policy: policy,
+      policy: policy.schedulingPolicy,
       default: defaultValue,
       equals: nil,
       lifetime: lifetime,
       label: label,
       selector: selector
+    )
+    self.descriptor = descriptor
+    self.valueDescriptor = AsyncCog.makeValueDescriptor(
+      for: descriptor,
+      equals: nil,
+      lifetime: lifetime,
+      label: label
+    )
+  }
+
+  /// Declares keyed one-shot async values with an ordered policy.
+  ///
+  /// Every key receives independent ordered scheduling. Requiring ``RunWork``
+  /// makes `.stream` unavailable in the selector while retaining the same lazy
+  /// descriptor-and-key identity, tracked dependency capture, and per-key
+  /// lifetime as the latest-policy initializer.
+  ///
+  /// - Parameters:
+  ///   - policy: Queue, exhaust-latest, or merged scheduling per key.
+  ///   - defaultValue: The honest resting value before a key first succeeds.
+  ///   - name: A stable declaration label; rendered labels include the key.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection returning one run for a key.
+  public init(
+    _ policy: OrderedPolicy,
+    default defaultValue: Value,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>, Key) -> RunWork<Value>
+  ) {
+    let label = CogLabel(name: name, fileID: fileID, line: line)
+    let lifetime = CogStateLifetime.whileObserved(grace: nil)
+    let descriptor = Self.makeDescriptor(
+      policy: policy.schedulingPolicy,
+      default: defaultValue,
+      equals: nil,
+      lifetime: lifetime,
+      label: label,
+      selector: { c, key in Work(selector(c, key)) }
     )
     self.descriptor = descriptor
     self.valueDescriptor = AsyncCog.makeValueDescriptor(
@@ -161,7 +202,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// wrong type means the context's storage itself is broken, and continuing
   /// would run the selector against an impossible identity.
   internal static func makeDescriptor(
-    policy: LatestPolicy,
+    policy: AsyncSchedulingPolicy,
     default defaultValue: Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
@@ -201,8 +242,9 @@ extension AsyncCogBox where Value: Equatable {
   /// success turns even when the successful value is unchanged.
   ///
   /// - Parameters:
-  ///   - policy: How replacement work interacts with an in-flight run for the
-  ///     same key. Only `.latest` is currently available.
+  ///   - policy: Latest-generation replacement for one key's one-shot or
+  ///     stream work. Ordered policies use the separate ``RunWork``
+  ///     initializer.
   ///   - defaultValue: The honest resting value every key returns before its first
   ///     success.
   ///   - name: A stable declaration label; rendered keyed labels include the key.
@@ -221,12 +263,52 @@ extension AsyncCogBox where Value: Equatable {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let lifetime = CogStateLifetime.whileObserved(grace: nil)
     let descriptor = Self.makeDescriptor(
-      policy: policy,
+      policy: policy.schedulingPolicy,
       default: defaultValue,
       equals: { oldValue, newValue in oldValue == newValue },
       lifetime: lifetime,
       label: label,
       selector: selector
+    )
+    self.descriptor = descriptor
+    self.valueDescriptor = AsyncCog.makeValueDescriptor(
+      for: descriptor,
+      equals: { oldValue, newValue in oldValue == newValue },
+      lifetime: lifetime,
+      label: label
+    )
+  }
+
+  /// Declares equality-gated keyed one-shot values with an ordered policy.
+  ///
+  /// ``RunWork`` enforces latest-only streams at the selector boundary, while
+  /// `Equatable` suppresses unchanged value-projection notices independently
+  /// for each key. Status and scheduling remain per-key graph state.
+  ///
+  /// - Parameters:
+  ///   - policy: Queue, exhaust-latest, or merged scheduling per key.
+  ///   - defaultValue: The honest resting value before a key first succeeds.
+  ///   - name: A stable declaration label; rendered labels include the key.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection returning one run for a key.
+  public init(
+    _ policy: OrderedPolicy,
+    default defaultValue: Value,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>, Key) -> RunWork<Value>
+  ) {
+    let label = CogLabel(name: name, fileID: fileID, line: line)
+    let lifetime = CogStateLifetime.whileObserved(grace: nil)
+    let descriptor = Self.makeDescriptor(
+      policy: policy.schedulingPolicy,
+      default: defaultValue,
+      equals: { oldValue, newValue in oldValue == newValue },
+      lifetime: lifetime,
+      label: label,
+      selector: { c, key in Work(selector(c, key)) }
     )
     self.descriptor = descriptor
     self.valueDescriptor = AsyncCog.makeValueDescriptor(

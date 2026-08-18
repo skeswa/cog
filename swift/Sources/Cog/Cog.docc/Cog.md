@@ -104,7 +104,9 @@ first-class kind with its own status and policies.
 
 - ``CogStatus``
 - ``Work``
+- ``RunWork``
 - ``LatestPolicy``
+- ``OrderedPolicy``
 - ``CogRefresh``
 
 ### Side effects

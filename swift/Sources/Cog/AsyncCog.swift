@@ -73,8 +73,9 @@ public struct AsyncCog<Value> {
   /// still publishes its result on the MainActor.
   ///
   /// - Parameters:
-  ///   - policy: How new work interacts with an in-flight run. `.latest` is
-  ///     currently the only policy and is therefore the default.
+  ///   - policy: Latest-generation replacement for one-shot or stream work.
+  ///     Omit it for the default `.latest` spelling; ordered policies use the
+  ///     separate ``RunWork`` initializer.
   ///   - defaultValue: The honest resting value a value read returns before any
   ///     generation succeeds. Choose one that renders truthfully while work is
   ///     in flight; when no such value exists, make `Value` optional and pass
@@ -95,10 +96,54 @@ public struct AsyncCog<Value> {
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
-      policy: policy,
+      policy: policy.schedulingPolicy,
       default: defaultValue,
       equals: nil,
       selector: { c, _ in selector(c) },
+      lifetime: .whileObserved(grace: nil),
+      label: label
+    )
+    self.init(
+      descriptor: descriptor,
+      valueDescriptor: Self.makeValueDescriptor(
+        for: descriptor,
+        equals: nil,
+        lifetime: .whileObserved(grace: nil),
+        label: label
+      ),
+      key: nil
+    )
+  }
+
+  /// Declares one keyless one-shot async value with an ordered policy.
+  ///
+  /// Ordered policies cannot describe streams: the selector must return
+  /// ``RunWork``, whose only factory is ``RunWork/run(_:)``. This type boundary
+  /// rejects invalid work before a context exists while preserving the same
+  /// lazy declaration identity, dependency capture, lifetime, and status model
+  /// as the latest-policy initializer.
+  ///
+  /// - Parameters:
+  ///   - policy: Queue, exhaust-latest, or merged scheduling for one-shot runs.
+  ///   - defaultValue: The honest resting value before any run succeeds.
+  ///   - name: A stable label for turns, diagnostics, and task tools.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection that returns one run.
+  public init(
+    _ policy: OrderedPolicy,
+    default defaultValue: Value,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>) -> RunWork<Value>
+  ) {
+    let label = CogLabel(name: name, fileID: fileID, line: line)
+    let descriptor = AsyncCogDescriptor(
+      policy: policy.schedulingPolicy,
+      default: defaultValue,
+      equals: nil,
+      selector: { c, _ in Work(selector(c)) },
       lifetime: .whileObserved(grace: nil),
       label: label
     )
@@ -181,8 +226,8 @@ extension AsyncCog where Value: Equatable {
   /// and success as distinct turns.
   ///
   /// - Parameters:
-  ///   - policy: The replacement policy for in-flight work. Only `.latest` is
-  ///     currently available.
+  ///   - policy: Latest-generation replacement for one-shot or stream work.
+  ///     Ordered policies use the separate ``RunWork`` initializer.
   ///   - defaultValue: The honest resting value returned before the first success.
   ///   - name: A stable label for turns, diagnostics, and task tools.
   ///   - fileID: The declaration's file. Leave this at its default.
@@ -199,10 +244,52 @@ extension AsyncCog where Value: Equatable {
   ) {
     let label = CogLabel(name: name, fileID: fileID, line: line)
     let descriptor = AsyncCogDescriptor(
-      policy: policy,
+      policy: policy.schedulingPolicy,
       default: defaultValue,
       equals: { oldValue, newValue in oldValue == newValue },
       selector: { c, _ in selector(c) },
+      lifetime: .whileObserved(grace: nil),
+      label: label
+    )
+    self.init(
+      descriptor: descriptor,
+      valueDescriptor: Self.makeValueDescriptor(
+        for: descriptor,
+        equals: { oldValue, newValue in oldValue == newValue },
+        lifetime: .whileObserved(grace: nil),
+        label: label
+      ),
+      key: nil
+    )
+  }
+
+  /// Declares an equality-gated one-shot async value with an ordered policy.
+  ///
+  /// This overload combines ``RunWork``'s compile-time stream exclusion with
+  /// the ordinary `Equatable` value projection. Equal successes may still be
+  /// visible as lifecycle transitions while value consumers remain quiet.
+  ///
+  /// - Parameters:
+  ///   - policy: Queue, exhaust-latest, or merged scheduling for one-shot runs.
+  ///   - defaultValue: The honest resting value before any run succeeds.
+  ///   - name: A stable label for turns, diagnostics, and task tools.
+  ///   - fileID: The declaration's file. Leave this at its default.
+  ///   - line: The declaration's line. Leave this at its default.
+  ///   - selector: MainActor dependency selection that returns one run.
+  public init(
+    _ policy: OrderedPolicy,
+    default defaultValue: Value,
+    name: String? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    _ selector: @escaping @MainActor (Reader<CogStatus<Value>>) -> RunWork<Value>
+  ) {
+    let label = CogLabel(name: name, fileID: fileID, line: line)
+    let descriptor = AsyncCogDescriptor(
+      policy: policy.schedulingPolicy,
+      default: defaultValue,
+      equals: { oldValue, newValue in oldValue == newValue },
+      selector: { c, _ in Work(selector(c)) },
       lifetime: .whileObserved(grace: nil),
       label: label
     )
