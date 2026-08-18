@@ -13,17 +13,37 @@ package enum CogExternalObservationTrackingMode: Sendable {
   case legacy
 }
 
-/// The context-local identity of one linked external property.
+/// The selector consumer that owns one closure-form external observation.
 ///
-/// Object identity keeps equal-valued models separate. Key-path equality keeps
-/// repeated reads of the same property on one model attached to one bridge,
-/// while sibling properties receive independent Observation registrations.
-internal nonisolated struct CogExternalObservationIdentity: Hashable {
-  /// The exact external model instance.
-  let object: ObjectIdentifier
+/// A call-site identity alone would collide when a shared selector helper runs
+/// for several keyed states. The exact class state or generation-checked arena
+/// slot supplies the missing per-consumer namespace.
+internal nonisolated enum CogExternalObservationConsumerIdentity: Hashable {
+  /// One class-state selector consumer.
+  case simple(ObjectIdentifier)
 
-  /// The exact property selected on that model.
-  let keyPath: AnyKeyPath
+  #if COG_CORE_ARENA
+  /// One exact lifetime of an arena selector row.
+  case arena(CogArenaSlot)
+  #endif
+}
+
+/// The context-local identity of one linked external read.
+///
+/// Key paths share one observer across every consumer reading the same property.
+/// Closure forms belong to one selector and source call site because their
+/// captured inputs may change independently on each selector run.
+internal nonisolated enum CogExternalObservationIdentity: Hashable {
+  /// One exact property on one exact external model.
+  case keyPath(object: ObjectIdentifier, keyPath: AnyKeyPath)
+
+  /// One closure expression in one selector consumer.
+  case closure(
+    consumer: CogExternalObservationConsumerIdentity,
+    fileID: String,
+    line: UInt,
+    column: UInt
+  )
 }
 
 /// Type-erased cancellation owned by one ``Cogs`` context.
@@ -118,7 +138,7 @@ internal final class CogLegacyObservationShim<Value> {
   nonisolated deinit {}
 }
 
-/// One runtime-appropriate Observation path feeding one hidden Cog source.
+/// One runtime-appropriate Observation read feeding one hidden Cog source.
 ///
 /// The source is an implementation detail: selectors record an ordinary graph
 /// edge to it, so both storage cores reuse their existing invalidation,
@@ -126,17 +146,15 @@ internal final class CogLegacyObservationShim<Value> {
 /// with the external model and never sends its possibly non-Sendable value
 /// across an isolation boundary.
 @MainActor
-internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Tracked>:
-  CogExternalObservationBridge
-{
-  /// Model retained for as long as this context tracks its property.
-  let root: Root
-
-  /// Property read by both Observation and each post-boundary publication.
-  let keyPath: KeyPath<Root, Tracked>
+internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridge {
+  /// Read performed while Observation records its exact property accesses.
+  private var read: @MainActor () -> Tracked
 
   /// Hidden source on which dependent Cog selectors record their edge.
   let sourceCog: ManualCog<Tracked>
+
+  /// Stable diagnostic name used by every hidden-source publication.
+  private let turnName: String
 
   /// Continuous modern observation, or `nil` on a pre-iOS-26 runtime.
   private var observationTask: Task<Void, Never>?
@@ -145,10 +163,14 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
   private var legacyObservation: CogLegacyObservationShim<Tracked>?
 
   /// Creates the hidden source at the same value used to arm Observation.
-  init(root: Root, keyPath: KeyPath<Root, Tracked>, initialValue: Tracked) {
-    self.root = root
-    self.keyPath = keyPath
+  init(
+    read: @escaping @MainActor () -> Tracked,
+    initialValue: Tracked,
+    turnName: String
+  ) {
+    self.read = read
     self.sourceCog = ManualCog(initialValue, name: "c.track")
+    self.turnName = turnName
   }
 
   /// Arms the runtime-appropriate external observation path.
@@ -180,13 +202,12 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
   /// property there therefore captures the newest post-setter value.
   @available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
   private func startModernObservation(in cogs: Cogs) {
-    let root = root
-    let keyPath = keyPath
+    let read = read
     let sourceCog = sourceCog
-    let turnName = "c.track(\(keyPath))"
+    let turnName = turnName
     observationTask = Task.immediate(name: turnName) { @MainActor [weak cogs] in
       let changes = Observations {
-        _ = root[keyPath: keyPath]
+        _ = read()
       }
       var isInitialValue = true
       for await _ in changes {
@@ -196,7 +217,7 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
           continue
         }
         guard let cogs else { return }
-        let value = root[keyPath: keyPath]
+        let value = read()
         cogs.commit(turnName) { c in c[sourceCog] = value }
       }
     }
@@ -207,12 +228,11 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
   /// The shim owns deferral past `willSet` and re-arm ordering. This bridge
   /// only turns each accepted newest value into an ordinary hidden-source turn.
   private func startLegacyObservation(in cogs: Cogs) {
-    let root = root
-    let keyPath = keyPath
+    let read = read
     let sourceCog = sourceCog
-    let turnName = "c.track(\(keyPath))"
+    let turnName = turnName
     let observation = CogLegacyObservationShim(
-      read: { root[keyPath: keyPath] },
+      read: read,
       didChange: { [weak cogs] value in
         guard let cogs else { return }
         cogs.commit(turnName) { c in c[sourceCog] = value }
@@ -223,8 +243,31 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
     observation.start()
   }
 
+  /// Replaces a closure-form read while preserving its one hidden source.
+  ///
+  /// A selector rerun may capture different ordinary inputs. Cancelling and
+  /// synchronously re-arming makes Observation follow the new read set before
+  /// the selector returns. The direct value is returned because the hidden
+  /// source exists to carry invalidation; it may still hold the preceding
+  /// closure result until the next external boundary publishes.
+  func replaceRead(
+    _ read: @escaping @MainActor () -> Tracked,
+    in cogs: Cogs
+  ) -> Tracked {
+    stopObserving()
+    self.read = read
+    let currentValue = read()
+    start(in: cogs)
+    return currentValue
+  }
+
   /// Cancels the exact modern task or legacy registration this bridge owns.
   func cancel() {
+    stopObserving()
+  }
+
+  /// Stops either runtime path without releasing the hidden source or read.
+  private func stopObserving() {
     observationTask?.cancel()
     observationTask = nil
     legacyObservation?.cancel()
@@ -246,12 +289,12 @@ extension Cogs {
     for root: Root,
     keyPath: KeyPath<Root, Tracked>
   ) -> ManualCog<Tracked> {
-    let identity = CogExternalObservationIdentity(
+    let identity = CogExternalObservationIdentity.keyPath(
       object: ObjectIdentifier(root),
       keyPath: keyPath
     )
     if let existing = externalObservationBridges[identity] {
-      guard let bridge = existing as? CogTrackedPropertyBridge<Root, Tracked> else {
+      guard let bridge = existing as? CogTrackedValueBridge<Tracked> else {
         fatalError(
           "A c.track bridge was recovered with an incompatible model or property type."
         )
@@ -259,13 +302,51 @@ extension Cogs {
       return bridge.sourceCog
     }
 
-    let bridge = CogTrackedPropertyBridge(
-      root: root,
-      keyPath: keyPath,
-      initialValue: root[keyPath: keyPath]
+    let bridge = CogTrackedValueBridge(
+      read: { root[keyPath: keyPath] },
+      initialValue: root[keyPath: keyPath],
+      turnName: "c.track(\(keyPath))"
     )
     externalObservationBridges[identity] = bridge
     bridge.start(in: self)
     return bridge.sourceCog
+  }
+
+  /// Resolves and re-arms one selector-owned closure-form external read.
+  ///
+  /// The bridge and hidden source remain singular across selector reruns. The
+  /// current closure replaces the prior capture and re-arms synchronously, so a
+  /// changing captured index or branch cannot leave Observation attached to an
+  /// earlier read set.
+  internal func trackedClosureSource<Tracked>(
+    for consumer: CogExternalObservationConsumerIdentity,
+    fileID: String,
+    line: UInt,
+    column: UInt,
+    read: @escaping @MainActor () -> Tracked
+  ) -> (sourceCog: ManualCog<Tracked>, value: Tracked) {
+    let identity = CogExternalObservationIdentity.closure(
+      consumer: consumer,
+      fileID: fileID,
+      line: line,
+      column: column
+    )
+    if let existing = externalObservationBridges[identity] {
+      guard let bridge = existing as? CogTrackedValueBridge<Tracked> else {
+        fatalError("A c.track closure bridge was recovered with an incompatible value type.")
+      }
+      let value = bridge.replaceRead(read, in: self)
+      return (bridge.sourceCog, value)
+    }
+
+    let initialValue = read()
+    let bridge = CogTrackedValueBridge(
+      read: read,
+      initialValue: initialValue,
+      turnName: "c.track closure at \(fileID):\(line):\(column)"
+    )
+    externalObservationBridges[identity] = bridge
+    bridge.start(in: self)
+    return (bridge.sourceCog, initialValue)
   }
 }

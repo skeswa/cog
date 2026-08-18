@@ -318,6 +318,56 @@ public struct Reader<Value> {
     return self[sourceCog]
   }
 
+  /// Links a synchronous external Observation read into this selector.
+  ///
+  /// Use this form when one value reads several properties of the same external
+  /// model or otherwise cannot be expressed by one key path:
+  ///
+  /// ```swift
+  /// let displayNameCog = Cog<String> { c in
+  ///   c.track(profile) { profile in
+  ///     "\(profile.givenName) \(profile.familyName)"
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// Observation records every property read synchronously by `read`. The iOS
+  /// 26 path coalesces those properties at suspension boundaries; the legacy
+  /// path has the same post-setter re-arm semantics and documented disarmed
+  /// window as the key-path overload. Each selector and source call site owns
+  /// one bridge. On a selector rerun, Cog replaces its captured closure and
+  /// re-arms synchronously so changing captured inputs cannot leave tracking on
+  /// an earlier property set.
+  ///
+  /// `Tracked` need not be `Sendable`; the read and publication stay on the
+  /// MainActor. Keep every external model the closure touches on that actor.
+  ///
+  /// - Parameters:
+  ///   - root: The primary external `@Observable` model retained by the bridge.
+  ///   - fileID: Source identity supplied by the compiler.
+  ///   - line: Source identity supplied by the compiler.
+  ///   - column: Source identity supplied by the compiler.
+  ///   - read: Synchronous read whose Observation accesses form the dependency.
+  /// - Returns: The newest value from the current observation boundary.
+  public func track<Root: Observable & AnyObject, Tracked>(
+    _ root: Root,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    column: UInt = #column,
+    read: @escaping @MainActor (Root) -> Tracked
+  ) -> Tracked {
+    let consumer = externalObservationConsumerIdentity()
+    let tracked = cogs.trackedClosureSource(
+      for: consumer,
+      fileID: String(describing: fileID),
+      line: line,
+      column: column,
+      read: { read(root) }
+    )
+    _ = self[tracked.sourceCog]
+    return tracked.value
+  }
+
   /// Peeks at a source without depending on it.
   ///
   /// Use this when the selector needs the source's current value but only a
@@ -435,6 +485,21 @@ public struct Reader<Value> {
     }
     #endif
     return state
+  }
+
+  /// Names the exact selector consumer that owns a closure-form observer.
+  private func externalObservationConsumerIdentity()
+    -> CogExternalObservationConsumerIdentity
+  {
+    #if COG_CORE_ARENA
+    if let arenaState {
+      cogs.arenaCore.requireTracking(arenaState)
+      return .arena(arenaState)
+    }
+    #endif
+    let state = requiredSimpleState()
+    cogs.requireTracking(state)
+    return .simple(ObjectIdentifier(state))
   }
 
   #if COG_CORE_ARENA
