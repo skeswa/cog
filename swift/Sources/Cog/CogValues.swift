@@ -1,3 +1,36 @@
+/// How one ``CogValues`` iterator keeps changed values its reader has not consumed.
+///
+/// Buffering never blocks a synchronous graph turn. The default
+/// ``newest(_:)`` policy bounds memory and favors the latest settled state for
+/// UI consumers that fall behind.
+public nonisolated enum CogValuesBuffering: Sendable, Equatable {
+  /// Keep up to `limit` undelivered values, discarding the oldest on overflow.
+  ///
+  /// A limit must be greater than zero. ``Cogs/values(of:buffering:)-(Cog<Value>,_)``
+  /// defaults to `.newest(1)`, so a paused reader resumes with the latest
+  /// settled value without making intervening commits wait.
+  case newest(Int)
+
+  /// Creates the standard-library stream storage for this public policy.
+  ///
+  /// Policy validation happens when a subscription iterator is created, before
+  /// that iterator registers with the graph or settles any state.
+  internal func makeStream<Value>(of: Value.Type) -> (
+    stream: AsyncStream<Value>, continuation: AsyncStream<Value>.Continuation
+  ) {
+    switch self {
+    case .newest(let limit):
+      guard limit > 0 else {
+        fatalError("CogValuesBuffering.newest requires a limit greater than zero.")
+      }
+      return AsyncStream.makeStream(
+        of: Value.self,
+        bufferingPolicy: .bufferingNewest(limit)
+      )
+    }
+  }
+}
+
 /// A current-value-first asynchronous subscription to one Cog value.
 ///
 /// Create this sequence with ``Cogs/values(of:)-(Cog<Value>)`` or its manual
@@ -28,15 +61,13 @@ public struct CogValues<Value>: @MainActor AsyncSequence {
   internal init(
     cogs: Cogs,
     label: CogLabel,
+    buffering: CogValuesBuffering,
     read: @escaping @MainActor (ReactionReader) -> Value
   ) {
     makeIteratorBody = { [weak cogs] in
       guard let cogs else { return Iterator.finished() }
 
-      let (stream, continuation) = AsyncStream.makeStream(
-        of: Value.self,
-        bufferingPolicy: .unbounded
-      )
+      let (stream, continuation) = buffering.makeStream(of: Value.self)
       let continuationOwner = CogValuesContinuation(continuation)
       let subscription = CogValuesSubscription()
       continuation.onTermination = { @Sendable [weak subscription] _ in
@@ -156,12 +187,18 @@ extension Cogs {
   /// writes are offered in turn order. The subscription never gives write
   /// capability and never makes a synchronous commit wait for its reader.
   ///
-  /// - Parameter valueReference: The manual source value to export.
+  /// - Parameters:
+  ///   - valueReference: The manual source value to export.
+  ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
-  public func values<Value>(of valueReference: ManualCog<Value>) -> CogValues<Value> {
+  public func values<Value>(
+    of valueReference: ManualCog<Value>,
+    buffering: CogValuesBuffering = .newest(1)
+  ) -> CogValues<Value> {
     CogValues(
       cogs: self,
       label: CogLabel(name: "values(of:)", fileID: #fileID, line: #line),
+      buffering: buffering,
       read: { c in c[valueReference] }
     )
   }
@@ -172,12 +209,18 @@ extension Cogs {
   /// first element. Later turns offer a value only when the declaration's
   /// equality rule reports a change. Each iterator owns its own subscription.
   ///
-  /// - Parameter valueReference: The derived value to settle and export.
+  /// - Parameters:
+  ///   - valueReference: The derived value to settle and export.
+  ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
-  public func values<Value>(of valueReference: Cog<Value>) -> CogValues<Value> {
+  public func values<Value>(
+    of valueReference: Cog<Value>,
+    buffering: CogValuesBuffering = .newest(1)
+  ) -> CogValues<Value> {
     CogValues(
       cogs: self,
       label: CogLabel(name: "values(of:)", fileID: #fileID, line: #line),
+      buffering: buffering,
       read: { c in c[valueReference] }
     )
   }
@@ -189,12 +232,18 @@ extension Cogs {
   /// failure transitions alone do not emit; a later changed accepted value
   /// does, following the async declaration's ordinary equality rule.
   ///
-  /// - Parameter valueReference: The async value projection to export.
+  /// - Parameters:
+  ///   - valueReference: The async value projection to export.
+  ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
-  public func values<Value>(of valueReference: AsyncCog<Value>) -> CogValues<Value> {
+  public func values<Value>(
+    of valueReference: AsyncCog<Value>,
+    buffering: CogValuesBuffering = .newest(1)
+  ) -> CogValues<Value> {
     CogValues(
       cogs: self,
       label: CogLabel(name: "values(of:)", fileID: #fileID, line: #line),
+      buffering: buffering,
       read: { c in c[valueReference] }
     )
   }
