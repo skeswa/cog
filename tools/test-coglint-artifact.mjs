@@ -33,29 +33,77 @@ const VARIANTS = [
   },
 ];
 
-main();
+main(parseOptions(process.argv.slice(2)));
 
 /** Runs the complete build, structure, checksum, and host-selection proof. */
-function main() {
-  if (process.platform !== "darwin" || process.arch !== "arm64") {
-    fail("LINT-19 requires the accepted Apple Silicon release host");
+function main(options) {
+  if (process.platform !== "darwin") {
+    fail("LINT-19 requires a macOS host");
+  }
+  if (!options.fromArchive && process.arch !== "arm64") {
+    fail("building LINT-19 requires the accepted Apple Silicon release host");
   }
 
-  run(process.execPath, [join(REPO_ROOT, "tools", "build-coglint-artifact.mjs")], {
-    stdio: "inherit",
-  });
+  if (options.fromArchive) {
+    validateArchiveAndChecksum();
+    materializeBundleFromArchive();
+  } else {
+    run(process.execPath, [join(REPO_ROOT, "tools", "build-coglint-artifact.mjs")], {
+      stdio: "inherit",
+    });
+  }
   validateMetadata();
-  validateArchiveAndChecksum();
+  if (!options.fromArchive) validateArchiveAndChecksum();
+
+  const swiftExecutable = run("xcrun", ["--find", "swift"], {
+    encoding: "utf8",
+  }).stdout.trim();
 
   const probeDirectory = mkdtempSync(join(tmpdir(), "coglint-artifact-selection-"));
   process.on("exit", () => rmSync(probeDirectory, { force: true, recursive: true }));
   writeProbePackage(probeDirectory);
 
-  for (const variant of VARIANTS) {
-    validateHostSelection(probeDirectory, variant);
+  for (const variant of options.variants) {
+    validateHostSelection(probeDirectory, swiftExecutable, variant);
   }
 
-  console.log("\nPASS LINT-19: SwiftPM selected and executed both native CogLint variants");
+  const hosts = options.variants.map((variant) => variant.architecture).join(", ");
+  console.log(`\nPASS LINT-19: SwiftPM selected and executed CogLint for ${hosts}`);
+}
+
+/** Selects a build or downloaded-archive proof and its concrete host variants. */
+function parseOptions(arguments_) {
+  let fromArchive = false;
+  const architectures = [];
+
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const argument = arguments_[index];
+    if (argument === "--from-archive") {
+      fromArchive = true;
+      continue;
+    }
+    if (argument === "--host") {
+      const architecture = arguments_[index + 1];
+      if (architecture === undefined) fail("--host requires an architecture");
+      architectures.push(architecture);
+      index += 1;
+      continue;
+    }
+    fail(`unrecognized argument ${JSON.stringify(argument)}`);
+  }
+
+  const selected =
+    architectures.length === 0 ? VARIANTS : architectures.map(variantForArchitecture);
+  if (new Set(selected).size !== selected.length) fail("each --host architecture must be unique");
+  return { fromArchive, variants: selected };
+}
+
+/** Resolves a CLI host name to the one accepted metadata variant. */
+function variantForArchitecture(architecture) {
+  const variant = VARIANTS.find((candidate) => candidate.architecture === architecture);
+  if (variant === undefined)
+    fail(`unsupported --host architecture ${JSON.stringify(architecture)}`);
+  return variant;
 }
 
 /** Requires the exact artifact schema, version, paths, and normalized triples. */
@@ -111,6 +159,13 @@ function validateArchiveAndChecksum() {
   if (!/^[0-9a-f]{64}$/.test(recorded) || recorded !== computed) {
     fail(`recorded checksum ${JSON.stringify(recorded)} does not match SwiftPM ${computed}`);
   }
+}
+
+/** Extracts the already-checksummed release archive as the sole probe input. */
+function materializeBundleFromArchive() {
+  rmSync(BUNDLE_PATH, { force: true, recursive: true });
+  run("unzip", ["-q", ARCHIVE_PATH, "-d", ARTIFACTS_DIRECTORY]);
+  process.on("exit", () => rmSync(BUNDLE_PATH, { force: true, recursive: true }));
 }
 
 /** Creates a real binary-target consumer whose command plugin executes its tool. */
@@ -173,14 +228,13 @@ enum SelectionFailure: Error {
 }
 
 /** Runs SwiftPM in one host mode and requires its exact variant and real CLI. */
-function validateHostSelection(probeDirectory, variant) {
+function validateHostSelection(probeDirectory, swiftExecutable, variant) {
   console.log(`\n==> Probing SwiftPM selection for ${variant.supportedTriple}`);
   const result = run(
     "arch",
     [
       `-${variant.architecture}`,
-      "xcrun",
-      "swift",
+      swiftExecutable,
       "package",
       "--package-path",
       probeDirectory,

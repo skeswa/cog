@@ -39,6 +39,8 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @property {RunsOn} runsOn
  * @property {string | null} condition the job's `if:` expression
  * @property {number} conditionLine
+ * @property {import("./yaml.mjs").Node | null | undefined} needs
+ * @property {number} needsLine
  * @property {import("./yaml.mjs").Node | null | undefined} permissions
  * @property {number} permissionsLine
  * @property {import("./yaml.mjs").Node | null | undefined} timeout
@@ -147,6 +149,7 @@ function readTriggers(root) {
 function readJob(jobEntry) {
   const node = jobEntry.value;
   const condition = entryOf(node, "if");
+  const needs = entryOf(node, "needs");
   const permissions = entryOf(node, "permissions");
   const timeout = entryOf(node, "timeout-minutes");
   const reusable = entryOf(node, "uses");
@@ -176,6 +179,8 @@ function readJob(jobEntry) {
     runsOn: readRunsOn(node, jobEntry.line),
     condition: condition === undefined ? null : (text(condition.value) ?? ""),
     conditionLine: condition?.line ?? jobEntry.line,
+    needs: needs?.value,
+    needsLine: needs?.line ?? jobEntry.line,
     permissions: permissions?.value,
     permissionsLine: permissions?.line ?? jobEntry.line,
     timeout: timeout?.value,

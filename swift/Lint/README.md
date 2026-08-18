@@ -40,9 +40,15 @@ target sources and stay outside the dogfood pass.
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
 executables, the release `.artifactbundle.zip`, and its SwiftPM checksum under
 `swift/Lint/Artifacts`. The generated products are ignored. The artifact suite
-rebuilds them and runs a scratch SwiftPM command plugin under both arm64 and
-Rosetta, requiring the selected path to name the matching metadata variant and
-the selected executable to serve its real CLI help.
+rebuilds them and runs a scratch SwiftPM command plugin under each requested
+host, requiring the selected path to name the matching metadata variant and
+the selected executable to serve its real CLI help. By default it proves both
+arm64 and Rosetta locally. Candidate CI splits that proof without splitting
+the bytes: the pinned-Xcode mini runs `--host arm64`, then a real Intel runner
+downloads the checksummed archive, selects Xcode 26.3 build 17C529 (whose
+Intel Swift-tools 6.2 host matches the distributed package manifest), and runs
+`--from-archive --host x86_64`. That handoff is necessary because Xcode 26.6's
+host SwiftPM executable is arm64-only and cannot itself run under Rosetta.
 
 The build-tool plugin receives the exact Swift membership of its target and
 runs the binary in Xcode reporter mode before compilation. It keeps a

@@ -267,7 +267,7 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
 Fork pull requests never reach the mini. Every self-hosted job carries a
 same-repo guard, and an approval-gated GitHub-hosted `macos-26` lane covers
 forks. The two conditions are exhaustive and mutually exclusive, so exactly
-one macOS lane runs per event:
+one ordinary macOS lane runs per pull-request or push event:
 
 ```yaml
 # Self-hosted lane.
@@ -281,6 +281,16 @@ if: >-
   github.event_name == 'pull_request'
   && github.event.pull_request.head.repo.full_name != github.repository
 ```
+
+M8 adds one manual release-artifact exception, bounded to same-repository
+`workflow_dispatch` events. The mini builds and checksums both CogLint
+executables under pinned Xcode 26.6 and proves the arm64 member. Xcode 26.6's
+host SwiftPM driver is arm64-only, so a dependent GitHub-hosted
+`macos-15-intel` job downloads that exact SHA-named archive, independently
+checks its provenance and checksum, selects the image's Xcode 26.3 build
+17C529 (an Intel Swift-tools 6.2 host matching CogLintPlugins), and proves
+x86_64 selection without rebuilding. This is a consumer proof, not a third
+build toolchain or a path by which pull-request code can reach the mini.
 
 The `event_name != 'pull_request' ||` clause matters: on `push` and
 `schedule` there is no `github.event.pull_request`, so a bare comparison

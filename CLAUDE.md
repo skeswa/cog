@@ -67,7 +67,8 @@ every scenario covered by exactly one task.
   matrix, simulator tests, the Weather build and tests, release tests,
   compile-fail
   fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
-  fork lane), `swift-docs.yml` (the DocC archive on the mini, published to
+  fork lane, plus the manual candidate artifact's downloaded-byte proof on a
+  hosted Intel runner), `swift-docs.yml` (the DocC archive on the mini, published to
   GitHub Pages from a hosted job on tag push), and `markdown.yml` (Oxfmt and
   the workflow-contract check on GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
@@ -143,6 +144,10 @@ directly:
   record its SwiftPM checksum. The version defaults to `0.4.0`.
 - `mise run test:lint-artifact` — rebuild the artifact and prove SwiftPM
   selects and executes each exact metadata variant under arm64 and Rosetta.
+  Candidate CI splits the same proof without rebuilding the archive: append
+  `-- --host arm64` on its pinned-Xcode builder, then append
+  `-- --from-archive --host x86_64` after downloading it on the pinned Xcode
+  26.3/17C529 Intel host.
 - `mise run test:lint-build-tool-plugin` — apply the local artifact through
   the build-tool plugin in scratch SwiftPM and Xcode consumers, then prove an
   unchanged rebuild replays identical diagnostics from each plugin cache.

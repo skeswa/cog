@@ -1,12 +1,18 @@
 name: Swift CI
 
 # The Swift lane. Everything here needs a Swift toolchain, so every job runs on
-# macOS — and macOS means one of exactly two runner lanes:
+# macOS — and ordinary CI means one of exactly two runner lanes:
 #
 #   1. The self-hosted Mac mini, `runs-on: [self-hosted, macOS, ARM64,
 #      cog-mini]`, for pushes to `main` and same-repo pull requests.
 #   2. An approval-gated GitHub-hosted `macos-26` runner, for pull requests
 #      from forks, which structurally never reach the mini.
+#
+# A manually dispatched release-artifact proof adds one bounded third host:
+# `macos-15-intel` downloads bytes built under pinned Xcode on the mini and
+# proves SwiftPM's x86_64 executable selection without rebuilding them. Xcode
+# 26.6's host tools are arm64-only, so Rosetta cannot truthfully supply that
+# proof on the mini. This hosted job never runs for pull requests or pushes.
 #
 # The two `if:` guards below are exhaustive and mutually exclusive, so exactly
 # one lane runs per event. They are copied verbatim from the "macOS runner
@@ -41,14 +47,16 @@ name: Swift CI
 # Jobs land here as the milestones that need them land: `M0-05c` adds the
 # release-configuration and compile-fail jobs, `M0-09b` adds the task-ledger
 # check and widens the path filters below, M2 adds `test-simulator` and the
-# Weather build, `M5-08b` adds the benchmark package gate, and `M8-13c` adds
-# CogLint dogfood to both macOS runner lanes.
+# Weather build, `M5-08b` adds the benchmark package gate, `M8-13c` adds
+# CogLint dogfood to both macOS runner lanes, and `M8-17` adds the manually
+# dispatched, exact-source release-artifact job.
 
 # The two path lists are deliberately duplicated rather than shared through a
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
 # trigger parser rather than the runner, and a parse failure there does not
 # error — the lane simply never runs.
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "Package.swift"
@@ -89,6 +97,12 @@ env:
   # default — so the two lanes compile with the identical toolchain, not
   # merely the same version number.
   COG_XCODE_VERSION: "26.6"
+  COG_XCODE_BUILD: "17F113"
+  # The final Intel-hosted Xcode release carries Swift tools 6.2, matching the
+  # generated CogLintPlugins manifest. `macos-15-intel` defaults to Xcode 16.4
+  # / Swift 6.1, so the downloaded-byte consumer selects this pin explicitly.
+  COG_INTEL_XCODE_VERSION: "26.3"
+  COG_INTEL_XCODE_BUILD: "17C529"
   # Kept in step with `markdown.yml`.
   COG_MISE_VERSION: "2026.8.3"
 
@@ -203,6 +217,209 @@ jobs:
 
       - name: Lint Cog and Weather with CogLint
         run: mise run lint:swift
+
+  # Release-candidate bytes are deliberately manual. A dispatch still runs the
+  # full same-repo suite, but only this job pays for both native release builds,
+  # proves the arm64 member, and retains their exact archive. It checks out
+  # `github.sha`, not a PR merge commit, so the later tag can name the source
+  # recorded in provenance. The dependent Intel job consumes these same bytes.
+  lint-artifact:
+    name: CogLint candidate artifact (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: |
+          set -euo pipefail
+          found=""
+          inventory=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            inventory="${inventory}    ${app} -> ${version}"$'\n'
+            if [ "$version" = "$COG_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          echo "Installed Xcodes:"
+          printf '%s' "${inventory:-    (none)}"
+          if [ -z "$found" ]; then
+            echo "::error title=Pinned Xcode missing::Xcode ${COG_XCODE_VERSION} is not installed on $(hostname -s)."
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+
+      - name: Build the artifact and exercise its arm64 variant
+        run: mise run test:lint-artifact -- --host arm64
+
+      - name: Verify and record candidate provenance
+        run: |
+          set -euo pipefail
+          archive="swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip"
+          checksum_file="${archive}.checksum"
+          provenance="${archive}.provenance"
+
+          source_sha="$(git rev-parse HEAD)"
+          if [ "$source_sha" != "$GITHUB_SHA" ]; then
+            echo "::error title=Candidate source mismatch::checked out ${source_sha}, expected ${GITHUB_SHA}"
+            exit 1
+          fi
+
+          xcode_version="$(xcodebuild -version | sed -n 's/^Xcode //p')"
+          xcode_build="$(xcodebuild -version | sed -n 's/^Build version //p')"
+          swift_version="$(swift --version | head -n 1)"
+          if [ "$xcode_version" != "$COG_XCODE_VERSION" ] || [ "$xcode_build" != "$COG_XCODE_BUILD" ]; then
+            echo "::error title=Candidate toolchain mismatch::expected Xcode ${COG_XCODE_VERSION} (${COG_XCODE_BUILD}), got ${xcode_version} (${xcode_build})"
+            exit 1
+          fi
+          case "$swift_version" in
+            *"Apple Swift version 6.3.3"*) ;;
+            *) echo "::error title=Candidate Swift mismatch::${swift_version}"; exit 1 ;;
+          esac
+
+          recorded_checksum="$(tr -d '[:space:]' < "$checksum_file")"
+          computed_checksum="$(swift package compute-checksum "$archive")"
+          if [ "$recorded_checksum" != "$computed_checksum" ]; then
+            echo "::error title=Candidate checksum mismatch::recorded ${recorded_checksum}, computed ${computed_checksum}"
+            exit 1
+          fi
+
+          {
+            printf 'format=coglint-candidate-v1\n'
+            printf 'version=0.4.0\n'
+            printf 'source_sha=%s\n' "$source_sha"
+            printf 'xcode_version=%s\n' "$xcode_version"
+            printf 'xcode_build=%s\n' "$xcode_build"
+            printf 'swift_version=%s\n' "$swift_version"
+            printf 'artifact=%s\n' "$(basename "$archive")"
+            printf 'checksum=%s\n' "$computed_checksum"
+            printf 'arm64_probe=passed\n'
+          } > "$provenance"
+          cat "$provenance"
+
+      - name: Retain the exact candidate archive and provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coglint-0.4.0-${{ github.sha }}
+          path: |
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  # Xcode 26.6 builds the Intel executable but ships an arm64-only SwiftPM
+  # driver, so Rosetta cannot prove host selection on the mini. This dependent
+  # job downloads the already-checksummed candidate onto GitHub's real Intel
+  # host and exercises that exact archive without rebuilding any CogLint code.
+  lint-artifact-x86_64:
+    name: CogLint candidate artifact (Intel host)
+    needs: lint-artifact
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Intel consumer Xcode
+        run: |
+          set -euo pipefail
+          found=""
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            version="$(/usr/bin/defaults read "$app/Contents/version" CFBundleShortVersionString 2>/dev/null || echo unknown)"
+            if [ "$version" = "$COG_INTEL_XCODE_VERSION" ] && [ -z "$found" ]; then
+              found="$app"
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "::error title=Intel Xcode missing::Xcode ${COG_INTEL_XCODE_VERSION} is not installed"
+            exit 1
+          fi
+          developer_dir="${found}/Contents/Developer"
+          actual_build="$(DEVELOPER_DIR="$developer_dir" xcodebuild -version | sed -n 's/^Build version //p')"
+          if [ "$actual_build" != "$COG_INTEL_XCODE_BUILD" ]; then
+            echo "::error title=Intel Xcode build mismatch::expected ${COG_INTEL_XCODE_BUILD}, got ${actual_build}"
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=${developer_dir}" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$developer_dir" xcodebuild -version
+          DEVELOPER_DIR="$developer_dir" swift --version
+          file "$(DEVELOPER_DIR="$developer_dir" xcrun --find swift)"
+
+      - name: Download the exact arm-built candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coglint-0.4.0-${{ github.sha }}
+          path: swift/Lint/Artifacts
+
+      - name: Verify the Intel host and downloaded provenance
+        run: |
+          set -euo pipefail
+          archive="swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip"
+          checksum_file="${archive}.checksum"
+          provenance="${archive}.provenance"
+
+          if [ "$(uname -m)" != "x86_64" ]; then
+            echo "::error title=Candidate host mismatch::expected x86_64, got $(uname -m)"
+            exit 1
+          fi
+          grep -Fx "format=coglint-candidate-v1" "$provenance"
+          grep -Fx "source_sha=${GITHUB_SHA}" "$provenance"
+          grep -Fx "xcode_version=${COG_XCODE_VERSION}" "$provenance"
+          grep -Fx "xcode_build=${COG_XCODE_BUILD}" "$provenance"
+          grep -Fx "arm64_probe=passed" "$provenance"
+
+          recorded_checksum="$(tr -d '[:space:]' < "$checksum_file")"
+          computed_checksum="$(swift package compute-checksum "$archive")"
+          grep -Fx "checksum=${computed_checksum}" "$provenance"
+          if [ "$recorded_checksum" != "$computed_checksum" ]; then
+            echo "::error title=Downloaded checksum mismatch::recorded ${recorded_checksum}, computed ${computed_checksum}"
+            exit 1
+          fi
+          xcodebuild -version
+          swift --version
+          cat "$provenance"
+
+      - name: Exercise the exact x86_64 artifact variant
+        run: mise run test:lint-artifact -- --from-archive --host x86_64
 
   test-host:
     name: Host tests (self-hosted, ${{ matrix.leg }})
