@@ -179,13 +179,16 @@ Manifest choices:
   leg into a `.define()` so tests can assert which leg they run in.
 - swift-docc-plugin is env-gated (`COG_DOCC=1`, set only by the docs
   workflow), so consumers resolve a zero-dependency package.
-- The `swift/Lint` manifest owns swift-syntax and swift-argument-parser. Its
+- The `swift/Lint` manifest uses Swift tools 6.2 and Swift 6 language mode and
+  owns exact `swift-syntax` 603.0.2 and `swift-argument-parser` 1.8.2 pins. Its
   isolation gate proves those source dependencies remain absent from the root
-  package. M8 measures whether an unused binary artifact has material fetch
-  cost before it selects the accepted distribution path: root-manifest
-  products when the cost is negligible, otherwise a generated sibling
-  distribution manifest at the same version. That conditional Channel B is
-  the generated `CogLintPlugins` package in `skeswa/coglint-plugins`.
+  package. Release builds use pinned Xcode 26.6 / Swift 6.3.3 to produce
+  native `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0` variants from
+  the Apple Silicon runner. M8 measures whether an unused binary artifact has
+  material fetch cost before it selects the accepted distribution path:
+  root-manifest products when the cost is negligible, otherwise a generated
+  sibling distribution manifest at the same version. That conditional Channel
+  B is the generated `CogLintPlugins` package in `skeswa/coglint-plugins`.
 
 ## Plan-to-task contract
 

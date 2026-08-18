@@ -181,6 +181,11 @@ is the second such package, under the same isolation gate:
   rule and the convention it enforces change in one revision, checked by one
   CI — which is the whole premise of an executable style guide.
 
+The package uses Swift tools 6.2 and Swift 6 language mode. Development and
+release builds use the repository's Xcode 26.6 (build 17F113), Swift 6.3.3
+toolchain; `swift-syntax` is pinned to that compiler's 603 release family.
+Exact dependency, deployment, and host-triple pins are recorded in §7.
+
 ### 3.2 Products and surfaces
 
 The consumer-facing surface is:
@@ -517,14 +522,45 @@ finding (§2.4) seeds a future Kotlin design document.
    future move therefore must ship and verify a real Pages-compatible redirect
    before changing any canonical URL.
 
-4. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
+4. **Toolchain, dependencies, and hosts — settled August 18, 2026.** The
+   development package and release pipeline use these exact pins:
+
+   | Surface                    | Accepted pin                                                             |
+   | -------------------------- | ------------------------------------------------------------------------ |
+   | SwiftPM manifest           | `swift-tools-version: 6.2`                                               |
+   | Swift language mode        | Swift 6                                                                  |
+   | Release toolchain          | Xcode 26.6 (17F113), Swift 6.3.3                                         |
+   | `swift-syntax`             | `.exact("603.0.2")`, revision `79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1` |
+   | `swift-argument-parser`    | `.exact("1.8.2")`, revision `6a52f3251125d74daf04fcbd5e6f08a75d074382`   |
+   | macOS deployment target    | 14.0                                                                     |
+   | Apple Silicon host variant | `arm64-apple-macosx14.0`                                                 |
+   | Intel host variant         | `x86_64-apple-macosx14.0`                                                |
+
+   The 603 swift-syntax line matches the compiler that produces the released
+   executable; Cog's Swift 6.2 source floor does not force the linter onto the
+   602 line because consumers receive a prebuilt binary and the development
+   package is isolated from their graph. Exact pins keep one release
+   reproducible instead of admitting dependency drift between its binary and
+   fixtures. The Apple Silicon release host builds two native variants rather
+   than dropping Intel or requiring an Intel release machine.
+
+   A compatibility probe imported `SwiftSyntax`, `SwiftParser`, and
+   `ArgumentParser`, parsed a Swift source file, and built in release for both
+   accepted triples under Xcode 26.4 / Swift 6.3.0; both binaries reported one
+   parsed statement, with the Intel binary executing through Rosetta. Their
+   Mach-O load commands record macOS 14.0. The pinned Xcode 26.6 CI toolchain
+   is Swift 6.3.3, and the existing benchmark resolve independently records
+   these same dependency versions. M8's package scaffold makes this probe a
+   permanent compatibility build under that release toolchain.
+
+5. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
    companion, `@Environment(\.cogs)` declared per-view, `fatalError` over
    `preconditionFailure`, `nonisolated deinit` on generic classes, and no
    `@testable import Cog` in scenario tests — are queued behind the first six,
    several of them library-internal rather than consumer-facing.
-5. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
+6. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
    a `custom_rules` config for SwiftLint shops, accepting the drift risk.
-6. **Kotlin.** When to record the Android decision; the ergonomic bar is
+7. **Kotlin.** When to record the Android decision; the ergonomic bar is
    known, the timing is not. The monorepo shape helps here too: the Kotlin
    lint module would live under `kotlin/` beside its library, matching the
    plan's platform layout.

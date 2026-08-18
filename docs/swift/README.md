@@ -374,6 +374,9 @@ These choices are settled; §10 of the core document has the full record.
   fallback is the generated `CogLintPlugins` package in
   `skeswa/coglint-plugins`. Rule diagnostics link directly to permanent native
   DocC articles under `/cog/documentation/cog/`, without a redirect facade.
+  Its isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
+  swift-argument-parser 1.8.2 exactly; Xcode 26.6 / Swift 6.3.3 builds native
+  arm64 and x86_64 macOS 14 variants.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
 debug-history tools, and persistence helpers. Also open are several

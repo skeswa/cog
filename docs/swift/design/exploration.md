@@ -1135,7 +1135,10 @@ keeps its slot and points at the table above instead of renumbering the rest.
     errors, and an exact next-line suppression requires one rule slug and a
     non-empty source-visible reason. Diagnostics use the permanent native DocC
     article paths under `/cog/documentation/cog/`, with no redirect facade.
-    Later rules and Kotlin timing remain open. Concept record: issue #318.
+    The isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
+    swift-argument-parser 1.8.2 exactly; Xcode 26.6 / Swift 6.3.3 releases
+    native arm64 and x86_64 macOS 14 host binaries. Later rules and Kotlin
+    timing remain open. Concept record: issue #318.
 
 ---
 
