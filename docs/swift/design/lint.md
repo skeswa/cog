@@ -245,7 +245,7 @@ stable documentation URL:
 ```
 WeatherCard.swift:186:7: error: [primitives-only-in-ops] `refresh` is a demand
 on the graph; call a named op from a `CogOps` extension —
-https://skeswa.github.io/cog/lint/primitives-only-in-ops
+https://skeswa.github.io/cog/documentation/cog/primitivesonlyinops
 ```
 
 - Each rule has an article in `Cog.docc` — the violation, why the convention
@@ -254,9 +254,9 @@ https://skeswa.github.io/cog/lint/primitives-only-in-ops
   pipeline. The diagnostic is the teaching moment; the page is the lesson.
   This is the same posture as
   Cog's runtime diagnostics (the cycle path, the escaped-writer message):
-  explain, don't merely fail. The URL shape shown above is illustrative
-  until open question 3 fixes it — DocC static hosting emits
-  `/cog/documentation/…` paths unless a redirect layer is added.
+  explain, don't merely fail. The canonical URL is the native DocC article
+  path under `/cog/documentation/cog/`; §7 records every exact URL. V1 adds no
+  redirect facade.
 - The `github` reporter emits workflow-command annotations so violations
   land on the PR diff; the `sarif` reporter carries the URL as `helpUri`
   for code scanning. Xcode renders the URL as copyable text, terminals and
@@ -495,9 +495,28 @@ finding (§2.4) seeds a future Kotlin design document.
    only the next physical line, and carries the reason in the source review
    that accepts it. Severity is fixed in v1 rather than configurable.
 
-3. **Stable URL shape.** Rule articles live in `Cog.docc`; whether the public
-   path uses DocC's emitted `/cog/documentation/…` form or a redirect-backed
-   `/cog/lint/<rule>` form must be fixed before the first diagnostic ships.
+3. **Stable URL shape — settled August 18, 2026.** Diagnostics and SARIF use
+   the native, statically hosted DocC article URLs:
+
+   | Rule                         | Canonical URL                                                            |
+   | ---------------------------- | ------------------------------------------------------------------------ |
+   | `cog-declaration-suffix`     | `https://skeswa.github.io/cog/documentation/cog/cogdeclarationsuffix`    |
+   | `no-cogs-in-view-init`       | `https://skeswa.github.io/cog/documentation/cog/nocogsinviewinit`        |
+   | `primitives-only-in-ops`     | `https://skeswa.github.io/cog/documentation/cog/primitivesonlyinops`     |
+   | `initial-state-in-mechanism` | `https://skeswa.github.io/cog/documentation/cog/initialstateinmechanism` |
+   | `manual-cog-private`         | `https://skeswa.github.io/cog/documentation/cog/manualcogprivate`        |
+   | `no-multi-read-cogs-helper`  | `https://skeswa.github.io/cog/documentation/cog/nomultireadcogshelper`   |
+
+   A direct DocC conversion probe confirmed that its article identifier drops
+   the rule title's hyphens, matching the existing archive's article paths.
+   These URLs are canonical and permanent: generated articles retain the
+   title that produces the accepted path, and the documentation suite checks
+   both its HTML route and data payload. V1 adds no `/cog/lint/<rule>` facade.
+   DocC's `@Redirected` directive only emits redirect metadata for a hosting
+   server to consume; GitHub Pages does not turn it into an HTTP redirect. A
+   future move therefore must ship and verify a real Pages-compatible redirect
+   before changing any canonical URL.
+
 4. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
    companion, `@Environment(\.cogs)` declared per-view, `fatalError` over
    `preconditionFailure`, `nonisolated deinit` on generic classes, and no

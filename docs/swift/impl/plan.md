@@ -719,7 +719,10 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   dogfood target, and a `mise run lint:swift` command. Production sources lint
   with primitives restricted to `CogOps`; test targets use their explicit
   exemption. The root package must retain its zero-source-dependency
-  guarantee on the selected distribution channel.
+  guarantee on the selected distribution channel. Each rule article retains
+  the title that produces its canonical native
+  `/cog/documentation/cog/<rule-without-hyphens>` route; the DocC gate checks
+  both the static HTML route and its data payload, with no redirect facade.
 - Run the complete linter fixture and integration suite, prepare the
   non-mutating release candidate, and tag `0.4.0`. Publish the checksummed
   binary asset before exact plugin consumption is attempted; verify Pages and
@@ -745,6 +748,8 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
 - Docs: publish DocC to GitHub Pages through the env-gated swift-docc-plugin in
   `swift-docs.yml` on tag push (`upload-pages-artifact` plus
   `deploy-pages`); URL `https://skeswa.github.io/cog/documentation/cog/`.
+  M8 rule diagnostics use permanent native article URLs beneath that prefix;
+  the six exact paths are fixed in lint.md §7 and require no redirect layer.
   Fallback: `xcodebuild docbuild` plus `docc process-archive`, which needs
   no package dependency.
 - Checklist: before tagging, run `fmt:check` and `test:matrix` locally, then
