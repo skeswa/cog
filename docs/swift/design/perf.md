@@ -689,6 +689,23 @@ regression. Since 0.2.0 was scoped to the core replacement, the principled
 release recommendation is no release rather than a version containing no
 shipping change.
 
+**M6 closeout** — `M6-12b`, 2026-08-17. The no-release record is approved.
+The decision is implemented, not merely proposed: an unset selector compiles
+the simple core, and the complete 248-scenario behavior suite still passes
+under both explicit core selections. The committed performance gate verifies
+all 13 registered threshold workloads, proves malloc counting is live, keeps
+PERF-06 exactly allocation-free at p90, and bounds every PERF-10 runtime cell.
+The edge and runtime measurements, decision rationale, and retained selector
+are therefore reproducible without changing what an ordinary consumer builds.
+
+There is no 0.2.0 payload. The only change that version was chartered to ship
+was arena replacing simple, and the measurements rejected that replacement.
+Changing a changelog, version reference, tag, DocC deployment, exact-version
+consumer, or GitHub Release would manufacture publication work for an
+unchanged library. `M6-12c`, `M6-12d`, and `M6-12e` are consequently not
+applicable; M6 closes on the recorded evidence above, and M7 may start from the
+unchanged simple default.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

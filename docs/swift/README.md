@@ -392,8 +392,8 @@ full review.
 
 [impl/plan.md](./impl/plan.md) is the execution plan,
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
-[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6's measured
-core decision keeps the simple implementation as the shipping default and the
-arena as an internal comparison build, so the milestone closes without a
-0.2.0 release. M7 completes async policies, streams, and exports behind the
-same public behavior suite before the next release gate.
+[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
+without a 0.2.0 release: its measured core decision keeps the simple
+implementation as the shipping default and the arena as an internal comparison
+build. M7 completes async policies, streams, and exports behind the same public
+behavior suite before the next release gate.
