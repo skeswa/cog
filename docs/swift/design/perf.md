@@ -4,8 +4,9 @@ _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
 an implementation plan. The comparisons in §9.6 select inline `AnyHashable`
-value references and the shared linked edge pool; hash-table and exclusivity
-layouts remain benchmark-gated.
+value references and the shared linked edge pool within the arena candidate,
+but retain the simple core as the shipping implementation. Hash-table and
+exclusivity layouts remain benchmark-gated.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
@@ -309,8 +310,9 @@ rather than against zero — `mise run bench:baseline:check` fails if a steady
 turn's allocation count moves from the recorded baseline by more than 100 raw
 allocations, where one extra allocation per turn is 1,000 (`M5-11` explains the
 units and the noise floor). The cost cannot creep upward unnoticed while M6 is
-being built. Zero remains the target M6 has to reach, and `M6-11d` is where it
-becomes an absolute gate.
+being built. Zero remains the replacement target; the M6 candidate reaches five
+rather than zero, so `M6-12a` retains the simple core and its drift gate instead
+of pretending the target was met.
 
 Attribution, from the same session, so M6 knows where to look:
 
@@ -344,8 +346,9 @@ hundred and thirty releases. PERF-02 asks for none of it, and none of it is
 what §5's "no ARC, locks, or existentials in graph walks" rule buys — in M6,
 not here. The simple core walks class states held through existentials, and
 every hop retains. Until the arena core lands, PERF-02 is pinned against drift
-from these numbers, so the traffic cannot grow unnoticed; `M6-11d` is where
-zero becomes the gate.
+from these numbers, so the traffic cannot grow unnoticed. The arena candidate
+cuts this traffic substantially but does not reach zero; `M6-12a` records why
+that is not enough to replace the shipping core.
 
 Worth noting for M6: releases outnumber retains roughly two to one. That is not
 an imbalance — the extra releases are objects created before the measured
@@ -630,6 +633,61 @@ impossible temporary reference to a real Observation workload and succeeds only
 when the same command reports a threshold regression. CI runs
 `mise run bench:thresholds:check` in one globally serialized job on the pinned
 bare-metal runner.
+
+**Core decision** — `M6-12a`, 2026-08-17. **The simple core remains the
+shipping default, and M6 does not recommend a 0.2.0 release.** The arena stays
+behind `COG_TEST_CORE=arena` with the selected shared-pool edge layout as a
+behavior-equivalent research and benchmark candidate.
+
+Correctness is not the discriminator: the same 248 public behavior scenarios
+pass under both implementations, and both preserve the public API and one-graph
+ownership model. The runtime comparison is genuinely mixed. Arena p50 wall
+clock improves diamond by 12%, broad by 26%, and unstable by 49%, while deep
+regresses by 4%. Instructions regress by 4% on diamond and 33% on deep, then
+improve by 10% on broad and 31% on unstable. That is promising for wider and
+dynamic graphs, but it is not a general replacement result.
+
+The cost targets decide the close call. The existing quiescent PERF-01,
+PERF-02, and PERF-07 probes were rerun back-to-back under both selectors in the
+same pinned session:
+
+| Workload                | Core   | mallocs / objects | retains / releases | p50 wall clock |
+| ----------------------- | ------ | ----------------: | -----------------: | -------------: |
+| steady turn             | simple |             7 / 7 |            66 / 93 |       2.202 µs |
+| steady turn             | arena  |             5 / 5 |            48 / 67 |       2.425 µs |
+| 16-consumer propagation | simple |           26 / 26 |      1,132 / 2,048 |          40 µs |
+| 16-consumer propagation | arena  |             5 / 5 |          424 / 488 |          21 µs |
+
+Arena substantially reduces wide-propagation work, but it reaches neither
+promised zero: a steady turn still allocates five times and propagation still
+performs hundreds of retains and releases. The smallest steady turn is also
+10% slower despite the lower counts.
+
+The pinned-key result is more important because it tests algorithmic shape,
+not a constant:
+
+| Pinned keys | simple retains / releases / p50 | arena retains / releases / p50 |
+| ----------: | ------------------------------: | -----------------------------: |
+|           1 |              69 / 96 / 2.826 µs |             51 / 70 / 3.172 µs |
+|         100 |            168 / 195 / 4.850 µs |           249 / 268 / 4.583 µs |
+|         500 |               568 / 595 / 15 µs |          1,049 / 1,068 / 10 µs |
+
+Simple pays exactly one retain and one release per additional pinned key;
+arena pays exactly two of each. Arena's compact traversal wins wall clock at
+larger sizes, but the M6 target was to make a turn O(changed keys) instead of
+O(pinned keys), not to traverse every irrelevant row faster. The candidate
+therefore steepens the explicit ARC slope it was built to flatten.
+
+Replacing a mature, correct core is justified by a broad improvement or by
+removing a structural cost that matters as graphs grow. Arena does neither yet:
+it wins important workloads, loses others, misses both zero-cost targets, and
+preserves the pinned-key scaling defect at twice the ARC slope. Shipping that
+trade would add representation risk without fulfilling the reason for the
+swap. Reconsider only after a candidate makes pinned-key work O(changed), then
+remeasure steady, deep, broad, and unstable shapes without a new common-path
+regression. Since 0.2.0 was scoped to the core replacement, the principled
+release recommendation is no release rather than a version containing no
+shipping change.
 
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
