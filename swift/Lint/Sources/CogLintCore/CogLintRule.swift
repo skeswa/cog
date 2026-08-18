@@ -49,7 +49,10 @@ package struct CogLintRuleContext: Equatable, Sendable {
 /// shipping different convention sets.
 package enum CogLintRuleRegistry {
   /// The rules enabled for production targets, in stable registration order.
-  package static let all: [any CogLintRule] = [ManualCogPrivateRule()]
+  package static let all: [any CogLintRule] = [
+    CogDeclarationSuffixRule(),
+    ManualCogPrivateRule(),
+  ]
 }
 
 /// One rule violation before its absolute offset is mapped into a source file.
