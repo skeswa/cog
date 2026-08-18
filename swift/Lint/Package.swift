@@ -46,6 +46,10 @@ let package = Package(
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]
     ),
+    .executableTarget(
+      name: "CogLintDocGenerator",
+      dependencies: ["CogLintFixtures"]
+    ),
     .testTarget(
       name: "CogLintTests",
       dependencies: [

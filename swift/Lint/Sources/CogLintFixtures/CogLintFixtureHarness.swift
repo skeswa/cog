@@ -98,6 +98,38 @@ package enum CogLintFixtureHarness {
     return lines.joined(separator: "\n") + "\n"
   }
 
+  /// Renders the complete checked-in DocC article for one rule fixture.
+  ///
+  /// The kebab-case heading is intentional: DocC removes its hyphens for the
+  /// native article identifier used by the permanent diagnostic URL.
+  package static func docCArticle(for fixture: CogLintRuleFixture) -> String {
+    let documentation = fixture.documentation
+    let prose = """
+      # \(fixture.rule.slug)
+
+      \(documentation.violation)
+
+      ## Why this rule exists
+
+      \(documentation.rationale)
+
+      ## How to fix it
+
+      \(documentation.repair)
+
+      """
+    let examples = docCExampleFragment(for: fixture).trimmingCharacters(in: .newlines)
+    return prose + "\n" + examples + "\n"
+  }
+
+  /// Returns the stable UpperCamelCase source name for a rule article.
+  package static func docCArticleFileName(for fixture: CogLintRuleFixture) -> String {
+    let stem = fixture.rule.slug.split(separator: "-").map { component in
+      component.prefix(1).uppercased() + component.dropFirst()
+    }.joined()
+    return "\(stem).md"
+  }
+
   /// Checks that all three categories and their documentation fields exist.
   private static func validateStructure(
     of fixture: CogLintRuleFixture,
@@ -106,6 +138,7 @@ package enum CogLintFixtureHarness {
     if fixture.rule.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       failures.append(CogLintFixtureFailure("fixture rule slug must not be empty"))
     }
+    validateDocumentationProse(of: fixture, into: &failures)
     if fixture.triggering.isEmpty {
       failures.append(CogLintFixtureFailure("\(fixture.rule.slug) has no triggering examples"))
     }
@@ -129,6 +162,22 @@ package enum CogLintFixtureHarness {
     }
     for example in fixture.nonTriggering + fixture.acceptedEvasions {
       validateDocumentation(of: example, rule: fixture.rule, into: &failures)
+    }
+  }
+
+  /// Checks the prose sections required by every generated rule article.
+  private static func validateDocumentationProse(
+    of fixture: CogLintRuleFixture,
+    into failures: inout [CogLintFixtureFailure]
+  ) {
+    let fields = [
+      ("violation", fixture.documentation.violation),
+      ("rationale", fixture.documentation.rationale),
+      ("repair", fixture.documentation.repair),
+    ]
+    for (name, value) in fields
+    where value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      failures.append(CogLintFixtureFailure("\(fixture.rule.slug) has no documentation \(name)"))
     }
   }
 

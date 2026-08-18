@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `cog-declaration-suffix`.
   package static let cogDeclarationSuffix = CogLintRuleFixture(
     rule: CogDeclarationSuffixRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "A recognized Cog declaration must end in `Cog` for a keyless reference or `Cogs` for a keyed box.",
+      rationale:
+        "The suffix makes reference shape visible at every use and keeps narrower qualifiers such as `Source`, `Async`, or a domain role before the common ending. A reader can therefore distinguish a declaration from an ordinary domain value and know whether it needs a key without chasing its type.",
+      repair:
+        "Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `ManualCogBox` named `reportCog` to `reportCogs`."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(

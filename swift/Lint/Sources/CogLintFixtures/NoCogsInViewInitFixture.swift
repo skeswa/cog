@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `no-cogs-in-view-init`.
   package static let noCogsInViewInit = CogLintRuleFixture(
     rule: NoCogsInViewInitRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "A recognized SwiftUI view must not store `Cogs` or accept it through an initializer or method parameter.",
+      rationale:
+        "Production has one app-wide runtime installed at the scene boundary. Resolving it independently in every consumer prevents views from forwarding graph ownership, creating hidden composition boundaries, or making an initializer appear to choose which state graph is authoritative.",
+      repair:
+        "Declare `@Environment(\\.cogs) private var cogs` in each view that reads or operates on Cog. Pass domain values and identities between views, and keep explicit `Cogs` parameters only at non-view boundaries such as isolated test harnesses."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(

@@ -12,6 +12,7 @@ import Testing
 
   let emptyCategories = CogLintRuleFixture(
     rule: FixtureSentinelRule(),
+    documentation: documentation(),
     triggering: [],
     nonTriggering: [],
     acceptedEvasions: []
@@ -132,6 +133,7 @@ private func fixture(
 ) -> CogLintRuleFixture {
   CogLintRuleFixture(
     rule: FixtureSentinelRule(),
+    documentation: documentation(),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(
@@ -156,5 +158,14 @@ private func fixture(
         source: acceptedEvasionSource
       )
     ]
+  )
+}
+
+/// Supplies complete inert article prose for the fixture-harness sentinel.
+private func documentation() -> CogLintRuleDocumentation {
+  CogLintRuleDocumentation(
+    violation: "The sentinel rejects its reserved identifier.",
+    rationale: "The synthetic rule exercises the shared documentation machinery.",
+    repair: "Use the conforming sentinel identifier instead."
   )
 }

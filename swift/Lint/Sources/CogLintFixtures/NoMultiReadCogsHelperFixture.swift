@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `no-multi-read-cogs-helper`.
   package static let noMultiReadCogsHelper = CogLintRuleFixture(
     rule: NoMultiReadCogsHelperRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "A value-returning member of `extension Cogs` or `extension CogOps` contains two or more immediate graph reads.",
+      rationale:
+        "Reads in one consumer already come from one settled turn and register independently for precise invalidation. Repackaging several reads behind a runtime helper hides the consumer's dependencies, invites the projection to be stored or forwarded, and adds a type without improving consistency.",
+      repair:
+        "Read each value flatly on its own line at the consuming boundary. If the combined value is real derived state rather than values merely used together, declare a derived cog and read that single declaration instead."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(

@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `primitives-only-in-ops`.
   package static let primitivesOnlyInOps = CogLintRuleFixture(
     rule: PrimitivesOnlyInOpsRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "Production code calls `commit` or `refresh` outside a bare primitive call in an `extension CogOps` domain operation.",
+      rationale:
+        "Graph primitives describe how Cog performs work, not what the application is asking for. Named operations keep the domain verb beside its state declarations, give every call site one readable intent, and apply the same boundary to views, mechanisms, selectors, writers, and runtime helpers.",
+      repair:
+        "Move the primitive into a named method on `CogOps`, spell `commit(...)` or `refresh(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(
