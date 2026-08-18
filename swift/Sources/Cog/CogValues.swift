@@ -2,7 +2,8 @@
 ///
 /// Buffering never blocks a synchronous graph turn. The default
 /// ``newest(_:)`` policy bounds memory and favors the latest settled state for
-/// UI consumers that fall behind.
+/// UI consumers that fall behind. ``unbounded`` preserves every unseen value
+/// when lossless delivery matters more than a memory bound.
 public nonisolated enum CogValuesBuffering: Sendable, Equatable {
   /// Keep up to `limit` undelivered values, discarding the oldest on overflow.
   ///
@@ -17,6 +18,13 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
   /// unseen transitions for consumers that prefer ordered backlog over the
   /// newest state, while commits remain non-blocking when that backlog is full.
   case oldest(Int)
+
+  /// Keep every undelivered value in settlement order.
+  ///
+  /// This policy is lossless while the iterator remains subscribed, but a
+  /// stalled reader permits its backlog to grow without bound. Commits remain
+  /// synchronous and never wait for the reader.
+  case unbounded
 
   /// Creates the standard-library stream storage for this public policy.
   ///
@@ -41,6 +49,11 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
       return AsyncStream.makeStream(
         of: Value.self,
         bufferingPolicy: .bufferingOldest(limit)
+      )
+    case .unbounded:
+      return AsyncStream.makeStream(
+        of: Value.self,
+        bufferingPolicy: .unbounded
       )
     }
   }
