@@ -98,6 +98,8 @@ mise run test:lint-build-tool-plugin # SwiftPM/Xcode diagnostics + cache replay
 mise run test:lint-command-plugin # bare/plugin role and reporter parity
 mise run build:lint-distribution # generate the Channel B plugin package
 mise run test:lint-distribution # prove source/fetch isolation boundaries
+mise run build:lint-documentation # render the six rule-reference articles
+mise run test:lint-documentation # prove fixture parity and permanent routes
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
 mise run bench          # run the separate release benchmark package

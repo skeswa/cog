@@ -25,6 +25,8 @@ mise run test:lint-build-tool-plugin
 mise run test:lint-command-plugin
 mise run build:lint-distribution
 mise run test:lint-distribution
+mise run build:lint-documentation
+mise run test:lint-documentation
 ```
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
@@ -53,6 +55,14 @@ machine-readable generation record. `mise run test:lint-distribution` proves
 this sibling stays outside an ordinary Cog consumer’s resolve, fetch, and
 source-dependency graph while retaining the eager binary fetch that makes the
 explicit sibling boundary necessary.
+
+The rule-reference articles are generated with
+`mise run build:lint-documentation`. Their violation, rationale, repair, and
+code examples all come from `CogLintFixtures`; the checked-in Markdown is a
+release input, not another editable copy. `mise run test:lint-documentation`
+regenerates the six articles in scratch space, requires byte identity, builds
+the statically hosted DocC archive, and checks each diagnostic URL’s HTML route,
+data payload, and rendered code listings.
 
 `coglint` accepts an explicit mix of Swift files and directories. Directories
 are searched recursively, hidden descendants are skipped, overlapping inputs

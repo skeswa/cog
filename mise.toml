@@ -144,6 +144,14 @@ run = "node {{config_root}}/tools/generate-coglint-plugins.mjs"
 description = "Prove Channel B dependency and unused-artifact behavior"
 run = "node {{config_root}}/tools/test-coglint-distribution.mjs"
 
+[tasks."build:lint-documentation"]
+description = "Generate CogLint rule articles from their executable fixtures"
+run = "swift run --package-path {{config_root}}/swift/Lint --scratch-path {{config_root}}/.build/coglint-documentation CogLintDocGenerator --output {{config_root}}/swift/Sources/Cog/Cog.docc"
+
+[tasks."test:lint-documentation"]
+description = "Prove CogLint article fixture parity and permanent DocC routes"
+run = "node {{config_root}}/tools/test-coglint-documentation.mjs"
+
 # The task ledger is validated by tools/check-task-ledger.mjs, which derives
 # the scenario census from docs/swift/impl/scenarios.md rather than from any
 # hand-maintained count. `tasks:check` runs the checker's own fixture suite

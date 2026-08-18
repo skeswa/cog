@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `initial-state-in-mechanism`.
   package static let initialStateInMechanism = CogLintRuleFixture(
     rule: InitialStateInMechanismRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "An app initializer uses a local returned directly by `Cogs.bootstrapApp` for graph work instead of only retaining it.",
+      rationale:
+        "A bootstrap mechanism's `operate` runs inside bootstrap, so its writes settle before `bootstrapApp` returns and before any watcher can observe the initial value on the way past. Entry-point graph work would expose an intermediate world and split production initialization from the mechanism arrangement tests can reproduce.",
+      repair:
+        "Move initial reads, named operations, and primitive calls into a `Mechanism` supplied to `bootstrapApp(mechanisms:)`. The app initializer may construct services and mechanisms, bootstrap once, and retain the returned runtime directly."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(

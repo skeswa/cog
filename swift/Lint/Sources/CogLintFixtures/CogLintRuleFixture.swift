@@ -1,5 +1,28 @@
 import CogLintCore
 
+/// The prose generated around one rule's executable example corpus.
+///
+/// Keeping the violation, rationale, and repair beside the examples gives a
+/// rule one authoritative teaching record. The checked-in DocC article is a
+/// rendered product of this value rather than a second source of truth.
+package struct CogLintRuleDocumentation: Equatable, Sendable {
+  /// A direct statement of the source shape that the rule rejects.
+  package let violation: String
+
+  /// Why the convention matters to Cog's state and API guarantees.
+  package let rationale: String
+
+  /// The conforming rewrite a reader should make after seeing a diagnostic.
+  package let repair: String
+
+  /// Creates the complete prose contract for one generated article.
+  package init(violation: String, rationale: String, repair: String) {
+    self.violation = violation
+    self.rationale = rationale
+    self.repair = repair
+  }
+}
+
 /// A documented Swift snippet used by one rule's executable specification.
 ///
 /// The name and explanation become DocC prose, while `source` is passed
@@ -62,6 +85,9 @@ package struct CogLintRuleFixture: Sendable {
   /// The rule executed against every source example.
   package let rule: any CogLintRule
 
+  /// The non-example prose rendered into the rule's DocC article.
+  package let documentation: CogLintRuleDocumentation
+
   /// The explicit target role supplied while executing this corpus.
   package let targetRole: CogLintTargetRole
 
@@ -80,12 +106,14 @@ package struct CogLintRuleFixture: Sendable {
   /// fixtures and prove those failures are diagnosed instead of trapped.
   package init(
     rule: any CogLintRule,
+    documentation: CogLintRuleDocumentation,
     targetRole: CogLintTargetRole = .production,
     triggering: [CogLintTriggeringExample],
     nonTriggering: [CogLintFixtureExample],
     acceptedEvasions: [CogLintFixtureExample]
   ) {
     self.rule = rule
+    self.documentation = documentation
     self.targetRole = targetRole
     self.triggering = triggering
     self.nonTriggering = nonTriggering

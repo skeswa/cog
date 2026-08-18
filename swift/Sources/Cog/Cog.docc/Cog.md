@@ -120,4 +120,13 @@ first-class kind with its own status and policies.
 
 - ``Mechanism``
 - ``MechanismController``
+
+### Cog conventions
+
+- <doc:CogDeclarationSuffix>
+- <doc:NoCogsInViewInit>
+- <doc:PrimitivesOnlyInOps>
+- <doc:InitialStateInMechanism>
+- <doc:ManualCogPrivate>
+- <doc:NoMultiReadCogsHelper>
 - ``CogWatchStart``

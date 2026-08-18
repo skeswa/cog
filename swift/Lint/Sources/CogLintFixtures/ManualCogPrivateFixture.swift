@@ -5,6 +5,14 @@ extension CogLintFixtureRegistry {
   /// The executable examples, positions, and documented evasions for `manual-cog-private`.
   package static let manualCogPrivate = CogLintRuleFixture(
     rule: ManualCogPrivateRule(),
+    documentation: CogLintRuleDocumentation(
+      violation:
+        "A recognized `ManualCog` or `ManualCogBox` source has wider access than `private` or `fileprivate`.",
+      rationale:
+        "Cog state is singular, so each mutable fact has one writable source owned by the file that defines it. Exporting the manual declaration exports a writer target and lets unrelated code bypass the named domain operations that explain who may change that fact.",
+      repair:
+        "Narrow the writable source to `private` or `fileprivate`. When another file needs to read it, expose the source's `.readOnly` projection or a genuinely derived cog instead of the manual declaration itself."
+    ),
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(

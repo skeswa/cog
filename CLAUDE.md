@@ -53,7 +53,8 @@ every scenario covered by exactly one task.
   measurements those pins rest on. Unlike the root package, its
   `Package.resolved` is committed.
 - `swift/Lint/` — the **separate** `CogLint` SwiftPM development package. Its
-  package-only `CogLintCore`, `coglint` executable, and tests own the exact
+  package-only `CogLintCore` and `CogLintFixtures` targets, `coglint`
+  executable, fixture-backed DocC generator, and tests own the exact
   swift-syntax and swift-argument-parser pins without exposing them to a Cog
   consumer. Its committed `Package.resolved` fixes those revisions, and its
   scaffold test asks SwiftPM to prove the root dependency graph remains empty.
@@ -150,6 +151,11 @@ directly:
 - `mise run test:lint-distribution` — prove an ordinary Cog consumer resolves
   and builds without lint sources or an artifact fetch, while an unused
   Channel B opt-in retains SwiftPM’s measured eager-fetch behavior.
+- `mise run build:lint-documentation` — regenerate all six checked-in CogLint
+  DocC articles from their executable fixture corpora.
+- `mise run test:lint-documentation` — regenerate into scratch space, require
+  byte-for-byte fixture parity, build the DocC archive, and verify every
+  permanent diagnostic URL has both its static HTML route and data payload.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
