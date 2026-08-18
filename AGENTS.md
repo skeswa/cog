@@ -143,6 +143,13 @@ directly:
 - `mise run test:lint-command-plugin` — invoke the command plugin in a scratch
   consumer and prove byte-identical bare-CLI behavior under both target roles
   and all three reporters.
+- `mise run build:lint-distribution` — generate the version-coupled Channel B
+  `CogLintPlugins` package from the checked-in plugin sources and current
+  artifact checksum. Optional named arguments set version, output, checksum,
+  and artifact URL.
+- `mise run test:lint-distribution` — prove an ordinary Cog consumer resolves
+  and builds without lint sources or an artifact fetch, while an unused
+  Channel B opt-in retains SwiftPM’s measured eager-fetch behavior.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.

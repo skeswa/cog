@@ -136,6 +136,14 @@ run = "node {{config_root}}/tools/test-coglint-build-tool-plugin.mjs"
 description = "Prove CogLint command-plugin parity across target roles and reporters"
 run = "node {{config_root}}/tools/test-coglint-command-plugin.mjs"
 
+[tasks."build:lint-distribution"]
+description = "Generate the Channel B CogLintPlugins distribution package"
+run = "node {{config_root}}/tools/generate-coglint-plugins.mjs"
+
+[tasks."test:lint-distribution"]
+description = "Prove Channel B dependency and unused-artifact behavior"
+run = "node {{config_root}}/tools/test-coglint-distribution.mjs"
+
 # The task ledger is validated by tools/check-task-ledger.mjs, which derives
 # the scenario census from docs/swift/impl/scenarios.md rather than from any
 # hand-maintained count. `tasks:check` runs the checker's own fixture suite
