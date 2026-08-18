@@ -21,7 +21,7 @@ struct CogLintCommand: ParsableCommand {
   var targetRole = CogLintTargetRole.production.rawValue
 
   /// The diagnostic serialization selected for this invocation.
-  @Option(help: "Reporter: xcode or github")
+  @Option(help: "Reporter: xcode, github, or sarif")
   var reporter = CogLintReporter.xcode.rawValue
 
   /// Rejects an empty invocation instead of reporting a misleading clean run.
@@ -33,7 +33,7 @@ struct CogLintCommand: ParsableCommand {
       throw ValidationError("target role must be `production` or `test`")
     }
     guard CogLintReporter(rawValue: reporter) != nil else {
-      throw ValidationError("reporter must be `xcode` or `github`")
+      throw ValidationError("reporter must be `xcode`, `github`, or `sarif`")
     }
   }
 
@@ -44,7 +44,7 @@ struct CogLintCommand: ParsableCommand {
       throw ValidationError("target role must be `production` or `test`")
     }
     guard let selectedReporter = CogLintReporter(rawValue: reporter) else {
-      throw ValidationError("reporter must be `xcode` or `github`")
+      throw ValidationError("reporter must be `xcode`, `github`, or `sarif`")
     }
     let execution = try CogLintEngine.lint(
       paths: paths,
@@ -52,7 +52,7 @@ struct CogLintCommand: ParsableCommand {
       targetRole: selectedRole,
       rules: CogLintRuleRegistry.all
     )
-    let output = execution.output(for: selectedReporter)
+    let output = try execution.output(for: selectedReporter)
     if !output.isEmpty {
       FileHandle.standardOutput.write(Data(output.utf8))
     }

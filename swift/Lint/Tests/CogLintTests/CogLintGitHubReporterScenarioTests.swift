@@ -34,10 +34,10 @@ import Testing
 }
 
 /// Proves a clean run and reporter selection retain the shared execution disposition.
-@Test func `LINT-15 reporter selection does not change clean or failing status`() {
+@Test func `LINT-15 reporter selection does not change clean or failing status`() throws {
   let clean = CogLintExecution(findings: [])
-  #expect(clean.output(for: .github).isEmpty)
-  #expect(clean.output(for: .xcode).isEmpty)
+  #expect(try clean.output(for: .github).isEmpty)
+  #expect(try clean.output(for: .xcode).isEmpty)
   #expect(clean.exitCode == 0)
 
   let finding = CogLintFinding(
@@ -49,7 +49,7 @@ import Testing
     helpURL: URL(string: "https://example.invalid/manual")!
   )
   let failing = CogLintExecution(findings: [finding])
-  #expect(failing.output(for: .github) == finding.githubDescription + "\n")
-  #expect(failing.output(for: .xcode) == finding.xcodeDescription + "\n")
+  #expect(try failing.output(for: .github) == finding.githubDescription + "\n")
+  #expect(try failing.output(for: .xcode) == finding.xcodeDescription + "\n")
   #expect(failing.exitCode == 1)
 }
