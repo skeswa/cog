@@ -19,6 +19,7 @@ Build the executable and run the guarded tests from the repository root with:
 swift package --package-path swift/Lint build
 swift run --package-path swift/Lint coglint swift/Sources
 mise run test:lint
+mise run lint:swift
 mise run build:lint-artifact
 mise run test:lint-artifact
 mise run test:lint-build-tool-plugin
@@ -28,6 +29,11 @@ mise run test:lint-distribution
 mise run build:lint-documentation
 mise run test:lint-documentation
 ```
+
+`mise run lint:swift` first runs the guarded package suite, then checks root
+library and Weather production targets with the production role and their
+unit/UI test targets with the explicit test role. Compile-fail fixtures and
+benchmark workloads are not target sources and stay outside the dogfood pass.
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
 executables, the release `.artifactbundle.zip`, and its SwiftPM checksum under

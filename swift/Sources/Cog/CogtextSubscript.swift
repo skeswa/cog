@@ -67,11 +67,7 @@ extension Cogs {
   /// - Parameter valueReference: The async value the UI reads.
   /// - Returns: Its newest settled value in this context.
   public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
-    #if COG_CORE_ARENA
-    return self[valueReference.valueCog]
-    #else
     self[valueReference.valueCog]
-    #endif
   }
 
   /// Reads a source's read-only projection through the UI boundary.
