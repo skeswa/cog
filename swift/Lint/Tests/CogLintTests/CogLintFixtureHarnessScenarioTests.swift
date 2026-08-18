@@ -1,5 +1,6 @@
 import CogLintCore
 import CogLintFixtures
+import Foundation
 import SwiftSyntax
 import Testing
 
@@ -107,6 +108,9 @@ import Testing
 private struct FixtureSentinelRule: CogLintRule {
   /// The test-only slug rendered in failures and the generated fragment.
   let slug = "fixture-sentinel"
+
+  /// The inert test URL that proves fixtures do not infer production article routes.
+  let helpURL = URL(string: "https://example.invalid/fixture-sentinel")!
 
   /// Reports the exact token spelling reserved as the sentinel violation.
   func violations(in source: SourceFileSyntax) -> [CogLintViolation] {

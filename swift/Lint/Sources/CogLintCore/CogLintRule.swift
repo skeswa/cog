@@ -1,3 +1,4 @@
+import Foundation
 import SwiftSyntax
 
 /// A syntax-only check that reports violations in one parsed Swift file.
@@ -10,8 +11,21 @@ package protocol CogLintRule: Sendable {
   /// The stable kebab-case identifier printed in diagnostics and help URLs.
   var slug: String { get }
 
+  /// The permanent article URL that teaches the convention behind this rule.
+  var helpURL: URL { get }
+
   /// Returns violations in deterministic source order for `source`.
   func violations(in source: SourceFileSyntax) -> [CogLintViolation]
+}
+
+/// The production rule set evaluated by the bare CLI and both plugin surfaces.
+///
+/// Rule tasks append their finished rule here. Keeping one registry in the core
+/// prevents the CLI, command plugin, and build-tool plugin from silently
+/// shipping different convention sets.
+package enum CogLintRuleRegistry {
+  /// The rules enabled for production targets, in stable registration order.
+  package static let all: [any CogLintRule] = []
 }
 
 /// One rule violation before its absolute offset is mapped into a source file.

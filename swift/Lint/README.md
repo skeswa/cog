@@ -17,8 +17,15 @@ Build the executable and run the guarded tests from the repository root with:
 
 ```console
 swift package --package-path swift/Lint build
+swift run --package-path swift/Lint coglint swift/Sources
 mise run test:lint
 ```
+
+`coglint` accepts an explicit mix of Swift files and directories. Directories
+are searched recursively, hidden descendants are skipped, overlapping inputs
+are deduplicated, and diagnostics are ordered by path and source position.
+Every error uses Xcode's `path:line:column: error:` grammar and includes its
+rule slug and permanent DocC help URL.
 
 Extra test arguments pass through, including scenario filters such as
 `mise run test:lint --filter LINT-02`. The wrapper enumerates tests before the
