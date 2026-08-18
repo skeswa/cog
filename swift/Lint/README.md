@@ -22,6 +22,7 @@ mise run test:lint
 mise run build:lint-artifact
 mise run test:lint-artifact
 mise run test:lint-build-tool-plugin
+mise run test:lint-command-plugin
 ```
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
@@ -37,6 +38,11 @@ content-addressed result under the target-specific plugin work directory. An
 unchanged build replays the same diagnostics and failing status without
 reparsing; the LINT-17 suite proves that behavior in both a scratch SwiftPM
 package and a macOS Xcode project.
+
+The command plugin is a transparent on-demand adapter: `swift package
+coglint` forwards the bare CLI arguments, runs from the consumer package, and
+preserves reporter output and status. The LINT-18 suite compares both surfaces
+under production and test target roles with Xcode, GitHub, and SARIF reporters.
 
 `coglint` accepts an explicit mix of Swift files and directories. Directories
 are searched recursively, hidden descendants are skipped, overlapping inputs

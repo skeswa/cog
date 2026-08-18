@@ -140,6 +140,9 @@ directly:
 - `mise run test:lint-build-tool-plugin` — apply the local artifact through
   the build-tool plugin in scratch SwiftPM and Xcode consumers, then prove an
   unchanged rebuild replays identical diagnostics from each plugin cache.
+- `mise run test:lint-command-plugin` — invoke the command plugin in a scratch
+  consumer and prove byte-identical bare-CLI behavior under both target roles
+  and all three reporters.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
