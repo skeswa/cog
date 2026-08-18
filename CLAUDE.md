@@ -133,6 +133,10 @@ directly:
   wrapper enumerates tests before every run and requires a nonzero executed
   count from its own xUnit report. Extra arguments pass through, as in
   `mise run test:lint --filter LINT-02`.
+- `mise run lint:swift` — first run the guarded CogLint suite, then lint root
+  library and Weather production target sources with production rules and
+  their unit/UI test target sources with the explicit test-role primitive
+  exemption.
 - `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
   `x86_64` CogLint executables, assemble the release artifact bundle, and
   record its SwiftPM checksum. The version defaults to `0.4.0`.

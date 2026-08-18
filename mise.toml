@@ -114,6 +114,26 @@ run = "node {{config_root}}/tools/check-compile-fail.mjs"
 description = "Run the guarded CogLint package tests"
 run = "node {{config_root}}/tools/swift-lint-test.mjs"
 
+[tasks."lint:swift"]
+description = "Test CogLint, then check library and Weather target sources"
+depends = ["test:lint"]
+run = """
+set -euo pipefail
+echo "==> Cog and Weather production targets"
+swift run --package-path "{{config_root}}/swift/Lint" coglint \
+  --target-role production \
+  "{{config_root}}/swift/Sources" \
+  "{{config_root}}/swift/Examples/Weather/Weather" \
+  "{{config_root}}/swift/Examples/Weather/WeatherPackage/Sources"
+echo "==> Cog and Weather test targets"
+swift run --package-path "{{config_root}}/swift/Lint" coglint \
+  --target-role test \
+  "{{config_root}}/swift/Tests" \
+  "{{config_root}}/swift/Examples/Weather/WeatherTests" \
+  "{{config_root}}/swift/Examples/Weather/WeatherUITests" \
+  "{{config_root}}/swift/Examples/Weather/WeatherPackage/Tests"
+"""
+
 # CogLint ships as a checksummed SwiftPM artifact bundle with one native
 # executable per supported macOS host. The build task creates the ignored
 # development copy and release archive. The test task rebuilds it, then uses a

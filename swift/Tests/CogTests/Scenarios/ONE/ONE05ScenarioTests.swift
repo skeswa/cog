@@ -5,7 +5,7 @@ import Testing
 // Every assertion resolves this one declaration. Different declarations would
 // make isolation vacuous: their values would differ even in one context.
 @MainActor
-private let one05State = ManualCog<Int>(41, name: "one05.state")
+private let one05StateCog = ManualCog<Int>(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 test and preview contexts coexist without sharing state`() {
@@ -13,18 +13,18 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
   let previewContext = Cogs.forTesting()
 
   #expect(testContext !== previewContext)
-  #expect(testContext.peek(one05State) == 41)
-  #expect(previewContext.peek(one05State) == 41)
+  #expect(testContext.peek(one05StateCog) == 41)
+  #expect(previewContext.peek(one05StateCog) == 41)
 
-  testContext.commit("test.write") { c in c[one05State] = 101 }
+  testContext.commit("test.write") { c in c[one05StateCog] = 101 }
 
-  #expect(testContext.peek(one05State) == 101)
-  #expect(previewContext.peek(one05State) == 41)
+  #expect(testContext.peek(one05StateCog) == 101)
+  #expect(previewContext.peek(one05StateCog) == 41)
 
-  previewContext.commit("preview.write") { c in c[one05State] = 202 }
+  previewContext.commit("preview.write") { c in c[one05StateCog] = 202 }
 
-  #expect(testContext.peek(one05State) == 101)
-  #expect(previewContext.peek(one05State) == 202)
+  #expect(testContext.peek(one05StateCog) == 101)
+  #expect(previewContext.peek(one05StateCog) == 202)
 }
 
 @MainActor
@@ -36,14 +36,14 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
     if let previous {
       #expect(current !== previous.cogs)
-      #expect(previous.cogs.peek(one05State) == previous.written)
+      #expect(previous.cogs.peek(one05StateCog) == previous.written)
     }
-    #expect(current.peek(one05State) == 41)
+    #expect(current.peek(one05StateCog) == 41)
 
     let written = 1_000 + index
-    current.commit("sequential.write") { c in c[one05State] = written }
+    current.commit("sequential.write") { c in c[one05StateCog] = written }
 
-    #expect(current.peek(one05State) == written)
+    #expect(current.peek(one05StateCog) == written)
     previous = (current, written)
   }
 }
@@ -53,7 +53,7 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
   #expect(Cogs.hasBootstrappedApp == false)
 
   let beforeInstall = Cogs.forTesting()
-  #expect(beforeInstall.peek(one05State) == 41)
+  #expect(beforeInstall.peek(one05StateCog) == 41)
   #expect(Cogs.hasBootstrappedApp == false)
 
   Cogs.withBootstrappedApp { app in
@@ -63,13 +63,13 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
     #expect(Cogs.isBootstrappedApp(app))
     #expect(Cogs.isBootstrappedApp(beforeInstall) == false)
     #expect(Cogs.isBootstrappedApp(duringInstall) == false)
-    #expect(app.peek(one05State) == 41)
-    #expect(duringInstall.peek(one05State) == 41)
+    #expect(app.peek(one05StateCog) == 41)
+    #expect(duringInstall.peek(one05StateCog) == 41)
 
-    duringInstall.commit("isolated.during-app") { c in c[one05State] = 303 }
+    duringInstall.commit("isolated.during-app") { c in c[one05StateCog] = 303 }
 
-    #expect(duringInstall.peek(one05State) == 303)
-    #expect(app.peek(one05State) == 41)
+    #expect(duringInstall.peek(one05StateCog) == 303)
+    #expect(app.peek(one05StateCog) == 41)
     #expect(Cogs.isBootstrappedApp(app))
   }
 
@@ -77,6 +77,6 @@ private let one05State = ManualCog<Int>(41, name: "one05.state")
 
   let afterInstall = Cogs.forTesting()
   #expect(afterInstall !== beforeInstall)
-  #expect(afterInstall.peek(one05State) == 41)
+  #expect(afterInstall.peek(one05StateCog) == 41)
   #expect(Cogs.hasBootstrappedApp == false)
 }
