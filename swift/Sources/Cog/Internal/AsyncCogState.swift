@@ -341,7 +341,11 @@ internal final class AsyncCogState<Value>:
   /// Queue selection may precede this call by several turns. Delaying pending
   /// keeps the visible lifecycle aligned with the one active run rather than
   /// claiming that work waiting in FIFO storage is already in flight.
-  private func publishPending(in cogs: Cogs, in pendingTurn: CogTurn?) {
+  private func publishPending(
+    in cogs: Cogs,
+    in pendingTurn: CogTurn?,
+    requiringPublicationTurn: Bool = false
+  ) {
     let pending = CogStatus<Value>.pending(
       value: lastSuccess ?? descriptor.defaultValue,
       hasSucceeded: lastSuccess != nil
@@ -349,6 +353,11 @@ internal final class AsyncCogState<Value>:
     if let pendingTurn {
       pendingStatus = pending
       pendingTurn.touch(self)
+    } else if requiringPublicationTurn {
+      // A queued successor starts after another run's terminal turn. Unlike a
+      // cold pull, it already has consumers that must observe pending in its
+      // own ordered turn.
+      stage(pending, named: "pending", in: cogs)
     } else if status == nil {
       // A first read must synchronously return honest pending state. Nothing
       // can already subscribe to a state with no status, so install it now and
@@ -381,12 +390,17 @@ internal final class AsyncCogState<Value>:
   private func beginQueuedRun(
     _ run: AsyncQueuedRun<Value>,
     publishingPendingIn pendingTurn: CogTurn? = nil,
+    requiringPublicationTurn: Bool = false,
     in cogs: Cogs
   ) {
     guard activeTask == nil, activeRunGeneration == nil else {
       fatalError("An async queue tried to start two runs at once.")
     }
-    publishPending(in: cogs, in: pendingTurn)
+    publishPending(
+      in: cogs,
+      in: pendingTurn,
+      requiringPublicationTurn: requiringPublicationTurn
+    )
     launch(run.operation, generation: run.generation, in: cogs)
   }
 
@@ -432,19 +446,22 @@ internal final class AsyncCogState<Value>:
           in: cogs
         )
         self.resolveRefresh(for: runGeneration, as: .failure(error))
+        if self.descriptor.policy == .queue {
+          self.startNextQueuedRun(in: cogs)
+        }
       }
     }
   }
 
-  /// Removes and starts the next FIFO entry after the head succeeds.
+  /// Removes and starts the next FIFO entry after the head finishes.
   ///
-  /// Failure continuation is intentionally left to M7-03c, whose scenario
-  /// decides and proves that independently. This slice establishes serial FIFO
-  /// start order for successful runs without absorbing that later repair.
+  /// Success and failure both terminate exactly one queue entry. The completed
+  /// run publishes and resolves its own refresh before this method publishes
+  /// pending for the successor, preserving visible lifecycle and handle order.
   private func startNextQueuedRun(in cogs: Cogs) {
     guard !queuedRuns.isEmpty else { return }
     let run = queuedRuns.removeFirst()
-    beginQueuedRun(run, in: cogs)
+    beginQueuedRun(run, requiringPublicationTurn: true, in: cogs)
   }
 
   /// Files one explicit refresh cell under the generation it must follow.
