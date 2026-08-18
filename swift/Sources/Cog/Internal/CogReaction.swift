@@ -1,14 +1,31 @@
-/// One reaction registration owned by a context.
+/// Whether a tracked terminal publishes an export or runs an application effect.
+///
+/// The phase is fixed at registration. Flushes use it to offer every changed
+/// export after UI notices but before any mechanism reaction or watch runs.
+internal enum CogReactionPhase: Equatable {
+  /// A ``CogValues`` subscription whose body offers one settled value.
+  case export
+
+  /// A mechanism reaction or watch whose body performs application work.
+  case effect
+}
+
+/// One tracked terminal registration owned by a context.
 ///
 /// A reaction is a terminal consumer, not readable state. The simple core uses
 /// its class-state conformance for reverse edges; the arena core gives it one
 /// generated scalar row and keeps this object only for the effect closure,
 /// registration order, cancellation identity, and cold lifetime bookkeeping.
 /// The owning MainActor context runs it after UI settlement and keeps only the
-/// durable derived roots it directly reads externally leased.
+/// durable derived roots it directly reads externally leased. Export terminals
+/// run before effect terminals within each flush; registration order remains
+/// stable inside each phase.
 internal final class CogReaction: CogState, CogConsumer {
   /// The stable diagnostic identity supplied at registration.
   let label: CogLabel
+
+  /// Which flush phase owns this terminal's body run.
+  let phase: CogReactionPhase
 
   /// The context that owns this registration, or `nil` once it is gone.
   ///
@@ -82,10 +99,12 @@ internal final class CogReaction: CogState, CogConsumer {
   init(
     cogs: Cogs,
     label: CogLabel,
+    phase: CogReactionPhase,
     body: @escaping @MainActor (ReactionReader) -> Void
   ) {
     self.cogs = cogs
     self.label = label
+    self.phase = phase
     self.body = body
     #if COG_CORE_ARENA
     self.arenaSlot = cogs.arenaCore.allocateReaction()
@@ -121,8 +140,13 @@ internal final class CogReaction: CogState, CogConsumer {
     #endif
 
     // Predicate removal also handles an already-removed registration and keeps
-    // survivor order.
-    cogs?.reactions.removeAll { $0 === self }
+    // survivor order inside the terminal's phase.
+    switch phase {
+    case .export:
+      cogs?.exportReactions.removeAll { $0 === self }
+    case .effect:
+      cogs?.reactions.removeAll { $0 === self }
+    }
   }
 
   /// Records a body read and installs its reverse invalidation edge.
@@ -225,10 +249,17 @@ internal final class CogReaction: CogState, CogConsumer {
     // self-cancellation.
     guard !isCancelled, let body = self.body else { return }
 
-    // Record every reaction run, including a watch's quiet `.skip` install.
+    // Record every terminal run, including initial offers and a watch's quiet
+    // `.skip` install. Only effects participate in reaction write-back chain
+    // diagnostics; an export merely offers into non-blocking stream storage.
     #if DEBUG
-    cogs.recordHistoryEffect(label: label)
-    cogs.turnChainTracker.recordReaction(label: label)
+    switch phase {
+    case .export:
+      cogs.recordHistoryOffer(label: label)
+    case .effect:
+      cogs.recordHistoryEffect(label: label)
+      cogs.turnChainTracker.recordReaction(label: label)
+    }
     #endif
 
     let previousDependencies = dependencies
@@ -358,6 +389,14 @@ internal enum CogReactionRun {
 
   /// Establish dependencies for a registration created during this flush.
   case initial(CogReaction)
+
+  /// The flush phase of the terminal captured by this run.
+  var phase: CogReactionPhase {
+    switch self {
+    case .changed(let reaction), .initial(let reaction):
+      reaction.phase
+    }
+  }
 
   /// Performs the queued run using the mode captured when it was enqueued.
   func perform(in cogs: Cogs) {

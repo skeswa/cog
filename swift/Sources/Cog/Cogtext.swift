@@ -105,17 +105,23 @@ public final class Cogs {
   /// preventing nested Observation or reaction propagation.
   internal var queuedTurns: [QueuedCogTurn] = []
 
-  /// Reactions this context owns, in registration order.
+  /// Tracked export terminals this context owns, in registration order.
+  ///
+  /// Keeping the phase physically separate makes the common effect-only flush
+  /// scan each effect once while still giving exports their earlier phase.
+  internal var exportReactions: [CogReaction] = []
+
+  /// Tracked effect terminals this context owns, in registration order.
   ///
   /// The simple core scans this array after each flush and runs marked
   /// reactions. M6 replaces the scan with a measured flat queue without
   /// changing order or behavior.
   internal var reactions: [CogReaction] = []
 
-  /// Work still to run in the active flush's reaction phase.
+  /// Work still to run in the active flush's export and effect phases.
   ///
-  /// Changed reactions run first. Registrations made during the flush append
-  /// their initial run and finish before queued write-back turns.
+  /// Changed exports run before effects. Registrations made during the flush
+  /// append their initial run and finish before queued write-back turns.
   internal var reactionRuns: [CogReactionRun] = []
 
   /// Every state this context has been asked for, filed by descriptor and key.
@@ -256,8 +262,13 @@ public final class Cogs {
     // externally owned value subscriptions: clear their raw teardown leases,
     // then cancel them so their waiting AsyncSequences finish instead of
     // retaining inert reaction bodies after the graph is gone.
-    let remainingReactions = reactions
-    for reaction in remainingReactions {
+    let remainingExports = exportReactions
+    for reaction in remainingExports {
+      reaction.releaseDependenciesForContextTeardown()
+      reaction.cancel()
+    }
+    let remainingEffects = reactions
+    for reaction in remainingEffects {
       reaction.releaseDependenciesForContextTeardown()
       reaction.cancel()
     }

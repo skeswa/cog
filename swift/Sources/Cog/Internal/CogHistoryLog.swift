@@ -63,6 +63,11 @@ internal struct CogHistoryLog {
     record(CogHistoryEntry(event: .notice, turn: turn, subject: .cog(label, key)))
   }
 
+  /// Records one changed or initial export offer.
+  mutating func recordOffer(label: CogLabel) {
+    record(CogHistoryEntry(event: .offer, turn: turn, subject: .offer(label)))
+  }
+
   /// Records one run of a reaction or watch body.
   mutating func recordEffect(label: CogLabel) {
     record(CogHistoryEntry(event: .effect, turn: turn, subject: .effect(label)))
@@ -91,6 +96,8 @@ internal enum CogHistorySubject {
   case turn(String)
   /// One descriptor label and optional key involved in graph propagation.
   case cog(CogLabel, CogKey?)
+  /// One export registration whose body offered a value.
+  case offer(CogLabel)
   /// One reaction or watch label whose body ran.
   case effect(CogLabel)
 }

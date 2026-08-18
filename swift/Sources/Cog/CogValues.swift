@@ -102,7 +102,7 @@ public struct CogValues<Value>: @MainActor AsyncSequence {
         Task { @MainActor in subscription?.cancel() }
       }
       subscription.install(
-        cogs.register(label: label) { reader in
+        cogs.registerExport(label: label) { reader in
           continuationOwner.continuation.yield(read(reader))
         }
       )
