@@ -362,7 +362,7 @@ These choices are settled; §10 of the core document has the full record.
   review reconsidered thirteen of them against swift-state-graph and renamed
   none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
   reasoning, and the one name with a revisit trigger.
-- First-party lint tooling is settled as a syntax-only `coglint` developed in
+- First-party lint tooling is implemented as a syntax-only `coglint` developed in
   a nested package and shipped as a prebuilt binary behind SwiftPM plugins. Its
   six initial rules cover declarations, view/runtime boundaries, primitive
   ownership, bootstrap-time state, source privacy, and multi-read runtime
@@ -412,8 +412,7 @@ full review.
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
 without a 0.2.0 release: its measured core decision keeps the simple
 implementation as the shipping default and the arena as an internal comparison
-build. M7 implementation and its complete behavior gate are green; the 0.3.0
-release chain is preparing the candidate that contains async policies, streams,
-exports, and external Observation tracking. M8 develops first-party lint
-tooling next, while its publication remains serialized behind the 0.3.0
-release.
+build. M7 is published as 0.3.0. M8 implementation and its complete fixture,
+artifact, plugin, documentation, distribution, and dogfood gate are green; the
+0.4.0 release chain is preparing the binary-backed Cog release before it
+publishes the version-matched Channel B plugin package.

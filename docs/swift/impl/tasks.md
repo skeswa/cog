@@ -1835,7 +1835,7 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
 - **M8-15b** _(Gate)_ — Prepare the non-mutating 0.4.0 release candidate,
   including changelog, docs, immutable CI links, and the locally exercised
   checksummed artifact bundle.
-  _Depends: M8-15a._
+  _Depends: M8-16, M8-17._
   _Verify: approved release checklist, artifact checksum, and immutable CI links._
 - **M8-15c** _(Release)_ — Create and push the annotated `0.4.0` tag after the
   0.3.0 GitHub Release completes.
@@ -1859,3 +1859,16 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Depends: M8-15f._
   _Verify: exact-consumer plugin build and documentation-link suite for LINT-23._
   _Greens: LINT-23._
+- **M8-16** _(Infrastructure)_ — Prepare the 0.4.0 release notes and consumer
+  lint documentation: changelog, current package pin, status snapshots, and
+  a DocC setup guide for the selected Channel B plugins.
+  _Depends: M8-15a._
+  _Verify: `mise run docs`, `mise run test:lint-documentation`,
+  `mise run fmt:check`, and `mise run tasks:check`._
+- **M8-17** _(Infrastructure)_ — Build, exercise, checksum, and retain the
+  0.4.0 candidate artifact under CI's pinned Xcode 26.6, with exact-source
+  provenance and a downloadable immutable Actions artifact.
+  _Depends: M8-15a._
+  _Verify: `mise run workflows:check`, a green artifact job for the exact
+  source SHA, and downloaded checksum/provenance matching the two successful
+  host-selection probes._

@@ -18,7 +18,7 @@ minors may break, and patches never do.
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.3.0")
+    .upToNextMinor(from: "0.4.0")
   )
 ]
 ```
