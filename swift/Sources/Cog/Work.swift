@@ -21,18 +21,18 @@ public struct Work<Value> {
     self.storage = storage
   }
 
-  /// Extracts one-shot work for the M3 runtime path.
+  /// Extracts one-shot work for the retained arena research core.
   ///
-  /// M7-06 replaces this compatibility projection when it teaches the runtime
-  /// to iterate ``stream(_:)`` storage. Keeping the distinction in storage now
-  /// lets the public policy split land independently without erasing whether a
-  /// selector returned one value or a sequence.
+  /// The selected simple core dispatches the tagged storage directly. Arena
+  /// remains an M6 selector-only benchmark candidate and still consumes its
+  /// original one-shot projection; keeping that buildable does not claim stream
+  /// behavior for the unselected core.
   internal var operation: @Sendable @isolated(any) () async throws -> sending Value {
     switch storage {
     case .run(let operation):
       return operation
     case .stream:
-      fatalError("Stream work reached the one-shot runtime before M7-06.")
+      fatalError("Stream work is unavailable in the unselected arena research core.")
     }
   }
 
@@ -72,7 +72,7 @@ public struct Work<Value> {
   /// - Returns: A stream work description for a latest-policy async cog.
   public static func stream<Sequence: AsyncSequence>(_ sequence: Sequence) -> Self
   where Sequence.Element == Value {
-    Self(storage: .stream(sequence))
+    Self(storage: .stream(WorkStream(sequence)))
   }
 
   /// Promotes one-shot-only work into the latest policy's broader work type.
@@ -110,16 +110,89 @@ public struct RunWork<Value> {
 
 /// The internal tagged storage that preserves one-shot versus stream shape.
 ///
-/// The sequence stays type-erased only until M7-06 installs its iterator
-/// adapter. Storage never crosses the MainActor merely because it is wrapped in
-/// ``Work``; execution isolation remains a property of the operation or
-/// sequence itself.
+/// Stream storage owns a lazy type-erased iterator factory. Storage never
+/// crosses the MainActor merely because it is wrapped in ``Work``; execution
+/// isolation remains a property of the operation or sequence itself.
 internal enum WorkStorage<Value> {
   /// One deferred value-producing operation.
   case run(@Sendable @isolated(any) () async throws -> sending Value)
 
-  /// One selected async sequence, retained without starting it.
-  case stream(Any)
+  /// One selected async sequence, retained behind a lazy iterator factory.
+  case stream(WorkStream<Value>)
+}
+
+/// A type-erased async sequence that remains inert until Cog asks for an iterator.
+///
+/// The factory and iterator stay MainActor-confined, matching selector and
+/// publication isolation while allowing the underlying sequence and iterator
+/// to remain non-`Sendable`. This erasure exposes only `next`; callers cannot
+/// recover or drive the original sequence outside Cog's generation checks.
+internal struct WorkStream<Value> {
+  /// Creates one type-erased iterator when the selected generation starts.
+  private let makeIteratorBody: @MainActor () -> WorkStreamIterator<Value>
+
+  /// Retains a sequence without constructing its iterator or starting work.
+  init<Sequence: AsyncSequence>(_ sequence: Sequence) where Sequence.Element == Value {
+    makeIteratorBody = {
+      let storage = WorkStreamIteratorStorage(sequence.makeAsyncIterator())
+      return WorkStreamIterator { try await storage.next() }
+    }
+  }
+
+  /// Creates the sole iterator owned by one running stream generation.
+  func makeIterator() -> WorkStreamIterator<Value> {
+    makeIteratorBody()
+  }
+}
+
+/// The type-erased iterator driven by one Cog-owned stream task.
+internal final class WorkStreamIterator<Value> {
+  /// Advances the concrete iterator while preserving MainActor confinement.
+  private let nextBody: @MainActor () async throws -> Value?
+
+  /// Erases one concrete iterator's advancing closure.
+  init(next: @escaping @MainActor () async throws -> Value?) {
+    nextBody = next
+  }
+
+  /// Returns the next element or natural end from the underlying sequence.
+  func next() async throws -> Value? {
+    try await nextBody()
+  }
+
+  // Written explicitly per the generic-class release-build rule.
+  nonisolated deinit {}
+}
+
+/// Single-consumer storage for a concrete iterator whose `next` may be concurrent.
+///
+/// `AsyncIteratorProtocol.next` is executor-independent on the deployment
+/// floor, so the iterator cannot remain an actor-isolated stored property across
+/// that suspension. Cog supplies the synchronization invariant instead: this
+/// box is private to one stream task, and that task never calls `next` again
+/// until the preceding call returns. The unchecked conformance expresses only
+/// that exclusive ownership; it does not make the iterator generally shareable.
+private nonisolated final class WorkStreamIteratorStorage<Iterator: AsyncIteratorProtocol>:
+  @unchecked Sendable
+{
+  /// The iterator moved into a task-local value for each exclusive advance.
+  private var iterator: Iterator
+
+  /// Takes exclusive ownership of one freshly created iterator.
+  init(_ iterator: consuming Iterator) {
+    self.iterator = iterator
+  }
+
+  /// Advances once under the owning stream task's no-overlap invariant.
+  func next() async throws -> Iterator.Element? {
+    var iterator = self.iterator
+    let element = try await iterator.next()
+    self.iterator = iterator
+    return element
+  }
+
+  // Written explicitly per the generic-class release-build rule.
+  nonisolated deinit {}
 }
 
 /// How an async state schedules new work while prior work is in flight.

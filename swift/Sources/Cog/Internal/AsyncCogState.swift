@@ -324,60 +324,73 @@ internal final class AsyncCogState<Value>:
       previousDependency.removeSubscriber(self)
     }
 
-    let operation = work.operation
     let runGeneration = advanceGeneration()
 
-    switch descriptor.policy {
-    case .queue:
-      if let refreshWaiter {
-        register(refreshWaiter, for: runGeneration)
-      }
-      let run = AsyncDeferredRun(generation: runGeneration, operation: operation)
-      if activeTask == nil {
-        beginDeferredRun(run, publishingPendingIn: pendingTurn, in: cogs)
-      } else {
-        queuedRuns.append(run)
-        // Selection made this state current even though the request has not
-        // started and therefore must not publish pending yet. Cleaning here is
-        // also what lets a second source turn invalidate the state again and
-        // append another distinct FIFO entry.
-        markChecked(at: cogs.revision)
-      }
-    case .exhaustLatest:
-      let run = AsyncDeferredRun(generation: runGeneration, operation: operation)
-      if activeTask == nil {
+    switch work.storage {
+    case .run(let operation):
+      switch descriptor.policy {
+      case .queue:
+        if let refreshWaiter {
+          register(refreshWaiter, for: runGeneration)
+        }
+        let run = AsyncDeferredRun(generation: runGeneration, operation: operation)
+        if activeTask == nil {
+          beginDeferredRun(run, publishingPendingIn: pendingTurn, in: cogs)
+        } else {
+          queuedRuns.append(run)
+          // Selection made this state current even though the request has not
+          // started and therefore must not publish pending yet. Cleaning here is
+          // also what lets a second source turn invalidate the state again and
+          // append another distinct FIFO entry.
+          markChecked(at: cogs.revision)
+        }
+      case .exhaustLatest:
+        let run = AsyncDeferredRun(generation: runGeneration, operation: operation)
+        if activeTask == nil {
+          resolveRefreshes(as: .superseded)
+          if let refreshWaiter {
+            register(refreshWaiter, for: runGeneration)
+          }
+          publishPending(in: cogs, in: pendingTurn)
+          launchRun(operation, generation: runGeneration, in: cogs)
+        } else {
+          if let replaced = exhaustCatchUp {
+            resolveRefresh(for: replaced.generation, as: .superseded)
+          }
+          if let refreshWaiter {
+            register(refreshWaiter, for: runGeneration)
+          }
+          exhaustCatchUp = run
+          // The latest selector captured current dependencies, but its operation
+          // remains deferred until the active run reaches a terminal result.
+          markChecked(at: cogs.revision)
+        }
+      case .merged:
+        publishPending(in: cogs, in: pendingTurn)
+        if let refreshWaiter {
+          register(refreshWaiter, for: runGeneration)
+        }
+        launchRun(operation, generation: runGeneration, in: cogs)
+      case .latest:
+        publishPending(in: cogs, in: pendingTurn)
         resolveRefreshes(as: .superseded)
         if let refreshWaiter {
           register(refreshWaiter, for: runGeneration)
         }
-        publishPending(in: cogs, in: pendingTurn)
-        launch(operation, generation: runGeneration, in: cogs)
-      } else {
-        if let replaced = exhaustCatchUp {
-          resolveRefresh(for: replaced.generation, as: .superseded)
-        }
-        if let refreshWaiter {
-          register(refreshWaiter, for: runGeneration)
-        }
-        exhaustCatchUp = run
-        // The latest selector captured current dependencies, but its operation
-        // remains deferred until the active run reaches a terminal result.
-        markChecked(at: cogs.revision)
+        activeTask?.cancel()
+        launchRun(operation, generation: runGeneration, in: cogs)
       }
-    case .merged:
-      publishPending(in: cogs, in: pendingTurn)
-      if let refreshWaiter {
-        register(refreshWaiter, for: runGeneration)
+    case .stream(let stream):
+      guard descriptor.policy == .latest else {
+        fatalError("Ordered async work reached the runtime with a stream.")
       }
-      launch(operation, generation: runGeneration, in: cogs)
-    case .latest:
       publishPending(in: cogs, in: pendingTurn)
       resolveRefreshes(as: .superseded)
       if let refreshWaiter {
         register(refreshWaiter, for: runGeneration)
       }
       activeTask?.cancel()
-      launch(operation, generation: runGeneration, in: cogs)
+      launchStream(stream, generation: runGeneration, in: cogs)
     }
     return runGeneration
   }
@@ -447,11 +460,11 @@ internal final class AsyncCogState<Value>:
       in: pendingTurn,
       requiringPublicationTurn: requiringPublicationTurn
     )
-    launch(run.operation, generation: run.generation, in: cogs)
+    launchRun(run.operation, generation: run.generation, in: cogs)
   }
 
   /// Creates one task and installs it under the policy's eligibility rule.
-  private func launch(
+  private func launchRun(
     _ operation: @escaping @Sendable @isolated(any) () async throws -> sending Value,
     generation runGeneration: UInt64,
     in cogs: Cogs
@@ -517,6 +530,72 @@ internal final class AsyncCogState<Value>:
     } else {
       activeRunGeneration = runGeneration
       activeTask = task
+    }
+  }
+
+  /// Creates and owns the iterator task for one latest stream generation.
+  private func launchStream(
+    _ stream: WorkStream<Value>,
+    generation runGeneration: UInt64,
+    in cogs: Cogs
+  ) {
+    activeRunGeneration = runGeneration
+    activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
+      let iterator = stream.makeIterator()
+      do {
+        while let value = try await iterator.next() {
+          guard let cogs else { return }
+          guard let self else {
+            cogs.acknowledgeAsyncCompletionCheckIfRequested()
+            return
+          }
+          guard self.acceptsResult(for: runGeneration, in: cogs) else {
+            self.resolveRefresh(for: runGeneration, as: .superseded)
+            cogs.acknowledgeAsyncCompletionCheckIfRequested()
+            return
+          }
+
+          let changed =
+            switch self.lastSuccess {
+            case .none:
+              true
+            case .some(let previous):
+              !self.descriptor.valuesAreEqual(previous, value)
+            }
+          if changed {
+            self.lastSuccess = .some(value)
+            self.stage(.success(value), named: "success", in: cogs)
+          }
+          self.resolveRefresh(for: runGeneration, as: .success(value))
+          cogs.acknowledgeAsyncCompletionCheckIfRequested()
+        }
+
+        guard let cogs else { return }
+        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        guard let self, self.acceptsResult(for: runGeneration, in: cogs) else { return }
+        self.activeTask = nil
+        self.activeRunGeneration = nil
+      } catch {
+        guard let cogs else { return }
+        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        guard let self else { return }
+        guard !Task.isCancelled, self.acceptsResult(for: runGeneration, in: cogs)
+        else {
+          self.resolveRefresh(for: runGeneration, as: .superseded)
+          return
+        }
+        self.publish(
+          .failure(
+            error,
+            value: self.lastSuccess ?? self.descriptor.defaultValue,
+            hasSucceeded: self.lastSuccess != nil
+          ),
+          completing: runGeneration,
+          named: "failure",
+          in: cogs
+        )
+        self.resolveRefresh(for: runGeneration, as: .failure(error))
+      }
     }
   }
 
