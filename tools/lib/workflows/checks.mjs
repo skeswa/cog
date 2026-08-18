@@ -4,7 +4,7 @@
 // returns diagnostics. `WORKFLOW_CHECKS` is the ordered registry the CLI runs;
 // later hardening slices append to it rather than editing existing checks.
 
-import { entries, text } from "./yaml.mjs";
+import { entries, get, items, text } from "./yaml.mjs";
 
 // ---------------------------------------------------------------------------
 // POLICY CONSTANTS — the knobs this checker enforces. Edit here, nowhere else.
@@ -74,6 +74,40 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 
 /** An image digest, the only pinnable form of a `docker://` reference. */
 const IMAGE_DIGEST = /@sha256:[0-9a-f]{64}$/;
+
+/** Inputs whose changes can alter the CogLint dogfood result or its execution. */
+const COGLINT_TRIGGER_PATHS = [
+  "Package.swift",
+  "Package.resolved",
+  "swift/**",
+  "mise.toml",
+  "tools/**",
+  ".github/workflows/swift-ci.yml",
+];
+
+/** The two concrete runner lanes permitted to execute repository Swift. */
+const COGLINT_SELF_HOSTED_LABELS = ["self-hosted", "macOS", "ARM64", "cog-mini"];
+const COGLINT_FORK_RUNNER = "macos-26";
+const COGLINT_ARTIFACT_INTEL_RUNNER = "macos-15-intel";
+
+/** The routing predicates that keep same-repo and fork code in separate lanes. */
+const COGLINT_SELF_HOSTED_CONDITION =
+  "github.repository == 'skeswa/cog' && (github.event_name != 'pull_request' || " +
+  "github.event.pull_request.head.repo.full_name == github.repository)";
+const COGLINT_FORK_CONDITION =
+  "github.event_name == 'pull_request' && " +
+  "github.event.pull_request.head.repo.full_name != github.repository";
+const COGLINT_ARTIFACT_CONDITION =
+  "github.repository == 'skeswa/cog' && github.event_name == 'workflow_dispatch' && " +
+  "(github.event_name != 'pull_request' || " +
+  "github.event.pull_request.head.repo.full_name == github.repository)";
+
+/** Files retained together as one versioned CogLint candidate. */
+const COGLINT_CANDIDATE_FILES = [
+  "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip",
+  "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum",
+  "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance",
+];
 
 // ---------------------------------------------------------------------------
 // Checks
@@ -419,6 +453,451 @@ function shaPinnedActions(workflow) {
   return diagnostics;
 }
 
+/**
+ * The Swift workflow always runs CogLint over same-repo and fork changes.
+ *
+ * The generic checks above grade every job's hardening. This contract is more
+ * specific: it keeps the dogfood command attached to both halves of the fixed
+ * macOS topology, requires an explicit read-only token at each lint job, and
+ * prevents a source or tool change from bypassing lint through `on.paths`.
+ * It intentionally applies only to `swift-ci.yml`; fixtures use that basename
+ * so they exercise the same route as the repository workflow.
+ *
+ * @param {import("./model.mjs").Workflow} workflow
+ * @returns {Diagnostic[]}
+ */
+function cogLintCiContract(workflow) {
+  if ((workflow.path.split("/").pop() ?? workflow.path) !== "swift-ci.yml") return [];
+
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  for (const triggerName of ["pull_request", "push"]) {
+    const trigger = workflow.triggers.find((candidate) => candidate.name === triggerName);
+    if (trigger === undefined) {
+      diagnostics.push({
+        path: workflow.path,
+        line: 1,
+        check: "coglint-ci-contract",
+        message: `CogLint needs the \`${triggerName}\` trigger`,
+      });
+      continue;
+    }
+
+    const pathsEntry = entries(trigger.configuration).find((entry) => entry.key === "paths");
+    const configuredPaths = new Set(
+      items(pathsEntry?.value)
+        .map((item) => text(item))
+        .filter((path) => path !== null && path !== undefined),
+    );
+    const missing = COGLINT_TRIGGER_PATHS.filter((path) => !configuredPaths.has(path));
+    if (missing.length === 0) continue;
+    diagnostics.push({
+      path: workflow.path,
+      line: pathsEntry?.line ?? trigger.line,
+      check: "coglint-ci-contract",
+      message:
+        `\`${triggerName}.paths\` can bypass CogLint; add ` +
+        missing.map((path) => `\`${path}\``).join(", "),
+    });
+  }
+
+  inspectCogLintJob({
+    workflow,
+    diagnostics,
+    id: "lint-swift",
+    runnerShape: "sequence",
+    runnerLabels: COGLINT_SELF_HOSTED_LABELS,
+    condition: COGLINT_SELF_HOSTED_CONDITION,
+  });
+  inspectCogLintJob({
+    workflow,
+    diagnostics,
+    id: "fork-lint-swift",
+    runnerShape: "string",
+    runnerLabels: [COGLINT_FORK_RUNNER],
+    condition: COGLINT_FORK_CONDITION,
+  });
+  return diagnostics;
+}
+
+/**
+ * @param {object} input
+ * @param {import("./model.mjs").Workflow} input.workflow
+ * @param {Diagnostic[]} input.diagnostics
+ * @param {string} input.id
+ * @param {"string" | "sequence"} input.runnerShape
+ * @param {string[]} input.runnerLabels
+ * @param {string} input.condition
+ */
+function inspectCogLintJob({ workflow, diagnostics, id, runnerShape, runnerLabels, condition }) {
+  const job = workflow.jobs.find((candidate) => candidate.id === id);
+  if (job === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `missing required CogLint job \`${id}\``,
+    });
+    return;
+  }
+
+  const actualLabels = job.runsOn.labels.map((label) => label.value);
+  if (
+    job.runsOn.shape !== runnerShape ||
+    actualLabels.length !== runnerLabels.length ||
+    !actualLabels.every((label, index) => label === runnerLabels[index])
+  ) {
+    const expected = runnerShape === "sequence" ? `[${runnerLabels.join(", ")}]` : runnerLabels[0];
+    diagnostics.push({
+      path: workflow.path,
+      line: job.runsOn.line,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` must run on exactly \`${expected}\``,
+    });
+  }
+
+  if (normalizeExpression(job.condition ?? "") !== normalizeExpression(condition)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.conditionLine,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` does not carry its exact runner-lane \`if:\` policy`,
+    });
+  }
+
+  if (!hasExactContentsRead(job.permissions)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.permissionsLine,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` needs its own exact \`permissions: {contents: read}\` block`,
+    });
+  }
+
+  if (!job.steps.some((step) => step.run?.trim() === "mise run lint:swift")) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` must execute exactly \`mise run lint:swift\``,
+    });
+  }
+}
+
+/**
+ * The release artifact is built only by an exact-source manual dispatch.
+ *
+ * Keeping this separate from ordinary PR dogfood prevents every synchronization
+ * from paying for two native release builds. The manual run still follows the
+ * fixed self-hosted topology, and the uploaded unit must contain the archive,
+ * its independently checked checksum, and source/toolchain provenance. A
+ * dependent real-Intel host must then download those bytes and exercise the
+ * x86_64 member: Xcode 26.6's arm64-only SwiftPM driver cannot do that under
+ * Rosetta on the build host.
+ *
+ * @param {import("./model.mjs").Workflow} workflow
+ * @returns {Diagnostic[]}
+ */
+function cogLintArtifactCiContract(workflow) {
+  if ((workflow.path.split("/").pop() ?? workflow.path) !== "swift-ci.yml") return [];
+
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  if (!workflow.triggers.some((trigger) => trigger.name === "workflow_dispatch")) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "coglint-artifact-ci-contract",
+      message: "the exact-source CogLint candidate needs a `workflow_dispatch` trigger",
+    });
+  }
+
+  const job = workflow.jobs.find((candidate) => candidate.id === "lint-artifact");
+  if (job === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "coglint-artifact-ci-contract",
+      job: "lint-artifact",
+      message: "missing required CogLint candidate job `lint-artifact`",
+    });
+    return diagnostics;
+  }
+
+  const actualLabels = job.runsOn.labels.map((label) => label.value);
+  if (
+    job.runsOn.shape !== "sequence" ||
+    actualLabels.length !== COGLINT_SELF_HOSTED_LABELS.length ||
+    !actualLabels.every((label, index) => label === COGLINT_SELF_HOSTED_LABELS[index])
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.runsOn.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message:
+        "job `lint-artifact` must run on exactly " +
+        `\`[${COGLINT_SELF_HOSTED_LABELS.join(", ")}]\``,
+    });
+  }
+
+  if (
+    normalizeExpression(job.condition ?? "") !== normalizeExpression(COGLINT_ARTIFACT_CONDITION)
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.conditionLine,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message: "job `lint-artifact` must be limited to same-repository `workflow_dispatch`",
+    });
+  }
+
+  if (!hasExactContentsRead(job.permissions)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.permissionsLine,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message: "job `lint-artifact` needs its own exact `permissions: {contents: read}` block",
+    });
+  }
+
+  const checkout = job.steps.find(
+    (step) => step.uses !== null && actionName(step.uses).toLowerCase() === CHECKOUT_ACTION,
+  );
+  if (checkout === undefined || text(get(checkout.with, "ref")) !== "${{ github.sha }}") {
+    diagnostics.push({
+      path: workflow.path,
+      line: checkout?.line ?? job.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message: "job `lint-artifact` checkout must set `ref: ${{ github.sha }}`",
+    });
+  }
+
+  if (
+    !job.steps.some((step) => step.run?.trim() === "mise run test:lint-artifact -- --host arm64")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message:
+        "job `lint-artifact` must build and probe arm64 with exactly " +
+        "`mise run test:lint-artifact -- --host arm64`",
+    });
+  }
+
+  const provenance = job.steps.find(
+    (step) =>
+      step.run?.includes("format=coglint-candidate-v1") === true &&
+      step.run.includes("swift package compute-checksum") &&
+      step.run.includes("$COG_XCODE_BUILD") &&
+      step.run.includes("arm64_probe=passed"),
+  );
+  if (provenance === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message:
+        "job `lint-artifact` must verify source, Xcode build, and checksum before writing v1 provenance",
+    });
+  }
+
+  const upload = job.steps.find(
+    (step) =>
+      step.uses !== null && actionName(step.uses).toLowerCase() === "actions/upload-artifact",
+  );
+  const uploadedPaths = new Set(
+    (text(get(upload?.with, "path")) ?? "")
+      .split(/\r?\n/)
+      .map((path) => path.trim())
+      .filter((path) => path.length > 0),
+  );
+  const uploadSettingsValid =
+    upload !== undefined &&
+    text(get(upload.with, "name")) === "coglint-0.4.0-${{ github.sha }}" &&
+    COGLINT_CANDIDATE_FILES.every((path) => uploadedPaths.has(path)) &&
+    text(get(upload.with, "if-no-files-found")) === "error" &&
+    text(get(upload.with, "compression-level")) === "0";
+  if (!uploadSettingsValid) {
+    diagnostics.push({
+      path: workflow.path,
+      line: upload?.line ?? job.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message:
+        "job `lint-artifact` must upload the SHA-named archive, checksum, and provenance without recompression",
+    });
+  }
+
+  const intelJob = workflow.jobs.find((candidate) => candidate.id === "lint-artifact-x86_64");
+  if (intelJob === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "coglint-artifact-ci-contract",
+      job: "lint-artifact-x86_64",
+      message: "missing required downloaded-artifact proof job `lint-artifact-x86_64`",
+    });
+    return diagnostics;
+  }
+
+  if (
+    intelJob.runsOn.shape !== "string" ||
+    intelJob.runsOn.labels.length !== 1 ||
+    intelJob.runsOn.labels[0].value !== COGLINT_ARTIFACT_INTEL_RUNNER
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.runsOn.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message: `job \`lint-artifact-x86_64\` must run on \`${COGLINT_ARTIFACT_INTEL_RUNNER}\``,
+    });
+  }
+
+  if (text(intelJob.needs) !== "lint-artifact") {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.needsLine,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message: "job `lint-artifact-x86_64` must depend directly on `lint-artifact`",
+    });
+  }
+
+  if (
+    normalizeExpression(intelJob.condition ?? "") !==
+    normalizeExpression(COGLINT_ARTIFACT_CONDITION)
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.conditionLine,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message: "job `lint-artifact-x86_64` must be limited to same-repository `workflow_dispatch`",
+    });
+  }
+
+  if (!hasExactContentsRead(intelJob.permissions)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.permissionsLine,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` needs its own exact `permissions: {contents: read}` block",
+    });
+  }
+
+  const intelCheckout = intelJob.steps.find(
+    (step) => step.uses !== null && actionName(step.uses).toLowerCase() === CHECKOUT_ACTION,
+  );
+  if (intelCheckout === undefined || text(get(intelCheckout.with, "ref")) !== "${{ github.sha }}") {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelCheckout?.line ?? intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message: "job `lint-artifact-x86_64` checkout must set `ref: ${{ github.sha }}`",
+    });
+  }
+
+  const intelToolchain = intelJob.steps.find(
+    (step) =>
+      step.run?.includes("COG_INTEL_XCODE_VERSION") === true &&
+      step.run.includes("COG_INTEL_XCODE_BUILD") &&
+      step.run.includes("DEVELOPER_DIR") &&
+      step.run.includes("xcodebuild -version") &&
+      step.run.includes("swift --version"),
+  );
+  if (intelToolchain === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` must select and record its pinned Intel Xcode version and build",
+    });
+  }
+
+  const download = intelJob.steps.find(
+    (step) =>
+      step.uses !== null && actionName(step.uses).toLowerCase() === "actions/download-artifact",
+  );
+  if (
+    download === undefined ||
+    text(get(download.with, "name")) !== "coglint-0.4.0-${{ github.sha }}" ||
+    text(get(download.with, "path")) !== "swift/Lint/Artifacts"
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: download?.line ?? intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` must download the SHA-named candidate into `swift/Lint/Artifacts`",
+    });
+  }
+
+  const downloadedProof = intelJob.steps.find(
+    (step) =>
+      step.run?.includes("$(uname -m)") === true &&
+      step.run.includes("GITHUB_SHA") &&
+      step.run.includes("swift package compute-checksum") &&
+      step.run.includes("arm64_probe=passed"),
+  );
+  if (downloadedProof === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` must verify its Intel host and the downloaded source, checksum, and arm64 proof",
+    });
+  }
+
+  if (
+    !intelJob.steps.some(
+      (step) => step.run?.trim() === "mise run test:lint-artifact -- --from-archive --host x86_64",
+    )
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` must probe the downloaded archive with exactly " +
+        "`mise run test:lint-artifact -- --from-archive --host x86_64`",
+    });
+  }
+
+  return diagnostics;
+}
+
+/** @param {import("./yaml.mjs").Node | null | undefined} permissions */
+function hasExactContentsRead(permissions) {
+  const permissionEntries = entries(permissions);
+  return (
+    permissionEntries.length === 1 &&
+    permissionEntries[0].key === "contents" &&
+    text(permissionEntries[0].value) === "read"
+  );
+}
+
 /** The ordered registry the CLI runs. */
 export const WORKFLOW_CHECKS = [
   { name: "no-pull-request-target", run: noPullRequestTarget },
@@ -427,6 +906,8 @@ export const WORKFLOW_CHECKS = [
   { name: "credential-hygiene", run: credentialHygiene },
   { name: "job-timeout", run: jobTimeout },
   { name: "sha-pinned-actions", run: shaPinnedActions },
+  { name: "coglint-ci-contract", run: cogLintCiContract },
+  { name: "coglint-artifact-ci-contract", run: cogLintArtifactCiContract },
 ];
 
 /**

@@ -7,7 +7,8 @@ This document turns the concept recorded in
 Cog, as an executable style guide — into a concrete design: what the tool is,
 how it reaches an iOS project, and the first six rules. The architecture and
 rule boundary were accepted after two `/vette` reviews and are recorded in the
-core §10 decision record; §7 lists the remaining implementation choices.
+core §10 decision record; §7 records the implementation decisions and the
+remaining open choices.
 References beginning "core" resolve in
 [exploration.md](./exploration.md) and its companions; bare § references
 resolve in this document.
@@ -99,7 +100,7 @@ for first-party tooling:
 - the bare CLI for run-script phases, pre-commit hooks, and non-SPM setups.
 
 Diagnostics reach the Xcode issue navigator and inline editor annotations by
-printing the classic `path:line:col: warning: message` form, which Xcode
+printing the classic `path:line:col: error: message` form, which Xcode
 parses from plugin output exactly as it parses run-script output. One known
 platform caveat: since Xcode 16.3 a scheme-interaction bug sometimes demotes
 plugin warnings to the report navigator only
@@ -155,7 +156,7 @@ available automaticity.
 
 `coglint` is a SwiftSyntax `SyntaxVisitor` executable that lints a file set
 and prints findings; rules are Swift types over the AST, not configuration.
-It is developed in this repository as its own SwiftPM package at
+It is developed in this repository as the `CogLint` SwiftPM package at
 `swift/Lint/`, beside the root package rather than inside it.
 
 This is the shape the repository already committed to. The plan nests
@@ -180,16 +181,21 @@ is the second such package, under the same isolation gate:
   rule and the convention it enforces change in one revision, checked by one
   CI — which is the whole premise of an executable style guide.
 
+The package uses Swift tools 6.2 and Swift 6 language mode. Development and
+release builds use the repository's Xcode 26.6 (build 17F113), Swift 6.3.3
+toolchain; `swift-syntax` is pinned to that compiler's 603 release family.
+Exact dependency, deployment, and host-triple pins are recorded in §7.
+
 ### 3.2 Products and surfaces
 
 The consumer-facing surface is:
 
-| Product                | Surface                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| `coglint` (CLI)        | `coglint [paths] [--reporter xcode\|github\|sarif]`; run-script phases, pre-commit, mise, CI      |
-| `CogLintPlugin`        | build-tool plugin: prebuild command over the binary target; findings on every Xcode/SwiftPM build |
-| `CogLintCommandPlugin` | `swift package coglint`; on-demand runs, CI, and the future `--fix` home                          |
-| binary target          | `coglint.artifactbundle.zip` per release, checksummed; consumers never build the linter           |
+| Product                  | Surface                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `coglint` (CLI)          | `coglint [paths] [--reporter xcode\|github\|sarif]`; run-script phases, pre-commit, mise, CI                 |
+| `CogLintBuildToolPlugin` | build-tool plugin: prebuild command over `CogLintBinary`; findings on every Xcode/SwiftPM build              |
+| `CogLintCommandPlugin`   | `swift package coglint`; on-demand runs, CI, and the future `--fix` home                                     |
+| `CogLintBinary`          | binary executable product and target backed by `CogLintBinary.artifactbundle.zip`; consumers build no linter |
 
 Consumer wiring is one `plugins:` line per app target for SwiftPM and Xcode
 targets alike (Xcode 14+ supports build-tool plugins on xcodeproj targets),
@@ -206,30 +212,30 @@ issue #318's evidence becomes the code that proves the rules fire.
 
 One SwiftPM limitation shapes distribution: a git dependency resolves only at
 the repository root, so no consumer can depend on `swift/Lint` by URL. The
-nested package is the development workspace; the accepted v1 distribution is
-**Channel A**, where the root `Package.swift` vends the `binaryTarget` and both
-plugins. Cog and `coglint` share one version, one tag, and one release
-workflow. A lint-only fix is an ordinary Cog patch release. That coupling is a
-feature: the executable convention and the library version it understands
-cannot drift, and the diagnostic's documentation publishes from the same
-immutable revision.
+nested package is the development workspace. The accepted v1 distribution is
+**Channel B**: a minimal sibling repository, `skeswa/coglint-plugins`, contains
+the generated `CogLintPlugins` package with the binary target and plugin
+declarations. Cog's root manifest remains free of the binary target, so an
+ordinary library consumer neither fetches lint tooling nor resolves its source
+dependencies. §7 records the measurement that rejected Channel A.
 
-The skeleton measures one remaining fact before those products enter the root
-manifest: whether SwiftPM and Xcode download an unused binary artifact for a
-consumer that applies neither plugin. Lazy fetching, or eager fetching with no
-material resolve cost, clears the gate and Channel A proceeds.
+Channel B changes only fetch scope, not ownership or versioning. Cog and
+`coglint` share one version and release workflow; a lint-only fix is an
+ordinary Cog patch release. All source, tests, and rule documentation remain
+in this repository. The sibling manifest is generated from the immutable Cog
+release, references that release's asset and checksum, and never releases
+independently. Release automation performs one ordered publication:
 
-If the measurement finds a material cost, **Channel B** is the predetermined
-fallback, but it changes only fetch scope, not ownership or versioning. A
-minimal sibling repository contains the binary target and plugin declarations
-and is generated from each Cog release. Release automation in this repository
-then performs one ordered publication:
-
-1. select the immutable Cog release commit;
-2. build and test `coglint` from that commit;
-3. publish and verify that commit's rule pages;
-4. regenerate the sibling manifest with the artifact checksum; and
-5. tag the sibling repository with the same version, last.
+1. select the immutable Cog release commit, then build, test, bundle, and
+   checksum `coglint` from it;
+2. push the Cog tag, which starts the matching DocC deployment;
+3. publish the Cog GitHub Release with
+   `CogLintBinary.artifactbundle.zip` attached;
+4. verify the Pages deployment, download the asset by its final URL, and
+   verify its checksum and host variants;
+5. generate the sibling manifest with that verified URL and checksum and tag
+   `skeswa/coglint-plugins` at the same version, last; and
+6. only then run the exact-version plugin consumer.
 
 The distribution repository never releases independently in v1. All source,
 rules, fixtures, and documentation remain here, and a failed step leaves no
@@ -243,7 +249,7 @@ stable documentation URL:
 ```
 WeatherCard.swift:186:7: error: [primitives-only-in-ops] `refresh` is a demand
 on the graph; call a named op from a `CogOps` extension —
-https://skeswa.github.io/cog/lint/primitives-only-in-ops
+https://skeswa.github.io/cog/documentation/cog/primitivesonlyinops
 ```
 
 - Each rule has an article in `Cog.docc` — the violation, why the convention
@@ -252,16 +258,20 @@ https://skeswa.github.io/cog/lint/primitives-only-in-ops
   pipeline. The diagnostic is the teaching moment; the page is the lesson.
   This is the same posture as
   Cog's runtime diagnostics (the cycle path, the escaped-writer message):
-  explain, don't merely fail. The URL shape shown above is illustrative
-  until open question 3 fixes it — DocC static hosting emits
-  `/cog/documentation/…` paths unless a redirect layer is added.
+  explain, don't merely fail. The canonical URL is the native DocC article
+  path under `/cog/documentation/cog/`; §7 records every exact URL. V1 adds no
+  redirect facade.
 - The `github` reporter emits workflow-command annotations so violations
   land on the PR diff; the `sarif` reporter carries the URL as `helpUri`
   for code scanning. Xcode renders the URL as copyable text, terminals and
   CI logs as a link.
-- Findings default to `error`. A suppression is written
-  `// coglint:disable-next-line <rule>` and is itself lintable — a later
-  rule can require a trailing reason.
+- Every v1 finding is an `error`; v1 has no advisory rules or severity
+  configuration. A suppression is written
+  `// coglint:disable-next-line <rule> -- <reason>`. It names exactly one rule,
+  requires at least one non-whitespace reason character, and applies only to
+  the next physical source line. A malformed directive suppresses nothing, so
+  the underlying error remains visible with the accepted directive form in
+  its diagnostic.
 
 ### 3.5 Fixtures are the spec, the docs, and the tests
 
@@ -302,14 +312,14 @@ factory function, or a cross-file conformance defeats the classifier, and
 every rule built on it inherits that documented miss as a non-triggering
 fixture.
 
-| Rule                         | Enforces                                                                                       | Confidence |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------- |
-| `cog-declaration-suffix`     | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)                   | high       |
-| `no-cogs-in-view-init`       | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)                     | high       |
-| `primitives-only-in-ops`     | primitives are called only inside `CogOps` extensions (core §3.2; conventions)                 | high       |
-| `initial-state-in-mechanism` | an app entry point bootstraps and retains the graph but performs no graph work (mechanisms §6) | highest    |
-| `manual-cog-private`         | writable sources are `private` or `fileprivate` (core §4; core §10 "Who may write?")           | highest    |
-| `no-multi-read-cogs-helper`  | graph reads stay flat instead of hiding behind a multi-read runtime helper (conventions)       | high       |
+| Rule                         | Enforces                                                                                       | Confidence | Severity |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------- | -------- |
+| `cog-declaration-suffix`     | declaration names end in `Cog`/`Cogs` by shape (core §3.1; core §10 item 23)                   | high       | error    |
+| `no-cogs-in-view-init`       | views never accept, store, or forward `Cogs` (core §3.4; core §10 item 25)                     | high       | error    |
+| `primitives-only-in-ops`     | primitives are called only inside `CogOps` extensions (core §3.2; conventions)                 | high       | error    |
+| `initial-state-in-mechanism` | an app entry point bootstraps and retains the graph but performs no graph work (mechanisms §6) | highest    | error    |
+| `manual-cog-private`         | writable sources are `private` or `fileprivate` (core §4; core §10 "Who may write?")           | highest    | error    |
+| `no-multi-read-cogs-helper`  | graph reads stay flat instead of hiding behind a multi-read runtime helper (conventions)       | high       | error    |
 
 ### 4.1 `cog-declaration-suffix`
 
@@ -430,8 +440,8 @@ Phased, with the same discipline as the main plan — each phase lands green:
 2. **Plan integration.** Before implementation, add the accepted work to
    [plan.md](../impl/plan.md), the scenario tree, and the task ledger in one
    change, with `mise run tasks:check` green.
-3. **Skeleton.** Measure unused-artifact fetching, then follow the Channel A/B
-   decision already fixed by §3.3. Create the nested `swift/Lint` package, the
+3. **Skeleton.** Follow the measured Channel B decision fixed by §3.3. Create
+   the nested `swift/Lint` package, the
    CLI over `manual-cog-private`, the fixture harness, the isolation check
    proving its dependencies cannot enter the shipped root package (the
    `swift/Benchmarks` gate, reused), and the checksummed artifact pipeline.
@@ -444,25 +454,144 @@ Phased, with the same discipline as the main plan — each phase lands green:
 Kotlin parity is deliberately outside this rollout; the Compose `lintPublish`
 finding (§2.4) seeds a future Kotlin design document.
 
-## 7. Open questions
+## 7. Decisions and open questions
 
-1. **Naming.** `coglint` as the binary, `swift/Lint` as the package directory,
-   and the product names in §3.2 remain working names. If the measured fallback
-   selects Channel B, its generated distribution repository also needs a name.
-2. **Severity policy.** Default `error` for the five boundary and declaration
-   rules is proposed; whether `no-multi-read-cogs-helper` starts as `warning`,
-   and whether suppressions must carry a reason, remain open.
-3. **Stable URL shape.** Rule articles live in `Cog.docc`; whether the public
-   path uses DocC's emitted `/cog/documentation/…` form or a redirect-backed
-   `/cog/lint/<rule>` form must be fixed before the first diagnostic ships.
-4. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
+1. **Naming — settled August 18, 2026.** The names deliberately separate one
+   stable user spelling from role-explicit SwiftPM symbols:
+
+   | Role                                       | Accepted name                      |
+   | ------------------------------------------ | ---------------------------------- |
+   | CLI executable, artifact tool, plugin verb | `coglint`                          |
+   | Development directory                      | `swift/Lint`                       |
+   | Development package                        | `CogLint`                          |
+   | Build-tool plugin product and target       | `CogLintBuildToolPlugin`           |
+   | Command plugin product and target          | `CogLintCommandPlugin`             |
+   | Binary executable product and target       | `CogLintBinary`                    |
+   | Artifact bundle and release asset          | `CogLintBinary.artifactbundle.zip` |
+   | Conditional Channel B repository           | `skeswa/coglint-plugins`           |
+   | Conditional Channel B package              | `CogLintPlugins`                   |
+
+   Users type `coglint` everywhere; UpperCamelCase names exist only where
+   SwiftPM requires product, target, or package identity. Including
+   `BuildTool`, `Command`, and `Binary` prevents three different delivery
+   roles from collapsing into an ambiguous `CogLintPlugin`. The fallback
+   repository says `plugins` because it is generated distribution machinery,
+   not the linter's source or an independently owned product.
+
+2. **Severity and suppression — settled August 18, 2026.** V1 treats every
+   accepted convention as enforceable and every waiver as reviewable:
+
+   | Surface                      | Accepted policy                                                       |
+   | ---------------------------- | --------------------------------------------------------------------- |
+   | `cog-declaration-suffix`     | `error`                                                               |
+   | `no-cogs-in-view-init`       | `error`                                                               |
+   | `primitives-only-in-ops`     | `error`                                                               |
+   | `initial-state-in-mechanism` | `error`                                                               |
+   | `manual-cog-private`         | `error`                                                               |
+   | `no-multi-read-cogs-helper`  | `error`                                                               |
+   | Next-line suppression        | `// coglint:disable-next-line <rule> -- <non-empty reason>`           |
+   | Malformed suppression        | suppresses nothing; the underlying error explains the accepted syntax |
+
+   A warning would make the same settled convention optional in build-tool
+   and CI use without identifying a meaningful confidence boundary: all six
+   rules operate only over the precise syntax their classifiers accept.
+   Suppression is the exceptional escape hatch, so it names one rule, reaches
+   only the next physical line, and carries the reason in the source review
+   that accepts it. Severity is fixed in v1 rather than configurable.
+
+3. **Stable URL shape — settled August 18, 2026.** Diagnostics and SARIF use
+   the native, statically hosted DocC article URLs:
+
+   | Rule                         | Canonical URL                                                            |
+   | ---------------------------- | ------------------------------------------------------------------------ |
+   | `cog-declaration-suffix`     | `https://skeswa.github.io/cog/documentation/cog/cogdeclarationsuffix`    |
+   | `no-cogs-in-view-init`       | `https://skeswa.github.io/cog/documentation/cog/nocogsinviewinit`        |
+   | `primitives-only-in-ops`     | `https://skeswa.github.io/cog/documentation/cog/primitivesonlyinops`     |
+   | `initial-state-in-mechanism` | `https://skeswa.github.io/cog/documentation/cog/initialstateinmechanism` |
+   | `manual-cog-private`         | `https://skeswa.github.io/cog/documentation/cog/manualcogprivate`        |
+   | `no-multi-read-cogs-helper`  | `https://skeswa.github.io/cog/documentation/cog/nomultireadcogshelper`   |
+
+   A direct DocC conversion probe confirmed that its article identifier drops
+   the rule title's hyphens, matching the existing archive's article paths.
+   These URLs are canonical and permanent: generated articles retain the
+   title that produces the accepted path, and the documentation suite checks
+   both its HTML route and data payload. V1 adds no `/cog/lint/<rule>` facade.
+   DocC's `@Redirected` directive only emits redirect metadata for a hosting
+   server to consume; GitHub Pages does not turn it into an HTTP redirect. A
+   future move therefore must ship and verify a real Pages-compatible redirect
+   before changing any canonical URL.
+
+4. **Toolchain, dependencies, and hosts — settled August 18, 2026.** The
+   development package and release pipeline use these exact pins:
+
+   | Surface                    | Accepted pin                                                             |
+   | -------------------------- | ------------------------------------------------------------------------ |
+   | SwiftPM manifest           | `swift-tools-version: 6.2`                                               |
+   | Swift language mode        | Swift 6                                                                  |
+   | Release toolchain          | Xcode 26.6 (17F113), Swift 6.3.3                                         |
+   | `swift-syntax`             | `.exact("603.0.2")`, revision `79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1` |
+   | `swift-argument-parser`    | `.exact("1.8.2")`, revision `6a52f3251125d74daf04fcbd5e6f08a75d074382`   |
+   | macOS deployment target    | 14.0                                                                     |
+   | Apple Silicon host variant | `arm64-apple-macosx14.0`                                                 |
+   | Intel host variant         | `x86_64-apple-macosx14.0`                                                |
+
+   The 603 swift-syntax line matches the compiler that produces the released
+   executable; Cog's Swift 6.2 source floor does not force the linter onto the
+   602 line because consumers receive a prebuilt binary and the development
+   package is isolated from their graph. Exact pins keep one release
+   reproducible instead of admitting dependency drift between its binary and
+   fixtures. The Apple Silicon release host builds two native variants rather
+   than dropping Intel or requiring an Intel release machine.
+
+   A compatibility probe imported `SwiftSyntax`, `SwiftParser`, and
+   `ArgumentParser`, parsed a Swift source file, and built in release for both
+   accepted triples under Xcode 26.4 / Swift 6.3.0; both binaries reported one
+   parsed statement, with the Intel binary executing through Rosetta. Their
+   Mach-O load commands record macOS 14.0. The pinned Xcode 26.6 CI toolchain
+   is Swift 6.3.3, and the existing benchmark resolve independently records
+   these same dependency versions. M8's package scaffold makes this probe a
+   permanent compatibility build under that release toolchain.
+
+5. **Distribution channel — settled August 18, 2026.** Channel B is selected.
+   The measurement used a distribution fixture with the same shape as Channel
+   A: one source library, the `CogLintBinary` remote binary target at the
+   deliberately unreachable
+   `https://unused-artifact.invalid/CogLintBinary.artifactbundle.zip`, and both
+   plugins depending on that binary. Its consumer selected only the source
+   library and applied neither plugin.
+
+   | Surface               | Reproduction                                      | Result                                                                  |
+   | --------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
+   | SwiftPM resolve       | `swift package reset`; `swift package resolve -v` | printed `Downloading binary artifact`; failed in 0.68 s on the URL      |
+   | SwiftPM release build | library-only `swift-package build`                | failed in 1.6 s because `CogLintBinary` was required                    |
+   | Xcode workspace build | library-only macOS app through `xcodebuildmcp`    | package resolution failed in 1.9 s because `CogLintBinary` was required |
+
+   Both resolvers therefore fetch the artifact eagerly even when the consumer
+   cannot use it. This is material, not a theoretical request: the two minimal
+   parser/CLI compatibility binaries measured for §7 item 4 already total
+   39,104,024 bytes before bundling. Channel A would tax every Cog consumer and
+   would make an unavailable optional lint asset break an ordinary library
+   resolve, so it is rejected. Channel B confines that fetch to consumers who
+   explicitly add `skeswa/coglint-plugins`.
+
+   Asset publication must precede any plugin-distribution tag or exact
+   consumer. A read-only check returned 404 for
+   `releases/download/0.4.0/CogLintBinary.artifactbundle.zip`; the same asset
+   name also returns 404 under the already-published 0.3.0 tag, whose GitHub
+   Release has no assets. A source tag cannot make a binary URL exist. The
+   ordered release contract in §3.3 therefore publishes and verifies the Cog
+   Release asset and rule pages before generating and tagging
+   `CogLintPlugins`; that sibling tag is the first public object from which an
+   exact plugin consumer can discover the asset URL.
+
+6. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
    companion, `@Environment(\.cogs)` declared per-view, `fatalError` over
    `preconditionFailure`, `nonisolated deinit` on generic classes, and no
    `@testable import Cog` in scenario tests — are queued behind the first six,
    several of them library-internal rather than consumer-facing.
-5. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
+7. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
    a `custom_rules` config for SwiftLint shops, accepting the drift risk.
-6. **Kotlin.** When to record the Android decision; the ergonomic bar is
+8. **Kotlin.** When to record the Android decision; the ergonomic bar is
    known, the timing is not. The monorepo shape helps here too: the Kotlin
    lint module would live under `kotlin/` beside its library, matching the
    plan's platform layout.

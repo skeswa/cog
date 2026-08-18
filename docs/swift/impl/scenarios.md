@@ -1052,9 +1052,10 @@ locations in my editor and CI, without making my app compile the linter.
   examples and exact diagnostic positions. The harness fails if any of those
   expectations drift, and emits the canonical DocC examples from that same
   corpus instead of maintaining a second copy.
-- **LINT-03.** `// coglint:disable-next-line <rule>` suppresses exactly that
-  rule on exactly the following line under the settled severity and optional
-  reason policy; it neither leaks farther nor hides another rule.
+- **LINT-03.** An exact next-line suppression written as
+  `// coglint:disable-next-line <rule> -- <non-empty reason>` suppresses exactly
+  that rule on exactly the following physical line; it neither leaks farther
+  nor hides another rule, and a missing reason suppresses nothing.
 - **LINT-04.** The declaration classifier recognizes direct constructors and
   explicit nominal annotations paired with `.init`, normalizing module
   qualification, generic arguments, and optional wrapping, and carries shape

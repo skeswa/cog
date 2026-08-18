@@ -37,8 +37,10 @@ The Swift library is real and usable. Its simple shipping core, SwiftUI
 boundary, mechanisms, declared lifetimes, async policies and streams, value
 exports, and external Observation bridge have all landed, with the Weather
 example app built on them. The measured data-oriented core remains an internal
-research candidate rather than the shipping default. The Android library has
-not been started.
+research candidate rather than the shipping default. The first-party CogLint
+CLI, plugins, six initial rules, and generated rule documentation have also
+landed; their 0.4.0 binary-backed release is being prepared. The Android
+library has not been started.
 
 The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
 shows the production-bootstrap and isolated-test call sites, and
@@ -56,7 +58,7 @@ Cog for Swift resolves with no dependencies of its own. Add it to a
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.3.0")
+    .upToNextMinor(from: "0.4.0")
   )
 ]
 ```
@@ -74,6 +76,9 @@ The documentation lives at
 [skeswa.github.io/cog](https://skeswa.github.io/cog/documentation/cog/), and
 [Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
 takes an app from this pin to a value on screen.
+[Linting your app](https://skeswa.github.io/cog/documentation/cog/lintingyourapp)
+shows how to add the separately distributed, version-matched CogLint plugins
+without adding lint dependencies to an ordinary Cog consumer.
 
 ## Working in this repository
 
@@ -91,6 +96,16 @@ mise run test:cores     # verify default simple; behavior under both cores
 mise run test:value-references # all three value-reference layouts
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
+mise run test:lint      # guarded tests for the separate CogLint package
+mise run lint:swift     # test CogLint, then check Cog and Weather sources
+mise run build:lint-artifact # build/checksum both native CogLint variants
+mise run test:lint-artifact # prove SwiftPM host-variant selection/execution
+mise run test:lint-build-tool-plugin # SwiftPM/Xcode diagnostics + cache replay
+mise run test:lint-command-plugin # bare/plugin role and reporter parity
+mise run build:lint-distribution # generate the Channel B plugin package
+mise run test:lint-distribution # prove source/fetch isolation boundaries
+mise run build:lint-documentation # render the six rule-reference articles
+mise run test:lint-documentation # prove fixture parity and permanent routes
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
 mise run bench          # run the separate release benchmark package
@@ -103,10 +118,11 @@ mise run docs           # build the DocC archive into .build/docs
 `swift/CompileFail/`, and `mise run workflows:check` validates the GitHub
 Actions hardening contract.
 
-Tests always run through the `mise` wrapper rather than `swift test`, because
-SwiftPM exits 0 when `--filter` selects nothing and the wrapper fails instead.
-Pass arguments straight through:
-`mise run test --filter 'DECL-01|ONE-05' --parallel`.
+Tests always run through a `mise` wrapper rather than filtered `swift test`,
+because SwiftPM exits 0 when `--filter` selects nothing and the wrappers fail
+instead. Pass arguments straight through:
+`mise run test --filter 'DECL-01|ONE-05' --parallel` or
+`mise run test:lint --filter LINT-02`.
 
 `AGENTS.md` and `CLAUDE.md` carry the full command reference, the repository
 layout, and the version-control conventions.
@@ -251,7 +267,7 @@ Xcode*.app` and reads each bundle's `version.plist`, which is the only
 Fork pull requests never reach the mini. Every self-hosted job carries a
 same-repo guard, and an approval-gated GitHub-hosted `macos-26` lane covers
 forks. The two conditions are exhaustive and mutually exclusive, so exactly
-one macOS lane runs per event:
+one ordinary macOS lane runs per pull-request or push event:
 
 ```yaml
 # Self-hosted lane.
@@ -265,6 +281,16 @@ if: >-
   github.event_name == 'pull_request'
   && github.event.pull_request.head.repo.full_name != github.repository
 ```
+
+M8 adds one manual release-artifact exception, bounded to same-repository
+`workflow_dispatch` events. The mini builds and checksums both CogLint
+executables under pinned Xcode 26.6 and proves the arm64 member. Xcode 26.6's
+host SwiftPM driver is arm64-only, so a dependent GitHub-hosted
+`macos-15-intel` job downloads that exact SHA-named archive, independently
+checks its provenance and checksum, selects the image's Xcode 26.3 build
+17C529 (an Intel Swift-tools 6.2 host matching CogLintPlugins), and proves
+x86_64 selection without rebuilding. This is a consumer proof, not a third
+build toolchain or a path by which pull-request code can reach the mini.
 
 The `event_name != 'pull_request' ||` clause matters: on `push` and
 `schedule` there is no `github.event.pull_request`, so a bare comparison

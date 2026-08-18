@@ -362,17 +362,25 @@ These choices are settled; §10 of the core document has the full record.
   review reconsidered thirteen of them against swift-state-graph and renamed
   none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
   reasoning, and the one name with a revisit trigger.
-- First-party lint tooling is settled as a syntax-only `coglint` developed in
+- First-party lint tooling is implemented as a syntax-only `coglint` developed in
   a nested package and shipped as a prebuilt binary behind SwiftPM plugins. Its
   six initial rules cover declarations, view/runtime boundaries, primitive
   ownership, bootstrap-time state, source privacy, and multi-read runtime
   helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
-  the root manifest is the v1 distribution unless an unused-artifact fetch
-  measurement selects the version-coupled manifest-repository fallback.
+  the root manifest remains artifact-free because SwiftPM and Xcode both
+  eagerly fetched an unused binary target. The selected distribution is the
+  version-coupled sibling manifest repository. The
+  package and products are `CogLint`, `CogLintBinary`,
+  `CogLintBuildToolPlugin`, and `CogLintCommandPlugin`; distribution uses the
+  generated `CogLintPlugins` package in
+  `skeswa/coglint-plugins`. Rule diagnostics link directly to permanent native
+  DocC articles under `/cog/documentation/cog/`, without a redirect facade.
+  Its isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
+  swift-argument-parser 1.8.2 exactly; Xcode 26.6 / Swift 6.3.3 builds native
+  arm64 and x86_64 macOS 14 variants.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, persistence helpers, the lint products' final names and
-severity policy, and the stable rule-page URL shape. Also open are several
+debug-history tools, and persistence helpers. Also open are several
 edge behaviors: debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by
@@ -404,8 +412,7 @@ full review.
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
 without a 0.2.0 release: its measured core decision keeps the simple
 implementation as the shipping default and the arena as an internal comparison
-build. M7 implementation and its complete behavior gate are green; the 0.3.0
-release chain is preparing the candidate that contains async policies, streams,
-exports, and external Observation tracking. M8 develops first-party lint
-tooling next, while its publication remains serialized behind the 0.3.0
-release.
+build. M7 is published as 0.3.0. M8 implementation and its complete fixture,
+artifact, plugin, documentation, distribution, and dogfood gate are green; the
+0.4.0 release chain is preparing the binary-backed Cog release before it
+publishes the version-matched Channel B plugin package.

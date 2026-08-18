@@ -11,6 +11,7 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @typedef {object} Trigger
  * @property {string} name
  * @property {number} line
+ * @property {import("./yaml.mjs").Node | null | undefined} configuration
  */
 
 /**
@@ -26,6 +27,8 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @property {number} line
  * @property {string | null} uses
  * @property {number} usesLine
+ * @property {string | null} run
+ * @property {number} runLine
  * @property {import("./yaml.mjs").Node | null | undefined} with
  */
 
@@ -36,6 +39,8 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @property {RunsOn} runsOn
  * @property {string | null} condition the job's `if:` expression
  * @property {number} conditionLine
+ * @property {import("./yaml.mjs").Node | null | undefined} needs
+ * @property {number} needsLine
  * @property {import("./yaml.mjs").Node | null | undefined} permissions
  * @property {number} permissionsLine
  * @property {import("./yaml.mjs").Node | null | undefined} timeout
@@ -118,13 +123,23 @@ function readTriggers(root) {
   const on = entryOf(root, "on");
   if (on === undefined || on.value === null || on.value === undefined) return [];
   const node = on.value;
-  if (node.kind === "scalar") return [{ name: node.text, line: node.line }];
+  if (node.kind === "scalar") {
+    return [{ name: node.text, line: node.line, configuration: undefined }];
+  }
   if (node.kind === "seq") {
     return node.items
       .filter((item) => item.kind === "scalar")
-      .map((item) => ({ name: /** @type {any} */ (item).text, line: item.line }));
+      .map((item) => ({
+        name: /** @type {any} */ (item).text,
+        line: item.line,
+        configuration: undefined,
+      }));
   }
-  return node.entries.map((item) => ({ name: item.key, line: item.line }));
+  return node.entries.map((item) => ({
+    name: item.key,
+    line: item.line,
+    configuration: item.value,
+  }));
 }
 
 /**
@@ -134,6 +149,7 @@ function readTriggers(root) {
 function readJob(jobEntry) {
   const node = jobEntry.value;
   const condition = entryOf(node, "if");
+  const needs = entryOf(node, "needs");
   const permissions = entryOf(node, "permissions");
   const timeout = entryOf(node, "timeout-minutes");
   const reusable = entryOf(node, "uses");
@@ -144,11 +160,14 @@ function readJob(jobEntry) {
   for (const stepNode of items(get(node, "steps"))) {
     if (stepNode.kind !== "map") continue;
     const uses = entryOf(stepNode, "uses");
+    const run = entryOf(stepNode, "run");
     steps.push({
       index,
       line: stepNode.line,
       uses: uses === undefined ? null : (text(uses.value) ?? ""),
       usesLine: uses?.line ?? stepNode.line,
+      run: run === undefined ? null : (text(run.value) ?? ""),
+      runLine: run?.line ?? stepNode.line,
       with: get(stepNode, "with"),
     });
     index += 1;
@@ -160,6 +179,8 @@ function readJob(jobEntry) {
     runsOn: readRunsOn(node, jobEntry.line),
     condition: condition === undefined ? null : (text(condition.value) ?? ""),
     conditionLine: condition?.line ?? jobEntry.line,
+    needs: needs?.value,
+    needsLine: needs?.line ?? jobEntry.line,
     permissions: permissions?.value,
     permissionsLine: permissions?.line ?? jobEntry.line,
     timeout: timeout?.value,

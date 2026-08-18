@@ -106,6 +106,69 @@ run = "node {{config_root}}/tools/weather-test.mjs"
 description = "Type-check every compile-fail fixture in one batched swiftc pass"
 run = "node {{config_root}}/tools/check-compile-fail.mjs"
 
+# CogLint is a separate package with a wrapper of its own. It enumerates tests
+# before every run, validates every filter alternative, and owns the xUnit
+# report used to reject an authoritative executed count of zero.
+
+[tasks."test:lint"]
+description = "Run the guarded CogLint package tests"
+run = "node {{config_root}}/tools/swift-lint-test.mjs"
+
+[tasks."lint:swift"]
+description = "Test CogLint, then check library and Weather target sources"
+depends = ["test:lint"]
+run = """
+set -euo pipefail
+echo "==> Cog and Weather production targets"
+swift run --package-path "{{config_root}}/swift/Lint" coglint \
+  --target-role production \
+  "{{config_root}}/swift/Sources" \
+  "{{config_root}}/swift/Examples/Weather/Weather"
+echo "==> Cog and Weather test targets"
+swift run --package-path "{{config_root}}/swift/Lint" coglint \
+  --target-role test \
+  "{{config_root}}/swift/Tests" \
+  "{{config_root}}/swift/Examples/Weather/WeatherTests"
+"""
+
+# CogLint ships as a checksummed SwiftPM artifact bundle with one native
+# executable per supported macOS host. The build task creates the ignored
+# development copy and release archive. The test task rebuilds it, then uses a
+# scratch command plugin under arm64 and Rosetta to prove SwiftPM selects and
+# executes the exact matching metadata variant.
+
+[tasks."build:lint-artifact"]
+description = "Build and checksum the CogLint macOS artifact bundle"
+run = "node {{config_root}}/tools/build-coglint-artifact.mjs"
+
+[tasks."test:lint-artifact"]
+description = "Prove SwiftPM selects and executes both CogLint host variants"
+run = "node {{config_root}}/tools/test-coglint-artifact.mjs"
+
+[tasks."test:lint-build-tool-plugin"]
+description = "Prove CogLint build-tool diagnostics and cache replay in SwiftPM and Xcode"
+run = "node {{config_root}}/tools/test-coglint-build-tool-plugin.mjs"
+
+[tasks."test:lint-command-plugin"]
+description = "Prove CogLint command-plugin parity across target roles and reporters"
+run = "node {{config_root}}/tools/test-coglint-command-plugin.mjs"
+
+[tasks."build:lint-distribution"]
+description = "Generate the Channel B CogLintPlugins distribution package"
+run = "node {{config_root}}/tools/generate-coglint-plugins.mjs"
+
+[tasks."test:lint-distribution"]
+description = "Prove Channel B dependency and unused-artifact behavior"
+run = "node {{config_root}}/tools/test-coglint-distribution.mjs"
+
+[tasks."build:lint-documentation"]
+description = "Generate CogLint rule articles from their executable fixtures"
+run = "swift run --package-path {{config_root}}/swift/Lint --scratch-path {{config_root}}/.build/coglint-documentation CogLintDocGenerator --output {{config_root}}/swift/Sources/Cog/Cog.docc"
+
+[tasks."test:lint-documentation"]
+description = "Prove CogLint article fixture parity and permanent DocC routes"
+run = "node {{config_root}}/tools/test-coglint-documentation.mjs"
+
 # The task ledger is validated by tools/check-task-ledger.mjs, which derives
 # the scenario census from docs/swift/impl/scenarios.md rather than from any
 # hand-maintained count. `tasks:check` runs the checker's own fixture suite

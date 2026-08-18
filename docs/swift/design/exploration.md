@@ -1124,12 +1124,22 @@ keeps its slot and points at the table above instead of renumbering the rest.
     evidence, so an explicit type plus `.init` is not an accidental evasion;
     the multi-read rule stays lexical instead of becoming a data-flow engine.
     Cog, `coglint`, and the rule articles in `Cog.docc` share one version and
-    release. V1 vends the plugins from the root manifest unless a measured
-    unused-artifact cost selects a distribution-only manifest repository;
-    that fallback remains generated, version-coupled, and published only
-    after the matching rule pages. Product names, severities, the stable URL
-    shape, later rules, and Kotlin timing remain open. Concept record: issue
-    #318.
+    release. SwiftPM and Xcode both eagerly fetch an unused root-manifest
+    binary target, so v1 uses the generated, version-coupled
+    `skeswa/coglint-plugins` distribution repository. Its matching tag is
+    published only after the Cog Release asset and rule pages are verified.
+    Naming was settled on August 18, 2026:
+    `coglint` is the tool, the development package is `CogLint`, the products
+    are `CogLintBinary`, `CogLintBuildToolPlugin`, and
+    `CogLintCommandPlugin`, and distribution uses the generated
+    `CogLintPlugins` package in `skeswa/coglint-plugins`. All six v1 rules are
+    errors, and an exact next-line suppression requires one rule slug and a
+    non-empty source-visible reason. Diagnostics use the permanent native DocC
+    article paths under `/cog/documentation/cog/`, with no redirect facade.
+    The isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
+    swift-argument-parser 1.8.2 exactly; Xcode 26.6 / Swift 6.3.3 releases
+    native arm64 and x86_64 macOS 14 host binaries. Later rules and Kotlin
+    timing remain open. Concept record: issue #318.
 
 ---
 

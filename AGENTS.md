@@ -52,16 +52,23 @@ every scenario covered by exactly one task.
   pinned tool matrix and the MainActor isolation shim; `probes/` holds the
   measurements those pins rest on. Unlike the root package, its
   `Package.resolved` is committed.
-- `tools/` — pinned Node tooling: `swift-test.mjs`,
+- `swift/Lint/` — the **separate** `CogLint` SwiftPM development package. Its
+  package-only `CogLintCore` and `CogLintFixtures` targets, `coglint`
+  executable, fixture-backed DocC generator, and tests own the exact
+  swift-syntax and swift-argument-parser pins without exposing them to a Cog
+  consumer. Its committed `Package.resolved` fixes those revisions, and its
+  scaffold test asks SwiftPM to prove the root dependency graph remains empty.
+- `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
   `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
-  `check-task-ledger.mjs`, and `check-workflows.mjs`, plus the checkers' own
-  fixture suites (`test-task-ledger.mjs`, `test-workflows.mjs`) and
-  `fixtures/`.
+  `check-task-ledger.mjs`, and `check-workflows.mjs`, plus shared test guards,
+  the checkers' own fixture suites (`test-task-ledger.mjs`,
+  `test-workflows.mjs`), and `fixtures/`.
 - `.github/workflows/` — `swift-ci.yml` (format, the four-leg host test
   matrix, simulator tests, the Weather build and tests, release tests,
   compile-fail
   fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
-  fork lane), `swift-docs.yml` (the DocC archive on the mini, published to
+  fork lane, plus the manual candidate artifact's downloaded-byte proof on a
+  hosted Intel runner), `swift-docs.yml` (the DocC archive on the mini, published to
   GitHub Pages from a hosted job on tag push), and `markdown.yml` (Oxfmt and
   the workflow-contract check on GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
@@ -106,7 +113,8 @@ DocC markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
 symbol links into single-backtick code spans, which silently turns every
 documentation link into plain text.
 
-Tests go through `tools/swift-test.mjs`, never `swift test` directly:
+Root-package tests go through `tools/swift-test.mjs`, never `swift test`
+directly:
 
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
@@ -122,6 +130,42 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 - `mise run test:compilefail` — type-checks every fixture in
   `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
   when a fixture misses its expected diagnostic and when it stops failing.
+- `mise run test:lint` — run the separate `swift/Lint` package tests. This
+  wrapper enumerates tests before every run and requires a nonzero executed
+  count from its own xUnit report. Extra arguments pass through, as in
+  `mise run test:lint --filter LINT-02`.
+- `mise run lint:swift` — first run the guarded CogLint suite, then lint root
+  library and Weather production target sources with production rules and
+  every tracked unit test target source with the explicit test-role primitive
+  exemption. Empty Xcode-created target directories are not command inputs;
+  CogLint continues to reject any named input that does not exist.
+- `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
+  `x86_64` CogLint executables, assemble the release artifact bundle, and
+  record its SwiftPM checksum. The version defaults to `0.4.0`.
+- `mise run test:lint-artifact` — rebuild the artifact and prove SwiftPM
+  selects and executes each exact metadata variant under arm64 and Rosetta.
+  Candidate CI splits the same proof without rebuilding the archive: append
+  `-- --host arm64` on its pinned-Xcode builder, then append
+  `-- --from-archive --host x86_64` after downloading it on the pinned Xcode
+  26.3/17C529 Intel host.
+- `mise run test:lint-build-tool-plugin` — apply the local artifact through
+  the build-tool plugin in scratch SwiftPM and Xcode consumers, then prove an
+  unchanged rebuild replays identical diagnostics from each plugin cache.
+- `mise run test:lint-command-plugin` — invoke the command plugin in a scratch
+  consumer and prove byte-identical bare-CLI behavior under both target roles
+  and all three reporters.
+- `mise run build:lint-distribution` — generate the version-coupled Channel B
+  `CogLintPlugins` package from the checked-in plugin sources and current
+  artifact checksum. Optional named arguments set version, output, checksum,
+  and artifact URL.
+- `mise run test:lint-distribution` — prove an ordinary Cog consumer resolves
+  and builds without lint sources or an artifact fetch, while an unused
+  Channel B opt-in retains SwiftPM’s measured eager-fetch behavior.
+- `mise run build:lint-documentation` — regenerate all six checked-in CogLint
+  DocC articles from their executable fixture corpora.
+- `mise run test:lint-documentation` — regenerate into scratch space, require
+  byte-for-byte fixture parity, build the DocC archive, and verify every
+  permanent diagnostic URL has both its static HTML route and data payload.
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.

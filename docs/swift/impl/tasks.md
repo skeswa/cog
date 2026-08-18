@@ -1818,16 +1818,24 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Depends: M8-10a, M8-13b._
   _Verify: `mise run workflows:check` and a green lint CI job._
 
+- **M8-14** _(Infrastructure)_ — Make `lint:swift` portable to a clean
+  checkout by naming only tracked target source roots. Keep missing-input
+  validation strict: remove empty Xcode-created directory operands rather
+  than teaching CogLint to ignore a misspelled path.
+  _Depends: M8-13b._
+  _Verify: `mise run lint:swift` from a clean Git archive and
+  `mise run fmt:check`._
+
 - **M8-15a** _(Gate)_ — Run the complete lint fixture, reporter, artifact,
   plugin, documentation, dogfood, and selected-distribution suite.
-  _Depends: M8-11b, M8-13a, M8-13c._
+  _Depends: M8-11b, M8-13a, M8-13c, M8-14._
   _Verify: `mise run test:lint`, `mise run lint:swift`, `mise run docs`,
   `mise run workflows:check`, `mise run tasks:check`, and all scratch
   integration suites._
 - **M8-15b** _(Gate)_ — Prepare the non-mutating 0.4.0 release candidate,
   including changelog, docs, immutable CI links, and the locally exercised
   checksummed artifact bundle.
-  _Depends: M8-15a._
+  _Depends: M8-16, M8-17._
   _Verify: approved release checklist, artifact checksum, and immutable CI links._
 - **M8-15c** _(Release)_ — Create and push the annotated `0.4.0` tag after the
   0.3.0 GitHub Release completes.
@@ -1848,6 +1856,25 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Verify: selected-channel record and, for Channel B, remote sibling tag and manifest._
 - **M8-15g** _(Gate)_ — Prove exact 0.4.0 consumption through the selected
   distribution channel in a scratch iOS 17 app.
-  _Depends: M8-15f._
+  _Depends: M8-18._
   _Verify: exact-consumer plugin build and documentation-link suite for LINT-23._
   _Greens: LINT-23._
+- **M8-16** _(Infrastructure)_ — Prepare the 0.4.0 release notes and consumer
+  lint documentation: changelog, current package pin, status snapshots, and
+  a DocC setup guide for the selected Channel B plugins.
+  _Depends: M8-15a._
+  _Verify: `mise run docs`, `mise run test:lint-documentation`,
+  `mise run fmt:check`, and `mise run tasks:check`._
+- **M8-17** _(Infrastructure)_ — Build, exercise, checksum, and retain the
+  0.4.0 candidate artifact under CI's pinned Xcode 26.6, with exact-source
+  provenance and a downloadable immutable Actions artifact.
+  _Depends: M8-15a._
+  _Verify: `mise run workflows:check`, a green artifact job for the exact
+  source SHA, and downloaded checksum/provenance matching the two successful
+  host-selection probes._
+- **M8-18** _(Infrastructure)_ — Correct the Channel B package identity in the
+  consumer setup guide and permanently derive that spelling from its
+  repository URL.
+  _Depends: M8-15f._
+  _Verify: `mise run test:lint-documentation`, `mise run fmt:check`, and
+  `mise run tasks:check`._
