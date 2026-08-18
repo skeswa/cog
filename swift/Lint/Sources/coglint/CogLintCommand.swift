@@ -16,19 +16,30 @@ struct CogLintCommand: ParsableCommand {
   @Argument(help: "Swift files and directories to lint")
   var paths: [String] = []
 
+  /// The explicit source-target role; test enables only documented test exemptions.
+  @Option(help: "Target role: production or test")
+  var targetRole = CogLintTargetRole.production.rawValue
+
   /// Rejects an empty invocation instead of reporting a misleading clean run.
   func validate() throws {
     guard !paths.isEmpty else {
       throw ValidationError("at least one Swift file or directory is required")
+    }
+    guard CogLintTargetRole(rawValue: targetRole) != nil else {
+      throw ValidationError("target role must be `production` or `test`")
     }
   }
 
   /// Runs the production registry, prints Xcode diagnostics, and fails on errors.
   mutating func run() throws {
     let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    guard let selectedRole = CogLintTargetRole(rawValue: targetRole) else {
+      throw ValidationError("target role must be `production` or `test`")
+    }
     let execution = try CogLintEngine.lint(
       paths: paths,
       relativeTo: currentDirectory,
+      targetRole: selectedRole,
       rules: CogLintRuleRegistry.all
     )
     if !execution.xcodeOutput.isEmpty {

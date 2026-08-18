@@ -27,6 +27,13 @@ are deduplicated, and diagnostics are ordered by path and source position.
 Every error uses Xcode's `path:line:column: error:` grammar and includes its
 rule slug and permanent DocC help URL.
 
+Production is the default target role. Pass `--target-role test` only for test
+target sources; role is explicit invocation configuration and is never guessed
+from a file path. A suppression must use the exact next-physical-line form
+`// coglint:disable-next-line <rule> -- <non-empty reason>`. It names one rule,
+does not cross a blank or comment line, and a malformed attempt suppresses
+nothing.
+
 Extra test arguments pass through, including scenario filters such as
 `mise run test:lint --filter LINT-02`. The wrapper enumerates tests before the
 run, rejects an unmatched filter or unmatched top-level alternative, and

@@ -83,6 +83,7 @@ package enum CogLintEngine {
   package static func lint(
     paths: [String],
     relativeTo currentDirectory: URL,
+    targetRole: CogLintTargetRole,
     rules: [any CogLintRule]
   ) throws -> CogLintExecution {
     let files = try CogLintPathDiscovery.discover(paths: paths, relativeTo: currentDirectory)
@@ -100,16 +101,24 @@ package enum CogLintEngine {
 
       let source = CogLintParser.parse(source: sourceText)
       let converter = SourceLocationConverter(fileName: file.displayPath, tree: source)
+      let context = CogLintRuleContext(targetRole: targetRole)
+      let suppressions = CogLintSuppressionIndex(source: sourceText)
       for rule in rules {
-        for violation in rule.violations(in: source) {
+        for violation in rule.violations(in: source, context: context) {
           let location = converter.location(for: violation.position)
+          let suppression = suppressions.decision(for: rule.slug, on: location.line)
+          if suppression == .suppress { continue }
+          let message =
+            suppression == .reportMalformedDirective
+            ? malformedSuppressionMessage(for: violation.message, rule: rule.slug)
+            : violation.message
           findings.append(
             CogLintFinding(
               path: file.displayPath,
               line: location.line,
               column: location.column,
               rule: rule.slug,
-              message: violation.message,
+              message: message,
               helpURL: rule.helpURL
             )
           )
@@ -119,6 +128,12 @@ package enum CogLintEngine {
 
     findings.sort(by: findingPrecedes)
     return CogLintExecution(findings: findings)
+  }
+
+  /// Appends the one accepted waiver spelling after a malformed next-line attempt.
+  private static func malformedSuppressionMessage(for message: String, rule: String) -> String {
+    message
+      + "; suppress only with `// coglint:disable-next-line \(rule) -- <non-empty reason>`"
   }
 
   /// Defines reporter order independently of input path, filesystem, and registry order.
