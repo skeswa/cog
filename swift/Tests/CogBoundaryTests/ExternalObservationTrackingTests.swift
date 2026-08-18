@@ -64,4 +64,31 @@ func `EXPORT-10 tracking one property ignores sibling mutations`() async {
   #expect(selectorRuns == 2)
 }
 
+@available(iOS 26.0, *)
+@MainActor
+@Test(.timeLimit(.minutes(1)))
+func `EXPORT-12 synchronous mutations coalesce to the newest tracked value`() async {
+  let model = ExternalObservationModel()
+  var selectorRuns = 0
+  let doubledCog = Cog<Int> { c in
+    selectorRuns += 1
+    return c.track(model, \.tracked) * 2
+  }
+  let cogs = Cogs.forTesting()
+  var values = cogs.values(of: doubledCog).makeAsyncIterator()
+
+  #expect(await values.next() == 0)
+  #expect(selectorRuns == 1)
+
+  model.tracked = 1
+  model.unrelated = 1
+  model.tracked = 2
+  model.tracked = 3
+  await Task.yield()
+
+  #expect(await values.next() == 6)
+  #expect(cogs.peek(doubledCog) == 6)
+  #expect(selectorRuns == 2)
+}
+
 #endif
