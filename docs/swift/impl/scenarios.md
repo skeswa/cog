@@ -839,10 +839,9 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open questions 8, 9, and 14): what status a stream
-publishes when its sequence ends naturally, whether a throwing sequence
-publishes a failure, and whether consecutive equal elements each commit a
-turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
+_Pending (core §10, open questions 9 and 14): whether a throwing sequence
+publishes a failure, and whether consecutive equal elements each commit a turn
+or are equality-gated (STREAM-01 versus the TURN-09 rule)._
 
 - **STREAM-01.** A `.stream` cog commits each element of its sequence as
   its own turn. Watchers see every committed value.
@@ -853,6 +852,14 @@ turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
 - **STREAM-04.** An unwatched `.stream` cog is released while its
   sequence is live. The sequence is cancelled, and late elements commit
   nothing.
+- **STREAM-05.** A stream emits a value and then ends naturally. Ending
+  publishes no extra turn or notice, starts no replacement, and leaves the
+  emitted value as the current success. An explicit refresh starts a fresh
+  pending generation.
+- **STREAM-06.** A stream ends naturally without an element. Cog fabricates
+  neither success nor failure: status remains pending on the declared default
+  with `hasSucceeded == false`, no completion turn lands, and an explicit
+  refresh can start a fresh generation.
 
 ## 16. EXPORT — Exports and interop
 

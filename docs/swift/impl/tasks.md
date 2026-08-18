@@ -1532,6 +1532,12 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-01b, M7-01c, M7-01d, M7-02._
   _Verify: `mise run test --filter 'STREAM-01|STREAM-02'`._
   _Greens: STREAM-01, STREAM-02._
+- **M7-06b** _(Behavior)_ — Leave stream state untouched on natural end,
+  including the empty-sequence pending state, until dependency change or
+  explicit refresh starts a new generation.
+  _Depends: M7-06a._
+  _Verify: `mise run test --filter 'STREAM-05|STREAM-06'`._
+  _Greens: STREAM-05, STREAM-06._
 - **M7-07a** _(Behavior)_ — Cancel and replace streams on dependency change,
   rejecting late elements.
   _Depends: M7-06a._
@@ -1618,8 +1624,8 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Greens: EXPORT-13._
 - **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
-  _Depends: M7-03c, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
-  M7-12, M7-15._
+  _Depends: M7-03c, M7-04, M7-05, M7-06b, M7-07b, M7-10c, M7-11a,
+  M7-11b, M7-12, M7-15._
   _Verify: complete host, release, simulator, Weather, available floor, and
   compile-fail suites._
   _Greens: COUNT-11._
