@@ -1,6 +1,7 @@
 name: Drifted CogLint CI contract
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - Package.swift
@@ -43,3 +44,65 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - run: mise run lint:swift
+
+  lint-artifact:
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - run: mise run test:lint-artifact -- --host arm64
+      - run: |
+          test "$COG_XCODE_BUILD" = 17F113
+          swift package compute-checksum CogLintBinary.artifactbundle.zip
+          printf 'format=coglint-candidate-v1\n' > CogLintBinary.artifactbundle.zip.provenance
+          printf 'arm64_probe=passed\n' >> CogLintBinary.artifactbundle.zip.provenance
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coglint-0.4.0-${{ github.sha }}
+          path: |
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance
+          if-no-files-found: error
+          compression-level: 0
+
+  lint-artifact-x86_64:
+    needs: lint-artifact
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - run: |
+          test "$COG_INTEL_XCODE_VERSION" = 26.3
+          test "$COG_INTEL_XCODE_BUILD" = 17C529
+          echo DEVELOPER_DIR=/Applications/Xcode_26.3.app >> "$GITHUB_ENV"
+          xcodebuild -version
+          swift --version
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: coglint-0.4.0-${{ github.sha }}
+          path: swift/Lint/Artifacts
+      - run: |
+          test "$(uname -m)" = x86_64
+          test "$GITHUB_SHA" = abc
+          swift package compute-checksum CogLintBinary.artifactbundle.zip
+          grep arm64_probe=passed CogLintBinary.artifactbundle.zip.provenance
+      - run: mise run test:lint-artifact -- --from-archive --host x86_64

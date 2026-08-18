@@ -186,7 +186,12 @@ Manifest choices:
   isolation gate proves those source dependencies remain absent from the root
   package. Release builds use pinned Xcode 26.6 / Swift 6.3.3 to produce
   native `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0` variants from
-  the Apple Silicon runner. M8-01e proved that SwiftPM and Xcode eagerly fetch
+  the Apple Silicon runner. Candidate CI proves arm64 selection there, then a
+  dependent GitHub-hosted `macos-15-intel` job downloads the exact checksummed
+  archive, selects Xcode 26.3 build 17C529 as an Intel Swift-tools 6.2 host,
+  and proves x86_64 selection without rebuilding; Xcode 26.6's host SwiftPM
+  executable is arm64-only, so Rosetta on the build runner cannot supply a
+  real Intel-host proof. M8-01e proved that SwiftPM and Xcode eagerly fetch
   an unused root-manifest binary target, so Channel B is selected: Cog's root
   manifest stays artifact-free, while the generated `CogLintPlugins` package
   in `skeswa/coglint-plugins` vends the binary and plugins at the matching
