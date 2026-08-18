@@ -1,0 +1,46 @@
+name: Valid CogLint CI contract
+
+on:
+  pull_request:
+    paths:
+      - Package.swift
+      - Package.resolved
+      - swift/**
+      - mise.toml
+      - tools/**
+      - .github/workflows/swift-ci.yml
+  push:
+    branches: [main]
+    paths:
+      - Package.swift
+      - Package.resolved
+      - swift/**
+      - mise.toml
+      - tools/**
+      - .github/workflows/swift-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  lint-swift:
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - run: mise run lint:swift
+
+  fork-lint-swift:
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - run: mise run lint:swift
