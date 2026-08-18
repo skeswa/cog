@@ -1131,9 +1131,10 @@ keeps its slot and points at the table above instead of renumbering the rest.
     `coglint` is the tool, the development package is `CogLint`, the products
     are `CogLintBinary`, `CogLintBuildToolPlugin`, and
     `CogLintCommandPlugin`, and the conditional fallback is the generated
-    `CogLintPlugins` package in `skeswa/coglint-plugins`. Severities, the
-    stable URL shape, later rules, and Kotlin timing remain open. Concept
-    record: issue #318.
+    `CogLintPlugins` package in `skeswa/coglint-plugins`. All six v1 rules are
+    errors, and an exact next-line suppression requires one rule slug and a
+    non-empty source-visible reason. The stable URL shape, later rules, and
+    Kotlin timing remain open. Concept record: issue #318.
 
 ---
 
