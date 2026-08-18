@@ -1127,9 +1127,13 @@ keeps its slot and points at the table above instead of renumbering the rest.
     release. V1 vends the plugins from the root manifest unless a measured
     unused-artifact cost selects a distribution-only manifest repository;
     that fallback remains generated, version-coupled, and published only
-    after the matching rule pages. Product names, severities, the stable URL
-    shape, later rules, and Kotlin timing remain open. Concept record: issue
-    #318.
+    after the matching rule pages. Naming was settled on August 18, 2026:
+    `coglint` is the tool, the development package is `CogLint`, the products
+    are `CogLintBinary`, `CogLintBuildToolPlugin`, and
+    `CogLintCommandPlugin`, and the conditional fallback is the generated
+    `CogLintPlugins` package in `skeswa/coglint-plugins`. Severities, the
+    stable URL shape, later rules, and Kotlin timing remain open. Concept
+    record: issue #318.
 
 ---
 
