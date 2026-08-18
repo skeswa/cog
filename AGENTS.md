@@ -135,8 +135,9 @@ directly:
   `mise run test:lint --filter LINT-02`.
 - `mise run lint:swift` — first run the guarded CogLint suite, then lint root
   library and Weather production target sources with production rules and
-  their unit/UI test target sources with the explicit test-role primitive
-  exemption.
+  every tracked unit test target source with the explicit test-role primitive
+  exemption. Empty Xcode-created target directories are not command inputs;
+  CogLint continues to reject any named input that does not exist.
 - `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
   `x86_64` CogLint executables, assemble the release artifact bundle, and
   record its SwiftPM checksum. The version defaults to `0.4.0`.
