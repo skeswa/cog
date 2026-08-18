@@ -252,8 +252,14 @@ public final class Cogs {
       (state as? any CogLifetimeLeaseState)?.prepareForLifetimeRelease()
       (state as? any CogConsumer)?.releaseDependenciesForContextTeardown()
     }
-    for reaction in reactions {
+    // Mechanism scopes removed their registrations above. Any survivors are
+    // externally owned value subscriptions: clear their raw teardown leases,
+    // then cancel them so their waiting AsyncSequences finish instead of
+    // retaining inert reaction bodies after the graph is gone.
+    let remainingReactions = reactions
+    for reaction in remainingReactions {
       reaction.releaseDependenciesForContextTeardown()
+      reaction.cancel()
     }
     #if COG_CORE_ARENA
     arenaCore.prepareForContextTeardown()

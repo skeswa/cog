@@ -2,9 +2,10 @@ extension Cogs {
   /// Registers one reaction body under `label` and schedules its first tracking
   /// run.
   ///
-  /// Registration is a ``MechanismController`` capability, never public
-  /// context API: reactions have one door, and it is a mechanism's controller
-  /// (§6.3).
+  /// Application reactions remain a ``MechanismController`` capability, never
+  /// public context API: reactions have one application-facing door, and it is
+  /// a mechanism's controller (§6.3). ``CogValues`` reuses this internal
+  /// tracked terminal to offer values; it exposes no arbitrary effect body.
   ///
   /// Shared by reactions and watches to preserve registration order and initial
   /// run scheduling. Registration owns the body, while the returned token owns
