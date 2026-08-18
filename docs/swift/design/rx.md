@@ -76,10 +76,10 @@ let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
 }
 ```
 
-Cog commits each sequence element as its own turn. If `accuracy` changes, Cog
-cancels the old sequence and starts the new one — `flatMapLatest` at a graph
-state. A stream may use only `.latest`; other policies have no safe v1 meaning
-for work that may never end.
+Cog commits each changed sequence element as its own turn; equal `Equatable`
+elements are state no-ops. If `accuracy` changes, Cog cancels the old sequence
+and starts the new one — `flatMapLatest` at a graph state. A stream may use only
+`.latest`; other policies have no safe v1 meaning for work that may never end.
 
 #### Operator dictionary
 

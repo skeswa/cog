@@ -653,10 +653,10 @@ release gates.
 - `OrderedPolicy`: `.queue`; `.exhaustLatest` (finish, coalesce, catch up
   once); `.merged`. The `LatestPolicy`/`OrderedPolicy` type split keeps
   `.stream` `.latest`-only by construction (§5.2).
-- `Work.stream`: each element is its own turn; a dependency change cancels
-  and restarts the sequence; release of a live stream cancels it, and late
-  elements commit nothing. Settle the open §10 questions on stream
-  termination and failure before implementing.
+- `Work.stream`: each changed element is its own turn under ordinary state
+  equality; a dependency change cancels and restarts the sequence; release of
+  a live stream cancels it, and late elements commit nothing. Settle the open
+  §10 questions on stream termination and failure before implementing.
 - `cogs.values(of:buffering:)`: a current-value-first multicast
   `AsyncSequence`; `.newest(1)` default, plus `.oldest(n)` and `.unbounded`;
   independent per-subscriber buffers and graph leases (§8). Test exact
