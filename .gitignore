@@ -10,6 +10,8 @@ Package.resolved.bak
 # them. `swift/Benchmarks/Package.resolved` is deliberately NOT ignored.
 .benchmarkBaselines/
 Thresholds/
+!swift/Benchmarks/Thresholds/
+!swift/Benchmarks/Thresholds/*.p90.json
 
 # Xcode
 DerivedData/

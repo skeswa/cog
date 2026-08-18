@@ -39,19 +39,18 @@ Or `mise run bench` from the repository root, which wraps exactly this and
 passes extra arguments through. The plugin always builds release; a debug
 measurement of a graph library measures the optimizer's absence.
 
-CI builds this package in release on every Swift change (`bench-build`) but
-does **not** run it. A number taken on a machine simultaneously running four
-test legs is a number about contention; `M6-11d` is where measurement joins CI,
-with the thresholds and serialization that needs.
+CI runs the committed threshold gate on every Swift change (`bench-build`). It
+stays on the pinned bare Apple Silicon mini, whose one-job runner and global
+benchmark concurrency group prevent a timing run from sharing the machine with
+another job.
 
 ## What is here today
 
-One target, `CogGraph`, with one benchmark over the shared Kairo diamond. It
-exists to prove the whole path works end to end — pinned harness, isolation
-shim, shared scenarios, release build — and it carries **no thresholds**.
-`M5-06` and `M5-07a`–`M5-07d` add those one measured result at a time, because a
-threshold with no measurement behind it is a guess that fails at the worst
-moment.
+One target, `CogGraph`, carries the allocation, graph-shape, layout, and
+four-runtime comparison workloads described below. Baseline tolerances pin
+counting metrics against drift. Committed static files add the portable CI
+gate: PERF-06's exact zero-allocation p90 plus PERF-10's generous wall-clock
+ceilings.
 
 Benchmarks drive the scenarios from `_CogScenarios`, the same values
 `CogScenarioTests` asserts on. That sharing is the point: a run-count assertion
@@ -61,8 +60,9 @@ before reporting, because a benchmark measures however much work it is given —
 a graph that silently started recomputing twice per turn would otherwise show
 up as a slower number rather than as a defect.
 
-Numbers printed from a developer machine are not baselines. Baselines are
-recorded on the pinned runner by `M5-08a`.
+Numbers printed from an arbitrary developer machine are not baselines. The
+recorded evidence and CI ceilings both name the pinned environment that gives
+them meaning.
 
 ## Supported tool matrix
 
@@ -225,6 +225,47 @@ numbers meant to outlive a session belong in
 [`perf.md`](../../docs/swift/design/perf.md) §9.6 with their environment
 written beside them.
 
+## Committed CI thresholds
+
+```console
+mise run bench:thresholds:check      # run the exact and timing gates
+mise run bench:thresholds:sentinel   # prove a real regression is rejected
+```
+
+The portable gate uses `swift package benchmark thresholds check` and the 13
+files under `Thresholds/`: one exact allocation workload and twelve PERF-10
+runtime/workload pairs. The wrapper fails before measuring if even one file is
+missing or its benchmark is no longer registered. It also runs
+`perf-witness-allocating` first, because a zero malloc result is evidence only
+after a workload known to allocate reports nonzero.
+
+There is a subtle but load-bearing encoding here. Upstream compares a measured
+p90 to the number in the static file, then applies the benchmark's configured
+absolute _tolerance_ on both sides. It also exits nonzero when a result is far
+enough below the reference, calling that an improvement. Every committed
+reference is therefore **zero**, and benchmark source carries the positive
+absolute tolerance. Since these metrics cannot be negative, the tolerance is a
+one-sided ceiling: `0...ceiling` passes and only a value above the ceiling can
+fail. PERF-06 has both reference and tolerance zero, preserving exactness.
+
+The wall-clock ceilings are roughly three times the slower pinned p90 in each
+cell. Cog's row covers both simple and arena builds so the gate remains valid
+through the M6 core decision.
+
+| Runtime           | diamond |  deep |  broad | unstable |
+| ----------------- | ------: | ----: | -----: | -------: |
+| Cog, either core  |   20 ms | 10 ms |  40 ms |    10 ms |
+| raw `@Observable` |    3 ms |  1 ms |   8 ms |     2 ms |
+| swift-state-graph |   80 ms | 50 ms | 120 ms |    25 ms |
+
+The sentinel command writes an impossible reference to a temporary directory,
+runs the real `perf-10-observation-deep` workload through the same threshold
+command, and succeeds only if the harness emits its threshold-regression
+diagnostic. It never edits a committed threshold or benchmark. The wrapper
+accepts both BenchmarkTool's raw exit 2 and the exit 1 to which `swift package`
+can normalize a failed plugin command; the diagnostic distinguishes the
+intended regression from a build or launch failure.
+
 ### Determinism — `M5-11`, settled 2026-08-17
 
 `M5-08a` shipped a gate that failed roughly one run in six. It now passes
@@ -269,8 +310,8 @@ this, both worth knowing before writing another threshold:
 
 - Upstream's `absolute` thresholds are **tolerances on the difference from a
   baseline**, not ceilings on a value. Proven by tightening a "ceiling" below
-  the measured cost and watching the check stay green. Absolute ceilings are
-  `thresholds check` against static threshold files — `M6-11d`'s job.
+  the measured cost and watching the check stay green. Absolute ceilings use
+  `thresholds check` against committed static references, as described above.
 - They compare **raw sums, not the scaled per-operation figures the table
   prints**. At `scalingFactor: .kilo`, the seven mallocs a steady turn reports
   are 7,000 to a threshold, and one extra allocation per operation is a drift
@@ -360,14 +401,9 @@ adapter. No comparison-only branch enters either core.
 
 ## What is coming
 
-Everything M5 planned for this package has landed. What remains is
-representation work, and it arrives as new _shapes_ rather than new machinery:
-
-| Task               | Adds                                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `M5-09b`, `M5-09c` | the interned-token and generic-keyed value-reference candidates, rebuilt through the same keyed shapes            |
-| `M5-09e`           | keyed diamonds and key churn measured under all three layouts; inline `AnyHashable` selected for v1               |
-| `M6-11c`, `M6-11d` | pinned four-runtime results and CI gating with the timing thresholds this package deliberately does not carry yet |
+The comparison and its CI gate are complete. `M6-12a` uses the recorded data
+to select the shipping core, and `M6-13` executes that decision without
+changing these shared workloads or their ceilings.
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
 here when a count moves and the question becomes which line moved it.

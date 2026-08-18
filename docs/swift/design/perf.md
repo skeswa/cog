@@ -597,6 +597,40 @@ reads do seven times the derived work. `M6-11d` turns the recorded timing
 distributions into generous gates, and `M6-12a` — not this measurement task —
 weighs the mixed core result and selects the default.
 
+**Absolute CI gates** — `M6-11d`, 2026-08-17. Wall-clock p90 is the only
+PERF-10 metric promoted from comparison evidence to a regression promise.
+Instructions remain explanatory and peak resident memory remains too coarse at
+these workload sizes. Each ceiling is roughly three times the slower recorded
+p90 for its runtime/workload cell. Cog uses the slower of simple and arena, so
+the gate neither decides `M6-12a` nor needs rewriting after `M6-13` executes
+that decision.
+
+| Runtime           | Recorded p90: diamond / deep / broad / unstable | Absolute ceilings: diamond / deep / broad / unstable |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| Cog, either core  | 5.231 / 2.750 / 13 / 2.755 ms                   | **20 / 10 / 40 / 10 ms**                             |
+| raw `@Observable` | 0.820 / 0.216 / 2.277 / 0.350 ms                | **3 / 1 / 8 / 2 ms**                                 |
+| swift-state-graph | 26 / 15 / 37 / 7.696 ms                         | **80 / 50 / 120 / 25 ms**                            |
+
+The encoding is intentionally mechanical. Ordo One's static command compares
+the measured p90 with a reference and then applies the benchmark's absolute
+tolerance symmetrically; it exits nonzero for a large improvement as well as a
+regression. Every committed `Thresholds/*.p90.json` reference is therefore
+zero, and the positive tolerance in `RuntimeComparisonBenchmarks.swift` is the
+actual one-sided ceiling. A nonnegative metric cannot cross the lower side, so
+only exceeding the ceiling fails. The wrapper additionally verifies all twelve
+PERF-10 files exist and still name registered benchmarks before invoking the
+harness; upstream itself only fails when _none_ exist and could otherwise let
+one file hide eleven missing gates.
+
+PERF-06 stays exact in the same gate: static p90 references of zero for
+`mallocCountTotal` and `objectAllocCount`, both with zero p90 tolerance. The
+allocating witness runs first and must report nonzero, so this cannot pass by
+silently measuring nothing. `mise run bench:thresholds:sentinel` supplies an
+impossible temporary reference to a real Observation workload and succeeds only
+when the same command reports a threshold regression. CI runs
+`mise run bench:thresholds:check` in one globally serialized job on the pinned
+bare-metal runner.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

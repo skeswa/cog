@@ -41,7 +41,7 @@ name: Swift CI
 # Jobs land here as the milestones that need them land: `M0-05c` adds the
 # release-configuration and compile-fail jobs, `M0-09b` adds the task-ledger
 # check and widens the path filters below, M2 adds `test-simulator` and the
-# Weather build, and `M5-08b` adds `bench-build`.
+# Weather build, and `M5-08b` adds the benchmark package gate.
 
 # The two path lists are deliberately duplicated rather than shared through a
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
@@ -732,26 +732,24 @@ jobs:
       - name: Run the Weather example tests
         run: mise run test:weather
 
-  # The benchmark package, built in release and **not run**. `M5-08b` adds it
-  # so the package cannot rot unnoticed: it is a separate SwiftPM package that
-  # nothing else in CI compiles, so a change to `Cog` that breaks a benchmark
-  # would otherwise surface only when somebody next measured something.
+  # The benchmark package's portable gate. PERF-10 wall-clock measurements use
+  # generous absolute p90 ceilings recorded from the pinned comparison, while
+  # PERF-06 retains its exact zero-malloc requirement. The wrapper first proves
+  # malloc counting is live and that every gated benchmark and threshold exists.
   #
-  # Building rather than measuring, deliberately. A number taken on a machine
-  # that is simultaneously running four test legs is a number about contention,
-  # and gating on one would be worse than not having it — `M6-11d` is where
-  # measurement joins CI, with the thresholds and the serialization that needs.
-  # The concurrency group is here already so that when this job does start
-  # measuring, it is not the change that also has to remember it.
+  # This stays on the bare Apple Silicon mini: timing ceilings are meaningful
+  # only on the pinned environment. The host services one job at a time, and
+  # the repository-wide concurrency group also prevents benchmark runs from
+  # different refs contending if another matching runner is ever added.
   bench-build:
-    name: Benchmark build (self-hosted)
+    name: Benchmark thresholds (self-hosted)
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
       contents: read
     concurrency:
-      group: swift-bench-${{ github.ref }}
-      cancel-in-progress: true
+      group: swift-bench-cog-mini
+      cancel-in-progress: false
     if: >-
       github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
       || github.event.pull_request.head.repo.full_name == github.repository)
@@ -799,6 +797,5 @@ jobs:
           restore-keys: |
             swift-bench-${{ runner.arch }}-
 
-      - name: Build the benchmarks in release
-        working-directory: swift/Benchmarks
-        run: swift build -c release
+      - name: Check exact allocation and PERF-10 p90 ceilings
+        run: mise run bench:thresholds:check

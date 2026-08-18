@@ -134,6 +134,13 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
   count, then check the run against that baseline. Baselines live in the
   git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
   outlive a session go in `docs/swift/design/perf.md` §9.6.
+- `mise run bench:thresholds:check` — assert the allocation witness is live,
+  require every gated benchmark and its committed static threshold, then
+  enforce PERF-06's exact p90 zero-allocation result and PERF-10's one-sided
+  wall-clock ceilings. This is the benchmark gate CI runs on the pinned mini.
+- `mise run bench:thresholds:sentinel` — run a real PERF-10 workload against a
+  temporary impossible threshold and pass only when the gate rejects it as a
+  regression.
 
 The example app uses the same pinned Xcode as the library:
 

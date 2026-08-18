@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Pinned-environment benchmark baselines.
+// Pinned-environment benchmark gates.
 //
 //     node tools/bench-baseline.mjs update [name]
 //     node tools/bench-baseline.mjs check  [name]
+//     node tools/bench-baseline.mjs thresholds-check
+//     node tools/bench-baseline.mjs thresholds-sentinel
 //
 // A benchmark number means nothing without the machine and toolchain that
 // produced it. perf §9 says every baseline pins its environment — exact Xcode
@@ -20,6 +22,11 @@
 // answer that a human might notice — it produces a plausible one. The
 // environment gate turns that into a loud failure.
 //
+// `thresholds-check` is the portable CI half: it validates the complete set of
+// committed static references, proves each benchmark is registered, asserts
+// the allocation witness, and then applies the source-defined p90 ceilings.
+// `thresholds-sentinel` proves the same harness path rejects a regression.
+//
 // ## The witness
 //
 // `check` also asserts that `perf-witness-allocating` reports a NON-ZERO
@@ -35,19 +42,43 @@
 // `swift/Benchmarks/.benchmarkBaselines/`, which is git-ignored on purpose:
 // the format is upstream-unstable, and a baseline is a statement about one
 // machine. Numbers that outlive a session belong in perf.md §9.6, written by
-// hand, with their environment beside them.
+// hand, with their environment beside them. Portable zero references live in
+// `swift/Benchmarks/Thresholds/`; their one-sided tolerances live in benchmark
+// source so a code review sees the effective ceilings.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const benchmarkPackage = join(repositoryRoot, "swift", "Benchmarks");
 const baselineDirectory = join(benchmarkPackage, ".benchmarkBaselines");
+const thresholdDirectory = join(benchmarkPackage, "Thresholds");
 
 /** The benchmark whose whole job is to allocate, so a silent zero cannot hide. */
 const WITNESS_BENCHMARK = "perf-witness-allocating";
+
+/** Benchmarks whose committed p90 references form the CI performance gate. */
+const THRESHOLDED_BENCHMARKS = [
+  "perf-06-value-reference",
+  "perf-10-cog-diamond",
+  "perf-10-cog-deep",
+  "perf-10-cog-broad",
+  "perf-10-cog-unstable",
+  "perf-10-observation-diamond",
+  "perf-10-observation-deep",
+  "perf-10-observation-broad",
+  "perf-10-observation-unstable",
+  "perf-10-state-graph-diamond",
+  "perf-10-state-graph-deep",
+  "perf-10-state-graph-broad",
+  "perf-10-state-graph-unstable",
+];
+
+/** One exact regular expression, so CI measures no ungated workload by accident. */
+const THRESHOLD_FILTER = `^(${THRESHOLDED_BENCHMARKS.join("|")})$`;
 
 // Baselines cover every benchmark in the package.
 //
@@ -233,6 +264,141 @@ function assertWitnessMeasured() {
 }
 
 /**
+ * Checks that every promised static reference exists and remains exactly zero.
+ *
+ * The harness only fails when it finds no files at all; one surviving file can
+ * otherwise hide twelve missing gates. Zero is intentional: benchmark source
+ * carries each one-sided absolute tolerance, making that tolerance the actual
+ * ceiling and preventing a faster result from exiting as an "improvement".
+ *
+ * @param {string} directory Directory containing static p90 references.
+ */
+function assertStaticThresholdsComplete(directory) {
+  for (const benchmark of THRESHOLDED_BENCHMARKS) {
+    const path = join(directory, `CogGraph.${benchmark}.p90.json`);
+    if (!existsSync(path)) fail(`missing static threshold file: ${path}`);
+
+    const thresholds = JSON.parse(readFileSync(path, "utf8"));
+    const expectedMetrics =
+      benchmark === "perf-06-value-reference"
+        ? ["mallocCountTotal", "objectAllocCount"]
+        : ["wallClock"];
+    const actualMetrics = Object.keys(thresholds).sort();
+    if (JSON.stringify(actualMetrics) !== JSON.stringify(expectedMetrics.sort())) {
+      fail(
+        `static threshold '${benchmark}' has metrics ${actualMetrics.join(", ")}; ` +
+          `expected ${expectedMetrics.join(", ")}`,
+      );
+    }
+    for (const [metric, reference] of Object.entries(thresholds)) {
+      if (reference !== 0) {
+        fail(
+          `static threshold '${benchmark}' uses ${metric} reference ${reference}; ` +
+            "references must remain zero so source tolerances are one-sided ceilings",
+        );
+      }
+    }
+  }
+}
+
+/** Fails if a committed threshold no longer names a registered benchmark. */
+function assertThresholdedBenchmarksRegistered() {
+  const output = run("swift", ["package", "benchmark", "list", "--no-progress"]);
+  const registered = new Set(
+    output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+  const missing = THRESHOLDED_BENCHMARKS.filter((benchmark) => !registered.has(benchmark));
+  if (missing.length > 0) {
+    fail(`static thresholds name unregistered benchmarks: ${missing.join(", ")}`);
+  }
+  console.log(
+    `bench-baseline: registration OK — found all ${THRESHOLDED_BENCHMARKS.length} thresholded benchmarks`,
+  );
+}
+
+/** Runs the committed exact-allocation and PERF-10 absolute threshold gate. */
+function checkStaticThresholds() {
+  assertStaticThresholdsComplete(thresholdDirectory);
+  assertThresholdedBenchmarksRegistered();
+  assertWitnessMeasured();
+
+  console.log("==> checking committed absolute benchmark thresholds");
+  run("swift", [
+    "package",
+    "benchmark",
+    "thresholds",
+    "check",
+    "--filter",
+    THRESHOLD_FILTER,
+    "--path",
+    thresholdDirectory,
+    "--no-progress",
+  ]);
+  console.log(
+    `bench-baseline: OK — ${THRESHOLDED_BENCHMARKS.length} benchmarks stayed within their ceilings`,
+  );
+}
+
+/**
+ * Proves the real threshold path rejects a known regression.
+ *
+ * A temporary negative reference pushes a fast Observation result beyond its
+ * positive source tolerance. This exercises the same benchmark, parser, and
+ * threshold comparison as CI without changing either source or committed
+ * threshold files.
+ */
+function checkThresholdSentinel() {
+  const benchmark = "perf-10-observation-deep";
+  const sentinelDirectory = mkdtempSync(join(tmpdir(), "cog-benchmark-thresholds-"));
+  const sentinelPath = join(sentinelDirectory, `CogGraph.${benchmark}.p90.json`);
+  writeFileSync(sentinelPath, `${JSON.stringify({ wallClock: -1_000_000_000 }, null, 2)}\n`);
+
+  let regression;
+  try {
+    run(
+      "swift",
+      [
+        "package",
+        "benchmark",
+        "thresholds",
+        "check",
+        "--filter",
+        `^${benchmark}$`,
+        "--path",
+        sentinelDirectory,
+        "--no-progress",
+      ],
+      { quiet: true },
+    );
+  } catch (error) {
+    regression = error;
+  } finally {
+    rmSync(sentinelDirectory, { recursive: true, force: true });
+  }
+
+  if (regression === undefined) {
+    fail("the sentinel regression passed; the absolute threshold gate is not active");
+  }
+  const output = `${regression.stdout ?? ""}\n${regression.stderr ?? ""}`;
+  const isThresholdRegression = output.includes("WORSE than the defined thresholds");
+  // Direct BenchmarkTool execution uses 2. `swift package` may normalize the
+  // plugin's nonzero child status to 1, so the harness diagnostic is the
+  // authoritative distinction from a build or launch failure.
+  if (![1, 2].includes(regression.status) || !isThresholdRegression) {
+    fail(
+      `the sentinel command failed for the wrong reason (exit ${regression.status ?? "unknown"}):\n` +
+        output.trim().slice(-2_000),
+    );
+  }
+  console.log(
+    `bench-baseline: OK — sentinel '${benchmark}' was rejected as a threshold regression`,
+  );
+}
+
+/**
  * Verifies the environment, the witness, and then the baseline itself.
  *
  * @param {string} name Baseline name.
@@ -276,10 +442,18 @@ switch (subcommand) {
   case "check":
     check(name);
     break;
+  case "thresholds-check":
+    checkStaticThresholds();
+    break;
+  case "thresholds-sentinel":
+    checkThresholdSentinel();
+    break;
   default:
     fail(
       "expected a subcommand.\n" +
         "  node tools/bench-baseline.mjs update [name]\n" +
-        "  node tools/bench-baseline.mjs check  [name]",
+        "  node tools/bench-baseline.mjs check  [name]\n" +
+        "  node tools/bench-baseline.mjs thresholds-check\n" +
+        "  node tools/bench-baseline.mjs thresholds-sentinel",
     );
 }
