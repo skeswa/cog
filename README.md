@@ -37,8 +37,10 @@ The Swift library is real and usable. Its simple shipping core, SwiftUI
 boundary, mechanisms, declared lifetimes, async policies and streams, value
 exports, and external Observation bridge have all landed, with the Weather
 example app built on them. The measured data-oriented core remains an internal
-research candidate rather than the shipping default. The Android library has
-not been started.
+research candidate rather than the shipping default. The first-party CogLint
+CLI, plugins, six initial rules, and generated rule documentation have also
+landed; their 0.4.0 binary-backed release is being prepared. The Android
+library has not been started.
 
 The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
 shows the production-bootstrap and isolated-test call sites, and
@@ -56,7 +58,7 @@ Cog for Swift resolves with no dependencies of its own. Add it to a
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.3.0")
+    .upToNextMinor(from: "0.4.0")
   )
 ]
 ```
@@ -74,6 +76,9 @@ The documentation lives at
 [skeswa.github.io/cog](https://skeswa.github.io/cog/documentation/cog/), and
 [Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
 takes an app from this pin to a value on screen.
+[Linting your app](https://skeswa.github.io/cog/documentation/cog/lintingyourapp)
+shows how to add the separately distributed, version-matched CogLint plugins
+without adding lint dependencies to an ordinary Cog consumer.
 
 ## Working in this repository
 

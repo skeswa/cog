@@ -8,10 +8,46 @@ under a "Breaking" heading; a **patch** release only adds or fixes. Pin
 accordingly:
 
 ```swift
-.package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.3.0"))
+.package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.4.0"))
 ```
 
 Kotlin releases through Maven coordinates and is not versioned here.
+
+## [0.4.0] - 2026-08-18
+
+Cog conventions are now executable. The first-party `coglint` binary ships
+behind opt-in SwiftPM plugins while the Cog library itself continues to
+resolve with no dependencies.
+
+### Breaking
+
+- No intentional source-breaking library change. Existing 0.3.0 declarations,
+  async policies, streams, exports, and external Observation tracking retain
+  their spellings and semantics.
+
+### Added
+
+- The syntax-only `coglint` CLI with deterministic recursive path discovery,
+  exact source locations, explicit production and test target roles, Xcode,
+  GitHub, and SARIF reporters, and reason-bearing next-line suppression. The
+  opt-in build-tool plugin fails a build on findings; every diagnostic links
+  to its rule article and its expected repair.
+- Six initial convention rules covering declaration suffixes, passing `Cogs`
+  into views, primitive calls outside `CogOps`, initial state outside
+  mechanisms, writable source visibility, and multi-read graph helpers.
+- `CogLintBuildToolPlugin` for build-time checks and
+  `CogLintCommandPlugin` for `swift package coglint`, both backed by a
+  checksummed macOS 14 artifact containing native arm64 and x86_64 binaries.
+- Permanent DocC articles generated from the same fixture corpus that tests
+  every rule, plus a setup guide for the version-matched plugin package.
+
+### Changed
+
+- Lint distribution uses the separately versioned-but-coupled
+  `skeswa/coglint-plugins` repository. Keeping its binary target outside Cog's
+  root manifest prevents ordinary library consumers from eagerly downloading
+  an unused lint artifact or resolving the linter's source dependencies.
+- Cog and Weather sources now dogfood the same linter command gated in CI.
 
 ## [0.3.0] - 2026-08-17
 
@@ -104,5 +140,6 @@ SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
   effect runs, with zero cost in release builds.
 - DocC documentation and the `swift/Examples/Weather` example app.
 
+[0.4.0]: https://github.com/skeswa/cog/releases/tag/0.4.0
 [0.3.0]: https://github.com/skeswa/cog/releases/tag/0.3.0
 [0.1.0]: https://github.com/skeswa/cog/releases/tag/0.1.0
