@@ -52,6 +52,7 @@ package enum CogLintRuleRegistry {
   package static let all: [any CogLintRule] = [
     CogDeclarationSuffixRule(),
     NoCogsInViewInitRule(),
+    PrimitivesOnlyInOpsRule(),
     ManualCogPrivateRule(),
   ]
 }

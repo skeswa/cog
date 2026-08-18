@@ -4,6 +4,7 @@ package enum CogLintFixtureRegistry {
   package static let all: [CogLintRuleFixture] = [
     cogDeclarationSuffix,
     noCogsInViewInit,
+    primitivesOnlyInOps,
     manualCogPrivate,
   ]
 }
