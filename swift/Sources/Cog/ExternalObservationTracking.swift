@@ -24,7 +24,88 @@ internal protocol CogExternalObservationBridge: AnyObject {
   func cancel()
 }
 
-/// One iOS 26 Observation sequence feeding one hidden Cog source.
+/// A one-shot legacy Observation registration that re-arms after each change.
+///
+/// `withObservationTracking` calls `onChange` from `willSet` and consumes the
+/// registration before doing so. The sendable callback therefore performs no
+/// graph work itself. It enqueues a MainActor task, allowing the setter to
+/// finish, and that task installs the next registration before it reads and
+/// publishes the newest value. Mutations in the small interval between the
+/// callback and that re-arm can be missed; the public contract names that
+/// legacy limitation instead of promising continuous tracking.
+@MainActor
+internal final class CogLegacyObservationShim<Value> {
+  /// Reads the exact external property while Observation records accesses.
+  private let read: @MainActor () -> Value
+
+  /// Receives the newest value after the setter and re-arm both finish.
+  private let didChange: @MainActor (Value) -> Void
+
+  /// Internal seam fired after each post-change registration is installed.
+  private let didRearm: @MainActor () -> Void
+
+  /// Whether this one-shot-lifetime observer has ever installed tracking.
+  private var hasStarted = false
+
+  /// Whether callbacks may enqueue another observation transition.
+  private var isStarted = false
+
+  /// Creates an idle shim around one property read.
+  ///
+  /// - Parameters:
+  ///   - read: The synchronous MainActor property access to observe.
+  ///   - didChange: Publication after the setter completes and tracking re-arms.
+  ///   - didRearm: Test seam acknowledging the completed re-arm transition.
+  init(
+    read: @escaping @MainActor () -> Value,
+    didChange: @escaping @MainActor (Value) -> Void,
+    didRearm: @escaping @MainActor () -> Void = {}
+  ) {
+    self.read = read
+    self.didChange = didChange
+    self.didRearm = didRearm
+  }
+
+  /// Installs the initial one-shot registration synchronously.
+  func start() {
+    guard !hasStarted else {
+      fatalError("A legacy Cog external-property observer started twice.")
+    }
+    hasStarted = true
+    isStarted = true
+    _ = arm()
+  }
+
+  /// Prevents a fired or future callback from publishing another transition.
+  func cancel() {
+    isStarted = false
+  }
+
+  /// Reads the current value and registers the callback consumed by its change.
+  private func arm() -> Value {
+    withObservationTracking {
+      read()
+    } onChange: { [weak self] in
+      Task { @MainActor [weak self] in
+        self?.consumeChange()
+      }
+    }
+  }
+
+  /// Re-arms before publishing the value read after the completed setter.
+  private func consumeChange() {
+    guard isStarted else { return }
+    let value = arm()
+    didRearm()
+    didChange(value)
+  }
+
+  // Written explicitly for the generic-class release-build rule. Cancellation
+  // needs no isolation because queued callbacks hold this shim only weakly.
+  nonisolated deinit {}
+}
+
+/// One runtime-appropriate Observation path feeding one hidden Cog source.
 ///
 /// The source is an implementation detail: selectors record an ordinary graph
 /// edge to it, so both storage cores reuse their existing invalidation,
@@ -47,6 +128,9 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
   /// Continuous modern observation, or `nil` on a pre-iOS-26 runtime.
   private var observationTask: Task<Void, Never>?
 
+  /// One-shot legacy observer, or `nil` on a 26-era runtime.
+  private var legacyObservation: CogLegacyObservationShim<Tracked>?
+
   /// Creates the hidden source at the same value used to arm Observation.
   init(root: Root, keyPath: KeyPath<Root, Tracked>, initialValue: Tracked) {
     self.root = root
@@ -59,11 +143,13 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
   /// M7-13a owns the iOS 26 path. M7-14a fills the older-runtime branch with
   /// its explicitly bounded one-shot re-arm shim.
   func start(in cogs: Cogs) {
-    guard observationTask == nil else {
+    guard observationTask == nil, legacyObservation == nil else {
       fatalError("A Cog external-property bridge started twice.")
     }
     if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
       startModernObservation(in: cogs)
+    } else {
+      startLegacyObservation(in: cogs)
     }
   }
 
@@ -99,10 +185,31 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
     }
   }
 
-  /// Cancels the exact observation task this bridge owns.
+  /// Starts the one-shot observer used before the continuous runtime API.
+  ///
+  /// The shim owns deferral past `willSet` and re-arm ordering. This bridge
+  /// only turns each accepted newest value into an ordinary hidden-source turn.
+  private func startLegacyObservation(in cogs: Cogs) {
+    let root = root
+    let keyPath = keyPath
+    let sourceCog = sourceCog
+    let turnName = "c.track(\(keyPath))"
+    let observation = CogLegacyObservationShim(
+      read: { root[keyPath: keyPath] },
+      didChange: { [weak cogs] value in
+        cogs?.commit(turnName) { c in c[sourceCog] = value }
+      }
+    )
+    legacyObservation = observation
+    observation.start()
+  }
+
+  /// Cancels the exact modern task or legacy registration this bridge owns.
   func cancel() {
     observationTask?.cancel()
     observationTask = nil
+    legacyObservation?.cancel()
+    legacyObservation = nil
   }
 
   // Written explicitly for the generic-class release-build rule. The owning
