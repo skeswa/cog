@@ -48,10 +48,13 @@ description = "Run the Swift tests across all four isolation-matrix legs"
 run = "node {{config_root}}/tools/swift-test.mjs matrix"
 
 [tasks."test:cores"]
-description = "Run the Swift behavior suite against both core implementations"
+description = "Verify the shipping core and run Swift behavior against both implementations"
 run = """
 set -euo pipefail
-unset COG_TEST_EDGE
+unset COG_TEST_CORE COG_TEST_EDGE
+echo "==> shipping default (simple)"
+node "{{config_root}}/tools/swift-test.mjs" default \
+  --no-parallel --filter 'CoreSelectorInfrastructure'
 behavior_filter='[A-Z]+-[0-9][0-9]'
 for core in simple arena; do
   echo "==> core ${core}"

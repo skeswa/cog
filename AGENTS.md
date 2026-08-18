@@ -110,10 +110,10 @@ Tests go through `tools/swift-test.mjs`, never `swift test` directly:
 
 - `mise run test` — the default isolation leg.
 - `mise run test:matrix` — all four isolation legs.
-- `mise run test:cores` — the complete behavior suite, serialized to keep its
-  benchmark-sized graph scenarios from starving time-bounded actor tests,
-  under both the explicit `simple` and `arena` core selections without
-  changing the shipping default.
+- `mise run test:cores` — first prove the unset selector compiles the shipping
+  `simple` core, then run the complete behavior suite under explicit `simple`
+  and `arena` selections, serialized so benchmark-sized graph scenarios cannot
+  starve time-bounded actor tests.
 - `mise run test:value-references` — the full behavior suite under the
   `inline`, `interned`, and `generic` value-reference layouts.
 - `mise run test:release` — the default leg in release configuration.
@@ -177,14 +177,15 @@ generic-keyed candidates remain available only for behavior and benchmark
 comparison. Generic uses box-produced keyed reference types and conditional
 runtime overloads because its concrete `Key` necessarily crosses the public
 read surface; it cannot hide entirely behind `CogKey`.
-M6 adds two internal library selectors without changing public API.
+M6 retains two internal library selectors without changing public API.
 `COG_TEST_CORE` chooses `simple` (unset/default) or `arena`.
-`COG_TEST_EDGE` belongs only to `arena`; unset currently means its first
-runnable candidate, `pool`. Supplying an edge beside `simple`, or any
-unimplemented spelling, is a hard manifest error so a candidate command cannot
-pass without compiling that candidate. The manifest mirrors both choices into
-test-target defines for selector sentinels, while ordinary consumer builds
-remain on the simple core.
+`COG_TEST_EDGE` belongs only to `arena`; unset means its selected layout,
+`pool`. Supplying an edge beside `simple`, or any unimplemented spelling, is a
+hard manifest error so a comparison command cannot pass without compiling that
+candidate. The manifest mirrors both choices into test-target defines for
+selector sentinels. M6's measured decision keeps ordinary consumer builds on
+the simple core and retains arena only for explicit behavior and benchmark
+comparison.
 
 Documentation is a task of its own, because swift-docc-plugin is env-gated
 behind `COG_DOCC=1` so ordinary consumers resolve this package with no

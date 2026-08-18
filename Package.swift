@@ -131,15 +131,17 @@ default:
 
 // MARK: - The core and edge representation seams
 
-// M6 builds the arena vertically while the class-state correctness core remains
-// the shipping default. These selectors are library settings because they
-// choose the representation that implements Cogs, not merely which tests run.
-// Mirrored test defines let a sentinel prove that the runner, test target, and
-// library all selected the same implementation.
+// M6's measured decision retains the class-state correctness core as the
+// shipping default and the arena as a selector-only research and benchmark
+// build. These selectors are library settings because they choose the
+// representation that implements Cogs, not merely which tests run. Mirrored
+// test defines let a sentinel prove that the runner, test target, and library
+// all selected the same implementation.
 //
-// An arena build without an explicit edge uses `pool`, its first runnable
-// candidate. Naming an edge beside `simple` is an error: accepting it would let
-// a candidate command go green without compiling or exercising that candidate.
+// An arena build without an explicit edge uses `pool`, the layout selected for
+// that candidate. Naming an edge beside `simple` is an error: accepting it
+// would let a candidate command go green without compiling or exercising that
+// candidate.
 
 let requestedCore = Context.environment["COG_TEST_CORE"] ?? "simple"
 let requestedEdge = Context.environment["COG_TEST_EDGE"]
@@ -195,8 +197,8 @@ default:
 /// Library settings plus the selected value-reference, core, and edge layouts.
 ///
 /// The base flags never vary. Unset selectors choose the shipping simple core
-/// and inline value-reference layout; arena candidates are test-only until M6's
-/// measurement gate records otherwise.
+/// and inline value-reference layout. The measured arena and its losing edge
+/// layouts remain explicit test-and-benchmark comparison builds after M6.
 let librarySettings: [SwiftSetting] =
   baseLibrarySettings + valueReferenceLayoutSettings + coreSettings + edgeSettings
 testSettings += valueReferenceLayoutTestSettings + coreTestSettings + edgeTestSettings

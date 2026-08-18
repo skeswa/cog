@@ -1,13 +1,13 @@
 /// Core implementation compiled into the Cog library.
 ///
-/// The build-time selector is internal and changes no public API. The simple
-/// class-state core remains the default while M6 integrates and measures the
-/// arena candidate behind identical behavior tests.
+/// The build-time selector is internal and changes no public API. M6's measured
+/// decision retains the simple class-state core as the shipping default and
+/// the arena behind explicit behavior and benchmark comparison builds.
 internal nonisolated enum CogCoreImplementation: String, Sendable {
   /// The class-state correctness core shipped through 0.1.x.
   case simple
 
-  /// The data-oriented arena candidate built during M6.
+  /// The data-oriented arena retained as a selector-only comparison build.
   case arena
 
   /// The implementation selected by `COG_TEST_CORE` in `Package.swift`.
