@@ -91,4 +91,39 @@ func `EXPORT-12 synchronous mutations coalesce to the newest tracked value`() as
   #expect(selectorRuns == 2)
 }
 
+@available(iOS 26.0, *)
+@MainActor
+@Test(.timeLimit(.minutes(1)))
+func `EXPORT-13 closure tracking coalesces every observed property to its newest value`() async {
+  let model = ExternalObservationModel()
+  var selectorRuns = 0
+  let combinedCog = Cog<Int> { c in
+    selectorRuns += 1
+    return c.track(model) { external in
+      external.tracked * 10 + external.unrelated
+    }
+  }
+  let cogs = Cogs.forTesting()
+  var values = cogs.values(of: combinedCog).makeAsyncIterator()
+
+  #expect(await values.next() == 0)
+  #expect(selectorRuns == 1)
+
+  model.tracked = 1
+  model.unrelated = 2
+  model.tracked = 3
+  await Task.yield()
+
+  #expect(await values.next() == 32)
+  #expect(cogs.peek(combinedCog) == 32)
+  #expect(selectorRuns == 2)
+
+  model.tracked = 4
+  await Task.yield()
+
+  #expect(await values.next() == 42)
+  #expect(cogs.peek(combinedCog) == 42)
+  #expect(selectorRuns == 3)
+}
+
 #endif

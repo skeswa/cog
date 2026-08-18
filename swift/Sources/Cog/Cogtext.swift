@@ -139,9 +139,10 @@ public final class Cogs {
 
   /// External observable properties linked into this context, by exact identity.
   ///
-  /// Each type-erased bridge owns one continuous observer and one hidden source.
-  /// Context ownership keeps the link singular across selector reruns and lets
-  /// teardown cancel every observer before graph storage releases.
+  /// Each type-erased bridge owns one runtime-appropriate observer and one
+  /// hidden source. Context ownership keeps the link singular across selector
+  /// reruns and lets teardown cancel every observer before graph storage
+  /// releases.
   internal var externalObservationBridges:
     [CogExternalObservationIdentity: any CogExternalObservationBridge] = [:]
 
