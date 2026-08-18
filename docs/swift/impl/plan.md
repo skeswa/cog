@@ -184,11 +184,13 @@ Manifest choices:
   isolation gate proves those source dependencies remain absent from the root
   package. Release builds use pinned Xcode 26.6 / Swift 6.3.3 to produce
   native `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0` variants from
-  the Apple Silicon runner. M8 measures whether an unused binary artifact has
-  material fetch cost before it selects the accepted distribution path:
-  root-manifest products when the cost is negligible, otherwise a generated
-  sibling distribution manifest at the same version. That conditional Channel
-  B is the generated `CogLintPlugins` package in `skeswa/coglint-plugins`.
+  the Apple Silicon runner. M8-01e proved that SwiftPM and Xcode eagerly fetch
+  an unused root-manifest binary target, so Channel B is selected: Cog's root
+  manifest stays artifact-free, while the generated `CogLintPlugins` package
+  in `skeswa/coglint-plugins` vends the binary and plugins at the matching
+  version. [lint.md](../design/lint.md) §7 records the exact unreachable-URL
+  fixture, SwiftPM and Xcode fetch logs, measured binary size, and
+  asset-availability probe behind that selection.
 
 ## Plan-to-task contract
 
@@ -206,17 +208,17 @@ prior milestone is a barrier only where the table below or an explicit
 without weakening a milestone gate. Gates diagnose but never absorb repairs;
 the smallest repair task is inserted before a failed gate is rerun.
 
-| Plan milestone                   | Task ledger                     | Decisions before dependent work                                                    | Closing path                                                                                                                                                              |
-| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                           | `M0-10`                                                                                                                                                                   |
-| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-36`                                              | `M1-33c` host matrix, then `M1-32` release gate                                                                                                                           |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available                                                   |
-| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                 | `M3-11`                                                                                                                                                                   |
-| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review; `M4-07a` value-first async reads                      | `M4-05b` candidate → `M4-05c` tag → `M4-15` environment repair → `M4-05d` verification → `M4-05e` GitHub Release                                                          |
-| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility         | `M5-10`                                                                                                                                                                   |
-| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                     | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                            |
-| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                            |
-| M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks) | `M8-01a`–`M8-01d` surface pins; `M8-01e` measured Channel A/B selection            | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` fallback publication or N/A → `M8-15g` exact-consumer gate |
+| Plan milestone                   | Task ledger                     | Decisions before dependent work                                                            | Closing path                                                                                                                                                        |
+| -------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                                   | `M0-10`                                                                                                                                                             |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-36`                                                      | `M1-33c` host matrix, then `M1-32` release gate                                                                                                                     |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy         | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available                                             |
+| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                         | `M3-11`                                                                                                                                                             |
+| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review; `M4-07a` value-first async reads                              | `M4-05b` candidate → `M4-05c` tag → `M4-15` environment repair → `M4-05d` verification → `M4-05e` GitHub Release                                                    |
+| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility                 | `M5-10`                                                                                                                                                             |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                      |
+| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                      |
+| M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks) | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-15g` exact-consumer gate |
 
 ## Task bookkeeping
 
@@ -694,12 +696,12 @@ the 0.1 API vocabulary the rules recognize, but its independent development
 tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
 0.3.0 GitHub Release.
 
-- Settle the remaining product and distribution names, severity and
-  suppression policy, stable diagnostic URL shape, and exact toolchain,
-  dependency, and host-architecture pins before dependent work. Measure
-  unused binary-artifact fetching in both SwiftPM and Xcode, validate the
-  binary-asset publication topology, and select the already bounded Channel A
-  or Channel B path before either distribution manifest changes.
+- Use the settled product and distribution names, severity and suppression
+  policy, stable diagnostic URL shape, and exact toolchain, dependency, and
+  host-architecture pins. M8-01e measured eager unused-artifact fetching in
+  both SwiftPM and Xcode and selected Channel B: keep the root manifest free
+  of lint artifacts and generate the version-coupled sibling distribution
+  only after its Cog Release asset and documentation are available.
 - Create the isolated `swift/Lint` package. Its fixture harness is the
   executable rule specification: triggering and non-triggering examples,
   expected positions, accepted evasions, and the examples rendered into
@@ -729,10 +731,10 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
 - Run the complete linter fixture and integration suite, prepare the
   non-mutating release candidate, and tag `0.4.0`. Publish the checksummed
   binary asset before exact plugin consumption is attempted; verify Pages and
-  the asset first, then either publish the generated sibling tag last under
-  Channel B or record that step not applicable under Channel A. The terminal
-  scratch consumer must resolve the selected channel at exactly 0.4.0, run
-  the matching binary through the plugin, and reach the matching rule docs.
+  the asset first, then publish the generated `CogLintPlugins` sibling tag
+  last. The terminal scratch consumer must resolve that channel at exactly
+  0.4.0, run the matching binary through the plugin, and reach the matching
+  rule docs.
 
 ## Release process
 
@@ -772,20 +774,17 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   and push the annotated tag third. A source-only release then verifies Pages
   and exact consumption before creating the GitHub Release. A binary-backed
   release separates GitHub Release and asset publication, Pages and asset
-  verification, any conditional sibling-repository tag, and exact plugin
+  verification, the Channel B sibling-repository tag, and exact plugin
   consumption into distinct downstream tasks. The tag task never also owns
   workflow creation, asset upload, deployment troubleshooting, or
   post-release smoke testing.
 - Serialization: releases form one dependency-ordered chain. A tag task
-  depends on the previous release's terminal task — including a conditional
-  release's recorded not-applicable closure — so publications never
+  depends on the previous release's terminal task so publications never
   interleave, and the ledger checker enforces the chain. A patch release
   (for example `0.1.1`) inserts a new candidate → tag → verification →
   GitHub Release link into the chain, reusing the M4 task template. A Channel
   B sibling tag is part of its owning Cog release chain and is published only
-  after that Cog tag's docs and artifact verify; under Channel A the
-  corresponding release task records a not-applicable result so the same
-  dependency chain remains total.
+  after that Cog tag's docs and artifact verify.
 
 ## Kotlin headroom
 
@@ -884,12 +883,6 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   `--manifest-cache none`).
 - Whether the per-PR simulator job is fast enough, or should move to
   merge-queue or nightly.
-- Linter distribution facts owned by `M8-01e`: whether SwiftPM and Xcode
-  materially fetch an unused root-manifest binary target, which accepted
-  Channel A/B path that measurement selects, and the exact ordering needed to
-  make the checksummed release asset available before the first exact plugin
-  consumer. Product names, severity, URL, and dependency pins are separate
-  M8 decisions rather than measurement outcomes.
 - A missing-consumer warning for tracked UI reads is unavailable with public
   Observation today. `M2-07` defers it until the framework exposes an exact
   current-tracking query; the direct subscript spelling and automatic framework
