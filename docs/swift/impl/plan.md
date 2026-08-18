@@ -142,7 +142,9 @@ cog/                                  (git root = SwiftPM package root)
 │   │   └── Package.swift             #   deps never touch the shipped library
 │   ├── Lint/                         # SEPARATE SwiftPM development package
 │   │   ├── Package.swift             #   package CogLint; source deps isolated
-│   │   ├── Sources/coglint/          # CLI, rule engine, and reporters
+│   │   ├── Sources/
+│   │   │   ├── CogLintCore/          # package-only parser and rule engine
+│   │   │   └── coglint/              # executable CLI and reporters
 │   │   ├── Plugins/
 │   │   │   ├── CogLintBuildToolPlugin/
 │   │   │   └── CogLintCommandPlugin/
