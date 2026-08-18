@@ -839,11 +839,8 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-_Pending (core §10, open question 14): whether consecutive equal elements each
-commit a turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
-
-- **STREAM-01.** A `.stream` cog commits each element of its sequence as
-  its own turn. Watchers see every committed value.
+- **STREAM-01.** A `.stream` cog commits each changed element of its sequence
+  as its own turn. Watchers see every committed value.
 - **STREAM-02.** Before the first element arrives, the cog reports
   loading.
 - **STREAM-03.** A dependency changes. The old sequence is cancelled and
@@ -871,6 +868,12 @@ commit a turn or are equality-gated (STREAM-01 versus the TURN-09 rule)._
   `CancellationError`. Because Cog initiated that cancellation, no failure
   lands. The same error from a still-current stream Cog never cancelled is an
   ordinary published failure.
+- **STREAM-10.** An `Equatable` stream yields the same value twice, then a
+  different value. The duplicate creates no turn, value or status notice,
+  reaction, or history entry; the later changed element commits normally.
+- **STREAM-11.** A stream value has no equality rule. Cog conservatively
+  commits every element, including two whose fields happen to match, so no
+  implicit reflection or event loss hides a possible change.
 
 ## 16. EXPORT — Exports and interop
 

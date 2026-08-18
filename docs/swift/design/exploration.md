@@ -664,11 +664,11 @@ state. A real app picks one shape per fact — the two appear side by side here
 only to compare them.
 
 `Work` has two forms: `.run { ... }` returns one value, committed as one turn;
-`.stream(sequence)` commits each sequence element as its own turn. The split
-prevents hidden async tracking bugs: every `c[...]` read happens before the work
-starts, so no read can silently stop tracking after an `await`. Changing a
-dependency reruns the selector and creates new work; the policy in §5.2
-decides what happens to the old work.
+`.stream(sequence)` commits each changed sequence element as its own turn. The
+split prevents hidden async tracking bugs: every `c[...]` read happens before
+the work starts, so no read can silently stop tracking after an `await`.
+Changing a dependency reruns the selector and creates new work; the policy in
+§5.2 decides what happens to the old work.
 
 Read the value normally:
 
@@ -780,6 +780,14 @@ not rewrite the already terminal outcome. Cancellation remains cause-sensitive:
 replacement or release initiated by Cog publishes nothing, even when iteration
 surfaces `CancellationError`, while a still-current sequence that Cog never
 cancelled publishes any thrown error—including `CancellationError`—as failure.
+
+Stream elements use the same equality rule as every other Cog state. For an
+`Equatable` value, an element equal to the current success is discarded before
+a graph turn exists: value and status consumers stay quiet, history gains no
+entry, and a later different element still commits normally. Values without an
+equality rule conservatively treat every element as changed. Cog is current
+state, not an event-history transport; callers that must preserve duplicate
+events keep that `AsyncSequence` in an op or reaction instead (§5.4).
 
 ### 5.3 Freshness and lifetime
 
@@ -958,6 +966,7 @@ singular, and does measurement show less runtime work?
 | Streams with async policies?      | `.stream` is `.latest`-only and the type system enforces it (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Natural stream termination?       | Natural end publishes no turn and starts no replacement. The most recent status remains: last success after an element, or pending on the declared default with no accepted success after an empty sequence. Dependency change or refresh starts a new generation; a source that treats empty end as exceptional throws (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Throwing stream failure?          | An error from the still-current stream publishes failure, retains the last success or declared default, and starts no replacement. Before a first element it resolves an exact refresh handle as failure; after an element the handle has already resolved as success and does not change. Cog-initiated replacement or release cancellation stays silent, while a `CancellationError` Cog did not initiate is an ordinary failure (§5.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Equal stream elements?            | Stream elements follow ordinary state equality. An `Equatable` element equal to the current success creates no turn, notice, or history entry; a later changed element commits normally. Without an equality rule every element conservatively counts as changed. Duplicate event history belongs in an op or reaction, not a cog (§2.4, §5.2, §5.4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | State disposal?                   | Per-kind `app`, `whileObserved`, or `cache`; never infer UI liveness from graph edges. A `whileObserved` declaration without an explicit grace uses its context's 30-second production default, and `CogTesting` can override that context default alongside its injected clock. Sources take that policy through a `lifetime:` argument and must say `resetToInitial: true`, because releasing a source can only start it over; the impossible `false` spelling traps at the declaration (§5.3).                                                                                                                                                                                                                                                                                                                                                                                          |
 | State graph count?                | One app-wide `Cogs`. Tests and previews are separate runtimes with one isolated context (§2.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Untracked reads?                  | `c.peek` and one-shot `cogs.peek` skip the dependency edge but still settle the value they return; an untracked read is never stale. Peeking a `whileObserved` synchronous derived or async state is transient demand that renews ordinary grace without installing a durable consumer (§2.4, §5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -1029,9 +1038,11 @@ keeps its slot and points at the table above instead of renumbering the rest.
 13. **Timing modifiers:** §5.4 points `debounce` and `throttle` at "a
     reaction modifier or async-cog option," but no design or milestone
     exists. Deferred backlog.
-14. **Equal stream elements:** §5.2 commits each `.stream` element as its own
-    turn, while §3.2 discards equal writes at flush. Decide which rule wins
-    when a sequence yields consecutive equal elements.
+14. **Equal stream elements:** settled on August 17, 2026. Ordinary state
+    equality wins: an equal `Equatable` element creates no turn or notice,
+    while a value without an equality rule treats every element as changed.
+    Duplicate event history stays outside Cog state. See "Scheduling policies"
+    above.
 15. **One-shot reads of cold async cogs:** settled on August 12, 2026. A
     non-tracking peek or refresh is transient initial demand: it starts one
     run at pending without a durable lease, and ordinary `whileObserved`
