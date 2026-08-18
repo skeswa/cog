@@ -3,7 +3,9 @@
 import Cog
 import CogTesting
 import Observation
+import SwiftUI
 import Testing
+import UIKit
 
 /// Tracks the same graph projection as a card body: one-shot Observation with
 /// the re-render deferred to the next explicit frame.
@@ -207,6 +209,64 @@ private func entriesInLatestTurn(_ cogs: Cogs) -> [CogHistoryEntry] {
   let entries = cogs.debugHistory.entries
   guard let turn = entries.last(where: { $0.event == .turn })?.turn else { return [] }
   return entries.filter { $0.turn == turn }
+}
+
+@MainActor
+@Test(.timeLimit(.minutes(1)))
+func `EXPORT-07 a disappearing Weather map ends its value loop and lease`() async throws {
+  let clock = TestClock()
+  let cogs = Cogs.forTesting(
+    clock: clock,
+    whileObservedGrace: .seconds(10),
+    seeding: { $0.seedCurrentZip(.newYork) }
+  )
+  let focused = MainActorCleanupAcknowledgement()
+  var host: UIHostingController<AnyView>? = UIHostingController(
+    rootView: AnyView(
+      WeatherMapCard { location in
+        #expect(location.zip == .newYork)
+        focused.acknowledge()
+      }
+      .cogEnvironment(cogs)
+    )
+  )
+  let container = UIViewController()
+  let window = UIWindow(frame: UIScreen.main.bounds)
+  window.rootViewController = container
+  window.makeKeyAndVisible()
+
+  let mountedHost = try #require(host)
+  container.addChild(mountedHost)
+  mountedHost.view.frame = container.view.bounds
+  container.view.addSubview(mountedHost.view)
+  mountedHost.didMove(toParent: container)
+
+  // The callback occurs only after the real view task consumes the sequence's
+  // initial settled value and applies it to its local map camera.
+  try await focused.wait()
+  #expect(
+    cogs.debugHistory.entries.contains {
+      $0.event == .offer && $0.name == "values(of:)"
+    }
+  )
+
+  let released = MainActorCleanupAcknowledgement()
+  cogs.acknowledgeNextDerivedRelease(with: released)
+  mountedHost.willMove(toParent: nil)
+  mountedHost.view.removeFromSuperview()
+  mountedHost.removeFromParent()
+  host = nil
+
+  // Disappearance cancels SwiftUI's structured task. Iterator cancellation
+  // removes its exact graph registration, so the last lease starts grace.
+  try await clock.waitForScheduledSleep()
+  clock.advance(by: .seconds(10))
+  try await released.wait()
+  #expect(released.hasBeenAcknowledged)
+
+  window.isHidden = true
+  window.rootViewController = nil
+  clock.finish()
 }
 
 #endif
