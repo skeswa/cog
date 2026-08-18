@@ -135,11 +135,17 @@ internal final class AsyncCogState<Value>:
   /// no accepted success.
   private var lastSuccess: Value?
 
-  /// The cancellation handle for the currently executing generation.
+  /// The cancellation handle for the one run owned by a non-merged policy.
   ///
   /// Latest replacement may detach an older task that ignores cancellation;
   /// ordered policies keep this handle unchanged until the active run finishes.
   private var activeTask: Task<Void, Never>?
+
+  /// Every independently eligible operation currently running under `.merged`.
+  ///
+  /// Membership, rather than newest generation, is the commit boundary. Each
+  /// task removes only its own entry when it publishes or is rejected.
+  private var activeMergedTasks: [UInt64: Task<Void, Never>] = [:]
 
   /// The exact generation currently executing, independent of later queue IDs.
   ///
@@ -159,17 +165,17 @@ internal final class AsyncCogState<Value>:
 
   /// The monotonically increasing identity assigned to accepted work.
   ///
-  /// Latest policy uses the newest ID as its acceptance boundary. Ordered
-  /// policies may have larger IDs waiting while `activeRunGeneration`
-  /// identifies the only request allowed to complete. Lifetime release advances
-  /// the counter so no detached task can revive a removed state.
+  /// Latest uses the newest ID as its acceptance boundary; queue and exhaust
+  /// compare their separate active ID while later work waits; merged uses IDs
+  /// as keys in its live-task set. Lifetime release advances the counter so no
+  /// detached task can revive a removed state.
   private var generation: UInt64 = 0
 
   /// Awaitable explicit-refresh handles, filed by their exact generation.
   ///
-  /// Ordinary read- or dependency-started generations need no cell. Starting
-  /// replacement work resolves every older cell as superseded; lifetime
-  /// release resolves the remaining cells as released.
+  /// Ordinary read- or dependency-started generations need no cell. A policy
+  /// that replaces accepted work resolves that exact cell as superseded;
+  /// lifetime release resolves every remaining cell as released.
   private var refreshWaiters: [UInt64: CogRefreshWaiter<Value>] = [:]
 
   /// The last completed status available to `Reader.curr`, preserving initial absence.
@@ -271,6 +277,11 @@ internal final class AsyncCogState<Value>:
     exhaustCatchUp = nil
     activeTask?.cancel()
     activeTask = nil
+    let mergedTasks = Array(activeMergedTasks.values)
+    activeMergedTasks.removeAll(keepingCapacity: false)
+    for task in mergedTasks {
+      task.cancel()
+    }
     activeRunGeneration = nil
   }
 
@@ -353,7 +364,13 @@ internal final class AsyncCogState<Value>:
         // remains deferred until the active run reaches a terminal result.
         markChecked(at: cogs.revision)
       }
-    case .latest, .merged:
+    case .merged:
+      publishPending(in: cogs, in: pendingTurn)
+      if let refreshWaiter {
+        register(refreshWaiter, for: runGeneration)
+      }
+      launch(operation, generation: runGeneration, in: cogs)
+    case .latest:
       publishPending(in: cogs, in: pendingTurn)
       resolveRefreshes(as: .superseded)
       if let refreshWaiter {
@@ -433,14 +450,13 @@ internal final class AsyncCogState<Value>:
     launch(run.operation, generation: run.generation, in: cogs)
   }
 
-  /// Creates the sole task for one accepted one-shot generation.
+  /// Creates one task and installs it under the policy's eligibility rule.
   private func launch(
     _ operation: @escaping @Sendable @isolated(any) () async throws -> sending Value,
     generation runGeneration: UInt64,
     in cogs: Cogs
   ) {
-    activeRunGeneration = runGeneration
-    activeTask = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
+    let task = Task(name: renderedName) { @MainActor [weak self, weak cogs] in
       do {
         let value = try await operation()
         guard let cogs else { return }
@@ -451,7 +467,12 @@ internal final class AsyncCogState<Value>:
           return
         }
         self.lastSuccess = .some(value)
-        self.publish(.success(value), named: "success", in: cogs)
+        self.publish(
+          .success(value),
+          completing: runGeneration,
+          named: "success",
+          in: cogs
+        )
         self.resolveRefresh(for: runGeneration, as: .success(value))
         switch self.descriptor.policy {
         case .queue:
@@ -476,6 +497,7 @@ internal final class AsyncCogState<Value>:
             value: self.lastSuccess ?? self.descriptor.defaultValue,
             hasSucceeded: self.lastSuccess != nil
           ),
+          completing: runGeneration,
           named: "failure",
           in: cogs
         )
@@ -489,6 +511,12 @@ internal final class AsyncCogState<Value>:
           break
         }
       }
+    }
+    if descriptor.policy == .merged {
+      activeMergedTasks[runGeneration] = task
+    } else {
+      activeRunGeneration = runGeneration
+      activeTask = task
     }
   }
 
@@ -540,22 +568,29 @@ internal final class AsyncCogState<Value>:
 
   /// Whether work selected from one generation may publish into current state.
   ///
-  /// The active generation is newest under replacement policies and the FIFO
-  /// head under queue policy. The stored-object and clean-state checks remain
-  /// independent: an unobserved dirty state rejects work even when its task ID
-  /// still matches, forcing the next consumer to select current dependencies.
+  /// Latest accepts only the newest generation, serial ordered policies accept
+  /// their active generation, and merged accepts every generation still in its
+  /// live set. The stored-object and clean-state checks remain independent: an
+  /// unobserved dirty state rejects otherwise-live work and forces the next
+  /// consumer to select current dependencies.
   private func acceptsResult(for runGeneration: UInt64, in cogs: Cogs) -> Bool {
     let generationIsAccepted =
       switch descriptor.policy {
       case .queue, .exhaustLatest:
         activeRunGeneration == runGeneration
-      case .latest, .merged:
+      case .latest:
         generation == runGeneration
+      case .merged:
+        activeMergedTasks[runGeneration] != nil
       }
     guard generationIsAccepted, cogs.stillStoresAsyncState(self) else { return false }
     guard settleState == .clean else {
-      activeTask = nil
-      activeRunGeneration = nil
+      if descriptor.policy == .merged {
+        activeMergedTasks.removeValue(forKey: runGeneration)
+      } else {
+        activeTask = nil
+        activeRunGeneration = nil
+      }
       markDirty()
       return false
     }
@@ -576,13 +611,22 @@ internal final class AsyncCogState<Value>:
 
   /// Publishes one accepted work result as its own named system turn.
   ///
-  /// Clearing the handle records that no current task remains; generation still
-  /// guards any older task that outlived replacement cancellation. If graph
-  /// evaluation is active, `stage` queues publication; completion never nests a
-  /// turn into selector or reaction tracking.
-  private func publish(_ status: CogStatus<Value>, named statusName: String, in cogs: Cogs) {
-    activeTask = nil
-    activeRunGeneration = nil
+  /// A serial policy clears its sole handle; merged removes only the completing
+  /// generation so other overlapping runs stay eligible. If graph evaluation
+  /// is active, `stage` queues publication; completion never nests a turn into
+  /// selector or reaction tracking.
+  private func publish(
+    _ status: CogStatus<Value>,
+    completing runGeneration: UInt64,
+    named statusName: String,
+    in cogs: Cogs
+  ) {
+    if descriptor.policy == .merged {
+      activeMergedTasks.removeValue(forKey: runGeneration)
+    } else {
+      activeTask = nil
+      activeRunGeneration = nil
+    }
     stage(status, named: statusName, in: cogs)
   }
 
