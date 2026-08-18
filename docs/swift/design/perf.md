@@ -706,6 +706,12 @@ unchanged library. `M6-12c`, `M6-12d`, and `M6-12e` are consequently not
 applicable; M6 closes on the recorded evidence above, and M7 may start from the
 unchanged simple default.
 
+Conditional publication disposition:
+
+- **M6-12c — not applicable.** No `0.2.0` candidate was approved, so no
+  annotated tag was created or pushed. The remote `refs/tags/0.2.0` remains
+  absent.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
