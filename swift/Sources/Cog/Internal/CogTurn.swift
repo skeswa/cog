@@ -235,7 +235,8 @@ extension Cogs {
   /// Runs one idle → accumulating → flushing → idle transition.
   ///
   /// Flush order is part of correctness: publish staged state, settle and notify
-  /// UI roots, run reactions against that completed revision, then return idle.
+  /// UI roots, offer changed exports, run reactions against that completed
+  /// revision, then return idle.
   /// Reactions may enqueue write-back or async publication, but none may reenter
   /// this sequence; the caller drains them after `finishTurn`.
   private func runOuterTurn(named name: String, _ body: (CogTurn) -> Void) {

@@ -19,7 +19,7 @@ private nonisolated struct CogArenaHistoryRecord: Sendable {
 /// Raw diagnostic identity retained beside one arena history record.
 ///
 /// Arena graph work records the integer descriptor dispatch index and key. Turn
-/// and hybrid effect paths retain their already-existing names or labels; these
+/// and hybrid terminal paths retain their already-existing names or labels; these
 /// cold values are bounded by the same ring and never enter release builds.
 private enum CogArenaHistorySubject {
   /// Name supplied by one outer application or system turn.
@@ -30,6 +30,9 @@ private enum CogArenaHistorySubject {
 
   /// Transitional class-state event not yet migrated to an arena row.
   case cog(label: CogLabel, key: CogKey?)
+
+  /// Export label retained while offers use their class terminal bridge.
+  case offer(CogLabel)
 
   /// Reaction or watch label retained while effects use their class bridge.
   case effect(CogLabel)
@@ -56,7 +59,7 @@ internal struct CogArenaHistoryLog {
   /// Next physical overwrite position once both rings are full.
   private var next = 0
 
-  /// Turn ordinal stamped onto later state and effect records.
+  /// Turn ordinal stamped onto later state, offer, and effect records.
   private var turn: UInt64 = 0
 
   /// Records one outer turn before its staging body begins.
@@ -79,6 +82,11 @@ internal struct CogArenaHistoryLog {
     record(event: event, subject: .cog(label: label, key: key))
   }
 
+  /// Records one export offer in the shared arena event order.
+  mutating func recordOffer(label: CogLabel) {
+    record(event: .offer, subject: .offer(label))
+  }
+
   /// Records one reaction or watch run in the shared arena event order.
   mutating func recordEffect(label: CogLabel) {
     record(event: .effect, subject: .effect(label))
@@ -99,6 +107,8 @@ internal struct CogArenaHistoryLog {
           .cog(resolveDescriptor(descriptor), key)
         case .cog(let label, let key):
           .cog(label, key)
+        case .offer(let label):
+          .offer(label)
         case .effect(let label):
           .effect(label)
         }
