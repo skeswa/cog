@@ -13,6 +13,12 @@ Thresholds/
 !swift/Benchmarks/Thresholds/
 !swift/Benchmarks/Thresholds/*.p90.json
 
+# CogLint artifact-bundle products. The source, exact pins, and reproducible
+# build/selection pipeline are committed; release binaries are not.
+swift/Lint/Artifacts/CogLintBinary.artifactbundle/
+swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
+swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
+
 # Xcode
 DerivedData/
 *.xcuserstate

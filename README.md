@@ -92,6 +92,8 @@ mise run test:value-references # all three value-reference layouts
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
 mise run test:lint      # guarded tests for the separate CogLint package
+mise run build:lint-artifact # build/checksum both native CogLint variants
+mise run test:lint-artifact # prove SwiftPM host-variant selection/execution
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
 mise run bench          # run the separate release benchmark package
