@@ -21,21 +21,6 @@ public struct Work<Value> {
     self.storage = storage
   }
 
-  /// Extracts one-shot work for the retained arena research core.
-  ///
-  /// The selected simple core dispatches the tagged storage directly. Arena
-  /// remains an M6 selector-only benchmark candidate and still consumes its
-  /// original one-shot projection; keeping that buildable does not claim stream
-  /// behavior for the unselected core.
-  internal var operation: @Sendable @isolated(any) () async throws -> sending Value {
-    switch storage {
-    case .run(let operation):
-      return operation
-    case .stream:
-      fatalError("Stream work is unavailable in the unselected arena research core.")
-    }
-  }
-
   /// Describes one deferred, throwing value-producing operation.
   ///
   /// The body does not run during this call. An unannotated body inherits the
