@@ -11,13 +11,17 @@ swift-syntax 603.0.2 and swift-argument-parser 1.8.2 pins. Its committed
 `Package.resolved` makes the corresponding revisions part of the release
 toolchain contract.
 
-Until M8-02b adds the guarded test wrapper, build and run the unfiltered
-scaffold tests from the repository root with:
+Build the executable and run the guarded tests from the repository root with:
 
 ```console
 swift package --package-path swift/Lint build
-swift package --package-path swift/Lint test
+mise run test:lint
 ```
+
+Extra test arguments pass through, including scenario filters such as
+`mise run test:lint --filter LINT-02`. The wrapper enumerates tests before the
+run, rejects an unmatched filter or unmatched top-level alternative, and
+requires its xUnit report to contain a nonzero authoritative executed count.
 
 `rootManifestExcludesLintDependencies` removes the opt-in DocC environment
 gate and asks SwiftPM for the root package's JSON dependency graph. The test

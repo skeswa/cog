@@ -91,6 +91,7 @@ mise run test:cores     # verify default simple; behavior under both cores
 mise run test:value-references # all three value-reference layouts
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
+mise run test:lint      # guarded tests for the separate CogLint package
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
 mise run bench          # run the separate release benchmark package
@@ -103,10 +104,11 @@ mise run docs           # build the DocC archive into .build/docs
 `swift/CompileFail/`, and `mise run workflows:check` validates the GitHub
 Actions hardening contract.
 
-Tests always run through the `mise` wrapper rather than `swift test`, because
-SwiftPM exits 0 when `--filter` selects nothing and the wrapper fails instead.
-Pass arguments straight through:
-`mise run test --filter 'DECL-01|ONE-05' --parallel`.
+Tests always run through a `mise` wrapper rather than filtered `swift test`,
+because SwiftPM exits 0 when `--filter` selects nothing and the wrappers fail
+instead. Pass arguments straight through:
+`mise run test --filter 'DECL-01|ONE-05' --parallel` or
+`mise run test:lint --filter LINT-02`.
 
 `AGENTS.md` and `CLAUDE.md` carry the full command reference, the repository
 layout, and the version-control conventions.
