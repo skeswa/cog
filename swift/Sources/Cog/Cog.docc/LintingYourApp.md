@@ -36,7 +36,7 @@ targets: [
     plugins: [
       .plugin(
         name: "CogLintBuildToolPlugin",
-        package: "CogLintPlugins"
+        package: "coglint-plugins"
       )
     ]
   ),

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const LINT_PACKAGE = join(REPO_ROOT, "swift", "Lint");
 const DOCC_CATALOG = join(REPO_ROOT, "swift", "Sources", "Cog", "Cog.docc");
+const SETUP_GUIDE = join(DOCC_CATALOG, "LintingYourApp.md");
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-documentation-test");
 const GENERATED = join(TEST_ROOT, "generated");
 const ARCHIVE = join(REPO_ROOT, ".build", "docs", "Cog.doccarchive");
@@ -53,6 +54,7 @@ function main() {
     { stdio: "inherit" },
   );
   verifyGeneratedParity();
+  verifySetupGuide();
 
   console.log("\n==> Build the statically hosted Cog.docc archive");
   run("mise", ["run", "docs"], { cwd: REPO_ROOT, stdio: "inherit" });
@@ -64,6 +66,30 @@ function main() {
   console.log(
     "\nPASS LINT-22: all six permanent URLs resolve and every article matches its fixture corpus",
   );
+}
+
+/** Requires the documented product reference to equal the URL-derived package identity. */
+function verifySetupGuide() {
+  const guide = readFileSync(SETUP_GUIDE, "utf8");
+  const dependency = guide.match(
+    /\.package\(\s*url: "(https:\/\/github\.com\/skeswa\/coglint-plugins\.git)",\s*exact: "([^"]+)"\s*\)/s,
+  );
+  const plugin = guide.match(
+    /\.plugin\(\s*name: "CogLintBuildToolPlugin",\s*package: "([^"]+)"\s*\)/s,
+  );
+  if (dependency === null || plugin === null) {
+    fail("lint setup guide is missing its exact Channel B dependency or build-tool plugin");
+  }
+
+  const repository = new URL(dependency[1]).pathname.split("/").at(-1);
+  const packageIdentity = repository.replace(/\.git$/, "").toLowerCase();
+  if (plugin[1] !== packageIdentity) {
+    fail(`lint setup guide references package ${plugin[1]}; URL identity is ${packageIdentity}`);
+  }
+  if (dependency[2] !== "0.4.0") {
+    fail(`lint setup guide pins ${dependency[2]}; expected the current release 0.4.0`);
+  }
+  console.log(`==> Setup guide binds CogLintBuildToolPlugin to ${packageIdentity} 0.4.0`);
 }
 
 /** Defines one canonical rule route and its two independent source owners. */

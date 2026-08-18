@@ -1856,7 +1856,7 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Verify: selected-channel record and, for Channel B, remote sibling tag and manifest._
 - **M8-15g** _(Gate)_ — Prove exact 0.4.0 consumption through the selected
   distribution channel in a scratch iOS 17 app.
-  _Depends: M8-15f._
+  _Depends: M8-18._
   _Verify: exact-consumer plugin build and documentation-link suite for LINT-23._
   _Greens: LINT-23._
 - **M8-16** _(Infrastructure)_ — Prepare the 0.4.0 release notes and consumer
@@ -1872,3 +1872,9 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Verify: `mise run workflows:check`, a green artifact job for the exact
   source SHA, and downloaded checksum/provenance matching the two successful
   host-selection probes._
+- **M8-18** _(Infrastructure)_ — Correct the Channel B package identity in the
+  consumer setup guide and permanently derive that spelling from its
+  repository URL.
+  _Depends: M8-15f._
+  _Verify: `mise run test:lint-documentation`, `mise run fmt:check`, and
+  `mise run tasks:check`._
