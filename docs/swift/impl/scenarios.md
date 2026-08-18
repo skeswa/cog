@@ -813,9 +813,6 @@ _Milestone M7. Design: §5.2, §5.4._
 
 When order matters more than speed, I pick a policy that says so.
 
-_Pending (core §10, open question 10): whether a failed `.queue` run stops
-the queue or the next queued run still starts._
-
 - **POLICY-01.** After the initial run succeeds, three quick dependency
   changes under `.queue` make exactly three additional runs, one at a time
   and in input order. Each run starts only after the preceding one
@@ -829,6 +826,12 @@ the queue or the next queued run still starts._
   its own turn when it lands.
 - **POLICY-05.** A `.stream` selector cannot use `.queue`,
   `.exhaustLatest`, or `.merged`. The type system says no. (Proof: compile-fail.)
+- **POLICY-06.** Two refreshes queue behind a settled value. The first run
+  fails, publishes failure while retaining the last success, and resolves
+  only its own handle as failure. The next accepted run then starts, publishes
+  its own pending turn with that retained value, succeeds, and resolves only
+  its own handle as success; one failure never stops the queue or strands
+  later work.
 
 ## 15. STREAM — Streams
 
