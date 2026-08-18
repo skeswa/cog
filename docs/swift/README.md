@@ -72,10 +72,12 @@ The design lives in [design/](./design/); the implementation effort lives in
 
 ## Building and testing
 
-The package and its M1 simple correctness core are being implemented now. The
-SwiftUI boundary and later async slices have not landed yet. The repository is
-a SwiftPM package rooted at the git root, with every Swift target under
-`swift/`. Commands are mise tasks; `mise tasks` lists them all.
+The package is implemented through M7: the simple shipping core, SwiftUI
+boundary, mechanisms, lifetimes, async policies and streams, exports, and
+external Observation tracking are all present. The measured arena core remains
+an internal comparison build. The repository is a SwiftPM package rooted at the
+git root, with every Swift target under `swift/`. Commands are mise tasks;
+`mise tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
@@ -402,5 +404,8 @@ full review.
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
 without a 0.2.0 release: its measured core decision keeps the simple
 implementation as the shipping default and the arena as an internal comparison
-build. M7 completes async policies, streams, and exports behind the same public
-behavior suite before the next release gate.
+build. M7 implementation and its complete behavior gate are green; the 0.3.0
+release chain is preparing the candidate that contains async policies, streams,
+exports, and external Observation tracking. M8 develops first-party lint
+tooling next, while its publication remains serialized behind the 0.3.0
+release.

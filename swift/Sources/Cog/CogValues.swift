@@ -61,7 +61,7 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
 
 /// A current-value-first asynchronous subscription to one Cog value.
 ///
-/// Create this sequence with ``Cogs/values(of:)-(Cog<Value>)`` or its manual
+/// Create this sequence with ``Cogs/values(of:buffering:)-(Cog<Value>,_)`` or its manual
 /// and async overloads. Creating an iterator establishes an independent graph
 /// subscription, settles a cold value synchronously, and places that settled
 /// value first. Later changed values are offered without making a graph turn
