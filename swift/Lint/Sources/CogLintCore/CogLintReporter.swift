@@ -5,6 +5,9 @@ package enum CogLintReporter: String, CaseIterable, Sendable {
 
   /// Escaped workflow-command annotations consumed by GitHub Actions.
   case github
+
+  /// A SARIF 2.1.0 log consumed by GitHub code scanning and other analyzers.
+  case sarif
 }
 
 /// Reporter-specific views over one immutable, reporter-neutral finding.
@@ -26,10 +29,11 @@ extension CogLintExecution {
   }
 
   /// Serializes the execution through one selected reporter.
-  package func output(for reporter: CogLintReporter) -> String {
+  package func output(for reporter: CogLintReporter) throws -> String {
     switch reporter {
     case .xcode: xcodeOutput
     case .github: githubOutput
+    case .sarif: try sarifOutput()
     }
   }
 }
