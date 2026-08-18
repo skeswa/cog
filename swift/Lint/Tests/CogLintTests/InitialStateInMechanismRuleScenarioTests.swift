@@ -1,0 +1,60 @@
+import CogLintCore
+import CogLintFixtures
+import Foundation
+import Testing
+
+// MARK: - LINT-10
+
+/// Proves forbidden bootstrap-local work before and after retention.
+@Test func `LINT-10 bootstrap local fixture is the rule specification`() {
+  #expect(
+    CogLintFixtureHarness.failures(in: CogLintFixtureRegistry.initialStateInMechanism).isEmpty
+  )
+}
+
+/// Proves the production registry diagnoses a correctly wrapped but misplaced domain op.
+@Test func `LINT-10 production registry reports bootstrap-local domain work`() throws {
+  let root = FileManager.default.temporaryDirectory
+    .appending(path: "coglint-initial-state-\(UUID().uuidString)", directoryHint: .isDirectory)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+  try "struct MainApp: App { init() { let cogs = Cogs.bootstrapApp(); cogs.seedWorld() } }\n".write(
+    to: root.appending(path: "MainApp.swift"),
+    atomically: true,
+    encoding: .utf8
+  )
+
+  let execution = try CogLintEngine.lint(
+    paths: ["MainApp.swift"],
+    relativeTo: root,
+    targetRole: .production,
+    rules: CogLintRuleRegistry.all
+  )
+
+  #expect(execution.exitCode == 1)
+  #expect(
+    execution.xcodeOutput
+      == "MainApp.swift:1:64: error: [initial-state-in-mechanism] `cogs` may only retain the result of `Cogs.bootstrapApp`; move initial graph work into a bootstrap mechanism — https://skeswa.github.io/cog/documentation/cog/initialstateinmechanism\n"
+  )
+}
+
+// MARK: - LINT-11
+
+/// Proves both settled direct-retention spellings remain conforming.
+@Test func `LINT-11 direct bootstrap retention needs no local analysis`() {
+  let source = CogLintParser.parse(
+    source:
+      """
+      struct DirectApp: App {
+        private let cogs: Cogs
+        init() { cogs = Cogs.bootstrapApp() }
+      }
+      struct WrappedApp: App {
+        @State private var cogs: Cogs
+        init() { _cogs = .init(initialValue: Cogs.bootstrapApp()) }
+      }
+      """
+  )
+  let context = CogLintRuleContext(targetRole: .production)
+  #expect(InitialStateInMechanismRule().violations(in: source, context: context).isEmpty)
+}

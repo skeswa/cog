@@ -5,6 +5,7 @@ package enum CogLintFixtureRegistry {
     cogDeclarationSuffix,
     noCogsInViewInit,
     primitivesOnlyInOps,
+    initialStateInMechanism,
     manualCogPrivate,
   ]
 }
