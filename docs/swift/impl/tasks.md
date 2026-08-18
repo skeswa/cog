@@ -1634,8 +1634,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Greens: EXPORT-13._
 - **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
-  _Depends: M7-03c, M7-04, M7-05, M7-06b, M7-06c, M7-06d, M7-07b,
-  M7-10c, M7-11a, M7-11b, M7-12, M7-15._
+  _Depends: M7-10c, M7-11a, M7-11b, M7-12, M7-15, M7-17._
   _Verify: complete host, release, simulator, Weather, available floor, and
   compile-fail suites._
   _Greens: COUNT-11._
@@ -1654,6 +1653,13 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
 - **M7-16e** _(Release)_ — Publish the 0.3.0 GitHub Release.
   _Depends: M7-16d._
   _Verify: published GitHub Release points at the approved tag._
+- **M7-17** _(Infrastructure)_ — Repair the arena async sidecar so ordered
+  policies and latest streams preserve their selected scheduler and work shape
+  instead of applying latest one-shot semantics to every declaration.
+  _Depends: M7-03c, M7-04, M7-05, M7-06b, M7-06c, M7-06d, M7-07b._
+  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline COG_TEST_CORE=arena
+COG_TEST_EDGE=pool mise run test --filter
+'POLICY-(01|02|03|04|06)|STREAM-(0[1-9]|1[01])'`._
 
 ## M8 tasks
 
