@@ -27,10 +27,11 @@ package enum CogLintFixtureHarness {
   package static func failures(in fixture: CogLintRuleFixture) -> [CogLintFixtureFailure] {
     var failures: [CogLintFixtureFailure] = []
     validateStructure(of: fixture, into: &failures)
+    let context = CogLintRuleContext(targetRole: fixture.targetRole)
 
     for triggering in fixture.triggering {
       let source = CogLintParser.parse(source: triggering.example.source)
-      let actual = positions(of: fixture.rule.violations(in: source), in: source)
+      let actual = positions(of: fixture.rule.violations(in: source, context: context), in: source)
       if actual != triggering.positions {
         failures.append(
           CogLintFixtureFailure(
@@ -42,10 +43,22 @@ package enum CogLintFixtureHarness {
     }
 
     for example in fixture.nonTriggering {
-      validateClean(example, category: "non-triggering", rule: fixture.rule, into: &failures)
+      validateClean(
+        example,
+        category: "non-triggering",
+        rule: fixture.rule,
+        context: context,
+        into: &failures
+      )
     }
     for example in fixture.acceptedEvasions {
-      validateClean(example, category: "accepted evasion", rule: fixture.rule, into: &failures)
+      validateClean(
+        example,
+        category: "accepted evasion",
+        rule: fixture.rule,
+        context: context,
+        into: &failures
+      )
     }
 
     return failures
@@ -147,10 +160,11 @@ package enum CogLintFixtureHarness {
     _ example: CogLintFixtureExample,
     category: String,
     rule: any CogLintRule,
+    context: CogLintRuleContext,
     into failures: inout [CogLintFixtureFailure]
   ) {
     let source = CogLintParser.parse(source: example.source)
-    let actual = positions(of: rule.violations(in: source), in: source)
+    let actual = positions(of: rule.violations(in: source, context: context), in: source)
     if !actual.isEmpty {
       failures.append(
         CogLintFixtureFailure(

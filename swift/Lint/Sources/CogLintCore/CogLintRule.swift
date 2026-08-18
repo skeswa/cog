@@ -14,8 +14,32 @@ package protocol CogLintRule: Sendable {
   /// The permanent article URL that teaches the convention behind this rule.
   var helpURL: URL { get }
 
-  /// Returns violations in deterministic source order for `source`.
-  func violations(in source: SourceFileSyntax) -> [CogLintViolation]
+  /// Returns violations in deterministic source order for `source` and `context`.
+  func violations(in source: SourceFileSyntax, context: CogLintRuleContext) -> [CogLintViolation]
+}
+
+/// The declared role of the target whose source files are being checked.
+///
+/// Role is invocation configuration, never inferred from path spelling. Most
+/// rules behave identically in both roles; `primitives-only-in-ops` uses the
+/// test role to permit direct graph driving in test targets.
+package enum CogLintTargetRole: String, CaseIterable, Sendable {
+  /// Application and library production source with every convention enabled.
+  case production
+
+  /// Test source with the explicitly documented primitive-call exemption.
+  case test
+}
+
+/// Invocation-wide configuration visible to every syntax rule.
+package struct CogLintRuleContext: Equatable, Sendable {
+  /// Whether the selected files belong to a production or test target.
+  package let targetRole: CogLintTargetRole
+
+  /// Creates the rule context for one explicitly selected target role.
+  package init(targetRole: CogLintTargetRole) {
+    self.targetRole = targetRole
+  }
 }
 
 /// The production rule set evaluated by the bare CLI and both plugin surfaces.

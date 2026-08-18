@@ -62,6 +62,9 @@ package struct CogLintRuleFixture: Sendable {
   /// The rule executed against every source example.
   package let rule: any CogLintRule
 
+  /// The explicit target role supplied while executing this corpus.
+  package let targetRole: CogLintTargetRole
+
   /// Examples that must report at the listed exact positions.
   package let triggering: [CogLintTriggeringExample]
 
@@ -77,11 +80,13 @@ package struct CogLintRuleFixture: Sendable {
   /// fixtures and prove those failures are diagnosed instead of trapped.
   package init(
     rule: any CogLintRule,
+    targetRole: CogLintTargetRole = .production,
     triggering: [CogLintTriggeringExample],
     nonTriggering: [CogLintFixtureExample],
     acceptedEvasions: [CogLintFixtureExample]
   ) {
     self.rule = rule
+    self.targetRole = targetRole
     self.triggering = triggering
     self.nonTriggering = nonTriggering
     self.acceptedEvasions = acceptedEvasions

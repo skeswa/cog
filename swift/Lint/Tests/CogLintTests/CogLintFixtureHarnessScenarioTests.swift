@@ -113,7 +113,10 @@ private struct FixtureSentinelRule: CogLintRule {
   let helpURL = URL(string: "https://example.invalid/fixture-sentinel")!
 
   /// Reports the exact token spelling reserved as the sentinel violation.
-  func violations(in source: SourceFileSyntax) -> [CogLintViolation] {
+  func violations(
+    in source: SourceFileSyntax,
+    context _: CogLintRuleContext
+  ) -> [CogLintViolation] {
     source.tokens(viewMode: .sourceAccurate).compactMap { token in
       guard token.text == "badName" else { return nil }
       return CogLintViolation(message: "sentinel violation", at: token)

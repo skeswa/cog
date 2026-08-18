@@ -36,6 +36,7 @@ import Testing
     let execution = try CogLintEngine.lint(
       paths: ["Zeta.swift", "."],
       relativeTo: root,
+      targetRole: .production,
       rules: [EngineSentinelRule()]
     )
 
@@ -57,6 +58,7 @@ import Testing
     let execution = try CogLintEngine.lint(
       paths: ["Clean.swift"],
       relativeTo: root,
+      targetRole: .production,
       rules: [EngineSentinelRule()]
     )
 
@@ -75,7 +77,10 @@ private struct EngineSentinelRule: CogLintRule {
   let helpURL = URL(string: "https://example.invalid/fixture-sentinel")!
 
   /// Finds every sentinel token in source order.
-  func violations(in source: SourceFileSyntax) -> [CogLintViolation] {
+  func violations(
+    in source: SourceFileSyntax,
+    context _: CogLintRuleContext
+  ) -> [CogLintViolation] {
     source.tokens(viewMode: .sourceAccurate).compactMap { token in
       guard token.text == "badName" else { return nil }
       return CogLintViolation(message: "sentinel violation", at: token)
