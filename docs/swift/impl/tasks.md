@@ -1510,6 +1510,11 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-03a._
   _Verify: `mise run test --filter POLICY-02`._
   _Greens: POLICY-02._
+- **M7-03c** _(Behavior)_ — Continue a queue after a failed run while keeping
+  failure publication and refresh outcomes bound to their exact runs.
+  _Depends: M7-03b._
+  _Verify: `mise run test --filter POLICY-06`._
+  _Greens: POLICY-06._
 - **M7-04** _(Behavior)_ — Finish current exhaust work and run one catch-up
   from the newest state.
   _Depends: M7-02._
@@ -1613,7 +1618,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Greens: EXPORT-13._
 - **M7-16a** _(Gate)_ — Run the complete behavior suite on the selected value-reference,
   edge, and core layouts after every M7 track converges.
-  _Depends: M7-03b, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
+  _Depends: M7-03c, M7-04, M7-05, M7-07b, M7-10c, M7-11a, M7-11b,
   M7-12, M7-15._
   _Verify: complete host, release, simulator, Weather, available floor, and
   compile-fail suites._
