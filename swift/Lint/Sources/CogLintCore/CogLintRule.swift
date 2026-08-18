@@ -51,6 +51,7 @@ package enum CogLintRuleRegistry {
   /// The rules enabled for production targets, in stable registration order.
   package static let all: [any CogLintRule] = [
     CogDeclarationSuffixRule(),
+    NoCogsInViewInitRule(),
     ManualCogPrivateRule(),
   ]
 }
