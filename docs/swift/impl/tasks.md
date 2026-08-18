@@ -1640,7 +1640,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Greens: COUNT-11._
 - **M7-16b** _(Gate)_ — Prepare the non-mutating 0.3.0 release candidate,
   including benchmarks, docs, and changelog.
-  _Depends: M7-16a._
+  _Depends: M7-18._
   _Verify: approved release checklist with immutable CI links._
 - **M7-16c** _(Release)_ — Create and push the annotated `0.3.0` tag, only
   after the 0.2.0 chain has resolved — published, or closed with `M6-12a`'s
@@ -1660,6 +1660,11 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline COG_TEST_CORE=arena
 COG_TEST_EDGE=pool mise run test --filter
 'POLICY-(01|02|03|04|06)|STREAM-(0[1-9]|1[01])'`._
+- **M7-18** _(Infrastructure)_ — Prepare the 0.3.0 release notes and consumer
+  documentation: changelog, current package pin, status snapshots, and a DocC
+  guide connecting M7 streams, exports, and external Observation tracking.
+  _Depends: M7-16a._
+  _Verify: `mise run docs`, `mise run fmt:check`, and `mise run tasks:check`._
 
 ## M8 tasks
 
