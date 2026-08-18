@@ -21,6 +21,7 @@ swift run --package-path swift/Lint coglint swift/Sources
 mise run test:lint
 mise run build:lint-artifact
 mise run test:lint-artifact
+mise run test:lint-build-tool-plugin
 ```
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
@@ -29,6 +30,13 @@ executables, the release `.artifactbundle.zip`, and its SwiftPM checksum under
 rebuilds them and runs a scratch SwiftPM command plugin under both arm64 and
 Rosetta, requiring the selected path to name the matching metadata variant and
 the selected executable to serve its real CLI help.
+
+The build-tool plugin receives the exact Swift membership of its target and
+runs the binary in Xcode reporter mode before compilation. It keeps a
+content-addressed result under the target-specific plugin work directory. An
+unchanged build replays the same diagnostics and failing status without
+reparsing; the LINT-17 suite proves that behavior in both a scratch SwiftPM
+package and a macOS Xcode project.
 
 `coglint` accepts an explicit mix of Swift files and directories. Directories
 are searched recursively, hidden descendants are skipped, overlapping inputs
