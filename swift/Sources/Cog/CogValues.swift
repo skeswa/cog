@@ -11,6 +11,13 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
   /// settled value without making intervening commits wait.
   case newest(Int)
 
+  /// Keep the first `limit` undelivered values, discarding newer overflow.
+  ///
+  /// A limit must be greater than zero. This policy preserves the earliest
+  /// unseen transitions for consumers that prefer ordered backlog over the
+  /// newest state, while commits remain non-blocking when that backlog is full.
+  case oldest(Int)
+
   /// Creates the standard-library stream storage for this public policy.
   ///
   /// Policy validation happens when a subscription iterator is created, before
@@ -26,6 +33,14 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
       return AsyncStream.makeStream(
         of: Value.self,
         bufferingPolicy: .bufferingNewest(limit)
+      )
+    case .oldest(let limit):
+      guard limit > 0 else {
+        fatalError("CogValuesBuffering.oldest requires a limit greater than zero.")
+      }
+      return AsyncStream.makeStream(
+        of: Value.self,
+        bufferingPolicy: .bufferingOldest(limit)
       )
     }
   }
