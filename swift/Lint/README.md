@@ -23,6 +23,8 @@ mise run build:lint-artifact
 mise run test:lint-artifact
 mise run test:lint-build-tool-plugin
 mise run test:lint-command-plugin
+mise run build:lint-distribution
+mise run test:lint-distribution
 ```
 
 The artifact build produces separate native macOS 14 `arm64` and `x86_64`
@@ -43,6 +45,14 @@ The command plugin is a transparent on-demand adapter: `swift package
 coglint` forwards the bare CLI arguments, runs from the consumer package, and
 preserves reporter output and status. The LINT-18 suite compares both surfaces
 under production and test target roles with Xcode, GitHub, and SARIF reporters.
+
+Channel B is generated with `mise run build:lint-distribution` after the
+artifact build supplies its checksum. The output contains only the remote
+binary target, both checked-in plugin adapters, the repository license, and a
+machine-readable generation record. `mise run test:lint-distribution` proves
+this sibling stays outside an ordinary Cog consumer’s resolve, fetch, and
+source-dependency graph while retaining the eager binary fetch that makes the
+explicit sibling boundary necessary.
 
 `coglint` accepts an explicit mix of Swift files and directories. Directories
 are searched recursively, hidden descendants are skipped, overlapping inputs
