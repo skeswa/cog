@@ -32,6 +32,13 @@ let package = Package(
         .product(name: "SwiftSyntax", package: "swift-syntax"),
       ]
     ),
+    .target(
+      name: "CogLintFixtures",
+      dependencies: [
+        "CogLintCore",
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+      ]
+    ),
     .executableTarget(
       name: "coglint",
       dependencies: [
@@ -43,6 +50,7 @@ let package = Package(
       name: "CogLintTests",
       dependencies: [
         "CogLintCore",
+        "CogLintFixtures",
         .product(name: "SwiftSyntax", package: "swift-syntax"),
       ]
     ),

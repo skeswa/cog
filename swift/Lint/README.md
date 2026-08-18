@@ -3,8 +3,10 @@
 `CogLint` is a separate SwiftPM package so swift-syntax and
 swift-argument-parser remain outside the dependency graph resolved by a Cog
 library consumer. Its sole product is the `coglint` executable. `CogLintCore`
-is a package-only implementation target shared with fixture tests; it is not a
-consumer product.
+is the package-only rule and parser target. `CogLintFixtures` is another
+package-only target holding the executable fixture model, validator, and DocC
+fragment renderer, so rule tests and generated documentation consume one
+corpus. Neither target is a consumer product.
 
 The manifest uses Swift tools 6.2, Swift 6 language mode, macOS 14, exact
 swift-syntax 603.0.2 and swift-argument-parser 1.8.2 pins. Its committed
