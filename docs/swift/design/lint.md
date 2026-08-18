@@ -212,31 +212,30 @@ issue #318's evidence becomes the code that proves the rules fire.
 
 One SwiftPM limitation shapes distribution: a git dependency resolves only at
 the repository root, so no consumer can depend on `swift/Lint` by URL. The
-nested package is the development workspace; the accepted v1 distribution is
-**Channel A**, where the root `Package.swift` vends the `binaryTarget` and both
-plugins. Cog and `coglint` share one version, one tag, and one release
-workflow. A lint-only fix is an ordinary Cog patch release. That coupling is a
-feature: the executable convention and the library version it understands
-cannot drift, and the diagnostic's documentation publishes from the same
-immutable revision.
+nested package is the development workspace. The accepted v1 distribution is
+**Channel B**: a minimal sibling repository, `skeswa/coglint-plugins`, contains
+the generated `CogLintPlugins` package with the binary target and plugin
+declarations. Cog's root manifest remains free of the binary target, so an
+ordinary library consumer neither fetches lint tooling nor resolves its source
+dependencies. §7 records the measurement that rejected Channel A.
 
-The skeleton measures one remaining fact before those products enter the root
-manifest: whether SwiftPM and Xcode download an unused binary artifact for a
-consumer that applies neither plugin. Lazy fetching, or eager fetching with no
-material resolve cost, clears the gate and Channel A proceeds.
+Channel B changes only fetch scope, not ownership or versioning. Cog and
+`coglint` share one version and release workflow; a lint-only fix is an
+ordinary Cog patch release. All source, tests, and rule documentation remain
+in this repository. The sibling manifest is generated from the immutable Cog
+release, references that release's asset and checksum, and never releases
+independently. Release automation performs one ordered publication:
 
-If the measurement finds a material cost, **Channel B** is the predetermined
-fallback, but it changes only fetch scope, not ownership or versioning. A
-minimal sibling repository, `skeswa/coglint-plugins`, contains the
-`CogLintPlugins` package with the binary target and plugin declarations and is
-generated from each Cog release. Release automation in this repository then
-performs one ordered publication:
-
-1. select the immutable Cog release commit;
-2. build and test `coglint` from that commit;
-3. publish and verify that commit's rule pages;
-4. regenerate the sibling manifest with the artifact checksum; and
-5. tag the sibling repository with the same version, last.
+1. select the immutable Cog release commit, then build, test, bundle, and
+   checksum `coglint` from it;
+2. push the Cog tag, which starts the matching DocC deployment;
+3. publish the Cog GitHub Release with
+   `CogLintBinary.artifactbundle.zip` attached;
+4. verify the Pages deployment, download the asset by its final URL, and
+   verify its checksum and host variants;
+5. generate the sibling manifest with that verified URL and checksum and tag
+   `skeswa/coglint-plugins` at the same version, last; and
+6. only then run the exact-version plugin consumer.
 
 The distribution repository never releases independently in v1. All source,
 rules, fixtures, and documentation remain here, and a failed step leaves no
@@ -441,8 +440,8 @@ Phased, with the same discipline as the main plan — each phase lands green:
 2. **Plan integration.** Before implementation, add the accepted work to
    [plan.md](../impl/plan.md), the scenario tree, and the task ledger in one
    change, with `mise run tasks:check` green.
-3. **Skeleton.** Measure unused-artifact fetching, then follow the Channel A/B
-   decision already fixed by §3.3. Create the nested `swift/Lint` package, the
+3. **Skeleton.** Follow the measured Channel B decision fixed by §3.3. Create
+   the nested `swift/Lint` package, the
    CLI over `manual-cog-private`, the fixture harness, the isolation check
    proving its dependencies cannot enter the shipped root package (the
    `swift/Benchmarks` gate, reused), and the checksummed artifact pipeline.
@@ -553,14 +552,46 @@ finding (§2.4) seeds a future Kotlin design document.
    these same dependency versions. M8's package scaffold makes this probe a
    permanent compatibility build under that release toolchain.
 
-5. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
+5. **Distribution channel — settled August 18, 2026.** Channel B is selected.
+   The measurement used a distribution fixture with the same shape as Channel
+   A: one source library, the `CogLintBinary` remote binary target at the
+   deliberately unreachable
+   `https://unused-artifact.invalid/CogLintBinary.artifactbundle.zip`, and both
+   plugins depending on that binary. Its consumer selected only the source
+   library and applied neither plugin.
+
+   | Surface               | Reproduction                                      | Result                                                                  |
+   | --------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
+   | SwiftPM resolve       | `swift package reset`; `swift package resolve -v` | printed `Downloading binary artifact`; failed in 0.68 s on the URL      |
+   | SwiftPM release build | library-only `swift-package build`                | failed in 1.6 s because `CogLintBinary` was required                    |
+   | Xcode workspace build | library-only macOS app through `xcodebuildmcp`    | package resolution failed in 1.9 s because `CogLintBinary` was required |
+
+   Both resolvers therefore fetch the artifact eagerly even when the consumer
+   cannot use it. This is material, not a theoretical request: the two minimal
+   parser/CLI compatibility binaries measured for §7 item 4 already total
+   39,104,024 bytes before bundling. Channel A would tax every Cog consumer and
+   would make an unavailable optional lint asset break an ordinary library
+   resolve, so it is rejected. Channel B confines that fetch to consumers who
+   explicitly add `skeswa/coglint-plugins`.
+
+   Asset publication must precede any plugin-distribution tag or exact
+   consumer. A read-only check returned 404 for
+   `releases/download/0.4.0/CogLintBinary.artifactbundle.zip`; the same asset
+   name also returns 404 under the already-published 0.3.0 tag, whose GitHub
+   Release has no assets. A source tag cannot make a binary URL exist. The
+   ordered release contract in §3.3 therefore publishes and verifies the Cog
+   Release asset and rule pages before generating and tagging
+   `CogLintPlugins`; that sibling tag is the first public object from which an
+   exact plugin consumer can discover the asset URL.
+
+6. **The next rules.** Issue #318's remaining candidates — the unwrap-naming
    companion, `@Environment(\.cogs)` declared per-view, `fatalError` over
    `preconditionFailure`, `nonisolated deinit` on generic classes, and no
    `@testable import Cog` in scenario tests — are queued behind the first six,
    several of them library-internal rather than consumer-facing.
-6. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
+7. **SwiftLint adjunct.** Whether to publish the regex-expressible subset as
    a `custom_rules` config for SwiftLint shops, accepting the drift risk.
-7. **Kotlin.** When to record the Android decision; the ergonomic bar is
+8. **Kotlin.** When to record the Android decision; the ergonomic bar is
    known, the timing is not. The monorepo shape helps here too: the Kotlin
    lint module would live under `kotlin/` beside its library, matching the
    plan's platform layout.

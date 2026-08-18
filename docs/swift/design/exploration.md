@@ -1124,13 +1124,14 @@ keeps its slot and points at the table above instead of renumbering the rest.
     evidence, so an explicit type plus `.init` is not an accidental evasion;
     the multi-read rule stays lexical instead of becoming a data-flow engine.
     Cog, `coglint`, and the rule articles in `Cog.docc` share one version and
-    release. V1 vends the plugins from the root manifest unless a measured
-    unused-artifact cost selects a distribution-only manifest repository;
-    that fallback remains generated, version-coupled, and published only
-    after the matching rule pages. Naming was settled on August 18, 2026:
+    release. SwiftPM and Xcode both eagerly fetch an unused root-manifest
+    binary target, so v1 uses the generated, version-coupled
+    `skeswa/coglint-plugins` distribution repository. Its matching tag is
+    published only after the Cog Release asset and rule pages are verified.
+    Naming was settled on August 18, 2026:
     `coglint` is the tool, the development package is `CogLint`, the products
     are `CogLintBinary`, `CogLintBuildToolPlugin`, and
-    `CogLintCommandPlugin`, and the conditional fallback is the generated
+    `CogLintCommandPlugin`, and distribution uses the generated
     `CogLintPlugins` package in `skeswa/coglint-plugins`. All six v1 rules are
     errors, and an exact next-line suppression requires one rule slug and a
     non-empty source-visible reason. Diagnostics use the permanent native DocC

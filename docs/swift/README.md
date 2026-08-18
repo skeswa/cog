@@ -367,11 +367,12 @@ These choices are settled; §10 of the core document has the full record.
   six initial rules cover declarations, view/runtime boundaries, primitive
   ownership, bootstrap-time state, source privacy, and multi-read runtime
   helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
-  the root manifest is the v1 distribution unless an unused-artifact fetch
-  measurement selects the version-coupled manifest-repository fallback. The
+  the root manifest remains artifact-free because SwiftPM and Xcode both
+  eagerly fetched an unused binary target. The selected distribution is the
+  version-coupled sibling manifest repository. The
   package and products are `CogLint`, `CogLintBinary`,
-  `CogLintBuildToolPlugin`, and `CogLintCommandPlugin`; the conditional
-  fallback is the generated `CogLintPlugins` package in
+  `CogLintBuildToolPlugin`, and `CogLintCommandPlugin`; distribution uses the
+  generated `CogLintPlugins` package in
   `skeswa/coglint-plugins`. Rule diagnostics link directly to permanent native
   DocC articles under `/cog/documentation/cog/`, without a redirect facade.
   Its isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
