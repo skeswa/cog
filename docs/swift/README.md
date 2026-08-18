@@ -368,11 +368,15 @@ These choices are settled; §10 of the core document has the full record.
   ownership, bootstrap-time state, source privacy, and multi-read runtime
   helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
   the root manifest is the v1 distribution unless an unused-artifact fetch
-  measurement selects the version-coupled manifest-repository fallback.
+  measurement selects the version-coupled manifest-repository fallback. The
+  package and products are `CogLint`, `CogLintBinary`,
+  `CogLintBuildToolPlugin`, and `CogLintCommandPlugin`; the conditional
+  fallback is the generated `CogLintPlugins` package in
+  `skeswa/coglint-plugins`.
 
 Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, persistence helpers, the lint products' final names and
-severity policy, and the stable rule-page URL shape. Also open are several
+debug-history tools, persistence helpers, the lint severity policy, and the
+stable rule-page URL shape. Also open are several
 edge behaviors: debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by

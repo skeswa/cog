@@ -141,8 +141,12 @@ cog/                                  (git root = SwiftPM package root)
 │   ├── Benchmarks/                   # SEPARATE SwiftPM package so benchmark
 │   │   └── Package.swift             #   deps never touch the shipped library
 │   ├── Lint/                         # SEPARATE SwiftPM development package
-│   │   ├── Package.swift             #   swift-syntax + argument-parser isolated
-│   │   ├── Sources/                  # CLI, rule engine, reporters, plugin sources
+│   │   ├── Package.swift             #   package CogLint; source deps isolated
+│   │   ├── Sources/coglint/          # CLI, rule engine, and reporters
+│   │   ├── Plugins/
+│   │   │   ├── CogLintBuildToolPlugin/
+│   │   │   └── CogLintCommandPlugin/
+│   │   ├── Artifacts/                # CogLintBinary.artifactbundle development copy
 │   │   └── Tests/                    # fixture-driven rule and integration tests
 │   └── Examples/
 │       └── Weather/                  # Xcode app project; local-path dep on root
@@ -151,9 +155,11 @@ cog/                                  (git root = SwiftPM package root)
 
 Products: `Cog`, `CogTesting` (depends on Cog), and `_CogScenarios` (for the
 benchmark package only). Publish `seed` from `CogTesting`, only behind
-`#if DEBUG` (§6.6). M8 adds the `coglint` binary and build-tool and command
-plugins to the selected distribution manifest; their implementation remains
-in the isolated `swift/Lint` development package.
+`#if DEBUG` (§6.6). M8 adds the `CogLintBinary` executable product and target,
+`CogLintBuildToolPlugin`, and `CogLintCommandPlugin` to the selected
+distribution manifest. The packaged tool remains named `coglint`, and its
+implementation remains in the isolated `CogLint` development package at
+`swift/Lint`.
 
 Manifest choices:
 
@@ -178,7 +184,8 @@ Manifest choices:
   package. M8 measures whether an unused binary artifact has material fetch
   cost before it selects the accepted distribution path: root-manifest
   products when the cost is negligible, otherwise a generated sibling
-  distribution manifest at the same version.
+  distribution manifest at the same version. That conditional Channel B is
+  the generated `CogLintPlugins` package in `skeswa/coglint-plugins`.
 
 ## Plan-to-task contract
 

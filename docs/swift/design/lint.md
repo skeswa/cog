@@ -7,7 +7,8 @@ This document turns the concept recorded in
 Cog, as an executable style guide — into a concrete design: what the tool is,
 how it reaches an iOS project, and the first six rules. The architecture and
 rule boundary were accepted after two `/vette` reviews and are recorded in the
-core §10 decision record; §7 lists the remaining implementation choices.
+core §10 decision record; §7 records the implementation decisions and the
+remaining open choices.
 References beginning "core" resolve in
 [exploration.md](./exploration.md) and its companions; bare § references
 resolve in this document.
@@ -155,7 +156,7 @@ available automaticity.
 
 `coglint` is a SwiftSyntax `SyntaxVisitor` executable that lints a file set
 and prints findings; rules are Swift types over the AST, not configuration.
-It is developed in this repository as its own SwiftPM package at
+It is developed in this repository as the `CogLint` SwiftPM package at
 `swift/Lint/`, beside the root package rather than inside it.
 
 This is the shape the repository already committed to. The plan nests
@@ -184,12 +185,12 @@ is the second such package, under the same isolation gate:
 
 The consumer-facing surface is:
 
-| Product                | Surface                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| `coglint` (CLI)        | `coglint [paths] [--reporter xcode\|github\|sarif]`; run-script phases, pre-commit, mise, CI      |
-| `CogLintPlugin`        | build-tool plugin: prebuild command over the binary target; findings on every Xcode/SwiftPM build |
-| `CogLintCommandPlugin` | `swift package coglint`; on-demand runs, CI, and the future `--fix` home                          |
-| binary target          | `coglint.artifactbundle.zip` per release, checksummed; consumers never build the linter           |
+| Product                  | Surface                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `coglint` (CLI)          | `coglint [paths] [--reporter xcode\|github\|sarif]`; run-script phases, pre-commit, mise, CI                 |
+| `CogLintBuildToolPlugin` | build-tool plugin: prebuild command over `CogLintBinary`; findings on every Xcode/SwiftPM build              |
+| `CogLintCommandPlugin`   | `swift package coglint`; on-demand runs, CI, and the future `--fix` home                                     |
+| `CogLintBinary`          | binary executable product and target backed by `CogLintBinary.artifactbundle.zip`; consumers build no linter |
 
 Consumer wiring is one `plugins:` line per app target for SwiftPM and Xcode
 targets alike (Xcode 14+ supports build-tool plugins on xcodeproj targets),
@@ -221,9 +222,10 @@ material resolve cost, clears the gate and Channel A proceeds.
 
 If the measurement finds a material cost, **Channel B** is the predetermined
 fallback, but it changes only fetch scope, not ownership or versioning. A
-minimal sibling repository contains the binary target and plugin declarations
-and is generated from each Cog release. Release automation in this repository
-then performs one ordered publication:
+minimal sibling repository, `skeswa/coglint-plugins`, contains the
+`CogLintPlugins` package with the binary target and plugin declarations and is
+generated from each Cog release. Release automation in this repository then
+performs one ordered publication:
 
 1. select the immutable Cog release commit;
 2. build and test `coglint` from that commit;
@@ -444,11 +446,30 @@ Phased, with the same discipline as the main plan — each phase lands green:
 Kotlin parity is deliberately outside this rollout; the Compose `lintPublish`
 finding (§2.4) seeds a future Kotlin design document.
 
-## 7. Open questions
+## 7. Decisions and open questions
 
-1. **Naming.** `coglint` as the binary, `swift/Lint` as the package directory,
-   and the product names in §3.2 remain working names. If the measured fallback
-   selects Channel B, its generated distribution repository also needs a name.
+1. **Naming — settled August 18, 2026.** The names deliberately separate one
+   stable user spelling from role-explicit SwiftPM symbols:
+
+   | Role                                       | Accepted name                      |
+   | ------------------------------------------ | ---------------------------------- |
+   | CLI executable, artifact tool, plugin verb | `coglint`                          |
+   | Development directory                      | `swift/Lint`                       |
+   | Development package                        | `CogLint`                          |
+   | Build-tool plugin product and target       | `CogLintBuildToolPlugin`           |
+   | Command plugin product and target          | `CogLintCommandPlugin`             |
+   | Binary executable product and target       | `CogLintBinary`                    |
+   | Artifact bundle and release asset          | `CogLintBinary.artifactbundle.zip` |
+   | Conditional Channel B repository           | `skeswa/coglint-plugins`           |
+   | Conditional Channel B package              | `CogLintPlugins`                   |
+
+   Users type `coglint` everywhere; UpperCamelCase names exist only where
+   SwiftPM requires product, target, or package identity. Including
+   `BuildTool`, `Command`, and `Binary` prevents three different delivery
+   roles from collapsing into an ambiguous `CogLintPlugin`. The fallback
+   repository says `plugins` because it is generated distribution machinery,
+   not the linter's source or an independently owned product.
+
 2. **Severity policy.** Default `error` for the five boundary and declaration
    rules is proposed; whether `no-multi-read-cogs-helper` starts as `warning`,
    and whether suppressions must carry a reason, remain open.
