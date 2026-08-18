@@ -86,11 +86,14 @@ mise run fmt            # format Markdown, JSON, YAML, and Swift
 mise run fmt:check      # verify formatting, writing nothing
 mise run test           # Swift tests on the default isolation leg
 mise run test:matrix    # all four isolation legs
+mise run test:cores     # verify default simple; behavior under both cores
 mise run test:value-references # all three value-reference layouts
 mise run test:release   # the default leg in release configuration
 mise run test:simulator # boundary tests on the latest iOS simulator
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
+mise run bench          # run the separate release benchmark package
+mise run bench:thresholds:check # enforce committed performance ceilings
 mise run tasks:check    # validate the Swift implementation task ledger
 mise run docs           # build the DocC archive into .build/docs
 ```

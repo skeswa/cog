@@ -39,6 +39,11 @@ internal final class CogTurn {
   /// no-ops. A future measured representation may deduplicate this work.
   private var touchedSources: [any PendingCogSource] = []
 
+  #if COG_CORE_ARENA
+  /// Arena source slots touched once in writer order by this turn.
+  private var touchedArenaSources: ContiguousArray<CogArenaSlot> = []
+  #endif
+
   /// Creates one accumulating turn with its unforgeable writer capability.
   init(id: CogTurnID, name: String) {
     self.id = id
@@ -54,6 +59,16 @@ internal final class CogTurn {
     touchedSources.append(source)
   }
 
+  #if COG_CORE_ARENA
+  /// Registers one arena source whose pending typed cell must be published.
+  ///
+  /// ``CogArenaStateFlags/touched`` performs row-level deduplication before
+  /// this method, keeping the flush list O(changed sources) without hashing.
+  func touchArenaSource(_ source: CogArenaSlot) {
+    touchedArenaSources.append(source)
+  }
+  #endif
+
   /// Publishes all staged slots under one newly assigned graph revision.
   ///
   /// Revision advances even for an empty system turn because the named pending
@@ -61,6 +76,10 @@ internal final class CogTurn {
   /// its staged value changes and which consumers to invalidate.
   func flushPendingSources(in cogs: Cogs) {
     let revision = cogs.advanceRevision()
+    #if COG_CORE_ARENA
+    cogs.arenaCore.flushPendingSources(touchedArenaSources)
+    touchedArenaSources.removeAll(keepingCapacity: true)
+    #endif
     for source in touchedSources {
       source.flushPendingValue(in: cogs, at: revision)
     }
@@ -105,7 +124,14 @@ extension Cogs {
   /// frame leaves its derived state on the computing path through recomputation.
   internal var canRunSystemTurnImmediately: Bool {
     guard case .idle = turnPhase else { return false }
-    return settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil
+    guard settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil else {
+      return false
+    }
+    #if COG_CORE_ARENA
+    return arenaCore.isSettlementIdle
+    #else
+    return true
+    #endif
   }
 
   /// Rejects an application operation before it can open a turn during derivation.
@@ -114,8 +140,12 @@ extension Cogs {
   /// whole selector region—including dependency reconciliation and equality—
   /// read-only and prevents a failed attempt from partially mutating the graph.
   internal func requireOutsideDerivedComputation(forTurnNamed name: String) {
-    if let computing = settleStack.innermostComputingState {
-      let cogName = CogCycleStep(state: computing).name
+    #if COG_CORE_ARENA
+    let computingName = arenaCore.innermostComputingName
+    #else
+    let computingName = settleStack.innermostComputingState.map { CogCycleStep(state: $0).name }
+    #endif
+    if let cogName = computingName {
       fatalError(
         """
         Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \
@@ -255,7 +285,7 @@ extension Cogs {
     // Record when the turn is created. Nested commits do not reach this point,
     // and the entry precedes the work it caused.
     #if DEBUG
-    historyLog.recordTurn(named: name)
+    recordHistoryTurn(named: name)
     turnChainTracker.recordTurn(named: name)
     #endif
 

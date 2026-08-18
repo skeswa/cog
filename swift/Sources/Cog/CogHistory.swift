@@ -125,7 +125,7 @@ extension Cogs {
   /// The returned value is a snapshot: subsequent turns do not mutate it.
   /// Ask again for a newer view. History types, storage, and recording compile
   /// out of release builds, so production code cannot depend on this property.
-  public var debugHistory: CogHistory { historyLog.snapshot }
+  public var debugHistory: CogHistory { historySnapshot }
 }
 
 #endif

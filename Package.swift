@@ -129,12 +129,79 @@ default:
   )
 }
 
-/// Library settings plus the selected value-reference layout.
+// MARK: - The core and edge representation seams
+
+// M6's measured decision retains the class-state correctness core as the
+// shipping default and the arena as a selector-only research and benchmark
+// build. These selectors are library settings because they choose the
+// representation that implements Cogs, not merely which tests run. Mirrored
+// test defines let a sentinel prove that the runner, test target, and library
+// all selected the same implementation.
+//
+// An arena build without an explicit edge uses `pool`, the layout selected for
+// that candidate. Naming an edge beside `simple` is an error: accepting it
+// would let a candidate command go green without compiling or exercising that
+// candidate.
+
+let requestedCore = Context.environment["COG_TEST_CORE"] ?? "simple"
+let requestedEdge = Context.environment["COG_TEST_EDGE"]
+
+var coreSettings: [SwiftSetting] = []
+var edgeSettings: [SwiftSetting] = []
+var coreTestSettings: [SwiftSetting] = []
+var edgeTestSettings: [SwiftSetting] = []
+
+switch requestedCore {
+case "simple":
+  if let requestedEdge {
+    fatalError(
+      """
+      COG_TEST_EDGE was \(requestedEdge), but edge layouts belong only to the arena core. \
+      Unset COG_TEST_EDGE or select COG_TEST_CORE=arena.
+      """
+    )
+  }
+  coreSettings.append(.define("COG_CORE_SIMPLE"))
+  coreTestSettings.append(.define("COG_LEG_CORE_SIMPLE"))
+case "arena":
+  coreSettings.append(.define("COG_CORE_ARENA"))
+  coreTestSettings.append(.define("COG_LEG_CORE_ARENA"))
+
+  switch requestedEdge ?? "pool" {
+  case "pool":
+    edgeSettings.append(.define("COG_EDGE_POOL"))
+    edgeTestSettings.append(.define("COG_LEG_EDGE_POOL"))
+  case "prefix":
+    edgeSettings.append(.define("COG_EDGE_PREFIX"))
+    edgeTestSettings.append(.define("COG_LEG_EDGE_PREFIX"))
+  case "inline":
+    edgeSettings.append(.define("COG_EDGE_INLINE"))
+    edgeTestSettings.append(.define("COG_LEG_EDGE_INLINE"))
+  default:
+    fatalError(
+      """
+      COG_TEST_EDGE was \(requestedEdge ?? "nil"), which is not an implemented arena edge \
+      candidate. Expected pool, prefix, or inline, or leave it unset for pool.
+      """
+    )
+  }
+default:
+  fatalError(
+    """
+    COG_TEST_CORE was \(requestedCore), which is not a core implementation. Expected \
+    simple or arena, or leave it unset for simple.
+    """
+  )
+}
+
+/// Library settings plus the selected value-reference, core, and edge layouts.
 ///
-/// The base flags never vary; only the layout define does, and only because
-/// `COG_TEST_VALUE_REFERENCE_LAYOUT` asked it to.
-let librarySettings: [SwiftSetting] = baseLibrarySettings + valueReferenceLayoutSettings
-testSettings += valueReferenceLayoutTestSettings
+/// The base flags never vary. Unset selectors choose the shipping simple core
+/// and inline value-reference layout. The measured arena and its losing edge
+/// layouts remain explicit test-and-benchmark comparison builds after M6.
+let librarySettings: [SwiftSetting] =
+  baseLibrarySettings + valueReferenceLayoutSettings + coreSettings + edgeSettings
+testSettings += valueReferenceLayoutTestSettings + coreTestSettings + edgeTestSettings
 
 // MARK: - Optional dependencies
 

@@ -47,6 +47,22 @@ run = "node {{config_root}}/tools/swift-test.mjs default"
 description = "Run the Swift tests across all four isolation-matrix legs"
 run = "node {{config_root}}/tools/swift-test.mjs matrix"
 
+[tasks."test:cores"]
+description = "Verify the shipping core and run Swift behavior against both implementations"
+run = """
+set -euo pipefail
+unset COG_TEST_CORE COG_TEST_EDGE
+echo "==> shipping default (simple)"
+node "{{config_root}}/tools/swift-test.mjs" default \
+  --no-parallel --filter 'CoreSelectorInfrastructure'
+behavior_filter='[A-Z]+-[0-9][0-9]'
+for core in simple arena; do
+  echo "==> core ${core}"
+  COG_TEST_CORE="${core}" node "{{config_root}}/tools/swift-test.mjs" default \
+    --no-parallel --filter "${behavior_filter}"
+done
+"""
+
 [tasks."test:value-references"]
 description = "Run the Swift tests across all value-reference layouts"
 run = """
@@ -151,6 +167,21 @@ run = "node {{config_root}}/tools/bench-baseline.mjs update"
 [tasks."bench:baseline:check"]
 description = "Check the current run against a baseline recorded in this environment"
 run = "node {{config_root}}/tools/bench-baseline.mjs check"
+
+# Committed static thresholds are the portable CI gate. Each p90 reference is
+# zero and benchmark source supplies its one-sided absolute ceiling; the tool
+# first proves malloc counting is live and that every gated benchmark and file
+# exists.
+# The sentinel command runs one real workload against a temporary impossible
+# reference and succeeds only when the harness rejects it as a regression.
+
+[tasks."bench:thresholds:check"]
+description = "Check exact allocation and PERF-10 p90 ceilings"
+run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-check"
+
+[tasks."bench:thresholds:sentinel"]
+description = "Prove the absolute benchmark threshold gate rejects a regression"
+run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-sentinel"
 
 # The DocC archive. swift-docc-plugin is env-gated behind `COG_DOCC=1` so that
 # an ordinary consumer resolves this package with no dependencies at all; that

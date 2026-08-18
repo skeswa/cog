@@ -28,6 +28,14 @@ let package = Package(
     // working tree, so resolving Cog from a tag would make every measurement a
     // statement about a commit that is not the one being changed.
     .package(path: "../.."),
+    // Comparison-only prior art, pinned at the exact release whose source the
+    // adapter was written against. This dependency belongs only to the
+    // separate benchmark package; adding it to the root would make Cog
+    // consumers resolve StateGraph and its macro toolchain.
+    .package(
+      url: "https://github.com/VergeGroup/swift-state-graph",
+      exact: "0.28.0"
+    ),
     // The harness, pinned exactly rather than to a range, on upstream's own
     // words: the `.benchmarkBaselines` representation "is not stable and is not
     // viewed as public API and may break over time", and malloc metrics are not
@@ -50,6 +58,7 @@ let package = Package(
         .product(name: "Benchmark", package: "benchmark"),
         .product(name: "Cog", package: "cog"),
         .product(name: "CogTesting", package: "cog"),
+        .product(name: "StateGraph", package: "swift-state-graph"),
         // The shared scenario graphs. Sharing them with `CogScenarioTests` is
         // the point: a run-count assertion and a timing measurement that
         // disagreed about which graph they ran would make both meaningless.

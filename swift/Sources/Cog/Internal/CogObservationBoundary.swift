@@ -195,6 +195,19 @@ extension Cogs {
   /// current baseline and joins the next flush; notifying it in the same pass
   /// could report a change predating its first observed value.
   internal func flushObservationBoundaries() {
+    #if COG_CORE_ARENA
+    arenaCore.flushObservationBoundaries(in: self)
+    #else
+    flushClassObservationBoundaries()
+    #endif
+  }
+
+  /// Flushes the simple core's class-backed UI roots.
+  ///
+  /// Manual, synchronous derived, and async states all use this path when the
+  /// correctness core is selected. The arena build compiles the call out and
+  /// flushes its descriptor-dispatched scalar roots instead.
+  private func flushClassObservationBoundaries() {
     let boundaryCount = observationStates.count
     for state in observationStates.prefix(boundaryCount) {
       if state.settleState != .clean,
@@ -207,7 +220,7 @@ extension Cogs {
       #if DEBUG
       let changedBySeed = state.observationBoundary?.consumeDeferredChange() ?? false
       guard changedThisTurn || changedBySeed else { continue }
-      historyLog.recordNotice(label: state.label, key: state.observationKey)
+      recordHistoryNotice(label: state.label, key: state.observationKey)
       #else
       guard changedThisTurn else { continue }
       #endif

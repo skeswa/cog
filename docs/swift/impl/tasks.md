@@ -1363,6 +1363,13 @@ ArenaDirtyPropagationInfrastructure`._
   _Depends: M6-10ca._
   _Verify: `COG_TEST_CORE=arena mise run test --filter
 'REACT-15|REACT-16|REACT-17'`._
+- **M6-10cc** _(Infrastructure)_ — Keep the arena's debug-only quiescence
+  probe out of release test compilation without publishing that diagnostic
+  seam in production.
+  _Depends: M6-10cb._
+  _Verify: `COG_TEST_CORE=arena mise run test --filter
+ArenaQuiescenceInfrastructure` and `COG_TEST_CORE=arena mise run test:release
+--filter CoreSelectorInfrastructure`._
 - **M6-10d** _(Infrastructure)_ — Pass mechanism bootstrap, gated-scope
   cancellation, and task behavior through the arena core selector.
   _Depends: M6-10cb._
@@ -1415,7 +1422,7 @@ ArenaDirtyPropagationInfrastructure`._
   core untouched; expose simple-versus-arena checking as
   `mise run test:cores`. This task is outcome-neutral: it proves the arena,
   it does not adopt it.
-  _Depends: M6-10bb, M6-10d, M6-10fb, M6-10fc, M6-10hb._
+  _Depends: M6-10bb, M6-10cc, M6-10d, M6-10fb, M6-10fc, M6-10hb._
   _Verify: `mise run test:cores` and `mise run test:compilefail`._
   _Greens: COUNT-10._
 - **M6-11a** _(Infrastructure)_ — Add the raw `@Observable` comparison

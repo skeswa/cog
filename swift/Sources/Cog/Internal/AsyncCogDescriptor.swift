@@ -3,21 +3,22 @@
 /// ``AsyncCog`` and ``AsyncCogBox`` are lightweight value references. They
 /// retain one descriptor like this and, for a boxed declaration, pair it with
 /// an erased key. A ``Cogs`` uses the descriptor's object identity plus that
-/// key to find or create an ``AsyncCogState``. Consequently, every context and
-/// every key gets independent mutable status, dependency, task, and generation
-/// state while all of them share the declaration written by the caller.
+/// key to find or create simple-core state or an arena row. Consequently,
+/// every context and key gets independent mutable status, dependency, task,
+/// and generation state while sharing the declaration written by the caller.
 ///
 /// The descriptor stores only declaration metadata and the synchronous half of
 /// the async selector. It never stores current status or a running `Task`.
-/// Those belong to ``AsyncCogState`` so one declaration can be used safely in
-/// multiple isolated contexts and, for ``AsyncCogBox``, at multiple keys.
+/// Those belong to the selected core's context-owned state so one declaration
+/// can be used safely in multiple isolated contexts and, for ``AsyncCogBox``,
+/// at multiple keys.
 /// All descriptor access remains MainActor-confined; `Work` is the explicit
 /// boundary that permits the selected operation to choose its own isolation.
 ///
 /// Async selection deliberately has two stages:
 ///
-/// 1. `AsyncCogState` calls ``makeWork(_:key:)`` on the MainActor while Cog is
-///    tracking reads through the supplied ``Reader``.
+/// 1. The selected core calls ``makeWork(_:key:)`` on the MainActor while Cog
+///    tracks reads through the supplied ``Reader``.
 /// 2. The selector returns a ``Work`` whose operation runs after dependency
 ///    tracking has ended and may suspend.
 ///
@@ -100,7 +101,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   ///
   /// The caller is responsible for opening the tracking scope. This method
   /// returns the description of work to start; it does not launch a task,
-  /// publish pending, or mutate status. ``AsyncCogState`` performs those steps
+  /// publish pending, or mutate status. The selected core performs those steps
   /// after the selector has returned and its dependency set is complete.
   func makeWork(_ reader: Reader<CogStatus<Value>>, key: CogKey?) -> Work<Value> {
     selector(reader, key)

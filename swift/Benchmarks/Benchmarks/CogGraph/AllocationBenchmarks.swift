@@ -128,11 +128,12 @@ private final class WitnessBox {
 ///
 /// The absolute numbers this pins against live in perf.md §9.6 — that a steady
 /// turn costs seven mallocs and `box[key]` costs none.
-private func allocationDrift() -> BenchmarkThresholds {
+private func allocationDrift(exactP90: Bool = false) -> BenchmarkThresholds {
   let tolerance = 100
   return BenchmarkThresholds(
     absolute: [
-      .p0: tolerance, .p25: tolerance, .p50: tolerance, .p75: tolerance, .p90: tolerance,
+      .p0: tolerance, .p25: tolerance, .p50: tolerance, .p75: tolerance,
+      .p90: exactP90 ? 0 : tolerance,
       .p99: tolerance, .p100: tolerance,
     ]
   )
@@ -186,7 +187,10 @@ let allocationBenchmarks: @Sendable () -> Void = {
   }
 
   // PERF-06. Measured at zero, exactly as the scenario words it, at every
-  // percentile — so here the drift gate and the scenario's own claim coincide.
+  // percentile. The committed static p90 reference is zero, and p90's
+  // tolerance is also zero, so the CI gate retains the exact zero-malloc
+  // requirement. Other percentiles keep the baseline-only noise tolerance;
+  // the static gate reads p90 exclusively.
   Benchmark(
     "perf-06-value-reference",
     configuration: .init(
@@ -195,8 +199,8 @@ let allocationBenchmarks: @Sendable () -> Void = {
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
       thresholds: ungated.merging([
-        .mallocCountTotal: allocationDrift(),
-        .objectAllocCount: allocationDrift(),
+        .mallocCountTotal: allocationDrift(exactP90: true),
+        .objectAllocCount: allocationDrift(exactP90: true),
       ]) { _, gate in gate }
     )
   ) { benchmark in

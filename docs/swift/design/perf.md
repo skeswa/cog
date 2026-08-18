@@ -3,8 +3,10 @@
 _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. The value-reference comparison in §9.6 selects inline
-`AnyHashable`; edge, hash-table, and exclusivity layouts remain benchmark-gated.
+an implementation plan. The comparisons in §9.6 select inline `AnyHashable`
+value references and the shared linked edge pool within the arena candidate,
+but retain the simple core as the shipping implementation. Hash-table and
+exclusivity layouts remain benchmark-gated.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
@@ -97,10 +99,9 @@ Manual, derived, and async states share topology; their descriptors differ in
 how they produce a row. One keyed box stores one compute closure, not one
 closure per key.
 
-### 3.3 Edge layout remains open
+### 3.3 Shared linked edge pool
 
-One candidate translates alien-signals' link object into a 24-byte indexed
-pool entry:
+Cog translates alien-signals' link object into a 24-byte indexed pool entry:
 
 ```swift
 struct Edge {
@@ -116,15 +117,18 @@ dependency list. Indices avoid ARC and weak loads, a free list recycles
 removed edges, and a cursor can reuse edges when a selector reads the same
 dependencies in the same order — zero steady-state allocation and hashing.
 
-This is only a candidate. Benchmarks must compare:
+The M6 comparison measured:
 
 - the shared linked edge pool;
 - per-state arrays with prefix reuse, as in Reactively;
 - small inline dependency storage with overflow, based on Incremental's
   common-case layout.
 
-Alien-signals is strongest on mostly static graphs; Reactively performs well
-when dependencies change often. Cog must measure both.
+The shared pool won the expected mostly-static shape on instructions. The
+prefix candidate won high churn on instructions, but not wall time, while
+adding per-turn ARC. The inline-plus-overflow candidate won neither shape.
+§9.6 records the complete comparison and selection. Both losing candidates
+remain behind test-and-benchmark selectors so the decision stays reproducible.
 
 ### 3.4 Propagation
 
@@ -306,8 +310,9 @@ rather than against zero — `mise run bench:baseline:check` fails if a steady
 turn's allocation count moves from the recorded baseline by more than 100 raw
 allocations, where one extra allocation per turn is 1,000 (`M5-11` explains the
 units and the noise floor). The cost cannot creep upward unnoticed while M6 is
-being built. Zero remains the target M6 has to reach, and `M6-11d` is where it
-becomes an absolute gate.
+being built. Zero remains the replacement target; the M6 candidate reaches five
+rather than zero, so `M6-12a` retains the simple core and its drift gate instead
+of pretending the target was met.
 
 Attribution, from the same session, so M6 knows where to look:
 
@@ -341,8 +346,9 @@ hundred and thirty releases. PERF-02 asks for none of it, and none of it is
 what §5's "no ARC, locks, or existentials in graph walks" rule buys — in M6,
 not here. The simple core walks class states held through existentials, and
 every hop retains. Until the arena core lands, PERF-02 is pinned against drift
-from these numbers, so the traffic cannot grow unnoticed; `M6-11d` is where
-zero becomes the gate.
+from these numbers, so the traffic cannot grow unnoticed. The arena candidate
+cuts this traffic substantially but does not reach zero; `M6-12a` records why
+that is not enough to replace the shipping core.
 
 Worth noting for M6: releases outnumber retains roughly two to one. That is not
 an imbalance — the extra releases are objects created before the measured
@@ -477,6 +483,46 @@ The selector and both losing candidates remain test-and-benchmark-only so
 COUNT-09 can continue proving behavior parity and the recorded shapes remain
 reproducible. Unset — every ordinary consumer build — selects inline.
 
+**Edge-layout comparison and selection** — `M6-05c`, 2026-08-17, `mactop`
+(Apple Silicon, 12 cores, 24 GB), Darwin 25.4.0, Xcode 26.4 / Apple Swift
+6.3.0, release, harness 1.36.2, malloc interposer 1.4.0. All six runs used the
+same checkout and host session. Each candidate was rebuilt through
+`COG_TEST_CORE=arena` and `COG_TEST_EDGE`; the measured graph stayed alive and
+quiescent across samples so the process-global malloc and ARC counters were
+valid.
+
+Both roots read one stable control and 32 data sources. The mostly-static
+workload changes one value while retaining all 33 edges in the same order. The
+high-churn workload replaces the 32-edge suffix every turn while retaining the
+control edge.
+
+| Layout               | mostly-static p50 |    high-churn p50 | mallocs / objects | static retains / releases | churn retains / releases |
+| -------------------- | ----------------: | ----------------: | ----------------: | ------------------------: | -----------------------: |
+| shared linked pool   | **294 K / 12 µs** |     335 K / 13 µs |             7 / 7 |                 233 / 256 |                228 / 251 |
+| prefix arrays        |     303 K / 12 µs | **321 K / 13 µs** |             7 / 7 |                 233 / 256 |                229 / 252 |
+| inline plus overflow |     304 K / 12 µs |     326 K / 13 µs |             7 / 7 |                 233 / 256 |                228 / 251 |
+
+The workload cells are instructions / wall clock. The static and churn runs
+produced 245–260 and 231–235 samples per candidate, respectively. Instruction
+counts were exact through p90; p100 ranged from 313–331 K for static and
+349–363 K for churn. Wall-clock distributions overlapped.
+
+**Selected: shared linked edge pool.** Mostly-static dependency sets are the
+ordinary graph shape, and the pool executes 3.1–3.4% fewer instructions there
+without moving wall time or allocation counts. Prefix arrays execute 4.2%
+fewer instructions than the pool under deliberately complete suffix churn,
+but all candidates still report 13 µs at p50 and the prefix representation
+adds one retain and one release per turn. That ARC is directly contrary to
+§5's graph-walk rule, and the measured churn result does not justify a nested
+array per state. Inline plus overflow is structurally more complex and wins
+neither workload.
+
+The shared pool is therefore the ordinary arena build. It keeps one compact
+entry per edge, reconciles stable ordered reads in place, and recycles removed
+entries through an index free list without per-edge ARC. Prefix and inline
+remain test-and-benchmark-only so COUNT-09 and PERF-09 can reproduce the
+comparison.
+
 **Pinned-key notice traffic** — `M5-07d`, same session and environment. A keyed
 family where the UI once read `n` rows and now writes and reads exactly one.
 Every other row is pinned to the app context and untouched, so anything that
@@ -502,6 +548,177 @@ dirty-set propagation are the rules that turn it into O(changed). All three
 points stay in the suite so M6 can show the slope going flat rather than merely
 showing one number get smaller.
 
+**Runtime comparison, before core selection** — `M6-11c`, 2026-08-17,
+`mactop` (Apple Silicon arm64, 12 cores, 24 GB), macOS 26.4.1 / Darwin 25.4.0,
+Xcode 26.4 (17E192) / Apple Swift 6.3.0, release, harness 1.36.2. The external
+adapter is swift-state-graph 0.28.0 at
+`e602fcdb19342a38c135543e7228b3fd60753dc7`; its transitive SwiftSyntax pin is
+603.0.2. All sixteen exact-name runs used the same checkout and host session.
+The simple and arena runs rebuilt Cog through `COG_TEST_CORE`; the arena used
+the selected shared-pool edge layout, and both used inline `AnyHashable` value
+references. StateGraph and raw Observation were captured in the simple-compiled
+executable because neither adapter reaches Cog.
+
+Every sample checked its final value and exact derived-body count before the
+harness accepted the timing. The common shapes are the Kairo ports: a five-arm
+diamond over 500 turns, a 50-link chain over 50 turns, fifty two-link broad
+arms over 50 turns, and an unstable consumer with 20 repeated branch reads over
+100 turns. The three memoized graphs cost 3,006, 2,550, 5,100, and 302 derived
+runs respectively. Raw Observation has no derived cache: its first three counts
+are the same, while unstable costs 2,121 ordinary computed reads. That
+difference is an adapter result, not work hidden from the table.
+
+| Runtime                |      diamond p50 |           deep p50 |        broad p50 |       unstable p50 |
+| ---------------------- | ---------------: | -----------------: | ---------------: | -----------------: |
+| simple Cog             |  99 M / 4.964 ms |    51 M / 2.540 ms |    239 M / 12 ms |    45 M / 2.484 ms |
+| arena Cog              | 103 M / 4.362 ms |    68 M / 2.654 ms | 214 M / 8.905 ms |    31 M / 1.272 ms |
+| swift-state-graph 0.28 |    506 M / 25 ms |      301 M / 14 ms |    715 M / 36 ms |   152 M / 7.479 ms |
+| raw `@Observable`      |  16 M / 0.787 ms | 4.106 M / 0.205 ms |  45 M / 2.130 ms | 7.094 M / 0.327 ms |
+
+Each workload cell is instructions / wall clock. Units preserve the harness's
+displayed precision rather than inventing digits after a rounded millisecond.
+The companion process-level measurements were:
+
+| Runtime                | diamond memory / samples | deep memory / samples | broad memory / samples | unstable memory / samples |
+| ---------------------- | -----------------------: | --------------------: | ---------------------: | ------------------------: |
+| simple Cog             |              13 MB / 595 |         14 MB / 1,163 |            13 MB / 241 |             13 MB / 1,172 |
+| arena Cog              |              13 MB / 684 |         14 MB / 1,122 |            14 MB / 336 |             13 MB / 2,328 |
+| swift-state-graph 0.28 |              13 MB / 118 |           13 MB / 212 |             14 MB / 84 |               13 MB / 400 |
+| raw `@Observable`      |            13 MB / 3,730 |        13 MB / 10,000 |          13 MB / 1,379 |             13 MB / 8,854 |
+
+Memory is p50 peak resident memory for the complete benchmark process, not an
+allocation attributed to one graph; at these sizes its 13–15 MB spread is not
+a useful separator. Sample counts differ because every exact-name benchmark
+ran to the same three-second duration cap.
+
+Recorded without selecting a core: arena wall clock is lower than simple on
+diamond, broad, and unstable and higher on deep; instructions are higher on
+diamond and deep and lower on broad and unstable.
+swift-state-graph is the slowest graph runtime in all four shapes. Raw
+Observation is the lower bound and is fastest even where its uncached unstable
+reads do seven times the derived work. `M6-11d` turns the recorded timing
+distributions into generous gates, and `M6-12a` — not this measurement task —
+weighs the mixed core result and selects the default.
+
+**Absolute CI gates** — `M6-11d`, 2026-08-17. Wall-clock p90 is the only
+PERF-10 metric promoted from comparison evidence to a regression promise.
+Instructions remain explanatory and peak resident memory remains too coarse at
+these workload sizes. Each ceiling is roughly three times the slower recorded
+p90 for its runtime/workload cell. Cog uses the slower of simple and arena, so
+the gate neither decides `M6-12a` nor needs rewriting after `M6-13` executes
+that decision.
+
+| Runtime           | Recorded p90: diamond / deep / broad / unstable | Absolute ceilings: diamond / deep / broad / unstable |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| Cog, either core  | 5.231 / 2.750 / 13 / 2.755 ms                   | **20 / 10 / 40 / 10 ms**                             |
+| raw `@Observable` | 0.820 / 0.216 / 2.277 / 0.350 ms                | **3 / 1 / 8 / 2 ms**                                 |
+| swift-state-graph | 26 / 15 / 37 / 7.696 ms                         | **80 / 50 / 120 / 25 ms**                            |
+
+The encoding is intentionally mechanical. Ordo One's static command compares
+the measured p90 with a reference and then applies the benchmark's absolute
+tolerance symmetrically; it exits nonzero for a large improvement as well as a
+regression. Every committed `Thresholds/*.p90.json` reference is therefore
+zero, and the positive tolerance in `RuntimeComparisonBenchmarks.swift` is the
+actual one-sided ceiling. A nonnegative metric cannot cross the lower side, so
+only exceeding the ceiling fails. The wrapper additionally verifies all twelve
+PERF-10 files exist and still name registered benchmarks before invoking the
+harness; upstream itself only fails when _none_ exist and could otherwise let
+one file hide eleven missing gates.
+
+PERF-06 stays exact in the same gate: static p90 references of zero for
+`mallocCountTotal` and `objectAllocCount`, both with zero p90 tolerance. The
+allocating witness runs first and must report nonzero, so this cannot pass by
+silently measuring nothing. `mise run bench:thresholds:sentinel` supplies an
+impossible temporary reference to a real Observation workload and succeeds only
+when the same command reports a threshold regression. CI runs
+`mise run bench:thresholds:check` in one globally serialized job on the pinned
+bare-metal runner.
+
+**Core decision** — `M6-12a`, 2026-08-17. **The simple core remains the
+shipping default, and M6 does not recommend a 0.2.0 release.** The arena stays
+behind `COG_TEST_CORE=arena` with the selected shared-pool edge layout as a
+behavior-equivalent research and benchmark candidate.
+
+Correctness is not the discriminator: the same 248 public behavior scenarios
+pass under both implementations, and both preserve the public API and one-graph
+ownership model. The runtime comparison is genuinely mixed. Arena p50 wall
+clock improves diamond by 12%, broad by 26%, and unstable by 49%, while deep
+regresses by 4%. Instructions regress by 4% on diamond and 33% on deep, then
+improve by 10% on broad and 31% on unstable. That is promising for wider and
+dynamic graphs, but it is not a general replacement result.
+
+The cost targets decide the close call. The existing quiescent PERF-01,
+PERF-02, and PERF-07 probes were rerun back-to-back under both selectors in the
+same pinned session:
+
+| Workload                | Core   | mallocs / objects | retains / releases | p50 wall clock |
+| ----------------------- | ------ | ----------------: | -----------------: | -------------: |
+| steady turn             | simple |             7 / 7 |            66 / 93 |       2.202 µs |
+| steady turn             | arena  |             5 / 5 |            48 / 67 |       2.425 µs |
+| 16-consumer propagation | simple |           26 / 26 |      1,132 / 2,048 |          40 µs |
+| 16-consumer propagation | arena  |             5 / 5 |          424 / 488 |          21 µs |
+
+Arena substantially reduces wide-propagation work, but it reaches neither
+promised zero: a steady turn still allocates five times and propagation still
+performs hundreds of retains and releases. The smallest steady turn is also
+10% slower despite the lower counts.
+
+The pinned-key result is more important because it tests algorithmic shape,
+not a constant:
+
+| Pinned keys | simple retains / releases / p50 | arena retains / releases / p50 |
+| ----------: | ------------------------------: | -----------------------------: |
+|           1 |              69 / 96 / 2.826 µs |             51 / 70 / 3.172 µs |
+|         100 |            168 / 195 / 4.850 µs |           249 / 268 / 4.583 µs |
+|         500 |               568 / 595 / 15 µs |          1,049 / 1,068 / 10 µs |
+
+Simple pays exactly one retain and one release per additional pinned key;
+arena pays exactly two of each. Arena's compact traversal wins wall clock at
+larger sizes, but the M6 target was to make a turn O(changed keys) instead of
+O(pinned keys), not to traverse every irrelevant row faster. The candidate
+therefore steepens the explicit ARC slope it was built to flatten.
+
+Replacing a mature, correct core is justified by a broad improvement or by
+removing a structural cost that matters as graphs grow. Arena does neither yet:
+it wins important workloads, loses others, misses both zero-cost targets, and
+preserves the pinned-key scaling defect at twice the ARC slope. Shipping that
+trade would add representation risk without fulfilling the reason for the
+swap. Reconsider only after a candidate makes pinned-key work O(changed), then
+remeasure steady, deep, broad, and unstable shapes without a new common-path
+regression. Since 0.2.0 was scoped to the core replacement, the principled
+release recommendation is no release rather than a version containing no
+shipping change.
+
+**M6 closeout** — `M6-12b`, 2026-08-17. The no-release record is approved.
+The decision is implemented, not merely proposed: an unset selector compiles
+the simple core, and the complete 248-scenario behavior suite still passes
+under both explicit core selections. The committed performance gate verifies
+all 13 registered threshold workloads, proves malloc counting is live, keeps
+PERF-06 exactly allocation-free at p90, and bounds every PERF-10 runtime cell.
+The edge and runtime measurements, decision rationale, and retained selector
+are therefore reproducible without changing what an ordinary consumer builds.
+
+There is no 0.2.0 payload. The only change that version was chartered to ship
+was arena replacing simple, and the measurements rejected that replacement.
+Changing a changelog, version reference, tag, DocC deployment, exact-version
+consumer, or GitHub Release would manufacture publication work for an
+unchanged library. `M6-12c`, `M6-12d`, and `M6-12e` are consequently not
+applicable; M6 closes on the recorded evidence above, and M7 may start from the
+unchanged simple default.
+
+Conditional publication disposition:
+
+- **M6-12c — not applicable.** No `0.2.0` candidate was approved, so no
+  annotated tag was created or pushed. The remote `refs/tags/0.2.0` remains
+  absent.
+- **M6-12d — not applicable.** With no tag, there is no tag-triggered DocC
+  deployment and no exact `0.2.0` package version for a scratch consumer to
+  resolve. Revision-based substitutes would not prove either post-release
+  claim and are deliberately not reported as such.
+- **M6-12e — not applicable.** There is no approved candidate, tag, or verified
+  release artifact for a `0.2.0` GitHub Release to describe. No release was
+  drafted or published; the conditional publication chain terminates here.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
@@ -517,8 +734,9 @@ and cannot express one.
   heights. Revisit only if an eager batch mode becomes a requirement.
 - **No locks or atomics in the graph.** Async generation checks live at the
   concurrency boundary, not in graph storage.
-- **No unmeasured representation choice.** Value-reference layout, edge layout, hash
-  tables, and exclusivity attributes wait for benchmarks.
+- **No unmeasured representation choice.** Value-reference and edge layouts
+  are settled by the measurements in §9.6; hash tables and exclusivity
+  attributes wait for benchmarks.
 
 ## Appendix A: costs in current Swift designs
 

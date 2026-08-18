@@ -39,7 +39,7 @@ extension Cogs {
     let deferredInitialRuns = reactionRuns
     reactionRuns.removeAll(keepingCapacity: true)
 
-    for reaction in reactions where reaction.settleState != .clean {
+    for reaction in reactions where reaction.needsFlush(in: self) {
       reactionRuns.append(.changed(reaction))
     }
     reactionRuns.append(contentsOf: deferredInitialRuns)

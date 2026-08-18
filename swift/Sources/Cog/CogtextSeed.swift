@@ -36,6 +36,13 @@ extension Cogs {
     seedBarrierDepth += 1
     defer { seedBarrierDepth -= 1 }
 
+    #if COG_CORE_ARENA
+    let currentValue = arenaCore.manualValue(for: valueReference)
+    guard !valueReference.descriptor.valuesAreEqual(currentValue, value) else { return }
+
+    advanceRevision()
+    arenaCore.publishTestingSeed(value, for: valueReference)
+    #else
     let state = manualState(for: valueReference)
     guard !state.descriptor.valuesAreEqual(state.currentValue, value) else { return }
 
@@ -44,6 +51,7 @@ extension Cogs {
     state.markChanged(at: revision)
     state.observationBoundary?.deferChange()
     invalidateSubscribers(of: state)
+    #endif
   }
 }
 

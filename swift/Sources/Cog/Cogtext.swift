@@ -72,6 +72,14 @@ public final class Cogs {
   /// changed debug seed also advances it.
   internal private(set) var revision: CogVersion = .initial
 
+  #if COG_CORE_ARENA
+  /// Data-oriented graph selected for this build-time arena test leg.
+  ///
+  /// Public references remain unchanged; manual, synchronous derived, async,
+  /// reaction, lifetime, Observation, and history paths share its scalar rows.
+  internal let arenaCore: CogArenaCore
+  #endif
+
   /// One enter/exit buffer reused by iterative settle walks.
   internal var settleStack = CogSettleStack()
 
@@ -157,11 +165,13 @@ public final class Cogs {
   /// for `CogTesting`.
   internal var turnChainTracker = CogTurnChainTracker()
 
+  #if COG_CORE_SIMPLE
   /// What this context has done lately (§2.3, perf §8).
   ///
-  /// All history storage, types, and call sites compile out of release builds
-  /// (`HIST-04`).
+  /// The arena core owns its integer recorder instead. Both histories and all
+  /// recording call sites compile out of release builds (`HIST-04`).
   internal var historyLog = CogHistoryLog()
+  #endif
   #endif
 
   /// Creates an empty context.
@@ -182,6 +192,9 @@ public final class Cogs {
   ) {
     self.clock = clock
     self.defaultWhileObservedGrace = defaultWhileObservedGrace
+    #if COG_CORE_ARENA
+    self.arenaCore = CogArenaCore()
+    #endif
   }
 
   /// Installs a one-shot acknowledgement for the next async completion check.
@@ -242,6 +255,9 @@ public final class Cogs {
     for reaction in reactions {
       reaction.releaseDependenciesForContextTeardown()
     }
+    #if COG_CORE_ARENA
+    arenaCore.prepareForContextTeardown()
+    #endif
     deinitCleanupAcknowledgement?()
   }
 }
@@ -425,6 +441,23 @@ extension Cogs {
     nextLifetimeReleaseCheckAcknowledgement = acknowledgement
   }
 
+  /// Consumes the package-only signal after one grace check completes.
+  ///
+  /// Both storage cores share this context-owned testing seam; the callback
+  /// never enters arena storage or changes release eligibility.
+  internal func acknowledgeLifetimeReleaseCheckIfRequested() {
+    let acknowledgement = nextLifetimeReleaseCheckAcknowledgement
+    nextLifetimeReleaseCheckAcknowledgement = nil
+    acknowledgement?()
+  }
+
+  /// Consumes the package-only signal after one state closure is released.
+  internal func acknowledgeLifetimeReleaseIfRequested() {
+    let acknowledgement = nextLifetimeReleaseAcknowledgement
+    nextLifetimeReleaseAcknowledgement = nil
+    acknowledgement?()
+  }
+
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///
   /// A diagnostic seam for `CogTesting`, not UI API. It reports only the count
@@ -432,7 +465,11 @@ extension Cogs {
   /// boundary objects — so behavior tests (UI-05) can hold "only what a view
   /// read pays for a boundary" without coupling to state representation.
   package var observationBoundaryCountForTesting: Int {
+    #if COG_CORE_ARENA
+    arenaCore.observationBoundaryCount
+    #else
     observationStates.count
+    #endif
   }
 
   /// Whether this source's exact state currently owns an Observation boundary.
@@ -460,8 +497,45 @@ extension Cogs {
 
   /// Shared identity lookup behind the boundary probes above.
   private func hasObservationBoundary(_ identity: CogStateIdentity) -> Bool {
+    #if COG_CORE_ARENA
+    arenaCore.hasObservationBoundary(for: identity)
+    #else
     (states[identity] as? any CogObservationState)?.observationBoundary != nil
+    #endif
   }
+
+  #if COG_CORE_ARENA
+  /// Exercises derived-state release and replacement through the arena core.
+  ///
+  /// Package-only for `CogTesting`; normal clients never receive slot handles.
+  /// Both declarations are settled through their real typed columns, and the
+  /// returned snapshot contains identity-free allocator facts only.
+  package func arenaSlotReuseForTesting<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>
+  ) -> CogArenaSlotReuseSnapshot {
+    arenaCore.slotReuseSnapshot(
+      releasing: releasedReference,
+      replacingWith: replacementReference,
+      in: self
+    )
+  }
+
+  /// Deliberately touches a released slot after its row has been reused.
+  ///
+  /// This exists solely for PERF-05's debug child process. Successful behavior
+  /// is termination with the stale-generation message, never a normal return.
+  package func trapOnStaleArenaSlotAccessForTesting<ReleasedValue, ReplacementValue>(
+    releasing releasedReference: Cog<ReleasedValue>,
+    replacingWith replacementReference: Cog<ReplacementValue>
+  ) {
+    arenaCore.trapOnStaleSlotAccess(
+      releasing: releasedReference,
+      replacingWith: replacementReference,
+      in: self
+    )
+  }
+  #endif
 
   /// Removes the exact still-unobserved state after its grace task resumes.
   ///
@@ -476,9 +550,7 @@ extension Cogs {
     identity: CogStateIdentity,
     generation: UInt64
   ) {
-    let checkAcknowledgement = nextLifetimeReleaseCheckAcknowledgement
-    nextLifetimeReleaseCheckAcknowledgement = nil
-    defer { checkAcknowledgement?() }
+    defer { acknowledgeLifetimeReleaseCheckIfRequested() }
 
     if state.pendingLifetimeReleaseGeneration == generation {
       state.pendingLifetimeReleaseGeneration = nil
@@ -495,9 +567,7 @@ extension Cogs {
 
     releaseUnobservedClosure(startingAt: state)
 
-    let acknowledgement = nextLifetimeReleaseAcknowledgement
-    nextLifetimeReleaseAcknowledgement = nil
-    acknowledgement?()
+    acknowledgeLifetimeReleaseIfRequested()
   }
 
   /// Releases a newly disconnected unobserved dependency closure at the
@@ -545,6 +615,9 @@ extension Cogs {
   @discardableResult
   internal func advanceRevision() -> CogVersion {
     revision = revision.advanced()
+    #if COG_CORE_ARENA
+    arenaCore.advanceRevision()
+    #endif
     return revision
   }
 
@@ -569,7 +642,8 @@ extension Cogs {
     }
   }
 
-  /// Resolves an async value reference to its state in this context.
+  #if COG_CORE_SIMPLE
+  /// Resolves an async value reference to its simple-core state in this context.
   ///
   /// Lookup and work start are deliberately separate. Merely resolving the
   /// descriptor-and-key slot allocates state but does not run the selector;
@@ -603,6 +677,7 @@ extension Cogs {
       AsyncCogState(descriptor: descriptor, key: key)
     }
   }
+  #endif
 
   /// Gets the state for `identity`, or files the result of `create`.
   ///
@@ -648,12 +723,18 @@ extension Cogs {
   /// - Returns: The value the source holds in this context, which is its
   ///   declaration's starting value until a turn writes it.
   public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    let value = arenaCore.manualValue(for: valueReference)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    return value
+    #else
     let state = manualState(for: valueReference)
     // An `.app` source ignores this. An ephemeral one treats a one-shot read as
     // the transient demand it is: real enough to renew grace, not durable
     // enough to keep the value alive on its own.
     scheduleLifetimeReleaseIfUnobserved(state)
     return state.currentValue
+    #endif
   }
 
   /// Reads a derived cog's value without creating a dependency edge.
@@ -669,10 +750,16 @@ extension Cogs {
   /// - Parameter valueReference: The derived cog to read.
   /// - Returns: Its fully settled value in this context.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
+    #if COG_CORE_ARENA
+    let value = arenaCore.derivedValue(for: valueReference, in: self)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    return value
+    #else
     let state = derivedState(for: valueReference)
     let value = state.settledValue(in: self)
     scheduleLifetimeReleaseIfUnobserved(state)
     return value
+    #endif
   }
 
   /// Reads an async cog's current value without creating a dependency edge.

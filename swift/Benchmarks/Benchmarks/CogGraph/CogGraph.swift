@@ -47,10 +47,12 @@ let benchmarks: @Sendable () -> Void = {
   // file registers through here.
   allocationBenchmarks()
   propagationBenchmarks()
+  edgeLayoutBenchmarks()
   memoryBenchmarks()
   boundaryBenchmarks()
   pinnedKeyBenchmarks()
   valueReferenceBenchmarks()
+  runtimeComparisonBenchmarks()
 
   // Timing over the shared Kairo diamond, and **no counting metrics at all**.
   //

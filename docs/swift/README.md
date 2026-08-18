@@ -82,6 +82,7 @@ mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swi
 mise run fmt:check        # the same checks, writing nothing
 mise run test             # the default isolation leg
 mise run test:matrix      # all four isolation legs
+mise run test:cores       # verify default simple; behavior under both cores
 mise run test:release     # the default leg in release configuration
 mise run test:compilefail # batched swiftc pass over swift/CompileFail/
 mise run tasks:check      # validate impl/tasks.md against the plan and scenarios
@@ -194,7 +195,7 @@ registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
 and non-nestable: do not put `await` in it, and do not use it as general test or
 preview setup.
 
-## Where things stand (2026-08-14)
+## Where things stand (2026-08-17)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -324,8 +325,15 @@ These choices are settled; §10 of the core document has the full record.
   in that region fails immediately in every build, names the cog/key and turn,
   and tells the caller to invoke the op outside derived computation, from event
   handling or a reaction.
-- The runtime will use a data-oriented arena. Public value references remain names, never
-  arena slot handles.
+- The shipping runtime remains the simple class-state core. The data-oriented
+  arena passes the same 248 public behavior scenarios and uses the selected
+  shared linked edge pool, but its measured gains are mixed and it misses M6's
+  defining cost targets: five allocations remain per steady turn, propagation
+  still performs ARC traffic, and notice work remains O(pinned keys) with two
+  retain/release pairs per key rather than simple's one. Arena remains an
+  internal selector-only research and benchmark candidate; M6 recommends no
+  0.2.0 release. Public value references remain names, never arena slot
+  handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -357,8 +365,9 @@ severity policy, and the stable rule-page URL shape. Also open are several
 edge behaviors: what a stream's status does when its sequence ends or throws,
 whether equal stream elements commit distinct turns, whether a failed `.queue`
 run stops the queue, and debounce/throttle timing modifiers (deferred backlog).
-Value-reference layout, edge layout, and hash tables also remain open until
-benchmarks choose them.
+Custom hash tables also remain open until benchmarks justify them. Inline
+`AnyHashable` value references and the shared linked edge pool are selected by
+the measurements in design/perf.md §9.6.
 
 ## Prior art
 
@@ -383,8 +392,8 @@ full review.
 
 [impl/plan.md](./impl/plan.md) is the execution plan,
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
-[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. Build the
-simple correctness version first, then the SwiftUI boundary, then a first
-async slice for a usable 0.1.0. The benchmark port selected inline value
-references; next, build the data-oriented core and measure it against the
-simple version, swift-state-graph, and raw `@Observable`.
+[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
+without a 0.2.0 release: its measured core decision keeps the simple
+implementation as the shipping default and the arena as an internal comparison
+build. M7 completes async policies, streams, and exports behind the same public
+behavior suite before the next release gate.

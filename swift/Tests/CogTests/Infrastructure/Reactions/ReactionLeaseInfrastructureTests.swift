@@ -29,6 +29,10 @@ import Testing
   #expect(seen.map { $0.1 } == [2, 6])
 }
 
+#if COG_LEG_CORE_SIMPLE
+// These assertions intentionally inspect class-state identity and counters.
+// ArenaLifetimeInfrastructureTests owns the same invariants through generated
+// slots and scalar lease counts when the replacement core is selected.
 @MainActor
 @Test func `ReactionLeaseInfrastructure counts direct derived roots once per reaction`() {
   let cogs = Cogs.forTesting()
@@ -155,6 +159,7 @@ import Testing
   token?.cancel()
   #expect(rootState?.externalLeaseCount == 0)
 }
+#endif
 
 extension Cogs {
   /// Registers a bare reaction through the internal door.

@@ -90,11 +90,15 @@ extension Cogs {
   internal func writerRead<Value>(_ valueReference: ManualCog<Value>, turnID: CogTurnID) -> Value {
     requireWriterTurn(turnID, usage: .reading, target: valueReference)
 
+    #if COG_CORE_ARENA
+    return arenaCore.writerValue(for: valueReference)
+    #else
     let state = manualState(for: valueReference)
     guard case .some(let pending) = state.pendingValue else {
       return state.currentValue
     }
     return pending
+    #endif
   }
 
   /// Replaces a source's staged value and marks it touched once for this turn.
@@ -108,6 +112,10 @@ extension Cogs {
   ) {
     let turn = requireWriterTurn(turnID, usage: .writing, target: valueReference)
 
+    #if COG_CORE_ARENA
+    arenaCore.writerStage(valueReference, value: value, in: turn)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    #else
     let state = manualState(for: valueReference)
     state.pendingValue = .some(value)
     turn.touch(state)
@@ -117,6 +125,7 @@ extension Cogs {
     // written and never observed still goes away instead of accumulating keys
     // forever. `.app` sources — every source that did not opt in — ignore this.
     scheduleLifetimeReleaseIfUnobserved(state)
+    #endif
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.
