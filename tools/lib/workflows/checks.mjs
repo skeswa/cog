@@ -4,7 +4,7 @@
 // returns diagnostics. `WORKFLOW_CHECKS` is the ordered registry the CLI runs;
 // later hardening slices append to it rather than editing existing checks.
 
-import { entries, text } from "./yaml.mjs";
+import { entries, items, text } from "./yaml.mjs";
 
 // ---------------------------------------------------------------------------
 // POLICY CONSTANTS — the knobs this checker enforces. Edit here, nowhere else.
@@ -74,6 +74,28 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 
 /** An image digest, the only pinnable form of a `docker://` reference. */
 const IMAGE_DIGEST = /@sha256:[0-9a-f]{64}$/;
+
+/** Inputs whose changes can alter the CogLint dogfood result or its execution. */
+const COGLINT_TRIGGER_PATHS = [
+  "Package.swift",
+  "Package.resolved",
+  "swift/**",
+  "mise.toml",
+  "tools/**",
+  ".github/workflows/swift-ci.yml",
+];
+
+/** The two concrete runner lanes permitted to execute repository Swift. */
+const COGLINT_SELF_HOSTED_LABELS = ["self-hosted", "macOS", "ARM64", "cog-mini"];
+const COGLINT_FORK_RUNNER = "macos-26";
+
+/** The routing predicates that keep same-repo and fork code in separate lanes. */
+const COGLINT_SELF_HOSTED_CONDITION =
+  "github.repository == 'skeswa/cog' && (github.event_name != 'pull_request' || " +
+  "github.event.pull_request.head.repo.full_name == github.repository)";
+const COGLINT_FORK_CONDITION =
+  "github.event_name == 'pull_request' && " +
+  "github.event.pull_request.head.repo.full_name != github.repository";
 
 // ---------------------------------------------------------------------------
 // Checks
@@ -419,6 +441,147 @@ function shaPinnedActions(workflow) {
   return diagnostics;
 }
 
+/**
+ * The Swift workflow always runs CogLint over same-repo and fork changes.
+ *
+ * The generic checks above grade every job's hardening. This contract is more
+ * specific: it keeps the dogfood command attached to both halves of the fixed
+ * macOS topology, requires an explicit read-only token at each lint job, and
+ * prevents a source or tool change from bypassing lint through `on.paths`.
+ * It intentionally applies only to `swift-ci.yml`; fixtures use that basename
+ * so they exercise the same route as the repository workflow.
+ *
+ * @param {import("./model.mjs").Workflow} workflow
+ * @returns {Diagnostic[]}
+ */
+function cogLintCiContract(workflow) {
+  if ((workflow.path.split("/").pop() ?? workflow.path) !== "swift-ci.yml") return [];
+
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  for (const triggerName of ["pull_request", "push"]) {
+    const trigger = workflow.triggers.find((candidate) => candidate.name === triggerName);
+    if (trigger === undefined) {
+      diagnostics.push({
+        path: workflow.path,
+        line: 1,
+        check: "coglint-ci-contract",
+        message: `CogLint needs the \`${triggerName}\` trigger`,
+      });
+      continue;
+    }
+
+    const pathsEntry = entries(trigger.configuration).find((entry) => entry.key === "paths");
+    const configuredPaths = new Set(
+      items(pathsEntry?.value)
+        .map((item) => text(item))
+        .filter((path) => path !== null && path !== undefined),
+    );
+    const missing = COGLINT_TRIGGER_PATHS.filter((path) => !configuredPaths.has(path));
+    if (missing.length === 0) continue;
+    diagnostics.push({
+      path: workflow.path,
+      line: pathsEntry?.line ?? trigger.line,
+      check: "coglint-ci-contract",
+      message:
+        `\`${triggerName}.paths\` can bypass CogLint; add ` +
+        missing.map((path) => `\`${path}\``).join(", "),
+    });
+  }
+
+  inspectCogLintJob({
+    workflow,
+    diagnostics,
+    id: "lint-swift",
+    runnerShape: "sequence",
+    runnerLabels: COGLINT_SELF_HOSTED_LABELS,
+    condition: COGLINT_SELF_HOSTED_CONDITION,
+  });
+  inspectCogLintJob({
+    workflow,
+    diagnostics,
+    id: "fork-lint-swift",
+    runnerShape: "string",
+    runnerLabels: [COGLINT_FORK_RUNNER],
+    condition: COGLINT_FORK_CONDITION,
+  });
+  return diagnostics;
+}
+
+/**
+ * @param {object} input
+ * @param {import("./model.mjs").Workflow} input.workflow
+ * @param {Diagnostic[]} input.diagnostics
+ * @param {string} input.id
+ * @param {"string" | "sequence"} input.runnerShape
+ * @param {string[]} input.runnerLabels
+ * @param {string} input.condition
+ */
+function inspectCogLintJob({ workflow, diagnostics, id, runnerShape, runnerLabels, condition }) {
+  const job = workflow.jobs.find((candidate) => candidate.id === id);
+  if (job === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `missing required CogLint job \`${id}\``,
+    });
+    return;
+  }
+
+  const actualLabels = job.runsOn.labels.map((label) => label.value);
+  if (
+    job.runsOn.shape !== runnerShape ||
+    actualLabels.length !== runnerLabels.length ||
+    !actualLabels.every((label, index) => label === runnerLabels[index])
+  ) {
+    const expected = runnerShape === "sequence" ? `[${runnerLabels.join(", ")}]` : runnerLabels[0];
+    diagnostics.push({
+      path: workflow.path,
+      line: job.runsOn.line,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` must run on exactly \`${expected}\``,
+    });
+  }
+
+  if (normalizeExpression(job.condition ?? "") !== normalizeExpression(condition)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.conditionLine,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` does not carry its exact runner-lane \`if:\` policy`,
+    });
+  }
+
+  const permissionEntries = entries(job.permissions);
+  const hasExactReadPermission =
+    permissionEntries.length === 1 &&
+    permissionEntries[0].key === "contents" &&
+    text(permissionEntries[0].value) === "read";
+  if (!hasExactReadPermission) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.permissionsLine,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` needs its own exact \`permissions: {contents: read}\` block`,
+    });
+  }
+
+  if (!job.steps.some((step) => step.run?.trim() === "mise run lint:swift")) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "coglint-ci-contract",
+      job: id,
+      message: `job \`${id}\` must execute exactly \`mise run lint:swift\``,
+    });
+  }
+}
+
 /** The ordered registry the CLI runs. */
 export const WORKFLOW_CHECKS = [
   { name: "no-pull-request-target", run: noPullRequestTarget },
@@ -427,6 +590,7 @@ export const WORKFLOW_CHECKS = [
   { name: "credential-hygiene", run: credentialHygiene },
   { name: "job-timeout", run: jobTimeout },
   { name: "sha-pinned-actions", run: shaPinnedActions },
+  { name: "coglint-ci-contract", run: cogLintCiContract },
 ];
 
 /**

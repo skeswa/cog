@@ -45,6 +45,26 @@ const CASES = [
     checks: [],
   },
   {
+    name: "valid CogLint trigger and runner contract passes",
+    workflow: resolve(FIXTURES, "coglint-contract-valid/swift-ci.yml"),
+    checks: [],
+  },
+  {
+    name: "CogLint path, runner, permission, and command drift",
+    workflow: resolve(FIXTURES, "coglint-contract-drift/swift-ci.yml"),
+    checks: ["coglint-ci-contract"],
+    mentions: [
+      "`pull_request.paths`",
+      "`tools/**`",
+      "`lint-swift`",
+      "[self-hosted, macOS, ARM64, cog-mini]",
+      "permissions: {contents: read}",
+      "mise run lint:swift",
+      "`fork-lint-swift`",
+      "`macos-26`",
+    ],
+  },
+  {
     name: "self-hosted job with no guard",
     workflow: resolve(FIXTURES, "guard-removed.yml"),
     checks: ["self-hosted-guard"],
