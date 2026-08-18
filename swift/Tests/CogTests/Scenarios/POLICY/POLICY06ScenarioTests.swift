@@ -7,55 +7,10 @@ private nonisolated enum Policy06Error: Error, Equatable {
   case offline
 }
 
-/// Deterministic ordered work indexed by selector generation.
-@MainActor
-private final class Policy06ControlledWork {
-  /// Announces only when an operation actually begins executing.
-  let starts: AsyncStream<Int>
-
-  /// Feeds operation starts to the test in exact generation order.
-  private let startContinuation: AsyncStream<Int>.Continuation
-
-  /// Started operations awaiting an exact success or failure.
-  private var continuations: [Int: CheckedContinuation<Int, any Error>] = [:]
-
-  /// Generation assigned to the next selected operation.
-  private var nextGeneration = 0
-
-  /// Creates a probe with no selected or running work.
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  /// Describes one run that announces and then suspends its generation.
-  func makeRun() -> RunWork<Int> {
-    let generation = nextGeneration
-    nextGeneration += 1
-    return .run {
-      self.startContinuation.yield(generation)
-      return try await withCheckedThrowingContinuation {
-        self.continuations[generation] = $0
-      }
-    }
-  }
-
-  /// Completes one started generation successfully.
-  func succeed(_ generation: Int, with value: Int) {
-    continuations.removeValue(forKey: generation)?.resume(returning: value)
-  }
-
-  /// Completes one started generation with an error.
-  func fail(_ generation: Int, with error: any Error) {
-    continuations.removeValue(forKey: generation)?.resume(throwing: error)
-  }
-
-  nonisolated deinit {}
-}
-
 @MainActor
 @Test func `POLICY-06 queue continues after failure with exact refresh outcomes`() async throws {
   let (cogs, m) = probedContext()
-  let work = Policy06ControlledWork()
+  let work = PolicyGenerationControlledWork()
   let queuedCog = AsyncCog<Int>(.queue, default: -1, name: "queued") { _ in
     work.makeRun()
   }
