@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 /// One observable entry into a controlled stream iterator.
-private nonisolated struct DependencyStreamStart: Sendable, Equatable {
+nonisolated struct DependencyStreamStart: Sendable, Equatable {
   /// The stream generation whose iterator requested an element.
   let generation: Int
 
@@ -17,7 +17,7 @@ private nonisolated struct DependencyStreamStart: Sendable, Equatable {
 /// lets the old iterator return a late element after Cog has cancelled it, so
 /// the scenario reaches Cog's generation check instead of relying on sequence
 /// cancellation to discard the element first.
-private actor DependencyStreamChannel {
+actor DependencyStreamChannel {
   /// Publishes every request for a next element.
   let startContinuation: AsyncStream<DependencyStreamStart>.Continuation
 
@@ -48,7 +48,7 @@ private actor DependencyStreamChannel {
 }
 
 /// A controlled sequence that reports cancellation but still permits a late element.
-private nonisolated struct DependencyStreamSequence: AsyncSequence, Sendable {
+nonisolated struct DependencyStreamSequence: AsyncSequence, Sendable {
   typealias Element = Int
 
   /// The selector generation represented by this sequence.
@@ -101,7 +101,7 @@ private nonisolated struct DependencyStreamSequence: AsyncSequence, Sendable {
 }
 
 @MainActor
-private final class DependencyStreamWork {
+final class DependencyStreamWork {
   /// Announces each iterator request together with its captured dependency.
   let starts: AsyncStream<DependencyStreamStart>
 
