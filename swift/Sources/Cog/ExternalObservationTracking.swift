@@ -1,5 +1,18 @@
 internal import Observation
 
+/// Which runtime path links external Observation state into one context.
+///
+/// Production selects automatically from OS availability. `CogTesting` may
+/// force the legacy path on a newer host so its bounded compatibility behavior
+/// and deterministic re-arm seam remain testable after CI moves past iOS 25.
+package enum CogExternalObservationTrackingMode: Sendable {
+  /// Use continuous Observation where available and the legacy shim otherwise.
+  case automatic
+
+  /// Use the pre-iOS-26 one-shot re-arm shim regardless of host availability.
+  case legacy
+}
+
 /// The context-local identity of one linked external property.
 ///
 /// Object identity keeps equal-valued models separate. Key-path equality keeps
@@ -146,10 +159,14 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
     guard observationTask == nil, legacyObservation == nil else {
       fatalError("A Cog external-property bridge started twice.")
     }
-    if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
-      startModernObservation(in: cogs)
-    } else {
+    if cogs.externalObservationTrackingMode == .legacy {
       startLegacyObservation(in: cogs)
+    } else {
+      if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
+        startModernObservation(in: cogs)
+      } else {
+        startLegacyObservation(in: cogs)
+      }
     }
   }
 
@@ -197,7 +214,9 @@ internal final class CogTrackedPropertyBridge<Root: Observable & AnyObject, Trac
     let observation = CogLegacyObservationShim(
       read: { root[keyPath: keyPath] },
       didChange: { [weak cogs] value in
-        cogs?.commit(turnName) { c in c[sourceCog] = value }
+        guard let cogs else { return }
+        cogs.commit(turnName) { c in c[sourceCog] = value }
+        cogs.acknowledgeExternalObservationRearmIfRequested()
       }
     )
     legacyObservation = observation
