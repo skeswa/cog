@@ -1217,6 +1217,40 @@ samples are inside `CogArenaValueColumn` itself — `installedRow`, `stage`,
 unspecialized generic code. No per-call-site cache helps that; it needs
 specialization, which is a different route.
 
+**Footprint and build cost, both cores** — `M9-25`, 2026-08-19, same host and
+toolchain. Issue #373 route F asked for this: §9.6 had a per-state figure for
+the simple core and none for the arena. Seven paired runs of PERF-03's
+thousand-state graph — five hundred keyed sources and five hundred keyed
+consumers, built and settled in a fresh context every iteration.
+
+| Measure                        | simple        | arena         |
+| ------------------------------ | ------------- | ------------- |
+| resident-memory delta, p50, KB | 1,279–1,656   | 1,082–1,918   |
+| median of those medians        | ~1,345        | ~1,541        |
+| build + settle + teardown, p50 | **~1,068 µs** | **~2,320 µs** |
+
+**The memory difference is not a result.** The arena's median runs about 15%
+higher, and the ranges overlap so heavily — the arena's best run is below the
+simple core's worst — that seven pairs cannot separate them. This is the metric
+§9.6 already flags as sampled rather than counted: resident memory is
+page-granular and the delta only advances on iterations where the peak actually
+moves, which is why its gate is a whole mebibyte. Anyone wanting a real answer
+needs a counted probe of the columns and dictionaries, not this benchmark.
+
+Recorded because the first pair measured suggested a clean 48% difference and
+it did not survive being run again. Route F remains open; what it now has is a
+reason not to trust a single pair.
+
+**The build cost is a result**, and a large one. Constructing, settling, and
+releasing a thousand-state graph takes the arena **2.2× as long**, consistently
+across every run with little spread. That is cold-start cost and the cost of a
+screen materialising a large keyed family, and it is the first measurement that
+favours the simple core by a wide margin on a shape a real app hits.
+
+Worth reading beside the steady-state numbers, which favour the arena on every
+whole-graph shape after `M9-22` and `M9-23`. The arena is faster to _run_ and
+slower to _build_; nothing measured so far told us the second half.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
