@@ -36,6 +36,13 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 
   /// The accumulating turn has staged this source once.
   static let touched = CogArenaStateFlags(rawValue: 1 << 4)
+
+  /// This row's boundary is already on the changed-boundary queue.
+  ///
+  /// Dedupe for the O(changed) flush: a row reached by two invalidation paths
+  /// in one turn notifies once. A spare bit rather than a set, because the walk
+  /// that sets it is already holding the flag word.
+  static let noticeQueued = CogArenaStateFlags(rawValue: 1 << 5)
 }
 
 /// Context-owned scalar storage for the data-oriented core.

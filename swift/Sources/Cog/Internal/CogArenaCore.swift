@@ -593,10 +593,23 @@ internal final class CogArenaCore {
   /// created while another root settles joins the next flush and cannot receive
   /// a notice for a change that predates its first observed value.
   func flushObservationBoundaries(in cogs: Cogs) {
-    let boundaryCount = observationEntries.count
-    for index in 0..<boundaryCount {
+    var rows = propagation.takeChangedBoundaryRows()
+    guard !rows.isEmpty else { return }
+
+    // Notice order is boundary-creation order, and a row's boundary column is
+    // its position in that order, so sorting on it restores what the registry
+    // walk delivered for free. This sorts the changed set, which is the small
+    // one; sorting was never the cost being removed.
+    rows.sort { arena.boundary[Int($0)] < arena.boundary[Int($1)] }
+
+    for rawRow in rows {
+      let row = Int(rawRow)
+      propagation.clearBoundaryNotice(row: rawRow)
+
+      let entryIndex = arena.boundary[row]
+      guard entryIndex != CogArenaStorage.noIndex else { continue }
+      let index = Int(entryIndex)
       let slot = observationEntries[index].slot
-      let row = arena.index(of: slot)
 
       // Settle before the guard, because settling is what makes `changedAt`
       // current. The flag test comes first so a clean row — every pinned key on
@@ -605,13 +618,14 @@ internal final class CogArenaCore {
         settle(slot, in: cogs)
       }
 
-      // `M9-03`: the guard, then the entry and the record. It used to be the
-      // other way round, so an untouched pinned key paid a boundary-carrying
-      // struct copy and a descriptor lookup to be told it had not changed.
+      // The guard, then the entry and the record. `M9-03` put them in this
+      // order when the walk still visited every boundary; a queued row can
+      // still turn out unchanged — an equal recomputation settles clean — so
+      // the order still earns its keep.
       let changedThisTurn = arena.changedAt[row] == revision
       #if DEBUG
-      // Debug still touches every boundary, because a deferred seed change has
-      // to be consumed whether or not the row changed this turn.
+      // A deferred seed change has to be consumed whether or not the row
+      // changed this turn. Seeding invalidates, so a seeded row is queued.
       let changedBySeed = observationEntries[index].boundary.consumeDeferredChange()
       guard changedThisTurn || changedBySeed else { continue }
       recordHistoryState(event: .notice, slot: slot)

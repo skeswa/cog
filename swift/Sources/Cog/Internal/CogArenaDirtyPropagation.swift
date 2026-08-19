@@ -34,6 +34,13 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
   /// Selected candidate supplying each producer's subscriber chain.
   private let edges: EdgeStorage
 
+  /// Rows whose UI boundary could have changed in the accumulating turn.
+  ///
+  /// The flush walks this instead of every boundary the context has ever made,
+  /// which is what makes a turn cost O(changed) rather than O(pinned keys). The
+  /// buffer is reused across turns like the walk's own stack.
+  private var changedBoundaryRows: ContiguousArray<Int32> = []
+
   /// Reused LIFO work storage; successful walks always drain it to zero.
   private var stack: ContiguousArray<CogArenaInvalidationFrame> = []
 
@@ -68,6 +75,11 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
     guard stack.isEmpty else {
       fatalError("Cog tried to reenter an arena invalidation walk.")
     }
+
+    // The producer changed by definition; `mark` catches everything downstream
+    // that could. Between them they are exactly the boundaries a flush has any
+    // reason to visit, which is what makes the flush O(changed keys).
+    enqueueBoundaryNotice(row: producer.index)
 
     appendSubscribers(of: producer.index, requesting: .dirty)
     while let frame = stack.popLast() {
@@ -126,7 +138,36 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
       flags.insert(.dirty)
     }
     arena.flags[row] = flags
+    enqueueBoundaryNotice(row: rawRow)
     return true
+  }
+
+  /// Queues one row's boundary notice, if it has a boundary and is not queued.
+  ///
+  /// Both tests are scalar loads on a row this walk already holds, so a graph
+  /// with no UI boundaries pays two loads and a branch per marked row.
+  private func enqueueBoundaryNotice(row rawRow: Int32) {
+    let row = Int(rawRow)
+    guard row >= 0, row < arena.rowCount else { return }
+    guard arena.boundary[row] != CogArenaStorage.noIndex else { return }
+    guard !arena.flags[row].contains(.noticeQueued) else { return }
+
+    arena.flags[row].insert(.noticeQueued)
+    changedBoundaryRows.append(rawRow)
+  }
+
+  /// Takes the rows whose boundaries changed, leaving the queue empty.
+  func takeChangedBoundaryRows() -> ContiguousArray<Int32> {
+    let rows = changedBoundaryRows
+    changedBoundaryRows.removeAll(keepingCapacity: true)
+    return rows
+  }
+
+  /// Clears one row's queued mark once the flush has published it.
+  func clearBoundaryNotice(row rawRow: Int32) {
+    let row = Int(rawRow)
+    guard row >= 0, row < arena.rowCount else { return }
+    arena.flags[row].remove(.noticeQueued)
   }
 
   // Written out, and `nonisolated`, because generic classes under the
