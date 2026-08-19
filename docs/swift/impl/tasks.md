@@ -2063,12 +2063,24 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   _Verify: `mise run test:cores`, `mise run test --filter 'LIFE|SEED'`,
   `mise run test:release`, and `COG_TEST_CORE=arena mise run bench --filter
 perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
+- **M9-24** _(Infrastructure)_ — Hoist the arena's generation re-validation to
+  one checked entry boundary per operation. `CogArenaStorage.index(of:)`
+  re-validates a slot on nearly every column touch, and the file's own comment
+  anticipates the fix; the shape is row-taking variants on the typed value
+  column with the slot-taking members kept as thin wrappers, so no caller
+  changes. Measured at roughly 8% of an arena turn **before** `M9-22` removed
+  the exclusivity checks around the same accesses, so its remaining value is
+  unknown and has to be re-measured rather than assumed.
+  _Depends: M9-23._
+  _Verify: `mise run test:cores` and `COG_TEST_CORE=arena mise run bench
+--filter perf-01-steady-turn` against the `M9-23` measurement, keeping the
+  stale-token diagnostic on the side that can still move._
 - **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
   `M6-12a`'s core decision changes, which of issue #373's remaining routes
   become scheduled work, and whether M9's result warrants a patch release.
   Add the scenarios and tasks whichever answer requires, including a release
   link at the end of the serialized chain if one is warranted.
-  _Depends: M9-23._
+  _Depends: M9-24._
   _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
   and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate
