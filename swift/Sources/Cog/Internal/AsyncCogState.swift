@@ -756,6 +756,9 @@ internal final class AsyncCogState<Value>:
   }
 
   // Written out, and `nonisolated`, per the generic-class release rule.
+  /// Answers ``CogState/asDerivedSettleState`` without a runtime lookup.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { self }
+
   nonisolated deinit {}
 }
 

@@ -160,7 +160,11 @@ internal enum CogSettleFrame {
   /// Inspect a state and schedule its dirty producers before its exit.
   case enter(any CogState)
   /// Decide whether the now-parent-current state must recompute.
-  case exit(any CogState)
+  ///
+  /// Narrowed, because only a derived state ever gets an exit frame. Storing
+  /// the wider type here meant re-narrowing it on the way out of every node,
+  /// for a fact the push site already knew.
+  case exit(any DerivedCogSettleState)
 }
 
 /// The context-owned traversal storage reused by every settle walk.
@@ -207,7 +211,7 @@ internal struct CogSettleStack {
   }
 
   /// Appends an exit frame that runs after the state's scheduled dependencies.
-  mutating func pushExit(_ state: any CogState) {
+  mutating func pushExit(_ state: any DerivedCogSettleState) {
     frames.append(.exit(state))
   }
 
@@ -344,7 +348,7 @@ extension Cogs {
       switch frame {
       case .enter(let state):
         guard state.settleState != .clean else { continue }
-        guard let derived = state as? any DerivedCogSettleState else {
+        guard let derived = state.asDerivedSettleState else {
           // Sources are settled when their pending value moves to current, so
           // an invalid source here would be an internal propagation mistake.
           state.markChecked(at: revision)
@@ -362,8 +366,7 @@ extension Cogs {
           settleStack.pushEnter(dependency)
         }
 
-      case .exit(let state):
-        guard let derived = state as? any DerivedCogSettleState else { continue }
+      case .exit(let derived):
         defer { settleStack.endComputing(derived) }
 
         let parentChanged = derived.dependencies.contains {

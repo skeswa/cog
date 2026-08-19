@@ -256,5 +256,8 @@ internal final class DerivedCogState<Value>:
 
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.
+  /// Answers ``CogState/asDerivedSettleState`` without a runtime lookup.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { self }
+
   nonisolated deinit {}
 }

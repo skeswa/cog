@@ -211,7 +211,7 @@ extension Cogs {
     let boundaryCount = observationStates.count
     for state in observationStates.prefix(boundaryCount) {
       if state.settleState != .clean,
-        let derived = state as? any DerivedCogSettleState
+        let derived = state.asDerivedSettleState
       {
         settle(derived)
       }
