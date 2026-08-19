@@ -63,6 +63,7 @@ const WITNESS_BENCHMARK = "perf-witness-allocating";
 /** Benchmarks whose committed p90 references form the CI performance gate. */
 const THRESHOLDED_BENCHMARKS = [
   "perf-06-value-reference",
+  "perf-11-pinned-key-slope-1000",
   "perf-10-cog-diamond",
   "perf-10-cog-deep",
   "perf-10-cog-broad",
@@ -76,6 +77,18 @@ const THRESHOLDED_BENCHMARKS = [
   "perf-10-state-graph-broad",
   "perf-10-state-graph-unstable",
 ];
+
+/**
+ * Which metrics each gated benchmark commits a reference for.
+ *
+ * Most of the gate is wall clock. Two are not: PERF-06 promises allocation-free
+ * value-reference creation, and PERF-11 promises that a thousand pinned keys
+ * cost a turn what one does, which is a claim about ARC rather than about time.
+ */
+const STATIC_THRESHOLD_METRICS = {
+  "perf-06-value-reference": ["mallocCountTotal", "objectAllocCount"],
+  "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
+};
 
 /** One exact regular expression, so CI measures no ungated workload by accident. */
 const THRESHOLD_FILTER = `^(${THRESHOLDED_BENCHMARKS.join("|")})$`;
@@ -279,10 +292,7 @@ function assertStaticThresholdsComplete(directory) {
     if (!existsSync(path)) fail(`missing static threshold file: ${path}`);
 
     const thresholds = JSON.parse(readFileSync(path, "utf8"));
-    const expectedMetrics =
-      benchmark === "perf-06-value-reference"
-        ? ["mallocCountTotal", "objectAllocCount"]
-        : ["wallClock"];
+    const expectedMetrics = STATIC_THRESHOLD_METRICS[benchmark] ?? ["wallClock"];
     const actualMetrics = Object.keys(thresholds).sort();
     if (JSON.stringify(actualMetrics) !== JSON.stringify(expectedMetrics.sort())) {
       fail(

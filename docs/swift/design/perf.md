@@ -854,6 +854,52 @@ Any rerun of the simple-versus-arena comparison before those three are fixed
 would measure the same coat on both candidates, which is what `M6-12a` already
 did. `M9-17` reruns it afterwards.
 
+**Pinned-key work is O(changed)** — `M9-06`, 2026-08-19, `mactop` (Apple
+Silicon arm64, 12 cores, 24 GB), macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4
+(17E192) / Apple Swift 6.3, release, harness 1.36.2. Same shape as `M5-07d`:
+one keyed source written and read, every other key pinned and untouched.
+
+| Pinned keys | simple retains / releases / p50 | arena retains / releases / p50 |
+| ----------: | ------------------------------: | -----------------------------: |
+|           1 |              71 / 89 / 2.490 µs |             55 / 70 / 3.154 µs |
+|       1,000 |              71 / 89 / 2.402 µs |             55 / 70 / 3.174 µs |
+
+**Identical at every percentile, on both cores.** `M5-07d` recorded one retain
+and one release per pinned key on simple and `M6-11c` recorded two on arena;
+both are now zero, and the thousand-key turn is no slower than the one-key
+turn. Against the pre-M9 numbers the thousand-key shape falls from 1,067
+retains and 26 µs to 71 retains and 2.4 µs.
+
+Two changes, in order. `M9-03` moved the arena's `changedAt` guard above its
+boundary-entry copy and descriptor lookup, which was expected to halve that
+core's slope and removed it: the entry and the record were the whole of its
+per-key ARC. `M9-04` and `M9-05` then replaced both flushes with a
+changed-boundary queue filled where invalidation already visits a state, which
+removed the residual scalar walk — worth 1.9 ns per key on the arena after
+`M9-03`, and the entire difference on the simple core.
+
+The queue costs a small constant: the simple core's one-key turn pays three
+more retains than it did, for a thousand-key turn that pays 996 fewer.
+
+**`M6-12a`'s condition is met.** It named "a candidate makes pinned-key work
+O(changed)" as the trigger for reconsidering the core swap, and that is now
+true of both cores rather than of a candidate. `M9-17` reruns the comparison.
+Worth noting ahead of it: on this shape the shipping core is now the faster of
+the two, 2.402 µs against 3.174 µs.
+
+**The gate.** `perf-11-pinned-key-slope-1000` carries a committed p90 ceiling of
+90,000 retains and 110,000 releases — raw sums, so 90 and 110 per operation,
+against the 71 and 89 measured. It is an absolute ceiling rather than a drift
+tolerance because the claim is absolute: a thousand pinned keys must cost what
+one costs. `M9-06` verified the gate bites by tightening the ceiling below the
+measured value and watching the same command fail.
+
+**Ceilings are raw sums, and the report prints scaled figures.** A ceiling of
+90 rather than 90,000 passes against a measured 71,000 while reading, in the
+source, exactly like the intended gate. `M5-11` recorded the same trap for
+baseline tolerances; `M9-06` walked into it for static ceilings and is
+recording it beside the number so the next reader does not.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
