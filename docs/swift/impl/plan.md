@@ -226,7 +226,7 @@ the smallest repair task is inserted before a failed gate is rerun.
 | M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                                                |
 | M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                                                |
 | M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks) | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-18` identity repair → `M8-15g` exact-consumer gate |
-| M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks) | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-18` decision, and `M9-19` closeout                                                                                                 |
+| M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks) | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-25` and `M9-26` build cost, `M9-18` decision, and `M9-19` closeout                                                                 |
 
 ## Task bookkeeping
 
@@ -792,11 +792,21 @@ deinit`s pay executor checks on top of their mallocs. The remaining three are
   candidates, which is what `M6-12a` already did. `M9-18` records whether that
   changes the core decision, which of issue #373's remaining routes become
   scheduled work, and whether M9's result justifies a patch release.
+- **Steady state is not the whole comparison.** Every benchmark above builds
+  its graph outside the measured region and then drives turns through it, which
+  is right for the question it asks and blind to what construction costs.
+  `M9-25` measures a graph's footprint and its build cost on both cores, and
+  `M9-26` attributes whatever gap it finds, so `M9-18` weighs a core that is
+  faster to run against one that is cheaper to create rather than deciding on
+  turns alone.
 - **Not in scope.** Instruction-level work (perf §5's borrowed records, unsafe
-  buffers, unchecked exclusivity, `@inlinable` paths), the per-read hashing
-  follow-ups of perf §4, and the per-state footprint probe stay backlog on
-  #373. They are real, but they are tuning below a machinery cost that
-  dominates them; `M9-18` is where they are promoted or left.
+  buffers, `@inlinable` paths) and the per-read hashing follow-ups of perf §4
+  stay backlog on #373. They are real, but they are tuning below a machinery
+  cost that dominates them; `M9-18` is where they are promoted or left.
+  Unchecked exclusivity left this list when `M9-21` measured it at a third of
+  an arena turn, and the per-state footprint probe left it when route F's
+  question turned out to be answerable with a benchmark already in the suite;
+  `M9-22` and `M9-25` own them.
 - **No publication.** M9 is a performance milestone behind an unchanged public
   API, so it carries no release chain. If `M9-18` records that a version is
   warranted, that decision adds the candidate → tag → verification → release

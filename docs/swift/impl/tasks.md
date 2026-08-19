@@ -2075,12 +2075,37 @@ perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
   _Verify: `mise run test:cores` and `COG_TEST_CORE=arena mise run bench
 --filter perf-01-steady-turn` against the `M9-23` measurement, keeping the
   stale-token diagnostic on the side that can still move._
+- **M9-25** _(Decision)_ — Measure what a graph costs to _hold_ and to _build_
+  on both cores, which issue #373's route F asks for and §9.6 has for the
+  simple core only. Run PERF-03's thousand-state shape paired on both
+  selectors, enough times to know whether a difference is real, and record the
+  footprint and the build-settle-teardown wall clock. Resident memory is
+  sampled rather than counted, so a single pair is not a result and the record
+  must say so where it cannot separate them.
+  _Depends: M9-24._
+  _Verify: recorded `perf.md` §9.6 entry with its environment, carrying paired
+  runs rather than one, and `mise run fmt:check`._
+- **M9-26** _(Decision)_ — Attribute whatever build-cost gap `M9-25` finds to
+  call sites, on the same standing as every other §9.6 claim. Extend the
+  `M9-01` probe with a construction workload rather than reasoning from the
+  source, since a build is the one path whose costs the other workloads
+  deliberately warm away. Counting metrics alone may not explain the gap; where
+  they do not, bucket a sampler's leaves as §9.6 already does and record which
+  bucket moved.
+  _Depends: M9-25._
+  _Verify: recorded `perf.md` §9.6 entry naming the buckets that moved, the
+  `build` workload runnable from the probe's method document, and
+  `mise run fmt:check`._
 - **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
   `M6-12a`'s core decision changes, which of issue #373's remaining routes
   become scheduled work, and whether M9's result warrants a patch release.
   Add the scenarios and tasks whichever answer requires, including a release
-  link at the end of the serialized chain if one is warranted.
-  _Depends: M9-24._
+  link at the end of the serialized chain if one is warranted. Weigh the
+  steady-state result against `M9-25`'s build cost rather than either alone:
+  after `M9-22` and `M9-23` the arena wins every whole-graph shape and still
+  takes 2.2x as long to construct a keyed graph, and `M9-26` traces that to
+  unspecialized generic code on the one path `M9-23`'s memo cannot cover.
+  _Depends: M9-26._
   _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
   and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate

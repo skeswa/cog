@@ -85,6 +85,18 @@ let chainCogs = CogBox<Int, Int>(
   name: "prof.chain"
 )
 
+/// The keyed source family the build workload populates from scratch.
+///
+/// PERF-03's shape exactly: one keyed source and one keyed derived consumer per
+/// entry, which is how a screen actually reaches a thousand states.
+let buildSourceCogs = ManualCogBox<Int, Int>(0, name: "prof.build.source")
+
+/// One derived consumer per built entry.
+let buildCogs = CogBox<Int, Int>(
+  { c, key in c[buildSourceCogs[key]] &+ key },
+  name: "prof.build.entry"
+)
+
 // MARK: - Workloads
 
 let arguments = CommandLine.arguments
@@ -106,6 +118,21 @@ func run(_ body: (Int) -> Void) {
   armProfiler(mode)
   for iteration in 1...armedIterations { body(warmupIterations + iteration) }
   disarmProfiler()
+}
+
+/// Builds and releases one fresh context holding `pairs` source-derived pairs.
+///
+/// The context is local, so it is released before the next iteration begins and
+/// each measured iteration reports one complete build rather than a cumulative
+/// graph. Reads are the tracked subscript and `peek` in the same combination
+/// PERF-03 uses, so the two agree on what "a built state" means.
+func buildContext(pairs: Int) {
+  let context = Cogs.forTesting()
+  for key in 0..<pairs {
+    blackHole(context.peek(buildSourceCogs[key]))
+    blackHole(context[buildCogs[key]])
+  }
+  blackHole(context)
 }
 
 let cogs = Cogs.forTesting()
@@ -153,6 +180,20 @@ case "deep":
     cogs.commit(chainSourceCog, to: iteration, name: "prof.deep.turn")
     blackHole(cogs[chainCogs[max(parameter, 1)]])
   }
+
+case "build":
+  // Construction rather than steady state: a *fresh* context each iteration,
+  // populated with `parameter` source-and-derived pairs. Everything the other
+  // workloads deliberately push behind their warm-up — slot allocation, column
+  // growth, identity filing — is the measured work here, so dividing by twice
+  // `parameter` gives the per-state cost of bringing a state into existence.
+  //
+  // Warm-up is short because one iteration is thousands of states rather than
+  // one turn; 200 of them would take minutes and prove nothing extra.
+  for _ in 1...2 { buildContext(pairs: max(parameter, 1)) }
+  armProfiler(mode)
+  for _ in 1...armedIterations { buildContext(pairs: max(parameter, 1)) }
+  disarmProfiler()
 
 default:
   fputs("unknown workload \(workload)\n", stderr)

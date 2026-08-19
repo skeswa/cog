@@ -1018,6 +1018,14 @@ instruction-level work still on issue #373.
 `M6-11c` ran, in one session, on both selectors, after the shared machinery both
 cores were wearing came off.
 
+> **This record's arena figures are superseded and its verdict no longer
+> holds.** `M9-22` and `M9-23` landed after it and took 21% and a further 22%
+> off the arena's turn, which reversed the deep-graph result this table reports
+> as a 20% loss. Read it as the state of the comparison at that moment; for the
+> current one, read `M9-23` for the steady turn and whole-graph shapes, `M9-25`
+> for build cost, and `M9-26` for where that cost goes. The simple-core column
+> still stands — nothing after this changed it.
+
 Cost benchmarks, per operation:
 
 | Workload          | Core   | mallocs | retains / releases | p50 wall clock |
@@ -1250,6 +1258,61 @@ favours the simple core by a wide margin on a shape a real app hits.
 Worth reading beside the steady-state numbers, which favour the arena on every
 whole-graph shape after `M9-22` and `M9-23`. The arena is faster to _run_ and
 slower to _build_; nothing measured so far told us the second half.
+
+**Where the arena's build cost goes** — `M9-26`, 2026-08-19, same host and
+toolchain. `M9-25` established the 2.2× and did not explain it, so the `M9-01`
+probe gained a `build` workload: PERF-03's exact shape, a fresh context per
+iteration, so everything the other workloads deliberately push behind their
+warm-up is the measured region instead. One build of a thousand states:
+
+| Counter     | simple | arena      |
+| ----------- | ------ | ---------- |
+| allocations | 4,525  | 5,697      |
+| retains     | 22,504 | **17,527** |
+| releases    | 38,052 | **24,745** |
+
+**Neither counter explains it.** Allocations are 26% higher, which cannot
+produce 2.2×, and ARC is 22% _lower_ — the arena genuinely touches fewer
+reference counts building a graph, exactly as its design intends. The cost is
+in leaf CPU time that no counting metric sees, so it needs `sample`. Six
+seconds each, bucketed by leaf symbol as §9.6's table is:
+
+| Bucket                            | simple | arena     | absolute change |
+| --------------------------------- | ------ | --------- | --------------- |
+| generic metadata + witness tables | 17.7%  | **28.6%** | **~3.5×**       |
+| unspecialized generic value work  | 25.7%  | 30.5%     | ~2.6×           |
+| array growth and copying          | 1.5%   | 6.8%      | ~10×            |
+| dictionary and `AnyHashable` keys | 12.2%  | 9.3%      | ~1.7×           |
+| ARC                               | 13.0%  | 3.3%      | ~0.55×          |
+| dynamic casts, conformance lookup | 10.9%  | 3.1%      | ~0.63×          |
+| Cog's own code                    | 8.4%   | 10.0%     | ~2.6×           |
+
+Percentages are of each core's own run; the absolute column multiplies them by
+`M9-25`'s 2,320 µs against 1,068 µs, which is the comparison that matters. The
+two runs sampled almost identical leaf totals (4,808 and 4,817), so the shares
+are directly comparable as fractions of time.
+
+**The cost is the erased-storage crossing, not the layout.** A simple-core
+state is one object whose fields are concrete and inline. An arena state is
+split across the scalar columns and a per-descriptor generic
+`CogArenaValueColumn<Value>`, reached through the `AnyObject` in
+`CogArenaDescriptorRecord` and recovered as its concrete type at each touch.
+That crossing is what instantiates metadata and looks up witness tables, and
+construction pays it per state.
+
+Construction pays it and a steady turn largely does not, because `M9-23`'s memo
+files the resolved slot-and-column pair on the declaration — **and only for a
+keyless one**, since one declaration names a whole keyed family and a
+single-entry memo would thrash between its members. PERF-03 is a hundred
+percent keyed. So the build workload is precisely the path the memo does not
+cover, which is the same reason the arena still loses keyed lookups. The two
+findings are one finding.
+
+This also names what a fix would have to be. Nothing here is wasted work that a
+cache can skip a second time; it is unspecialized generic code, so the route is
+specialization, which is the same conclusion `M9-24` reached from the steady
+turn. Route F's remaining question is whether that is reachable without
+widening the public API.
 
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`

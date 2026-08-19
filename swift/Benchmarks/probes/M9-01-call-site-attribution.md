@@ -48,8 +48,9 @@ value-reference selectors. Sources live beside this document in
   isolation matches.
 - `Sources/CogProfile/main.swift` — the workloads: `steady` (one write and one
   tracked read), `commit` (a write with no read), `read` (a tracked read of a
-  clean value), `pinned` (one live key beside `K` pinned ones), and `deep` (a
-  source pulled through a chain of `K` derived nodes).
+  clean value), `pinned` (one live key beside `K` pinned ones), `deep` (a
+  source pulled through a chain of `K` derived nodes), and `build` (`K` keyed
+  source-and-consumer pairs constructed in a fresh context).
 - `interpose.c` — the profiler.
 
 `main.swift` runs two hundred warm-up iterations, arms the profiler, runs
@@ -110,7 +111,18 @@ done
 # Per-node settle cost on a hundred-node chain, both cores.
 DYLD_INSERT_LIBRARIES=./libcogprof.dylib ./.build/release/CogProfile deep 3 1 100
 DYLD_INSERT_LIBRARIES=./libcogprof.dylib ./.build-arena/release/CogProfile deep 3 1 100
+
+# One build of PERF-03's thousand states, both cores (`M9-26`).
+DYLD_INSERT_LIBRARIES=./libcogprof.dylib ./.build/release/CogProfile build 1 1 500
+DYLD_INSERT_LIBRARIES=./libcogprof.dylib ./.build-arena/release/CogProfile build 1 1 500
 ```
+
+**`build` is the one workload whose warm-up is short on purpose.** Every other
+workload measures a steady turn and needs two hundred iterations to get first-run
+costs behind the measured region. `build` measures those costs — one iteration is
+a thousand states rather than one turn — so it warms twice, enough to bind dyld
+stubs and settle the global metadata cache without hiding the per-state work
+under them.
 
 **Take allocation counts with ARC recording disarmed.** Arming it costs exactly
 one extra allocation per armed region — measured as a constant across steady,
