@@ -1167,6 +1167,56 @@ also reserved there, measures 1,601 ns against this change's 1,696 — most of
 the win for a fraction of the blast radius, which is why the targeted attribute
 is what landed.
 
+**The arena's metadata cost, and where the everyday gap went** — `M9-23`,
+2026-08-19, same host and toolchain. `M9-21` measured generic-metadata
+instantiation at 26% of the arena's ordinary turn; `M9-22` removed the
+exclusivity third; this removes most of the metadata third.
+
+| Measure             |  `M9-17` |  `M9-22` |          now | simple core |
+| ------------------- | -------: | -------: | -----------: | ----------: |
+| steady turn p50     | 2,198 ns | 1,696 ns | **1,337 ns** |    1,639 ns |
+| steady retains      |       47 |       46 |       **38** |          62 |
+| 16-consumer fan p50 |    21 µs |        — |    **13 µs** |       37 µs |
+| 100-node chain p50  |   109 µs |        — |    **94 µs** |      128 µs |
+| allocations         |        0 |        0 |            0 |           0 |
+
+**The arena is now the faster core on every shape except keyed reads.** `M6-11c`
+had it losing the smallest turn by 10% and `M9-17` by 34%; it now wins it by
+18%, having never changed its representation.
+
+The change memoizes a keyless declaration's resolved column and slot on its
+descriptor, per context. That skips a `recordsByIdentity` lookup, a
+`CogStateIdentity` construction, a `slots` lookup, and — the expensive part — the
+`record.column as? CogArenaValueColumn<Value>` downcast that instantiated the
+metadata. Resolution sites in the profile go from 405 samples to 8.
+
+Two design points worth keeping:
+
+**Context identity is a monotonic counter, not an `ObjectIdentifier`.** A
+deallocated `Cogs` address is reusable, so a memo matched against a recycled
+address could serve another context's state — an ABA hazard with a
+cross-context correctness failure at the end of it. A never-reused counter
+cannot be impersonated.
+
+**The memo validates itself rather than trusting its invalidation hooks.**
+Releasing a row advances its generation before the index can be reused, so a
+stale memo fails `arena.contains(slot)` on its own. The explicit eviction on
+release and on context teardown is hygiene; correctness does not depend on
+having found every path. Descriptors outlive contexts — they are `static let` —
+so this is the property that matters.
+
+**Keyed references keep the old path**, deliberately: `box[key]` would need a
+per-key memo and a wider invalidation surface for a shape this measurement does
+not cover. It shows in the numbers — the arena's pinned-key turn is unchanged at
+about 2.6 µs against the simple core's 2.2 µs, and that is now the only everyday
+shape where the arena loses.
+
+**The remaining metadata is not reachable this way.** 782 of the 1,007 residual
+samples are inside `CogArenaValueColumn` itself — `installedRow`, `stage`,
+`commit`, `current` — where the cost is `ContiguousArray<Value?>` access in
+unspecialized generic code. No per-call-site cache helps that; it needs
+specialization, which is a different route.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

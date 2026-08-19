@@ -86,6 +86,15 @@ private final class CogArenaDescriptorRecord {
   /// Cancels descriptor-owned cold work before the context releases its arena.
   let prepareForContextTeardown: @MainActor () -> Void
 
+  /// Drops the declaration's memoized keyless location for one context.
+  ///
+  /// Release and teardown reach a descriptor only through its erased record,
+  /// so the typed memo is evicted by dispatching once here rather than by
+  /// storing a second closure on every arena row. The argument is the calling
+  /// context's identity: a descriptor shared with another live context must
+  /// keep that context's memo.
+  let forgetMemoizedLocation: @MainActor (UInt64) -> Void
+
   /// Erased selector key by global arena row.
   ///
   /// The current vertical slice exercises keyless rows. Keeping keys on the
@@ -106,7 +115,8 @@ private final class CogArenaDescriptorRecord {
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
     notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
     removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
-    prepareForContextTeardown: @escaping @MainActor () -> Void
+    prepareForContextTeardown: @escaping @MainActor () -> Void,
+    forgetMemoizedLocation: @escaping @MainActor (UInt64) -> Void
   ) {
     self.identity = identity
     self.label = label
@@ -120,6 +130,7 @@ private final class CogArenaDescriptorRecord {
     self.notifyObservation = notifyObservation
     self.removeValue = removeValue
     self.prepareForContextTeardown = prepareForContextTeardown
+    self.forgetMemoizedLocation = forgetMemoizedLocation
   }
 
   /// Installs the selector key for one newly allocated row.
@@ -237,6 +248,23 @@ internal final class CogArenaCore {
   /// Latest graph revision assigned by the enclosing context turn.
   private(set) var revision: UInt32 = 0
 
+  /// Process-unique identity of this graph, issued once at construction.
+  ///
+  /// Descriptors are shared across contexts — a test, a preview, and an app
+  /// each build their own `Cogs` over the same declarations — so anything a
+  /// declaration remembers about "its" graph has to say which graph it means.
+  /// Object identity cannot: a deallocated context's address is reusable, and
+  /// a memo compared against a recycled address would silently read another
+  /// context's state. A strictly increasing counter is never reused, so a
+  /// stale memo simply fails to match.
+  let contextIdentity: UInt64
+
+  /// Source of the identities above, advanced once per arena graph.
+  ///
+  /// MainActor-isolated with the rest of the core, so the increment needs no
+  /// atomic. `0` is reserved as the "no memo" sentinel a descriptor starts at.
+  private static var nextContextIdentity: UInt64 = 1
+
   /// Stable descriptor-and-key names resolved to exact slot lifetimes.
   private var slots: [CogStateIdentity: CogArenaSlot] = [:]
 
@@ -325,6 +353,12 @@ internal final class CogArenaCore {
     self.arena = arena
     self.edges = edges
     self.propagation = CogArenaDirtyPropagation(arena: arena, edges: edges)
+
+    guard Self.nextContextIdentity < UInt64.max else {
+      fatalError("Cog exhausted its UInt64 arena context identity space.")
+    }
+    self.contextIdentity = Self.nextContextIdentity
+    Self.nextContextIdentity += 1
   }
 
   /// Advances the compact arena revision once for an enclosing context turn.
@@ -978,40 +1012,115 @@ internal final class CogArenaCore {
     return row
   }
 
-  /// Resolves or creates one manual row and its typed descriptor column.
+  /// Resolves one manual row and its typed descriptor column.
+  ///
+  /// Every keyless read, write, and lifetime renewal of a source arrives here,
+  /// so this is one of two places where a steady turn pays for resolution. The
+  /// memo on the declaration short-circuits three costs: the descriptor
+  /// registry lookup, the checked downcast that restores `Value` from the
+  /// record's erased column, and the identity lookup that finds the slot. The
+  /// downcast is the expensive one — in unspecialized generic code it asks the
+  /// runtime to instantiate ``CogArenaValueColumn`` metadata the caller was
+  /// already handed.
+  ///
+  /// Two conditions make the memo sound, and both are checked here rather than
+  /// maintained by invalidation hooks elsewhere. The context identity proves
+  /// the memo was written by *this* graph, and identities are never reused.
+  /// ``CogArenaStorage/contains(_:)`` then proves the memoized slot still
+  /// names a live occupant: a released row always advances its generation
+  /// before the index can be reused, so a state that has since been released —
+  /// or replaced by another descriptor's state at the same index — fails this
+  /// check and falls through to the ordinary path.
   private func manualLocation<Value>(
     for valueReference: ManualCog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
-    let setup = manualRecord(for: valueReference.descriptor)
+    if valueReference.key == nil,
+      let memo = valueReference.descriptor.memoizedArenaLocation(in: contextIdentity),
+      arena.contains(memo.slot)
+    {
+      return memo
+    }
+    return resolvedManualLocation(for: valueReference)
+  }
+
+  /// Resolves or creates one manual row without consulting the memo.
+  ///
+  /// Split out so the memoized path above stays a straight line. A keyless
+  /// resolution files its result on the declaration on the way out; a keyed
+  /// one deliberately does not, because one declaration names a family of
+  /// keyed states and a single-entry memo would thrash between them.
+  private func resolvedManualLocation<Value>(
+    for valueReference: ManualCog<Value>
+  ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
+    let descriptor = valueReference.descriptor
+    let setup = manualRecord(for: descriptor)
     let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
+      descriptor: descriptor.identity,
       key: valueReference.key
     )
-    if let slot = existingSlot(for: identity, record: setup.record) {
-      return (slot, setup.column)
+
+    let slot: CogArenaSlot
+    if let existing = existingSlot(for: identity, record: setup.record) {
+      slot = existing
+    } else {
+      slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
+      setup.column.insert(descriptor.startingValue(forKey: valueReference.key), at: slot)
     }
 
-    let slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
-    setup.column.insert(
-      valueReference.descriptor.startingValue(forKey: valueReference.key), at: slot)
+    if valueReference.key == nil {
+      descriptor.memoizeArenaLocation(
+        slot: slot,
+        column: setup.column,
+        in: contextIdentity
+      )
+    }
     return (slot, setup.column)
   }
 
-  /// Resolves or creates one cold derived row and its typed descriptor column.
+  /// Resolves one derived row and its typed descriptor column.
+  ///
+  /// The memo has the same two guards as ``manualLocation(for:)``, and the
+  /// liveness one carries real weight here: a `whileObserved` derived state is
+  /// released when its grace expires, and the memo must not be able to hand
+  /// back the row it used to own.
   private func derivedLocation<Value>(
     for valueReference: Cog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
-    let setup = derivedRecord(for: valueReference.descriptor)
+    if valueReference.key == nil,
+      let memo = valueReference.descriptor.memoizedArenaLocation(in: contextIdentity),
+      arena.contains(memo.slot)
+    {
+      return memo
+    }
+    return resolvedDerivedLocation(for: valueReference)
+  }
+
+  /// Resolves or creates one cold derived row without consulting the memo.
+  private func resolvedDerivedLocation<Value>(
+    for valueReference: Cog<Value>
+  ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
+    let descriptor = valueReference.descriptor
+    let setup = derivedRecord(for: descriptor)
     let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
+      descriptor: descriptor.identity,
       key: valueReference.key
     )
-    if let slot = existingSlot(for: identity, record: setup.record) {
-      return (slot, setup.column)
+
+    let slot: CogArenaSlot
+    if let existing = existingSlot(for: identity, record: setup.record) {
+      slot = existing
+    } else {
+      slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
+      arena.flags[arena.index(of: slot)].insert(.dirty)
     }
 
-    let slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
-    arena.flags[arena.index(of: slot)].insert(.dirty)
+    if valueReference.key == nil {
+      descriptor.memoizeArenaLocation(
+        slot: slot,
+        column: setup.column,
+        in: contextIdentity
+      )
+    }
     return (slot, setup.column)
   }
 
@@ -1062,7 +1171,10 @@ internal final class CogArenaCore {
       recompute: nil,
       notifyObservation: { _, boundary in boundary.notifyValueChange() },
       removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: {}
+      prepareForContextTeardown: {},
+      forgetMemoizedLocation: { context in
+        descriptor.forgetMemoizedArenaLocation(in: context)
+      }
     )
     return (record, column)
   }
@@ -1097,7 +1209,10 @@ internal final class CogArenaCore {
       },
       notifyObservation: { _, boundary in boundary.notifyValueChange() },
       removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: {}
+      prepareForContextTeardown: {},
+      forgetMemoizedLocation: { context in
+        descriptor.forgetMemoizedArenaLocation(in: context)
+      }
     )
     return (record, column)
   }
@@ -1143,7 +1258,11 @@ internal final class CogArenaCore {
         column.notifyObservation(at: slot, through: boundary)
       },
       removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: { column.prepareForContextTeardown() }
+      prepareForContextTeardown: { column.prepareForContextTeardown() },
+      // Async declarations memoize nothing: their statuses are not on the
+      // steady-turn path this memo exists for, and adding a second memo shape
+      // would widen the invalidation surface for no measured gain.
+      forgetMemoizedLocation: { _ in }
     )
     return (record, column)
   }
@@ -1160,7 +1279,8 @@ internal final class CogArenaCore {
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
     notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
     removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
-    prepareForContextTeardown: @escaping @MainActor () -> Void
+    prepareForContextTeardown: @escaping @MainActor () -> Void,
+    forgetMemoizedLocation: @escaping @MainActor (UInt64) -> Void
   ) -> CogArenaDescriptorRecord {
     guard records.count <= Int(Int32.max) else {
       fatalError("Cog exhausted its Int32 arena descriptor index space.")
@@ -1177,7 +1297,8 @@ internal final class CogArenaCore {
       recompute: recompute,
       notifyObservation: notifyObservation,
       removeValue: removeValue,
-      prepareForContextTeardown: prepareForContextTeardown
+      prepareForContextTeardown: prepareForContextTeardown,
+      forgetMemoizedLocation: forgetMemoizedLocation
     )
     recordsByIdentity[identity] = record
     records.append(.passUnretained(record))
@@ -1473,6 +1594,14 @@ internal final class CogArenaCore {
     edges.removeDependencySuffix(of: slot, after: .none, in: arena)
     record.removeValue(slot)
     record.removeKey(at: row)
+    // Belt and braces, and only for the one state the memo can name. The
+    // memoized slot would already fail its liveness check once this row's
+    // generation advances below, so dropping it here is not what makes the
+    // memo correct — it is what keeps a released declaration from pinning
+    // this context's column after the state itself is gone.
+    if key == nil {
+      record.forgetMemoizedLocation(contextIdentity)
+    }
     guard slots.removeValue(forKey: identity) == slot else {
       fatalError("Cog removed a different arena slot from state identity storage.")
     }
@@ -1513,7 +1642,14 @@ internal final class CogArenaCore {
   /// Cancels every arena-owned sleeper before the enclosing context disappears.
   func prepareForContextTeardown() {
     for record in records {
-      record.takeUnretainedValue().prepareForContextTeardown()
+      let record = record.takeUnretainedValue()
+      record.prepareForContextTeardown()
+      // Declarations outlive contexts. Evicting here keeps a `static let`
+      // declaration from retaining this graph's typed column — and the values
+      // in it — after the context that owned them is gone. The memo would
+      // still be *correct* without this, because no later context can match
+      // this one's identity; it would merely leak one column per declaration.
+      record.forgetMemoizedLocation(contextIdentity)
     }
     for row in lifetimeEntries.indices where lifetimeEntries[row].task != nil {
       guard lifetimeEntries[row].generation < UInt64.max else {

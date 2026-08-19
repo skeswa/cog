@@ -16,6 +16,25 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   /// them; the lifetime engine uses this policy when it schedules release.
   let lifetime: CogStateLifetime
 
+  #if COG_CORE_ARENA
+  /// Arena context whose keyless location the two fields below memoize.
+  ///
+  /// Identical in shape, contract, and safety argument to
+  /// ``ManualCogDescriptor``'s memo; read the commentary there. The invariant
+  /// that carries the most weight for a *derived* declaration is the second
+  /// one: a `whileObserved` derived state is released as soon as its grace
+  /// expires, and the memo must not be able to resurrect it. It cannot,
+  /// because the released row advances its occupant generation before the
+  /// index is reusable, so the memoized slot stops naming a live occupant.
+  private var memoizedArenaContext: UInt64 = 0
+
+  /// Typed value column this declaration owns inside `memoizedArenaContext`.
+  private var memoizedArenaColumn: CogArenaValueColumn<Value>?
+
+  /// Exact slot lifetime of this declaration's **keyless** state there.
+  private var memoizedArenaSlot: CogArenaSlot?
+  #endif
+
   /// How a state of this declaration computes its value.
   ///
   /// Explicit `@MainActor` keeps the closure isolated under any caller default
@@ -58,6 +77,45 @@ internal final class DerivedCogDescriptor<Value>: CogDescriptor {
   func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
     equals?(oldValue, newValue) ?? false
   }
+
+  #if COG_CORE_ARENA
+  /// The keyless arena location memoized for `context`, if one is filed.
+  ///
+  /// The caller still has to prove the slot is live; see the manual
+  /// descriptor's ``ManualCogDescriptor/memoizedArenaLocation(in:)``.
+  ///
+  /// - Parameter context: The reading context's ``CogArenaCore/contextIdentity``.
+  /// - Returns: The declaration's keyless slot and typed column in that exact
+  ///   context, or `nil` when this declaration has not been resolved there.
+  func memoizedArenaLocation(
+    in context: UInt64
+  ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>)? {
+    guard context == memoizedArenaContext,
+      let slot = memoizedArenaSlot,
+      let column = memoizedArenaColumn
+    else { return nil }
+    return (slot, column)
+  }
+
+  /// Files the keyless location this declaration resolved to in `context`.
+  func memoizeArenaLocation(
+    slot: CogArenaSlot,
+    column: CogArenaValueColumn<Value>,
+    in context: UInt64
+  ) {
+    memoizedArenaContext = context
+    memoizedArenaColumn = column
+    memoizedArenaSlot = slot
+  }
+
+  /// Drops the memo when, and only when, it belongs to `context`.
+  func forgetMemoizedArenaLocation(in context: UInt64) {
+    guard context == memoizedArenaContext else { return }
+    memoizedArenaContext = 0
+    memoizedArenaColumn = nil
+    memoizedArenaSlot = nil
+  }
+  #endif
 
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.

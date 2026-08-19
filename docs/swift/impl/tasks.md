@@ -2010,7 +2010,9 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   _Depends: M9-06, M9-10, M9-15._
   _Verify: `mise run test:matrix`, `mise run test:cores`,
   `mise run test:value-references`, `mise run test:release`,
-  `mise run test:simulator`, and `mise run test:compilefail`._
+  `mise run test:simulator`, `mise run test:compilefail`, and
+  `mise run lint:swift` — which the first pass omitted, and which was the only
+  check that had anything to say._
 - **M9-20** _(Infrastructure)_ — Carry positions rather than states on the
   changed-boundary queue. A boundary's creation order is its index in the
   registry, so the queue can be integers; the existential queue `M9-04` built
@@ -2049,12 +2051,24 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   _Verify: `mise run test:cores`, `mise run test:release`, and
   `COG_TEST_CORE=arena mise run bench --filter perf-01-steady-turn` below the
   `M9-17` measurement at unchanged allocation counts._
+- **M9-23** _(Infrastructure)_ — Memoize a keyless declaration's resolved arena
+  column and slot on its descriptor, per context, removing the dictionary
+  lookups and the concrete-column downcast that `M9-21` measured instantiating
+  metadata on every read. Identify the context by a monotonic counter rather
+  than an `ObjectIdentifier`, because a recycled address would let a memo serve
+  another context's state, and make the memo self-validating through the slot
+  generation so correctness does not rest on having found every release path.
+  Keyed references keep the existing path.
+  _Depends: M9-22._
+  _Verify: `mise run test:cores`, `mise run test --filter 'LIFE|SEED'`,
+  `mise run test:release`, and `COG_TEST_CORE=arena mise run bench --filter
+perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
 - **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
   `M6-12a`'s core decision changes, which of issue #373's remaining routes
   become scheduled work, and whether M9's result warrants a patch release.
   Add the scenarios and tasks whichever answer requires, including a release
   link at the end of the serialized chain if one is warranted.
-  _Depends: M9-22._
+  _Depends: M9-23._
   _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
   and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate
