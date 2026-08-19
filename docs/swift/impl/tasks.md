@@ -2029,12 +2029,22 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   _Verify: complete pinned comparison result set recorded in `perf.md`, taken
   in one session on the pinned benchmark host._
   _Greens: PERF-14._
+- **M9-21** _(Infrastructure)_ — Stop copying the arena's changed-boundary queue
+  out of its owner, and record where the arena's ordinary turn actually goes.
+  Handing the queue back as a value shared its buffer, so the caller's sort had
+  to reallocate — the copy-on-write mistake `M9-09` fixed in the dependency
+  list, repeated in `M9-05`'s own repair. The flush sorts and reads in place
+  instead.
+  _Depends: M9-17._
+  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
+'UI|SEED|HIST'`, `mise run test:cores`, and `COG_TEST_CORE=arena mise run bench
+--filter perf-01-steady-turn` at zero allocations._
 - **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
   `M6-12a`'s core decision changes, which of issue #373's remaining routes
   become scheduled work, and whether M9's result warrants a patch release.
   Add the scenarios and tasks whichever answer requires, including a release
   link at the end of the serialized chain if one is warranted.
-  _Depends: M9-17._
+  _Depends: M9-21._
   _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
   and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate

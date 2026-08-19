@@ -593,16 +593,20 @@ internal final class CogArenaCore {
   /// created while another root settles joins the next flush and cannot receive
   /// a notice for a change that predates its first observed value.
   func flushObservationBoundaries(in cogs: Cogs) {
-    var rows = propagation.takeChangedBoundaryRows()
-    guard !rows.isEmpty else { return }
+    guard propagation.hasChangedBoundaryRows else { return }
 
     // Notice order is boundary-creation order, and a row's boundary column is
     // its position in that order, so sorting on it restores what the registry
     // walk delivered for free. This sorts the changed set, which is the small
     // one; sorting was never the cost being removed.
-    rows.sort { arena.boundary[Int($0)] < arena.boundary[Int($1)] }
+    propagation.sortChangedBoundaryRows { arena.boundary[Int($0)] < arena.boundary[Int($1)] }
 
-    for rawRow in rows {
+    // By index, and dropped afterwards, for the reason the simple core snapshots
+    // its count: a notice can run a synchronous Observation handler that queues
+    // another boundary, and that one belongs to the next flush.
+    let queuedCount = propagation.changedBoundaryRowCount
+    for position in 0..<queuedCount {
+      let rawRow = propagation.changedBoundaryRow(at: position)
       let row = Int(rawRow)
       propagation.clearBoundaryNotice(row: rawRow)
 
@@ -635,6 +639,8 @@ internal final class CogArenaCore {
       let entry = observationEntries[index]
       descriptorRecord(forRow: row).notifyObservation(entry.slot, entry.boundary)
     }
+
+    propagation.dropFlushedBoundaryRows(queuedCount)
   }
 
   /// Releases one unobserved derived row and allocates a replacement row.

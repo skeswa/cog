@@ -1069,6 +1069,59 @@ replaced. What remains is a genuine representation difference — the arena's AR
 traffic is three to four times lower, and that is §5's rule, still unmet by the
 shipping core and still the largest single item in a steady turn.
 
+**Where the arena's ordinary turn goes** — `M9-21`, 2026-08-19, same host and
+toolchain, 5,118 leaf samples. Recorded because the `M9-17` comparison shows
+the arena losing the smallest turn by a third, and the reason turns out to have
+nothing to do with its representation.
+
+| Bucket                         | simple |     arena |
+| ------------------------------ | -----: | --------: |
+| ARC retain and release         |  28.5% |  **6.5%** |
+| Exclusivity checks             |  12.5% | **31.7%** |
+| Generic metadata instantiation |  18.6% | **26.0%** |
+| Cog's own compiled code        |   9.1% |     12.2% |
+| Value-witness copies           |   5.3% |      8.2% |
+| Actor-isolation checks         |   8.9% |      2.2% |
+
+**The arena won the argument it was built for and lost two nobody had.** Its
+ARC traffic is a fifth of the simple core's, which is §5's rule working exactly
+as designed. It then spends that gain, and more, on exclusivity checks and
+metadata requests that the class-state core mostly does not make.
+
+Attribution, by the Cog frame beneath each cost:
+
+| Cost        | Site                                     | Samples |
+| ----------- | ---------------------------------------- | ------: |
+| metadata    | `CogArenaCore.manualRecord(for:)`        |     531 |
+| metadata    | `CogArenaValueColumn.installedRow(for:)` |     527 |
+| exclusivity | `CogArenaStorage.index(of:)`             |     382 |
+| metadata    | `CogArenaValueColumn.commit(at:)`        |     384 |
+| metadata    | `CogArenaValueColumn.stage(_:at:)`       |     359 |
+| metadata    | `CogArenaCore.manualLocation(for:)`      |     292 |
+| exclusivity | `CogArenaCore.settle(_:in:)`             |     175 |
+
+Two shapes, and both are already named in perf §5 and issue #373 as reserved
+work nobody had priced:
+
+**Exclusivity, ~32%.** The arena's columns are mutable stored properties on
+classes, so every `arena.flags[row]` and every column touch pays a dynamic
+exclusivity check with its thread-local bookkeeping. §5 reserved the fix —
+borrow each column once per turn phase rather than per access — and route E
+separately noticed that `index(of:)` re-validates a generation on nearly every
+column touch, which `CogArenaStorage.swift` itself anticipates hoisting. They
+are the same 382 samples seen from two directions.
+
+**Metadata, ~26%.** Resolving one value walks record → location → column → row,
+and every layer is generic over the value type, so each asks the runtime for
+`CogArenaValueColumn<Value>` metadata it has already been given. This is the
+simple core's `M9-12` problem with more layers, and the same remedy applies:
+cache the resolved location on the declaration's descriptor per context.
+
+Together those two are about 1,240 ns of a 2,150 ns turn, against a 510 ns gap
+to the simple core. Neither would close it entirely; both are aimed well past
+it, and the metadata fix would narrow rather than close because it helps the
+simple core too.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

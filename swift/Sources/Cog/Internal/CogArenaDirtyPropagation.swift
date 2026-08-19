@@ -156,11 +156,30 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
     changedBoundaryRows.append(rawRow)
   }
 
-  /// Takes the rows whose boundaries changed, leaving the queue empty.
-  func takeChangedBoundaryRows() -> ContiguousArray<Int32> {
-    let rows = changedBoundaryRows
-    changedBoundaryRows.removeAll(keepingCapacity: true)
-    return rows
+  /// Whether any boundary was invalidated in the accumulating turn.
+  var hasChangedBoundaryRows: Bool { !changedBoundaryRows.isEmpty }
+
+  /// Rows queued so far, in notice order.
+  ///
+  /// Sorted in place and read by index rather than handed back as a value.
+  /// Returning it copied the buffer — the same copy-on-write mistake `M9-09`
+  /// found in the dependency list, made again here — because the property kept
+  /// its own reference and the caller's sort then had to reallocate.
+  var changedBoundaryRowCount: Int { changedBoundaryRows.count }
+
+  /// Puts the queued rows in the order their boundaries were created.
+  func sortChangedBoundaryRows(by areInOrder: (Int32, Int32) -> Bool) {
+    changedBoundaryRows.sort(by: areInOrder)
+  }
+
+  /// The queued row at `position`.
+  func changedBoundaryRow(at position: Int) -> Int32 {
+    changedBoundaryRows[position]
+  }
+
+  /// Drops the rows a flush has published, keeping anything queued during it.
+  func dropFlushedBoundaryRows(_ count: Int) {
+    changedBoundaryRows.removeFirst(count)
   }
 
   /// Clears one row's queued mark once the flush has published it.
