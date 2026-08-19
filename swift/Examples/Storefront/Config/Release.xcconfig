@@ -1,0 +1,10 @@
+// Release.xcconfig
+// Release configuration for the Storefront benchmark application.
+//
+// Release is the configuration the UI performance suite runs in: a measurement
+// taken against `-Onone` describes the debug build and nothing else.
+
+#include "Shared.xcconfig"
+
+// No release-specific overrides. Every release setting is an Xcode project
+// default.

@@ -1,0 +1,38 @@
+// Shared.xcconfig
+// Settings shared by the Storefront benchmark application and its UI tests.
+
+// ==========================================
+// Project Identity
+// ==========================================
+PRODUCT_NAME = Storefront
+PRODUCT_DISPLAY_NAME = Cog Storefront
+PRODUCT_BUNDLE_IDENTIFIER = com.skeswa.cog.storefront
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1
+
+// ==========================================
+// Platform Configuration
+// ==========================================
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 6.0
+SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT = YES
+SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY = YES
+SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES
+SWIFT_UPCOMING_FEATURE_INTERNAL_IMPORTS_BY_DEFAULT = YES
+
+// One device family, deliberately. A measured row count is only reproducible
+// when the screen it is measured on is pinned, so this application is iPhone
+// only and the UI performance suite names one simulator model.
+TARGETED_DEVICE_FAMILY = 1
+
+// ==========================================
+// Info PLIST
+// ==========================================
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait
+
+// ==========================================
+// Entitlements
+// ==========================================
+CODE_SIGN_ENTITLEMENTS = Config/Storefront.entitlements

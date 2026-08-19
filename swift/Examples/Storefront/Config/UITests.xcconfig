@@ -1,0 +1,26 @@
+// UITests.xcconfig
+// Settings for the StorefrontUITests UI-testing bundle.
+
+#include "Shared.xcconfig"
+
+// ==========================================
+// UI Test Target Settings
+// ==========================================
+PRODUCT_BUNDLE_IDENTIFIER = com.skeswa.cog.storefront.uitests
+PRODUCT_MODULE_NAME = StorefrontUITests
+PRODUCT_NAME = StorefrontUITests
+TEST_TARGET_NAME = Storefront
+
+// The application builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, and
+// a UI-testing bundle cannot: `XCTestCase` declares nonisolated initializers,
+// so a subclass that the compiler made MainActor-isolated by default fails to
+// override them. Each test class here takes `@MainActor` explicitly instead,
+// which is what `XCUIElement`'s isolation actually requires.
+SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated
+
+// Shared.xcconfig points every target at the application's entitlements file.
+// A UI-testing bundle and its generated runner have no entitlements of their
+// own, and inheriting the application's makes code signing fail on a real
+// device. The bare assignment clears the inherited value rather than setting
+// it to a path that does not exist.
+CODE_SIGN_ENTITLEMENTS =

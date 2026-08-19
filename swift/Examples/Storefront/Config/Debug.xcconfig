@@ -1,0 +1,6 @@
+// Debug.xcconfig
+// Debug configuration for the Storefront benchmark application.
+
+#include "Shared.xcconfig"
+
+// No debug-specific overrides. Every debug setting is an Xcode project default.
