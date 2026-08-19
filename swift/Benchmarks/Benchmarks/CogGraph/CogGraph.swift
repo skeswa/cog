@@ -52,7 +52,11 @@ let benchmarks: @Sendable () -> Void = {
   boundaryBenchmarks()
   pinnedKeyBenchmarks()
   valueReferenceBenchmarks()
+  // The Storefront macrobenchmark's quiescent cuts belong with the other
+  // counting benchmarks, ahead of anything that drops a `Cogs`.
+  storefrontCountingBenchmarks()
   runtimeComparisonBenchmarks()
+  storefrontTimingBenchmarks()
 
   // Timing over the shared Kairo diamond, and **no counting metrics at all**.
   //

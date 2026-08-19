@@ -28,6 +28,13 @@ let package = Package(
     // working tree, so resolving Cog from a tag would make every measurement a
     // statement about a commit that is not the one being changed.
     .package(path: "../.."),
+    // The shared Storefront macrobenchmark workload, also by local path. It
+    // lives in a package of its own rather than in this one because the SwiftUI
+    // benchmark application consumes the same workload, and an iOS application
+    // target that depended on *this* package would resolve the benchmark
+    // harness, the malloc interposer, and swift-state-graph along with it.
+    // `swift/Storefront` is deliberately dependency-free for that reason.
+    .package(path: "../Storefront"),
     // Comparison-only prior art, pinned at the exact release whose source the
     // adapter was written against. This dependency belongs only to the
     // separate benchmark package; adding it to the root would make Cog
@@ -59,6 +66,13 @@ let package = Package(
         .product(name: "Cog", package: "cog"),
         .product(name: "CogTesting", package: "cog"),
         .product(name: "StateGraph", package: "swift-state-graph"),
+        // The Storefront macrobenchmark's declarations, fixtures, deterministic
+        // service, and interaction trace — the same ones the SwiftUI benchmark
+        // application drives. The package *identity* is `Storefront`, the last
+        // component of its path, even though its manifest is named
+        // `cog-storefront`; SwiftPM derives identity from the location, not the
+        // name, exactly as it does for `cog` itself.
+        .product(name: "CogStorefront", package: "Storefront"),
         // The shared scenario graphs. Sharing them with `CogScenarioTests` is
         // the point: a run-count assertion and a timing measurement that
         // disagreed about which graph they ran would make both meaningless.
