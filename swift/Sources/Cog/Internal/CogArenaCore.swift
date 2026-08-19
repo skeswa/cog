@@ -594,22 +594,32 @@ internal final class CogArenaCore {
   /// a notice for a change that predates its first observed value.
   func flushObservationBoundaries(in cogs: Cogs) {
     let boundaryCount = observationEntries.count
-    for entry in observationEntries.prefix(boundaryCount) {
-      let row = arena.index(of: entry.slot)
-      let record = descriptorRecord(forRow: row)
-      if record.kind != .manual, needsSettlement(row) {
-        settle(entry.slot, in: cogs)
+    for index in 0..<boundaryCount {
+      let slot = observationEntries[index].slot
+      let row = arena.index(of: slot)
+
+      // Settle before the guard, because settling is what makes `changedAt`
+      // current. The flag test comes first so a clean row — every pinned key on
+      // an ordinary turn — never resolves its descriptor record at all.
+      if needsSettlement(row), descriptorRecord(forRow: row).kind != .manual {
+        settle(slot, in: cogs)
       }
 
+      // `M9-03`: the guard, then the entry and the record. It used to be the
+      // other way round, so an untouched pinned key paid a boundary-carrying
+      // struct copy and a descriptor lookup to be told it had not changed.
       let changedThisTurn = arena.changedAt[row] == revision
       #if DEBUG
-      let changedBySeed = entry.boundary.consumeDeferredChange()
+      // Debug still touches every boundary, because a deferred seed change has
+      // to be consumed whether or not the row changed this turn.
+      let changedBySeed = observationEntries[index].boundary.consumeDeferredChange()
       guard changedThisTurn || changedBySeed else { continue }
-      recordHistoryState(event: .notice, slot: entry.slot)
+      recordHistoryState(event: .notice, slot: slot)
       #else
       guard changedThisTurn else { continue }
       #endif
-      record.notifyObservation(entry.slot, entry.boundary)
+      let entry = observationEntries[index]
+      descriptorRecord(forRow: row).notifyObservation(entry.slot, entry.boundary)
     }
   }
 
