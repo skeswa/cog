@@ -55,7 +55,7 @@ import Testing
     ])
   #expect(outerTurn != nil)
   #expect(queuedTurn != nil)
-  #expect(queuedTurn !== outerTurn)
+  #expect(queuedTurn != outerTurn)
   #expect(cogs.peek(queuedSource) == 1)
   #expect(cogs.queuedTurns.isEmpty)
   guard case .idle = cogs.turnPhase else {
@@ -132,7 +132,7 @@ import Testing
     ])
   #expect(valuesSeen == [0, 1, 2])
   #expect(turnNames == ["first", "second", "late"])
-  #expect(Set(turnIDs.map(ObjectIdentifier.init)).count == 3)
+  #expect(Set(turnIDs).count == 3)
   #expect(cogs.peek(value) == 3)
   #expect(cogs.queuedTurns.isEmpty)
   guard case .idle = cogs.turnPhase else {

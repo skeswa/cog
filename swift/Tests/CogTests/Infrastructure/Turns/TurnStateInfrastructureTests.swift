@@ -20,14 +20,14 @@ import Testing
     Issue.record("The context did not start accumulating")
     return
   }
-  #expect(accumulating.id === turn.id)
+  #expect(accumulating.id == turn.id)
 
   cogs.startFlushing(turn.id)
   guard case .flushing(let flushing) = cogs.turnPhase else {
     Issue.record("The context did not start flushing")
     return
   }
-  #expect(flushing.id === turn.id)
+  #expect(flushing.id == turn.id)
 
   cogs.finishTurn(turn.id)
   guard case .idle = cogs.turnPhase else {
@@ -47,7 +47,7 @@ import Testing
       Issue.record("The turn body did not run while accumulating")
       return
     }
-    #expect(active.id === turn.id)
+    #expect(active.id == turn.id)
   }
 }
 
@@ -78,7 +78,7 @@ private func defaultTurnName(in cogs: Cogs) -> String {
 
   #expect(first != nil)
   #expect(second != nil)
-  #expect(first !== second)
+  #expect(first != second)
 }
 
 @MainActor

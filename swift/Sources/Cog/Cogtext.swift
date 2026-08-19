@@ -118,6 +118,25 @@ public final class Cogs {
   /// preventing nested Observation or reaction propagation.
   internal var queuedTurns: [QueuedCogTurn] = []
 
+  /// The one turn object this context reuses, rebound at the start of each turn.
+  ///
+  /// Turns never overlap, so one object suffices, and reusing it keeps the
+  /// staged-source buffers at the capacity they have already reached.
+  internal let reusedTurn = CogTurn()
+
+  /// The last turn token minted; the next turn takes its successor.
+  ///
+  /// Monotonic and never reused, which is what makes a token unforgeable and
+  /// an escaped writer's token stale. Wraparound would let an ancient writer
+  /// look current, so it traps.
+  internal var nextTurnToken: UInt64 = 0 {
+    didSet {
+      guard nextTurnToken != 0 else {
+        fatalError("Cog exhausted its turn token counter.")
+      }
+    }
+  }
+
   /// Tracked export terminals this context owns, in registration order.
   ///
   /// Keeping the phase physically separate makes the common effect-only flush

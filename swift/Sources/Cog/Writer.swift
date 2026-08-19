@@ -179,7 +179,7 @@ extension Cogs {
     usage: WriterUsage,
     target valueReference: ManualCog<Value>
   ) -> CogTurn {
-    guard case .accumulating(let turn) = turnPhase, turn.id === turnID else {
+    guard case .accumulating(let turn) = turnPhase, turn.id == turnID else {
       // Composed inside the autoclosure, so a live write pays nothing to build
       // a message it never prints.
       fatalError(escapedWriterMessage(usage: usage, target: valueReference))

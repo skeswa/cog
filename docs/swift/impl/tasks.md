@@ -1945,8 +1945,11 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   third allocation with them: the touched-source list grows from zero capacity
   only because its owner is new every turn, so a reused owner retires it too.
   _Depends: M9-07._
-  _Verify: `mise run test --filter 'TURN|ESC'` and `mise run test:release`,
-  which is where a generic-class deinit regression would appear._
+  _Verify: `mise run test --filter 'TURN'`, the turn infrastructure suites
+  through `mise run test --filter
+'TurnQueueInfrastructure|TurnStateInfrastructure|TurnCompositionInfrastructure'`,
+  and `mise run test:release`, which is where a generic-class deinit regression
+  would appear._
 - **M9-09** _(Infrastructure)_ — Reuse the capacity of the two arrays a turn
   rebuilds from a context-lived owner: the invalidation work list, and the
   dependency list, which reallocates today because `run(in:)` still holds the
