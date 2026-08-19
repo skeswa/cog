@@ -62,6 +62,7 @@ const WITNESS_BENCHMARK = "perf-witness-allocating";
 
 /** Benchmarks whose committed p90 references form the CI performance gate. */
 const THRESHOLDED_BENCHMARKS = [
+  "perf-01-steady-turn",
   "perf-06-value-reference",
   "perf-11-pinned-key-slope-1000",
   "perf-10-cog-diamond",
@@ -81,11 +82,13 @@ const THRESHOLDED_BENCHMARKS = [
 /**
  * Which metrics each gated benchmark commits a reference for.
  *
- * Most of the gate is wall clock. Two are not: PERF-06 promises allocation-free
- * value-reference creation, and PERF-11 promises that a thousand pinned keys
- * cost a turn what one does, which is a claim about ARC rather than about time.
+ * Most of the gate is wall clock. Three are not: PERF-01 and PERF-06 promise an
+ * allocation-free steady turn and value reference, and PERF-11 promises that a
+ * thousand pinned keys cost a turn what one does, which is a claim about ARC
+ * rather than about time.
  */
 const STATIC_THRESHOLD_METRICS = {
+  "perf-01-steady-turn": ["mallocCountTotal", "objectAllocCount"],
   "perf-06-value-reference": ["mallocCountTotal", "objectAllocCount"],
   "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
 };

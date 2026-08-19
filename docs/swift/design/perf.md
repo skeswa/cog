@@ -900,6 +900,51 @@ source, exactly like the intended gate. `M5-11` recorded the same trap for
 baseline tolerances; `M9-06` walked into it for static ceilings and is
 recording it beside the number so the next reader does not.
 
+**A steady turn allocates nothing** — `M9-10`, 2026-08-19, `mactop`, Xcode 26.4
+(17E192) / Apple Swift 6.3, release, harness 1.36.2 with the malloc interposer.
+Same benchmark and same shape as `M5-06`, which recorded seven.
+
+| Metric             |  `M5-06` |      now |
+| ------------------ | -------: | -------: |
+| `mallocCountTotal` |        7 |    **0** |
+| `objectAllocCount` |        7 |    **0** |
+| retains            |       66 |       63 |
+| releases           |       93 |       76 |
+| p50 wall clock     | 2.202 µs | 1.676 µs |
+
+Zero at every percentile across 1,751 samples, on the **class-state core**, and
+without changing representation. `M6-12a` recorded the arena reaching five
+rather than zero and concluded the swap did not earn itself; the target was
+never the representation's to reach, because none of the seven allocations was
+graph storage.
+
+Where the seven went, in the order they were removed:
+
+| Allocation             | Removed by | What it was                                                                          |
+| ---------------------- | ---------- | ------------------------------------------------------------------------------------ |
+| invalidation work list | `M9-09`    | a local array grown from zero every changed source                                   |
+| dependency list        | `M9-09`    | reallocated by copy-on-write, because the previous list was copied rather than moved |
+| `CogOps` write box     | `M9-07`    | an escaping closure for a single write                                               |
+| `withTurn` body box    | `M9-07`    | a second escaping closure, one layer down                                            |
+| `CogTurnID`            | `M9-08`    | an object whose only job was to be compared by identity                              |
+| `CogTurn`              | `M9-08`    | per-turn state that one reused object holds                                          |
+| touched-source list    | `M9-08`    | grown from zero capacity because its owner was new each turn                         |
+
+A commit with no read is also zero, and so is a turn that settles a hundred-node
+chain — `M9-01` measured that shape at 107 allocations, one per node, all of
+them the copy-on-write defect.
+
+The gate is exact rather than a tolerance now, matching PERF-06: a claim of
+nothing is checkable exactly, and a tolerance around nothing would hide the
+first allocation to come back. `perf-01-steady-turn` joins the committed
+static-threshold set, so CI enforces zero rather than pinning drift.
+
+**Retains and releases did not reach zero**, and are not close: 63 and 76 for a
+turn with one consumer. That is §5's rule still unmet, and it belongs to the
+routes issue #373 keeps — borrowed descriptor records, unsafe buffers, and the
+hashing follow-ups — not to a core swap. `M9-17` remeasures before anything
+else is promoted.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

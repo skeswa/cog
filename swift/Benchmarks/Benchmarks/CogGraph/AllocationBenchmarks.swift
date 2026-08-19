@@ -161,11 +161,17 @@ let allocationBenchmarks: @Sendable () -> Void = {
     .releaseCount: measuredNotGated,
   ]
 
-  // PERF-01. A steady turn costs seven mallocs and seven object allocations
-  // on the simple core, not zero. Zero is what the data-oriented core has to
-  // reach (perf.md §9.6); until it does, pinning the count against any drift
-  // is what keeps the cost from creeping upward unnoticed, which a zero
-  // threshold nobody can satisfy would not.
+  // PERF-01 and PERF-12. A steady turn costs nothing, at every percentile.
+  //
+  // It cost seven mallocs and seven object allocations for most of the
+  // project's life, and this benchmark was pinned against drift because zero
+  // was a target no shipping core had met. M9 met it in shared machinery
+  // rather than by swapping representation: `M9-09` reused two buffers,
+  // `M9-07` stopped boxing a single write into two escaping closures, and
+  // `M9-08` replaced the per-turn object and identity with a reused buffer and
+  // an integer token. The gate is exact now, for the same reason PERF-06's is:
+  // a claim of nothing is checkable exactly, and a tolerance around nothing
+  // would only hide the first allocation to come back.
   Benchmark(
     "perf-01-steady-turn",
     configuration: .init(
@@ -174,8 +180,8 @@ let allocationBenchmarks: @Sendable () -> Void = {
       scalingFactor: .kilo,
       maxDuration: .seconds(3),
       thresholds: ungated.merging([
-        .mallocCountTotal: allocationDrift(),
-        .objectAllocCount: allocationDrift(),
+        .mallocCountTotal: allocationDrift(exactP90: true),
+        .objectAllocCount: allocationDrift(exactP90: true),
       ]) { _, gate in gate }
     )
   ) { benchmark in
