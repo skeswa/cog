@@ -982,6 +982,37 @@ because the descriptor is already the concrete generic type. That is issue
 #373's route D, and it needs its own lifetime-release coverage before it is
 worth landing.
 
+**Settling a node allocates nothing** — `M9-15`, 2026-08-19, same host and
+toolchain. One source pulled through a hundred derived nodes, every turn, on a
+graph built and settled once outside the measured region.
+
+| Metric             | before M9 |    now | per node |
+| ------------------ | --------: | -----: | -------: |
+| `mallocCountTotal` |       107 |  **0** |        0 |
+| `objectAllocCount` |       107 |  **0** |        0 |
+| retains            |     4,176 |  3,964 |     39.6 |
+| releases           |     4,902 |  4,577 |     45.8 |
+| p50 wall clock     |    124 µs | 130 µs |   1.3 µs |
+
+The before column is `M9-01`'s probe rather than this benchmark, which did not
+exist then; the shapes match but the harnesses do not, so read the allocation
+rows — which are exact — rather than the wall-clock row, which is not
+comparable.
+
+**One allocation per node became none**, and it was never per-node work: the
+dependency list reallocated on every recompute because `run(in:)` copied the
+previous list instead of moving it, so `removeAll(keepingCapacity:)` had a
+shared buffer and could keep nothing (`M9-09`). A hundred nodes meant a hundred
+copies of that one mistake. This is also most of what the arena's five-versus-107
+advantage on deep shapes was measuring in M6.
+
+**ARC is not zero and is not close**: about forty retains and forty-six
+releases per node. §5's "no ARC in graph walks" rule remains unmet on the
+correctness core, which walks class states through existentials and retains at
+every hop. The gate reflects that honestly — allocations are held at exactly
+zero, ARC is pinned against drift — and the routes that would close it are
+instruction-level work still on issue #373.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

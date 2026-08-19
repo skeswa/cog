@@ -2000,8 +2000,9 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
 - **M9-15** _(Behavior)_ — Turn the per-node settle cost green and record the
   measurement and its gate in `perf.md`.
   _Depends: M9-12, M9-13, M9-14._
-  _Verify: benchmark filter for the deep chain reports the recorded per-node
-  allocation and ARC cost, plus the recorded `perf.md` result._
+  _Verify: `mise run bench --filter perf-13-deep-chain` reports the recorded
+  per-turn allocation and ARC cost, `mise run bench:thresholds:check` holds its
+  allocations at exactly zero, and `perf.md` records the per-node figures._
   _Greens: PERF-13._
 - **M9-16** _(Gate)_ — Prove the machinery work changed nothing observable:
   the complete behavior suite across the isolation matrix, both cores, every

@@ -65,6 +65,7 @@ const THRESHOLDED_BENCHMARKS = [
   "perf-01-steady-turn",
   "perf-06-value-reference",
   "perf-11-pinned-key-slope-1000",
+  "perf-13-deep-chain",
   "perf-10-cog-diamond",
   "perf-10-cog-deep",
   "perf-10-cog-broad",
@@ -82,15 +83,16 @@ const THRESHOLDED_BENCHMARKS = [
 /**
  * Which metrics each gated benchmark commits a reference for.
  *
- * Most of the gate is wall clock. Three are not: PERF-01 and PERF-06 promise an
- * allocation-free steady turn and value reference, and PERF-11 promises that a
- * thousand pinned keys cost a turn what one does, which is a claim about ARC
- * rather than about time.
+ * Most of the gate is wall clock. Four are not: PERF-01, PERF-06 and PERF-13
+ * promise an allocation-free steady turn, value reference, and settle walk, and
+ * PERF-11 promises that a thousand pinned keys cost a turn what one does, which
+ * is a claim about ARC rather than about time.
  */
 const STATIC_THRESHOLD_METRICS = {
   "perf-01-steady-turn": ["mallocCountTotal", "objectAllocCount"],
   "perf-06-value-reference": ["mallocCountTotal", "objectAllocCount"],
   "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
+  "perf-13-deep-chain": ["mallocCountTotal", "objectAllocCount"],
 };
 
 /** One exact regular expression, so CI measures no ungated workload by accident. */
