@@ -244,6 +244,38 @@ extension Cogs {
     drainQueuedTurns()
   }
 
+  /// Joins or runs one turn whose body cannot outlive this call.
+  ///
+  /// The same sequence as ``withTurn(_:_:)`` minus the one case that forces a
+  /// heap-allocated closure: a commit that arrives during a flush has to be
+  /// stored and run later, and only an escaping body can be stored. Callers
+  /// therefore test the phase first and route that case to `withTurn`, which is
+  /// why reaching `.flushing` here is a Cog bug rather than a caller's mistake.
+  ///
+  /// `requireOutsideDerivedComputation` is the caller's obligation, so the
+  /// rejection message names the op rather than this seam.
+  internal func withNonEscapingTurn(_ name: String, _ body: (CogTurn) -> Void) {
+    switch turnPhase {
+    case .accumulating(let turn):
+      body(turn)
+      return
+
+    case .flushing:
+      fatalError("Cog routed a non-escaping turn body into a flush, which cannot store it.")
+
+    case .idle:
+      break
+    }
+
+    #if DEBUG
+    turnChainTracker.beginChain()
+    defer { turnChainTracker.endChain() }
+    #endif
+
+    runOuterTurn(named: name, body)
+    drainQueuedTurns()
+  }
+
   /// Runs one idle → accumulating → flushing → idle transition.
   ///
   /// Flush order is part of correctness: publish staged state, settle and notify

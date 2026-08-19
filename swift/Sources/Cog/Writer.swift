@@ -83,6 +83,42 @@ extension Cogs {
     }
   }
 
+  /// Commits one value to one manual source, without building a closure.
+  ///
+  /// This shadows ``CogOps/commit(_:to:name:)`` for a caller whose static type
+  /// is `Cogs`, which is every application write. The protocol-extension
+  /// spelling remains for `any CogOps` and for a mechanism's controller.
+  ///
+  /// The sugar used to reach the primitive through two escaping closures — one
+  /// per layer — and `M9-01` measured both as heap allocations on every turn.
+  /// Only a commit during a flush genuinely escapes, because it is stored and
+  /// run after the current flush returns, so only that case still pays.
+  ///
+  /// - Parameters:
+  ///   - valueReference: The state-owned source to update.
+  ///   - value: The value to publish at the commit boundary.
+  ///   - name: The turn name recorded for diagnostics and history.
+  public func commit<Value>(
+    _ valueReference: ManualCog<Value>,
+    to value: Value,
+    name: String = #function
+  ) {
+    requireOutsideDerivedComputation(forTurnNamed: name)
+
+    // Nothing between this test and the call below can change the phase: the
+    // context is MainActor-confined and neither step reaches user code.
+    if case .flushing = turnPhase {
+      commit(named: name) { writer in
+        writer[valueReference] = value
+      }
+      return
+    }
+
+    withNonEscapingTurn(name) { turn in
+      writerStage(valueReference, value: value, turnID: turn.id)
+    }
+  }
+
   /// Reads the staged overlay after proving the writer belongs to the active turn.
   ///
   /// Validation precedes state lookup so an escaped writer cannot lazily create
