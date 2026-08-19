@@ -285,6 +285,11 @@ extension Cogs {
   internal func invalidateSubscribers(of producer: any CogState) {
     assert(invalidationWork.isEmpty, "The invalidation walk re-entered itself.")
 
+    // The producer changed by definition; the walk below reaches everything
+    // else that could. Between them they are exactly the boundaries a flush
+    // has any reason to visit.
+    enqueueBoundaryNotice(for: producer)
+
     for edge in producer.subscribers {
       if let subscriber = edge.state {
         invalidationWork.append((subscriber, .dirty))
@@ -295,6 +300,7 @@ extension Cogs {
       guard state.settleState < requestedState else { continue }
 
       state.settleState = requestedState
+      enqueueBoundaryNotice(for: state)
       for edge in state.subscribers {
         if let subscriber = edge.state {
           invalidationWork.append((subscriber, .check))

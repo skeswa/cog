@@ -33,6 +33,12 @@ internal protocol CogState: AnyObject {
   /// M6 replaces the class-reference layout.
   var subscribers: [CogSubscriberEdge] { get set }
 
+  /// This state seen as a UI-observed root, or `nil` when nothing observes it.
+  ///
+  /// The invalidation walk asks this of every state it marks, so it cannot be
+  /// a dynamic cast for the reason ``asDerivedSettleState`` is not one.
+  var asObservationState: (any CogObservationState)? { get }
+
   /// This state seen as a derived settle participant, or `nil` for a source.
   ///
   /// The settle walk needs this narrowing on every node it enters, and `as? any
@@ -44,6 +50,10 @@ internal protocol CogState: AnyObject {
 }
 
 extension CogState {
+  /// Every state class in the correctness core is observable, so each overrides
+  /// this; the default keeps the requirement satisfiable by a state that is not.
+  var asObservationState: (any CogObservationState)? { nil }
+
   /// Sources are not derived. The two derived state classes override this.
   var asDerivedSettleState: (any DerivedCogSettleState)? { nil }
 }

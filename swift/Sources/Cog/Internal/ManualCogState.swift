@@ -133,6 +133,15 @@ internal final class ManualCogState<Value>: CogState, PendingCogSource, CogObser
 
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.
+  /// Answers ``CogState/asObservationState`` without a runtime lookup.
+  var asObservationState: (any CogObservationState)? { self }
+
+  /// Position in boundary-creation order; `-1` until registered.
+  var observationOrder: Int = -1
+
+  /// Whether a notice for this state is already queued for the flush.
+  var noticeQueued = false
+
   nonisolated deinit {}
 }
 

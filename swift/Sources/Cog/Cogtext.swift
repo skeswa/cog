@@ -169,6 +169,17 @@ public final class Cogs {
   /// roots instead of scanning every interior state in the graph.
   internal private(set) var observationStates: [any CogObservationState] = []
 
+  /// UI-read roots whose value could have changed in the accumulating turn.
+  ///
+  /// The flush walks this instead of every boundary the context has ever
+  /// created, which is what makes a turn cost O(changed) rather than O(pinned
+  /// keys). Entries are added where invalidation already visits a state, and
+  /// removed when the flush publishes them.
+  internal var changedBoundaryQueue: [any CogObservationState] = []
+
+  /// The next position in boundary-creation order.
+  private var nextObservationOrder = 0
+
   /// Pins one newly UI-read state in boundary creation order.
   ///
   /// Swift Observation has no exact removal signal that Cog can rely on, so the
@@ -179,7 +190,23 @@ public final class Cogs {
     if let lifetimeState = state as? any CogLifetimeLeaseState {
       lifetimeState.cancelPendingLifetimeRelease()
     }
+    state.observationOrder = nextObservationOrder
+    nextObservationOrder += 1
     observationStates.append(state)
+  }
+
+  /// Queues one state's boundary notice, if it has a boundary and is not queued.
+  ///
+  /// Called where invalidation already visits a state, so the boundary test is
+  /// paid only for states that could actually change this turn.
+  internal func enqueueBoundaryNotice(for state: any CogState) {
+    guard let observationState = state.asObservationState,
+      observationState.observationBoundary != nil,
+      !observationState.noticeQueued
+    else { return }
+
+    observationState.noticeQueued = true
+    changedBoundaryQueue.append(observationState)
   }
 
   /// Whose run is capturing dependencies right now, or `nil` between runs.
