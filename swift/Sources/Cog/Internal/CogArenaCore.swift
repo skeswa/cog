@@ -244,9 +244,13 @@ internal final class CogArenaCore {
   private var recordsByIdentity: [ObjectIdentifier: CogArenaDescriptorRecord] = [:]
 
   /// Integer-indexed unretained view of `recordsByIdentity` for graph walks.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var records: ContiguousArray<Unmanaged<CogArenaDescriptorRecord>> = []
 
   /// Reused enter/exit storage for iterative warm settlement.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var pullFrames: ContiguousArray<CogArenaPullFrame> = []
 
   /// Reused roots copied from one reaction terminal before its dependencies settle.
@@ -257,6 +261,8 @@ internal final class CogArenaCore {
   private var reactionPullRoots: ContiguousArray<CogArenaSlot> = []
 
   /// Nested selector scopes, outermost first.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var captures: ContiguousArray<CogArenaDependencyCapture> = []
 
   /// UI-read roots in boundary creation order.
@@ -285,6 +291,8 @@ internal final class CogArenaCore {
   /// This stays separate from `pullFrames`: an exit frame is popped before its
   /// selector and equality run, while the row must remain visibly computing
   /// until both have completed.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var computingPath: ContiguousArray<Int32> = []
 
   /// Whether traversal, selector capture, and post-selector publication are idle.

@@ -2039,12 +2039,22 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
 'UI|SEED|HIST'`, `mise run test:cores`, and `COG_TEST_CORE=arena mise run bench
 --filter perf-01-steady-turn` at zero allocations._
+- **M9-22** _(Infrastructure)_ — Take dynamic exclusivity enforcement off the
+  arena's scalar columns, which `M9-21` measured at a third of that core's
+  ordinary turn. Trivial element types and MainActor confinement make
+  overlapping access unreachable rather than merely unlikely; the typed value
+  columns keep enforcement because their element type is the user's and
+  releasing one can run arbitrary `deinit` code inside an access.
+  _Depends: M9-21._
+  _Verify: `mise run test:cores`, `mise run test:release`, and
+  `COG_TEST_CORE=arena mise run bench --filter perf-01-steady-turn` below the
+  `M9-17` measurement at unchanged allocation counts._
 - **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
   `M6-12a`'s core decision changes, which of issue #373's remaining routes
   become scheduled work, and whether M9's result warrants a patch release.
   Add the scenarios and tasks whichever answer requires, including a release
   link at the end of the serialized chain if one is warranted.
-  _Depends: M9-21._
+  _Depends: M9-22._
   _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
   and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate

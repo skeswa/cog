@@ -1122,6 +1122,51 @@ to the simple core. Neither would close it entirely; both are aimed well past
 it, and the metadata fix would narrow rather than close because it helps the
 simple core too.
 
+**The arena's exclusivity cost, removed** — `M9-22`, 2026-08-19, same host and
+toolchain. `M9-21` measured dynamic exclusivity enforcement at 31.7% of the
+arena's ordinary turn, the largest single cost in that core.
+
+| Measure               |   before |        after |
+| --------------------- | -------: | -----------: |
+| steady turn p50       | 2,152 ns | **1,696 ns** |
+| allocations           |        0 |            0 |
+| retains / releases    |  45 / 53 |      46 / 54 |
+| 1 pinned key p50      | 2,861 ns | **2,390 ns** |
+| 1,000 pinned keys p50 | 2,902 ns | **2,441 ns** |
+
+**21% off the smallest turn, and the everyday gap to the shipping core all but
+closes**: 1,696 ns against 1,639 ns, where `M9-17` measured 2,152 against 1,639.
+The pinned-key slope stays flat.
+
+The change is `@exclusivity(unchecked)` on the arena's scalar columns — the
+storage columns, the core's frame and record buffers, and the propagation
+stack. Each is a mutable stored property on a class, so every touch was
+bracketed by `swift_beginAccess`/`swift_endAccess` with thread-local
+bookkeeping, and one turn touches them dozens of times.
+
+Safe by construction rather than by convention, on three counts recorded in
+`CogArenaStorage`: the classes are `@MainActor`, so no second thread can hold an
+access; every element type is trivial, so no destructor — library or user — can
+run inside an access and re-enter; and no method holds an access open across a
+call. The third is an invariant a later edit could break, so it is written into
+the source as an instruction rather than left to be rediscovered.
+
+**The typed value columns keep full enforcement.** Their element type is the
+user's, and releasing one can run arbitrary `deinit` code inside an access.
+Annotating them measured a further 4.4%, and it was declined: an exclusivity
+trap with a clear message is worth more than 100 ns in a research core.
+
+Two things this settles about perf §5's reserved work. The per-phase
+`withUnsafeMutableBufferPointer` borrow **does not apply here**: every hot loop
+calls back into the arena inside its body — `settle` reaches a user selector,
+the propagation loop reads `flags` through the edge storage — and `Array`'s
+borrow leaves an empty array in place for the duration, so re-entry would read
+zero rows rather than trap. That is strictly more dangerous than the attribute
+for the same win. And the whole-library `-enforce-exclusivity=unchecked` flag,
+also reserved there, measures 1,601 ns against this change's 1,696 — most of
+the win for a fraction of the blast radius, which is why the targeted attribute
+is what landed.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as

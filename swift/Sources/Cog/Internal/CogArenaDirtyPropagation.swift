@@ -39,9 +39,13 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
   /// The flush walks this instead of every boundary the context has ever made,
   /// which is what makes a turn cost O(changed) rather than O(pinned keys). The
   /// buffer is reused across turns like the walk's own stack.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var changedBoundaryRows: ContiguousArray<Int32> = []
 
   /// Reused LIFO work storage; successful walks always drain it to zero.
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
   private var stack: ContiguousArray<CogArenaInvalidationFrame> = []
 
   /// Number of frames awaiting processing, exposed for infrastructure proofs.
