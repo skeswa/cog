@@ -105,11 +105,18 @@ extension Cogs {
   ) {
     requireOutsideDerivedComputation(forTurnNamed: name)
 
-    // Nothing between this test and the call below can change the phase: the
+    // Nothing between this test and the calls below can change the phase: the
     // context is MainActor-confined and neither step reaches user code.
+    //
+    // The queued path goes through `withTurn` rather than back through
+    // `commit(named:)`. Reaching for the public primitive here would have been
+    // the library calling its own op vocabulary from inside the implementation,
+    // which `primitives-only-in-ops` exists to prevent and which Cog's own
+    // linter caught. It is also less work: the queued body stages directly and
+    // never builds a `Writer`.
     if case .flushing = turnPhase {
-      commit(named: name) { writer in
-        writer[valueReference] = value
+      withTurn(name) { turn in
+        self.writerStage(valueReference, value: value, turnID: turn.id)
       }
       return
     }
