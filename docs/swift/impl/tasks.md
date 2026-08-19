@@ -2115,3 +2115,115 @@ perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
   _Verify: `mise run bench:thresholds:check`,
   `mise run bench:thresholds:sentinel`, `mise run fmt:check`, and
   `mise run tasks:check`._
+
+## M10 tasks
+
+_Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
+
+- **M10-01** _(Decision)_ — Settle the representative workload: its scale, its
+  declaration census, which async state sits at which level of the graph, and
+  where the shared workload lives. The scale is a **representative workload v1**
+  rather than a claim about real applications, so it is written down,
+  configurable, and asserted rather than assumed. Record every adjustment from
+  the original targets with its reason — the async census in particular, because
+  the stated levels (two roots, two mid-graph, two deep downstream, plus keyed
+  row and leaf families) do not fit the stated keyless count. Settle the package
+  boundary at the same time: an iOS application target cannot depend on
+  `swift/Benchmarks` without resolving the benchmark harness, the malloc
+  interposer, and swift-state-graph, so the workload is a package of its own
+  that depends on the root by path and on nothing else.
+  _Verify: recorded `perf.md` §9.6 entry naming the profile scale, the exact
+  declaration census, and every adjustment from the original targets, plus
+  `mise run tasks:check`._
+- **M10-02** _(Infrastructure)_ — Build the shared workload: profiles,
+  deterministic fixtures with no `Foundation` import, the four heavy kernels,
+  the sixteen-policy pricing ladder as one recursive keyed declaration, the
+  domain verbs, and the mechanism that installs initial state and registers the
+  durable leases a headless driver needs. Add the shape suite that checks the
+  declaration census mechanically, so a workload that silently grew a
+  declaration fails before it makes two recorded numbers incomparable.
+  _Depends: M10-01._
+  _Verify: `mise run test:storefront --filter StorefrontShapeTests` asserts the
+  census, the profile scale, and the even category spread, and
+  `mise run fmt:check`._
+- **M10-03** _(Infrastructure)_ — Add the deterministic scripted service, the
+  eleven-phase interaction trace, and the shadow model its checkpoints compare
+  against. Every request carries a semantic identity, the driver awaits the
+  exact set that has started rather than assuming sibling task order, responses
+  are released by name in a deliberately out-of-order sequence, and a superseded
+  request stays suspended instead of resuming on cancellation — which is what
+  removes the last race with Cog's one-shot async-completion acknowledgement and
+  makes a stale completion something the trace schedules on purpose. Add the
+  guarded `test:storefront` wrapper.
+  _Depends: M10-02._
+  _Verify: `mise run test:storefront` runs the smoke trace end to end with every
+  checkpoint holding and reports a nonzero authoritative executed count, and
+  `mise run lint:swift`._
+- **M10-04** _(Infrastructure)_ — Add the five benchmark cuts and register them
+  from the one discovery closure: cold start, whole session, quiescent
+  interactions, inventory burst, and the compute-only control. Only the
+  quiescent cuts carry malloc and ARC metrics; the rest build or drop a runtime
+  and accept async completions, which is exactly the shape `M5-11` took those
+  counters away from. Register the counting cuts before any non-quiescent
+  benchmark, because counting is process-global.
+  _Depends: M10-03._
+  _Verify: `mise run bench --filter 'perf-15-storefront-.*'` registers and runs
+  all five cuts, and `mise run test:lint` still proves the root package resolves
+  no dependencies._
+- **M10-05** _(Behavior)_ — Turn the headless macrobenchmark green and record
+  its first measurements. Every cut checks its own visible identifiers, money
+  totals, accepted generations, invalidation behavior, and checksum before
+  reporting.
+  _Depends: M10-04._
+  _Verify: `mise run bench --filter 'perf-15-storefront-.*'` reports every cut,
+  and `perf.md` §9.6 records the measurements, the environment that produced
+  them, and what the workload does not cover._
+  _Greens: PERF-15._
+- **M10-06** _(Infrastructure)_ — Add the SwiftUI benchmark application: a
+  hand-written objectVersion-77 Xcode project with an app target and a UI-test
+  target, both consuming the shared workload package, and a shared scheme whose
+  test action builds release with the debugger, code coverage, automatic
+  screenshots, and every runtime diagnostic disabled. Every Cog-consuming view
+  resolves the environment itself, reads flatly into domain locals, and calls
+  named domain verbs; benchmark-only controls are gated behind a launch argument
+  so they cannot appear in ordinary app mode.
+  _Depends: M10-03._
+  _Verify: `mise run build:storefront` and `mise run lint:swift`._
+- **M10-07** _(Behavior)_ — Turn the application performance suite green and
+  record its first measurements. Cold launch, settled scrolling, scrolling under
+  a deterministic inventory burst, search, detail navigation, and cart
+  interaction, each resetting application state outside the measured region on
+  one pinned device, orientation, locale, Dynamic Type setting, fixture, and row
+  height.
+  _Depends: M10-06._
+  _Verify: `mise run test:storefront-ui` executes the release suite on the
+  pinned simulator with a nonzero executed count, and `perf.md` §9.6 records the
+  measured figures, their environment, and why a simulator hitch figure is a
+  regression signal rather than a user-experience guarantee._
+  _Greens: PERF-16._
+- **M10-08** _(Behavior)_ — Measure the representative workload on both cores in
+  one session, so the tradeoff between construction cost and warm execution is
+  recorded on an application shape rather than a synthetic one. This is the
+  question `M9-25` and `M9-26` answered for a thousand-state fan; an application
+  composes many shapes at once and can answer it differently.
+  _Depends: M10-05._
+  _Verify: `mise run bench --filter 'perf-15-storefront-.*'` and
+  `COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'` taken in
+  one session on the pinned benchmark host, with the paired comparison recorded
+  in `perf.md` §9.6._
+  _Greens: PERF-17._
+- **M10-09** _(Decision)_ — Record what the first measurements settled: which
+  cuts have earned a committed threshold and what the pinned CI runner would
+  have to confirm before one lands, what the cold-start cost is actually spent
+  on, and which questions become scheduled work. Add the scenarios and tasks
+  whichever answer requires.
+  _Depends: M10-07, M10-08._
+  _Verify: recorded decision in `perf.md` §9.6 and the §10 ledger, naming the
+  threshold candidates and the follow-up work, plus `mise run tasks:check`._
+- **M10-10** _(Gate)_ — Close M10 on the recorded evidence: the workload's
+  suites green, the five cuts reporting under both cores, the release UI suite
+  executing on the pinned simulator, and the documents consistent.
+  _Depends: M10-09._
+  _Verify: `mise run test:storefront`, `mise run test:storefront-ui`,
+  `mise run bench --filter 'perf-15-storefront-.*'`, `mise run lint:swift`,
+  `mise run fmt:check`, and `mise run tasks:check`._

@@ -959,7 +959,7 @@ since expected counts derive from the parameters.
 
 ## 18. PERF — Performance guarantees
 
-_Milestones M5, M6, and M9, in the benchmark package. Design: perf §5–§9._
+_Milestones M5, M6, M9, and M10, in the benchmark package. Design: perf §5–§9._
 
 Benchmark-gated: thresholds stay provisional and representation choices stay
 open until perf.md records numbers. This group is the declared exception to
@@ -1016,6 +1016,27 @@ is needed.
   cores are remeasured against each other on steady, deep, broad, and
   unstable shapes in one pinned environment. perf.md records the new
   comparison, including whether any common-path cost regressed.
+- **PERF-15.** A representative commerce session — a catalog of a thousand-odd
+  products, a sixteen-policy pricing ladder, keyed inventory and offers, and a
+  cart whose totals depend on async quotes — is measured as five named cuts: a
+  cold start, the whole session, settled quiescent interactions, an inventory
+  burst, and a compute-only control that runs the same algorithms over the same
+  inputs with no graph at all. Every cut proves its own visible identifiers,
+  exact money totals, accepted async generations, invalidation behavior, and
+  output checksum before any number is reported. perf.md records the results
+  with the environment that produced them, the workload's exact shape, and what
+  the workload does not cover.
+- **PERF-16.** That same session, driven through a real SwiftUI application by
+  XCUIAutomation in release configuration, reports launch, scrolling,
+  scrolling-under-load, search, navigation, and cart interaction cost on one
+  pinned simulator configuration. Every measured iteration starts from
+  identical application state. perf.md records the results, and records that a
+  simulator hitch figure is a pinned regression signal rather than a
+  user-experience guarantee.
+- **PERF-17.** The representative headless workload runs under both the simple
+  and the data-oriented core in one session, so the tradeoff between what a
+  graph costs to build and what it costs to run is measured on an application
+  shape rather than on a synthetic one. perf.md records the paired comparison.
 
 ## 19. LEG — Build-settings matrix
 

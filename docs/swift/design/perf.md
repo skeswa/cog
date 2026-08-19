@@ -1314,6 +1314,158 @@ specialization, which is the same conclusion `M9-24` reached from the steady
 turn. Route F's remaining question is whether that is reachable without
 widening the public API.
 
+**The Storefront macrobenchmark: what it is, and what it is not** — `M10-01`,
+2026-08-19. Every benchmark above measures a _shape_ — a diamond, a fan, a
+chain, a thousand keyed states — chosen because it isolates one cost. The
+Storefront measures a composed application instead: one commerce session driven
+through named domain verbs, headlessly and again through a real SwiftUI
+interface.
+
+It is a **representative workload v1**, and the phrase is doing work. There is
+no such thing as a typical application without production telemetry, so the
+scale below is an explicit, configurable, asserted choice rather than a claim
+about real apps. `StorefrontShapeTests` checks every number in this table
+mechanically, so a workload that quietly grew a declaration fails before it
+makes two recorded numbers incomparable.
+
+| Property                           | `smoke` | `standard` |    `stress` |
+| ---------------------------------- | ------: | ---------: | ----------: |
+| Products                           |     120 |  **1,200** |       6,000 |
+| Categories                         |       6 |     **24** |          48 |
+| Distinct rows a session visits     |      24 |    **120** |         400 |
+| Rows materialized at once          |      12 |     **30** |          40 |
+| Prefetch margin, each side         |       4 |      **8** |          12 |
+| Pricing policies (price books × 1) |       4 |     **16** | 16 × 3 = 48 |
+
+| Declaration kind | Count |
+| ---------------- | ----: |
+| `ManualCog`      |    12 |
+| `ManualCogBox`   |     5 |
+| `Cog`            |    18 |
+| `CogBox`         |     8 |
+| `AsyncCog`       |     7 |
+| `AsyncCogBox`    |     3 |
+
+Two of those counts differ from the targets the workload was commissioned
+against, and both adjustments are structural rather than cosmetic:
+
+- **Seven keyless `AsyncCog`s, not five.** The commission also named the graph
+  levels async state had to occupy: two roots (catalog, account), two mid-graph
+  (search index, suggestions — plus recommendations), and two deep downstream
+  (shipping quote, tax quote). Those levels do not fit in five keyless
+  declarations, and merging shipping with tax would have deleted the fan-in a
+  checkout screen actually has.
+- **Five `ManualCogBox`es, not four.** The fifth is a per-product inventory
+  _generation_. A keyless epoch would have been simpler and would have made the
+  inventory-burst claim unprovable: bumping one epoch invalidates every demanded
+  row, so "the offscreen half of the burst cost nothing" could not be
+  distinguished from "the burst was cheap".
+
+The longest meaningful dependency path is **23 nodes** — the async catalog, the
+products it carries, the product index, the pricing ladder's base plus its
+sixteen policy stages, the effective price, the row value, and the reaction that
+observes it — and not one of them is an identity node.
+
+What it covers: a search funnel over the whole catalog, per-row keyed async at
+two depths, a recursive keyed pricing pipeline whose stages read _different_
+parts of the graph, a multi-source `Writer` filter change, a cart whose totals
+depend on two sibling async quotes, deliberate stale-generation and
+supersession handling, and lifetime release after grace on an injected clock.
+
+What it does not cover, and should not be read as covering: multiple screens
+alive at once, a real navigation stack's worth of retained state, background
+refresh under memory pressure, cold-launch disk I/O, any real network, and any
+device that is not the one named beside a number. It is one session, one
+shopper, one fixture seed.
+
+**The Storefront macrobenchmark, first measurements** — `M10-05`, 2026-08-19,
+`mactop` (Apple Silicon arm64, 12 cores, 24 GB), Xcode 26.4 (17E192) / Apple
+Swift 6.3, release, harness 1.36.2 with the malloc interposer. Standard profile,
+**simple core** (the shipping default). Report-only: no committed threshold, for
+the reason `M5-11` records — a threshold with no repeated pinned-CI history
+behind it is a guess.
+
+| Cut                                  | p50 wall clock | instructions | mallocs | object allocs | retains | releases | samples |
+| ------------------------------------ | -------------: | -----------: | ------: | ------------: | ------: | -------: | ------: |
+| `perf-15-storefront-cold`            |         555 ms |      7,998 M |       — |             — |       — |        — |      10 |
+| `perf-15-storefront-session`         |       6,178 ms |         88 G |       — |             — |       — |        — |   **2** |
+| `perf-15-storefront-interactions`    |       1,340 µs |         20 M |      19 |            19 |    29 K |     79 K |   2,181 |
+| `perf-15-storefront-async-burst`     |          80 ms |      1,158 M |       — |             — |       — |        — |      62 |
+| `perf-15-storefront-compute-control` |         604 µs |         13 M |   5,603 |         1,838 |    11 K |     21 K |   4,167 |
+
+The sample counts are part of the result. `-session` gets **two** samples inside
+its ten-second budget on the simple core, which is enough to say the number is
+about six seconds and not enough to say anything about its distribution; the
+counted cuts get thousands and report byte-identical counts at every percentile.
+Read the wall-clock rows accordingly.
+
+Malloc and ARC counters appear on two cuts only. The other three build or drop a
+runtime and accept async completions, which is exactly the non-quiescent shape
+`M5-11` took those counters away from after a null `swift_release_hook` crash.
+
+The compute-only control is reported **beside** the application cuts and never
+subtracted from them. Differencing two noisy measurements produces a third,
+noisier number that looks authoritative; printing both and letting a reader see
+the ratio is honest and just as useful. The ratio here is the headline: the same
+four algorithms over the same catalog cost **604 µs** with no graph and the cold
+graph-backed screen costs **555 ms**, so on the simple core roughly three orders
+of magnitude of a cold start is graph work rather than the application's own
+arithmetic.
+
+A sampler run over the cold cut puts that cost inside the reaction flush,
+descending the pricing pipeline through `DerivedCogState.recompute` frame by
+frame. The per-product term is roughly 6.7 M instructions and scales close to
+linearly (300 → 1,720 M, 600 → 3,142 M, 1,200 → 7,998 M), so it is a constant
+factor rather than an algorithmic blow-up. **Attributing that constant is not
+done**, and `M10-09` owns the disposition.
+
+**The Storefront macrobenchmark across cores** — `M10-08`, same host, toolchain,
+and session. Both cores measured back to back on the standard profile, and every
+cut checked its own visible identifiers, money totals, accepted generations, and
+checksum before reporting, on both.
+
+| Cut                                  | simple p50 | arena p50 |     arena is |
+| ------------------------------------ | ---------: | --------: | -----------: |
+| `perf-15-storefront-cold`            |     555 ms |     40 ms | 13.9× faster |
+| `perf-15-storefront-session`         |   6,178 ms |    195 ms | 31.7× faster |
+| `perf-15-storefront-interactions`    |   1,340 µs |     74 µs |   18× faster |
+| `perf-15-storefront-async-burst`     |      80 ms |   6.23 ms | 12.8× faster |
+| `perf-15-storefront-compute-control` |     604 µs |    657 µs |    unchanged |
+
+| Counted metric, `-interactions` | simple | arena |
+| ------------------------------- | -----: | ----: |
+| `mallocCountTotal`              |     19 |    12 |
+| `objectAllocCount`              |     19 |    12 |
+| retains                         |   29 K |   903 |
+| releases                        |   79 K |   950 |
+
+The control row is the check on the other four: it contains no graph, so a core
+swap must not move it, and it does not. Everything else moves by more than an
+order of magnitude.
+
+This is a different answer from the one the synthetic comparisons gave.
+`M6-12a` and `M9-17` measured the two cores on diamond, deep, broad, and
+unstable shapes and found them close enough that construction cost decided the
+matter; `M9-25` and `M9-26` then measured the arena as **2.2× slower to build** a
+thousand-state keyed graph. On a composed application the ordering reverses and
+the margin is enormous — including on construction, which is what the cold cut
+measures.
+
+The most likely reason is the one the workload's shape makes obvious and the
+synthetic shapes never did: this graph has two selectors with about **1,200
+dependencies each** — the eligibility filter and the ranker both read one keyed
+value per catalog product — and the simple core walks class states and
+existentials over those lists on every settle, while the arena walks columns.
+`perf-10`'s broad workload is wide, but it is not _this_ wide, and it is not
+wide underneath a sixteen-deep keyed pipeline.
+
+That is a measurement, not a decision. It is deliberately **not** treated here
+as reopening `M6-12a`'s selected core: one workload on one host is exactly the
+kind of evidence this document requires to be repeated in the pinned CI
+environment before it moves anything. `M10-09` owns the disposition, and the
+first question it has to answer is whether the simple core's wide-selector cost
+is a defect with a fix rather than a reason to swap cores.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
