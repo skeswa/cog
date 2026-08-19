@@ -1466,6 +1466,66 @@ environment before it moves anything. `M10-09` owns the disposition, and the
 first question it has to answer is whether the simple core's wide-selector cost
 is a defect with a fix rather than a reason to swap cores.
 
+**The Storefront application, first measurements** — `M10-07`, 2026-08-19,
+`mactop`, Xcode 26.4 (17E192), release configuration, on the **iPhone 17 Pro
+simulator running iOS 26.4 (23E244), arm64**. The **smoke** profile, not the
+standard one: a simulator UI run is six and a half minutes at 120 products and
+the suite's job is to exercise the interface, not to restate the headless
+scale. Five measured iterations per test, each preceded by a discarded warm-up
+invocation, with the application relaunched to identical state outside every
+measured region.
+
+| Test                                | Metric                                        |    mean |   RSD |
+| ----------------------------------- | --------------------------------------------- | ------: | ----: |
+| cold launch                         | `ApplicationFirstFramePresentationResponsive` | 1.183 s | 1.32% |
+| settled-feed scrolling              | `Scroll_DraggingAndDeceleration`              | 2.584 s | 0.01% |
+| scrolling during an inventory burst | `Scroll_DraggingAndDeceleration`              | 2.567 s | 0.57% |
+| search interaction                  | `XCTClockMetric`                              | 0.372 s | 1.54% |
+| search interaction                  | CPU time, app process                         | 0.225 s | 3.37% |
+| search interaction                  | instructions retired, app process             | 2.38 GI | 1.75% |
+| search interaction                  | peak physical memory, app process             | 72.6 MB | 0.12% |
+| detail navigation                   | `NavigationTransition`                        | 0.517 s | 0.34% |
+| cart and checkout interaction       | `XCTClockMetric`                              | 2.234 s | 2.23% |
+| cart and checkout interaction       | instructions retired, app process             | 3.18 GI | 0.21% |
+
+Three things this run settled that no Apple document states, and that were
+therefore assumptions until they were measured:
+
+- **A SwiftUI `List` does emit the UIKit scroll signposts.**
+  `XCTOSSignpostMetric.scrollingAndDecelerationMetric` produced data on a pure
+  SwiftUI list. Apple documents that sub-metric as backed by UIKit-instrumented
+  intervals and nowhere says whether SwiftUI participates; here it does.
+- **`XCTHitchMetric` produced nothing.** The two scrolling tests carry
+  `XCTHitchMetric(application:)` behind `@available(iOS 26.0, *)`, the runtime
+  was iOS 26.4 so the guard was satisfied, and the metric contributed **zero**
+  series — no error, no warning, no row. The tests keep it rather than pretend
+  it was never asked for. **This suite therefore cannot produce a hitch number
+  at all**, which is a coverage gap and not a passing grade.
+- **`Scroll_DraggingAndDeceleration` reports duration, not smoothness.** Its
+  0.011% relative standard deviation on the settled feed is not a compliment; a
+  synthesized swipe's interval is dominated by the fixed gesture and
+  deceleration time. It proves the list scrolls without stalling far more than
+  it quantifies how smoothly.
+
+**What these numbers are for.** They are a pinned regression signal against
+themselves — same host, same pinned Xcode, same simulated device, same fixture,
+same 76 pt row height, same locale and Dynamic Type setting. They are not
+evidence about what a person holding an iPhone experiences. An absolute
+hitch-ratio target belongs on a pinned physical device and nowhere else. Apple's
+published guidance for the Xcode Organizer's Hitches metric — "A hitch rate at
+or below 10 ms/s is good; at or below 25 ms/s is a warning; at or below 50 ms/s
+is critical; and above 50 ms/s warrants immediate attention" — is about field
+data from real devices reported through the Organizer, and is recorded here so
+that nobody invents a different number, not because this suite is measured
+against it.
+
+Two figures are deliberately not in the table. The per-iteration physical-memory
+_delta_ swings 39% and goes negative; the absolute and peak figures beside it
+are stable to a tenth of a percent and are the ones worth tracking. And nothing
+here is gated: the suite runs from `mise run test:storefront-ui` when a number
+is wanted, not on every pull request, because a six-and-a-half-minute timing
+test on a shared machine teaches people to rerun rather than to look.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
