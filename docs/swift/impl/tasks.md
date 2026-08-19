@@ -1972,13 +1972,18 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   _Depends: M9-01._
   _Verify: `mise run test --filter 'GRAPH|CYCLE'` and a deep-chain per-node
   cost below the recorded baseline._
-- **M9-12** _(Infrastructure)_ — Remove the dynamic cast and the generic
-  metadata instantiation from descriptor-and-key state resolution, keeping the
-  one-concrete-type-per-descriptor invariant provable without paying for it on
-  every lookup.
+- **M9-12** _(Infrastructure)_ — Remove the generic metadata instantiation from
+  descriptor-and-key state resolution by caching the resolved state on the
+  declaration's descriptor per context, so a keyless read reaches its state
+  without a dictionary hash or a metadata request. Keep the checked cast: the
+  first attempt replaced it with `unsafeDowncast` and measured 5% of a steady
+  turn, which is not a trade this project makes — the invariant is internal, so
+  a violation is a Cog bug, and an unchecked cast turns a clear release-build
+  error into undefined behavior. Inlining the two lookups alongside it measured
+  within noise and is not the lever either.
   _Depends: M9-01._
-  _Verify: `mise run test --filter 'DECL|KEY'` plus the compile-fail and
-  storage-corruption infrastructure tests that own the invariant._
+  _Verify: `mise run test --filter 'DECL|LIFE'`, `mise run test:release`, and a
+  recorded steady-turn metadata share below the `M9-10` measurement._
 - **M9-13** _(Infrastructure)_ — Remove the per-turn dynamic actor-isolation
   checks from dependency re-recording and boundary notification, which the
   profile measured at an eighth of a steady turn.

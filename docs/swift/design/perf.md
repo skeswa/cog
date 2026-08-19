@@ -945,6 +945,43 @@ routes issue #373 keeps — borrowed descriptor records, unsafe buffers, and the
 hashing follow-ups — not to a core swap. `M9-17` remeasures before anything
 else is promoted.
 
+**What a steady turn is made of now** — `M9-12`, 2026-08-19, same host and
+toolchain, 5,100 leaf samples over a 1.53 µs turn. The `M9-01` profile is the
+before; this is the after, and it is what the remaining routes are chosen from.
+
+| Bucket                               | `M9-01` |      now |
+| ------------------------------------ | ------: | -------: |
+| ARC retain and release               |   23.5% |    28.5% |
+| Generic metadata instantiation       |   19.0% |    18.6% |
+| Exclusivity checks                   |    8.2% |    12.5% |
+| **Cog's own compiled code**          |    6.1% | **9.1%** |
+| Actor-isolation checks               |   12.4% |     8.9% |
+| Weak-reference loads                 |    5.1% |     5.8% |
+| Dynamic casts and conformance lookup |    4.2% |     1.1% |
+| malloc and free                      |    5.5% | **0.0%** |
+
+Allocation is gone, casts are nearly gone, and isolation checks are down by a
+third. The shares that grew did so because the turn shrank around them.
+
+**Generic metadata is now the largest addressable cost**, and it is
+concentrated: `manualState(for:)` and `derivedState(for:)` account for most of
+it, because resolving a descriptor and key goes through a function generic over
+the concrete state class, so every read asks the runtime for
+`ManualCogState<Value>` or `DerivedCogState<Value>` metadata.
+
+`M9-12` measured the cheap version of this and rejected it. Replacing the
+lookup's checked cast with `unsafeDowncast` is worth 5% of a steady turn — and
+the cast guards an internal invariant, so a violation is a Cog bug rather than
+bad input, and an unchecked cast converts a clear release-build error into
+undefined behavior. §1 rule 2 is not tradeable against §1 rule 3 at that price.
+Marking the two lookups `@inline(__always)` alongside it measured within noise.
+
+The version that keeps the check is a per-context cache on the declaration's
+descriptor, which removes the dictionary hash and the metadata request together
+because the descriptor is already the concrete generic type. That is issue
+#373's route D, and it needs its own lifetime-release coverage before it is
+worth landing.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
