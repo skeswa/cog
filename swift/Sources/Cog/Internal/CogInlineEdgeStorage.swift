@@ -60,6 +60,12 @@ private nonisolated struct CogInlineDependencyRow: Sendable {
 /// both directions before replacements are appended.
 @MainActor
 internal final class CogInlineEdgeStorage: CogArenaEdgeStorageProtocol {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Inline-first dependency storage by consumer row.
   private var dependencyRows: ContiguousArray<CogInlineDependencyRow> = []
 

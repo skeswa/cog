@@ -20,7 +20,13 @@
 /// Object identity ties a writer to the context's accumulating turn and prevents
 /// an escaped writer from operating in a later turn. Application code cannot
 /// construct a matching token.
-internal final class CogTurnID {}
+internal final class CogTurnID {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+}
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
@@ -28,6 +34,12 @@ internal final class CogTurnID {}
 /// so one ordered flush can assign a single revision before invalidation reaches
 /// Observation boundaries and reactions.
 internal final class CogTurn {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// The unforgeable capability owned by writers for this exact turn.
   let id: CogTurnID
 

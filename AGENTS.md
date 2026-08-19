@@ -386,12 +386,17 @@ that runtime.
   unchanged across the value-reference layout and core swaps, so a scenario test able to
   observe state storage would fail a swap it should not care about. Reach for
   `@testable` only in infrastructure tests, which green no scenario.
-- **Give every generic class an explicit `nonisolated deinit`.** With
-  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` on a generic
-  class is main-actor-isolated, and Swift 6.3.0 and 6.3.3 both crash the
-  optimizer on it in release configuration. Debug builds are fine, so
-  `mise run test:matrix` will not catch it — only `mise run test:release`
-  will. This applies to states, boxes, descriptors, and async state alike.
+- **Give every class an explicit `nonisolated deinit`.** With
+  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` is
+  main-actor-isolated, which is wrong twice over. On a **generic** class it is a
+  build problem: Swift 6.3.0 and 6.3.3 both crash the optimizer on it in release
+  configuration. Debug builds are fine, so `mise run test:matrix` will not catch
+  it — only `mise run test:release` will. On **any** class it is also a cost: an
+  isolated `deinit` compiles to `swift_task_deinitOnExecutor`, so every
+  deallocation asks the concurrency runtime which executor it is on. `M9-01`
+  measured that at about an eighth of a steady turn. This applies to states,
+  boxes, descriptors, async state, turn objects, edges, and arena storage
+  alike.
 - **A `deinit` that must touch the graph is spelled `isolated deinit`, and
   its class must not be generic.** A written `deinit` is nonisolated unless it
   says otherwise, so it cannot call a MainActor-isolated method at all — the

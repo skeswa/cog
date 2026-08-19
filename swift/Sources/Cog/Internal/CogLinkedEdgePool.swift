@@ -63,6 +63,12 @@ internal nonisolated struct CogPoolEdge: Sendable {
 /// been removed.
 @MainActor
 internal final class CogLinkedEdgePool {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Contiguous live and reusable entries.
   ///
   /// The setter stays private so only this owner can grow or replace entries;

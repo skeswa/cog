@@ -47,6 +47,12 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 /// measured representations without changing this row-ownership contract.
 @MainActor
 internal final class CogArenaStorage {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Sentinel for no Observation boundary.
   static let noIndex: Int32 = -1
 

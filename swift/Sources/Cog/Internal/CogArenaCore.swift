@@ -37,6 +37,12 @@ private nonisolated enum CogArenaDescriptorKind: Equatable {
 /// one descriptor-level function, never a per-state closure or existential.
 @MainActor
 private final class CogArenaDescriptorRecord {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Process identity of the public declaration represented by this record.
   let identity: ObjectIdentifier
 
@@ -213,6 +219,12 @@ private struct CogArenaLifetimeEntry {
 /// function each; state rows own no classes or closures.
 @MainActor
 internal final class CogArenaCore {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Scalar state rows shared by every descriptor column.
   let arena: CogArenaStorage
 
