@@ -1013,6 +1013,62 @@ every hop. The gate reflects that honestly — allocations are held at exactly
 zero, ARC is pinned against drift — and the routes that would close it are
 instruction-level work still on issue #373.
 
+**The core comparison, rerun after M9** — `M9-17`, 2026-08-19, `mactop`, Xcode
+26.4 (17E192) / Apple Swift 6.3, release, harness 1.36.2. The same benchmarks
+`M6-11c` ran, in one session, on both selectors, after the shared machinery both
+cores were wearing came off.
+
+Cost benchmarks, per operation:
+
+| Workload          | Core   | mallocs | retains / releases | p50 wall clock |
+| ----------------- | ------ | ------: | -----------------: | -------------: |
+| steady turn       | simple |   **0** |            62 / 75 |   **1.639 µs** |
+| steady turn       | arena  |       1 |        **47 / 56** |       2.198 µs |
+| 16-consumer fan   | simple |   **0** |      1,158 / 2,041 |          37 µs |
+| 16-consumer fan   | arena  |       1 |      **409 / 478** |      **21 µs** |
+| 100-node chain    | simple |   **0** |      3,963 / 4,576 |         128 µs |
+| 100-node chain    | arena  |       1 |  **1,248 / 1,257** |     **109 µs** |
+| 1 pinned key      | simple |   **0** |            65 / 78 |   **2.072 µs** |
+| 1 pinned key      | arena  |       1 |        **50 / 59** |       2.861 µs |
+| 1,000 pinned keys | simple |   **0** |            65 / 78 |   **2.159 µs** |
+| 1,000 pinned keys | arena  |       1 |        **50 / 59** |       2.902 µs |
+
+Whole-graph runtimes:
+
+| Workload |   simple p50 |    arena p50 | simple instructions | arena instructions |
+| -------- | -----------: | -----------: | ------------------: | -----------------: |
+| diamond  |     4,551 µs | **4,219 µs** |            **84 M** |              102 M |
+| deep     | **2,279 µs** |     2,724 µs |            **43 M** |               68 M |
+| broad    |        12 ms |  **9.08 ms** |               221 M |          **217 M** |
+| unstable |     2,410 µs | **1,248 µs** |                43 M |           **31 M** |
+
+**Two positions swapped.** M6 recorded the simple core allocating seven times
+per steady turn against the arena's five, and that was one of the two cost
+targets the swap was chartered to meet. It is now zero against one: the
+shipping core allocates nothing on every cost benchmark here, and the arena
+still allocates once. The other target, zero ARC in graph walks, is still
+unmet by both, and the arena is still three to four times better at it.
+
+**The shape of the trade did not change; its terms did.** The arena still wins
+wide and dynamic graphs decisively — broad by 24%, unstable by 48% — and still
+loses deep, now by 20% in wall clock and 58% in instructions where M6 measured
+4% and 33%. The smallest turn, which M6 had the arena losing by 10%, it now
+loses by 34%, and the pinned-key shapes it now loses by about 35% despite
+carrying less ARC.
+
+That last pair is the interesting one. Both cores make pinned-key work
+O(changed) after `M9-03` and `M9-05`, so the comparison is no longer about
+scaling at all — and with scaling neutralised, the constant favours the simple
+core.
+
+**What M9 changed about the question.** `M6-12a` deferred the decision until a
+candidate made pinned-key work O(changed). That has happened, and it happened
+in shared machinery rather than in a representation, which is the substance of
+the answer: the defect was never the class-state core's to fix by being
+replaced. What remains is a genuine representation difference — the arena's ARC
+traffic is three to four times lower, and that is §5's rule, still unmet by the
+shipping core and still the largest single item in a steady turn.
+
 **A zero threshold can pass because nothing was measured.** `M5-05bb` found
 that a run with the malloc interposer disabled reports `mallocCountTotal == 0`
 for a workload that demonstrably allocates. `perf-witness-allocating` exists as
