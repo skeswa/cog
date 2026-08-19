@@ -224,7 +224,7 @@ extension Cogs {
     // free; a queue arrives in invalidation order, so restore it here. The
     // changed set is the point of the queue, so this sorts a handful of entries
     // rather than every key the screen has ever shown.
-    changedBoundaryQueue.sort { $0.observationOrder < $1.observationOrder }
+    changedBoundaryQueue.sort()
 
     // Snapshot the count for the reason the registry walk did: a notice can run
     // a synchronous Observation handler that reads new state, and a boundary
@@ -232,7 +232,7 @@ extension Cogs {
     // belongs to the next flush.
     let queuedCount = changedBoundaryQueue.count
     for index in 0..<queuedCount {
-      let state = changedBoundaryQueue[index]
+      let state = observationStates[changedBoundaryQueue[index]]
       state.noticeQueued = false
 
       if state.settleState != .clean, let derived = state.asDerivedSettleState {

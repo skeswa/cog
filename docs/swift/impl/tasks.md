@@ -2011,10 +2011,21 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   _Verify: `mise run test:matrix`, `mise run test:cores`,
   `mise run test:value-references`, `mise run test:release`,
   `mise run test:simulator`, and `mise run test:compilefail`._
+- **M9-20** _(Infrastructure)_ — Carry positions rather than states on the
+  changed-boundary queue. A boundary's creation order is its index in the
+  registry, so the queue can be integers; the existential queue `M9-04` built
+  retained on every append and again on every comparison its ordering sort
+  made, which `M9-17` measured costing more on a turn where every boundary
+  changed than the O(pinned) walk it replaced.
+  _Depends: M9-16._
+  _Verify: `mise run test --filter 'UI|SEED|HIST'`, `mise run test:release`,
+  and `mise run bench --filter perf-02-propagation --filter
+perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
+  with the flat slope intact._
 - **M9-17** _(Behavior)_ — Rerun the pinned runtime comparison of the simple
   and data-oriented cores on steady, deep, broad, and unstable shapes now that
   both wear a lighter coat, and record the new comparison in `perf.md`.
-  _Depends: M9-16._
+  _Depends: M9-20._
   _Verify: complete pinned comparison result set recorded in `perf.md`, taken
   in one session on the pinned benchmark host._
   _Greens: PERF-14._

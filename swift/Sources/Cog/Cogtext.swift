@@ -188,16 +188,20 @@ public final class Cogs {
   /// roots instead of scanning every interior state in the graph.
   internal private(set) var observationStates: [any CogObservationState] = []
 
-  /// UI-read roots whose value could have changed in the accumulating turn.
+  /// UI-read roots whose value could have changed in the accumulating turn, by
+  /// position in ``observationStates``.
   ///
   /// The flush walks this instead of every boundary the context has ever
   /// created, which is what makes a turn cost O(changed) rather than O(pinned
   /// keys). Entries are added where invalidation already visits a state, and
   /// removed when the flush publishes them.
-  internal var changedBoundaryQueue: [any CogObservationState] = []
-
-  /// The next position in boundary-creation order.
-  private var nextObservationOrder = 0
+  ///
+  /// Positions rather than states. A boundary's creation order *is* its index
+  /// here, so the queue can carry integers, and `M9-17` measured why that
+  /// matters: an existential queue retains on every append and again on every
+  /// comparison the ordering sort makes, which cost more on a turn where every
+  /// boundary changed than the O(pinned) walk it replaced.
+  internal var changedBoundaryQueue: [Int] = []
 
   /// Pins one newly UI-read state in boundary creation order.
   ///
@@ -209,8 +213,9 @@ public final class Cogs {
     if let lifetimeState = state as? any CogLifetimeLeaseState {
       lifetimeState.cancelPendingLifetimeRelease()
     }
-    state.observationOrder = nextObservationOrder
-    nextObservationOrder += 1
+    // The position and the append must stay in step: the changed-boundary queue
+    // carries positions and resolves them through `observationStates`.
+    state.observationOrder = observationStates.count
     observationStates.append(state)
   }
 
@@ -225,7 +230,7 @@ public final class Cogs {
     else { return }
 
     observationState.noticeQueued = true
-    changedBoundaryQueue.append(observationState)
+    changedBoundaryQueue.append(observationState.observationOrder)
   }
 
   /// Whose run is capturing dependencies right now, or `nil` between runs.
