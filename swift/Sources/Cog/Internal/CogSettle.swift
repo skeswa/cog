@@ -252,9 +252,11 @@ internal struct CogSettleStack {
   /// The state bit is set before frames for its parents run, making a nested read
   /// of this state detect the cycle even if the raw frame suffix changes.
   mutating func beginComputing(_ state: any DerivedCogSettleState) {
-    guard cyclePath(ifEntering: state) == nil else {
-      fatalError("Cog tried to enter a derived cycle without reporting it.")
-    }
+    // An assertion, not a check. Every caller has already asked `cyclePath` and
+    // reported what it found; this only catches a caller that forgot, which is
+    // a Cog bug and cannot be provoked from outside. Running it again in release
+    // scanned the active path a second time for every node the walk entered.
+    assert(cyclePath(ifEntering: state) == nil, "Cog entered a derived cycle without reporting it.")
     state.isComputing = true
     computingPath.append(state)
   }
