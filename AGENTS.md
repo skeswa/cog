@@ -58,8 +58,26 @@ every scenario covered by exactly one task.
   swift-syntax and swift-argument-parser pins without exposing them to a Cog
   consumer. Its committed `Package.resolved` fixes those revisions, and its
   scaffold test asks SwiftPM to prove the root dependency graph remains empty.
+- `swift/Storefront/` — the **separate** `cog-storefront` SwiftPM package
+  holding the Storefront macrobenchmark's shared workload: its state
+  declarations, deterministic fixtures, heavy kernels, sixteen-policy pricing
+  ladder, domain operations, scripted async service, eleven-phase interaction
+  trace, and the shadow model its checkpoints compare against. It depends on the
+  root by path and on **nothing else**, which is the whole reason it is not part
+  of `swift/Benchmarks`: an iOS application target cannot depend on that package
+  without also resolving the benchmark harness, the malloc interposer, and
+  swift-state-graph. Both the headless benchmark cuts and the SwiftUI benchmark
+  app drive exactly this workload. Its `README.md` explains the boundary and the
+  three profiles.
+- `swift/Examples/` — two Xcode example apps. `Weather/` is the worked
+  feature example; `Storefront/` is the SwiftUI benchmark application, whose
+  `StorefrontUITests` target measures launch, scrolling, search, navigation, and
+  cart interaction in release through XCUIAutomation. Both are hand-written
+  objectVersion-77 projects that reference the root package by relative path;
+  Storefront also references `swift/Storefront`.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
-  `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
+  `swift-simulator-test.mjs`, `weather-test.mjs`, `storefront-test.mjs`,
+  `storefront-ui-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus shared test guards,
   the checkers' own fixture suites (`test-task-ledger.mjs`,
   `test-workflows.mjs`), and `fixtures/`.
@@ -134,11 +152,15 @@ directly:
   wrapper enumerates tests before every run and requires a nonzero executed
   count from its own xUnit report. Extra arguments pass through, as in
   `mise run test:lint --filter LINT-02`.
-- `mise run lint:swift` — first run the guarded CogLint suite, then lint root
-  library and Weather production target sources with production rules and
-  every tracked unit test target source with the explicit test-role primitive
-  exemption. Empty Xcode-created target directories are not command inputs;
-  CogLint continues to reject any named input that does not exist.
+- `mise run lint:swift` — first run the guarded CogLint suite, then lint the
+  root library, the Storefront workload package, and both example apps'
+  production sources with production rules, and every tracked test target source
+  with the explicit test-role primitive exemption. The Storefront workload is
+  linted like application code on purpose: it is the worked example of what a
+  large Cog app looks like, and a benchmark that broke the conventions it exists
+  to measure would be measuring the wrong thing. Empty Xcode-created target
+  directories are not command inputs; CogLint continues to reject any named
+  input that does not exist.
 - `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
   `x86_64` CogLint executables, assemble the release artifact bundle, and
   record its SwiftPM checksum. The version defaults to `0.4.0`.
@@ -169,6 +191,10 @@ directly:
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
+  The Storefront macrobenchmark's five cuts are
+  `mise run bench --filter 'perf-15-storefront-.*'`, and they run under either
+  core through the same selector the rest of the suite uses
+  (`COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'`).
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
   `swift/Benchmarks` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator
@@ -186,7 +212,7 @@ directly:
   temporary impossible threshold and pass only when the gate rejects it as a
   regression.
 
-The example app uses the same pinned Xcode as the library:
+The example apps use the same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS
   Simulator destination without launching one.
@@ -195,6 +221,24 @@ The example app uses the same pinned Xcode as the library:
   command because `build:weather` uses xcodebuild's `build` action, which
   never compiles a target the Weather scheme lists only under its test
   action.
+- `mise run build:storefront` — build the Storefront benchmark app for a
+  generic iOS Simulator destination without launching one. The same
+  build-action split applies as for Weather.
+- `mise run test:storefront-ui` — run `StorefrontUITests` in **release** on a
+  pinned iOS simulator, and read the result bundle back to require a nonzero
+  executed count. Release rather than debug because Apple's performance-test
+  guidance is explicit that a measured run builds for testing with the Release
+  configuration and the debugger, code coverage, and runtime diagnostics off;
+  the scheme carries those settings. Set `COG_STOREFRONT_DESTINATION` to
+  override the destination, which local exploration may want and CI must not.
+
+The Storefront macrobenchmark's shared workload is a package of its own, so its
+correctness suite has a wrapper of its own:
+
+- `mise run test:storefront` — run the guarded `swift/Storefront` package
+  tests: the declaration-census and profile shape assertions, and the
+  eleven-phase interaction trace end to end. This suite is the gate every
+  Storefront benchmark number rests on.
 
 Extra arguments pass straight through, as in
 `mise run test --filter 'DECL-01|ONE-05' --parallel`. **Never run a filtered

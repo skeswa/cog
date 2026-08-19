@@ -87,6 +87,7 @@ mise run test:matrix      # all four isolation legs
 mise run test:cores       # verify default simple; behavior under both cores
 mise run test:release     # the default leg in release configuration
 mise run test:compilefail # batched swiftc pass over swift/CompileFail/
+mise run test:storefront  # the macrobenchmark workload's correctness suite
 mise run tasks:check      # validate impl/tasks.md against the plan and scenarios
 ```
 

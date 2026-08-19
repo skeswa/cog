@@ -108,6 +108,9 @@ mise run build:lint-documentation # render the six rule-reference articles
 mise run test:lint-documentation # prove fixture parity and permanent routes
 mise run build:weather  # build the Weather example for the iOS simulator
 mise run test:weather   # run the Weather example's tests on a simulator
+mise run test:storefront # guarded tests for the shared macrobenchmark workload
+mise run build:storefront # build the Storefront benchmark app for the simulator
+mise run test:storefront-ui # release UI performance suite on a pinned simulator
 mise run bench          # run the separate release benchmark package
 mise run bench:thresholds:check # enforce committed performance ceilings
 mise run tasks:check    # validate the Swift implementation task ledger

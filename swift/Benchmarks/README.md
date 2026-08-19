@@ -46,8 +46,9 @@ another job.
 
 ## What is here today
 
-One target, `CogGraph`, carries the allocation, graph-shape, layout, and
-four-runtime comparison workloads described below. Baseline tolerances pin
+One target, `CogGraph`, carries the allocation, graph-shape, layout,
+four-runtime comparison, and Storefront macrobenchmark workloads described
+below. Baseline tolerances pin
 counting metrics against drift. Committed static files add the portable CI
 gate: PERF-06's exact zero-allocation p90 plus PERF-10's generous wall-clock
 ceilings.
@@ -398,6 +399,61 @@ package to choose which implementation the `cog` adapter measures. The adapter
 itself uses only the shared public declarations, and its root reads use Cog's
 public Observation-tracked subscript under the same tracking scope as the raw
 adapter. No comparison-only branch enters either core.
+
+## The Storefront macrobenchmark
+
+`M10` adds the suite's one _application_ workload. Everything else here measures
+a shape — a diamond, a fan, a chain, a thousand keyed states — chosen because it
+isolates one cost. The Storefront measures a composed commerce session instead:
+a search funnel over the whole catalog, a sixteen-policy pricing ladder per
+product, keyed inventory and personalized offers, a cart whose totals depend on
+two sibling async quotes, and an inventory feed that touches rows nobody is
+looking at.
+
+Its declarations, fixtures, kernels, scripted service, and interaction trace
+live in **`swift/Storefront`**, a package of its own, because the SwiftUI
+benchmark application in `swift/Examples/Storefront` drives the same workload
+and an iOS application target cannot depend on _this_ package without resolving
+the harness, the interposer, and swift-state-graph. That package depends on the
+root by path and on nothing else. Read
+[`swift/Storefront/README.md`](../Storefront/README.md) first.
+
+Five cuts, and which metrics each may carry is decided entirely by `M5-11`'s
+quiescence rule:
+
+| Cut                                  | What it measures                                           | Counting metrics |
+| ------------------------------------ | ---------------------------------------------------------- | ---------------- |
+| `perf-15-storefront-cold`            | bootstrap, graph construction, first complete screen       | no               |
+| `perf-15-storefront-session`         | the whole eleven-phase interaction trace                   | no               |
+| `perf-15-storefront-interactions`    | settled, quiescent favorite / cart / variant / multi-write | **yes**          |
+| `perf-15-storefront-async-burst`     | one inventory burst accepted and settled                   | no               |
+| `perf-15-storefront-compute-control` | the same four kernels over the same inputs, no graph       | **yes**          |
+
+The three that say "no" build or drop a runtime and accept async completions,
+which is exactly the shape the null-`swift_release_hook` crash came from. The
+two that say "yes" hold one context for the whole run and never let a task
+complete inside the measured region.
+
+The interaction cut deliberately excludes query changes. Typing materializes new
+rows, new rows start inventory and offer requests, and a measured region that
+starts async work is not a region process-global counters may be attached to.
+Search cost is measured by the session cut, on wall clock alone.
+
+The compute-only control is reported **beside** the application cuts and never
+subtracted from them. It is also the check on the core comparison: it contains
+no graph, so swapping cores must not move it.
+
+```console
+mise run bench --filter 'perf-15-storefront-.*'
+COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
+mise run test:storefront        # the correctness gate the numbers rest on
+```
+
+Nothing here is gated. There are no committed threshold files for `perf-15`,
+and `tools/bench-baseline.mjs` names none, because these are first measurements
+on one host and a threshold with no repeated pinned-CI history behind it is a
+guess. `perf.md` §9.6 records the numbers, the environment, the workload's exact
+shape, and what it does not cover.
 
 ## What is coming
 

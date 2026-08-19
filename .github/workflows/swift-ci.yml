@@ -557,7 +557,7 @@ jobs:
         run: mise run test:simulator
 
   build-weather:
-    name: Weather build and tests (self-hosted)
+    name: Example apps and macrobenchmark workload (self-hosted)
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
@@ -606,6 +606,20 @@ jobs:
 
       - name: Run the Weather example tests
         run: mise run test:weather
+
+      # The Storefront macrobenchmark's shared workload and its SwiftUI
+      # benchmark application. The workload's correctness suite is the gate
+      # every recorded Storefront number rests on, so it runs on every change.
+      #
+      # The release UI *performance* suite is deliberately not here. It is
+      # report-only, it is slow, and a timing test on a shared machine teaches
+      # people to rerun rather than to look; it runs from
+      # `mise run test:storefront-ui` when a number is wanted.
+      - name: Run the Storefront workload tests
+        run: mise run test:storefront
+
+      - name: Build the Storefront benchmark app
+        run: mise run build:storefront
 
   # The release-configuration leg. The guardrails that promise every-build
   # behaviour — the second-context guard, escaped writers, cycle detection, the
@@ -996,7 +1010,7 @@ jobs:
         run: mise run test:simulator
 
   fork-build-weather:
-    name: Weather build and tests (fork, GitHub-hosted)
+    name: Example apps and macrobenchmark workload (fork, GitHub-hosted)
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -1044,6 +1058,20 @@ jobs:
 
       - name: Run the Weather example tests
         run: mise run test:weather
+
+      # The Storefront macrobenchmark's shared workload and its SwiftUI
+      # benchmark application. The workload's correctness suite is the gate
+      # every recorded Storefront number rests on, so it runs on every change.
+      #
+      # The release UI *performance* suite is deliberately not here. It is
+      # report-only, it is slow, and a timing test on a shared machine teaches
+      # people to rerun rather than to look; it runs from
+      # `mise run test:storefront-ui` when a number is wanted.
+      - name: Run the Storefront workload tests
+        run: mise run test:storefront
+
+      - name: Build the Storefront benchmark app
+        run: mise run build:storefront
 
   # The benchmark package's portable gate. PERF-10 wall-clock measurements use
   # generous absolute p90 ceilings recorded from the pinned comparison, while
