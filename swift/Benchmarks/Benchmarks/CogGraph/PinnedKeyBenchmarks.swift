@@ -109,4 +109,28 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
       benchmark.stopMeasurement()
     }
   }
+
+  // PERF-11. The same turn beside one pinned key and beside a thousand. PERF-07
+  // above pins the traffic against drift at three sizes; this pair exists to
+  // make the *slope* the thing under test, because O(pinned keys) is a claim
+  // about shape and no single number can carry it. `M9-06` commits the static
+  // ceiling that holds the thousand-key shape to the one-key cost.
+  for pinnedKeyCount in [1, 1000] {
+    Benchmark(
+      "perf-11-pinned-key-slope-\(pinnedKeyCount)",
+      configuration: .init(
+        metrics: metrics,
+        warmupIterations: 2,
+        scalingFactor: .kilo,
+        maxDuration: .seconds(3),
+        thresholds: thresholds
+      )
+    ) { benchmark in
+      await PinnedKeyHarness.settle(pinnedKeyCount: pinnedKeyCount)
+      let count = benchmark.scaledIterations.count
+      benchmark.startMeasurement()
+      await PinnedKeyHarness.runLiveKeyTurns(count, pinnedKeyCount: pinnedKeyCount)
+      benchmark.stopMeasurement()
+    }
+  }
 }

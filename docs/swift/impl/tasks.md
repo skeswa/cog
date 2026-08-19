@@ -1899,29 +1899,33 @@ disposition unchanged; a task that cannot is a plan change first._
   claim under test is the difference rather than two numbers a reader has to
   subtract.
   _Depends: M9-01._
-  _Verify: `mise run bench --filter perf-11-pinned-key-slope` reports both
-  shapes and their per-key difference._
+  _Verify: `mise run bench --filter perf-11-pinned-key-slope-1 --filter
+perf-11-pinned-key-slope-1000` reports both shapes, whose difference is the
+  per-key cost. The harness matches a filter against a whole benchmark name, so
+  both names are given._
 - **M9-03** _(Infrastructure)_ — Hoist the arena flush's `changedAt` guard
   above its boundary-entry copy and descriptor-record fetch, which halves that
   core's per-key traffic without changing the flush's shape.
   _Depends: M9-02._
   _Verify: `COG_TEST_CORE=arena mise run bench --filter
-perf-11-pinned-key-slope` reports the halved slope._
+perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000` reports no
+  ARC difference between the two shapes, and `COG_TEST_CORE=arena
+COG_TEST_EDGE=pool mise run test --filter 'UI|SEED|HIST'` stays green._
 - **M9-04** _(Infrastructure)_ — Give the simple core a changed-boundary queue:
   enqueue where a source is already stamped, dedupe with one flag, and flush
   that queue instead of sweeping `observationStates`. Preserve boundary-creation
   notice order by sorting the changed set, and keep a boundary created during a
   flush joining the next one.
   _Depends: M9-02._
-  _Verify: `mise run test --filter 'UI|SEED|HIST'` and
-  `mise run bench --filter perf-11-pinned-key-slope`._
+  _Verify: `mise run test --filter 'UI|SEED|HIST'` and `mise run bench --filter
+perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
 - **M9-05** _(Infrastructure)_ — Give the arena core the same changed-boundary
   queue over `CogArenaDirtyPropagation.mark(row:atLeast:)`, using a spare
   `CogArenaStateFlags` bit for the dedupe, so the boundary test stays a scalar
   read on rows the propagation already visits.
   _Depends: M9-03, M9-04._
   _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-'UI|SEED|HIST'` and the arena slope benchmark._
+'UI|SEED|HIST'` and the arena slope benchmarks by exact name._
 - **M9-06** _(Behavior)_ — Turn the flat pinned-key slope green on both cores
   and record the measurement and its gate in `perf.md`.
   _Depends: M9-05._
