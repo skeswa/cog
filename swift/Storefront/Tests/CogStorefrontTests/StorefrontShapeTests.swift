@@ -1,0 +1,142 @@
+import Foundation
+import Testing
+
+@testable import CogStorefront
+
+/// The workload's shape, asserted rather than described.
+///
+/// A macrobenchmark is only representative of anything if its size is known, so
+/// these tests replace every "approximately" in the design with an exact
+/// constant or a mechanically checked range. They are cheap and they run in the
+/// package's ordinary suite, because a workload that silently grew a
+/// declaration would otherwise make every recorded number incomparable with the
+/// one before it.
+@Suite("Storefront workload shape")
+struct StorefrontShapeTests {
+  /// The declaration census, hand-written here and mechanically checked below.
+  ///
+  /// These are the numbers `perf.md` quotes. If a declaration is added or
+  /// removed, this test fails first and the record is updated deliberately
+  /// rather than drifting.
+  static let expectedDeclarationCounts: [String: Int] = [
+    "ManualCog": 12,
+    "ManualCogBox": 5,
+    "Cog": 18,
+    "CogBox": 8,
+    "AsyncCog": 7,
+    "AsyncCogBox": 3,
+  ]
+
+  /// The directory holding the module's sources, derived from this file's path.
+  static var sourcesDirectory: URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()  // CogStorefrontTests
+      .deletingLastPathComponent()  // Tests
+      .deletingLastPathComponent()  // Storefront
+      .appendingPathComponent("Sources")
+      .appendingPathComponent("CogStorefront")
+  }
+
+  /// Counts file-scope declarations of each Cog kind across the module.
+  ///
+  /// Syntax-only, deliberately: a census that resolved types would need a
+  /// compiler, and a census that trusted a hand-maintained list would not be a
+  /// census. A declaration is counted when a `let` binding at column zero is
+  /// initialized with one of the six nominal spellings.
+  static func declarationCounts() throws -> [String: Int] {
+    var counts: [String: Int] = [:]
+    let files = try FileManager.default.contentsOfDirectory(
+      at: sourcesDirectory,
+      includingPropertiesForKeys: nil
+    )
+    for file in files where file.pathExtension == "swift" {
+      let text = try String(contentsOf: file, encoding: .utf8)
+      for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        // File scope only: a declaration inside a type or a function is
+        // indented, and a local Cog is invisible to this census exactly as it
+        // is to CogLint's own classifier.
+        guard line.first != " ", line.contains("let ") else { continue }
+        for kind in ["ManualCogBox", "ManualCog", "AsyncCogBox", "AsyncCog", "CogBox", "Cog"] {
+          if line.contains("= \(kind)<") {
+            counts[kind, default: 0] += 1
+            break
+          }
+        }
+      }
+    }
+    return counts
+  }
+
+  @Test("the declaration census is exactly what perf.md records")
+  func declarationCensus() throws {
+    let counts = try Self.declarationCounts()
+    for (kind, expected) in Self.expectedDeclarationCounts {
+      #expect(counts[kind, default: 0] == expected, "\(kind) count drifted")
+    }
+  }
+
+  @Test("the standard profile is the representative workload v1")
+  func standardProfileShape() {
+    let profile = StorefrontProfile.standard
+    #expect(profile.productCount == 1_200)
+    #expect(profile.categoryCount == 24)
+    #expect(profile.visitedRowCount == 120)
+    #expect(profile.viewportRowCount == 30)
+    #expect(profile.pricingPolicyCount == 16)
+    #expect(profile.priceBookCount == 1)
+    #expect(profile.pricingStageCount == 16)
+  }
+
+  @Test("every profile's policy prefix is a real prefix of the ladder")
+  func policyPrefixIsReal() {
+    for profile in StorefrontProfile.all {
+      #expect(profile.pricingPolicyCount <= StorefrontPricing.ladder.count)
+      #expect(profile.pricingPolicyCount > 0)
+      #expect(profile.priceBookCount <= StorefrontPricing.PriceBook.allCases.count)
+    }
+  }
+
+  @Test("the stress profile is a substantially deeper pipeline")
+  func stressIsDeeper() {
+    #expect(StorefrontProfile.stress.pricingStageCount == 48)
+    #expect(
+      StorefrontProfile.stress.pricingStageCount
+        > StorefrontProfile.standard.pricingStageCount * 2
+    )
+  }
+
+  @Test("the longest meaningful dependency path is 20 to 24 nodes")
+  func longestPathIsInRange() {
+    // catalog → catalogProducts → productIndex → stage0 … stage16 →
+    // effectivePrice → productRow → the browse reaction.
+    let profile = StorefrontProfile.standard
+    let pathLength = 3 + (profile.pricingPolicyCount + 1) + 3
+    #expect(pathLength >= 20)
+    #expect(pathLength <= 24)
+  }
+
+  @Test("the standard catalog has the size and even category spread it claims")
+  func catalogShape() {
+    let profile = StorefrontProfile.standard
+    let catalog = StorefrontFixtures.catalog(for: profile)
+    #expect(catalog.products.count == profile.productCount)
+    #expect(catalog.categories.count == profile.categoryCount)
+    var perCategory: [CategoryID: Int] = [:]
+    for product in catalog.products { perCategory[product.category, default: 0] += 1 }
+    #expect(perCategory.count == profile.categoryCount)
+    let sizes = Set(perCategory.values)
+    #expect(sizes.count == 1, "products should be spread evenly across categories")
+  }
+
+  @Test("the search phase types one character per operation")
+  func searchPlanShape() {
+    #expect(StorefrontSession.searchTarget == "trail shoes")
+    #expect(StorefrontSession.searchPrefixes.count == StorefrontSession.searchTarget.count)
+    // "trail " and "trail" normalize the same way, so one prefix starts no new
+    // generation. The expectation is derived, not observed.
+    #expect(
+      StorefrontSession.distinctNormalizedQueries.count
+        == StorefrontSession.searchPrefixes.count - 1
+    )
+  }
+}
