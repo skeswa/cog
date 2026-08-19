@@ -1937,17 +1937,21 @@ perf-11-pinned-key-slope` reports the halved slope._
 - **M9-08** _(Infrastructure)_ — Replace the per-turn `CogTurnID` and `CogTurn`
   pair with one reused turn buffer and a monotonically increasing integer
   token. This removes two allocations and both `isolated deinit`s, whose
-  executor checks the profile found cost more than the allocations did.
+  executor checks the profile found cost more than the allocations did, and a
+  third allocation with them: the touched-source list grows from zero capacity
+  only because its owner is new every turn, so a reused owner retires it too.
   _Depends: M9-07._
   _Verify: `mise run test --filter 'TURN|ESC'` and `mise run test:release`,
   which is where a generic-class deinit regression would appear._
-- **M9-09** _(Infrastructure)_ — Reuse the capacity of the three arrays a turn
-  rebuilds: the touched-source list, the invalidation list, and the dependency
-  list, which reallocates today because `run(in:)` still holds the previous one
-  while clearing it.
+- **M9-09** _(Infrastructure)_ — Reuse the capacity of the two arrays a turn
+  rebuilds from a context-lived owner: the invalidation work list, and the
+  dependency list, which reallocates today because `run(in:)` still holds the
+  previous one while clearing it. The touched-source list is the third such
+  array but has no owner to reuse from until the turn object does, so it
+  belongs to `M9-08`.
   _Depends: M9-01._
   _Verify: `mise run test --filter 'GRAPH|TURN'` and a steady-turn allocation
-  count three lower than the recorded baseline._
+  count two lower than the recorded baseline._
 - **M9-10** _(Behavior)_ — Turn the zero-allocation steady-turn machinery green
   and record the new count and its gate in `perf.md`.
   _Depends: M9-08, M9-09._

@@ -155,6 +155,14 @@ public final class Cogs {
   /// it with slotted storage (perf §3), so lookups go through the methods below.
   internal private(set) var states: [CogStateIdentity: any CogState] = [:]
 
+  /// Reused work list for the invalidation walk in ``invalidateSubscribers(of:)``.
+  ///
+  /// Context-owned rather than local so a turn does not grow a fresh buffer from
+  /// zero capacity every time a source changes. The walk only assigns settle
+  /// marks and reads edges, so it cannot re-enter itself and one buffer per
+  /// context is enough; it always drains to empty, which is asserted in debug.
+  internal var invalidationWork: [(any CogState, CogSettleState)] = []
+
   /// States whose exact values have crossed the UI observation boundary.
   ///
   /// First UI reads append here in creation order. Flushes walk only these hot

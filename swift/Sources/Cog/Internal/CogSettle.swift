@@ -273,20 +273,21 @@ extension Cogs {
   /// least as strongly marked also cuts off that traversal branch, which both
   /// preserves DIRTY and bounds diamond propagation.
   internal func invalidateSubscribers(of producer: any CogState) {
-    var work: [(any CogState, CogSettleState)] = []
+    assert(invalidationWork.isEmpty, "The invalidation walk re-entered itself.")
+
     for edge in producer.subscribers {
       if let subscriber = edge.state {
-        work.append((subscriber, .dirty))
+        invalidationWork.append((subscriber, .dirty))
       }
     }
 
-    while let (state, requestedState) = work.popLast() {
+    while let (state, requestedState) = invalidationWork.popLast() {
       guard state.settleState < requestedState else { continue }
 
       state.settleState = requestedState
       for edge in state.subscribers {
         if let subscriber = edge.state {
-          work.append((subscriber, .check))
+          invalidationWork.append((subscriber, .check))
         }
       }
     }
