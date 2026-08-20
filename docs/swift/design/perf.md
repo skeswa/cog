@@ -1565,15 +1565,39 @@ pattern the two instruments show. It is a reading, not a result: resident memory
 is sampled and page-granular, and §9 already names reserving capacity from known
 descriptor counts as the fix if it matters.
 
-**Steady state allocates nothing net, on either core.**
-`perf-15-storefront-interactions` reports `mallocFreeDelta` and
-`memoryLeakedBytes` of **zero** at every percentile across thousands of samples
-on both cores: a favorite toggle, a cart quantity, a variant selection, and a
-two-source open-product verb allocate 19 (simple) or 12 (arena) and return all
-of them. The compute-only control likewise nets zero and reports identical
-figures on both cores — 5,603 allocations, 625 KB — which is the check that the
-rows above mean what they say, since it contains no graph for a core swap to
-change.
+**Steady state allocates nothing net, on either core** — same session, exact p90
+integers. One iteration of the quiescent interaction loop is a favorite toggle,
+a cart quantity, a variant selection, and the two-source open-product verb; one
+pass of the compute-only control runs all four kernels over the same catalog
+with no graph at all.
+
+| Measure                       | interactions, simple | interactions, arena | control, simple | control, arena |
+| ----------------------------- | -------------------: | ------------------: | --------------: | -------------: |
+| allocations made              |                   19 |                  12 |           5,603 |          5,603 |
+| allocations returned          |                   19 |                  12 |           5,603 |          5,603 |
+| **allocations that survived** |                **0** |               **0** |           **0** |          **0** |
+| gross bytes requested         |                3,448 |                 536 |         624,883 |        624,883 |
+| **bytes that survived**       |                **0** |               **0** |           **0** |          **0** |
+| object allocations            |                   19 |                  12 |           1,838 |          1,838 |
+| retains                       |               29,064 |                 903 |          11,366 |         11,366 |
+| releases                      |               78,976 |                 950 |          20,670 |         20,664 |
+| instructions                  |               19.8 M |              1.46 M |          12.9 M |         12.9 M |
+| wall clock                    |              1.26 ms |             77.9 µs |          643 µs |         587 µs |
+
+Both delta rows read **zero at every percentile** across thousands of samples on
+both cores. A shopper's interaction returns every byte it takes; nothing about a
+steady session grows the heap. That is the property a gate would eventually want,
+and it is already true.
+
+What moves is the gross column, and it moves the same way everything else in this
+workload does: the same four writes against the same graph request 3,448 bytes on
+the simple core against the arena's 536, and cost 29,064 retains against 903.
+
+The control is the check on all of it. Across the core swap it is **byte
+identical** — 5,603 allocations, 624,883 bytes, 1,838 object allocations, 11,366
+retains — differing only by six releases and wall-clock noise, because it holds
+no graph for a core swap to change. A comparison whose control moved would not be
+a comparison.
 
 **The Storefront application, first measurements** — `M10-07`, 2026-08-19,
 `mactop`, Xcode 26.4 (17E192), release configuration, on the **iPhone 17 Pro
@@ -1593,6 +1617,7 @@ measured region.
 | search interaction                  | CPU time, app process                         | 0.225 s | 3.37% |
 | search interaction                  | instructions retired, app process             | 2.38 GI | 1.75% |
 | search interaction                  | peak physical memory, app process             | 72.6 MB | 0.12% |
+| search interaction                  | absolute physical memory, app process         | 71.4 MB | 0.11% |
 | detail navigation                   | `NavigationTransition`                        | 0.517 s | 0.34% |
 | cart and checkout interaction       | `XCTClockMetric`                              | 2.234 s | 2.23% |
 | cart and checkout interaction       | instructions retired, app process             | 3.18 GI | 0.21% |
@@ -1628,10 +1653,13 @@ data from real devices reported through the Organizer, and is recorded here so
 that nobody invents a different number, not because this suite is measured
 against it.
 
-Two figures are deliberately not in the table. The per-iteration physical-memory
-_delta_ swings 39% and goes negative; the absolute and peak figures beside it
-are stable to a tenth of a percent and are the ones worth tracking. And nothing
-here is gated: the suite runs from `mise run test:storefront-ui` when a number
+One figure is deliberately not in the table: the per-iteration physical-memory
+_delta_, which swings 39% and goes negative and is unusable as anything. The
+absolute and peak figures beside it are stable to a tenth of a percent and are
+the ones worth tracking — and they are the whole app, a SwiftUI process with a
+120-product catalog, not the graph's own footprint. For that, read the
+`perf-15-storefront-footprint` entry above, which counts bytes rather than
+sampling residency. Nothing here is gated: the suite runs from `mise run test:storefront-ui` when a number
 is wanted, not on every pull request, because a six-and-a-half-minute timing
 test on a shared machine teaches people to rerun rather than to look.
 
