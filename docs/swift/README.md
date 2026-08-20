@@ -79,6 +79,12 @@ The design lives in [design/](./design/); the implementation effort lives in
     optimization record.** Where the time actually goes and what each change
     bought. Separate from item 11 because it is obtained with a sampler and
     purpose-built probes rather than with the benchmark suite.
+13. **[impl/arena-optimization-plan-2026-08-20.md](./impl/arena-optimization-plan-2026-08-20.md):
+    arena specialization research and design.** Frozen research report
+    answering `M9-26`'s open question: the evidence that an `@inlinable`
+    typed frontier can recover the arena core's measured specialization
+    ceiling with stable Swift, the ranked alternatives, and the staged proof
+    plan with go/no-go gates.
 
 ## Building and testing
 
