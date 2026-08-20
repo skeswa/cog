@@ -7,8 +7,10 @@
 /// happen — and a graph that quietly started computing something else fails it.
 ///
 /// The shadow is deliberately written the long way: plain loops over plain
-/// values, no caching, no graph. It is allowed to be slow, because it never
-/// runs inside a measured region.
+/// values, no graph. Correctness runs may evaluate it at every checkpoint. A
+/// benchmark prepares its fixture-derived immutable storage before timing,
+/// suppresses phase checks while timing, and evaluates only the final state
+/// after timing stops.
 public nonisolated struct StorefrontWorld: Sendable {
   /// The world's size.
   public let profile: StorefrontProfile
@@ -66,11 +68,9 @@ public nonisolated struct StorefrontWorld: Sendable {
 
   /// Products by identifier, built once.
   ///
-  /// Stored rather than computed, and the difference is not stylistic: the
-  /// shadow model runs *inside* the benchmark's measured region, and a computed
-  /// property here rebuilt a 1,200-entry dictionary several times per visible
-  /// row per checkpoint. A verification model that costs more than the graph it
-  /// verifies turns a macrobenchmark into a measurement of itself.
+  /// Stored rather than computed because correctness checkpoints consult this
+  /// index repeatedly, and rebuilding a 1,200-entry dictionary per read would
+  /// make verification unnecessarily expensive.
   public let productIndex: [ProductID: Product]
 
   /// Category by identifier, built once.

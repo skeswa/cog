@@ -79,14 +79,16 @@ extension StorefrontSessionDriver {
     check(phase: phase, "visible rows", expected: 0, actual: sink.visibleProductIDs.count)
     check(phase: phase, "browse runs", expected: 1, actual: sink.browseRuns)
     await awaitStarted([.catalog, .account, .searchIndex])
-    let started: [StorefrontRequestID] = await script.startedRequests
-    let names = started.map { $0.description }.sorted()
-    check(
-      phase: phase,
-      "root requests",
-      expected: "[account, catalog, searchIndex]",
-      actual: "[\(names.joined(separator: ", "))]"
-    )
+    if recordsCheckpoints {
+      let started: [StorefrontRequestID] = await script.startedRequests
+      let names = started.map { $0.description }.sorted()
+      check(
+        phase: phase,
+        "root requests",
+        expected: "[account, catalog, searchIndex]",
+        actual: "[\(names.joined(separator: ", "))]"
+      )
+    }
   }
 
   // MARK: - 2. Root data
@@ -156,12 +158,15 @@ extension StorefrontSessionDriver {
       expected: world.visibleChecksum,
       actual: sink.visibleChecksum
     )
-    check(
-      phase: phase,
-      "no duplicate inventory work",
-      expected: true,
-      actual: await inventoryRequestsAreUnique()
-    )
+    if recordsCheckpoints {
+      let inventoryRequestsAreUnique = await inventoryRequestsAreUnique()
+      check(
+        phase: phase,
+        "no duplicate inventory work",
+        expected: true,
+        actual: inventoryRequestsAreUnique
+      )
+    }
   }
 
   // MARK: - 4. Scroll
@@ -189,12 +194,15 @@ extension StorefrontSessionDriver {
       expected: world.visibleChecksum,
       actual: sink.visibleChecksum
     )
-    check(
-      phase: phase,
-      "no duplicate inventory work",
-      expected: true,
-      actual: await inventoryRequestsAreUnique()
-    )
+    if recordsCheckpoints {
+      let inventoryRequestsAreUnique = await inventoryRequestsAreUnique()
+      check(
+        phase: phase,
+        "no duplicate inventory work",
+        expected: true,
+        actual: inventoryRequestsAreUnique
+      )
+    }
   }
 
   // MARK: - 5. Search
@@ -246,7 +254,7 @@ extension StorefrontSessionDriver {
       actual: suggestionStarts < StorefrontSession.searchPrefixes.count
     )
 
-    let acceptedBeforeStale = sink.suggestions
+    let acceptedBeforeStale = recordsCheckpoints ? sink.suggestions : []
     // The stale generation completes *after* it was superseded. Cog must refuse
     // it: cancellation is advisory, and correctness comes from the generation
     // check rather than from old work cooperating.
@@ -259,15 +267,16 @@ extension StorefrontSessionDriver {
     )
 
     try await release(.suggestions(query: finalQuery))
-    let expectedSuggestions = StorefrontKernels.suggestions(
-      for: finalQuery,
-      products: catalog.products,
-      count: profile.suggestionCount
-    )
     check(
       phase: phase,
       "current generation accepted",
-      expected: describeStrings(expectedSuggestions),
+      expected: describeStrings(
+        StorefrontKernels.suggestions(
+          for: finalQuery,
+          products: catalog.products,
+          count: profile.suggestionCount
+        )
+      ),
       actual: describeStrings(sink.suggestions)
     )
     try await drainRequests()
@@ -427,22 +436,22 @@ extension StorefrontSessionDriver {
     try await release(.recommendations(accountID: world.shopper.accountID))
     try await release(.detail(id: id))
 
-    let expectedDetail = StorefrontFixtures.detail(for: product)
     check(
       phase: phase,
       "detail review count",
-      expected: expectedDetail.reviewCount,
+      expected: StorefrontFixtures.detail(for: product).reviewCount,
       actual: sink.detailReviewCount
-    )
-    let expectedRecommendations = StorefrontKernels.recommend(
-      products: catalog.products,
-      taste: world.shopper.taste,
-      count: profile.recommendationCount
     )
     check(
       phase: phase,
       "recommendations",
-      expected: describe(expectedRecommendations),
+      expected: describe(
+        StorefrontKernels.recommend(
+          products: catalog.products,
+          taste: world.shopper.taste,
+          count: profile.recommendationCount
+        )
+      ),
       actual: describe(sink.recommendations)
     )
 
@@ -557,18 +566,20 @@ extension StorefrontSessionDriver {
     await awaitStarted(
       halves.onScreen.map { .inventory(id: $0, generation: generation) }
     )
-    var undemandedStarts = 0
-    for id in halves.offScreen {
-      undemandedStarts += await script.startCount(
-        of: .inventory(id: id, generation: generation)
+    if recordsCheckpoints {
+      var undemandedStarts = 0
+      for id in halves.offScreen {
+        undemandedStarts += await script.startCount(
+          of: .inventory(id: id, generation: generation)
+        )
+      }
+      check(
+        phase: phase,
+        "undemanded half starts no work",
+        expected: 0,
+        actual: undemandedStarts
       )
     }
-    check(
-      phase: phase,
-      "undemanded half starts no work",
-      expected: 0,
-      actual: undemandedStarts
-    )
 
     let runsBeforeOnScreen = sink.browseRuns
     for id in halves.onScreen {
@@ -581,18 +592,20 @@ extension StorefrontSessionDriver {
       actual: sink.browseRuns > runsBeforeOnScreen
     )
 
-    var undemandedStartsAfter = 0
-    for id in halves.offScreen {
-      undemandedStartsAfter += await script.startCount(
-        of: .inventory(id: id, generation: generation)
+    if recordsCheckpoints {
+      var undemandedStartsAfter = 0
+      for id in halves.offScreen {
+        undemandedStartsAfter += await script.startCount(
+          of: .inventory(id: id, generation: generation)
+        )
+      }
+      check(
+        phase: phase,
+        "undemanded half still starts no work",
+        expected: 0,
+        actual: undemandedStartsAfter
       )
     }
-    check(
-      phase: phase,
-      "undemanded half still starts no work",
-      expected: 0,
-      actual: undemandedStartsAfter
-    )
 
     try await drainRequests()
     check(
@@ -608,7 +621,8 @@ extension StorefrontSessionDriver {
   /// Extracted from the burst phase so the async-burst benchmark cut can drive
   /// exactly this round trip repeatedly without replaying the ten phases ahead
   /// of it. It is the same commit, the same barrier, the same release order,
-  /// and the same shadow-model check the trace performs.
+  /// and the same graph settlement the trace performs. The benchmark validates
+  /// the resulting checksum and demanded set after stopping measurement.
   ///
   /// - Parameter generation: The generation to advance the touched rows to.
   /// - Returns: The products the burst touched.
@@ -616,18 +630,30 @@ extension StorefrontSessionDriver {
   public func runDemandedInventoryBurst(generation: Int) async throws -> [ProductID] {
     let touched = world.prefetchProductIDs
     guard !touched.isEmpty else { return [] }
-    cogs.publishInventoryBurst(touched, generation: generation)
     for id in touched { world.inventoryGenerations[id] = generation }
+    try await runInventoryBurst(touching: touched, generation: generation)
+    return touched
+  }
+
+  /// Publishes and settles one already-chosen inventory burst.
+  ///
+  /// The benchmark snapshots the demanded product identifiers before starting
+  /// its timer and calls this method inside it. Choosing those identifiers and
+  /// updating its shadow therefore remain verifier work outside the measured
+  /// round trip, while the graph commit, async tasks, responses, and reactions
+  /// remain inside.
+  ///
+  /// - Parameters:
+  ///   - touched: Products whose inventory generation changes.
+  ///   - generation: The generation to publish.
+  public func runInventoryBurst(
+    touching touched: [ProductID],
+    generation: Int
+  ) async throws {
+    guard !touched.isEmpty else { return }
+    cogs.publishInventoryBurst(touched, generation: generation)
     await awaitStarted(touched.map { .inventory(id: $0, generation: generation) })
     try await drainRequests()
-    guard sink.visibleChecksum == world.visibleChecksum else {
-      fatalError(
-        """
-        The Storefront inventory burst settled to a screen the shadow model does not agree         with. A benchmark that reported a number here would be timing the wrong graph.
-        """
-      )
-    }
-    return touched
   }
 
   // MARK: - 11. Teardown
@@ -646,11 +672,12 @@ extension StorefrontSessionDriver {
     await script.setIgnoresCancellation(false)
     let superseded = cogs.refreshRecommendations()
     cogs.refreshRecommendations()
+    let supersededOutcome = await superseded.outcome
     check(
       phase: phase,
       "superseded refresh",
       expected: "superseded",
-      actual: describeOutcome(await superseded.outcome)
+      actual: describeOutcome(supersededOutcome)
     )
     await script.setIgnoresCancellation(true)
     try await drainRequests()
@@ -703,7 +730,7 @@ extension StorefrontSessionDriver {
     }
   }
 
-  /// Releases every suspended request that is *not* a suggestion.
+  /// Releases every scheduled or suspended request that is *not* a suggestion.
   ///
   /// The search phase deliberately keeps two suggestion generations in flight,
   /// so its per-keystroke drain must leave them alone while still resolving the

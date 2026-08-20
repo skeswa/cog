@@ -61,6 +61,33 @@ public nonisolated enum StorefrontSession {
     }
   }
 
+  /// Describes one persistent steady-state interaction.
+  ///
+  /// The global iteration, rather than a sample-local index, determines every
+  /// value. That keeps successive benchmark samples from replaying a fixed
+  /// product-to-quantity mapping that becomes an equality-gated no-op once the
+  /// retained graph has seen its first sample.
+  ///
+  /// - Parameters:
+  ///   - iteration: Monotonic ordinal across warmups and reported samples.
+  ///   - products: Products the settled viewport may touch.
+  ///   - variantCount: Variants available on each fixture product.
+  /// - Returns: The interaction, or `nil` for an empty product set.
+  public static func steadyInteraction(
+    at iteration: Int,
+    products: [ProductID],
+    variantCount: Int
+  ) -> StorefrontSteadyInteraction? {
+    guard !products.isEmpty else { return nil }
+    let lap = iteration / products.count
+    return StorefrontSteadyInteraction(
+      productID: products[iteration % products.count],
+      quantity: (lap % 2) + 1,
+      variantIndex: (lap + 1) % max(1, variantCount),
+      viewRank: iteration + 1
+    )
+  }
+
   /// The row windows the scroll phase visits, in order.
   ///
   /// Down through the list a viewport at a time until
@@ -149,6 +176,33 @@ public nonisolated enum StorefrontSession {
   }
 }
 
+/// The four values one steady-state benchmark iteration writes.
+///
+/// Favorite state is absent because the operation always toggles it. The other
+/// three values are explicit so a test can prove their persistent sequence and
+/// the benchmark can replay the exact measured operations into its shadow.
+public nonisolated struct StorefrontSteadyInteraction: Sendable, Equatable {
+  /// Product the iteration touches.
+  public let productID: ProductID
+
+  /// Absolute cart quantity to write, always one or two.
+  public let quantity: Int
+
+  /// Variant to select.
+  public let variantIndex: Int
+
+  /// Monotonic recently-viewed rank.
+  public let viewRank: Int
+
+  /// Creates one planned interaction.
+  public init(productID: ProductID, quantity: Int, variantIndex: Int, viewRank: Int) {
+    self.productID = productID
+    self.quantity = quantity
+    self.variantIndex = variantIndex
+    self.viewRank = viewRank
+  }
+}
+
 /// One thing the session promised, and what actually happened.
 ///
 /// A value rather than an assertion so the same trace can be driven by a
@@ -202,6 +256,9 @@ public final class StorefrontSessionDriver {
   /// The runtime under measurement.
   public let cogs: Cogs
 
+  /// Durable reaction leases whose settled outputs the driver can validate.
+  public let holds: StorefrontMechanism.Holds
+
   /// Where held reactions deposit what they read.
   public let sink: StorefrontSink
 
@@ -216,6 +273,14 @@ public final class StorefrontSessionDriver {
 
   /// Everything the trace claimed, in the order it claimed it.
   public private(set) var checkpoints: [StorefrontCheckpoint] = []
+
+  /// Whether phase checks evaluate and record their expected and actual values.
+  ///
+  /// Correctness runs leave this enabled. A benchmark may disable it so the
+  /// measured region contains the application trace rather than the deliberately
+  /// slow shadow verifier, then call ``requireSettledOutput()`` after stopping
+  /// measurement to validate the sample's final state and request quiescence.
+  public let recordsCheckpoints: Bool
 
   /// The shadow model every checkpoint is derived from.
   ///
@@ -241,16 +306,29 @@ public final class StorefrontSessionDriver {
   /// - Parameters:
   ///   - profile: The world to build.
   ///   - holds: Which durable leases the mechanism registers.
+  ///   - preparedWorld: An immutable fixture-derived world prepared outside a
+  ///     measured region. The driver receives a value copy and mutates only it.
+  ///   - recordsCheckpoints: Whether phase checks evaluate and record values.
   ///   - grace: The `whileObserved` grace the runtime uses. Short by default so
   ///     the lifetime phase advances a test clock rather than a real one.
   public init(
     profile: StorefrontProfile,
     holds: StorefrontMechanism.Holds = .all,
+    preparedWorld: StorefrontWorld? = nil,
+    recordsCheckpoints: Bool = true,
     grace: Duration = .seconds(30)
   ) {
     self.profile = profile
-    world = StorefrontWorld(profile: profile)
-    catalog = StorefrontFixtures.catalog(for: profile)
+    self.holds = holds
+    self.recordsCheckpoints = recordsCheckpoints
+    let world = preparedWorld ?? StorefrontWorld(profile: profile)
+    guard world.profile == profile else {
+      fatalError(
+        "The Storefront driver received a \(world.profile.name) world for its \(profile.name) profile."
+      )
+    }
+    self.world = world
+    catalog = world.catalog
     let clock = TestClock()
     self.clock = clock
     let service = StorefrontService(profile: profile, mode: .scripted)
@@ -282,10 +360,12 @@ public final class StorefrontSessionDriver {
   ///
   /// - Parameter id: The request to release.
   public func release(_ id: StorefrontRequestID) async throws {
-    guard await script.isSuspended(id) else {
+    guard await script.isPending(id) else {
       fatalError(
         """
-        The Storefront driver tried to release \(id), which is not suspended. Awaiting a         completion that will never arrive is a hang rather than a failure, so this traps         instead: either the graph never demanded that request, or it was already released.
+        The Storefront driver tried to release \(id), which is neither scheduled nor suspended. \
+        Awaiting a completion that will never arrive is a hang rather than a failure, so this \
+        traps instead: either the graph never demanded that request, or it was already released.
         """
       )
     }
@@ -302,7 +382,7 @@ public final class StorefrontSessionDriver {
     await script.awaitStarted(ids)
   }
 
-  /// Releases every suspended request, newest first, until none remain.
+  /// Releases every scheduled or suspended request, newest first, until none remain.
   ///
   /// Newest first is the deliberate out-of-order rule: the graph must not be
   /// relying on completions arriving in request order, and releasing in
@@ -323,7 +403,7 @@ public final class StorefrontSessionDriver {
     }
     fatalError(
       """
-      The Storefront script still had suspended requests after \(roundLimit) drain rounds, \
+      The Storefront script still had outstanding requests after \(roundLimit) drain rounds, \
       which means releasing a request keeps starting new ones. That is a runaway demand \
       loop in the workload, not a slow benchmark.
       """
@@ -339,18 +419,19 @@ public final class StorefrontSessionDriver {
   ///   - name: What is being claimed.
   ///   - expected: What should have happened.
   ///   - actual: What did.
-  public func check(
+  public func check<Expected: CustomStringConvertible, Actual: CustomStringConvertible>(
     phase: String,
     _ name: String,
-    expected: some CustomStringConvertible,
-    actual: some CustomStringConvertible
+    expected: @autoclosure () -> Expected,
+    actual: @autoclosure () -> Actual
   ) {
+    guard recordsCheckpoints else { return }
     checkpoints.append(
       StorefrontCheckpoint(
         phase: phase,
         name: name,
-        expected: expected.description,
-        actual: actual.description
+        expected: expected().description,
+        actual: actual().description
       )
     )
   }
@@ -362,8 +443,9 @@ public final class StorefrontSessionDriver {
 
   /// Traps when any checkpoint failed.
   ///
-  /// Benchmarks call this before reporting a number, because a workload that
-  /// computed the wrong answer produces a timing that means nothing.
+  /// Correctness runs and benchmark setup call this outside measured regions,
+  /// because a workload that computed the wrong answer produces a timing that
+  /// means nothing.
   public func requireCheckpointsHold() {
     let failures = failures
     guard failures.isEmpty else {
@@ -373,6 +455,60 @@ public final class StorefrontSessionDriver {
         \(failures.map(\.failureDescription).joined(separator: "; "))
         """
       )
+    }
+  }
+
+  /// Validates the final rendered output and proves that the sample is quiet.
+  ///
+  /// This is intentionally separate from ``check(phase:_:expected:actual:)``:
+  /// benchmark cuts call it only after stopping their timers. It remains useful
+  /// with checkpoint recording disabled because it derives the expected digest
+  /// from the driver's independently updated shadow world at the final state.
+  /// - Parameter expectedWorld: A shadow updated outside the driver, such as
+  ///   the interaction cut's post-timing replay. Defaults to the trace's world.
+  public func requireSettledOutput(against expectedWorld: StorefrontWorld? = nil) async {
+    let expectedWorld = expectedWorld ?? world
+    guard expectedWorld.profile == profile else {
+      fatalError(
+        "The Storefront sample was checked against a \(expectedWorld.profile.name) world for its \(profile.name) profile."
+      )
+    }
+    let expectedIDs = expectedWorld.visibleProductIDs
+    guard sink.visibleProductIDs == expectedIDs else {
+      fatalError(
+        "The Storefront sample settled to \(sink.visibleProductIDs.count) visible products; the shadow expected \(expectedIDs.count)."
+      )
+    }
+    let expectedChecksum = expectedWorld.visibleChecksum
+    guard sink.visibleChecksum == expectedChecksum else {
+      fatalError(
+        "The Storefront sample settled to checksum \(sink.visibleChecksum); the shadow expected \(expectedChecksum)."
+      )
+    }
+    if holds.contains(.search) {
+      let normalizedQuery = StorefrontKernels.normalize(expectedWorld.query)
+      let expectedSuggestions = StorefrontKernels.suggestions(
+        for: normalizedQuery,
+        products: expectedWorld.catalog.products,
+        count: profile.suggestionCount
+      )
+      guard sink.suggestions == expectedSuggestions else {
+        fatalError(
+          "The Storefront sample settled to \(sink.suggestions.count) suggestions; the shadow expected \(expectedSuggestions.count)."
+        )
+      }
+    }
+    if holds.contains(.cart), !expectedWorld.cartLines.isEmpty {
+      let expectedTotal = expectedWorld.orderTotal()
+      guard sink.orderTotal == expectedTotal else {
+        fatalError(
+          "The Storefront sample settled to order total \(sink.orderTotal.totalCents); the shadow expected \(expectedTotal.totalCents)."
+        )
+      }
+    }
+    let outstandingCount = await script.outstandingCount
+    guard outstandingCount == 0 else {
+      fatalError("The Storefront sample ended with \(outstandingCount) outstanding requests.")
     }
   }
 

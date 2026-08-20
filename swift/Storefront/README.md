@@ -63,13 +63,19 @@ randomness, and no `Foundation` import anywhere in this target — a fixture tha
 folded case or trimmed whitespace by the host's locale rules would make the
 workload's inputs depend on device settings.
 
-Asynchrony is scripted rather than timed. `StorefrontScript` records every
-request under a semantic identity, lets a driver await the exact set that has
-**started**, and releases responses by name in a deliberately out-of-order
-sequence. Superseded requests stay suspended instead of resuming on
-cancellation, which is what keeps the headless driver free of races with Cog's
-one-shot async-completion acknowledgement — and what makes a stale completion
-something the driver can schedule on purpose rather than hope for.
+Asynchrony is scripted rather than timed. Every async selector registers its
+semantic request synchronously before returning work to Cog. `StorefrontScript`
+then moves that request from a lock-backed **scheduled** ledger to its actor's
+**started** and suspended ledgers. The driver can therefore drain work selected
+by the graph even when the task has not reached the service actor yet; an empty
+drain proves there is neither scheduled nor suspended work, rather than merely
+winning a scheduler race.
+
+The driver releases responses by name in a deliberately out-of-order sequence.
+Superseded requests stay suspended instead of resuming on cancellation, which
+keeps the headless driver free of races with Cog's one-shot async-completion
+acknowledgement — and makes a stale completion something the driver can schedule
+on purpose rather than hope for.
 
 ## Running it
 
@@ -83,15 +89,29 @@ COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
 mise run bench --filter 'perf-15-storefront-(cold|session|async-burst)'
 ```
 
-The correctness suite is the gate every reported number depends on: each
-benchmark cut calls `requireCheckpointsHold()` before it reports anything, so a
-workload that computed the wrong answer traps instead of producing a timing.
+The correctness suite is the gate every reported number depends on. It runs the
+trace with every phase checkpoint enabled. Reported samples disable those
+deliberately expensive checks while their timer is running, then compare the
+sample's final visible identifiers and rendered checksum with the independent
+shadow and require exactly zero outstanding requests after the timer stops.
+
+The same boundary applies to the specialized cuts. Inventory-burst identifiers
+are snapshotted before timing and their shadow generations advance afterward.
+The retained interaction cut primes one complete viewport lap before counters
+are armed, then uses one monotonic ordinal across warmups and samples, alternates
+each product's quantity between one and two, advances its variant every viewport
+lap, and replays the exact measured operations into the shadow after timing. The
+compute-only control's stable signature covers search, ranking, directly priced
+cart lines, promotions, and recommendations.
 
 ## The eleven-phase trace
 
 `StorefrontSessionDriver.runStandardTrace()` performs one fixed story —
 bootstrap, root data, initial row data, scroll, search, filters, cart, detail,
 checkout, inventory burst, teardown — and records a `StorefrontCheckpoint` at
-every claim. Expectations come from `StorefrontWorld`, a shadow model
-recomputed from the profile and the events the driver issued, never from a
-number copied out of a passing run.
+every claim when checkpoint recording is enabled. Expectations come from
+`StorefrontWorld`, a shadow model updated from the profile and the events the
+driver issued, never from a number copied out of a passing run. Benchmark cuts
+prepare its catalog, indexes, and lookup dictionaries before starting their
+timers; the runtime under measurement still obtains its own catalog through the
+scripted service.

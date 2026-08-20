@@ -34,6 +34,14 @@ public final class StorefrontSink {
   /// The products the last browse run found on screen, in list order.
   public private(set) var visibleProductIDs: [ProductID] = []
 
+  /// The products whose row state the last browse run demanded, in list order.
+  ///
+  /// This includes the visible window and its prefetch margin. The async-burst
+  /// benchmark uses the recorded set after timing to prove it touched exactly
+  /// the rows the measured reaction actually held, without reading the graph
+  /// inside the measured region.
+  public private(set) var demandedProductIDs: [ProductID] = []
+
   /// A digest of every visible row's rendered content, in order.
   ///
   /// Order-sensitive, so two screens showing the same products in a different
@@ -68,10 +76,12 @@ public final class StorefrontSink {
   ///
   /// - Parameters:
   ///   - visible: The visible products, in list order.
+  ///   - demanded: The visible and prefetched products whose rows were read.
   ///   - checksum: The digest of their rendered content.
-  func recordBrowse(visible: [ProductID], checksum: Int) {
+  func recordBrowse(visible: [ProductID], demanded: [ProductID], checksum: Int) {
     browseRuns += 1
     visibleProductIDs = visible
+    demandedProductIDs = demanded
     visibleChecksum = checksum
   }
 
@@ -247,7 +257,11 @@ public struct StorefrontMechanism: Mechanism {
         for id in prefetchProducts {
           _ = c[storefrontProductRowCogs[id]]
         }
-        sink.recordBrowse(visible: visibleProducts, checksum: checksum)
+        sink.recordBrowse(
+          visible: visibleProducts,
+          demanded: prefetchProducts,
+          checksum: checksum
+        )
       }
     }
 

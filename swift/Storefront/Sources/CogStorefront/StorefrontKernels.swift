@@ -449,7 +449,8 @@ public nonisolated enum StorefrontKernels {
     public let promotionDiscountCents: Int
     /// The first recommended product, or `nil` when the catalog is empty.
     public let topRecommendation: ProductID?
-    /// A digest of every number above, so one comparison covers the pass.
+    /// A digest of every semantic output in the pass, including ranked
+    /// identifiers and each directly priced cart line.
     public let checksum: Int
 
     /// Creates a result.
@@ -526,13 +527,29 @@ public nonisolated enum StorefrontKernels {
     let cartIDs = StorefrontSession.cartProductIDs(for: profile, catalog: catalog)
     let lines = cartIDs.enumerated().map { position, id -> CartLine in
       let product = catalog.products[id.raw]
+      let quantity = position + 1
+      let inventory = StorefrontFixtures.inventory(
+        for: id,
+        generation: 0,
+        profile: profile
+      )
       return CartLine(
         productID: id,
         name: product.name,
         variantIndex: 0,
-        quantity: position + 1,
-        unitPriceCents: prices[id.raw] ?? product.listPriceCents,
-        inStock: true
+        quantity: quantity,
+        unitPriceCents: StorefrontPricing.effectivePriceWithoutGraph(
+          product: product,
+          variantIndex: 0,
+          profile: profile,
+          shopper: shopper,
+          address: StorefrontFixtures.startingAddress,
+          inventory: inventory,
+          offer: StorefrontFixtures.offer(for: id, shopper: shopper),
+          coupon: StorefrontFixtures.sessionCoupon,
+          cartQuantity: quantity
+        ),
+        inStock: inventory.units(forVariant: 0) >= quantity
       )
     }
     let categories = Dictionary(
@@ -555,6 +572,12 @@ public nonisolated enum StorefrontKernels {
     checksum = mix(checksum, index.postings.count)
     checksum = mix(checksum, candidateOrdinals.count)
     for id in ranked.prefix(profile.viewportRowCount) { checksum = mix(checksum, id.raw) }
+    for line in lines {
+      checksum = mix(checksum, line.productID.raw)
+      checksum = mix(checksum, line.quantity)
+      checksum = mix(checksum, line.unitPriceCents)
+      checksum = mix(checksum, line.inStock ? 1 : 0)
+    }
     checksum = mix(checksum, plan.discountCents)
     for id in recommended { checksum = mix(checksum, id.raw) }
 

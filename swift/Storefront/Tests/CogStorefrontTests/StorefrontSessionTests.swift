@@ -4,10 +4,10 @@ import Testing
 
 /// The standard interaction trace, run end to end on the smoke profile.
 ///
-/// This is the correctness gate every reported number depends on. A benchmark
-/// preconditions on the same checkpoints before it prints anything, so a
-/// failure here is a failure there — the difference is only that this suite
-/// reports each failed claim by name instead of trapping on the first.
+/// This is the detailed correctness gate every reported number depends on.
+/// Benchmarks keep these deliberately expensive phase checks outside their
+/// measured regions and validate each sample's final shadow digest and exact
+/// request quiescence after timing instead.
 @Suite("Storefront session")
 @MainActor
 struct StorefrontSessionTests {
@@ -28,9 +28,9 @@ struct StorefrontSessionTests {
   /// quarter of a second in release, so putting it in a debug unit suite would
   /// buy one more assertion at the cost of every other test's turnaround. It is
   /// not skipped, though: `perf-15-storefront-session` runs the same trace in
-  /// release and calls `requireCheckpointsHold()` before it reports a number,
-  /// so no measurement of the standard profile is ever published without every
-  /// checkpoint holding.
+  /// release, and this suite proves the complete trace semantics on the
+  /// structurally identical smoke profile while the benchmark validates each
+  /// standard-profile sample's final shadow digest after timing.
   @Test("a standard cold start holds every checkpoint")
   func standardColdStartHoldsEveryCheckpoint() async throws {
     let driver = StorefrontSessionDriver(profile: .standard)
@@ -51,5 +51,29 @@ struct StorefrontSessionTests {
       #expect(checkpoint.holds, "\(checkpoint.failureDescription)")
     }
     #expect(driver.sink.visibleProductIDs.count == StorefrontProfile.smoke.viewportRowCount)
+  }
+
+  @Test("draining immediately includes selected tasks that have not begun")
+  func immediateDrainSeesScheduledRequests() async throws {
+    let driver = StorefrontSessionDriver(profile: .smoke)
+
+    let released = try await driver.drainRequests()
+
+    #expect(released > 0)
+    #expect(await driver.service.script.outstandingCount == 0)
+  }
+
+  @Test("an early release consumes the synchronously scheduled request")
+  func earlyReleaseConsumesScheduledRequest() async throws {
+    let script = StorefrontScript(mode: .scripted)
+    script.schedule(.catalog)
+
+    #expect(await script.pendingRequestIDs == [.catalog])
+    #expect(await script.outstandingCount == 1)
+    await script.release(.catalog)
+    try await script.begin(.catalog)
+
+    #expect(await script.startCount(of: .catalog) == 1)
+    #expect(await script.outstandingCount == 0)
   }
 }

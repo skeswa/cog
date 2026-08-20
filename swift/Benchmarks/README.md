@@ -496,9 +496,31 @@ rows, new rows start inventory and offer requests, and a measured region that
 starts async work is not a region process-global counters may be attached to.
 Search cost is measured by the session cut, on wall clock alone.
 
+Its retained state does not reset between samples, so neither does its operation
+sequence. Before counters are armed, one complete viewport lap materializes
+every keyed source and stabilizes the cart and favorite collections. A monotonic
+ordinal then rotates across the visible products, alternates each product's cart
+quantity between one and two on successive laps, advances its variant, toggles
+its favorite, and assigns a new view rank. After the timer stops, the harness
+replays that exact ordinal range into the plain Storefront shadow and compares
+the rendered checksum. This prevents the cut from quietly becoming a loop of
+equality-gated writes after its first sample.
+
 The compute-only control is reported **beside** the application cuts and never
 subtracted from them. It is also the check on the core comparison: it contains
-no graph, so swapping cores must not move it.
+no graph, so swapping cores must not move it. Its cart products are priced
+directly through the same sixteen-policy kernel rather than looked up in the
+search-candidate price table; the two product sets need not overlap. A committed
+semantic checksum test covers those prices along with search, ranking,
+promotions, stock state, and recommendations.
+
+The correctness verifier is outside every reported timing. Cold and session
+drivers reuse immutable fixture-derived shadow storage prepared before
+`startMeasurement()`, suppress phase checkpoint evaluation until the timer is
+stopped, and then require the final visible identifiers, rendered checksum, and
+zero-outstanding-request ledger to agree. The burst cut likewise chooses its
+demanded identifiers before timing and advances its shadow after timing. The
+package correctness suite runs the detailed phase-by-phase checks.
 
 ```console
 mise run bench --filter 'perf-15-storefront-.*'

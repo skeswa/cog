@@ -1378,7 +1378,42 @@ refresh under memory pressure, cold-launch disk I/O, any real network, and any
 device that is not the one named beside a number. It is one session, one
 shopper, one fixture seed.
 
-**The Storefront macrobenchmark, first measurements** — `M10-05`, 2026-08-19,
+**Measurement-integrity correction** — 2026-08-20. A review found five defects
+in the first Storefront harness and workload:
+
+- cold and session timings built an independent shadow catalog and evaluated
+  its expensive checkpoints inside `startMeasurement()` / `stopMeasurement()`;
+- draining saw only requests that had reached the service actor, leaving a gap
+  for graph-selected tasks that had not begun executing;
+- the retained interaction cut reset its index per sample and mapped every
+  product to one fixed quantity, so later samples increasingly measured
+  equality-gated no-ops and never checked their rendered result;
+- every pricing stage read the product index and selected variant even when its
+  policy did not use either input, widening invalidation below the graph shape
+  this workload claims to represent; and
+- the compute control looked cart prices up in the search-candidate table even
+  though the standard cart products are not search candidates, silently falling
+  back to list prices instead of running their pricing ladders.
+
+The corrected harness prepares immutable shadow fixtures before timing,
+suppresses phase-check evaluation during reported samples, and validates the
+final shadow digest after timing. Async selectors register requests
+synchronously in a scheduled-work ledger before returning their tasks; a drain
+is complete only when both that ledger and the actor's suspended set are empty.
+Steady interactions use one monotonic sequence across warmups and samples,
+alternate quantities, advance variants, and replay into the shadow after the
+timer. Pricing stages now read only policy inputs. The control prices every cart
+line directly, and a committed semantic signature covers its whole output.
+
+These are workload and measurement-boundary changes, not an optimization. All
+Storefront numbers recorded before this correction — including the headless
+core ratios, steady allocation tables, resident-memory readings, footprint
+table, and simulator UI figures below — are retained as an audit trail but are
+**withdrawn as current evidence**. They must not be compared with corrected
+runs or used to choose a core. No replacement numbers are recorded here until
+both cores and the UI application are rerun under their pinned environments.
+
+**The Storefront macrobenchmark, first measurements — withdrawn** — `M10-05`, 2026-08-19,
 `mactop` (Apple Silicon arm64, 12 cores, 24 GB), Xcode 26.4 (17E192) / Apple
 Swift 6.3, release, harness 1.36.2 with the malloc interposer. Standard profile,
 **simple core** (the shipping default). Report-only: no committed threshold, for
@@ -1419,10 +1454,10 @@ linearly (300 → 1,720 M, 600 → 3,142 M, 1,200 → 7,998 M), so it is a const
 factor rather than an algorithmic blow-up. **Attributing that constant is not
 done**, and `M10-09` owns the disposition.
 
-**The Storefront macrobenchmark across cores** — `M10-08`, same host, toolchain,
-and session. Both cores measured back to back on the standard profile, and every
-cut checked its own visible identifiers, money totals, accepted generations, and
-checksum before reporting, on both.
+**The Storefront macrobenchmark across cores — withdrawn** — `M10-08`, same
+host, toolchain, and session. Both cores were measured back to back on the
+standard profile. The old harness evaluated its checks inside the measured
+region, which is one of the defects corrected above.
 
 | Cut                                  | simple p50 | arena p50 |     arena is |
 | ------------------------------------ | ---------: | --------: | -----------: |
@@ -1466,8 +1501,9 @@ environment before it moves anything. `M10-09` owns the disposition, and the
 first question it has to answer is whether the simple core's wide-selector cost
 is a defect with a fix rather than a reason to swap cores.
 
-**What the Storefront graph costs to hold** — `M10-05`, 2026-08-19, same host
-and toolchain, standard profile. `perf-15-storefront-footprint` builds the
+**What the Storefront graph cost to hold — historical, remeasure required** —
+`M10-05`, 2026-08-19, same host and toolchain, standard profile.
+`perf-15-storefront-footprint` builds the
 catalog-wide keyed funnel — one eligibility state and one score state per
 product, plus the two keyless nodes that gather them, **2,402 states** — and
 measures it with the interposer's counters rather than with sampled resident
@@ -1542,7 +1578,7 @@ list and updates a version when the next edge names the same producer: O(1) when
 dependency order is stable, integer indices throughout, no weak load and no ARC.
 It maintains the same two directions; it is not doing less bookkeeping.
 
-**Resident memory, with iteration counts pinned** — same session. The earlier
+**Resident memory, with iteration counts pinned — withdrawn** — same session. The earlier
 reading of these columns was taken with only a duration budget, which let the
 arena run 135 cold iterations against the simple core's 10 and 54 sessions
 against 2. That comparison said the arena's absolute peak was roughly twice the
@@ -1565,8 +1601,10 @@ pattern the two instruments show. It is a reading, not a result: resident memory
 is sampled and page-granular, and §9 already names reserving capacity from known
 descriptor counts as the fix if it matters.
 
-**Steady state allocates nothing net, on either core** — same session, exact p90
-integers. One iteration of the quiescent interaction loop is a favorite toggle,
+**Steady-state allocation — withdrawn** — same session, exact p90 integers. The
+old interaction sequence is one of the defects corrected above, so its zero-net
+result does not describe the corrected workload. One iteration of the
+quiescent interaction loop is a favorite toggle,
 a cart quantity, a variant selection, and the two-source open-product verb; one
 pass of the compute-only control runs all four kernels over the same catalog
 with no graph at all.
@@ -1599,7 +1637,8 @@ retains — differing only by six releases and wall-clock noise, because it hold
 no graph for a core swap to change. A comparison whose control moved would not be
 a comparison.
 
-**The Storefront application, first measurements** — `M10-07`, 2026-08-19,
+**The Storefront application, first measurements — historical, remeasure
+required** — `M10-07`, 2026-08-19,
 `mactop`, Xcode 26.4 (17E192), release configuration, on the **iPhone 17 Pro
 simulator running iOS 26.4 (23E244), arm64**. The **smoke** profile, not the
 standard one: a simulator UI run is six and a half minutes at 120 products and

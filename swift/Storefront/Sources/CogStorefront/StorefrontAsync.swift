@@ -26,6 +26,7 @@ public let storefrontCatalogCog = AsyncCog<CatalogSnapshot>(
   name: "storefront.catalog"
 ) { c in
   let storefrontService = c[storefrontServiceCog]
+  storefrontService.schedule(.catalog)
   return .run { @concurrent in
     try await storefrontService.catalog()
   }
@@ -42,6 +43,7 @@ public let storefrontAccountCog = AsyncCog<Shopper?>(
   name: "storefront.account"
 ) { c in
   let storefrontService = c[storefrontServiceCog]
+  storefrontService.schedule(.account)
   return .run { @concurrent in
     try await storefrontService.account()
   }
@@ -61,6 +63,7 @@ public let storefrontSearchIndexCog = AsyncCog<StorefrontKernels.SearchIndex>(
 ) { c in
   let storefrontService = c[storefrontServiceCog]
   let catalogProducts = c[storefrontCatalogProductsCog]
+  storefrontService.schedule(.searchIndex)
   return .run { @concurrent in
     try await storefrontService.searchIndex(products: catalogProducts)
   }
@@ -79,8 +82,9 @@ public let storefrontSuggestionsCog = AsyncCog<[String]>(
   let storefrontService = c[storefrontServiceCog]
   let normalizedQuery = c[storefrontNormalizedQueryCog]
   let catalogProducts = c[storefrontCatalogProductsCog]
+  guard !normalizedQuery.isEmpty else { return .run { [] } }
+  storefrontService.schedule(.suggestions(query: normalizedQuery))
   return .run { @concurrent in
-    guard !normalizedQuery.isEmpty else { return [] }
     return try await storefrontService.suggestions(
       query: normalizedQuery,
       products: catalogProducts
@@ -99,8 +103,9 @@ public let storefrontRecommendationsCog = AsyncCog<[ProductID]>(
   let storefrontService = c[storefrontServiceCog]
   let catalogProducts = c[storefrontCatalogProductsCog]
   let signedInShopper = c[signedInShopperCog]
+  guard let signedInShopper else { return .run { [] } }
+  storefrontService.schedule(.recommendations(accountID: signedInShopper.accountID))
   return .run { @concurrent in
-    guard let signedInShopper else { return [] }
     return try await storefrontService.recommendations(
       products: catalogProducts,
       shopper: signedInShopper
@@ -122,6 +127,7 @@ public let storefrontInventoryCogs = AsyncCogBox<InventoryReading, ProductID>(
 ) { c, id in
   let storefrontService = c[storefrontServiceCog]
   let inventoryGeneration = c[inventoryGenerationCogs[id]]
+  storefrontService.schedule(.inventory(id: id, generation: inventoryGeneration))
   return .run { @concurrent in
     try await storefrontService.inventory(for: id, generation: inventoryGeneration)
   }
@@ -137,8 +143,9 @@ public let storefrontOfferCogs = AsyncCogBox<PersonalizedOffer, ProductID>(
 ) { c, id in
   let storefrontService = c[storefrontServiceCog]
   let signedInShopper = c[signedInShopperCog]
+  guard let signedInShopper else { return .run { .none } }
+  storefrontService.schedule(.offer(id: id))
   return .run { @concurrent in
-    guard let signedInShopper else { return .none }
     return try await storefrontService.offer(for: id, shopper: signedInShopper)
   }
 }
@@ -156,8 +163,9 @@ public let storefrontDetailCogs = AsyncCogBox<ProductDetail, ProductID>(
 ) { c, id in
   let storefrontService = c[storefrontServiceCog]
   let productIndex = c[storefrontProductIndexCog]
+  guard let product = productIndex[id] else { return .run { .empty } }
+  storefrontService.schedule(.detail(id: id))
   return .run { @concurrent in
-    guard let product = productIndex[id] else { return .empty }
     return try await storefrontService.detail(for: product)
   }
 }
@@ -180,10 +188,17 @@ public let storefrontShippingQuoteCog = AsyncCog<ShippingQuote>(
   let shippingAddress = c[shippingAddressCog]
   let shippingMethod = c[shippingMethodCog]
   let cartLineIDs = c[storefrontCartLineIDsCog]
+  guard !cartLineIDs.isEmpty else { return .run { .pending } }
+  storefrontService.schedule(
+    .shippingQuote(
+      subtotalCents: discountedSubtotal,
+      market: shippingAddress.market,
+      method: shippingMethod
+    )
+  )
   return .run { @concurrent in
     // An empty cart is not a shipment. Quoting one would be a request no
     // storefront makes and a benchmark artifact nobody wants to explain.
-    guard !cartLineIDs.isEmpty else { return .pending }
     return try await storefrontService.shippingQuote(
       subtotalCents: discountedSubtotal,
       address: shippingAddress,
@@ -207,10 +222,13 @@ public let storefrontTaxQuoteCog = AsyncCog<TaxQuote>(
   let discountedSubtotal = c[storefrontDiscountedSubtotalCog]
   let shippingAddress = c[shippingAddressCog]
   let cartLineIDs = c[storefrontCartLineIDsCog]
+  guard !cartLineIDs.isEmpty else { return .run { .pending } }
+  storefrontService.schedule(
+    .taxQuote(subtotalCents: discountedSubtotal, market: shippingAddress.market)
+  )
   return .run { @concurrent in
     // Nothing in an empty cart is taxable, and asking is a request a real
     // checkout screen never sends.
-    guard !cartLineIDs.isEmpty else { return .pending }
     return try await storefrontService.taxQuote(
       discountedSubtotalCents: discountedSubtotal,
       address: shippingAddress

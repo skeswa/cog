@@ -295,12 +295,11 @@ public let storefrontPrefetchProductIDsCog = Cog<[ProductID]>(
 /// coupon stage and everything below it, and nothing above it.
 public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
   { c, key in
-    let productIndex = c[storefrontProductIndexCog]
-    guard let product = productIndex[key.productID] else { return 0 }
-    let selectedVariant = c[selectedVariantCogs[key.productID]]
-    let variantIndex = min(max(0, selectedVariant), max(0, product.variants.count - 1))
-
     guard let policy = key.policy, let previous = key.previous else {
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
+      let selectedVariant = c[selectedVariantCogs[key.productID]]
+      let variantIndex = min(max(0, selectedVariant), max(0, product.variants.count - 1))
       return StorefrontPricing.basePrice(
         product: product,
         book: key.book,
@@ -317,8 +316,12 @@ public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
       let signedInShopper = c[signedInShopperCog]
       return StorefrontPricing.membershipTier(cents, tier: signedInShopper?.tier ?? .guest)
     case .categoryCampaign:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
       return StorefrontPricing.categoryCampaign(cents, category: product.category)
     case .couponCode:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
       let coupon = c[couponCog]
       let storefrontService = c[storefrontServiceCog]
       return StorefrontPricing.couponCode(
@@ -331,12 +334,20 @@ public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
       let cartQuantity = c[cartQuantityCogs[key.productID]]
       return StorefrontPricing.bundleQuantity(cents, cartQuantity: cartQuantity)
     case .inventoryMarkdown:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
+      let selectedVariant = c[selectedVariantCogs[key.productID]]
+      let variantIndex = min(max(0, selectedVariant), max(0, product.variants.count - 1))
       let storefrontInventory = c[storefrontInventoryCogs[key.productID]]
       return StorefrontPricing.inventoryMarkdown(
         cents,
         availableUnits: storefrontInventory.units(forVariant: variantIndex)
       )
     case .clearance:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
+      let selectedVariant = c[selectedVariantCogs[key.productID]]
+      let variantIndex = min(max(0, selectedVariant), max(0, product.variants.count - 1))
       let storefrontInventory = c[storefrontInventoryCogs[key.productID]]
       return StorefrontPricing.clearance(
         cents,
@@ -350,15 +361,23 @@ public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
         loyaltyPoints: signedInShopper?.loyaltyPoints ?? 0
       )
     case .variantPremium:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
+      let selectedVariant = c[selectedVariantCogs[key.productID]]
+      let variantIndex = min(max(0, selectedVariant), max(0, product.variants.count - 1))
       let delta =
         product.variants.isEmpty ? 0 : product.variants[variantIndex].priceDeltaCents
       return StorefrontPricing.variantPremium(cents, delta: delta)
     case .ecoLevy:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
       return StorefrontPricing.ecoLevy(cents, category: product.category)
     case .shippingSubsidy:
       let shippingMethod = c[shippingMethodCog]
       return StorefrontPricing.shippingSubsidy(cents, method: shippingMethod)
     case .competitorMatch:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
       return StorefrontPricing.competitorMatch(cents, product: product)
     case .recentlyViewedNudge:
       let recentlyViewedRank = c[recentlyViewedRankCogs[key.productID]]
@@ -367,6 +386,8 @@ public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
       let storefrontOffer = c[storefrontOfferCogs[key.productID]]
       return StorefrontPricing.personalizedOffer(cents, offer: storefrontOffer)
     case .priceFloor:
+      let productIndex = c[storefrontProductIndexCog]
+      guard let product = productIndex[key.productID] else { return 0 }
       return StorefrontPricing.priceFloor(cents, product: product)
     case .charmRounding:
       return StorefrontPricing.charmRounding(cents)

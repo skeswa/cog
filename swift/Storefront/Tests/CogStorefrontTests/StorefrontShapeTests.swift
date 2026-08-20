@@ -139,4 +139,77 @@ struct StorefrontShapeTests {
         == StorefrontSession.searchPrefixes.count - 1
     )
   }
+
+  @Test("steady interactions keep changing retained per-product state")
+  func steadyInteractionSequence() throws {
+    let products = [ProductID(7), ProductID(11), ProductID(13)]
+    let first = try #require(
+      StorefrontSession.steadyInteraction(at: 0, products: products, variantCount: 4)
+    )
+    let nextLap = try #require(
+      StorefrontSession.steadyInteraction(at: products.count, products: products, variantCount: 4)
+    )
+    let thirdLap = try #require(
+      StorefrontSession.steadyInteraction(
+        at: products.count * 2,
+        products: products,
+        variantCount: 4
+      )
+    )
+
+    #expect(first.productID == nextLap.productID)
+    #expect(first.quantity == 1)
+    #expect(nextLap.quantity == 2)
+    #expect(thirdLap.quantity == 1)
+    #expect(first.variantIndex == 1)
+    #expect(nextLap.variantIndex == 2)
+    #expect(thirdLap.variantIndex == 3)
+    #expect(first.viewRank == 1)
+    #expect(nextLap.viewRank == 4)
+    #expect(thirdLap.viewRank == 7)
+  }
+
+  @Test("the standard compute control has a stable semantic signature")
+  func computeControlSignature() {
+    let profile = StorefrontProfile.standard
+    let catalog = StorefrontFixtures.catalog(for: profile)
+    let shopper = StorefrontFixtures.shopper(for: profile)
+    let index = StorefrontKernels.buildSearchIndex(products: catalog.products)
+    let candidates = Set(
+      StorefrontKernels.candidates(
+        in: index,
+        tokens: StorefrontKernels.tokenize(StorefrontSession.searchTarget),
+        productCount: catalog.products.count
+      ).map(ProductID.init)
+    )
+    let cartIDs = StorefrontSession.cartProductIDs(for: profile, catalog: catalog)
+    #expect(candidates.isDisjoint(with: cartIDs))
+    #expect(
+      cartIDs.enumerated().contains { position, id in
+        let product = catalog.products[id.raw]
+        return StorefrontPricing.effectivePriceWithoutGraph(
+          product: product,
+          variantIndex: 0,
+          profile: profile,
+          shopper: shopper,
+          address: StorefrontFixtures.startingAddress,
+          inventory: StorefrontFixtures.inventory(
+            for: id,
+            generation: 0,
+            profile: profile
+          ),
+          offer: StorefrontFixtures.offer(for: id, shopper: shopper),
+          coupon: StorefrontFixtures.sessionCoupon,
+          cartQuantity: position + 1
+        ) != product.listPriceCents
+      }
+    )
+    let result = StorefrontKernels.computeControl(for: profile, catalog: catalog)
+
+    // This covers the search index, ranking, directly priced cart lines,
+    // promotion plan, and recommendations. Change it deliberately when the
+    // representative workload changes; a mere implementation change should
+    // preserve it.
+    #expect(result.checksum == 1_907_130_560_780_147_234)
+  }
 }

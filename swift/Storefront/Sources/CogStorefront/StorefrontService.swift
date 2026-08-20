@@ -1,3 +1,5 @@
+import os
+
 /// The deterministic request boundary every async declaration in the workload
 /// selects.
 ///
@@ -51,6 +53,19 @@ public nonisolated struct StorefrontService: Sendable {
   public init(profile: StorefrontProfile, mode: Mode = .immediate) {
     self.profile = profile
     script = StorefrontScript(mode: mode)
+  }
+
+  /// Registers work selected synchronously by the graph before its task starts.
+  ///
+  /// Selection and execution are two different scheduler events. Recording the
+  /// request here closes the gap between them: the scripted driver can see and
+  /// release work even when Cog has created its task but that task has not yet
+  /// reached ``StorefrontScript/begin(_:)``. Immediate services record through
+  /// the same path so both modes exercise identical bookkeeping.
+  ///
+  /// - Parameter id: The semantic request the selector chose.
+  func schedule(_ id: StorefrontRequestID) {
+    script.schedule(id)
   }
 
   // MARK: - Requests
@@ -237,6 +252,22 @@ public nonisolated enum StorefrontRequestID: Hashable, Sendable, CustomStringCon
 /// generation — and a dictionary keyed only by request identity would lose the
 /// first continuation and hang the run.
 public actor StorefrontScript {
+  /// Synchronously selected work that has not reached ``begin(_:)`` yet.
+  ///
+  /// This ledger is lock-backed rather than actor-isolated because an async-cog
+  /// selector must register its request synchronously on the MainActor before it
+  /// hands Cog a task. The actor consumes the matching entry as the task begins.
+  private nonisolated let scheduled = OSAllocatedUnfairLock(initialState: ScheduledState())
+
+  /// Mutable state protected by ``scheduled``.
+  private struct ScheduledState {
+    /// How many selected tasks of each identity have not begun.
+    var counts: [StorefrontRequestID: Int] = [:]
+
+    /// Every not-yet-begun task in selection order.
+    var order: [StorefrontRequestID] = []
+  }
+
   /// How this script answers.
   private let mode: StorefrontService.Mode
 
@@ -288,10 +319,44 @@ public actor StorefrontScript {
 
   // MARK: - The request side
 
+  /// Records one synchronously selected request before Cog launches its task.
+  ///
+  /// Nonisolated so the async selector can make the request visible without an
+  /// actor hop. ``begin(_:)`` consumes exactly one matching entry later.
+  ///
+  /// - Parameter id: The semantic request the selector chose.
+  nonisolated func schedule(_ id: StorefrontRequestID) {
+    scheduled.withLock { state in
+      state.counts[id, default: 0] += 1
+      state.order.append(id)
+    }
+  }
+
+  /// Removes one scheduled entry as its task reaches the service actor.
+  ///
+  /// - Parameter id: The request that began.
+  private nonisolated func consumeScheduled(_ id: StorefrontRequestID) {
+    scheduled.withLock { state in
+      guard let count = state.counts[id], count > 0 else {
+        fatalError("The Storefront service began \(id) without scheduling it first.")
+      }
+      if count == 1 {
+        state.counts.removeValue(forKey: id)
+      } else {
+        state.counts[id] = count - 1
+      }
+      guard let index = state.order.firstIndex(of: id) else {
+        fatalError("The Storefront scheduled-request order lost \(id).")
+      }
+      state.order.remove(at: index)
+    }
+  }
+
   /// Records that a request started, and — in `scripted` mode — waits.
   ///
   /// - Parameter id: What started.
   func begin(_ id: StorefrontRequestID) async throws {
+    consumeScheduled(id)
     startCounts[id, default: 0] += 1
     startOrder.append(id)
     resumeSatisfiedStartWaiters()
@@ -442,14 +507,14 @@ public actor StorefrontScript {
 
   /// Releases every currently suspended request, oldest first.
   public func releaseAll() {
-    for id in startOrder where queued[id] != nil {
+    for id in pendingRequestIDs {
       release(id)
     }
   }
 
   // MARK: - Inspection
 
-  /// Whether this identity has at least one suspended ticket right now.
+  /// Whether this identity is selected or suspended and can therefore be released.
   ///
   /// A driver checks this before releasing, because releasing an identity that
   /// is not suspended is silently recorded as an early release — and a driver
@@ -458,8 +523,9 @@ public actor StorefrontScript {
   ///
   /// - Parameter id: Which request.
   /// - Returns: Whether it can be released now.
-  public func isSuspended(_ id: StorefrontRequestID) -> Bool {
-    queued[id]?.isEmpty == false
+  public func isPending(_ id: StorefrontRequestID) -> Bool {
+    if queued[id]?.isEmpty == false { return true }
+    return scheduled.withLock { $0.counts[id, default: 0] > 0 }
   }
 
   /// How many times a request has started.
@@ -479,13 +545,18 @@ public actor StorefrontScript {
   /// How many requests are suspended right now.
   public var suspendedCount: Int { suspended.count }
 
+  /// Selected or suspended requests that have not completed yet.
+  public var outstandingCount: Int {
+    suspended.count + scheduled.withLock { state in state.counts.values.reduce(0, +) }
+  }
+
   /// Declared explicitly rather than synthesized, matching the repository's
   /// rule for every other reference type here. An actor's deinit is nonisolated
   /// by default, so this changes nothing today; it exists so a reader does not
   /// have to know that to be sure.
   nonisolated deinit {}
 
-  /// Every request identity with at least one suspended ticket, in start order.
+  /// Every request identity with selected or suspended work, in demand order.
   ///
   /// A driver releases from this list *reversed*, which is the cheapest honest
   /// way to be deliberately out of order: the newest request lands first and
@@ -496,6 +567,10 @@ public actor StorefrontScript {
     var result: [StorefrontRequestID] = []
     for id in startOrder where queued[id] != nil {
       if seen.insert(id).inserted { result.append(id) }
+    }
+    let scheduledOrder = scheduled.withLock { $0.order }
+    for id in scheduledOrder where seen.insert(id).inserted {
+      result.append(id)
     }
     return result
   }

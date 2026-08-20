@@ -25,11 +25,14 @@ enum StorefrontHarness {
   /// from either would mean nothing.
   static let profile = StorefrontProfile.standard
 
+  /// Fixture-derived verifier storage prepared outside every measured region.
+  static let preparedWorld = StorefrontWorld(profile: profile)
+
   /// The catalog the compute-only control scores, built once.
   ///
   /// Fixture construction is not part of what the control measures — it is the
   /// *input* — so it happens here rather than inside the measured region.
-  static let controlCatalog = StorefrontFixtures.catalog(for: profile)
+  static let controlCatalog = preparedWorld.catalog
 
   // MARK: - Cold start
 
@@ -40,21 +43,45 @@ enum StorefrontHarness {
   /// viewport's inventory and offers. This is the only cut that measures what a
   /// graph costs to *create*, which every other benchmark in this package
   /// deliberately warms away.
-  static func runColdStart() async throws {
-    let driver = StorefrontSessionDriver(profile: profile, holds: .all)
+  static func runColdStart(preparedWorld: StorefrontWorld) async throws
+    -> StorefrontSessionDriver
+  {
+    let driver = StorefrontSessionDriver(
+      profile: profile,
+      holds: .all,
+      preparedWorld: preparedWorld,
+      recordsCheckpoints: false
+    )
     try await driver.runColdStart()
-    driver.requireCheckpointsHold()
     blackHole(driver.sink.visibleChecksum)
+    return driver
   }
 
   // MARK: - Whole session
 
   /// Runs the complete standard interaction trace.
-  static func runSession() async throws {
-    let driver = StorefrontSessionDriver(profile: profile, holds: .all)
+  static func runSession(preparedWorld: StorefrontWorld) async throws -> StorefrontSessionDriver {
+    let driver = StorefrontSessionDriver(
+      profile: profile,
+      holds: .all,
+      preparedWorld: preparedWorld,
+      recordsCheckpoints: false
+    )
     try await driver.runStandardTrace()
-    driver.requireCheckpointsHold()
     blackHole(driver.sink.visibleChecksum)
+    return driver
+  }
+
+  /// Validates one measured driver only after its timer has stopped.
+  ///
+  /// The phase-by-phase verifier is the Storefront package's correctness gate.
+  /// A reported sample instead proves its final independent shadow digest and
+  /// exact request quiescence here, keeping verifier kernels out of the timing.
+  static func validateMeasuredDriver(
+    _ driver: StorefrontSessionDriver,
+    against world: StorefrontWorld? = nil
+  ) async {
+    await driver.requireSettledOutput(against: world)
   }
 
   // MARK: - Quiescent interactions
@@ -65,8 +92,17 @@ enum StorefrontHarness {
   /// Products the interaction loop touches, all of them on screen.
   static var interactionProducts: [ProductID] = []
 
-  /// Monotonic rank the multi-source verb hands out.
-  static var interactionRank = 0
+  /// Shadow state replayed only after each measured interaction batch.
+  static var interactionWorld: StorefrontWorld?
+
+  /// Monotonic interaction ordinal across warmups and reported samples.
+  static var interactionIteration = 0
+
+  /// A measured range whose operations can be replayed after timing.
+  struct InteractionBatch: Sendable {
+    /// First global interaction ordinal in the batch.
+    let range: Range<Int>
+  }
 
   /// Builds and settles the interaction runtime exactly once.
   ///
@@ -77,15 +113,24 @@ enum StorefrontHarness {
   /// scripted service is left with nothing outstanding.
   static func settleInteractions() async throws {
     guard interactionDriver == nil else { return }
-    let driver = StorefrontSessionDriver(profile: profile, holds: .quiescentBrowse)
+    let driver = StorefrontSessionDriver(
+      profile: profile,
+      holds: .quiescentBrowse,
+      preparedWorld: preparedWorld
+    )
     try await driver.runColdStart()
     driver.requireCheckpointsHold()
-    precondition(
-      !driver.sink.visibleProductIDs.isEmpty,
-      "The Storefront interaction cut settled with nothing on screen."
-    )
+    guard !driver.sink.visibleProductIDs.isEmpty else {
+      fatalError("The Storefront interaction cut settled with nothing on screen.")
+    }
     interactionProducts = driver.sink.visibleProductIDs
+    interactionWorld = driver.world
     interactionDriver = driver
+    // Materialize every keyed source and stabilize the cart and favorite
+    // collections before process-global counters are armed. The next lap still
+    // changes all four values; this only makes "steady" mean already built.
+    let primingBatch = runInteractions(interactionProducts.count)
+    await validateInteractions(primingBatch)
   }
 
   /// Drives `count` synchronous interactions against the settled runtime.
@@ -101,21 +146,68 @@ enum StorefrontHarness {
   /// session cut instead, on wall clock alone.
   ///
   /// - Parameter count: How many iterations to drive.
-  static func runInteractions(_ count: Int) {
+  static func runInteractions(_ count: Int) -> InteractionBatch {
     guard let driver = interactionDriver else {
       fatalError("The Storefront interaction cut was driven before it was settled.")
     }
     let cogs = driver.cogs
     let products = interactionProducts
-    for index in 0..<count {
-      let id = products[index % products.count]
-      cogs.toggleFavorite(id)
-      cogs.setCartQuantity(index % 3, for: id)
-      cogs.selectVariant(index % max(1, profile.variantCount), for: id)
-      interactionRank += 1
-      cogs.openProduct(id, rank: interactionRank)
+    let start = interactionIteration
+    let end = start + count
+    for iteration in start..<end {
+      guard
+        let interaction = StorefrontSession.steadyInteraction(
+          at: iteration,
+          products: products,
+          variantCount: profile.variantCount
+        )
+      else {
+        fatalError("The Storefront interaction cut has no settled products.")
+      }
+      cogs.toggleFavorite(interaction.productID)
+      cogs.setCartQuantity(interaction.quantity, for: interaction.productID)
+      cogs.selectVariant(interaction.variantIndex, for: interaction.productID)
+      cogs.openProduct(interaction.productID, rank: interaction.viewRank)
     }
+    interactionIteration = end
     blackHole(driver.sink.visibleChecksum)
+    return InteractionBatch(range: start..<end)
+  }
+
+  /// Replays a measured batch into the plain shadow and validates its output.
+  ///
+  /// Replay is outside the measured region. Quantities alternate between one
+  /// and two on successive laps, variants advance on every lap, favorites
+  /// always toggle, and ranks are globally monotonic; no persistent sample can
+  /// degrade into repeatedly writing the values it already holds.
+  static func validateInteractions(_ batch: InteractionBatch) async {
+    guard let driver = interactionDriver, var world = interactionWorld else {
+      fatalError("The Storefront interaction batch was validated before it was settled.")
+    }
+    let products = interactionProducts
+    for iteration in batch.range {
+      guard
+        let interaction = StorefrontSession.steadyInteraction(
+          at: iteration,
+          products: products,
+          variantCount: profile.variantCount
+        )
+      else {
+        fatalError("The Storefront interaction replay has no settled products.")
+      }
+      let id = interaction.productID
+      if world.favorites.contains(id) {
+        world.favorites.remove(id)
+      } else {
+        world.favorites.insert(id)
+      }
+      world.cartQuantities[id] = interaction.quantity
+      if !world.cartContents.contains(id) { world.cartContents.append(id) }
+      world.variants[id] = interaction.variantIndex
+      world.viewRanks[id] = interaction.viewRank
+    }
+    interactionWorld = world
+    await validateMeasuredDriver(driver, against: world)
   }
 
   // MARK: - Footprint
@@ -151,7 +243,11 @@ enum StorefrontHarness {
   /// index and produces a list of ordinals, and it creates not one per-product
   /// state, which is what leaves the whole funnel for the measured region.
   static func prepareFootprint() async throws {
-    let driver = StorefrontSessionDriver(profile: profile, holds: [.account])
+    let driver = StorefrontSessionDriver(
+      profile: profile,
+      holds: [.account],
+      preparedWorld: preparedWorld
+    )
 
     // Demand the roots. Tracked, never `peek`: a one-shot peek renews a
     // `whileObserved` grace sleeper, which is a task and an allocation, and
@@ -202,14 +298,15 @@ enum StorefrontHarness {
   ///
   /// - Parameter rankedCount: What ``materializeFootprint()`` returned.
   static func retainFootprint(rankedCount: Int) {
-    precondition(
-      rankedCount == profile.productCount,
-      """
-      The Storefront footprint cut ranked \(rankedCount) products where the profile has \
-      \(profile.productCount). The state count this cut reports allocations for is derived \
-      from that number, so a timing taken here would be a cost with no denominator.
-      """
-    )
+    guard rankedCount == profile.productCount else {
+      fatalError(
+        """
+        The Storefront footprint cut ranked \(rankedCount) products where the profile has \
+        \(profile.productCount). The state count this cut reports allocations for is derived \
+        from that number, so a timing taken here would be a cost with no denominator.
+        """
+      )
+    }
     guard let driver = pendingFootprintContext else {
       fatalError("The Storefront footprint cut retained a context it never prepared.")
     }
@@ -233,13 +330,39 @@ enum StorefrontHarness {
   /// Which generation the next burst publishes.
   static var burstGeneration = 0
 
+  /// Shadow state advanced only after each measured burst.
+  static var burstWorld: StorefrontWorld?
+
+  /// Inputs selected before one burst timer starts.
+  struct BurstInput: Sendable {
+    /// Rows the held browse reaction currently demands.
+    let touched: [ProductID]
+
+    /// Inventory generation published by this burst.
+    let generation: Int
+  }
+
   /// Builds and settles the burst runtime exactly once.
   static func settleBurst() async throws {
     guard burstDriver == nil else { return }
-    let driver = StorefrontSessionDriver(profile: profile, holds: .quiescentBrowse)
+    let driver = StorefrontSessionDriver(
+      profile: profile,
+      holds: .quiescentBrowse,
+      preparedWorld: preparedWorld
+    )
     try await driver.runColdStart()
     driver.requireCheckpointsHold()
+    burstWorld = driver.world
     burstDriver = driver
+  }
+
+  /// Snapshots one burst's inputs outside the measured region.
+  static func prepareBurst() -> BurstInput {
+    guard let driver = burstDriver else {
+      fatalError("The Storefront burst cut was prepared before it was settled.")
+    }
+    burstGeneration += 1
+    return BurstInput(touched: driver.sink.demandedProductIDs, generation: burstGeneration)
   }
 
   /// Publishes one inventory burst, accepts every response, and settles.
@@ -248,14 +371,30 @@ enum StorefrontHarness {
   /// one multi-key commit, the requests the demanded rows start, the
   /// acceptance of each response, the graph settlement each acceptance causes,
   /// and the observation work that re-renders the affected rows.
-  static func runBurst() async throws {
+  static func runBurst(_ input: BurstInput) async throws {
     guard let driver = burstDriver else {
       fatalError("The Storefront burst cut was driven before it was settled.")
     }
-    burstGeneration += 1
-    let touched = try await driver.runDemandedInventoryBurst(generation: burstGeneration)
-    precondition(!touched.isEmpty, "The Storefront burst cut touched no rows.")
+    try await driver.runInventoryBurst(touching: input.touched, generation: input.generation)
     blackHole(driver.sink.visibleChecksum)
+  }
+
+  /// Validates a measured inventory burst after its timer has stopped.
+  static func validateBurst(_ input: BurstInput) async {
+    guard let driver = burstDriver, var world = burstWorld else {
+      fatalError("The Storefront burst cut was validated before it was settled.")
+    }
+    guard !input.touched.isEmpty else {
+      fatalError("The Storefront burst cut touched no rows.")
+    }
+    guard input.touched == driver.sink.demandedProductIDs else {
+      fatalError(
+        "The Storefront burst touched \(input.touched.count) rows but the browse reaction demanded \(driver.sink.demandedProductIDs.count)."
+      )
+    }
+    for id in input.touched { world.inventoryGenerations[id] = input.generation }
+    burstWorld = world
+    await validateMeasuredDriver(driver, against: world)
   }
 
   // MARK: - Compute-only control
@@ -266,13 +405,19 @@ enum StorefrontHarness {
   /// Differencing two noisy measurements produces a third, noisier number that
   /// looks authoritative and is not; printing both and letting a reader see the
   /// ratio is honest and just as useful.
-  static func runComputeControl() {
-    let result = StorefrontKernels.computeControl(for: profile, catalog: controlCatalog)
-    precondition(
-      result.indexedTokens > 0 && result.candidateCount > 0,
-      "The Storefront compute control produced an empty index or no candidates."
-    )
+  static func runComputeControl(
+    catalog: CatalogSnapshot
+  ) -> StorefrontKernels.ComputeControlResult {
+    let result = StorefrontKernels.computeControl(for: profile, catalog: catalog)
     blackHole(result.checksum)
+    return result
+  }
+
+  /// Validates the compute-only result after its timer has stopped.
+  static func validateComputeControl(_ result: StorefrontKernels.ComputeControlResult) {
+    guard result.indexedTokens > 0, result.candidateCount > 0 else {
+      fatalError("The Storefront compute control produced an empty index or no candidates.")
+    }
   }
 }
 
@@ -324,8 +469,9 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
     try await StorefrontHarness.settleInteractions()
     let count = benchmark.scaledIterations.count
     benchmark.startMeasurement()
-    await StorefrontHarness.runInteractions(count)
+    let batch = await StorefrontHarness.runInteractions(count)
     benchmark.stopMeasurement()
+    await StorefrontHarness.validateInteractions(batch)
   }
 
   Benchmark(
@@ -337,9 +483,11 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
+    let catalog = await StorefrontHarness.controlCatalog
     benchmark.startMeasurement()
-    await StorefrontHarness.runComputeControl()
+    let result = await StorefrontHarness.runComputeControl(catalog: catalog)
     benchmark.stopMeasurement()
+    await StorefrontHarness.validateComputeControl(result)
   }
 
   // What a catalog-wide keyed funnel costs to *build and hold*.
@@ -418,9 +566,11 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
+    let preparedWorld = await StorefrontHarness.preparedWorld
     benchmark.startMeasurement()
-    try await StorefrontHarness.runColdStart()
+    let driver = try await StorefrontHarness.runColdStart(preparedWorld: preparedWorld)
     benchmark.stopMeasurement()
+    await StorefrontHarness.validateMeasuredDriver(driver)
   }
 
   Benchmark(
@@ -434,9 +584,11 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
     )
   ) { benchmark in
     try await StorefrontHarness.settleBurst()
+    let input = await StorefrontHarness.prepareBurst()
     benchmark.startMeasurement()
-    try await StorefrontHarness.runBurst()
+    try await StorefrontHarness.runBurst(input)
     benchmark.stopMeasurement()
+    await StorefrontHarness.validateBurst(input)
   }
 
   Benchmark(
@@ -449,8 +601,10 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
+    let preparedWorld = await StorefrontHarness.preparedWorld
     benchmark.startMeasurement()
-    try await StorefrontHarness.runSession()
+    let driver = try await StorefrontHarness.runSession(preparedWorld: preparedWorld)
     benchmark.stopMeasurement()
+    await StorefrontHarness.validateMeasuredDriver(driver)
   }
 }
