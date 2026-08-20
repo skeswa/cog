@@ -21,10 +21,121 @@ purpose-built probes rather than with the benchmark suite. How to run the suite,
 its pinned tool matrix, its quiescence rules, and how a committed threshold is
 encoded are in [`swift/Benchmarks/README.md`](../../../swift/Benchmarks/README.md).
 
-Entries appear in the order they were recorded, and they back-reference each
-other — "same session and environment" means the entry above. Nothing here is
-reordered for tidiness, and a withdrawn entry is struck through in its heading
-rather than deleted, because an audit trail that loses its mistakes is not one.
+Below the summary that follows, entries appear in the order they were recorded,
+and they back-reference each other — "same session and environment" means the
+entry above. Nothing is reordered for tidiness, and a withdrawn entry keeps its
+place with the withdrawal in its heading rather than being deleted, because an
+audit trail that loses its mistakes is not one. The summary is the exception: it
+is assembled from those entries rather than being one of them, and it names the
+record behind every figure it quotes.
+
+## Where the two cores stand
+
+The most pressing open question in this record is which implementation to carry
+forward, so it goes first. The shipping default is the **simple core** —
+class states, edge arrays — selected by `M6-12a`. The **arena core** — scalar
+columns and a shared linked edge pool — stays behind `COG_TEST_CORE=arena` as a
+behaviour-equivalent research build. `M9-18` owns the decision to revisit that,
+and it has not been recorded yet.
+
+Everything below is assembled from standing records only. **Every Storefront
+number in this document is withdrawn** by the measurement-integrity correction,
+and contributes nothing to this summary — which matters, because the Storefront
+was the one workload built to answer this question on an application shape.
+
+### What each core currently wins
+
+Warm execution, from `M9-23` — the most recent measurement, after `M9-22` and
+`M9-23` removed the arena's exclusivity and metadata costs:
+
+| Shape                 |   simple |    arena | winner           |
+| --------------------- | -------: | -------: | ---------------- |
+| steady turn, p50      | 1,639 ns | 1,337 ns | arena, by 18%    |
+| steady turn, retains  |       62 |       38 | arena            |
+| 16-consumer fan, p50  |    37 µs |    13 µs | arena, by 2.8×   |
+| 100-node chain, p50   |   128 µs |    94 µs | arena, by 27%    |
+| pinned-key turn, p50  |  ~2.2 µs |  ~2.6 µs | **simple**, ~15% |
+| allocations, all four |        0 |        0 | tie              |
+
+Construction, from `M9-25` — seven paired runs of a thousand-state keyed graph,
+built and settled in a fresh context each time:
+
+| Measure                        |    simple |     arena | winner              |
+| ------------------------------ | --------: | --------: | ------------------- |
+| build + settle + teardown, p50 | ~1,068 µs | ~2,320 µs | **simple**, by 2.2× |
+| resident-memory delta, p50     | ~1,345 KB | ~1,541 KB | not separable       |
+
+The memory row is not a result: the ranges overlap so heavily that the arena's
+best run is below the simple core's worst. Route F is still open, and answering
+it needs a counted probe rather than this sampled metric.
+
+So the trade, stated plainly: **the arena is faster to run and slower to build**,
+and it carries a third to a half of the simple core's ARC traffic — which is
+perf §5's rule, still unmet by the shipping core and still the largest single
+item in its steady turn.
+
+### One thing here is inferred, not measured
+
+The four whole-graph shapes — diamond, deep, broad, unstable — were last
+measured at `M9-17`, whose arena column is superseded. `M9-22` and `M9-23` then
+took 21% and a further 22% off the arena's turn, which is enough to turn
+`M9-17`'s one arena loss (deep, by 20%) into a win. That is why `M9-23` and the
+`M9-18` charter both read "the arena wins every whole-graph shape".
+
+**Nobody has re-run that table.** It is an inference from two measured
+improvements, and it should be re-measured before it decides anything.
+
+### Both remaining arena losses are the same defect
+
+`M9-26` traced the 2.2× build cost to the erased-storage crossing: an arena
+state is split across scalar columns and a per-descriptor generic
+`CogArenaValueColumn<Value>`, reached through an `AnyObject` and recovered as
+its concrete type at every touch. That instantiates metadata and looks up
+witness tables, and construction pays it per state.
+
+`M9-23`'s memo files the resolved slot-and-column pair on the declaration and
+removes that cost — but **only for a keyless declaration**, because one
+declaration names a whole keyed family and a single-entry memo would thrash
+between its members. The build workload is a hundred percent keyed. So the
+arena's build loss and its pinned-key loss are not two problems; they are one
+problem seen twice, and the route out of both is specialization rather than
+another cache.
+
+### The judgement
+
+**Keep the simple core as the default today.** Not because it wins — on warm
+execution it does not — but because the evidence that would decide the question
+is missing, a core swap is a representation change with a release implication,
+and `M6-12a` already took this decision once on weaker evidence than we have
+now.
+
+**But the arena has the better cost/benefit going forward**, and that is a
+different question from which one ships today. Two reasons:
+
+- **The trend.** The arena lost the smallest turn by 10% at `M6-11c`, by 34% at
+  `M9-17`, and now wins it by 18% — without ever changing its representation.
+  Every one of those gains came from removing an overhead the profile located.
+- **The nature of what is left.** The simple core's dominant remaining cost is
+  ARC in graph walks, which is intrinsic to class states and existential
+  dependency arrays — you do not fix it without becoming something like the
+  arena. The arena's dominant remaining cost is unspecialized generic code,
+  which is a compiler-visible problem with a known route.
+
+One is a property of the design; the other is a build-output problem. That
+asymmetry, not any current number, is the strongest argument in the record.
+
+### What would move the decision
+
+1. **A rerun of the corrected Storefront macrobenchmark on both cores.**
+   Synthetic shapes cannot answer "better for an application", which is why this
+   workload exists; its numbers are withdrawn and it has not been rerun.
+2. **Whether specialization is reachable without widening the public API.**
+   `M9-24` and `M9-26` reached the same conclusion from opposite ends. If it is
+   reachable, the trade collapses into a straight win and the question is
+   settled. If it is not, the trade stands and app shape decides.
+3. **A re-measured whole-graph table**, so the claim above rests on a
+   measurement rather than on arithmetic applied to a superseded one.
+4. **A counted footprint probe**, since the sampled one cannot separate them.
 
 ## Representation: allocation, ARC, and footprint
 
