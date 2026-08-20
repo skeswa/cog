@@ -608,7 +608,7 @@ query caching.
   gating yet).
 - Compare the three value-reference layouts (inline `AnyHashable`, interned tokens,
   generic keyed value references) on keyed diamonds and key churn. Record results in
-  [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
+  [impl/benchmarks.md](./benchmarks.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6. Every behavior scenario
   implemented through M5 must pass under each value-reference layout selected by
@@ -626,7 +626,7 @@ query caching.
   per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
-  perf.md; only then settle the layout. Because this rewrite owns the settle
+  impl/benchmarks.md; only then settle the layout. Because this rewrite owns the settle
   walk, it also carries the cold first-read frame cycle `M4-14` measured: nine
   of the eleven frames per cold link are Cog's own, so collapsing them raises
   that bound for free.
@@ -652,7 +652,7 @@ query caching.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
   (perf §9.3–§9.5). Enable `baseline check` gating in CI: the noise-free
   `mallocCountTotal == 0` threshold plus generous absolute time thresholds.
-  Update perf.md and §10 with what the data settled.
+  Update impl/benchmarks.md and exploration §10 with what the data settled.
 - Tag `0.2.0` when the data-oriented core replaces the simple one (`M6-13`
   executes whichever outcome `M6-12a` records). If it does not, record why
   the simple core stays. After `M6-12b` approves that release candidate (or
@@ -750,7 +750,7 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
 ### M9: Shared turn machinery and O(changed) notices
 
 M9 acts on the post-M6 performance backlog (issue #373) with the profile
-`M6-12a` asked for actually in hand. `M9-01` recorded it — perf.md §9.6,
+`M6-12a` asked for actually in hand. `M9-01` recorded it — impl/optimization.md,
 "Post-M6 call-site profile" — and it reordered that backlog. The routes worth
 scheduling are the ones in **shared** machinery, which no core swap can reach,
 because about six percent of a steady turn is Cog's own compiled code and the
@@ -838,7 +838,7 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   application without production telemetry, so this is a **representative
   workload v1**: the scale is an explicit, configurable, asserted choice rather
   than a claim about real apps. `M10-01` settles it, `StorefrontShapeTests`
-  checks it mechanically, and `perf.md` records both what it covers and what it
+  checks it mechanically, and `impl/benchmarks.md` records both what it covers and what it
   does not.
 - **Correct before fast.** Every cut proves its own work before reporting:
   visible identifiers, exact money totals in integer cents, accepted async
@@ -864,7 +864,7 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   runtime diagnostic disabled, on one pinned device, orientation, locale, Dynamic
   Type setting, fixture, and row height. Its hitch and timing figures are a
   pinned regression signal; an absolute hitch-ratio target belongs on a pinned
-  physical device, and `perf.md` says so rather than borrowing Apple's Organizer
+  physical device, and `impl/benchmarks.md` says so rather than borrowing Apple's Organizer
   thresholds as if they applied.
 - **Not in scope.** Committed CI thresholds, a physical-device lane, and
   attribution of the cold-start cost to call sites. `M10-09` is where those are
@@ -940,7 +940,7 @@ a graph, measured headlessly and again through a real SwiftUI interface.
 
 - Settled decisions → exploration §10 and the [README.md](../README.md)
   "Where things stand" snapshot.
-- Benchmark results → perf.md; representation choices stay open until
+- Benchmark results → impl/benchmarks.md; representation choices stay open until
   measured.
 - Build, test, and bench commands → `CLAUDE.md` and `AGENTS.md`, in sync.
 - New documents → mapped in `docs/swift/README.md` or the root `README.md`.
@@ -977,8 +977,8 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   deploys before publishing the GitHub Release.
 - M5 (`M5-10`): run-count tests are green under every value-reference candidate selected
   by `COG_TEST_VALUE_REFERENCE_LAYOUT`; `box[key]` creation measures
-  `mallocCountTotal == 0` and steady turns hold the cost perf.md records;
-  value-reference layout numbers are recorded in perf.md before the choice settles.
+  `mallocCountTotal == 0` and steady turns hold the cost impl/benchmarks.md records;
+  value-reference layout numbers are recorded in impl/benchmarks.md before the choice settles.
 - M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
   arena edge candidate; `mise run test:cores` is green; edge-layout and
   runtime-comparison numbers are recorded before choices settle; the default
@@ -997,7 +997,7 @@ a graph, measured headlessly and again through a real SwiftUI interface.
 - M10 (`M10-10`): the Storefront workload's correctness and shape suites green;
   the five headless cuts registered and reporting under both cores; the release
   UI performance suite executing on the pinned simulator; linter and formatter
-  clean; `perf.md` §9.6 carrying the measurements, their environment, and the
+  clean; `impl/benchmarks.md` carrying the measurements, their environment, and the
   workload's stated limits.
 - Always: formatting and task-ledger checks clean; path-filtered CI green.
 

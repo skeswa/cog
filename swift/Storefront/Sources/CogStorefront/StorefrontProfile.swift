@@ -164,7 +164,7 @@ public nonisolated struct StorefrontProfile: Sendable, Equatable {
   /// The scale is an explicit choice rather than a measurement of real apps:
   /// 1,200 products over 24 categories, 120 distinct rows visited in one
   /// session, about 30 rows materialized at a time, and a 16-policy pricing
-  /// ladder. `perf.md` records what it covers and, just as importantly, what
+  /// ladder. `impl/benchmarks.md` records what it covers and, just as importantly, what
   /// it does not.
   public static let standard = StorefrontProfile(
     name: "standard",

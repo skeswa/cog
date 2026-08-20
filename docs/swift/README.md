@@ -47,9 +47,10 @@ The design lives in [design/](./design/); the implementation effort lives in
 4. **[design/rx.md](./design/rx.md): Rx mapping (§5.4).** How common stream
    operators map to state dependencies, async policies, and real event
    streams.
-5. **[design/perf.md](./design/perf.md): implementation and benchmarks.** The
-   planned data-oriented core and the tests that must choose its physical
-   layout.
+5. **[design/perf.md](./design/perf.md): performance architecture.** The cost
+   order, the data-oriented core, the ARC and exclusivity rules, and the
+   measurement plan that chooses the physical layout. Design only — the numbers
+   it produced live in items 11 and 12.
 6. **[design/prior-art.md](./design/prior-art.md): prior-art review.** The
    swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
    two libraries line up, tracked reads versus capture lists, and the
@@ -69,6 +70,15 @@ The design lives in [design/](./design/); the implementation effort lives in
     into dependency-aware tasks of half an engineering day or less, each with
     explicit closing verification; every scenario is covered by exactly one
     task's _Greens:_ line.
+11. **[impl/benchmarks.md](./impl/benchmarks.md): benchmark results.** Every
+    number the measurement plan has produced, with the environment that
+    produced it, the decision it drove, and the withdrawal when a measurement
+    turned out not to be trustworthy. Split out of design/perf.md, which had
+    become four fifths results.
+12. **[impl/optimization.md](./impl/optimization.md): profiling and
+    optimization record.** Where the time actually goes and what each change
+    bought. Separate from item 11 because it is obtained with a sampler and
+    purpose-built probes rather than with the benchmark suite.
 
 ## Building and testing
 
@@ -388,7 +398,7 @@ debug-history tools, and persistence helpers. Also open are several
 edge behaviors: debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by
-the measurements in design/perf.md §9.6.
+the measurements in impl/benchmarks.md.
 
 ## Prior art
 

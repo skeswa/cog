@@ -1,5 +1,5 @@
 // The `M9-01` call-site attribution harness. See
-// `../../../M9-01-call-site-attribution.md` for the method, and perf.md §9.6
+// `../../../M9-01-call-site-attribution.md` for the method, and `impl/optimization.md`
 // for what it measured.
 //
 // Every workload runs a fixed number of warm-up iterations, arms the profiler,
@@ -141,7 +141,7 @@ switch workload {
 case "steady":
   // One write, one tracked read, nothing new. The read is the tracked
   // subscript rather than `peek`, because a peek renews `whileObserved` grace
-  // and would measure lifetime machinery instead of a turn (perf.md §9.6).
+  // and would measure lifetime machinery instead of a turn (`impl/optimization.md`).
   blackHole(cogs[doubledCog])
   run { iteration in
     cogs.commit(counterSourceCog, to: iteration, name: "prof.turn")

@@ -255,7 +255,7 @@ run = "swift package benchmark"
 #
 # Baselines live in the git-ignored `swift/Benchmarks/.benchmarkBaselines/`:
 # upstream calls that format unstable, and numbers meant to outlive a session
-# belong in perf.md §9.6 with their environment written beside them.
+# belong in docs/swift/impl/benchmarks.md with their environment beside them.
 
 [tasks."bench:baseline:update"]
 description = "Record a benchmark baseline with the environment that produced it"

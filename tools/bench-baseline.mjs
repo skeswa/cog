@@ -41,7 +41,7 @@
 // Baselines and their metadata live under
 // `swift/Benchmarks/.benchmarkBaselines/`, which is git-ignored on purpose:
 // the format is upstream-unstable, and a baseline is a statement about one
-// machine. Numbers that outlive a session belong in perf.md §9.6, written by
+// machine. Numbers that outlive a session belong in docs/swift/impl/benchmarks.md, written by
 // hand, with their environment beside them. Portable zero references live in
 // `swift/Benchmarks/Thresholds/`; their one-sided tolerances live in benchmark
 // source so a code review sees the effective ceilings.

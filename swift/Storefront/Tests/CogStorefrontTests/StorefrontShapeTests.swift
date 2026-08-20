@@ -15,7 +15,7 @@ import Testing
 struct StorefrontShapeTests {
   /// The declaration census, hand-written here and mechanically checked below.
   ///
-  /// These are the numbers `perf.md` quotes. If a declaration is added or
+  /// These are the numbers `impl/benchmarks.md` quotes. If a declaration is added or
   /// removed, this test fails first and the record is updated deliberately
   /// rather than drifting.
   static let expectedDeclarationCounts: [String: Int] = [
@@ -67,7 +67,7 @@ struct StorefrontShapeTests {
     return counts
   }
 
-  @Test("the declaration census is exactly what perf.md records")
+  @Test("the declaration census is exactly what benchmarks.md records")
   func declarationCensus() throws {
     let counts = try Self.declarationCounts()
     for (kind, expected) in Self.expectedDeclarationCounts {

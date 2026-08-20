@@ -45,7 +45,7 @@ This is a **representative workload v1**. There is no such thing as a typical
 application without production telemetry, so the scale is an explicit,
 configurable, asserted choice rather than a claim about real apps.
 `StorefrontProfile` holds every number, `StorefrontShapeTests` checks them, and
-[`perf.md`](../../docs/swift/design/perf.md) §9.6 records what the workload
+[`benchmarks.md`](../../docs/swift/impl/benchmarks.md) records what the workload
 covers **and what it does not**.
 
 Three profiles, three questions:

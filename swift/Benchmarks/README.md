@@ -223,7 +223,7 @@ lives in `tools/bench-baseline.mjs`.
 Baselines live in the git-ignored `.benchmarkBaselines/`. Upstream calls the
 stored format unstable, and a baseline is a statement about one machine;
 numbers meant to outlive a session belong in
-[`perf.md`](../../docs/swift/design/perf.md) §9.6 with their environment
+[`benchmarks.md`](../../docs/swift/impl/benchmarks.md) with their environment
 written beside them.
 
 ## Committed CI thresholds
@@ -355,7 +355,7 @@ Run each exact benchmark name with `COG_TEST_CORE=arena` and one of
 `COG_TEST_EDGE=pool`, `prefix`, or `inline`. M6-05c's same-session comparison
 selected the shared pool: it won the expected mostly-static instruction count,
 all candidates tied on p50 wall time and allocations, prefix arrays added ARC
-under churn, and inline-plus-overflow won neither shape. `perf.md` §9.6 records
+under churn, and inline-plus-overflow won neither shape. `impl/benchmarks.md` records
 the raw comparison and rationale; the selectors retain both losing candidates
 for reproduction.
 
@@ -531,7 +531,7 @@ mise run test:storefront        # the correctness gate the numbers rest on
 Nothing here is gated. There are no committed threshold files for `perf-15`,
 and `tools/bench-baseline.mjs` names none, because these are first measurements
 on one host and a threshold with no repeated pinned-CI history behind it is a
-guess. `perf.md` §9.6 records the numbers, the environment, the workload's exact
+guess. `impl/benchmarks.md` records the numbers, the environment, the workload's exact
 shape, and what it does not cover.
 
 ## What is coming

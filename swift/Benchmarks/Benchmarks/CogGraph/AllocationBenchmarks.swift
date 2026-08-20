@@ -126,7 +126,7 @@ private final class WitnessBox {
 /// is the tempting choice and the wrong one; it failed roughly one run in
 /// seven, and a gate that cries wolf teaches everyone to rerun.
 ///
-/// The absolute numbers this pins against live in perf.md §9.6 — that a steady
+/// The absolute numbers this pins against live in `impl/benchmarks.md` — that a steady
 /// turn costs seven mallocs and `box[key]` costs none.
 private func allocationDrift(exactP90: Bool = false) -> BenchmarkThresholds {
   let tolerance = 100

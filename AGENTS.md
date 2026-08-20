@@ -97,12 +97,16 @@ every scenario covered by exactly one task.
   Design docs live in `docs/swift/design/`: `exploration.md` covers the core
   architecture and API; `mechanisms.md` covers mechanisms — the bootstrap-registered
   home for every side effect — and background work;
-  `rx.md` maps Rx concepts; `perf.md` covers the data-oriented implementation
-  and benchmark plan. Implementation docs live in `docs/swift/impl/`:
+  `rx.md` maps Rx concepts; `perf.md` covers the cost order, the data-oriented
+  implementation, and the measurement plan — design only, since its recorded
+  results were split out. Implementation docs live in `docs/swift/impl/`:
   `plan.md` is the implementation plan with milestones, tooling, CI, and
   the release process; `scenarios.md` is the test-scenario tree; `tasks.md`
   is the dependency-aware half-day task graph with explicit verification,
-  covering every scenario exactly once.
+  covering every scenario exactly once; `benchmarks.md` is the measurement
+  record, every number with the environment that produced it; and
+  `optimization.md` is the profiling record — where the time goes and what each
+  change bought, obtained with a sampler and probes rather than the suite.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and
@@ -203,7 +207,7 @@ directly:
   environments, assert the allocation witness still reports a non-zero malloc
   count, then check the run against that baseline. Baselines live in the
   git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
-  outlive a session go in `docs/swift/design/perf.md` §9.6.
+  outlive a session go in `docs/swift/impl/benchmarks.md`.
 - `mise run bench:thresholds:check` — assert the allocation witness is live,
   require every gated benchmark and its committed static threshold, then
   enforce PERF-06's exact p90 zero-allocation result and PERF-10's one-sided

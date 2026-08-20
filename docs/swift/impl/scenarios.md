@@ -59,7 +59,7 @@ library.
   scenarios at the end of that group when the decision lands.
 - Scenarios in group 18 are benchmark-gated. Threshold scenarios hold
   provisional thresholds, and comparison scenarios keep representation choices
-  open, until perf.md records numbers.
+  open, until impl/benchmarks.md records numbers.
 
 ## Testing constraints
 
@@ -962,24 +962,24 @@ since expected counts derive from the parameters.
 _Milestones M5, M6, M9, and M10, in the benchmark package. Design: perf §5–§9._
 
 Benchmark-gated: thresholds stay provisional and representation choices stay
-open until perf.md records numbers. This group is the declared exception to
+open until impl/benchmarks.md records numbers. This group is the declared exception to
 implementation agnosticism: it gates the implementation itself, lives in the
 benchmark package, and never constrains the behavior suite. Every scenario
 in this group has proof mode `benchmark` by default; no per-scenario marker
 is needed.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates what
-  perf.md records and no more; the recorded cost only ever ratchets downward.
+  impl/benchmarks.md records and no more; the recorded cost only ever ratchets downward.
   Allocating nothing (`mallocCountTotal == 0`) is the target; the simple core
   does not reach it, so pinning the count against drift is what stops the cost
   creeping upward until the data-oriented core does.
-- **PERF-02.** Propagation's retain and release traffic is what perf.md
+- **PERF-02.** Propagation's retain and release traffic is what impl/benchmarks.md
   records and no more; the recorded cost only ever ratchets downward. Doing
   none of it is the target (perf §5); the simple core walks class states, so
   pinning the traffic against drift is what stops it growing until the
   data-oriented core reaches zero.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
-  baseline threshold recorded in perf.md. While no baseline exists, this
+  baseline threshold recorded in impl/benchmarks.md. While no baseline exists, this
   check is red, never skipped.
 - **PERF-04.** A graph with 1,000 states and 12 UI-read values owns 12
   boundary objects, not 1,000.
@@ -988,17 +988,17 @@ is needed.
 - **PERF-06.** Building a value reference with `box[key]` allocates nothing.
 - **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
-  perf.md. While no baseline exists, this check is red, never skipped.
+  impl/benchmarks.md. While no baseline exists, this check is red, never skipped.
 - **PERF-08.** Keyed diamonds and key churn run under inline `AnyHashable`,
   interned-token, and generic-keyed value-reference layouts in one pinned environment.
-  Results land in perf.md before the value-reference layout is selected.
+  Results land in impl/benchmarks.md before the value-reference layout is selected.
 - **PERF-09.** Mostly static and high-churn graphs run under the shared
   edge pool, per-state prefix arrays, and inline-plus-overflow edge layouts
-  in one pinned environment. Results land in perf.md before the edge layout
+  in one pinned environment. Results land in impl/benchmarks.md before the edge layout
   is selected.
 - **PERF-10.** The selected core is measured against the simple core,
   swift-state-graph, and raw `@Observable` in one pinned environment.
-  perf.md records wall-clock results and generous absolute regression
+  impl/benchmarks.md records wall-clock results and generous absolute regression
   thresholds before timing gates enter CI.
 - **PERF-11.** A pinned keyed state that stops changing costs a turn
   nothing. A turn that writes and reads one key of a family performs the
@@ -1007,14 +1007,14 @@ is needed.
 - **PERF-12.** A steady turn's shared machinery allocates nothing: the turn
   boundary, the writer it hands out, and the arrays a turn accumulates into
   reuse their storage rather than being rebuilt. The recorded steady-turn
-  allocation count falls to what perf.md records and only ever ratchets
+  allocation count falls to what impl/benchmarks.md records and only ever ratchets
   downward.
-- **PERF-13.** Settling one node of a deep chain costs what perf.md records
+- **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md records
   and no more — allocations, retains, and releases per node — and the
   recorded cost only ever ratchets downward.
 - **PERF-14.** After the shared machinery work, the simple and data-oriented
   cores are remeasured against each other on steady, deep, broad, and
-  unstable shapes in one pinned environment. perf.md records the new
+  unstable shapes in one pinned environment. impl/benchmarks.md records the new
   comparison, including whether any common-path cost regressed.
 - **PERF-15.** A representative commerce session — a catalog of a thousand-odd
   products, a sixteen-policy pricing ladder, keyed inventory and offers, and a
@@ -1024,20 +1024,20 @@ is needed.
   keyed funnel, and a compute-only control that runs the same algorithms over
   the same inputs with no graph at all. Every cut proves its own visible identifiers,
   exact money totals, accepted async generations, invalidation behavior, and
-  output checksum before any number is reported. perf.md records the results
+  output checksum before any number is reported. impl/benchmarks.md records the results
   with the environment that produced them, the workload's exact shape, and what
   the workload does not cover.
 - **PERF-16.** That same session, driven through a real SwiftUI application by
   XCUIAutomation in release configuration, reports launch, scrolling,
   scrolling-under-load, search, navigation, and cart interaction cost on one
   pinned simulator configuration. Every measured iteration starts from
-  identical application state. perf.md records the results, and records that a
+  identical application state. impl/benchmarks.md records the results, and records that a
   simulator hitch figure is a pinned regression signal rather than a
   user-experience guarantee.
 - **PERF-17.** The representative headless workload runs under both the simple
   and the data-oriented core in one session, so the tradeoff between what a
   graph costs to build and what it costs to run is measured on an application
-  shape rather than on a synthetic one. perf.md records the paired comparison.
+  shape rather than on a synthetic one. impl/benchmarks.md records the paired comparison.
 
 ## 19. LEG — Build-settings matrix
 

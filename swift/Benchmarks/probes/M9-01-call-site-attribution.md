@@ -6,7 +6,7 @@ code reading and a ranking that no measurement stands behind is a guess with a
 tablecloth on.
 
 The results this probe produced, and the conclusions drawn from them, are in
-[perf.md §9.6](../../../docs/swift/design/perf.md) under **Post-M6 call-site
+[optimization.md](../../../docs/swift/impl/optimization.md) under **Post-M6 call-site
 profile**. This document is the method.
 
 ## Environment

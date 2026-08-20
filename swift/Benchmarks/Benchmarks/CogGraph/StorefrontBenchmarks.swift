@@ -450,7 +450,7 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
   ]
   // Reported, never gated. This workload has no pinned-CI history yet, and a
   // threshold with no repeated measurement behind it is a guess that fails at
-  // the worst moment. `perf.md` §9.6 records the first measurements and names
+  // the worst moment. `impl/benchmarks.md` records the first measurements and names
   // what promotion would require.
   let reported = BenchmarkThresholds()
   let reportedOnly = Dictionary(
