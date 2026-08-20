@@ -1018,10 +1018,11 @@ is needed.
   comparison, including whether any common-path cost regressed.
 - **PERF-15.** A representative commerce session — a catalog of a thousand-odd
   products, a sixteen-policy pricing ladder, keyed inventory and offers, and a
-  cart whose totals depend on async quotes — is measured as five named cuts: a
+  cart whose totals depend on async quotes — is measured as six named cuts: a
   cold start, the whole session, settled quiescent interactions, an inventory
-  burst, and a compute-only control that runs the same algorithms over the same
-  inputs with no graph at all. Every cut proves its own visible identifiers,
+  burst, the exact allocation and heap footprint of building a catalog-wide
+  keyed funnel, and a compute-only control that runs the same algorithms over
+  the same inputs with no graph at all. Every cut proves its own visible identifiers,
   exact money totals, accepted async generations, invalidation behavior, and
   output checksum before any number is reported. perf.md records the results
   with the environment that produced them, the workload's exact shape, and what

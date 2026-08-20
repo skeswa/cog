@@ -2159,16 +2159,22 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   _Verify: `mise run test:storefront` runs the smoke trace end to end with every
   checkpoint holding and reports a nonzero authoritative executed count, and
   `mise run lint:swift`._
-- **M10-04** _(Infrastructure)_ — Add the five benchmark cuts and register them
+- **M10-04** _(Infrastructure)_ — Add the six benchmark cuts and register them
   from the one discovery closure: cold start, whole session, quiescent
-  interactions, inventory burst, and the compute-only control. Only the
-  quiescent cuts carry malloc and ARC metrics; the rest build or drop a runtime
-  and accept async completions, which is exactly the shape `M5-11` took those
-  counters away from. Register the counting cuts before any non-quiescent
-  benchmark, because counting is process-global.
+  interactions, inventory burst, footprint, and the compute-only control. Only
+  the quiescent cuts carry malloc and ARC metrics; the rest build or drop a
+  runtime and accept async completions, which is exactly the shape `M5-11` took
+  those counters away from. Register the counting cuts before any non-quiescent
+  benchmark, because counting is process-global. The footprint cut answers what
+  a graph costs to _hold_ with counted bytes rather than sampled resident
+  memory, which means it must never release a context: retain every one it
+  builds, or the frees land in the next iteration's measured region. Pin
+  `maxIterations` on the cuts that report resident memory, so a faster core
+  cannot look larger merely by completing more build-and-drop cycles in the same
+  time budget.
   _Depends: M10-03._
   _Verify: `mise run bench --filter 'perf-15-storefront-.*'` registers and runs
-  all five cuts, and `mise run test:lint` still proves the root package resolves
+  all six cuts, and `mise run test:lint` still proves the root package resolves
   no dependencies._
 - **M10-05** _(Behavior)_ — Turn the headless macrobenchmark green and record
   its first measurements. Every cut checks its own visible identifiers, money
@@ -2221,7 +2227,7 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   _Verify: recorded decision in `perf.md` §9.6 and the §10 ledger, naming the
   threshold candidates and the follow-up work, plus `mise run tasks:check`._
 - **M10-10** _(Gate)_ — Close M10 on the recorded evidence: the workload's
-  suites green, the five cuts reporting under both cores, the release UI suite
+  suites green, the six cuts reporting under both cores, the release UI suite
   executing on the pinned simulator, and the documents consistent.
   _Depends: M10-09._
   _Verify: `mise run test:storefront`, `mise run test:storefront-ui`,

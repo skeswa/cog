@@ -77,6 +77,10 @@ something the driver can schedule on purpose rather than hope for.
 mise run test:storefront          # this package's correctness and shape suites
 mise run bench --filter 'perf-15-storefront-.*'
 COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
+
+# read the absolute resident-memory column only from a run of the timing cuts
+# alone: the footprint cut retains its graphs, which raises the baseline.
+mise run bench --filter 'perf-15-storefront-(cold|session|async-burst)'
 ```
 
 The correctness suite is the gate every reported number depends on: each

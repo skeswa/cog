@@ -418,21 +418,62 @@ the harness, the interposer, and swift-state-graph. That package depends on the
 root by path and on nothing else. Read
 [`swift/Storefront/README.md`](../Storefront/README.md) first.
 
-Five cuts, and which metrics each may carry is decided entirely by `M5-11`'s
+Six cuts, and which metrics each may carry is decided entirely by `M5-11`'s
 quiescence rule:
 
-| Cut                                  | What it measures                                           | Counting metrics |
-| ------------------------------------ | ---------------------------------------------------------- | ---------------- |
-| `perf-15-storefront-cold`            | bootstrap, graph construction, first complete screen       | no               |
-| `perf-15-storefront-session`         | the whole eleven-phase interaction trace                   | no               |
-| `perf-15-storefront-interactions`    | settled, quiescent favorite / cart / variant / multi-write | **yes**          |
-| `perf-15-storefront-async-burst`     | one inventory burst accepted and settled                   | no               |
-| `perf-15-storefront-compute-control` | the same four kernels over the same inputs, no graph       | **yes**          |
+| Cut                                  | What it measures                                            | Counting metrics |
+| ------------------------------------ | ----------------------------------------------------------- | ---------------- |
+| `perf-15-storefront-cold`            | bootstrap, graph construction, first complete screen        | no               |
+| `perf-15-storefront-session`         | the whole eleven-phase interaction trace                    | no               |
+| `perf-15-storefront-interactions`    | settled, quiescent favorite / cart / variant / multi-write  | **yes**          |
+| `perf-15-storefront-async-burst`     | one inventory burst accepted and settled                    | no               |
+| `perf-15-storefront-footprint`       | what a 2,402-state keyed funnel costs to build and **hold** | **yes**          |
+| `perf-15-storefront-compute-control` | the same four kernels over the same inputs, no graph        | **yes**          |
 
 The three that say "no" build or drop a runtime and accept async completions,
 which is exactly the shape the null-`swift_release_hook` crash came from. The
-two that say "yes" hold one context for the whole run and never let a task
-complete inside the measured region.
+three that say "yes" never let a task complete inside the measured region.
+
+### Measuring heap, and why not with resident memory
+
+`peakMemoryResident` and `peakMemoryResidentDelta` are the only memory metrics a
+non-quiescent cut may carry, and they are weak instruments: resident memory is
+OS-sampled, page-granular, and a high-water mark that never comes down. Left to
+a duration budget they are worse than weak — a core that runs ten times faster
+completes ten times as many build-and-drop cycles in the same window, and gives
+the allocator ten times as many chances to reach higher, so the column compares
+throughput while looking like it compares footprint. Every cut that reports them
+therefore pins `maxIterations`.
+
+The footprint cut answers the question properly, with the interposer's exact
+counters rather than a sampled one:
+
+| Metric              | What it means here                                       |
+| ------------------- | -------------------------------------------------------- |
+| `mallocCountTotal`  | allocations made while building the funnel               |
+| `freeCountTotal`    | allocations returned                                     |
+| `mallocFreeDelta`   | allocations that **survived** — the graph's footprint    |
+| `mallocBytesCount`  | gross bytes requested                                    |
+| `memoryLeakedBytes` | bytes that **survived** — the closest countable "held"   |
+| `storefrontStates`  | states materialized, so the columns above have a divisor |
+
+For a steady-state region such as `-interactions`, both delta columns should
+read **zero**; a non-zero one is an interaction that grows the heap every time a
+shopper performs it. For a build region such as `-footprint`, the delta columns
+_are_ the answer.
+
+That cut never releases a context. Releasing one between iterations would drop
+thousands of states and cancel their grace sleepers, and the frees would land
+inside the next iteration's measured region — the exact misattribution `M5-11`
+recorded. `maxIterations` is 3 because each retained context is a whole
+standard-profile graph, and because these are exact counts rather than a sampled
+distribution: agreement from p0 to p100 is the result.
+
+One consequence worth knowing before reading a number: the footprint cut's
+retained graphs raise the process's resident baseline for every cut registered
+after it. `peakMemoryResidentDelta` is a delta and survives that;
+`peakMemoryResident` does not, so read the absolute column only from a run where
+the timing cuts were filtered on their own.
 
 The interaction cut deliberately excludes query changes. Typing materializes new
 rows, new rows start inventory and offer requests, and a measured region that

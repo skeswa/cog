@@ -118,6 +118,113 @@ enum StorefrontHarness {
     blackHole(driver.sink.visibleChecksum)
   }
 
+  // MARK: - Footprint
+
+  /// Contexts the footprint cut has already measured, retained forever.
+  ///
+  /// Retained, not released, and that is the whole reason this cut can carry
+  /// allocation counters at all. Releasing a `Cogs` between iterations would
+  /// drop thousands of states and cancel their grace sleepers, and the frees
+  /// would land inside the *next* iteration's measured region — the exact
+  /// process-global attribution error `M5-11` recorded, with the null
+  /// `swift_release_hook` crash on the other side of it. Nothing is ever torn
+  /// down here, so nothing can be misattributed.
+  ///
+  /// The cost is real and bounded: `maxIterations` is small precisely because
+  /// each retained context is a whole standard-profile graph.
+  static var footprintContexts: [StorefrontSessionDriver] = []
+
+  /// The context built for the next measured materialization.
+  static var pendingFootprintContext: StorefrontSessionDriver?
+
+  /// Builds a context and settles its async roots, materializing no keyed state.
+  ///
+  /// This runs *outside* the measured region, and the split is the design. The
+  /// catalog, the account, and the search index are async: their tasks start,
+  /// suspend on the scripted service, and complete on another thread. A region
+  /// that contained any of that could not carry a malloc counter. So the roots
+  /// are resolved first and the measured region contains only synchronous
+  /// graph construction.
+  ///
+  /// The read that demands the roots is deliberately the *candidate list* — the
+  /// last node upstream of the keyed funnel. It pulls the catalog and the search
+  /// index and produces a list of ordinals, and it creates not one per-product
+  /// state, which is what leaves the whole funnel for the measured region.
+  static func prepareFootprint() async throws {
+    let driver = StorefrontSessionDriver(profile: profile, holds: [.account])
+
+    // Demand the roots. Tracked, never `peek`: a one-shot peek renews a
+    // `whileObserved` grace sleeper, which is a task and an allocation, and
+    // this cut exists to count allocations.
+    blackHole(driver.cogs[storefrontSearchCandidateIDsCog].count)
+
+    await driver.awaitStarted([.catalog, .account, .searchIndex])
+    // The account first, so no later state is built against a signed-out
+    // shopper and rebuilt after sign-in. Then the index generation that was
+    // started over the empty catalog, then the catalog itself, then the index
+    // generation the real catalog invalidates into.
+    try await driver.release(.account)
+    try await driver.release(.searchIndex)
+    try await driver.release(.catalog)
+    await driver.awaitStarted([.searchIndex, .searchIndex])
+    try await driver.release(.searchIndex)
+    try await driver.drainRequests()
+
+    pendingFootprintContext = driver
+  }
+
+  /// Materializes the catalog-wide keyed funnel, and nothing else.
+  ///
+  /// One tracked read of the ranked list demands, synchronously:
+  ///
+  /// - one `storefrontFilterEligibilityCogs` state per catalog product;
+  /// - one `storefrontSearchScoreCogs` state per eligible product; and
+  /// - the two keyless nodes that gather them.
+  ///
+  /// With no query, no category, and no stock filter, every product is
+  /// eligible, so the count is exactly `2 × productCount + 2` states — and the
+  /// returned rank count proves it, because a product can only appear in the
+  /// ranked list if both of its keyed states were created and read.
+  ///
+  /// No async is demanded anywhere on that path, which is what keeps the region
+  /// quiescent.
+  ///
+  /// - Returns: How many products the funnel ranked.
+  static func materializeFootprint() -> Int {
+    guard let driver = pendingFootprintContext else {
+      fatalError("The Storefront footprint cut was measured before it was prepared.")
+    }
+    let rankedProducts = driver.cogs[storefrontRankedProductIDsCog]
+    return rankedProducts.count
+  }
+
+  /// Checks the materialization and retains the context so nothing is released.
+  ///
+  /// - Parameter rankedCount: What ``materializeFootprint()`` returned.
+  static func retainFootprint(rankedCount: Int) {
+    precondition(
+      rankedCount == profile.productCount,
+      """
+      The Storefront footprint cut ranked \(rankedCount) products where the profile has \
+      \(profile.productCount). The state count this cut reports allocations for is derived \
+      from that number, so a timing taken here would be a cost with no denominator.
+      """
+    )
+    guard let driver = pendingFootprintContext else {
+      fatalError("The Storefront footprint cut retained a context it never prepared.")
+    }
+    footprintContexts.append(driver)
+    pendingFootprintContext = nil
+  }
+
+  /// The keyed and keyless states one footprint iteration creates.
+  ///
+  /// Derived from the profile, never observed: an eligibility state and a score
+  /// state per product, plus the eligible list and the ranked list. Reported as
+  /// a custom metric so a reader can divide the allocation columns by it
+  /// without doing arithmetic from a paragraph.
+  static var footprintStateCount: Int { profile.productCount * 2 + 2 }
+
   // MARK: - Async burst
 
   /// The settled runtime the burst cut drives, held across every sample.
@@ -176,8 +283,24 @@ enum StorefrontHarness {
 /// process-global: teardown from a non-quiescent benchmark lands in whichever
 /// benchmark measures next (`M5-11`).
 let storefrontCountingBenchmarks: @Sendable () -> Void = {
+  // Allocation *counts* and allocation *bytes*, both net and gross.
+  //
+  // `peakMemoryResidentDelta` is what the non-quiescent cuts have to settle
+  // for, and it is a poor instrument: resident memory is OS-sampled,
+  // page-granular, and a high-water mark that never comes down, so it answers
+  // "did this process ever get big" rather than "what does this graph cost".
+  // The interposer's counters answer the real question exactly:
+  //
+  // - `mallocCountTotal` / `freeCountTotal` — allocations made and returned;
+  // - `mallocFreeDelta` — allocations that **survived** the region, which for a
+  //   build region is the graph's allocation footprint and for a steady-state
+  //   region should be zero;
+  // - `mallocBytesCount` — gross bytes requested;
+  // - `memoryLeakedBytes` — bytes that survived the region, which is the
+  //   closest thing to "heap held" that can be counted rather than sampled.
   let countingMetrics: [BenchmarkMetric] = [
-    .mallocCountTotal, .objectAllocCount, .retainCount, .releaseCount, .wallClock,
+    .mallocCountTotal, .freeCountTotal, .mallocFreeDelta, .mallocBytesCount,
+    .memoryLeakedBytes, .objectAllocCount, .retainCount, .releaseCount, .wallClock,
     .instructions,
   ]
   // Reported, never gated. This workload has no pinned-CI history yet, and a
@@ -218,7 +341,47 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
     await StorefrontHarness.runComputeControl()
     benchmark.stopMeasurement()
   }
+
+  // What a catalog-wide keyed funnel costs to *build and hold*.
+  //
+  // Three iterations and no warm-up, because every iteration retains a whole
+  // standard-profile context forever — see `StorefrontHarness.footprintContexts`
+  // for why releasing one would make the next iteration's counters a fiction.
+  // Three is enough: these are exact interposer counts rather than a sampled
+  // distribution, so agreement from p0 to p100 is the result, and disagreement
+  // would itself be the finding.
+  Benchmark(
+    "perf-15-storefront-footprint",
+    configuration: .init(
+      metrics: countingMetrics + [footprintStateMetric],
+      warmupIterations: 0,
+      maxDuration: .seconds(120),
+      maxIterations: 3,
+      thresholds: reportedOnly.merging([footprintStateMetric: BenchmarkThresholds()]) {
+        current, _ in current
+      }
+    )
+  ) { benchmark in
+    try await StorefrontHarness.prepareFootprint()
+    benchmark.startMeasurement()
+    let rankedCount = await StorefrontHarness.materializeFootprint()
+    benchmark.stopMeasurement()
+    await StorefrontHarness.retainFootprint(rankedCount: rankedCount)
+    benchmark.measurement(footprintStateMetric, await StorefrontHarness.footprintStateCount)
+  }
 }
+
+/// States one footprint iteration materializes.
+///
+/// A custom metric because it is a *count of graph states*, which no built-in
+/// metric expresses, and because carrying it beside the allocation columns is
+/// what lets a reader divide one by the other. Unscaled: the count is the
+/// count, not a count per thousand iterations.
+private let footprintStateMetric = BenchmarkMetric.custom(
+  "storefrontStates",
+  polarity: .prefersSmaller,
+  useScalingFactor: false
+)
 
 /// The Storefront cuts whose measured region is not quiescent.
 ///
@@ -232,6 +395,16 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
   let timingMetrics: [BenchmarkMetric] = [
     .wallClock, .cpuTotal, .instructions, .peakMemoryResidentDelta, .peakMemoryResident,
   ]
+  // Every cut below pins `maxIterations`, and the reason is the memory columns
+  // rather than the timing ones. `peakMemoryResident` is a process-wide
+  // high-water mark that never comes down, and `peakMemoryResidentDelta` only
+  // advances on iterations where that mark moves. Left to a duration budget, a
+  // core that is ten times faster runs ten times as many build-and-drop cycles
+  // in the same window and gives the allocator ten times as many chances to
+  // reach higher — so the two columns would compare throughput while looking
+  // like they compare footprint. A fixed iteration count makes them comparable.
+  // The exact footprint question is answered by
+  // `perf-15-storefront-footprint`'s counted bytes, not by these.
   let reported = BenchmarkThresholds()
   let reportedOnly = Dictionary(uniqueKeysWithValues: timingMetrics.map { ($0, reported) })
 
@@ -240,7 +413,8 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
     configuration: .init(
       metrics: timingMetrics,
       warmupIterations: 1,
-      maxDuration: .seconds(5),
+      maxDuration: .seconds(120),
+      maxIterations: 10,
       thresholds: reportedOnly
     )
   ) { benchmark in
@@ -254,7 +428,8 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
     configuration: .init(
       metrics: timingMetrics,
       warmupIterations: 1,
-      maxDuration: .seconds(5),
+      maxDuration: .seconds(120),
+      maxIterations: 50,
       thresholds: reportedOnly
     )
   ) { benchmark in
@@ -269,7 +444,8 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
     configuration: .init(
       metrics: timingMetrics,
       warmupIterations: 1,
-      maxDuration: .seconds(10),
+      maxDuration: .seconds(180),
+      maxIterations: 3,
       thresholds: reportedOnly
     )
   ) { benchmark in

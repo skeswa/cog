@@ -1466,6 +1466,90 @@ environment before it moves anything. `M10-09` owns the disposition, and the
 first question it has to answer is whether the simple core's wide-selector cost
 is a defect with a fix rather than a reason to swap cores.
 
+**What the Storefront graph costs to hold** — `M10-05`, 2026-08-19, same host
+and toolchain, standard profile. `perf-15-storefront-footprint` builds the
+catalog-wide keyed funnel — one eligibility state and one score state per
+product, plus the two keyless nodes that gather them, **2,402 states** — and
+measures it with the interposer's counters rather than with sampled resident
+memory. The async roots are resolved before the measured region, so the region
+is purely synchronous graph construction; every context is retained forever, so
+no teardown can land in a later sample.
+
+| Measure                                           |       simple |        arena |       ratio |
+| ------------------------------------------------- | -----------: | -----------: | ----------: |
+| allocations made                                  |       22,000 |       10,000 |       2.2 × |
+| allocations returned                              |        3,685 |       10,000 |             |
+| **allocations that survived** (`mallocFreeDelta`) |   **18,000** |       **51** |   **353 ×** |
+| gross bytes requested                             |     2,476 KB |     2,617 KB | about equal |
+| **bytes that survived** (`memoryLeakedBytes`)     | **1,686 KB** | **1,208 KB** |   **1.4 ×** |
+| object allocations                                |       19,000 |          177 |       107 × |
+| retains                                           |     **10 M** |         60 K |       167 × |
+| releases                                          |     **30 M** |         59 K |       508 × |
+| p50 wall clock                                    |       457 ms |       7.0 ms |    **65 ×** |
+
+Three samples each, identical from p0 to p100 on the simple core; the arena
+moves between 51 and 75 surviving allocations, which is one column growing.
+
+**The heap answer is not the one resident memory suggested.** Per state, the
+simple core holds ~702 bytes and 7.5 surviving allocations; the arena holds
+~515 bytes and **0.02**. The arena's whole design shows up in that one column:
+2,402 states live inside a handful of columns rather than as 2,402 individually
+allocated objects, so it holds _fewer bytes_ while making three hundred times
+fewer surviving allocations.
+
+**And the ARC column is the mechanism from §9.6's core comparison, quantified.**
+Thirty million releases to build 2,402 states is roughly 12,500 releases per
+state, which no per-state work can explain. It is `CogSettle.swift`'s
+`addSubscriber`, which on every dependency read scans the producer's subscriber
+list twice — once to prune dead weak edges, once to dedupe — and every element
+touched costs a weak load, a retain/release pair, and a dynamic executor check
+on a MainActor-isolated existential. The storefront has several producers read
+by one to three thousand states each (`productIndex`, `queryTokens`,
+`selectedCategory`, `inStockOnly`, `catalogProducts`), so that scan is quadratic
+in fan. Summing `2 × Σk` over those producers predicts 30–60 M ARC operations
+against 40 M observed. A sampler over the same cut puts 40% of the simple core's
+time in executor checks, 33% in ARC, 20% in weak loads, and 12% in the
+OS-version check inside the executor check — that is, essentially all of it in
+that one loop, under four different frame names.
+
+The arena's `recordDependency` walks a cursor down the consumer's existing edge
+list and updates a version when the next edge names the same producer: O(1) when
+dependency order is stable, integer indices throughout, no weak load and no ARC.
+It maintains the same two directions; it is not doing less bookkeeping.
+
+**Resident memory, with iteration counts pinned** — same session. The earlier
+reading of these columns was taken with only a duration budget, which let the
+arena run 135 cold iterations against the simple core's 10 and 54 sessions
+against 2. That comparison said the arena's absolute peak was roughly twice the
+simple core's; **it was mostly counting build-and-drop cycles, and it is
+withdrawn.** With `maxIterations` pinned equal:
+
+| Cut            | simple abs / Δ, p50 | arena abs / Δ, p50 | iterations |
+| -------------- | ------------------: | -----------------: | ---------: |
+| `-cold`        |    22 MB / 1,983 KB |   32 MB / 5,018 KB |         10 |
+| `-async-burst` |      21 MB / 820 KB |     28 MB / 508 KB |         50 |
+| `-session`     |    31 MB / 3,410 KB |   53 MB / 5,640 KB |          3 |
+
+A gap remains — the arena's absolute peak runs about 1.5× the simple core's —
+and it points the opposite way from the counted footprint, which is the
+interesting part. The likeliest reading is transient rather than held: growing a
+column copies it, so the old and new buffers are briefly resident together, and
+`_platform_memmove` is the third-heaviest frame in the arena's profile. That
+would raise a high-water mark without raising held bytes, which is exactly the
+pattern the two instruments show. It is a reading, not a result: resident memory
+is sampled and page-granular, and §9 already names reserving capacity from known
+descriptor counts as the fix if it matters.
+
+**Steady state allocates nothing net, on either core.**
+`perf-15-storefront-interactions` reports `mallocFreeDelta` and
+`memoryLeakedBytes` of **zero** at every percentile across thousands of samples
+on both cores: a favorite toggle, a cart quantity, a variant selection, and a
+two-source open-product verb allocate 19 (simple) or 12 (arena) and return all
+of them. The compute-only control likewise nets zero and reports identical
+figures on both cores — 5,603 allocations, 625 KB — which is the check that the
+rows above mean what they say, since it contains no graph for a core swap to
+change.
+
 **The Storefront application, first measurements** — `M10-07`, 2026-08-19,
 `mactop`, Xcode 26.4 (17E192), release configuration, on the **iPhone 17 Pro
 simulator running iOS 26.4 (23E244), arm64**. The **smoke** profile, not the
