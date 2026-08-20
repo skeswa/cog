@@ -457,6 +457,22 @@ counters rather than a sampled one:
 | `memoryLeakedBytes` | bytes that **survived** — the closest countable "held"   |
 | `storefrontStates`  | states materialized, so the columns above have a divisor |
 
+"Survived" is a **flow balance across the measured window**, not a census of the
+live heap: mallocs minus frees observed between `startMeasurement()` and
+`stopMeasurement()`, in calls and in requested bytes. So a free inside the window
+of something allocated before it counts against the delta and can make it
+negative; something allocated inside and freed just after the window still counts
+as having survived; and "requested bytes" carries no allocator rounding, no
+malloc header, and no page granularity, which makes it a lower bound on resident
+growth rather than a measure of it. Upstream calls the byte metric
+`memoryLeakedBytes`; in a build-and-hold region the retention is intentional and
+the name is a misnomer.
+
+Read the delta columns rather than subtracting the two count columns: the
+harness's table rounds to K and M, so the printed counts do not reconcile.
+`--format metricP90AbsoluteThresholds --path stdout` prints exact p90 integers
+when you need them to.
+
 For a steady-state region such as `-interactions`, both delta columns should
 read **zero**; a non-zero one is an interaction that grows the heap every time a
 shopper performs it. For a build region such as `-footprint`, the delta columns

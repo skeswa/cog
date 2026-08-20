@@ -1475,30 +1475,55 @@ memory. The async roots are resolved before the measured region, so the region
 is purely synchronous graph construction; every context is retained forever, so
 no teardown can land in a later sample.
 
-| Measure                                           |       simple |        arena |       ratio |
-| ------------------------------------------------- | -----------: | -----------: | ----------: |
-| allocations made                                  |       22,000 |       10,000 |       2.2 × |
-| allocations returned                              |        3,685 |       10,000 |             |
-| **allocations that survived** (`mallocFreeDelta`) |   **18,000** |       **51** |   **353 ×** |
-| gross bytes requested                             |     2,476 KB |     2,617 KB | about equal |
-| **bytes that survived** (`memoryLeakedBytes`)     | **1,686 KB** | **1,208 KB** |   **1.4 ×** |
-| object allocations                                |       19,000 |          177 |       107 × |
-| retains                                           |     **10 M** |         60 K |       167 × |
-| releases                                          |     **30 M** |         59 K |       508 × |
-| p50 wall clock                                    |       457 ms |       7.0 ms |    **65 ×** |
+**What "survived" means here, exactly.** `mallocFreeDelta` is malloc calls minus
+free calls _observed between `startMeasurement()` and `stopMeasurement()`_, and
+`memoryLeakedBytes` is the same balance in requested bytes. They are a flow
+balance across the measured window, not a census of the live heap, and three
+consequences follow. A free inside the window, of memory allocated before it,
+counts against the delta and can drive it negative. Something allocated inside
+the window and freed a microsecond after the window closes still counts as
+having survived. And "requested bytes" is what the program asked for — no
+allocator size-class rounding, no malloc header, no page granularity, no
+fragmentation — so it is a lower bound on resident growth rather than a measure
+of it. Upstream's `memoryLeakedBytes` naming is a misnomer for a build-and-hold
+region: here the retention is the answer, not a defect. The counters are also
+process-global, which is why this cut may only exist at all in a region with no
+async work and no teardown.
 
-Three samples each, identical from p0 to p100 on the simple core; the arena
-moves between 51 and 75 surviving allocations, which is one column growing.
+For this cut those caveats are small and known: the region opens on a fully
+settled graph, closes one tracked read later, and the context is retained
+forever, so the balance is very nearly "what materializing the funnel added".
+
+Exact p90 integers, because the harness's own table rounds to K and M and
+rounded allocation counts cannot be subtracted:
+
+| Measure                                           |        simple |         arena |       ratio |
+| ------------------------------------------------- | ------------: | ------------: | ----------: |
+| allocations made (`mallocCountTotal`)             |        21,815 |        10,225 |       2.1 × |
+| allocations returned (`freeCountTotal`)           |         3,761 |        10,150 |             |
+| **allocations that survived** (`mallocFreeDelta`) |    **18,054** |        **75** |   **241 ×** |
+| gross bytes requested (`mallocBytesCount`)        |     2,500,066 |     2,639,596 | about equal |
+| **bytes that survived** (`memoryLeakedBytes`)     | **1,705,522** | **1,226,863** |  **1.39 ×** |
+| object allocations                                |        19,333 |           198 |        98 × |
+| retains                                           |    10,200,449 |        60,476 |       169 × |
+| releases                                          |    30,371,379 |        59,387 |       511 × |
+| instructions                                      |        7.10 G |         173 M |        41 × |
+| wall clock                                        |        485 ms |       12.6 ms |        38 × |
+| states materialized                               |         2,402 |         2,402 |             |
+
+Three samples each. The simple core's counts are identical from p0 to p100; the
+arena's surviving-allocation count moves between 51 and 75, which is one column
+growing on some iterations and not others.
 
 **The heap answer is not the one resident memory suggested.** Per state, the
-simple core holds ~702 bytes and 7.5 surviving allocations; the arena holds
-~515 bytes and **0.02**. The arena's whole design shows up in that one column:
-2,402 states live inside a handful of columns rather than as 2,402 individually
-allocated objects, so it holds _fewer bytes_ while making three hundred times
-fewer surviving allocations.
+simple core holds **710 bytes** and **7.5** surviving allocations; the arena
+holds **511 bytes** and **0.031**. The arena's whole design shows up in that one
+column: 2,402 states live inside a handful of columns rather than as 2,402
+individually allocated objects, so it holds _fewer bytes_ while making two
+hundred times fewer surviving allocations.
 
 **And the ARC column is the mechanism from §9.6's core comparison, quantified.**
-Thirty million releases to build 2,402 states is roughly 12,500 releases per
+Thirty million releases to build 2,402 states is 12,644 releases per
 state, which no per-state work can explain. It is `CogSettle.swift`'s
 `addSubscriber`, which on every dependency read scans the producer's subscriber
 list twice — once to prune dead weak edges, once to dedupe — and every element
