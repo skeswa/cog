@@ -6,8 +6,8 @@ import PackageDescription
 
 /// Settings applied to every shipped library target.
 ///
-/// The library flags never vary. Only the *test* targets change shape across
-/// the isolation matrix (see `testSettings` below).
+/// These language and isolation flags never vary. The `CompactArena` package
+/// trait adds its conditional setting farther below.
 let baseLibrarySettings: [SwiftSetting] = [
   .swiftLanguageMode(.v6),
   .defaultIsolation(MainActor.self),
@@ -43,8 +43,8 @@ let simulatorBoundaryOnly = Context.environment["COG_SIMULATOR_BOUNDARY_ONLY"] =
 
 /// Settings applied to every test target, for the leg the environment selects.
 ///
-/// Only the *test* targets vary; `librarySettings` above is fixed, because the
-/// shipped library has exactly one shape no matter how it is tested.
+/// Only test-target isolation varies here. The shipped library keeps its fixed
+/// MainActor isolation while representation selectors are assembled below.
 var testSettings: [SwiftSetting] = [
   .swiftLanguageMode(.v6)
 ]
@@ -82,126 +82,72 @@ default:
   )
 }
 
-// MARK: - The value-reference layout seam
+// MARK: - Retired experiment selectors
 
-// M5-09e selected inline `AnyHashable` as the shipping value-reference layout
-// (perf §4, §9.6). The selector remains so the complete behavior suite and
-// recorded benchmark shapes can keep exercising the rejected interned-token
-// and generic-keyed candidates: read an environment variable, lower it to a
-// define, and fail loudly on anything unrecognized.
-//
-// This is a *library* setting rather than a test setting, because the layout is
-// part of the library's representation — a test cannot choose it for code it did
-// not compile. It is test-and-benchmark-only in intent: unset means the
-// selected `inline` layout, so an ordinary consumer never opts into a losing
-// candidate or its conditional public surface.
-//
-// A typo is a hard error rather than a fall back to `inline`, for the reason the
-// isolation legs give: a mistyped candidate would otherwise buy a green from a
-// layout that never ran.
+// Keep explicit tombstones for old comparison commands. Silently ignoring an
+// exported selector would make a stale benchmark appear to measure a candidate
+// that no longer exists.
 
-let requestedValueReferenceLayout =
-  Context.environment["COG_TEST_VALUE_REFERENCE_LAYOUT"] ?? "inline"
-
-var valueReferenceLayoutSettings: [SwiftSetting] = []
-
-/// The layout, mirrored into the *test* targets so a test can compare what the
-/// environment asked for with what the library was actually built as.
-var valueReferenceLayoutTestSettings: [SwiftSetting] = []
-
-switch requestedValueReferenceLayout {
-case "inline":
-  valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_INLINE"))
-  valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_INLINE"))
-case "interned":
-  valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_INTERNED"))
-  valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_INTERNED"))
-case "generic":
-  valueReferenceLayoutSettings.append(.define("COG_VALUE_REFERENCE_LAYOUT_GENERIC"))
-  valueReferenceLayoutTestSettings.append(.define("COG_LEG_VALUE_REFERENCE_LAYOUT_GENERIC"))
-default:
+if let retiredCore = Context.environment["COG_TEST_CORE"] {
   fatalError(
     """
-    COG_TEST_VALUE_REFERENCE_LAYOUT was \(requestedValueReferenceLayout), which is not a \
-    value-reference layout candidate. Expected inline, interned, or generic, or leave \
-    it unset for inline.
+    COG_TEST_CORE=\(retiredCore) is no longer supported because the simple core was retired. \
+    Unset COG_TEST_CORE; use the CompactArena package trait for the supported compact build.
     """
   )
 }
 
-// MARK: - The core and edge representation seams
-
-// M6's measured decision retains the class-state correctness core as the
-// shipping default and the arena as a selector-only research and benchmark
-// build. These selectors are library settings because they choose the
-// representation that implements Cogs, not merely which tests run. Mirrored
-// test defines let a sentinel prove that the runner, test target, and library
-// all selected the same implementation.
-//
-// An arena build without an explicit edge uses `pool`, the layout selected for
-// that candidate. Naming an edge beside `simple` is an error: accepting it
-// would let a candidate command go green without compiling or exercising that
-// candidate.
-
-let requestedCore = Context.environment["COG_TEST_CORE"] ?? "simple"
-let requestedEdge = Context.environment["COG_TEST_EDGE"]
-
-var coreSettings: [SwiftSetting] = []
-var edgeSettings: [SwiftSetting] = []
-var coreTestSettings: [SwiftSetting] = []
-var edgeTestSettings: [SwiftSetting] = []
-
-switch requestedCore {
-case "simple":
-  if let requestedEdge {
-    fatalError(
-      """
-      COG_TEST_EDGE was \(requestedEdge), but edge layouts belong only to the arena core. \
-      Unset COG_TEST_EDGE or select COG_TEST_CORE=arena.
-      """
-    )
-  }
-  coreSettings.append(.define("COG_CORE_SIMPLE"))
-  coreTestSettings.append(.define("COG_LEG_CORE_SIMPLE"))
-case "arena":
-  coreSettings.append(.define("COG_CORE_ARENA"))
-  coreTestSettings.append(.define("COG_LEG_CORE_ARENA"))
-
-  switch requestedEdge ?? "pool" {
-  case "pool":
-    edgeSettings.append(.define("COG_EDGE_POOL"))
-    edgeTestSettings.append(.define("COG_LEG_EDGE_POOL"))
-  case "prefix":
-    edgeSettings.append(.define("COG_EDGE_PREFIX"))
-    edgeTestSettings.append(.define("COG_LEG_EDGE_PREFIX"))
-  case "inline":
-    edgeSettings.append(.define("COG_EDGE_INLINE"))
-    edgeTestSettings.append(.define("COG_LEG_EDGE_INLINE"))
-  default:
-    fatalError(
-      """
-      COG_TEST_EDGE was \(requestedEdge ?? "nil"), which is not an implemented arena edge \
-      candidate. Expected pool, prefix, or inline, or leave it unset for pool.
-      """
-    )
-  }
-default:
+if let retiredEdge = Context.environment["COG_TEST_EDGE"] {
   fatalError(
     """
-    COG_TEST_CORE was \(requestedCore), which is not a core implementation. Expected \
-    simple or arena, or leave it unset for simple.
+    COG_TEST_EDGE=\(retiredEdge) is no longer supported because shared pool edges were \
+    selected and the losing candidates were retired. Unset COG_TEST_EDGE.
     """
   )
 }
 
-/// Library settings plus the selected value-reference, core, and edge layouts.
+if let retiredSpecialization = Context.environment["COG_TEST_ARENA_SPECIALIZATION"] {
+  fatalError(
+    """
+    COG_TEST_ARENA_SPECIALIZATION=\(retiredSpecialization) is no longer supported. \
+    Unset it; use the CompactArena package trait for the supported compact build.
+    """
+  )
+}
+
+if let retiredValueReferenceLayout = Context.environment["COG_TEST_VALUE_REFERENCE_LAYOUT"] {
+  fatalError(
+    """
+    COG_TEST_VALUE_REFERENCE_LAYOUT=\(retiredValueReferenceLayout) is no longer supported \
+    because inline AnyHashable keys were selected and the losing candidates were retired. \
+    Unset COG_TEST_VALUE_REFERENCE_LAYOUT.
+    """
+  )
+}
+
+// MARK: - Arena specialization trait
+
+// The specialized arena with shared pool edges and inline AnyHashable keys is
+// the only implementation. The non-default CompactArena package trait is the
+// public binary-size opt-out: it suppresses specialization without changing
+// the arena representation or Cog's API and behavior.
+
+/// Settings contributed by the public binary-size opt-out trait.
+let compactArenaTraitSettings: [SwiftSetting] = [
+  .define("COG_ARENA_COMPACT", .when(traits: ["CompactArena"]))
+]
+
+/// Trait choices mirrored into tests for the selector sentinel.
+let compactArenaTraitTestSettings: [SwiftSetting] = [
+  .define("COG_LEG_ARENA_COMPACT", .when(traits: ["CompactArena"]))
+]
+
+/// Library settings plus the public binary-size trade.
 ///
-/// The base flags never vary. Unset selectors choose the shipping simple core
-/// and inline value-reference layout. The measured arena and its losing edge
-/// layouts remain explicit test-and-benchmark comparison builds after M6.
-let librarySettings: [SwiftSetting] =
-  baseLibrarySettings + valueReferenceLayoutSettings + coreSettings + edgeSettings
-testSettings += valueReferenceLayoutTestSettings + coreTestSettings + edgeTestSettings
+/// The base flags never vary. `CompactArena` is the sole representation
+/// choice and suppresses only the specialization attributes.
+let librarySettings: [SwiftSetting] = baseLibrarySettings + compactArenaTraitSettings
+testSettings += compactArenaTraitTestSettings
 
 // MARK: - Optional dependencies
 
@@ -232,6 +178,12 @@ let package = Package(
     // Not API. Exists so the separate `swift/Benchmarks` package can share the
     // scenario graphs with `CogScenarioTests`.
     .library(name: "_CogScenarios", targets: ["CogScenarios"]),
+  ],
+  traits: [
+    .trait(
+      name: "CompactArena",
+      description: "Reduce generated code size by disabling the arena's specialization frontier."
+    )
   ],
   dependencies: packageDependencies,
   targets: [

@@ -36,7 +36,7 @@ private enum CogTurnChainTraceStep {
 
 /// Tracks one synchronous chain of turns and warns if it runs too long.
 ///
-/// A chain starts with a commit made while the context is idle. If a reaction
+/// A chain starts with a turn made while the context is idle. If a reaction
 /// writes state, that write becomes the next turn in the same chain. For
 /// example: `turn A → reaction B → turn B`. The chain ends after all queued
 /// writes finish and control returns to the caller. Graph-owned system turns
@@ -155,17 +155,12 @@ extension Cogs {
       phaseIsIdle = false
     }
 
-    #if COG_CORE_ARENA
     let selectedCoreIsIdle = arenaCore.isSettlementIdle
-    #else
-    let selectedCoreIsIdle = settleStack.isEmpty && settleStack.isComputingEmpty
-    #endif
 
     return turnChainTracker.diagnostic(
       isIdle: phaseIsIdle
         && queuedTurns.isEmpty
         && reactionRuns.isEmpty
-        && trackedConsumer == nil
         && selectedCoreIsIdle
         && seedBarrierDepth == 0
         && !turnChainTracker.isActive

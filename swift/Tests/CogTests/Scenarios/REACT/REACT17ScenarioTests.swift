@@ -21,7 +21,7 @@ import Testing
 
         reactionRuns += 1
         guard value < 65 else { return }
-        m.commit("react17.turn.\(value + 1)") { c in
+        m.turn("react17.turn.\(value + 1)") { c in
           c[pong] = value + 1
         }
       }
@@ -33,7 +33,7 @@ import Testing
 
         reactionRuns += 1
         guard value < 65 else { return }
-        m.commit("react17.turn.\(value + 1)") { c in
+        m.turn("react17.turn.\(value + 1)") { c in
           c[ping] = value + 1
         }
       }
@@ -44,7 +44,7 @@ import Testing
   #expect(cogs.turnChainDiagnostic.isIdle)
 
   var initiatingBodySawBusyContext = false
-  cogs.commit("react17.turn.1") { c in
+  cogs.turn("react17.turn.1") { c in
     initiatingBodySawBusyContext = !cogs.turnChainDiagnostic.isIdle
     c[ping] = 1
   }
@@ -88,21 +88,21 @@ import Testing
       m.run { c in
         let value = c[ping]
         guard value > 0, value < 64 else { return }
-        m.commit("react17.edge.\(value + 1)") { c in
+        m.turn("react17.edge.\(value + 1)") { c in
           c[pong] = value + 1
         }
       }
       m.run { c in
         let value = c[pong]
         guard value > 0, value < 64 else { return }
-        m.commit("react17.edge.\(value + 1)") { c in
+        m.turn("react17.edge.\(value + 1)") { c in
           c[ping] = value + 1
         }
       }
     }
   ])
 
-  cogs.commit("react17.edge.1") { c in c[ping] = 1 }
+  cogs.turn("react17.edge.1") { c in c[ping] = 1 }
 
   // Sixty-four turns ran as one chain, and none of them warned.
   #expect(cogs.peek(ping) == 63)
@@ -131,21 +131,21 @@ import Testing
       m.run { c in
         let value = c[ping]
         guard value > 0, value < 65 else { return }
-        m.commit("react17.heavy.\(value + 1)") { c in
+        m.turn("react17.heavy.\(value + 1)") { c in
           c[pong] = value + 1
         }
       }
       m.run { c in
         let value = c[pong]
         guard value > 0, value < 65 else { return }
-        m.commit("react17.heavy.\(value + 1)") { c in
+        m.turn("react17.heavy.\(value + 1)") { c in
           c[ping] = value + 1
         }
       }
     }
   ])
 
-  cogs.commit("react17.heavy.1") { c in c[ping] = 1 }
+  cogs.turn("react17.heavy.1") { c in c[ping] = 1 }
 
   let diagnostic = cogs.turnChainDiagnostic
   let warning = try #require(diagnostic.lastWarning)
@@ -162,7 +162,7 @@ import Testing
   let source = ManualCog<Int>(0)
 
   for turn in 1...65 {
-    cogs.commit("react17.separate.\(turn)") { c in
+    cogs.turn("react17.separate.\(turn)") { c in
       c[source] = turn
     }
     #expect(cogs.turnChainDiagnostic.isIdle)

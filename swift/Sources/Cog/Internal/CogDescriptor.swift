@@ -38,6 +38,9 @@
 ///
 /// Type-erased code needs only the descriptor's identity and label.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal protocol CogDescriptor: AnyObject {
   /// What Cog calls this declaration when it prints about it.
   var label: CogLabel { get }
@@ -50,6 +53,9 @@ extension CogDescriptor {
   /// identity cannot be reused while either can still address the declaration.
   /// Debug history stores rendered labels and keys rather than retaining a
   /// descriptor solely for diagnostics.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   var identity: ObjectIdentifier {
     ObjectIdentifier(self)
   }

@@ -1,4 +1,3 @@
-#if COG_LEG_CORE_ARENA
 import CogTesting
 import Testing
 
@@ -12,18 +11,18 @@ import Testing
     0,
     lifetime: .whileObserved(resetToInitial: true, grace: .seconds(7))
   )
-  let derivedCog = Cog<Int> { _ in 1 }
+  let automaticCog = Cog<Int> { _ in 1 }
 
   _ = cogs.peek(appSourceCog)
   _ = cogs.peek(ephemeralSourceCog)
-  _ = cogs.peek(derivedCog)
+  _ = cogs.peek(automaticCog)
 
   #expect(cogs.arenaCore.lifetimePolicy(for: appSourceCog) == .app)
   #expect(
     cogs.arenaCore.lifetimePolicy(for: ephemeralSourceCog)
       == .whileObserved(grace: .seconds(7))
   )
-  #expect(cogs.arenaCore.lifetimePolicy(for: derivedCog) == .whileObserved(grace: nil))
+  #expect(cogs.arenaCore.lifetimePolicy(for: automaticCog) == .whileObserved(grace: nil))
 }
 
 @MainActor
@@ -82,12 +81,12 @@ import Testing
   #expect(cogs.arenaCore.leaseCount(for: rightCog) == 0)
   #expect(cogs.arenaCore.leaseCount(for: anchorCog) == 1)
 
-  cogs.commit { c in c[chooseLeftCog] = false }
+  cogs.turn { c in c[chooseLeftCog] = false }
   #expect(cogs.arenaCore.leaseCount(for: leftCog) == 0)
   #expect(cogs.arenaCore.leaseCount(for: rightCog) == 1)
   #expect(cogs.arenaCore.leaseCount(for: anchorCog) == 1)
 
-  cogs.commit { c in c[chooseLeftCog] = true }
+  cogs.turn { c in c[chooseLeftCog] = true }
   #expect(cogs.arenaCore.leaseCount(for: leftCog) == 1)
   #expect(cogs.arenaCore.leaseCount(for: rightCog) == 0)
   #expect(cogs.arenaCore.leaseCount(for: anchorCog) == 1)
@@ -101,17 +100,17 @@ import Testing
 @MainActor
 @Test func `ArenaLeaseInfrastructure a UI boundary pins once and composes with reactions`() {
   let cogs = Cogs.forTesting()
-  let derivedCog = Cog<Int> { _ in 1 }
-  let token = cogs.runForArenaLifetimeTesting { c in _ = c[derivedCog] }
+  let automaticCog = Cog<Int> { _ in 1 }
+  let token = cogs.runForArenaLifetimeTesting { c in _ = c[automaticCog] }
 
-  #expect(cogs.arenaCore.leaseCount(for: derivedCog) == 1)
+  #expect(cogs.arenaCore.leaseCount(for: automaticCog) == 1)
 
-  #expect(cogs[derivedCog] == 1)
-  #expect(cogs[derivedCog] == 1)
-  #expect(cogs.arenaCore.leaseCount(for: derivedCog) == 2)
+  #expect(cogs[automaticCog] == 1)
+  #expect(cogs[automaticCog] == 1)
+  #expect(cogs.arenaCore.leaseCount(for: automaticCog) == 2)
 
   token.cancel()
-  #expect(cogs.arenaCore.leaseCount(for: derivedCog) == 1)
+  #expect(cogs.arenaCore.leaseCount(for: automaticCog) == 1)
 }
 
 @MainActor
@@ -134,7 +133,7 @@ import Testing
   #expect(cogs.arenaCore.leaseCount(for: beforeCancellationCog) == 1)
   #expect(cogs.arenaCore.leaseCount(for: afterCancellationCog) == 0)
 
-  cogs.commit { c in c[triggerCog] = 1 }
+  cogs.turn { c in c[triggerCog] = 1 }
 
   #expect(token?.reaction.isCancelled == true)
   #expect(cogs.arenaCore.leaseCount(for: beforeCancellationCog) == 0)
@@ -170,4 +169,3 @@ extension Cogs {
     register(label: CogLabel(name: nil, fileID: #fileID, line: #line), body: body)
   }
 }
-#endif

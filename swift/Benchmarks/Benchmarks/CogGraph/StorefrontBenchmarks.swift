@@ -368,7 +368,7 @@ enum StorefrontHarness {
   /// Publishes one inventory burst, accepts every response, and settles.
   ///
   /// The measured region covers the whole round trip a warehouse feed causes:
-  /// one multi-key commit, the requests the demanded rows start, the
+  /// one multi-key turn, the requests the demanded rows start, the
   /// acceptance of each response, the graph settlement each acceptance causes,
   /// and the observation work that re-renders the affected rows.
   static func runBurst(_ input: BurstInput) async throws {

@@ -6,7 +6,7 @@ import Testing
 
 @MainActor extension CogOps {
   fileprivate func refreshCurrentLocation() {
-    commit("location.hourlyRefresh") { c in
+    turn("location.hourlyRefresh") { c in
       c[hourlyRefreshCountCog] += 1
     }
   }

@@ -58,7 +58,7 @@ private nonisolated struct OpaqueReading {
 }
 
 @MainActor
-@Test func `STREAM-11 values without equality commit conservatively`() async throws {
+@Test func `STREAM-11 values without equality publish conservatively`() async throws {
   let (cogs, m) = probedContext()
   let (sequence, continuation) = AsyncStream.makeStream(of: OpaqueReading.self)
   let readingsCog = AsyncCog<OpaqueReading>(

@@ -5,10 +5,10 @@ public import Cog
 // Sources and ops share one file for a reason the linter enforces: a manual
 // source must be `private` (CogLint `manual-cog-private`), and only code in
 // this file can therefore name one on the left of a writer assignment. The
-// readable surface leaves through `.readOnly` projections, which every derived
+// readable surface leaves through `.readOnly` projections, which every automatic
 // and async declaration in the neighbouring files reads.
 //
-// Nothing here is a primitive at a call site. `commit` and `refresh` appear
+// Nothing here is a primitive at a call site. `turn` and `refresh` appear
 // only inside `extension CogOps` verbs, which is both the repository's
 // convention and what makes the SwiftUI application and the headless driver
 // able to perform *the same* user actions rather than two similar ones.
@@ -118,7 +118,7 @@ private let recentlyViewedRankSourceCogs = ManualCogBox<Int, ProductID>(
 /// Which inventory generation each product is asking the service for.
 ///
 /// Keyed rather than one global epoch, and that is the whole point of the
-/// inventory burst: a burst commits new generations for exactly the products it
+/// inventory burst: a burst turns new generations for exactly the products it
 /// touches, in one turn, so a checkpoint can prove that the offscreen half of
 /// the burst invalidated nothing on screen. A keyless epoch would invalidate
 /// every demanded row and make that claim unprovable.
@@ -175,14 +175,14 @@ extension CogOps {
   ///
   /// - Parameter service: The boundary to install.
   public func installStorefrontService(_ service: StorefrontService) {
-    commit(storefrontServiceSourceCog, to: service)
+    turn(storefrontServiceSourceCog, to: service)
   }
 
   /// Records the account response the graph accepted.
   ///
   /// - Parameter shopper: The signed-in shopper, or `nil` when signed out.
   public func signIn(as shopper: Shopper?) {
-    commit(signedInShopperSourceCog, to: shopper)
+    turn(signedInShopperSourceCog, to: shopper)
   }
 
   /// Types one more character into the search field.
@@ -193,7 +193,7 @@ extension CogOps {
   ///
   /// - Parameter text: The field's new contents.
   public func typeSearchQuery(_ text: String) {
-    commit(searchQuerySourceCog, to: text)
+    turn(searchQuerySourceCog, to: text)
   }
 
   /// Applies the browse screen's filters and window in one turn.
@@ -213,7 +213,7 @@ extension CogOps {
     sortMode: SortMode,
     inStockOnly: Bool
   ) {
-    commit { c in
+    turn { c in
       c[selectedCategorySourceCog] = category
       c[sortModeSourceCog] = sortMode
       c[inStockOnlySourceCog] = inStockOnly
@@ -228,63 +228,63 @@ extension CogOps {
   ///
   /// - Parameter category: The category, or `nil` for all.
   public func selectCategory(_ category: CategoryID?) {
-    commit(selectedCategorySourceCog, to: category)
+    turn(selectedCategorySourceCog, to: category)
   }
 
   /// Chooses how results are ordered.
   ///
   /// - Parameter mode: The sort mode.
   public func selectSortMode(_ mode: SortMode) {
-    commit(sortModeSourceCog, to: mode)
+    turn(sortModeSourceCog, to: mode)
   }
 
   /// Shows or hides out-of-stock products.
   ///
   /// - Parameter isOn: Whether to hide them.
   public func setInStockOnly(_ isOn: Bool) {
-    commit(inStockOnlySourceCog, to: isOn)
+    turn(inStockOnlySourceCog, to: isOn)
   }
 
   /// Records the rows the list has materialized.
   ///
   /// - Parameter window: The new window.
   public func scrollRows(to window: RowWindow) {
-    commit(rowWindowSourceCog, to: window)
+    turn(rowWindowSourceCog, to: window)
   }
 
   /// Applies or clears a coupon.
   ///
   /// - Parameter coupon: The typed coupon, or `nil` to clear it.
   public func applyCoupon(_ coupon: CouponCode?) {
-    commit(couponSourceCog, to: coupon)
+    turn(couponSourceCog, to: coupon)
   }
 
   /// Chooses where the order ships.
   ///
   /// - Parameter address: The address.
   public func selectShippingAddress(_ address: ShippingAddress) {
-    commit(shippingAddressSourceCog, to: address)
+    turn(shippingAddressSourceCog, to: address)
   }
 
   /// Chooses how the order ships.
   ///
   /// - Parameter method: The method.
   public func selectShippingMethod(_ method: ShippingMethod) {
-    commit(shippingMethodSourceCog, to: method)
+    turn(shippingMethodSourceCog, to: method)
   }
 
   /// Toggles one product's favorite flag.
   ///
   /// - Parameter id: Which product.
   public func toggleFavorite(_ id: ProductID) {
-    commit { c in
+    turn { c in
       c[favoriteSourceCogs[id]] = !c[favoriteSourceCogs[id]]
     }
   }
 
   /// Opens a product's detail screen and records that it was viewed.
   ///
-  /// Two sources in one turn, and the rank is derived from the writer's own
+  /// Two sources in one turn, and the rank is calculated from the writer's own
   /// staged reads: the new rank is one past the highest the session has handed
   /// out, which the caller supplies because a rank counter is session
   /// bookkeeping rather than a fact about a product.
@@ -293,7 +293,7 @@ extension CogOps {
   ///   - id: Which product.
   ///   - rank: The recency rank to record; larger is more recent.
   public func openProduct(_ id: ProductID, rank: Int) {
-    commit { c in
+    turn { c in
       c[selectedProductSourceCog] = id
       c[recentlyViewedRankSourceCogs[id]] = rank
     }
@@ -301,7 +301,7 @@ extension CogOps {
 
   /// Returns to the browse screen.
   public func closeProduct() {
-    commit(selectedProductSourceCog, to: nil)
+    turn(selectedProductSourceCog, to: nil)
   }
 
   /// Selects a variant of one product.
@@ -310,7 +310,7 @@ extension CogOps {
   ///   - variantIndex: Which variant.
   ///   - id: Which product.
   public func selectVariant(_ variantIndex: Int, for id: ProductID) {
-    commit(selectedVariantSourceCogs[id], to: variantIndex)
+    turn(selectedVariantSourceCogs[id], to: variantIndex)
   }
 
   /// Adds a product to the cart, or increases its quantity.
@@ -323,7 +323,7 @@ extension CogOps {
   ///   - id: Which product.
   ///   - quantity: How many to add.
   public func addToCart(_ id: ProductID, quantity: Int = 1) {
-    commit { c in
+    turn { c in
       let existing = c[cartQuantitySourceCogs[id]]
       c[cartQuantitySourceCogs[id]] = existing + quantity
       if existing == 0 {
@@ -338,7 +338,7 @@ extension CogOps {
   ///   - quantity: The new quantity; zero removes the line.
   ///   - id: Which product.
   public func setCartQuantity(_ quantity: Int, for id: ProductID) {
-    commit { c in
+    turn { c in
       c[cartQuantitySourceCogs[id]] = max(0, quantity)
       if quantity <= 0 {
         c[cartContentsSourceCog] = c[cartContentsSourceCog].filter { $0 != id }
@@ -359,7 +359,7 @@ extension CogOps {
   ///   - ids: The products the feed touched.
   ///   - generation: The generation to advance them to.
   public func publishInventoryBurst(_ ids: [ProductID], generation: Int) {
-    commit { c in
+    turn { c in
       for id in ids {
         c[inventoryGenerationSourceCogs[id]] = generation
       }

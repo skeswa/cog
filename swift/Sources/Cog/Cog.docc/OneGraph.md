@@ -53,7 +53,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(adviceCog) == "coat")
-  cogs.commit(temperatureSourceCog, to: 80)
+  cogs.turn(temperatureSourceCog, to: 80)
   #expect(cogs.peek(adviceCog) == "shorts")
 }
 ```
@@ -96,7 +96,7 @@ history, and wakes no reaction — so seeding cannot be mistaken for the change
 under test. It exists only in debug builds; a release build has no way to seed
 at all.
 
-For a change that *should* behave like a change, use ``Cogs/commit(_:to:name:)``
+For a change that *should* behave like a change, use ``Cogs/turn(_:to:name:)``
 in the body of the test.
 
 ### Testing time without waiting

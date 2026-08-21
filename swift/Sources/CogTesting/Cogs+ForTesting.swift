@@ -13,7 +13,7 @@ extension Cogs {
   /// The factory mirrors production's single-call bootstrap exactly, with one
   /// addition: the `seeding` closure runs after the context exists and before
   /// any mechanism's `operate`, so a test arranges state first — quiet seeds
-  /// and loud commits both — and then watches mechanisms come alive against
+  /// and loud turns both — and then watches mechanisms come alive against
   /// it. An `initial: .run` watch therefore observes seeded values on its
   /// registration run. There is no late-start API, even for tests.
   ///

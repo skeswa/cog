@@ -40,7 +40,7 @@ private final class CogTrackingNSView: NSView {
   view.layoutSubtreeIfNeeded()
   #expect(view.renderedValues == [0])
 
-  cogs.commit { c in c[count] = 1 }
+  cogs.turn { c in c[count] = 1 }
   view.layoutSubtreeIfNeeded()
 
   #expect(view.renderedValues == [0, 1])

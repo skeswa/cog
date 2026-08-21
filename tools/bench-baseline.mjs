@@ -8,11 +8,11 @@
 //
 // A benchmark number means nothing without the machine and toolchain that
 // produced it. perf §9 says every baseline pins its environment — exact Xcode
-// and Swift version, harness version, architecture, allocator backend, and
-// where it ran — and this tool is what makes that mechanical instead of
-// remembered. `update` records the environment beside the baseline; `check`
-// refuses to compare against a baseline the current environment does not
-// match, and says exactly which field moved.
+// and Swift version, harness version, architecture, allocator backend,
+// and where it ran — and this tool is what makes
+// that mechanical instead of remembered. `update` records the environment
+// beside the baseline; `check` refuses to compare against a baseline the
+// current environment does not match, and says exactly which field moved.
 //
 // ## Why refusing is the point
 //

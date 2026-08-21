@@ -36,7 +36,7 @@ private struct ZipCode: Hashable {
   #expect(cogs.peek(count) == cogs.peek(countSource))
 
   for value in 1...10 {
-    cogs.commit { c in
+    cogs.turn { c in
       c[countSource] = value
     }
 
@@ -87,7 +87,7 @@ private struct ZipCode: Hashable {
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()
 
-  first.commit { c in
+  first.turn { c in
     c[countSource] = 7
   }
 

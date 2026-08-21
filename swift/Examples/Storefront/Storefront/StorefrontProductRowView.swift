@@ -33,7 +33,7 @@ struct StorefrontProductRowView: View {
   ///
   /// A plain object, not the runtime: a row reports that it exists and learns
   /// nothing in return. Passing it is ordinary SwiftUI composition, and it is
-  /// what lets the window be committed from the row that actually moved it
+  /// what lets the window be published from the row that actually moved it
   /// without every row owning a copy of the bookkeeping.
   let rowWindowTracker: StorefrontRowWindowTracker
 

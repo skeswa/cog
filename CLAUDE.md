@@ -13,9 +13,9 @@ mobile UI. Cog consists of:
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
 The Swift library is implemented and published through 0.4.0. Post-release
-performance work, the arena comparison core, the Storefront macrobenchmark,
-and their open decisions continue under the same checked plan and scenario
-ledger. Kotlin has a complete first design but no implementation. The canonical
+performance work, the specialized arena, the Storefront macrobenchmark, and
+their open decisions continue under the same checked plan and scenario ledger.
+Kotlin has a complete first design but no implementation. The canonical
 current snapshots live in `docs/swift/README.md` and `docs/kotlin/README.md`;
 keep milestone state there rather than copying it into this instruction file.
 
@@ -28,8 +28,8 @@ keep milestone state there rather than copying it into this instruction file.
 - `SECURITY.md` — supported releases and private vulnerability reporting.
 - `Package.swift` — the SwiftPM manifest. The package root is the git root;
   every Swift target reaches under `swift/` through an explicit `path:`. The
-  manifest reads the isolation, value-reference, core, and edge selectors
-  described under "Commands" below.
+  manifest reads the isolation selectors and public arena trait described
+  under "Commands" below.
 - `swift/Sources/` — `Cog` (the shipping library), `CogTesting` (the
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
@@ -87,8 +87,10 @@ keep milestone state there rather than copying it into this instruction file.
   the workflow-contract check on GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
   task definitions, formatter configuration, and the license.
-- `docs/dump-2026-08-06.md` — frozen snapshot of the old Dart and Flutter
-  design. Historical background only; never normative and never edited.
+- `docs/design.md` — the normative state model and vocabulary shared by Swift
+  and Kotlin. Platform documents refine it without silently overriding it.
+- `docs/history.md` — the nonnormative lineage from the original Dart and
+  Flutter design, including the ideas retained, revised, or rejected.
 - `docs/swift/` — living Swift documents. Start with `README.md`, the map.
   Design docs live in `docs/swift/design/`: `exploration.md` covers the core
   architecture and API; `mechanisms.md` covers mechanisms — the bootstrap-registered
@@ -135,24 +137,22 @@ run alone:
 - `mise run fmt:check` — `fmt:check:md` and `fmt:check:swift`
   (`swift format lint --strict`). Writes nothing.
 
-`.oxfmtrc.json` excludes two things from formatting: the frozen
-`docs/dump-2026-08-06.md`, and every `swift/Sources/**/*.docc/**` catalog file.
-DocC markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
+`.oxfmtrc.json` excludes every `swift/Sources/**/*.docc/**` catalog file. DocC
+markdown is not ordinary markdown: Oxfmt rewrites its double-backtick
 symbol links into single-backtick code spans, which silently turns every
 documentation link into plain text.
 
 Root-package tests go through `tools/swift-test.mjs`, never `swift test`
 directly:
 
-- `mise run test` — the default isolation leg.
-- `mise run test:matrix` — all four isolation legs.
-- `mise run test:cores` — first prove the unset selector compiles the shipping
-  `simple` core, then run the complete behavior suite under explicit `simple`
-  and `arena` selections, serialized so benchmark-sized graph scenarios cannot
-  starve time-bounded actor tests.
-- `mise run test:value-references` — the full behavior suite under the
-  `inline`, `interned`, and `generic` value-reference layouts.
-- `mise run test:release` — the default leg in release configuration.
+- `mise run test` — the default isolation leg, serialized so benchmark-sized
+  graph scenarios cannot starve time-bounded actor tests.
+- `mise run test:matrix` — all four isolation legs, serialized within each leg.
+- `mise run test:arena-configurations` — prove the unset package compiles the
+  specialized arena and run the complete behavior suite through both that
+  shipping default and the public `CompactArena` opt-out, serialized so
+  benchmark-sized graph scenarios cannot starve time-bounded actor tests.
+- `mise run test:release` — the default leg in release configuration, serialized.
 - `mise run api:check [baseline]` — compares the supported `Cog` and
   `CogTesting` public APIs with the newest semantic-version release tag, or an
   explicit baseline. The non-API `_CogScenarios` product is deliberately
@@ -205,10 +205,10 @@ directly:
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
-  The Storefront macrobenchmark's five cuts are
-  `mise run bench --filter 'perf-15-storefront-.*'`, and they run under either
-  core through the same selector the rest of the suite uses
-  (`COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'`).
+- `mise run bench:compact` — run the same benchmark package with its
+  `CompactArena` trait, forwarding that public trait to Cog. Extra arguments
+  pass through, so Storefront's five compact cuts are
+  `mise run bench:compact --filter 'perf-15-storefront-.*'`.
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
   `swift/Benchmarks` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator
@@ -255,7 +255,7 @@ correctness suite has a wrapper of its own:
   Storefront benchmark number rests on.
 
 Extra arguments pass straight through, as in
-`mise run test --filter 'DECL-01|ONE-05' --parallel`. **Never run a filtered
+`mise run test --filter 'DECL-01|ONE-05'`. **Never run a filtered
 `swift test` yourself.** SwiftPM exits 0 when `--filter` selects nothing, so a
 raw filtered run can report a green for work it never ran. The wrapper guards
 twice — it enumerates the built tests before the run and checks the
@@ -268,26 +268,18 @@ wrapper mode of its own — `mainactor-nnbd-on`, `mainactor-nnbd-off`,
 `nonisolated-nnbd-on`, `nonisolated-nnbd-off` — which CI uses to run one leg
 per job. `COG_TEST_MANIFEST_CACHE=none` is an escape hatch for a stale
 manifest cache; it is not needed today.
-The isolation matrix is joined by one more build-time selector,
-`COG_TEST_VALUE_REFERENCE_LAYOUT`, which chooses how a keyed value reference
-physically carries its key (perf §4). It is a **library** setting rather than a
-test setting, because the layout is part of the library's representation. Unset
-means the selected v1 layout, inline `AnyHashable`, so an ordinary consumer
-never opts into a losing candidate; an unrecognized value is a hard manifest
-error for the same reason a mistyped isolation leg is. The interned-token and
-generic-keyed candidates remain available only for behavior and benchmark
-comparison. Generic uses box-produced keyed reference types and conditional
-runtime overloads because its concrete `Key` necessarily crosses the public
-read surface; it cannot hide entirely behind `CogKey`.
-M6 retains two internal library selectors without changing public API.
-`COG_TEST_CORE` chooses `simple` (unset/default) or `arena`.
-`COG_TEST_EDGE` belongs only to `arena`; unset means its selected layout,
-`pool`. Supplying an edge beside `simple`, or any unimplemented spelling, is a
-hard manifest error so a comparison command cannot pass without compiling that
-candidate. The manifest mirrors both choices into test-target defines for
-selector sentinels. M6's measured decision keeps ordinary consumer builds on
-the simple core and retains arena only for explicit behavior and benchmark
-comparison.
+
+The specialized arena, inline `AnyHashable` keyed references, and linked edge
+pool are the sole retained runtime representations. The rejected generic and
+interned value references, prefix and inline edge layouts, and simple core live
+only in the benchmark and optimization records. Their former environment
+selectors (`COG_TEST_VALUE_REFERENCE_LAYOUT`, `COG_TEST_EDGE`,
+`COG_TEST_CORE`, and `COG_TEST_ARENA_SPECIALIZATION`) are manifest hard errors
+so stale comparison commands cannot silently measure the shipping build. A
+final application can explicitly trade speed for binary size with the
+non-default `CompactArena` package trait, which keeps the arena and linked edge
+pool but suppresses the typed frontier. Because traits are additive, reusable
+libraries should not force that application-level choice on their consumers.
 
 The published site at `skeswa.github.io/cog/` has two halves, built by two
 toolchains and merged into the one GitHub Pages deployment a repository gets:
@@ -377,7 +369,7 @@ Every design and implementation choice should preserve four rules:
    screens or features do not create state islands or mirror sources.
 
 For Swift, a correct normal read uses the latest completed turn and settles
-every dependency needed for that value. A `Writer` read during a commit sees
+every dependency needed for that value. A `Writer` read during a turn sees
 that turn's staged source values. Async value reads are total: they return
 the last accepted success, resting on the declaration's default until one
 exists. Async uncertainty stays explicit in `CogStatus`, read through the
@@ -399,7 +391,7 @@ that runtime.
 
 - **Suffix Swift state declarations by shape.** Name every keyless value
   reference `thingCog`, with `Cog` as the final word; this includes manual,
-  derived, async, and read-only projection declarations. Name every box
+  automatic, async, and read-only projection declarations. Name every box
   `thingCogs`, with plural `Cogs` as the final word. Put narrower qualifiers
   before the suffix (`weatherServiceSourceCog`, `weatherReportSourceCogs`).
   The app runtime remains the ordinary local `cogs`, and ordinary values read
@@ -423,13 +415,13 @@ that runtime.
   `Cogs` parameters remain appropriate at non-view composition boundaries such
   as isolated test harnesses; side effects register as mechanisms in the
   bootstrap call rather than through any later installation.
-- **Wrap every primitive in a named op.** `commit` and `refresh` are how the
+- **Wrap every primitive in a named op.** `turn` and `refresh` are how the
   graph is asked to do something, not what an app calls the asking. Application
   code — a view action, a button, a mechanism — calls a domain verb from a
   `CogOps` extension (`cogs.refreshForecast(for: zip)`), never the primitive
   inline. This keeps the declaration a call site resolves to in the state layer
   with the rest of it, and it applies to `refresh` for the same reason it
-  applies to `commit`: both are demands on the graph, and neither is domain
+  applies to `turn`: both are demands on the graph, and neither is domain
   vocabulary.
 - **Read flatly; never repackage reads into a projection type.** A view that
   needs several values reads each one on its own line and binds it to a domain
@@ -439,7 +431,7 @@ that runtime.
   view depends on, invites being stored or passed onward, and buys nothing:
   reads in one `body` already come from one settled turn, and each already
   registers on its own so unrelated turns invalidate nothing. If a value is
-  genuinely derived rather than merely read together, declare a derived cog and
+  genuinely automatic rather than merely read together, declare an automatic cog and
   read that flatly too.
 - **Put initial app state in a mechanism's `operate`, not in the app entry
   point.** `operate` runs inside bootstrap, so its writes settle before
@@ -467,11 +459,11 @@ that runtime.
   trap should assert on the child's `standardErrorContent`, not merely its
   exit status, or it cannot tell a clear error from a bare trap.
 - **A scenario test never uses `@testable import Cog`.** Tests that own a
-  scenario ID prove it through the public API and `CogTesting` only.
-  COUNT-09 through COUNT-11 require the whole behavior suite to pass
-  unchanged across the value-reference layout and core swaps, so a scenario test able to
-  observe state storage would fail a swap it should not care about. Reach for
-  `@testable` only in infrastructure tests, which green no scenario.
+  scenario ID prove it through the public API and `CogTesting` only. The
+  behavior suite must not observe representation details: it was the common
+  proof while the retained layouts were selected and remains the proof for the
+  public `CompactArena` trait. Reach for `@testable` only in infrastructure
+  tests, which green no scenario.
 - **Give every class an explicit `nonisolated deinit`.** With
   `.defaultIsolation(MainActor.self)`, a synthesized `deinit` is
   main-actor-isolated, which is wrong twice over. On a **generic** class it is a
@@ -492,10 +484,10 @@ that runtime.
   isolation, and the isolation is what lets a handle released on the MainActor
   clean up synchronously instead of hopping. Do not "fix" one of these two
   spellings into the other; they solve opposite problems.
-- **Keep platform designs separate.** Shared principles apply to both
-  libraries, but Swift decisions are normative only for Swift. Do not assume
-  an API or implementation choice also applies to Android without recording an
-  Android decision.
+- **Keep platform designs separate.** Cross-platform invariants and vocabulary
+  live in `docs/design.md`. Swift and Kotlin documents own their platform APIs,
+  runtime mechanics, and framework integration; do not copy a platform choice
+  across without recording a decision for the receiving platform.
 - **Preserve shared Swift section numbering.** The companion docs were split
   from `exploration.md`: `mechanisms.md` is §6 and `rx.md` is §5.4. A reference
   such as “§6.4” resolves in `mechanisms.md`. Do not renumber these sections.
@@ -503,8 +495,9 @@ that runtime.
   the same map: `effects.md` is §6 and `flows.md` is §5.4.
 - **Dated files are frozen; undated files are living.** Living design docs use
   short lowercase names and carry an authorship date below the title.
-- **Map new docs.** Add new Swift docs to `docs/swift/README.md`. Add new
-  platform doc sets to the root `README.md`.
+- **Map new docs.** Add shared docs and new platform doc sets to the root
+  `README.md`. Add new Swift docs to `docs/swift/README.md` and new Kotlin docs
+  to `docs/kotlin/README.md`.
 - **Do not re-litigate settled decisions.** The Swift snapshot is in
   `docs/swift/README.md` under “Where things stand.” The full settled/open
   ledger is `docs/swift/design/exploration.md` §10. The Kotlin snapshot and

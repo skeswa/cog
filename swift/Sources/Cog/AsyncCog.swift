@@ -1,4 +1,4 @@
-/// A declaration and value reference for asynchronously derived state.
+/// A declaration and value reference for asynchronously automatic state.
 ///
 /// Constructing or copying an `AsyncCog` does not create graph state or start
 /// work. The declaration carries stable descriptor identity; each ``Cogs``
@@ -12,7 +12,7 @@
 /// Reading an async cog is total and value-first (§5.1): `c[valueReference]`
 /// returns `Value` — the last accepted success, or the declaration's resting
 /// default before one exists — so async state reads in the same shape as a
-/// manual or derived cog wherever only the value matters. The request
+/// manual or automatic cog wherever only the value matters. The request
 /// lifecycle is read through the `status` lens on the same capability
 /// (`c.status[valueReference]`), which returns the full ``CogStatus``.
 /// Bind either form to the declaration's unsuffixed domain name before use;
@@ -45,14 +45,14 @@ public struct AsyncCog<Value> {
   /// Stable declaration identity and behavior shared by copies of this reference.
   internal let descriptor: AsyncCogDescriptor<Value>
 
-  /// Stable derived-declaration identity for the total value projection.
+  /// Stable automatic-declaration identity for the total value projection.
   ///
-  /// Value reads of this reference resolve through this derived declaration:
+  /// Value reads of this reference resolve through this automatic declaration:
   /// its selector reads the async state's status and extracts its total
   /// value, which already rests on the declaration default before success.
   /// One projection descriptor is shared by every copy and — through boxes —
   /// every key, exactly like `descriptor` itself.
-  internal let valueDescriptor: DerivedCogDescriptor<Value>
+  internal let valueDescriptor: AutomaticCogDescriptor<Value>
 
   /// The state-identity key, or `nil` for this keyless public declaration.
   internal let key: CogKey?
@@ -166,7 +166,7 @@ public struct AsyncCog<Value> {
   /// created here.
   internal init(
     descriptor: AsyncCogDescriptor<Value>,
-    valueDescriptor: DerivedCogDescriptor<Value>,
+    valueDescriptor: AutomaticCogDescriptor<Value>,
     key: CogKey?
   ) {
     self.descriptor = descriptor
@@ -174,11 +174,11 @@ public struct AsyncCog<Value> {
     self.key = key
   }
 
-  /// The derived reference every value spelling of this async cog reads.
+  /// The automatic reference every value spelling of this async cog reads.
   ///
-  /// This is the internal seam that makes `c[asyncCog]` an ordinary derived
+  /// This is the internal seam that makes `c[asyncCog]` an ordinary automatic
   /// read: same settlement, equality gating, lifetime, and release behavior
-  /// as any other derived state, with the async state reachable through the
+  /// as any other automatic state, with the async state reachable through the
   /// projection's dependency edge. A value-only consumer therefore releases
   /// the projection and its async dependency at one shared grace deadline.
   internal var valueCog: Cog<Value> {
@@ -199,8 +199,8 @@ public struct AsyncCog<Value> {
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
     label: CogLabel
-  ) -> DerivedCogDescriptor<Value> {
-    DerivedCogDescriptor(
+  ) -> AutomaticCogDescriptor<Value> {
+    AutomaticCogDescriptor(
       selector: { c, key in
         c.asyncStatus(from: descriptor, key: key).value
       },

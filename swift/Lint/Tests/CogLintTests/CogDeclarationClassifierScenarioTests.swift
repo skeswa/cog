@@ -19,8 +19,8 @@ import Testing
 
   #expect(
     classifications.map(summary) == [
-      "temperatureCog:keyless:derived:direct",
-      "temperaturesCogs:box:derived:direct",
+      "temperatureCog:keyless:automatic:direct",
+      "temperaturesCogs:box:automatic:direct",
       "currentZipSourceCog:keyless:writable:direct",
       "reportSourceCogs:box:writable:direct",
       "optionalSourceCog:keyless:writable:direct",
@@ -113,7 +113,7 @@ private func summary(_ classification: CogDeclarationClassification) -> String {
   let shape = classification.shape == .keyless ? "keyless" : "box"
   let origin: String
   switch classification.origin {
-  case .derived: origin = "derived"
+  case .automatic: origin = "automatic"
   case .writableSource: origin = "writable"
   case .asynchronous: origin = "async"
   }

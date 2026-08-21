@@ -8,7 +8,7 @@ Cog state is singular, so each mutable fact has one writable source owned by the
 
 ## How to fix it
 
-Narrow the writable source to `private` or `fileprivate`. When another file needs to read it, expose the source's `.readOnly` projection or a genuinely derived cog instead of the manual declaration itself.
+Narrow the writable source to `private` or `fileprivate`. When another file needs to read it, expose the source's `.readOnly` projection or a genuinely automatic cog instead of the manual declaration itself.
 
 <!-- Generated from the manual-cog-private CogLint fixture corpus; do not edit. -->
 
@@ -50,7 +50,7 @@ public private(set) var sessionSourceCog = ManualCog("")
 
 ### File-owned sources and public reads
 
-Bare private access owns writer targets, while derived and read-only names may remain wider.
+Bare private access owns writer targets, while automatic and read-only names may remain wider.
 
 ```swift
 private let countSourceCog = ManualCog(0)

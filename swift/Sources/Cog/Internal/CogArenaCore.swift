@@ -1,17 +1,16 @@
-#if COG_CORE_ARENA
 /// Primitive result of the package-only arena slot-reuse probe.
 ///
 /// `CogTesting` maps this internal representation to its public diagnostic
 /// value. Production API never exposes arena indices or generations, so a
 /// normal value reference remains a stable descriptor-and-key name.
 package nonisolated struct CogArenaSlotReuseSnapshot: Sendable {
-  /// Row returned to the allocator by the released derived state.
+  /// Row returned to the allocator by the released automatic state.
   package let releasedIndex: Int32
 
   /// Generation carried by the released state's now-stale token.
   package let releasedGeneration: UInt16
 
-  /// Row allocated to the replacement derived state.
+  /// Row allocated to the replacement automatic state.
   package let replacementIndex: Int32
 
   /// Generation carried by the replacement's live token.
@@ -19,12 +18,15 @@ package nonisolated struct CogArenaSlotReuseSnapshot: Sendable {
 }
 
 /// Production role of one descriptor in the arena vertical slice.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated enum CogArenaDescriptorKind: Equatable {
   /// A source whose typed column owns current and pending values.
   case manual
 
   /// A synchronous selector whose typed column begins without a value.
-  case derived
+  case automatic
 
   /// An asynchronous selector whose typed status column begins without a value.
   case async
@@ -36,6 +38,9 @@ internal nonisolated enum CogArenaDescriptorKind: Equatable {
 /// graph walks instead use the scalar descriptor index on each row and invoke
 /// one descriptor-level function, never a per-state closure or existential.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogArenaDescriptorRecord {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
@@ -44,36 +49,66 @@ internal final class CogArenaDescriptorRecord {
   nonisolated deinit {}
 
   /// Process identity of the public declaration represented by this record.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let identity: ObjectIdentifier
 
   /// Human-readable declaration label used only when rendering diagnostics.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let label: CogLabel
 
   /// Dense context-local dispatch index stored on every row of this descriptor.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let index: Int32
 
-  /// Whether rows are manual, synchronous derived, or asynchronous values.
+  /// Whether rows are manual, synchronous automatic, or asynchronous values.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let kind: CogArenaDescriptorKind
 
   /// Retention policy shared by every row belonging to this descriptor.
   ///
   /// Keeping it on the descriptor dispatch record avoids repeating an enum in
   /// every scalar row. Only the cold lease and release paths load it.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let lifetime: CogStateLifetime
 
   /// Concrete ``CogArenaValueColumn`` restored by checked generic setup.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let column: AnyObject
 
   /// Descriptor-local async task sidecars, or `nil` for synchronous values.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let asyncColumn: AnyObject?
 
-  /// Publishes a pending source value, or `nil` for derived descriptors.
-  let commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?
+  /// Publishes a pending source value, or `nil` for automatic descriptors.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  let publishSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?
 
-  /// Reruns one derived row, or `nil` for manual descriptors.
+  /// Reruns one automatic row, or `nil` for manual descriptors.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?
 
   /// Sends the field-appropriate mutation through one installed UI boundary.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let notifyObservation: @MainActor (CogArenaSlot, CogObservationBoundary) -> Void
 
   /// Clears this descriptor's typed value cell before a scalar row is reused.
@@ -81,9 +116,15 @@ internal final class CogArenaDescriptorRecord {
   /// Lifetime expiry starts from an erased slot, so release dispatches once at
   /// the descriptor boundary instead of storing a closure or existential on
   /// every arena row.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let removeValue: @MainActor (CogArenaSlot) -> Void
 
   /// Cancels descriptor-owned cold work before the context releases its arena.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let prepareForContextTeardown: @MainActor () -> Void
 
   /// Drops the declaration's memoized keyless location for one context.
@@ -93,6 +134,9 @@ internal final class CogArenaDescriptorRecord {
   /// storing a second closure on every arena row. The argument is the calling
   /// context's identity: a descriptor shared with another live context must
   /// keep that context's memo.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let forgetMemoizedLocation: @MainActor (UInt64) -> Void
 
   /// Erased selector key by global arena row.
@@ -100,6 +144,9 @@ internal final class CogArenaDescriptorRecord {
   /// The current vertical slice exercises keyless rows. Keeping keys on the
   /// descriptor record already avoids a graph-wide key table; later keyed
   /// integration can specialize this storage without changing row dispatch.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var keys: ContiguousArray<CogKey?> = []
 
   /// Creates one immutable descriptor dispatch record.
@@ -111,7 +158,7 @@ internal final class CogArenaDescriptorRecord {
     lifetime: CogStateLifetime,
     column: AnyObject,
     asyncColumn: AnyObject?,
-    commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
+    publishSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
     notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
     removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
@@ -125,7 +172,7 @@ internal final class CogArenaDescriptorRecord {
     self.lifetime = lifetime
     self.column = column
     self.asyncColumn = asyncColumn
-    self.commitSource = commitSource
+    self.publishSource = publishSource
     self.recompute = recompute
     self.notifyObservation = notifyObservation
     self.removeValue = removeValue
@@ -182,14 +229,14 @@ internal nonisolated struct CogArenaPullFrame {
 
 /// Cursor state for one selector currently capturing dependency reads.
 internal nonisolated struct CogArenaDependencyCapture {
-  /// Derived row receiving every read in this scope.
+  /// Automatic row receiving every read in this scope.
   let consumer: CogArenaSlot
 
   /// Next prior dependency available for static-prefix reuse.
-  var cursor: CogSelectedArenaEdgeStorage.Cursor
+  var cursor: CogEdgeIndex
 
   /// Last dependency accepted in selector read order.
-  var previous: CogSelectedArenaEdgeStorage.Cursor
+  var previous: CogEdgeIndex
 }
 
 /// One lazily created Observation boundary pinned to an exact slot lifetime.
@@ -229,6 +276,9 @@ internal struct CogArenaLifetimeEntry {
 /// only integer rows. Descriptor records own typed columns and one dispatch
 /// function each; state rows own no classes or closures.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogArenaCore {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
@@ -237,16 +287,22 @@ internal final class CogArenaCore {
   nonisolated deinit {}
 
   /// Scalar state rows shared by every descriptor column.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let arena: CogArenaStorage
 
-  /// Concrete indexed edge representation selected for this build.
-  let edges: CogSelectedArenaEdgeStorage
+  /// Shared linked-edge pool for dependency and subscriber topology.
+  let edges: CogLinkedEdgePool
 
   /// Reused iterative push engine over `edges`.
-  let propagation: CogSelectedArenaDirtyPropagation
+  let propagation: CogArenaDirtyPropagation
 
   /// Latest graph revision assigned by the enclosing context turn.
-  private(set) var revision: UInt32 = 0
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal private(set) var revision: UInt32 = 0
 
   /// Process-unique identity of this graph, issued once at construction.
   ///
@@ -257,6 +313,9 @@ internal final class CogArenaCore {
   /// a memo compared against a recycled address would silently read another
   /// context's state. A strictly increasing counter is never reused, so a
   /// stale memo simply fails to match.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let contextIdentity: UInt64
 
   /// Source of the identities above, advanced once per arena graph.
@@ -269,6 +328,9 @@ internal final class CogArenaCore {
   var slots: [CogStateIdentity: CogArenaSlot] = [:]
 
   /// Strong registry retaining each descriptor record exactly once.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var recordsByIdentity: [ObjectIdentifier: CogArenaDescriptorRecord] = [:]
 
   /// Integer-indexed unretained view of `recordsByIdentity` for graph walks.
@@ -314,7 +376,7 @@ internal final class CogArenaCore {
   var historyLog = CogArenaHistoryLog()
   #endif
 
-  /// Derived rows whose settlement has entered but not completed, outermost first.
+  /// Automatic rows whose settlement has entered but not completed, outermost first.
   ///
   /// This stays separate from `pullFrames`: an exit frame is popped before its
   /// selector and equality run, while the row must remain visibly computing
@@ -332,10 +394,10 @@ internal final class CogArenaCore {
     pullFrames.isEmpty && captures.isEmpty && computingPath.isEmpty
   }
 
-  /// Rendered name of the innermost derived row still computing.
+  /// Rendered name of the innermost automatic row still computing.
   ///
-  /// The application commit guard reads this before opening a turn, covering
-  /// both selector execution and custom equality just like the simple core.
+  /// The application turn guard reads this before opening a turn, covering
+  /// both selector execution and custom equality.
   var innermostComputingName: String? {
     guard let rawRow = computingPath.last else { return nil }
     return cycleStep(forRow: liveRow(rawRow)).name
@@ -346,10 +408,10 @@ internal final class CogArenaCore {
     computingPath.suffix(count).map { cycleStep(forRow: liveRow($0)).name }
   }
 
-  /// Creates one empty arena graph and binds its selected edge propagator.
+  /// Creates one empty arena graph and binds its linked-edge propagator.
   init() {
     let arena = CogArenaStorage()
-    let edges = CogSelectedArenaEdgeStorage()
+    let edges = CogLinkedEdgePool()
     self.arena = arena
     self.edges = edges
     self.propagation = CogArenaDirtyPropagation(arena: arena, edges: edges)
@@ -369,4 +431,3 @@ internal final class CogArenaCore {
     revision += 1
   }
 }
-#endif

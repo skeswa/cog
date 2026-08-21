@@ -5,7 +5,7 @@ Add Cog to an app, declare some state, and put it on screen.
 ## Overview
 
 This article builds the smallest complete thing: one source of state, one value
-derived from it, a view that reads both, and a button that writes. Everything
+computed automatically from it, a view that reads both, and a button that writes. Everything
 here is MainActor code — Cog's graph is MainActor-confined, so there is no
 queue to choose and no lock to hold.
 
@@ -61,7 +61,7 @@ comes back to it.
 
 ### Declare state
 
-Sources are the facts your app is told. Everything else is derived from them.
+Sources are the facts your app is told. Everything else is computed automatically from them.
 
 ```swift
 private let temperatureSourceCog = ManualCog<Int>(60, name: "temperature")
@@ -84,7 +84,7 @@ Three things are worth noticing:
 - `name:` is optional. Give one and diagnostics and debug history use it;
   leave it out and they fall back to the file and line you declared it on.
 
-Derived values are lazy and cached. `adviceCog` runs when something first reads
+Automatic values are lazy and cached. `adviceCog` runs when something first reads
 it, and reruns only when a value it actually read has changed.
 
 ### Read state in a view
@@ -121,13 +121,13 @@ without leaving a subscription behind.
 
 ### Write state
 
-Writes happen in turns. One `commit` is one turn, however many values it
+Writes happen in turns. One `turn` is one turn, however many values it
 touches, and everything it wrote becomes visible at the same moment.
 
 ```swift
 extension Cogs {
   func warmUp() {
-    commit { c in c[temperatureSourceCog] += 10 }
+    turn { c in c[temperatureSourceCog] += 10 }
   }
 }
 ```
@@ -140,16 +140,16 @@ Two details make this the shape to copy:
 - `c` here is a ``Writer``. Reading through it sees this turn's staged values,
   which is what makes `+= 10` mean what it looks like.
 
-For a single value there is a compact form, ``Cogs/commit(_:to:name:)``:
+For a single value there is a compact form, ``Cogs/turn(_:to:name:)``:
 
 ```swift
-cogs.commit(temperatureSourceCog, to: 72)
+cogs.turn(temperatureSourceCog, to: 72)
 ```
 
 Both spellings name the turn after the calling function by default, which is
 what debug history shows you later.
 
-The same rule covers ``Cogs/refresh(_:)``. `commit` and `refresh` are how the
+The same rule covers ``Cogs/refresh(_:)``. `turn` and `refresh` are how the
 graph is *asked* to do something; they are not what your app calls the asking.
 Wrap them in domain verbs and let views say what they want:
 
@@ -176,8 +176,8 @@ Resist gathering them into a projection struct. Reads in one `body` already
 come from one settled turn, so they cannot tear, and each registers on its own,
 so an unrelated turn invalidates nothing — a wrapper adds a layer you have to
 read to know what the view depends on, and invites being stored or passed
-onward. If a value is genuinely *derived* rather than merely read alongside
-others, declare a derived cog for it and read that flatly too.
+onward. If a value is genuinely *automatic* rather than merely read alongside
+others, declare an automatic cog for it and read that flatly too.
 
 ### Run a side effect
 
@@ -224,7 +224,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(adviceCog) == "coat")
-  cogs.commit(temperatureSourceCog, to: 80)
+  cogs.turn(temperatureSourceCog, to: 80)
   #expect(cogs.peek(adviceCog) == "shorts")
 }
 ```

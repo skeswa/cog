@@ -5,7 +5,7 @@ import Testing
 // Selector-owned counters make equality behavior visible through public reads.
 
 @MainActor
-@Test func `TURN-09 an equal source write does not recompute a derived cog`() {
+@Test func `TURN-09 an equal source write does not recompute an automatic cog`() {
   var runs = 0
 
   let cogs = Cogs.forTesting()
@@ -18,7 +18,7 @@ import Testing
   #expect(cogs.peek(doubled) == 2)
   #expect(runs == 1)
 
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
 
   #expect(cogs.peek(doubled) == 2)
   #expect(runs == 1)
@@ -37,14 +37,14 @@ import Testing
 
   #expect(cogs.peek(doubled) == 6)
 
-  cogs.commit { c in c[sources["one"]] = 3 }
+  cogs.turn { c in c[sources["one"]] = 3 }
 
   #expect(cogs.peek(doubled) == 6)
   #expect(runs == 1)
 }
 
 @MainActor
-@Test func `TURN-10 changing and reverting in one commit is no change`() {
+@Test func `TURN-10 changing and reverting in one turn is no change`() {
   var runs = 0
 
   let cogs = Cogs.forTesting()
@@ -57,7 +57,7 @@ import Testing
 
   #expect(cogs.peek(squared) == 16)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[source] = 5
     #expect(c[source] == 5)
 
@@ -91,14 +91,14 @@ import Testing
 
   #expect(cogs.peek(note) == "first")
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[source] = Reading(sample: 7, note: "equal by the custom rule")
   }
 
   #expect(cogs.peek(note) == "first")
   #expect(runs == 1)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[source] = Reading(sample: 8, note: "changed by the custom rule")
   }
 
@@ -133,7 +133,7 @@ import Testing
   #expect(cogs.peek(first) == "one")
   #expect(cogs.peek(second) == "four")
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[sources["one"]] = Reading(sample: 3, note: "equal")
     c[sources["four"]] = Reading(sample: 5, note: "changed")
   }
@@ -162,7 +162,7 @@ import Testing
   #expect(cogs.peek(value) == 3)
   #expect(runs == 1)
 
-  cogs.commit { c in c[source] = Reading(value: 3) }
+  cogs.turn { c in c[source] = Reading(value: 3) }
 
   #expect(cogs.peek(value) == 3)
   #expect(runs == 2)
@@ -195,7 +195,7 @@ import Testing
 
   // The safe treat-every-write-as-changed rule applies per key: the written
   // key recomputes, and the untouched sibling key does not.
-  cogs.commit { c in c[readings["home"]] = Reading(value: 3) }
+  cogs.turn { c in c[readings["home"]] = Reading(value: 3) }
 
   #expect(cogs.peek(home) == 3)
   #expect(cogs.peek(work) == 3)

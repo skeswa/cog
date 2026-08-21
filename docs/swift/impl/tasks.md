@@ -268,12 +268,12 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter DECL-05` and `mise run test:compilefail`._
   _Greens: DECL-05, DECL-06._
 - **M1-04aa** _(Infrastructure)_ — Add idle, accumulating, and flushing
-  phases, default/custom commit-name capture, unforgeable turn IDs, and
+  phases, default/custom turn-name capture, unforgeable turn IDs, and
   keyless pending/current storage.
   _Depends: M1-01b._
   _Verify: `mise run test --filter TurnStateInfrastructure`._
 - **M1-04ab** _(Behavior)_ — Add keyless staging, writer read-back, flush on
-  the outer commit boundary, and committed normal reads during accumulation.
+  the outer turn boundary, and completed-turn normal reads during accumulation.
   _Depends: M1-04aa._
   _Verify: `mise run test --filter 'READ-01|TURN-01|TURN-03|TURN-04'`._
   _Greens: READ-01, TURN-01, TURN-03, TURN-04._
@@ -281,12 +281,12 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-02, M1-04ab._
   _Verify: `mise run test --filter 'TURN-02|TURN-14'`._
   _Greens: TURN-02, TURN-14._
-- **M1-05a** _(Behavior)_ — Add keyless derived cogs, tracked `c[...]`, lazy
+- **M1-05a** _(Behavior)_ — Add keyless automatic cogs, tracked `c[...]`, lazy
   first computation, and caching.
   _Depends: M1-04ab._
   _Verify: `mise run test --filter 'DECL-07|DECL-09|READ-02'`._
   _Greens: DECL-07, DECL-09, READ-02._
-- **M1-05b** _(Behavior)_ — Add derived boxes and lexical keyed capture.
+- **M1-05b** _(Behavior)_ — Add automatic boxes and lexical keyed capture.
   _Depends: M1-02, M1-05a._
   _Verify: `mise run test --filter DECL-08`._
   _Greens: DECL-08._
@@ -299,11 +299,11 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-05a._
   _Verify: `mise run test --filter SettleEngineInfrastructure`._
 - **M1-06ab** _(Behavior)_ — Settle a linear chain through the explicit stack
-  from the newest committed source value.
+  from the newest published source value.
   _Depends: M1-06aa._
   _Verify: `mise run test --filter GRAPH-01`._
   _Greens: GRAPH-01._
-- **M1-06b** _(Behavior)_ — Add multi-parent checking so multi-source commits
+- **M1-06b** _(Behavior)_ — Add multi-parent checking so multi-source turns
   and diamonds settle once.
   _Depends: M1-06ab._
   _Verify: `mise run test --filter 'READ-03|GRAPH-02'`._
@@ -317,7 +317,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-04b, M1-06ab._
   _Verify: `mise run test --filter 'TURN-09|TURN-10|TURN-11|TURN-12'`._
   _Greens: TURN-09, TURN-10, TURN-11, TURN-12._
-- **M1-07b** _(Behavior)_ — Equality-gate derived recomputation and stop or
+- **M1-07b** _(Behavior)_ — Equality-gate automatic recomputation and stop or
   continue downstream waves accordingly.
   _Depends: M1-06b, M1-07a._
   _Verify: `mise run test --filter 'GRAPH-05|GRAPH-06'`._
@@ -396,7 +396,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter 'CYCLE-01|CYCLE-02'` and
   `mise run test:release --filter 'CYCLE-01|CYCLE-02'`._
   _Greens: CYCLE-01, CYCLE-02._
-- **M1-15ea** _(Behavior)_ — Reject a commit throughout derived computation,
+- **M1-15ea** _(Behavior)_ — Reject a turn throughout automatic computation,
   including custom equality, before its body or attempted graph mutation.
   _Depends: M1-07b, M1-15b._
   _Verify: `mise run test --filter CYCLE-06` and
@@ -469,7 +469,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test:compilefail`._
   _Greens: REACT-14._
 - **M1-19b** _(Behavior)_ — Do not wake reactions for equal manual writes or
-  equal derived recomputation.
+  equal automatic recomputation.
   _Depends: M1-16c._
   _Verify: `mise run test --filter 'REACT-21|REACT-22'`._
   _Greens: REACT-21, REACT-22._
@@ -482,7 +482,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-20a._
   _Verify: `mise run test --filter REACT-16`._
   _Greens: REACT-16._
-- **M1-13b** _(Behavior)_ — Verify several commits queued during one flush
+- **M1-13b** _(Behavior)_ — Verify several turns queued during one flush
   complete in FIFO settle-notify-react order.
   _Depends: M1-20b._
   _Verify: `mise run test --filter TURN-08`._
@@ -517,7 +517,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter MechanismTaskInfrastructure`._
 - **M1-37a** _(Behavior)_ — Operate bootstrap mechanisms synchronously in
   list order, settle operate-time writes before the factory returns, and
-  expose an earlier mechanism's committed values to a later mechanism's
+  expose an earlier mechanism's published values to a later mechanism's
   `operate`.
   _Depends: M1-16c._
   _Verify: `mise run test --filter 'MECH-01|MECH-02'`._
@@ -593,7 +593,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test --filter MECH-16`._
   _Greens: MECH-16._
 - **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
-  manual `.app` and synchronous-derived `.whileObserved` defaults.
+  manual `.app` and synchronous automatic `.whileObserved` defaults.
   _Depends: M1-05b, M1-08a._
   _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
 - **M1-27b** _(Infrastructure)_ — Track registered reactions as external
@@ -601,12 +601,12 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-16c, M1-27a, M1-35b._
   _Verify: `mise run test --filter ReactionLeaseInfrastructure`._
 - **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
-  testing override, then release an unobserved derived cog after injected
+  testing override, then release an unobserved automatic cog after injected
   grace and recreate it correctly.
   _Depends: M1-01ca, M1-27b._
   _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._
   _Greens: LIFE-02, LIFE-03._
-- **M1-28b** _(Behavior)_ — Cancel pending derived release and prove reaction
+- **M1-28b** _(Behavior)_ — Cancel pending automatic release and prove reaction
   leases suppress release.
   _Depends: M1-28a._
   _Verify: `mise run test --filter 'LIFE-04|LIFE-07'`._
@@ -654,7 +654,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-16c, M1-30a, M1-31a._
   _Verify: `mise run test --filter 'SEED-02|SEED-04'`._
   _Greens: SEED-02, SEED-04._
-- **M1-30c** _(Behavior)_ — Reject seeding a derived cog at compile time.
+- **M1-30c** _(Behavior)_ — Reject seeding an automatic cog at compile time.
   _Depends: M1-30a._
   _Verify: `mise run test:compilefail`._
   _Greens: SEED-06._
@@ -664,7 +664,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Verify: `mise run test:compilefail` and
   `mise run test --filter ACTOR-03`._
   _Greens: ACTOR-02, ACTOR-03._
-- **M1-33b** _(Behavior)_ — Prove selectors, commit bodies, and reactions run
+- **M1-33b** _(Behavior)_ — Prove selectors, turn bodies, and reactions run
   on the MainActor in every build-settings leg.
   _Depends: M1-16b, M1-33a._
   _Verify: `mise run test:matrix --filter ACTOR-01`._
@@ -721,12 +721,12 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Verify: `mise run test --filter UI-03`._
   _Greens: UI-03._
 - **M2-04** _(Behavior)_ — Suppress UI notices for equal manual writes and
-  equal derived recomputation.
+  equal automatic recomputation.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-04`._
   _Greens: UI-04._
 - **M2-05** _(Behavior)_ — Prove an application-owned SwiftUI binding can
-  delegate to domain ops, with compact single-source commits and immediate
+  delegate to domain ops, with compact single-source turns and immediate
   read-back; add no Cog binding helper.
   _Depends: M2-02ab._
   _Verify: `mise run test --filter UI-07`._
@@ -770,7 +770,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Verify: `test-simulator` completes only `CogBoundaryTests`._
 - **M2-14a** _(Infrastructure)_ — Create Weather's Xcode workspace with a
   local-path dependency on Cog, then build its state layer with per-ZIP
-  sources, `fileprivate` access, derived values, and ops.
+  sources, `fileprivate` access, automatic values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
 - **M2-14b** _(Infrastructure)_ — Register Weather's mechanism at bootstrap:
@@ -823,7 +823,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-01._
   _Verify: `mise run test --filter ASYNC-01`._
   _Greens: ASYNC-01._
-- **M3-03a** _(Behavior)_ — Commit success and failure as distinct named
+- **M3-03a** _(Behavior)_ — Publish success and failure as distinct named
   turns observed by watchers.
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-02`._
@@ -895,12 +895,12 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test:matrix --filter ASYNC-15`._
   _Greens: ASYNC-15._
-- **M3-10b** _(Behavior)_ — Run `@concurrent` work off-main and commit its
+- **M3-10b** _(Behavior)_ — Run `@concurrent` work off-main and publish its
   result on the MainActor under the generation check.
   _Depends: M3-05b, M3-10a._
   _Verify: `mise run test:matrix --filter ASYNC-16`._
   _Greens: ASYNC-16._
-- **M3-10c** _(Behavior)_ — Expose descriptor-derived internal task names
+- **M3-10c** _(Behavior)_ — Expose descriptor-based internal task names
   through the narrow testing seam.
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-17`._
@@ -921,13 +921,13 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter ASYNC-26`._
   _Greens: ASYNC-26._
 - **M3-10g** _(Behavior)_ — Reject public refresh during selector computation
-  with the commit-during-derivation diagnostic in debug and release.
+  with the turn-during-automatic-computation diagnostic in debug and release.
   _Depends: M3-08b._
   _Verify: `mise run test --filter ASYNC-27` and
   `mise run test:release --filter ASYNC-27`._
   _Greens: ASYNC-27._
 - **M3-10h** _(Behavior)_ — Defer graph-owned system turns requested during
-  derived computation until the outermost settle path exits, while keeping
+  automatic computation until the outermost settle path exits, while keeping
   first pending synchronously readable and preserving named turn order.
   _Depends: M3-04._
   _Verify: `mise run test --filter ASYNC-28`._
@@ -938,7 +938,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-08ca._
   _Verify: `mise run test --filter ASYNC-29`._
   _Greens: ASYNC-29._
-- **M3-10j** _(Behavior)_ — Treat a one-shot synchronous derived peek as
+- **M3-10j** _(Behavior)_ — Treat a one-shot synchronous automatic peek as
   transient demand: renew ordinary `whileObserved` grace without a durable
   lease or Observation boundary, then release and recreate the state after
   expiry.
@@ -1048,9 +1048,9 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   lens in the Weather example and its tests.
   _Depends: M4-07d._
   _Verify: `mise run build:weather` and `mise run test:weather`._
-- **M4-08** _(Behavior)_ — Prove commit-boundary settlement and
-  shortcut-diamond consistency: a derived cog settled mid-commit computes
-  from committed values, and an uneven diamond settles once with no torn
+- **M4-08** _(Behavior)_ — Prove turn-boundary settlement and
+  shortcut-diamond consistency: an automatic cog settled mid-turn computes
+  from published values, and an uneven diamond settles once with no torn
   pair.
   _Depends: M3-11._
   _Verify: `mise run test --filter 'TURN-15|GRAPH-13'`._
@@ -1062,12 +1062,12 @@ _Plan scope and exit: [M4: API review, docs, and 0.1.0](./plan.md#plan-m4)._
   `mise run test:release --filter CYCLE-07`._
   _Greens: CYCLE-07._
 - **M4-10** _(Behavior)_ — Prove the debug seed-misuse guard traps clearly
-  from a commit body and from a selector.
+  from a turn body and from a selector.
   _Depends: M3-11._
   _Verify: `mise run test --filter SEED-08`._
   _Greens: SEED-08._
 - **M4-11** _(Behavior)_ — Prove mid-flush gated-scope teardown, per-key
-  derived lifetime independence, whole-and-ordered queued-turn history, and
+  automatic lifetime independence, whole-and-ordered queued-turn history, and
   per-render Observation retracking.
   _Depends: M3-11._
   _Verify: `mise run test --filter 'MECH-11|LIFE-11|HIST-07|UI-16'`._
@@ -1201,22 +1201,22 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   `bench-build` CI job.
   _Depends: M5-07a, M5-07b, M5-07c, M5-07d._
   _Verify: local bench command and CI release build._
-- **M5-09a** _(Infrastructure)_ — Put value-reference layout behind a test/benchmark
-  candidate seam selected by `COG_TEST_VALUE_REFERENCE_LAYOUT`; record inline
+- **M5-09a** _(Infrastructure)_ — Put value-reference layout behind the
+  temporary test and benchmark seam used to compare candidates; record inline
   `AnyHashable` as the baseline candidate.
   _Depends: M5-04b, M5-08b._
-  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline mise run test` and the keyed benchmark
-  slice run through the seam._
+  _Verify: recorded selected-layout behavior and keyed benchmark baseline._
 - **M5-09b** _(Infrastructure)_ — Implement the interned-token candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=interned mise run test --filter COUNT-07`._
+  _Verify: recorded interned-token behavior and benchmark result._
 - **M5-09c** _(Infrastructure)_ — Implement the generic-keyed-value-reference candidate.
   _Depends: M5-09a._
-  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=generic mise run test --filter COUNT-07`._
+  _Verify: recorded generic-keyed behavior and benchmark result._
 - **M5-09d** _(Behavior)_ — Run every behavior scenario through M5 unchanged
-  under all three value-reference layouts; expose the loop as `mise run test:value-references`.
+  under all three value-reference layouts before selecting one.
   _Depends: M5-02b, M5-03a, M5-03b, M5-09b, M5-09c._
-  _Verify: `mise run test:value-references`._
+  _Verify: `mise run test` plus the three-candidate result recorded in
+  `impl/benchmarks.md`._
   _Greens: COUNT-09._
 - **M5-09e** _(Behavior)_ — Benchmark keyed diamonds and churn under every
   value-reference layout, record results, and settle the layout in `impl/benchmarks.md` and exploration §10.
@@ -1248,20 +1248,15 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 _Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
 
-_Arena-coverage exceptions: COUNT-01–COUNT-08 are proven under the arena core
-by the `M6-05a` edge gate rather than an `M6-10` filter._
-
 - **M6-01a** _(Infrastructure)_ — Add arena slot allocation, reuse,
   generations, and the scalar SoA column skeleton.
   _Depends: M5-10._
   _Verify: focused allocate, release, reuse, generation, and scalar-column
   tests._
 - **M6-01b** _(Infrastructure)_ — Put the core and edge representations behind
-  internal test-only `COG_TEST_CORE` and `COG_TEST_EDGE` selectors without
-  changing the public API.
+  temporary internal selectors without changing the public API.
   _Depends: M6-01a._
-  _Verify: selector sentinel tests under `COG_TEST_CORE=simple` and
-  `COG_TEST_CORE=arena COG_TEST_EDGE=pool`._
+  _Verify: recorded selector sentinel results for simple and arena/pool._
 - **M6-02** _(Infrastructure)_ — Implement the shared linked edge pool as the
   first runnable candidate.
   _Depends: M6-01b._
@@ -1269,12 +1264,11 @@ by the `M6-05a` edge gate rather than an `M6-10` filter._
 - **M6-06** _(Infrastructure)_ — Add typed per-descriptor current and pending
   value columns over arena slots.
   _Depends: M6-01a._
-  _Verify: typed read, stage, commit, and removal tests._
-- **M6-07aa** _(Infrastructure)_ — Stage and commit manual values through the
+  _Verify: typed read, stage, publish, and removal tests._
+- **M6-07aa** _(Infrastructure)_ — Stage and publish manual values through the
   arena and push dirty flags over baseline edges with a reused explicit stack.
   _Depends: M6-02, M6-06._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-ArenaDirtyPropagationInfrastructure`._
+  _Verify: `mise run test --filter ArenaDirtyPropagationInfrastructure`._
 - **M6-07ab** _(Infrastructure)_ — Pull and settle chain, diamond, and broad
   graphs with versions and equality backdating. Collapse the cold first-read
   frame cycle `M4-14` measured while rewriting this walk: nine of its eleven
@@ -1282,33 +1276,29 @@ ArenaDirtyPropagationInfrastructure`._
   and the `recompute`/`run`/`tracking` layering raises the `M4-14` bound
   without changing its shape.
   _Depends: M6-07aa._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-'GRAPH-01|GRAPH-02|GRAPH-04|GRAPH-05'`._
+  _Verify: `mise run test --filter 'GRAPH-01|GRAPH-02|GRAPH-04|GRAPH-05'`._
 - **M6-07ac** _(Infrastructure)_ — Recapture dynamic dependencies and reuse or
   remove baseline edges as dependency sets change.
   _Depends: M6-07ab._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-'GRAPH-09|GRAPH-10|GRAPH-11|COUNT-08'`._
+  _Verify: `mise run test --filter 'GRAPH-09|GRAPH-10|GRAPH-11|COUNT-08'`._
 - **M6-07b** _(Infrastructure)_ — Add arena computing marks and keyed cycle
   paths.
   _Depends: M6-07ac._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter CYCLE`._
+  _Verify: `mise run test --filter CYCLE`._
 - **M6-03** _(Infrastructure)_ — Implement Reactively-style per-state prefix
   arrays behind the runnable edge seam.
   _Depends: M6-07ac._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=prefix mise run test --filter
-'GRAPH|COUNT-08'`._
+  _Verify: recorded prefix-array behavior and benchmark result._
 - **M6-04** _(Infrastructure)_ — Implement inline-plus-overflow behind the
   runnable edge seam.
   _Depends: M6-07ac._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=inline mise run test --filter
-'GRAPH|COUNT-08'`._
+  _Verify: recorded inline-plus-overflow behavior and benchmark result._
 - **M6-05a** _(Gate)_ — Run the complete M5 scenario set under all three arena
   edge candidates. Candidate-specific repairs discovered here become separate
   tasks before this gate is retried.
   _Depends: M6-03, M6-04, M6-07b._
-  _Verify: the complete M5 scenario set with `COG_TEST_CORE=arena` and each of
-  `COG_TEST_EDGE=pool`, `prefix`, and `inline`._
+  _Verify: recorded complete M5 scenario run under all three candidates, plus
+  `mise run test` on the selected shared pool._
 - **M6-05b** _(Infrastructure)_ — Benchmark mostly-static and high-churn
   graphs under all correct edge candidates.
   _Depends: M6-05a._
@@ -1321,7 +1311,7 @@ ArenaDirtyPropagationInfrastructure`._
 - **M6-08a** _(Infrastructure)_ — Integrate lazy boundary creation with arena
   slots.
   _Depends: M6-05c._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'UI-01|UI-02|UI-05'`._
+  _Verify: `mise run test --filter 'UI-01|UI-02|UI-05'`._
 - **M6-08b** _(Behavior)_ — Reuse released slots with new generations and
   catch stale access in debug.
   _Depends: M6-08a._
@@ -1330,100 +1320,95 @@ ArenaDirtyPropagationInfrastructure`._
 - **M6-09** _(Infrastructure)_ — Integrate the debug ring buffer with zero
   release cost.
   _Depends: M6-05c._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter HIST` plus the arena
+  _Verify: `mise run test --filter HIST` plus the arena
   release symbol/build check._
 - **M6-10aa** _(Infrastructure)_ — Pass production/testing bootstrap,
   descriptors, and manual-source behavior through the arena selector.
   _Depends: M6-05c._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'ONE|DECL-0[1-5]'`._
-- **M6-10ab** _(Infrastructure)_ — Pass writer staging, commit phases, and
+  _Verify: `mise run test --filter 'ONE|DECL-0[1-5]'`._
+- **M6-10ab** _(Infrastructure)_ — Pass writer staging, turn phases, and
   queued-turn behavior through the arena selector.
   _Depends: M6-10aa._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter TURN`._
+  _Verify: `mise run test --filter TURN`._
 - **M6-10ba** _(Infrastructure)_ — Pass tracked, untracked, lazy, equal, and
-  dynamically recaptured derived reads, plus derived declaration and
+  dynamically recaptured automatic reads, plus automatic declaration and
   laziness behavior, through the arena selector.
   _Depends: M6-10ab._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'READ|GRAPH|DECL-0[7-9]'`._
+  _Verify: `mise run test --filter 'READ|GRAPH|DECL-0[7-9]'`._
 - **M6-10bb** _(Infrastructure)_ — Pass public self, multi-state, conditional,
-  keyed, and commit-during-derived-computation failure behavior through the
+  keyed, and turn-during-automatic-computation failure behavior through the
   arena selector.
   _Depends: M6-10ba._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter CYCLE` and
-  `COG_TEST_CORE=arena mise run test:release --filter CYCLE`._
+  _Verify: `mise run test --filter CYCLE` and
+  `mise run test:release --filter CYCLE`._
 - **M6-10ca** _(Infrastructure)_ — Pass reaction tracking, ordering,
   equality, watch, and cleanup behavior, plus MainActor confinement
   and non-`Sendable` values, through the arena selector.
   _Depends: M6-10ba._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-(0[1-9]|14|2[1-3])|ACTOR-0[13]'`._
+  _Verify: `mise run test --filter 'REACT-(0[1-9]|14|2[1-3])|ACTOR-0[13]'`._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
   and the turn-chain diagnostic through the arena selector.
   _Depends: M6-10ca._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'REACT-15|REACT-16|REACT-17'`._
+  _Verify: `mise run test --filter 'REACT-15|REACT-16|REACT-17'`._
 - **M6-10cc** _(Infrastructure)_ — Keep the arena's debug-only quiescence
   probe out of release test compilation without publishing that diagnostic
   seam in production.
   _Depends: M6-10cb._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-ArenaQuiescenceInfrastructure` and `COG_TEST_CORE=arena mise run test:release
---filter CoreSelectorInfrastructure`._
+  _Verify: `mise run test --filter ArenaQuiescenceInfrastructure` and
+  `mise run test:arena-configurations --filter ArenaSpecializationInfrastructure`._
 - **M6-10d** _(Infrastructure)_ — Pass mechanism bootstrap, gated-scope
   cancellation, and task behavior through the arena core selector.
   _Depends: M6-10cb._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter MECH`._
+  _Verify: `mise run test --filter MECH`._
 - **M6-10ea** _(Infrastructure)_ — Pass lifetime policies, external reaction
   leases, and UI pinning through arena lease counts.
   _Depends: M6-08b, M6-10ca._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
+  _Verify: `mise run test --filter
 'ArenaLifetimePolicyInfrastructure|ArenaLeaseInfrastructure'`._
 - **M6-10eb** _(Infrastructure)_ — Pass the complete lifetime behavior suite
   through arena grace, release, manual reset, and slot reuse.
   _Depends: M6-10ea._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter LIFE`._
+  _Verify: `mise run test --filter LIFE`._
 - **M6-10fa** _(Infrastructure)_ — Pass the M1 `CogTesting` debug-seed
   semantics, including the seed-misuse trap, through arena dirty propagation
   without turns, reactions, or history.
   _Depends: M6-09, M6-10cb._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'SEED-0[1-4]|SEED-08'`,
+  _Verify: `mise run test --filter 'SEED-0[1-4]|SEED-08'`,
   `mise run test:compilefail`, and the release absence check._
 - **M6-10g** _(Infrastructure)_ — Pass UI boundary behavior and
   UI-before-reaction flush ordering through the arena core selector.
   _Depends: M6-08a, M6-10ca._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'UI|REACT-19'` plus
-  UIKit simulator scenarios with `COG_TEST_CORE=arena`._
+  _Verify: `mise run test --filter 'UI|REACT-19'` plus UIKit simulator
+  scenarios._
 - **M6-10fb** _(Infrastructure)_ — Pass bounded history, explicit and
   `fileID:line` labels, named effect runs, and UI notices through the arena
   ring buffer and diagnostics.
   _Depends: M6-09, M6-10cb, M6-10g._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter 'HIST|DECL-1[01]'`
+  _Verify: `mise run test --filter 'HIST|DECL-1[01]'`
   plus the release zero-cost check._
 - **M6-10fc** _(Infrastructure)_ — Prove seed stays silent at a real arena UI
   boundary.
   _Depends: M6-10fa, M6-10g._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter SEED-07`._
+  _Verify: `mise run test --filter SEED-07`._
 - **M6-10ha** _(Infrastructure)_ — Pass async status creation, first work,
   results, projections, dependency capture, keys, isolation, and task naming
   through arena values.
   _Depends: M6-10ba._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
-'ASYNC-(0[1-6]|1[125678]|20|26|3[01289])'`._
+  _Verify: `mise run test --filter 'ASYNC-(0[1-6]|1[125678]|20|26|3[01289])'`._
 - **M6-10hb** _(Infrastructure)_ — Pass async replacement, refresh, stale
   generation rejection, previous-value carry, cold one-shot demand,
   non-reentrant system turns, bounded grace scheduling, and release/recreation
   through arena generations.
   _Depends: M6-10eb, M6-10ha._
-  _Verify: `COG_TEST_CORE=arena mise run test --filter
+  _Verify: `mise run test --filter
 'ASYNC-(0[7-9]|10|1[349]|2[1-5]|2[7-9]|3[5-7])'`._
 - **M6-10i** _(Behavior)_ — Run the complete behavior suite unchanged with
-  the arena core selected in place of the simple one, leaving the default
-  core untouched; expose simple-versus-arena checking as
-  `mise run test:cores`. This task is outcome-neutral: it proves the arena,
-  it does not adopt it.
+  the arena core selected in place of the simple one before changing the
+  default. The recorded comparison is outcome-neutral: it proves the arena,
+  it does not by itself adopt it.
   _Depends: M6-10bb, M6-10cc, M6-10d, M6-10fb, M6-10fc, M6-10hb._
-  _Verify: `mise run test:cores` and `mise run test:compilefail`._
+  _Verify: `mise run test` and `mise run test:compilefail` plus the recorded
+  pre-switch comparison._
   _Greens: COUNT-10._
 - **M6-11a** _(Infrastructure)_ — Add the raw `@Observable` comparison
   adapter and equivalent benchmark workloads.
@@ -1452,8 +1437,7 @@ ArenaQuiescenceInfrastructure` and `COG_TEST_CORE=arena mise run test:release
   record the arena's retained selector-only role. The default core never
   changes upstream of this task.
   _Depends: M6-12a._
-  _Verify: `mise run test:cores` with the default core matching the recorded
-  decision._
+  _Verify: `mise run test` with the default core matching the recorded decision._
 - **M6-12b** _(Gate)_ — If the recorded decision calls for 0.2.0, prepare its
   non-mutating release candidate across behavior, benchmarks, docs, and
   changelog; otherwise close M6 with the recorded no-release rationale.
@@ -1505,7 +1489,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-01a, M7-02._
   _Verify: `mise run test --filter POLICY-01`._
   _Greens: POLICY-01._
-- **M7-03b** _(Behavior)_ — Commit queued results in run order; the decision
+- **M7-03b** _(Behavior)_ — Publish queued results in run order; the decision
   task owns failure scenarios in its reserved `M7-03c*` branch.
   _Depends: M7-03a._
   _Verify: `mise run test --filter POLICY-02`._
@@ -1520,13 +1504,13 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-02._
   _Verify: `mise run test --filter POLICY-03`._
   _Greens: POLICY-03._
-- **M7-05** _(Behavior)_ — Overlap merged runs and commit each result as its
+- **M7-05** _(Behavior)_ — Overlap merged runs and publish each result as its
   own turn.
   _Depends: M7-02._
   _Verify: `mise run test --filter POLICY-04`._
   _Greens: POLICY-04._
 - **M7-06a** _(Behavior)_ — Start latest stream work, show loading before the
-  first element, and commit each element under the settled equality rule;
+  first element, and publish each element under the settled equality rule;
   decision tasks add termination, failure, and equality behavior only in their
   reserved `M7-06b*`, `M7-06c*`, and `M7-06d*` branches.
   _Depends: M7-01b, M7-01c, M7-01d, M7-02._
@@ -1588,7 +1572,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   _Depends: M7-10b._
   _Verify: `mise run test --filter EXPORT-15`._
   _Greens: EXPORT-15._
-- **M7-11a** _(Behavior)_ — Offer no export value when derived recomputation
+- **M7-11a** _(Behavior)_ — Offer no export value when automatic recomputation
   lands equal.
   _Depends: M7-08._
   _Verify: `mise run test --filter EXPORT-14`._
@@ -1657,8 +1641,7 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   policies and latest streams preserve their selected scheduler and work shape
   instead of applying latest one-shot semantics to every declaration.
   _Depends: M7-03c, M7-04, M7-05, M7-06b, M7-06c, M7-06d, M7-07b._
-  _Verify: `COG_TEST_VALUE_REFERENCE_LAYOUT=inline COG_TEST_CORE=arena
-COG_TEST_EDGE=pool mise run test --filter
+  _Verify: `mise run test --filter
 'POLICY-(01|02|03|04|06)|STREAM-(0[1-9]|1[01])'`._
 - **M7-18** _(Infrastructure)_ — Prepare the 0.3.0 release notes and consumer
   documentation: changelog, current package pin, status snapshots, and a DocC
@@ -1907,10 +1890,9 @@ perf-11-pinned-key-slope-1000` reports both shapes, whose difference is the
   above its boundary-entry copy and descriptor-record fetch, which halves that
   core's per-key traffic without changing the flush's shape.
   _Depends: M9-02._
-  _Verify: `COG_TEST_CORE=arena mise run bench --filter
-perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000` reports no
-  ARC difference between the two shapes, and `COG_TEST_CORE=arena
-COG_TEST_EDGE=pool mise run test --filter 'UI|SEED|HIST'` stays green._
+  _Verify: `mise run bench --filter perf-11-pinned-key-slope-1 --filter
+perf-11-pinned-key-slope-1000` reports no ARC difference between the two shapes,
+  and `mise run test --filter 'UI|SEED|HIST'` stays green._
 - **M9-04** _(Infrastructure)_ — Give the simple core a changed-boundary queue:
   enqueue where a source is already stamped, dedupe with one flag, and flush
   that queue instead of sweeping `observationStates`. Preserve boundary-creation
@@ -1924,8 +1906,8 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   `CogArenaStateFlags` bit for the dedupe, so the boundary test stays a scalar
   read on rows the propagation already visits.
   _Depends: M9-03, M9-04._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-'UI|SEED|HIST'` and the arena slope benchmarks by exact name._
+  _Verify: `mise run test --filter 'UI|SEED|HIST'` and the arena slope
+  benchmarks by exact name._
 - **M9-06** _(Behavior)_ — Turn the flat pinned-key slope green on both cores
   and record the measurement and its gate in `impl/benchmarks.md`.
   _Depends: M9-05._
@@ -1933,7 +1915,7 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   per-key traffic, plus the recorded `impl/benchmarks.md` result and threshold._
   _Greens: PERF-11._
 - **M9-07** _(Infrastructure)_ — Add a non-escaping fast path for
-  `commit(named:)` and `withTurn`, keeping an escaping overload for the
+  `turn(named:)` and `withTurn`, keeping an escaping overload for the
   queued-turn path that genuinely stores its body.
   _Depends: M9-01._
   _Verify: `mise run test --filter 'ONE|TURN'` and a steady-turn allocation
@@ -2005,11 +1987,12 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   allocations at exactly zero, and `impl/benchmarks.md` records the per-node figures._
   _Greens: PERF-13._
 - **M9-16** _(Gate)_ — Prove the machinery work changed nothing observable:
-  the complete behavior suite across the isolation matrix, both cores, every
-  value-reference layout, release configuration, and the simulator.
+  the complete behavior suite across the isolation matrix, arena
+  configurations, release configuration, and the simulator. The retired core
+  and layout comparisons remain in the selection record.
   _Depends: M9-06, M9-10, M9-15._
-  _Verify: `mise run test:matrix`, `mise run test:cores`,
-  `mise run test:value-references`, `mise run test:release`,
+  _Verify: `mise run test:matrix`, `mise run test:arena-configurations`,
+  `mise run test:release`,
   `mise run test:simulator`, `mise run test:compilefail`, and
   `mise run lint:swift` — which the first pass omitted, and which was the only
   check that had anything to say._
@@ -2038,9 +2021,8 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   list, repeated in `M9-05`'s own repair. The flush sorts and reads in place
   instead.
   _Depends: M9-17._
-  _Verify: `COG_TEST_CORE=arena COG_TEST_EDGE=pool mise run test --filter
-'UI|SEED|HIST'`, `mise run test:cores`, and `COG_TEST_CORE=arena mise run bench
---filter perf-01-steady-turn` at zero allocations._
+  _Verify: `mise run test --filter 'UI|SEED|HIST'`, `mise run test`, and
+  `mise run bench --filter perf-01-steady-turn` at zero allocations._
 - **M9-22** _(Infrastructure)_ — Take dynamic exclusivity enforcement off the
   arena's scalar columns, which `M9-21` measured at a third of that core's
   ordinary turn. Trivial element types and MainActor confinement make
@@ -2048,8 +2030,8 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   columns keep enforcement because their element type is the user's and
   releasing one can run arbitrary `deinit` code inside an access.
   _Depends: M9-21._
-  _Verify: `mise run test:cores`, `mise run test:release`, and
-  `COG_TEST_CORE=arena mise run bench --filter perf-01-steady-turn` below the
+  _Verify: `mise run test`, `mise run test:release`, and
+  `mise run bench --filter perf-01-steady-turn` below the
   `M9-17` measurement at unchanged allocation counts._
 - **M9-23** _(Infrastructure)_ — Memoize a keyless declaration's resolved arena
   column and slot on its descriptor, per context, removing the dictionary
@@ -2060,9 +2042,9 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   generation so correctness does not rest on having found every release path.
   Keyed references keep the existing path.
   _Depends: M9-22._
-  _Verify: `mise run test:cores`, `mise run test --filter 'LIFE|SEED'`,
-  `mise run test:release`, and `COG_TEST_CORE=arena mise run bench --filter
-perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
+  _Verify: `mise run test`, `mise run test --filter 'LIFE|SEED'`,
+  `mise run test:release`, and `mise run bench --filter perf-01-steady-turn`
+  below the `M9-22` measurement at unchanged allocations._
 - **M9-24** _(Infrastructure)_ — Hoist the arena's generation re-validation to
   one checked entry boundary per operation. `CogArenaStorage.index(of:)`
   re-validates a slot on nearly every column touch, and the file's own comment
@@ -2072,8 +2054,8 @@ perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
   the exclusivity checks around the same accesses, so its remaining value is
   unknown and has to be re-measured rather than assumed.
   _Depends: M9-23._
-  _Verify: `mise run test:cores` and `COG_TEST_CORE=arena mise run bench
---filter perf-01-steady-turn` against the `M9-23` measurement, keeping the
+  _Verify: `mise run test` and `mise run bench --filter perf-01-steady-turn`
+  against the `M9-23` measurement, keeping the
   stale-token diagnostic on the side that can still move._
 - **M9-25** _(Decision)_ — Measure what a graph costs to _hold_ and to _build_
   on both cores, which issue #373's route F asks for and §9.6 has for the
@@ -2096,18 +2078,28 @@ perf-01-steady-turn` below the `M9-22` measurement at unchanged allocations._
   _Verify: recorded `impl/optimization.md` entry naming the buckets that moved, the
   `build` workload runnable from the probe's method document, and
   `mise run fmt:check`._
-- **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
-  `M6-12a`'s core decision changes, which of issue #373's remaining routes
-  become scheduled work, and whether M9's result warrants a patch release.
-  Add the scenarios and tasks whichever answer requires, including a release
-  link at the end of the serialized chain if one is warranted. Weigh the
-  steady-state result against `M9-25`'s build cost rather than either alone:
-  after `M9-22` and `M9-23` the arena wins every whole-graph shape and still
-  takes 2.2x as long to construct a keyed graph, and `M9-26` traces that to
-  unspecialized generic code on the one path `M9-23`'s memo cannot cover.
+- **M9-27** _(Infrastructure)_ — Ship the measured typed frontier as the default
+  arena implementation. Retire the simple-core selector, keep shared pool edges
+  as the sole core's selected layout, delete the class-backed implementation and
+  its representation-private tests, and replace the specialization opt-in with
+  the non-default `CompactArena` package trait as an explicit binary-size
+  opt-out. Use that public trait for compact-arena tests and benchmarks, and
+  make every retired representation selector a hard manifest error so an old
+  command cannot silently measure a different implementation.
   _Depends: M9-26._
-  _Verify: recorded decision in `perf.md` and §10, the issue #373 disposition,
-  and `mise run tasks:check`._
+  _Verify: `mise run test:arena-configurations`, `mise run test:matrix`,
+  `mise run test:release`, `mise run test:compilefail`, and `mise run api:check`._
+- **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
+  `M6-12a`'s core decision changes, which of issue #373's remaining routes stay
+  open, and whether M9's result warrants a release. Record that the specialized
+  arena wins every whole-graph shape and closes the keyed construction gap,
+  that about 80% of consulted users accept the measured binary-size cost, and
+  that `CompactArena` serves the remaining size-sensitive applications without
+  restoring simple. Add a release link at the end of the serialized chain if a
+  release is warranted.
+  _Depends: M9-27._
+  _Verify: recorded decision in `perf.md`, `impl/benchmarks.md`, and §10; the
+  issue #373 disposition; and `mise run tasks:check`._
 - **M9-19** _(Gate)_ — Close M9 on the recorded evidence: the benchmark gate
   green against the new thresholds, the documented decision, and the backlog
   issue updated to match what was scheduled.
@@ -2207,16 +2199,17 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   measured figures, their environment, and why a simulator hitch figure is a
   regression signal rather than a user-experience guarantee._
   _Greens: PERF-16._
-- **M10-08** _(Behavior)_ — Measure the representative workload on both cores in
-  one session, so the tradeoff between construction cost and warm execution is
-  recorded on an application shape rather than a synthetic one. This is the
-  question `M9-25` and `M9-26` answered for a thousand-state fan; an application
-  composes many shapes at once and can answer it differently.
+- **M10-08** _(Behavior)_ — Measure the representative workload under the
+  specialized default and compact arena in one session, so the binary-size
+  opt-out's runtime tradeoff is recorded on an application shape rather than a
+  synthetic one. This is the question `M9-25` through `M9-27` answered for a
+  thousand-state fan; an application composes many shapes at once and can
+  answer it differently.
   _Depends: M10-05._
   _Verify: `mise run bench --filter 'perf-15-storefront-.*'` and
-  `COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'` taken in
-  one session on the pinned benchmark host, with the paired comparison recorded
-  in `impl/benchmarks.md`._
+  `mise run bench:compact --filter 'perf-15-storefront-.*'` taken in one session
+  on the pinned benchmark host,
+  with the paired comparison recorded in `impl/benchmarks.md`._
   _Greens: PERF-17._
 - **M10-09** _(Decision)_ — Record what the first measurements settled: which
   cuts have earned a committed threshold and what the pinned CI runner would
@@ -2227,8 +2220,9 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   _Verify: recorded decision in `impl/benchmarks.md` and the exploration §10 ledger, naming the
   threshold candidates and the follow-up work, plus `mise run tasks:check`._
 - **M10-10** _(Gate)_ — Close M10 on the recorded evidence: the workload's
-  suites green, the six cuts reporting under both cores, the release UI suite
-  executing on the pinned simulator, and the documents consistent.
+  suites green, the six cuts reporting under both arena configurations, the
+  release UI suite executing on the pinned simulator, and the documents
+  consistent.
   _Depends: M10-09._
   _Verify: `mise run test:storefront`, `mise run test:storefront-ui`,
   `mise run bench --filter 'perf-15-storefront-.*'`, `mise run lint:swift`,

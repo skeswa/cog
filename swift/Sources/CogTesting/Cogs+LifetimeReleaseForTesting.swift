@@ -3,7 +3,7 @@ public import Cog
 // MARK: - Lifetime-release inspection
 
 extension Cogs {
-  /// Signals after the next eligible derived root finishes graph removal.
+  /// Signals after the next eligible automatic root finishes graph removal.
   ///
   /// A lifetime test installs this before removing the last lease, advances its
   /// injected clock, then awaits the acknowledgement. The signal fires only
@@ -16,17 +16,17 @@ extension Cogs {
   ///
   /// - Parameter acknowledgement: The one-shot MainActor signal completed
   ///   after removal finishes.
-  public func acknowledgeNextDerivedRelease(
+  public func acknowledgeNextAutomaticRelease(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextDerivedRelease {
+    acknowledgeNextAutomaticRelease {
       acknowledgement.acknowledge()
     }
   }
 
-  /// Signals after the next derived grace-expiry eligibility check.
+  /// Signals after the next automatic grace-expiry eligibility check.
   ///
-  /// Unlike ``acknowledgeNextDerivedRelease(with:)``, this fires after the
+  /// Unlike ``acknowledgeNextAutomaticRelease(with:)``, this fires after the
   /// deadline reaches the MainActor even when identity, renewal, a lease, UI
   /// pinning, or a subscriber correctly prevents removal. Tests use it to
   /// establish that a negative release decision has completed without polling.
@@ -34,10 +34,10 @@ extension Cogs {
   ///
   /// - Parameter acknowledgement: The one-shot MainActor signal completed
   ///   after the next eligibility decision.
-  public func acknowledgeNextDerivedReleaseCheck(
+  public func acknowledgeNextAutomaticReleaseCheck(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextDerivedReleaseCheck {
+    acknowledgeNextAutomaticReleaseCheck {
       acknowledgement.acknowledge()
     }
   }

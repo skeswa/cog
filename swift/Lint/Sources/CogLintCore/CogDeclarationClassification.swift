@@ -16,7 +16,7 @@ package enum CogDeclarationShape: Equatable, Sendable {
 /// separately prevents a projection from being treated as a writable name.
 package enum CogDeclarationOrigin: Equatable, Sendable {
   /// Synchronous state computed from other graph values.
-  case derived
+  case automatic
 
   /// Manually writable source state.
   case writableSource
@@ -27,7 +27,7 @@ package enum CogDeclarationOrigin: Equatable, Sendable {
 
 /// Whether a declaration directly names its origin or exposes a read-only facade.
 package enum CogDeclarationAccess: Equatable, Sendable {
-  /// A direct derived, manual, or async declaration reference.
+  /// A direct automatic, manual, or async declaration reference.
   case direct
 
   /// A `.readOnly` projection that cannot be passed to a writer.
@@ -48,7 +48,7 @@ package struct CogDeclarationClassification: Sendable {
   /// Whether the reference is keyless or a keyed box.
   package let shape: CogDeclarationShape
 
-  /// Whether the underlying declaration is derived, writable, or asynchronous.
+  /// Whether the underlying declaration is automatic, writable, or asynchronous.
   package let origin: CogDeclarationOrigin
 
   /// Whether this name is a direct reference or a read-only projection.

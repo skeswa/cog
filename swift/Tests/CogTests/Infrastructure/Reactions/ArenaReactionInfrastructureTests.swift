@@ -3,8 +3,6 @@ import Testing
 
 @testable import Cog
 
-#if COG_LEG_CORE_ARENA
-
 // Internal proofs that an arena-selected reaction participates in scalar
 // topology directly. Public REACT scenarios remain representation-independent.
 
@@ -25,15 +23,11 @@ import Testing
   #expect(cogs.arenaCore.arena.contains(reactionSlot))
   #expect(cogs.arenaCore.arena.descriptor[Int(reactionSlot.index)] == CogArenaStorage.noIndex)
   #expect(cogs.arenaCore.edges.liveCount == 1)
-  #expect(token.reaction.dependencies.isEmpty)
-  #expect(cogs.states.isEmpty)
 
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
 
   #expect(values == [0, 1])
   #expect(cogs.arenaCore.edges.liveCount == 1)
-  #expect(token.reaction.dependencies.isEmpty)
-  #expect(cogs.states.isEmpty)
 
   token.cancel()
 
@@ -62,7 +56,7 @@ import Testing
   let reactionSlot = try #require(token).reaction.arenaSlot
 
   #expect(cogs.arenaCore.edges.liveCount == 1)
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
 
   #expect(values == [10])
   #expect(token?.reaction.isCancelled == true)
@@ -70,5 +64,3 @@ import Testing
   #expect(cogs.arenaCore.edges.liveCount == 0)
   #expect(cogs.reactions.isEmpty)
 }
-
-#endif

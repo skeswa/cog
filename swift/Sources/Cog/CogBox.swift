@@ -1,4 +1,4 @@
-/// A family of synchronously derived values sharing one declaration.
+/// A family of synchronously automatic values sharing one declaration.
 ///
 /// A box owns one descriptor and selector. Each descriptor-and-key pair names
 /// independent cached state and dependencies in a context. Equal keys resolve
@@ -26,37 +26,18 @@
 @MainActor
 public struct CogBox<Value, Key: Hashable> {
   /// Stable declaration identity and behavior shared by every key and box copy.
-  internal let descriptor: DerivedCogDescriptor<Value>
+  internal let descriptor: AutomaticCogDescriptor<Value>
 
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  /// A derived value reference that retains this box's concrete key type.
-  ///
-  /// The generic candidate returns this inferred type from `box[key]`. It is a
-  /// stable descriptor-and-key name with no context slot or cached value.
-  public struct ValueReference {
-    /// The keyed derived declaration shared by references from this box.
-    internal let descriptor: DerivedCogDescriptor<Value>
-
-    /// The exact state key, stored without existential erasure.
-    internal let key: Key
-
-    /// Adapts the candidate after it enters the class-state runtime shell.
-    internal var simpleCoreReference: Cog<Value> {
-      Cog(descriptor: descriptor, key: CogKey(key))
-    }
-  }
-  #endif
-
-  /// Builds a keyed facade over an existing derived declaration.
+  /// Builds a keyed facade over an existing automatic declaration.
   ///
   /// Async value projections use this path to expose their shared projection
   /// descriptor with normal keyed-`Cog` spelling. It allocates neither a new
   /// descriptor nor context state.
-  internal init(descriptor: DerivedCogDescriptor<Value>) {
+  internal init(descriptor: AutomaticCogDescriptor<Value>) {
     self.descriptor = descriptor
   }
 
-  /// Declares a keyed derived value.
+  /// Declares a keyed automatic value.
   ///
   /// Each key records only the producers read during that key's most recent
   /// selector run. Without an equality rule, every rerun counts as a changed
@@ -86,7 +67,7 @@ public struct CogBox<Value, Key: Hashable> {
     )
   }
 
-  /// Declares a keyed derived value with an explicit equality rule.
+  /// Declares a keyed automatic value with an explicit equality rule.
   ///
   /// Equality is evaluated after a rerun. Returning `true` preserves the cached
   /// value and stops downstream work for that key, but it does not prevent the
@@ -117,23 +98,17 @@ public struct CogBox<Value, Key: Hashable> {
     )
   }
 
-  /// The value reference naming this box's derived value for one key.
+  /// The value reference naming this box's automatic value for one key.
   ///
   /// This operation only packages the box's descriptor with `key`. Equal keys
   /// therefore name the same state in a context, and repeated subscripting
   /// does not allocate descriptors or compute the selector.
   ///
   /// - Parameter key: The hashable value completing this state's identity.
-  /// - Returns: A lightweight derived value reference for that key.
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  public subscript(key: Key) -> ValueReference {
-    ValueReference(descriptor: descriptor, key: key)
-  }
-  #else
+  /// - Returns: A lightweight automatic value reference for that key.
   public subscript(key: Key) -> Cog<Value> {
     Cog(descriptor: descriptor, key: CogKey(key))
   }
-  #endif
 
   /// Builds the single type-erased descriptor shared by all keys.
   ///
@@ -145,8 +120,8 @@ public struct CogBox<Value, Key: Hashable> {
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime,
     label: CogLabel
-  ) -> DerivedCogDescriptor<Value> {
-    DerivedCogDescriptor(
+  ) -> AutomaticCogDescriptor<Value> {
+    AutomaticCogDescriptor(
       selector: { c, erasedKey in
         guard let key = erasedKey?.erased.base as? Key else {
           fatalError(
@@ -168,7 +143,7 @@ public struct CogBox<Value, Key: Hashable> {
 }
 
 extension CogBox where Value: Equatable {
-  /// Declares an `Equatable` keyed derived value whose equal reruns stop the
+  /// Declares an `Equatable` keyed automatic value whose equal reruns stop the
   /// downstream wave independently for each key.
   ///
   /// The synthesized equality rule affects only propagation after the selector

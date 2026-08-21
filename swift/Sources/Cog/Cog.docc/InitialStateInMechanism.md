@@ -29,7 +29,7 @@ struct WeatherApp: App {
     _ = cogs[currentZipCodeCog]
     helper(cogs)
     _cogs = State(initialValue: cogs)
-    cogs.commit(currentZipSourceCog, to: .newYork)
+    cogs.turn(currentZipSourceCog, to: .newYork)
     cogs.refresh(forecastCog)
   }
 }

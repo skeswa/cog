@@ -27,7 +27,7 @@ package struct ManualCogPrivateRule: CogLintRule {
       }
       return CogLintViolation(
         message:
-          "writable Cog sources must be `private` or `fileprivate`; expose `.readOnly` or a derived cog",
+          "writable Cog sources must be `private` or `fileprivate`; expose `.readOnly` or an automatic cog",
         at: classification.nameToken
       )
     }

@@ -8,22 +8,23 @@ debug tools.
 
 The goal is small code that stays correct under change.
 
-## Design principles
+## Shared foundation
 
-1. Cog should feel simple.
-2. Every state read should be correct.
-3. Cog should minimize runtime overhead without weakening the other rules.
-4. Cog state should be singular. One running app has one authoritative graph,
-   each mutable fact represented in Cog has one writable source in it, and
-   screens or features do not create state islands or mirror sources.
+The [shared state model](../design.md) owns Cog's principles, vocabulary, and
+cross-platform behavior. On Kotlin, its single runtime is one process-wide
+`CogStore`; correct reads settle through Compose snapshots on the store lane;
+async uncertainty is explicit in `CogPhase`; and Compose `State` is the UI
+boundary. This set owns those Android choices rather than inheriting Swift's.
 
 ## Start here
 
-1. [§1–§5 and §7–§11: core design](exploration.md)
-2. [Full weather feature](example.md)
-3. [§5.4: Flow and reactive-library mapping](flows.md)
-4. [§6: effects and background work](effects.md)
-5. [Performance model and spike plan](perf.md)
+1. [Shared state model](../design.md)
+2. [§1–§5 and §7–§11: core design](exploration.md)
+3. [Full weather feature](example.md)
+4. [§5.4: Flow and reactive-library mapping](flows.md)
+5. [§6: effects and background work](effects.md)
+6. [Performance model and spike plan](perf.md)
+7. [Design history](../history.md)
 
 The section numbers match the Swift set where that helps comparison. The
 Kotlin choices stand on their own.
@@ -37,7 +38,7 @@ such as `CogBox<User, UserId>` names a set of values.
 Compose already has the right low-level parts:
 
 - `MutableState` stores source values.
-- `derivedStateOf` caches derived values and tracks changing dependencies.
+- `derivedStateOf` caches automatic values and tracks changing dependencies.
 - snapshots make a group of writes visible at once.
 - a `State` read invalidates only the Compose scopes that used it.
 
@@ -46,7 +47,7 @@ Cog builds policy around those parts:
 - the app creates one store and shares it across every screen;
 - descriptors have stable identity and readable debug labels;
 - writable descriptors stay private;
-- all writes happen in a named `commit`;
+- all writes happen in a named `turn`;
 - UI, reactions, and Flow collectors keep only the graph they need alive;
 - async state is explicit in `CogPhase`;
 - debug builds can explain why a value changed.
@@ -54,10 +55,10 @@ Cog builds policy around those parts:
 ```mermaid
 flowchart LR
     UI["Composable"] -->|"read"| State["Cog state<br/>Compose State"]
-    Event["Event handler"] -->|"commit"| Store["CogStore"]
+    Event["Event handler"] -->|"turn"| Store["CogStore"]
     Store -->|"snapshot write"| State
-    State --> Derived["derivedStateOf"]
-    Derived --> UI
+    State --> Automatic["derivedStateOf"]
+    Automatic --> UI
     Store -.-> Policy["names · lifetime · async · debug"]
 ```
 
@@ -68,7 +69,7 @@ private val countSource = ManualCog(0)
 val count = countSource.readOnly
 val doubled = Cog { get(count) * 2 }
 
-fun CogStore.increment() = commit("increment") {
+fun CogStore.increment() = turn("increment") {
     countSource.value += 1
 }
 
@@ -97,7 +98,7 @@ The first design is ready for a prototype. The prototype must prove:
 
 - staged and atomic writes;
 - escaped-writer failure in every build;
-- dynamic derived dependencies;
+- dynamic automatic dependencies;
 - exact Compose invalidation;
 - ordered reactions;
 - keyed state cleanup;
@@ -113,5 +114,5 @@ until the spike and benchmarks in [§9](perf.md#9-spike-and-benchmark-plan).
 spike must test it. Appendix material explains trade-offs but should not be
 needed for normal use.
 
-The dated [old Dart and Flutter dump](../dump-2026-08-06.md) is background
-only. It is not the Android design.
+[Design history](../history.md) explains the Dart and Flutter lineage. It is
+background only, not the Android design.

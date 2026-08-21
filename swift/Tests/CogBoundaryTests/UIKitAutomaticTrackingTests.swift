@@ -40,7 +40,7 @@ private final class CogTrackingView: UIView {
   view.updatePropertiesIfNeeded()
   #expect(view.renderedValues == [0])
 
-  cogs.commit { c in c[count] = 1 }
+  cogs.turn { c in c[count] = 1 }
   view.updatePropertiesIfNeeded()
 
   #expect(view.renderedValues == [0, 1])

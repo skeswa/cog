@@ -17,20 +17,6 @@ extension Cogs {
   public func seed<Value>(_ valueReference: ManualCog<Value>, to value: Value) {
     seedForTesting(valueReference, to: value)
   }
-
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  /// Seeds one keyed source while retaining its generic candidate key type at
-  /// the public testing boundary.
-  ///
-  /// The same idle-only, equality, and invalidation rules as the keyless
-  /// overload apply; only the value-reference representation differs.
-  public func seed<Value, Key: Hashable>(
-    _ valueReference: ManualCogBox<Value, Key>.ValueReference,
-    to value: Value
-  ) {
-    seedForTesting(valueReference, to: value)
-  }
-  #endif
 }
 
 #endif

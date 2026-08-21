@@ -1,4 +1,3 @@
-#if COG_LEG_CORE_ARENA
 import Cog
 import CogTesting
 import Testing
@@ -38,4 +37,3 @@ import Testing
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
   #expect(stderr.contains("Cog tried to use stale arena slot 0 at generation 0."))
 }
-#endif

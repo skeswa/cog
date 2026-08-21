@@ -1,5 +1,3 @@
-#if COG_CORE_ARENA
-
 /// One ordered arena request selected before its operation may start.
 ///
 /// The selector has already captured this request's dependencies. Queue keeps
@@ -331,7 +329,7 @@ internal final class CogArenaAsyncColumn<Value> {
       switch cogs.turnPhase {
       case .idle:
         statuses.stage(pending, at: slot)
-        _ = statuses.commit(at: slot)
+        _ = statuses.publish(at: slot)
         arena.changedAt[row] = core.revision
         cogs.withSystemTurn("\(renderedName(for: key)) pending") { _ in }
       case .accumulating, .flushing:
@@ -492,13 +490,13 @@ internal final class CogArenaAsyncColumn<Value> {
   }
 
   /// Publishes one pending arena status through the turn's scalar source pass.
-  func commitPending(
+  func publishPendingStatus(
     at slot: CogArenaSlot,
     revision: UInt32,
-    propagatingWith propagation: CogSelectedArenaDirtyPropagation
+    propagatingWith propagation: CogArenaDirtyPropagation
   ) -> Bool {
     _ = installedRow(for: slot)
-    return statuses.commitSource(
+    return statuses.publishSource(
       at: slot,
       revision: revision,
       propagatingWith: propagation
@@ -705,5 +703,3 @@ internal final class CogArenaAsyncColumn<Value> {
   // package's MainActor default otherwise crash the pinned release optimizer.
   nonisolated deinit {}
 }
-
-#endif

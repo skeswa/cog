@@ -6,13 +6,13 @@
 /// compiled out of release artifacts. This enum is `nonisolated` and
 /// `Sendable`, so a copied event value has no MainActor requirement.
 public nonisolated enum CogHistoryEvent: Sendable, Equatable {
-  /// One outer graph turn began under its commit or system-generated name.
+  /// One outer graph turn began under its turn or system-generated name.
   case turn
 
-  /// A manual source published a changed staged value at a commit boundary.
+  /// A manual source published a changed staged value at a turn boundary.
   case write
 
-  /// A synchronous derived cog's dependency-selecting selector ran.
+  /// A synchronous automatic cog's dependency-selecting selector ran.
   case recompute
 
   /// One changed UI boundary emitted its coalesced Observation notice.
@@ -23,6 +23,25 @@ public nonisolated enum CogHistoryEvent: Sendable, Equatable {
 
   /// A reaction or watch body ran, including its initial tracking run.
   case effect
+}
+
+/// The unrendered identity behind one history entry.
+///
+/// ``CogHistoryEntry/name`` renders these values at display time. Subjects keep
+/// declaration labels and erased keys, not arena slots or descriptor
+/// references, so retaining debug history cannot extend graph-state lifetime.
+internal enum CogHistorySubject {
+  /// A named outer turn, recorded before its staging body begins.
+  case turn(String)
+
+  /// One descriptor label and optional key involved in graph propagation.
+  case cog(CogLabel, CogKey?)
+
+  /// One export registration whose body offered a value.
+  case offer(CogLabel)
+
+  /// One reaction or watch label whose body ran.
+  case effect(CogLabel)
 }
 
 /// One debug-history entry.
@@ -44,7 +63,7 @@ public struct CogHistoryEntry {
 
   /// What Cog calls the subject of this entry.
   ///
-  /// Turns use their commit name. Writes and recomputations use the
+  /// Turns use their turn name. Writes and recomputations use the
   /// declaration label and optional key. Offers and effects use the
   /// registration label.
   public var name: String {
@@ -129,7 +148,7 @@ extension Cogs {
   /// The returned value is a snapshot: subsequent turns do not mutate it.
   /// Ask again for a newer view. History types, storage, and recording compile
   /// out of release builds, so production code cannot depend on this property.
-  public var debugHistory: CogHistory { historySnapshot }
+  public var debugHistory: CogHistory { arenaCore.historySnapshot }
 }
 
 #endif

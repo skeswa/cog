@@ -4,12 +4,31 @@
 /// distinguishes a row's current occupant from an earlier state that used the
 /// same index. This token is internal graph machinery, never value-reference
 /// identity: public value references remain stable descriptor-and-key names.
+#if !COG_ARENA_COMPACT
+@frozen
+@usableFromInline
+#endif
 internal nonisolated struct CogArenaSlot: Hashable {
   /// The dense position shared by every scalar column.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let index: Int32
 
   /// The occupant generation that must still match the arena's row.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let generation: UInt16
+
+  /// Names one exact occupant of a scalar arena row.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  init(index: Int32, generation: UInt16) {
+    self.index = index
+    self.generation = generation
+  }
 }
 
 /// Compact graph and allocator state for one arena row.
@@ -18,23 +37,52 @@ internal nonisolated struct CogArenaSlot: Hashable {
 /// settlement strength bits the arena core will drive; they must not coexist
 /// once propagation owns the column. `computing` is orthogonal and marks the
 /// active pull path. An empty value belongs only to a released row.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
   /// The packed byte stored in the arena's `flags` column.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let rawValue: UInt8
 
+  /// Restores the packed settlement flags carried by one scalar row.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  init(rawValue: UInt8) {
+    self.rawValue = rawValue
+  }
+
   /// The row currently belongs to a live state.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let occupied = CogArenaStateFlags(rawValue: 1 << 0)
 
   /// A producer may have changed, so versions must be checked before rerunning.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let check = CogArenaStateFlags(rawValue: 1 << 1)
 
   /// A direct input changed, so the state must recompute.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let dirty = CogArenaStateFlags(rawValue: 1 << 2)
 
   /// The state is on the active synchronous computation path.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let computing = CogArenaStateFlags(rawValue: 1 << 3)
 
   /// The accumulating turn has staged this source once.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let touched = CogArenaStateFlags(rawValue: 1 << 4)
 
   /// This row's boundary is already on the changed-boundary queue.
@@ -42,6 +90,9 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
   /// Dedupe for the O(changed) flush: a row reached by two invalidation paths
   /// in one turn notifies once. A spare bit rather than a set, because the walk
   /// that sets it is already holding the flag word.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let noticeQueued = CogArenaStateFlags(rawValue: 1 << 5)
 }
 
@@ -53,6 +104,9 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 /// and edges deliberately live elsewhere: sibling M6 storage owns their
 /// measured representations without changing this row-ownership contract.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogArenaStorage {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
@@ -83,14 +137,23 @@ internal final class CogArenaStorage {
   /// columns deliberately keep full enforcement, because their element type is
   /// the user's and releasing one can run arbitrary `deinit` code.
   @exclusivity(unchecked)
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var flags: ContiguousArray<CogArenaStateFlags> = []
 
   /// Last revision in which each row's value changed.
   @exclusivity(unchecked)
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var changedAt: ContiguousArray<UInt32> = []
 
   /// Last revision through which each row was proved current.
   @exclusivity(unchecked)
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var checkedAt: ContiguousArray<UInt32> = []
 
   /// Head of each row's dependency list.
@@ -119,6 +182,9 @@ internal final class CogArenaStorage {
 
   /// Occupant generation per row, advanced before an index may be reused.
   @exclusivity(unchecked)
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var generation: ContiguousArray<UInt16> = []
 
   /// Released indices whose generation can still advance, in reuse order.
@@ -186,6 +252,9 @@ internal final class CogArenaStorage {
   ///
   /// This is the non-trapping check used at generation boundaries. A released,
   /// reused, out-of-range, or otherwise stale token returns `false`.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func contains(_ slot: CogArenaSlot) -> Bool {
     guard slot.index >= 0 else { return false }
     let index = Int(slot.index)
@@ -198,6 +267,9 @@ internal final class CogArenaStorage {
   /// Centralizing this validation keeps stale access from silently reaching a
   /// new occupant. Hot graph walks can later replace repeated validation with
   /// one checked entry boundary if measurements require it.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func index(of slot: CogArenaSlot) -> Int {
     guard contains(slot) else {
       fatalError(

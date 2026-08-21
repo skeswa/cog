@@ -21,23 +21,23 @@ import Testing
   #expect(cogs.peek(selected) == 1)
   #expect(runs == 1)
 
-  cogs.commit { c in c[y] = 11 }
+  cogs.turn { c in c[y] = 11 }
   #expect(cogs.peek(selected) == 1)
   #expect(runs == 1)
 
-  cogs.commit { c in c[x] = 2 }
+  cogs.turn { c in c[x] = 2 }
   #expect(cogs.peek(selected) == 2)
   #expect(runs == 2)
 
-  cogs.commit { c in c[useX] = false }
+  cogs.turn { c in c[useX] = false }
   #expect(cogs.peek(selected) == 11)
   #expect(runs == 3)
 
-  cogs.commit { c in c[y] = 12 }
+  cogs.turn { c in c[y] = 12 }
   #expect(cogs.peek(selected) == 12)
   #expect(runs == 4)
 
-  cogs.commit { c in c[x] = 3 }
+  cogs.turn { c in c[x] = 3 }
   #expect(cogs.peek(selected) == 12)
   #expect(runs == 4)
 }
@@ -58,15 +58,15 @@ import Testing
   #expect(cogs.peek(selected) == -1)
   #expect(runs == 1)
 
-  cogs.commit { c in c[z] = 2 }
+  cogs.turn { c in c[z] = 2 }
   #expect(cogs.peek(selected) == -1)
   #expect(runs == 1)
 
-  cogs.commit { c in c[includeZ] = true }
+  cogs.turn { c in c[includeZ] = true }
   #expect(cogs.peek(selected) == 2)
   #expect(runs == 2)
 
-  cogs.commit { c in c[z] = 3 }
+  cogs.turn { c in c[z] = 3 }
   #expect(cogs.peek(selected) == 3)
   #expect(runs == 3)
 }
@@ -88,16 +88,16 @@ import Testing
   #expect(cogs.peek(totals["friends"]) == 60)
   #expect(runs == 1)
 
-  cogs.commit { c in c[members["friends"]] = [1, 3] }
+  cogs.turn { c in c[members["friends"]] = [1, 3] }
   #expect(cogs.peek(totals["friends"]) == 40)
   #expect(runs == 2)
 
-  cogs.commit { c in c[scores[2]] = 200 }
+  cogs.turn { c in c[scores[2]] = 200 }
   #expect(cogs.peek(scores[2]) == 200)
   #expect(cogs.peek(totals["friends"]) == 40)
   #expect(runs == 2)
 
-  cogs.commit { c in c[scores[1]] = 100 }
+  cogs.turn { c in c[scores[1]] = 100 }
   #expect(cogs.peek(totals["friends"]) == 130)
   #expect(runs == 3)
 }
@@ -123,15 +123,15 @@ func
   #expect(cogs.peek(currentTemperature) == 72)
   #expect(runs == 1)
 
-  cogs.commit { c in c[currentZip] = "10001" }
+  cogs.turn { c in c[currentZip] = "10001" }
   #expect(cogs.peek(currentTemperature) == 41)
   #expect(runs == 2)
 
-  cogs.commit { c in c[weather["10001"]] = 50 }
+  cogs.turn { c in c[weather["10001"]] = 50 }
   #expect(cogs.peek(currentTemperature) == 50)
   #expect(runs == 3)
 
-  cogs.commit { c in c[weather["90210"]] = 99 }
+  cogs.turn { c in c[weather["90210"]] = 99 }
   #expect(cogs.peek(weather["90210"]) == 99)
   #expect(cogs.peek(currentTemperature) == 50)
   #expect(runs == 3)

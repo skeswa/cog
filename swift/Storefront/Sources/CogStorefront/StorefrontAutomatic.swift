@@ -1,6 +1,6 @@
 public import Cog
 
-// Everything the Storefront computes, in the order it computes it.
+// Every automatic Storefront declaration, in dependency order.
 //
 // The shape to notice is the funnel: the whole catalog is indexed and scored,
 // a filter narrows it, a rank orders it, sections group it, and a window

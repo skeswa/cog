@@ -1,16 +1,16 @@
-#if COG_CORE_ARENA
-
 // MARK: - Values
 
-/// Typed source, derived, async, and Observation-facing operations on the arena core.
+/// Typed source, automatic, async, and Observation-facing operations on the arena core.
 ///
 /// These entry points resolve public descriptor-and-key identities before the
 /// scalar settlement machinery takes over. Keeping that boundary together
 /// makes the representation transition explicit without adding a helper object
 /// or another call on steady reads and writes.
 extension CogArenaCore {
-  #if COG_CORE_ARENA
   /// Stages one typed source and registers its row once with the active turn.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func writerStage<Value>(
     _ valueReference: ManualCog<Value>,
     value: Value,
@@ -24,7 +24,10 @@ extension CogArenaCore {
   /// Registers one staged arena source exactly once with its accumulating turn.
   ///
   /// Manual values and async statuses share the same scalar touched bit and
-  /// ordered source list; their descriptor record restores the typed commit.
+  /// ordered source list; their descriptor record restores the typed turn.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func touchArenaSource(_ slot: CogArenaSlot, in turn: CogTurn) {
     let row = arena.index(of: slot)
     guard !arena.flags[row].contains(.touched) else { return }
@@ -40,11 +43,11 @@ extension CogArenaCore {
         fatalError("Cog found an arena turn entry whose source was not touched.")
       }
       let record = descriptorRecord(forRow: row)
-      guard record.kind != .derived, let commit = record.commitSource else {
+      guard record.kind != .automatic, let publishSource = record.publishSource else {
         fatalError("Cog tried to flush a non-source arena row as pending state.")
       }
 
-      let changed = commit(slot, revision, propagation)
+      let changed = publishSource(slot, revision, propagation)
       #if DEBUG
       if changed, record.kind == .manual {
         recordHistoryState(event: .write, slot: slot)
@@ -53,15 +56,20 @@ extension CogArenaCore {
       arena.flags[row].remove(.touched)
     }
   }
-  #endif
 
   /// Reads the pending overlay or current value of one source for a writer.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func writerValue<Value>(for valueReference: ManualCog<Value>) -> Value {
     let location = manualLocation(for: valueReference)
     return location.column.writerValue(at: location.slot)
   }
 
   /// Reads one source without recording a dependency.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func manualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
     let location = manualLocation(for: valueReference)
     return location.column.current(at: location.slot)
@@ -87,9 +95,12 @@ extension CogArenaCore {
   }
   #endif
 
-  /// Pulls one derived value current without recording a dependency.
-  func derivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
-    let location = derivedLocation(for: valueReference)
+  /// Pulls one automatic value current without recording a dependency.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func automaticValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
+    let location = automaticLocation(for: valueReference)
     settle(location.slot, in: cogs)
     return location.column.current(at: location.slot)
   }
@@ -99,6 +110,9 @@ extension CogArenaCore {
   /// The value operation stays pure so testing seeds and internal tracked reads
   /// cannot accidentally create a sleeper. Public `peek` and ordinary writes
   /// call this explicit lifetime half after resolving the same stable identity.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func scheduleLifetimeReleaseIfUnobserved<Value>(
     for valueReference: ManualCog<Value>,
     in cogs: Cogs
@@ -107,12 +121,15 @@ extension CogArenaCore {
     scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
   }
 
-  /// Renews grace after one transient synchronous-derived demand.
+  /// Renews grace after one transient synchronous-automatic demand.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func scheduleLifetimeReleaseIfUnobserved<Value>(
     for valueReference: Cog<Value>,
     in cogs: Cogs
   ) {
-    let location = derivedLocation(for: valueReference)
+    let location = automaticLocation(for: valueReference)
     scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
   }
 
@@ -132,18 +149,24 @@ extension CogArenaCore {
   ///
   /// Resolving the value first installs the arena row; boundary access then
   /// records the exact public read without creating a graph dependency.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func observedManualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
     let location = manualLocation(for: valueReference)
     accessObservationBoundary(for: location.slot)
     return location.column.current(at: location.slot)
   }
 
-  /// Settles and reads one derived row through its Observation boundary.
+  /// Settles and reads one automatic row through its Observation boundary.
   ///
   /// Settlement precedes registration so cold computation establishes the
   /// consumer's baseline before later completed turns can invalidate it.
-  func observedDerivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
-    let location = derivedLocation(for: valueReference)
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func observedAutomaticValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
+    let location = automaticLocation(for: valueReference)
     settle(location.slot, in: cogs)
     accessObservationBoundary(for: location.slot)
     return location.column.current(at: location.slot)
@@ -251,9 +274,9 @@ extension CogArenaCore {
     return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
   }
 
-  /// Descriptor lifetime restored by an installed derived arena row.
+  /// Descriptor lifetime restored by an installed automatic arena row.
   func lifetimePolicy<Value>(for valueReference: Cog<Value>) -> CogStateLifetime {
-    let location = derivedLocation(for: valueReference)
+    let location = automaticLocation(for: valueReference)
     return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
   }
 
@@ -263,15 +286,15 @@ extension CogArenaCore {
     return arena.leaseCount[arena.index(of: location.slot)]
   }
 
-  /// Durable reaction and UI owners of one installed derived arena row.
+  /// Durable reaction and UI owners of one installed automatic arena row.
   func leaseCount<Value>(for valueReference: Cog<Value>) -> UInt32 {
-    let location = derivedLocation(for: valueReference)
+    let location = automaticLocation(for: valueReference)
     return arena.leaseCount[arena.index(of: location.slot)]
   }
 
   /// Settles and notifies the boundary roots changed in this arena revision.
   ///
-  /// The count snapshot preserves the simple core's baseline rule: a boundary
+  /// The count snapshot preserves the established baseline rule: a boundary
   /// created while another root settles joins the next flush and cannot receive
   /// a notice for a change that predates its first observed value.
   func flushObservationBoundaries(in cogs: Cogs) {
@@ -283,7 +306,7 @@ extension CogArenaCore {
     // one; sorting was never the cost being removed.
     propagation.sortChangedBoundaryRows { arena.boundary[Int($0)] < arena.boundary[Int($1)] }
 
-    // By index, and dropped afterwards, for the reason the simple core snapshots
+    // By index, and dropped afterwards, for the reason this method snapshots
     // its count: a notice can run a synchronous Observation handler that queues
     // another boundary, and that one belongs to the next flush.
     let queuedCount = propagation.changedBoundaryRowCount
@@ -325,7 +348,7 @@ extension CogArenaCore {
     propagation.dropFlushedBoundaryRows(queuedCount)
   }
 
-  /// Releases one unobserved derived row and allocates a replacement row.
+  /// Releases one unobserved automatic row and allocates a replacement row.
   ///
   /// This package diagnostic drives PERF-05 through real descriptor lookup,
   /// typed-column removal, edge cleanup, identity removal, and arena reuse. The
@@ -336,10 +359,10 @@ extension CogArenaCore {
     replacingWith replacementReference: Cog<ReplacementValue>,
     in cogs: Cogs
   ) -> CogArenaSlotReuseSnapshot {
-    _ = derivedValue(for: releasedReference, in: cogs)
-    let released = releaseDerivedState(for: releasedReference)
+    _ = automaticValue(for: releasedReference, in: cogs)
+    let released = releaseAutomaticState(for: releasedReference)
 
-    let replacement = derivedLocation(for: replacementReference)
+    let replacement = automaticLocation(for: replacementReference)
     settle(replacement.slot, in: cogs)
 
     return CogArenaSlotReuseSnapshot(
@@ -360,13 +383,12 @@ extension CogArenaCore {
     replacingWith replacementReference: Cog<ReplacementValue>,
     in cogs: Cogs
   ) {
-    _ = derivedValue(for: releasedReference, in: cogs)
-    let released = releaseDerivedState(for: releasedReference)
+    _ = automaticValue(for: releasedReference, in: cogs)
+    let released = releaseAutomaticState(for: releasedReference)
 
-    let replacement = derivedLocation(for: replacementReference)
+    let replacement = automaticLocation(for: replacementReference)
     settle(replacement.slot, in: cogs)
 
     _ = arena.index(of: released)
   }
 }
-#endif

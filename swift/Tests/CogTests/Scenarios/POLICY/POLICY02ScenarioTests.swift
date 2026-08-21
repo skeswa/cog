@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `POLICY-02 queue commits results in run order and ends newest`() async throws {
+@Test func `POLICY-02 queue publishes results in run order and ends newest`() async throws {
   let (cogs, m) = probedContext()
   let inputCog = ManualCog<Int>(0)
   let work = PolicyQueueControlledWork()
@@ -22,10 +22,10 @@ import Testing
   #expect(await starts.next() == 0)
   try await resolveAsyncStatus(in: cogs) { work.succeed(0) }
 
-  cogs.commit("request one") { c in c[inputCog] = 1 }
+  cogs.turn("request one") { c in c[inputCog] = 1 }
   #expect(await starts.next() == 1)
-  cogs.commit("request two") { c in c[inputCog] = 2 }
-  cogs.commit("request three") { c in c[inputCog] = 3 }
+  cogs.turn("request two") { c in c[inputCog] = 2 }
+  cogs.turn("request three") { c in c[inputCog] = 3 }
 
   try await resolveAsyncStatus(in: cogs) { work.succeed(1) }
   #expect(await starts.next() == 2)

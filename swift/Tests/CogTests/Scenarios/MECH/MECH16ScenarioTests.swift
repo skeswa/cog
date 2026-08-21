@@ -7,7 +7,7 @@ import os
 
 @MainActor extension CogOps {
   fileprivate func recordReading(_ value: Int) {
-    commit { c in c[readingSourceCog] = value }
+    turn { c in c[readingSourceCog] = value }
   }
 }
 

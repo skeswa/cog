@@ -7,7 +7,7 @@ import Testing
 // MARK: - GRAPH-01
 
 @MainActor
-@Test func `GRAPH-01 a changed source settles a derived chain before the read returns`() {
+@Test func `GRAPH-01 a changed source settles an automatic chain before the read returns`() {
   var middleRuns = 0
   var rootRuns = 0
 
@@ -26,10 +26,10 @@ import Testing
   #expect(middleRuns == 1)
   #expect(rootRuns == 1)
 
-  cogs.commit { c in c[source] = 10 }
+  cogs.turn { c in c[source] = 10 }
 
   // The read is the pull boundary: it returns only after every dependency it
-  // needs has caught up to the newest committed source value.
+  // needs has caught up to the newest published source value.
   #expect(cogs.peek(root) == 22)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
@@ -64,7 +64,7 @@ import Testing
 
   #expect(cogs.peek(root) == 12)
 
-  cogs.commit { c in c[source] = 3 }
+  cogs.turn { c in c[source] = 3 }
 
   #expect(cogs.peek(root) == 34)
   #expect(leftRuns == 2)
@@ -96,7 +96,7 @@ import Testing
   }
   #expect(runs == Array(repeating: 1, count: breadth))
 
-  cogs.commit { c in c[source] = 10 }
+  cogs.turn { c in c[source] = 10 }
   #expect(cogs.peek(source) == 10)
   #expect(runs == Array(repeating: 1, count: breadth))
 

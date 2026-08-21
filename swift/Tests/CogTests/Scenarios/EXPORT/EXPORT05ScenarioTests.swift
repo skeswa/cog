@@ -22,7 +22,7 @@ import Testing
     #expect(await newestIterator.next() == 0)
 
     for value in 1...3 {
-      cogs.commit(sourceCog, to: value)
+      cogs.turn(sourceCog, to: value)
     }
 
     #expect(await newestIterator.next() == 6)
@@ -30,7 +30,7 @@ import Testing
     #expect(await oldestIterator.next() == 4)
   }
 
-  cogs.commit(sourceCog, to: 4)
+  cogs.turn(sourceCog, to: 4)
   #expect(await oldestIterator.next() == 8)
   #expect(selectorRuns == 5)
 }

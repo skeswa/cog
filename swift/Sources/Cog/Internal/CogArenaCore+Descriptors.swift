@@ -1,5 +1,3 @@
-#if COG_CORE_ARENA
-
 // MARK: - Descriptors and locations
 
 /// Descriptor registration and descriptor-and-key location resolution.
@@ -27,6 +25,9 @@ extension CogArenaCore {
   /// before the index can be reused, so a state that has since been released —
   /// or replaced by another descriptor's state at the same index — fails this
   /// check and falls through to the ordinary path.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func manualLocation<Value>(
     for valueReference: ManualCog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
@@ -45,6 +46,9 @@ extension CogArenaCore {
   /// resolution files its result on the declaration on the way out; a keyed
   /// one deliberately does not, because one declaration names a family of
   /// keyed states and a single-entry memo would thrash between them.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func resolvedManualLocation<Value>(
     for valueReference: ManualCog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
@@ -73,13 +77,16 @@ extension CogArenaCore {
     return (slot, setup.column)
   }
 
-  /// Resolves one derived row and its typed descriptor column.
+  /// Resolves one automatic row and its typed descriptor column.
   ///
   /// The memo has the same two guards as ``manualLocation(for:)``, and the
-  /// liveness one carries real weight here: a `whileObserved` derived state is
+  /// liveness one carries real weight here: a `whileObserved` automatic state is
   /// released when its grace expires, and the memo must not be able to hand
   /// back the row it used to own.
-  func derivedLocation<Value>(
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func automaticLocation<Value>(
     for valueReference: Cog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
     if valueReference.key == nil,
@@ -88,15 +95,18 @@ extension CogArenaCore {
     {
       return memo
     }
-    return resolvedDerivedLocation(for: valueReference)
+    return resolvedAutomaticLocation(for: valueReference)
   }
 
-  /// Resolves or creates one cold derived row without consulting the memo.
-  func resolvedDerivedLocation<Value>(
+  /// Resolves or creates one cold automatic row without consulting the memo.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func resolvedAutomaticLocation<Value>(
     for valueReference: Cog<Value>
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
     let descriptor = valueReference.descriptor
-    let setup = derivedRecord(for: descriptor)
+    let setup = automaticRecord(for: descriptor)
     let identity = CogStateIdentity(
       descriptor: descriptor.identity,
       key: valueReference.key
@@ -138,6 +148,9 @@ extension CogArenaCore {
   }
 
   /// Restores the manual descriptor's concrete column through checked setup.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func manualRecord<Value>(
     for descriptor: ManualCogDescriptor<Value>
   ) -> (record: CogArenaDescriptorRecord, column: CogArenaValueColumn<Value>) {
@@ -161,8 +174,8 @@ extension CogArenaCore {
       lifetime: descriptor.lifetime,
       column: column,
       asyncColumn: nil,
-      commitSource: { slot, revision, propagation in
-        column.commitSource(at: slot, revision: revision, propagatingWith: propagation)
+      publishSource: { slot, revision, propagation in
+        column.publishSource(at: slot, revision: revision, propagatingWith: propagation)
       },
       recompute: nil,
       notifyObservation: { _, boundary in boundary.notifyValueChange() },
@@ -175,15 +188,18 @@ extension CogArenaCore {
     return (record, column)
   }
 
-  /// Restores the derived descriptor's concrete column and recompute function.
-  func derivedRecord<Value>(
-    for descriptor: DerivedCogDescriptor<Value>
+  /// Restores the automatic descriptor's concrete column and recompute function.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func automaticRecord<Value>(
+    for descriptor: AutomaticCogDescriptor<Value>
   ) -> (record: CogArenaDescriptorRecord, column: CogArenaValueColumn<Value>) {
     if let record = recordsByIdentity[descriptor.identity] {
-      guard record.kind == .derived,
+      guard record.kind == .automatic,
         let column = record.column as? CogArenaValueColumn<Value>
       else {
-        fatalError("Cog restored a derived arena descriptor with the wrong value type.")
+        fatalError("Cog restored an automatic arena descriptor with the wrong value type.")
       }
       return (record, column)
     }
@@ -195,11 +211,11 @@ extension CogArenaCore {
     let record = makeRecord(
       identity: descriptor.identity,
       label: descriptor.label,
-      kind: .derived,
+      kind: .automatic,
       lifetime: descriptor.lifetime,
       column: column,
       asyncColumn: nil,
-      commitSource: nil,
+      publishSource: nil,
       recompute: { core, cogs, slot, key in
         core.recompute(descriptor: descriptor, column: column, slot: slot, key: key, in: cogs)
       },
@@ -234,8 +250,8 @@ extension CogArenaCore {
       lifetime: descriptor.lifetime,
       column: column.statuses,
       asyncColumn: column,
-      commitSource: { slot, revision, propagation in
-        column.commitPending(
+      publishSource: { slot, revision, propagation in
+        column.publishPendingStatus(
           at: slot,
           revision: revision,
           propagatingWith: propagation
@@ -264,6 +280,9 @@ extension CogArenaCore {
   }
 
   /// Registers one descriptor and returns its dense dispatch record.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func makeRecord(
     identity: ObjectIdentifier,
     label: CogLabel,
@@ -271,7 +290,7 @@ extension CogArenaCore {
     lifetime: CogStateLifetime,
     column: AnyObject,
     asyncColumn: AnyObject?,
-    commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
+    publishSource: (@MainActor (CogArenaSlot, UInt32, CogArenaDirtyPropagation) -> Bool)?,
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
     notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
     removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
@@ -289,7 +308,7 @@ extension CogArenaCore {
       lifetime: lifetime,
       column: column,
       asyncColumn: asyncColumn,
-      commitSource: commitSource,
+      publishSource: publishSource,
       recompute: recompute,
       notifyObservation: notifyObservation,
       removeValue: removeValue,
@@ -302,6 +321,9 @@ extension CogArenaCore {
   }
 
   /// Returns the exact live slot already filed for `identity`, when present.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func existingSlot(
     for identity: CogStateIdentity,
     record: CogArenaDescriptorRecord
@@ -340,6 +362,9 @@ extension CogArenaCore {
   }
 
   /// Allocates and files one row for a descriptor-and-key identity.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func installSlot(
     for identity: CogStateIdentity,
     record: CogArenaDescriptorRecord,
@@ -354,21 +379,21 @@ extension CogArenaCore {
     return slot
   }
 
-  /// Removes one settled, unobserved derived state for the slot-reuse probe.
+  /// Removes one settled, unobserved automatic state for the slot-reuse probe.
   ///
   /// Production grace expiry reaches the same erased release sequence. This
   /// typed entry only proves that the diagnostic names the expected descriptor
   /// before it deliberately returns the retired token to its caller.
-  func releaseDerivedState<Value>(for valueReference: Cog<Value>) -> CogArenaSlot {
+  func releaseAutomaticState<Value>(for valueReference: Cog<Value>) -> CogArenaSlot {
     let identity = CogStateIdentity(
       descriptor: valueReference.descriptor.identity,
       key: valueReference.key
     )
     guard let slot = slots[identity] else {
-      fatalError("Cog tried to release an arena derived state that was not installed.")
+      fatalError("Cog tried to release an arena automatic state that was not installed.")
     }
 
-    let setup = derivedRecord(for: valueReference.descriptor)
+    let setup = automaticRecord(for: valueReference.descriptor)
     let row = arena.index(of: slot)
     guard arena.descriptor[row] == setup.record.index else {
       fatalError("Cog tried to release an arena row through another descriptor.")
@@ -378,4 +403,3 @@ extension CogArenaCore {
     return slot
   }
 }
-#endif

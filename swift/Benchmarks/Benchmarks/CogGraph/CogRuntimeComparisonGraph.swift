@@ -4,20 +4,20 @@ import Observation
 
 /// Flat ownership for the Cog adapter's declarations.
 ///
-/// Derived descriptors capture this storage `unowned`, while the graph owns
+/// Automatic descriptors capture this storage `unowned`, while the graph owns
 /// both it and the runtime. That breaks the otherwise permanent cycle in which
 /// the storage owns a descriptor whose selector owns the storage, and it also
 /// makes teardown flat rather than recursive for the deep workload.
 @MainActor
 private final class CogComparisonStorage {
-  /// Every source and derived declaration in creation order.
+  /// Every source and automatic declaration in creation order.
   var nodes: [CogComparisonNode] = []
 
   /// Reads one stored declaration through the selector's explicit reader.
   func read(_ value: RuntimeComparisonValue, through reader: Reader<Int>) -> Int {
     switch nodes[value.index] {
     case .source(let source): reader[source]
-    case .derived(let derived): reader[derived]
+    case .automatic(let automatic): reader[automatic]
     }
   }
 }
@@ -29,21 +29,21 @@ private enum CogComparisonNode {
   case source(ManualCog<Int>)
 
   /// A memoized Cog computation.
-  case derived(Cog<Int>)
+  case automatic(Cog<Int>)
 }
 
-/// PERF-10 adapter for either Cog core selected by `COG_TEST_CORE`.
+/// PERF-10 adapter for the specialized or compact arena configuration.
 ///
-/// The benchmark package is rebuilt once with `simple` and once with `arena`;
-/// the public declarations stay identical, so the adapter needs no core
-/// branch of its own. Its explicit reader bridge is the only place the common
-/// workload meets Cog's dependency-capture API.
+/// The benchmark package's `CompactArena` trait forwards Cog's public trait;
+/// declarations stay identical, so the adapter needs no configuration branch
+/// of its own. Its explicit reader bridge is the only place the common workload
+/// meets Cog's dependency-capture API.
 @MainActor
 final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
   /// Isolated runtime that owns all state created for this sample.
   private let cogs = Cogs.forTesting()
 
-  /// Flat declaration storage shared with derived selectors.
+  /// Flat declaration storage shared with automatic selectors.
   private let storage = CogComparisonStorage()
 
   /// Makes a Cog manual declaration.
@@ -55,13 +55,13 @@ final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
     return value
   }
 
-  /// Makes a Cog derived declaration and bridges its explicit reader.
-  func derived(
+  /// Makes a Cog automatic declaration and bridges its explicit reader.
+  func automatic(
     _ compute: @escaping @MainActor (RuntimeComparisonReader) -> Int
   ) -> RuntimeComparisonValue {
     let value = RuntimeComparisonValue(index: storage.nodes.count)
     let storage = storage
-    let derived = Cog<Int>(
+    let automatic = Cog<Int>(
       { [unowned storage] reader in
         compute(
           RuntimeComparisonReader { dependency in
@@ -69,9 +69,9 @@ final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
           }
         )
       },
-      name: "perf.compare.derived.\(value.index)"
+      name: "perf.compare.automatic.\(value.index)"
     )
-    storage.nodes.append(.derived(derived))
+    storage.nodes.append(.automatic(automatic))
     return value
   }
 
@@ -89,20 +89,20 @@ final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
         cogs[source]
       } onChange: {
       }
-    case .derived(let derived):
+    case .automatic(let automatic):
       return withObservationTracking {
-        cogs[derived]
+        cogs[automatic]
       } onChange: {
       }
     }
   }
 
-  /// Commits a source write as one Cog turn.
+  /// Writes a source in one Cog turn.
   func write(_ value: RuntimeComparisonValue, to newValue: Int) {
     guard case .source(let source) = storage.nodes[value.index] else {
-      fatalError("The runtime comparison tried to write a derived Cog value.")
+      fatalError("The runtime comparison tried to write an automatic Cog value.")
     }
-    cogs.commit(source, to: newValue, name: "perf.compare.turn")
+    cogs.turn(source, to: newValue, name: "perf.compare.turn")
   }
 
   /// Returns the counted expectations already proved by COUNT-01–COUNT-04.

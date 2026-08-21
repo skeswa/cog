@@ -1,4 +1,4 @@
-/// One declaration-and-key step in a derived dependency cycle.
+/// One declaration-and-key step in an automatic dependency cycle.
 ///
 /// Descriptor identity distinguishes declarations that share a label. The
 /// failure path renders the label and key on demand. Steps are captured only
@@ -12,15 +12,10 @@ internal struct CogCycleStep {
   /// Erased state key, or `nil` for a keyless declaration.
   let key: CogKey?
 
-  /// Captures diagnostic identity from one active derived state.
-  init(state: any DerivedCogSettleState) {
-    self.init(descriptor: state.descriptorIdentity, label: state.label, key: state.key)
-  }
-
   /// Captures diagnostic identity from a data-oriented arena row.
   ///
-  /// Keeping this initializer state-free lets both cores share the path and
-  /// message renderer without making an arena row impersonate a class state.
+  /// Keeping this initializer state-free lets compact and specialized arena
+  /// configurations share the path and message renderer.
   init(descriptor: ObjectIdentifier, label: CogLabel, key: CogKey?) {
     self.descriptor = descriptor
     self.label = label
@@ -34,7 +29,7 @@ internal struct CogCycleStep {
   }
 }
 
-/// The exact active-path suffix closed by one repeated derived read.
+/// The exact active-path suffix closed by one repeated automatic read.
 ///
 /// The closing state appears twice. `A -> A` is a self-cycle; an active path
 /// `[prefix, A, B]` that reads A reports `A -> B -> A`. The path comes from the
@@ -44,11 +39,6 @@ internal struct CogCycleStep {
 internal struct CogCyclePath {
   /// Active computation suffix followed by its repeated closing state.
   let steps: [CogCycleStep]
-
-  /// Captures the ordered states without retaining those state objects.
-  init(states: [any DerivedCogSettleState]) {
-    self.steps = states.map(CogCycleStep.init(state:))
-  }
 
   /// Captures an already-erased path produced by the arena computing stack.
   init(steps: [CogCycleStep]) {
@@ -89,15 +79,6 @@ extension Cogs {
   package func cycleDiagnosticSnapshot<Value>(
     ifReading valueReference: Cog<Value>
   ) -> CogCycleDiagnosticSnapshot? {
-    #if COG_CORE_ARENA
     return arenaCore.cycleDiagnosticSnapshot(ifReading: valueReference)
-    #else
-    let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity, key: valueReference.key)
-    guard let state = states[identity] as? any DerivedCogSettleState else {
-      return nil
-    }
-    return settleStack.cyclePath(ifEntering: state)?.snapshot
-    #endif
   }
 }

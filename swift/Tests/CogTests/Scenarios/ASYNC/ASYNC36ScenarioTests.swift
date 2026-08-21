@@ -47,7 +47,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
 
 @MainActor
 @Test func `ASYNC-36 replaced concurrent work receives cooperative cancellation`() async {
-  // ASYNC-16 proves a stale concurrent result cannot commit; this proves the
+  // ASYNC-16 proves a stale concurrent result cannot publish; this proves the
   // replaced background task is also told to stop. Without the cancellation
   // request, off-actor work would keep burning until it finished on its own.
   let (cogs, m) = probedContext()
@@ -71,7 +71,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
   }
   #expect(await startIterator.next() == 0)
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
 
   // The replaced run is cancelled cooperatively, and the replacement starts.
   #expect(await cancellationIterator.next() == 0)
@@ -83,7 +83,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
 
   work.finish(1, with: 11)
   guard let completed = await statusIterator.next(), completed.kind == .success else {
-    Issue.record("The replacement's result did not commit")
+    Issue.record("The replacement's result did not publish")
     return
   }
   #expect(completed.value == 11)

@@ -21,14 +21,14 @@ import Testing
 
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
   #expect(
-    stderr.contains("Cog cannot commit turn \(String(reflecting: "refresh(_:)"))"),
+    stderr.contains("Cog cannot start turn \(String(reflecting: "refresh(_:)"))"),
     "stderr was: \(stderr)"
   )
-  #expect(stderr.contains("derived cog refreshing is computing"), "stderr was: \(stderr)")
-  #expect(stderr.contains("Derived computation may only read Cog state"), "stderr was: \(stderr)")
+  #expect(stderr.contains("automatic cog refreshing is computing"), "stderr was: \(stderr)")
+  #expect(stderr.contains("Automatic computation may only read Cog state"), "stderr was: \(stderr)")
   #expect(
     stderr.contains(
-      "Invoke this op outside derived computation, from event handling or a reaction."
+      "Invoke this op outside automatic computation, from event handling or a reaction."
     ),
     "stderr was: \(stderr)"
   )

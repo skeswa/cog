@@ -20,12 +20,12 @@ import Testing
   #expect(await starts.next() == 0)
   try await resolveAsyncStatus(in: cogs) { work.succeed(0) }
 
-  cogs.commit("request one") { c in c[inputCog] = 1 }
+  cogs.turn("request one") { c in c[inputCog] = 1 }
   #expect(await starts.next() == 1)
   let pendingCountBeforeQueueing = statusKinds.count(where: { $0 == .pending })
 
-  cogs.commit("request two") { c in c[inputCog] = 2 }
-  cogs.commit("request three") { c in c[inputCog] = 3 }
+  cogs.turn("request two") { c in c[inputCog] = 2 }
+  cogs.turn("request three") { c in c[inputCog] = 3 }
 
   guard statusKinds.count(where: { $0 == .pending }) == pendingCountBeforeQueueing else {
     work.finishAll()

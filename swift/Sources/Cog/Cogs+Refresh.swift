@@ -114,8 +114,8 @@ extension Cogs {
   /// Call refresh from event handling or a reaction. A request made by a
   /// reaction queues its system turn until reaction tracking finishes, so
   /// status publication cannot reenter the active consumer. Calling it while any
-  /// derived or async selector is computing instead traps before the target
-  /// state is created, using the same diagnostic as a commit during derivation.
+  /// automatic or async selector is computing instead traps before the target
+  /// state is created, using the same diagnostic as a turn during automatic computation.
   ///
   /// - Parameter valueReference: The keyless or keyed async identity to demand
   ///   again in this context.
@@ -123,16 +123,9 @@ extension Cogs {
   ///   started. Retaining it does not retain the Cog state or add observation.
   @discardableResult
   public func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value> {
-    requireOutsideDerivedComputation(forTurnNamed: #function)
-    #if COG_CORE_ARENA
+    requireOutsideAutomaticComputation(forTurnNamed: #function)
     let refresh = arenaCore.refresh(valueReference, in: self)
     arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
     return refresh
-    #else
-    let state = asyncState(for: valueReference)
-    let refresh = state.refresh(in: self)
-    scheduleLifetimeReleaseIfUnobserved(state)
-    return refresh
-    #endif
   }
 }

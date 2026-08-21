@@ -20,7 +20,7 @@ import Testing
   // the factory returned, with no rise required.
   #expect(seen == [0])
 
-  cogs.commit { c in c[uploads] = 1 }
+  cogs.turn { c in c[uploads] = 1 }
   #expect(seen == [0, 1])
 }
 
@@ -57,10 +57,10 @@ import Testing
   #expect(seen.isEmpty)
 
   // The rise runs the body once; its registrations are live.
-  cogs.commit(loggedIn, to: true)
+  cogs.turn(loggedIn, to: true)
   #expect(bodyRuns == 1)
   #expect(seen == [0])
-  cogs.commit { c in c[uploads] = 1 }
+  cogs.turn { c in c[uploads] = 1 }
   #expect(seen == [0, 1])
 
   // The task is running before the fall, so the cancellation it receives is
@@ -70,18 +70,18 @@ import Testing
 
   // The fall ends everything the scope registered: the reaction never runs
   // again and the task receives cooperative cancellation.
-  cogs.commit(loggedIn, to: false)
+  cogs.turn(loggedIn, to: false)
   var cancellationIterator = cancellations.makeAsyncIterator()
   _ = await cancellationIterator.next()
-  cogs.commit { c in c[uploads] = 2 }
+  cogs.turn { c in c[uploads] = 2 }
   #expect(seen == [0, 1])
 
   // The next rise runs the body again from scratch: fresh registrations that
   // observe current state, with nothing surviving the down-and-up cycle.
-  cogs.commit(loggedIn, to: true)
+  cogs.turn(loggedIn, to: true)
   #expect(bodyRuns == 2)
   #expect(seen == [0, 1, 2])
-  cogs.commit { c in c[uploads] = 3 }
+  cogs.turn { c in c[uploads] = 3 }
   #expect(seen == [0, 1, 2, 3])
   _ = holdContinuation
 }

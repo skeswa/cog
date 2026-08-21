@@ -123,7 +123,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-03 a starting value is a starting value, not a computation`() {
   // A key's value is settled once, when that key's state first appears, and
   // held from then on. Reading a key again does not ask the closure again —
-  // which is what makes it a source rather than a derived cog, and is why a
+  // which is what makes it a source rather than an automatic cog, and is why a
   // later write to a key is permanent.
   let cogs = Cogs.forTesting()
 
@@ -184,7 +184,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
   let firstValueReference = ledgers[5]
   let secondValueReference = ledgers[2 + 3]
 
-  cogs.commit { c in c[firstValueReference] = writtenElsewhere }
+  cogs.turn { c in c[firstValueReference] = writtenElsewhere }
 
   #expect(cogs.peek(secondValueReference) === writtenElsewhere)
   #expect(cogs.peek(secondValueReference).entries == ["replacement"])

@@ -6,7 +6,7 @@ need it, and let Cog update only what actually changed.
 ## Overview
 
 Cog keeps one graph of state for your whole app. You declare each fact once,
-derive the rest from it, and read values wherever you need them. When something
+compute the rest automatically, and read values wherever you need them. When something
 changes, Cog settles exactly the values that depend on it and notifies exactly
 the views that read them. Nothing else runs.
 
@@ -41,8 +41,8 @@ Three ideas carry most of the library:
   `c.peek(someCog)` deliberately does not. In a view, `cogs[someCog]` is the
   tracked read and `cogs.peek(someCog)` the one-shot. You can see a
   computation's dependency set by reading it.
-- **Writes happen in turns.** ``Cogs/commit(_:_:)`` is the only way in. Every
-  write in one commit crosses the boundary together, so a view that reads two
+- **Writes happen in turns.** ``Cogs/turn(_:_:)`` is the only way in. Every
+  write in one turn crosses the boundary together, so a view that reads two
   values that changed together never renders a torn pair.
 
 ### Where to go next

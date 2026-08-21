@@ -31,7 +31,7 @@ import Testing
   // Every mechanism is live on the very next line: one turn wakes both, and
   // their reactions run in list order because registration order is list
   // order.
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
   #expect(events == ["operate:First", "operate:Second", "react:First", "react:Second"])
 }
 
@@ -42,11 +42,11 @@ import Testing
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe(name: "Configurer") { m in
-      m.commit("configure") { c in c[configured] = 7 }
+      m.turn("configure") { c in c[configured] = 7 }
     },
     MechanismProbe(name: "Observer") { m in
       // The earlier mechanism's turn has already settled: a later mechanism
-      // observes the committed value during its own `operate`.
+      // observes the published value during its own `operate`.
       laterMechanismSaw = m.peek(configured)
     },
   ])

@@ -12,15 +12,14 @@ internal enum CogReactionPhase: Equatable {
 
 /// One tracked terminal registration owned by a context.
 ///
-/// A reaction is a terminal consumer, not readable state. The simple core uses
-/// its class-state conformance for reverse edges; the arena core gives it one
-/// generated scalar row and keeps this object only for the effect closure,
+/// A reaction is a terminal consumer, not readable state. The arena gives it
+/// one generated scalar row and keeps this object only for the effect closure,
 /// registration order, cancellation identity, and cold lifetime bookkeeping.
 /// The owning MainActor context runs it after UI settlement and keeps only the
-/// durable derived roots it directly reads externally leased. Export terminals
+/// durable automatic roots it directly reads externally leased. Export terminals
 /// run before effect terminals within each flush; registration order remains
 /// stable inside each phase.
-internal final class CogReaction: CogState, CogConsumer {
+internal final class CogReaction {
   /// The stable diagnostic identity supplied at registration.
   let label: CogLabel
 
@@ -33,7 +32,6 @@ internal final class CogReaction: CogState, CogConsumer {
   /// isolated test context without keeping that graph alive.
   private weak var cogs: Cogs?
 
-  #if COG_CORE_ARENA
   /// Generated value-less terminal receiving this reaction's arena edges.
   let arenaSlot: CogArenaSlot
 
@@ -56,7 +54,6 @@ internal final class CogReaction: CogState, CogConsumer {
   /// returns. Counting those frames keeps self-cancellation from retiring the
   /// shared slot until every nested run has unwound.
   private var runDepth = 0
-  #endif
 
   /// What this registration runs, until cancellation releases it.
   ///
@@ -64,35 +61,7 @@ internal final class CogReaction: CogState, CogConsumer {
   private var body: (@MainActor (ReactionReader) -> Void)?
 
   /// Whether this registration has been stopped.
-  ///
-  /// Separate from `settleState`, which invalidation and settlement overwrite.
   private(set) var isCancelled = false
-
-  /// Producers read by the last completed run, in read order.
-  ///
-  /// Strong ownership keeps the producer graph alive while registered; each
-  /// producer stores only one weak reverse edge back to this reaction.
-  private(set) var dependencies: [any CogState] = []
-
-  /// Unique directly read derived roots this registration keeps observed.
-  ///
-  /// Separate from `dependencies` because repeated reads still own one lease.
-  private(set) var leasedDependencies: [any CogLifetimeLeaseState] = []
-
-  /// Whether invalidation requires this terminal consumer to check or rerun.
-  var settleState: CogSettleState = .clean
-
-  /// The last revision in which a reaction body was treated as changed.
-  ///
-  /// Reactions do not publish a value, so this remains the initial revision;
-  /// direct DIRTY state, not `changedAt`, forces a run.
-  var changedAt: CogVersion = .initial
-
-  /// The graph revision against which the last completed body run was checked.
-  var checkedAt: CogVersion = .initial
-
-  /// Reactions are terminal consumers, so invalidation stops here.
-  var subscribers: [CogSubscriberEdge] = []
 
   /// Creates an inert registration; the context installs and initially runs it
   /// in registration order after ownership is established.
@@ -106,10 +75,11 @@ internal final class CogReaction: CogState, CogConsumer {
     self.label = label
     self.phase = phase
     self.body = body
-    #if COG_CORE_ARENA
     self.arenaSlot = cogs.arenaCore.allocateReaction()
-    #endif
   }
+
+  /// Releases the closure and bookkeeping wherever the last owner runs.
+  nonisolated deinit {}
 
   /// Stops this registration and takes it out of the graph.
   ///
@@ -118,26 +88,17 @@ internal final class CogReaction: CogState, CogConsumer {
   ///
   /// Queued runs remain in the array, so every run checks `isCancelled`.
   ///
-  /// `settleState` is irrelevant after the reaction leaves the graph.
-  ///
   /// `run(in:)` keeps an executing body in a local, so self-cancellation cannot
   /// release the closure on the stack.
   func cancel() {
     guard !isCancelled else { return }
     isCancelled = true
-    releaseExternalLeases()
+    releaseArenaLeases()
     body = nil
 
-    for dependency in dependencies {
-      dependency.removeSubscriber(self)
-    }
-    dependencies.removeAll()
-
-    #if COG_CORE_ARENA
     if runDepth == 0 {
       releaseArenaSlotIfNeeded()
     }
-    #endif
 
     // Predicate removal also handles an already-removed registration and keeps
     // survivor order inside the terminal's phase.
@@ -149,51 +110,23 @@ internal final class CogReaction: CogState, CogConsumer {
     }
   }
 
-  /// Records a body read and installs its reverse invalidation edge.
-  func recordDependency(on producer: any CogState) {
-    // A body that cancels itself and then keeps reading must not attach a new
-    // edge to a registration that is already out of the graph.
-    guard !isCancelled else { return }
-
-    dependencies.append(producer)
-    producer.addSubscriber(self)
-  }
-
-  /// Balances external leases and drops strong edges during context teardown.
+  /// Balances arena leases during context teardown.
   ///
   /// This bypasses normal grace scheduling because no state in the context can
   /// survive the same isolated deinitialization pass.
-  func releaseDependenciesForContextTeardown() {
-    #if COG_CORE_ARENA
+  func releaseArenaLeasesForContextTeardown() {
     if let cogs {
       cogs.arenaCore.releaseReactionLeasesForContextTeardown(&arenaLeasedDependencies)
     } else {
       arenaLeasedDependencies.removeAll(keepingCapacity: true)
     }
     arenaLeaseScratch.removeAll(keepingCapacity: true)
-    #endif
-
-    // The context is already ending, so balance the inert counts directly and
-    // never enter the normal release path that later schedules grace work.
-    for dependency in leasedDependencies {
-      dependency.decrementExternalLeaseCount()
-    }
-    leasedDependencies.removeAll()
-    dependencies.removeAll()
   }
 
-  /// Whether either selected core has made this registration reachable.
-  ///
-  /// The class mark remains relevant while async state is still migrating.
-  /// Arena manual and derived producers instead mark the generated terminal
-  /// row directly, so scheduling consults both representations during M6.
+  /// Whether propagation has made this registration reachable.
   func needsFlush(in cogs: Cogs) -> Bool {
     guard !isCancelled else { return false }
-    #if COG_CORE_ARENA
-    return settleState != .clean || cogs.arenaCore.reactionNeedsSettlement(arenaSlot)
-    #else
-    return settleState != .clean
-    #endif
+    return cogs.arenaCore.reactionNeedsSettlement(arenaSlot)
   }
 
   /// Runs once at registration to establish the first dependency set.
@@ -207,43 +140,26 @@ internal final class CogReaction: CogState, CogConsumer {
   /// Settles the hot dependencies of a reachable reaction and reruns it only
   /// when at least one value changed since its last completed run.
   ///
-  /// CHECK dependencies settle first. If they all prove equal, advancing only
-  /// this reaction's `checkedAt` stops work without invoking user code.
+  /// CHECK dependencies settle first. If they all prove equal, the arena stops
+  /// work without invoking user code.
   func runIfNeeded(in cogs: Cogs) {
     guard needsFlush(in: cogs) else { return }
 
-    #if COG_CORE_ARENA
     let arenaDependencyChanged = cogs.arenaCore.settleReactionDependencies(
       arenaSlot,
       in: cogs
     )
-    #else
-    let arenaDependencyChanged = false
-    #endif
 
-    for dependency in dependencies {
-      guard dependency.settleState != .clean else { continue }
-      if let derived = dependency as? any DerivedCogSettleState {
-        cogs.settle(derived)
-      }
-    }
-
-    let dependencyChanged = dependencies.contains {
-      $0.changedAt > checkedAt
-    }
-
-    if settleState == .dirty || dependencyChanged || arenaDependencyChanged {
+    if arenaDependencyChanged {
       run(in: cogs)
-    } else {
-      markChecked(at: cogs.revision)
     }
   }
 
   /// Captures a fresh dependency set around one synchronous body run.
   ///
-  /// Dependency edges and lease ownership reconcile before the final checked
-  /// mark. Any system turns requested by async reads inside the body drain only
-  /// afterward, when tracking and the derived computing path are both empty.
+  /// Dependency edges and lease ownership reconcile before capture completes.
+  /// Any system turns requested by async reads inside the body drain only
+  /// afterward, when tracking and the automatic computing path are both empty.
   private func run(in cogs: Cogs) {
     // Every run checks cancellation. The local keeps the closure alive through
     // self-cancellation.
@@ -255,17 +171,13 @@ internal final class CogReaction: CogState, CogConsumer {
     #if DEBUG
     switch phase {
     case .export:
-      cogs.recordHistoryOffer(label: label)
+      cogs.arenaCore.recordHistoryOffer(label: label)
     case .effect:
-      cogs.recordHistoryEffect(label: label)
+      cogs.arenaCore.recordHistoryEffect(label: label)
       cogs.turnChainTracker.recordReaction(label: label)
     }
     #endif
 
-    let previousDependencies = dependencies
-    dependencies.removeAll(keepingCapacity: true)
-
-    #if COG_CORE_ARENA
     runDepth += 1
     defer {
       runDepth -= 1
@@ -274,24 +186,9 @@ internal final class CogReaction: CogState, CogConsumer {
       }
     }
     cogs.arenaCore.captureReactionDependencies(for: arenaSlot) {
-      cogs.tracking(self) {
-        body(ReactionReader(cogs: cogs, reaction: self))
-      }
-    }
-    #else
-    cogs.tracking(self) {
       body(ReactionReader(cogs: cogs, reaction: self))
     }
-    #endif
 
-    for previousDependency in previousDependencies
-    where !dependencies.contains(where: { $0 === previousDependency }) {
-      previousDependency.removeSubscriber(self)
-    }
-
-    reconcileExternalLeases(in: cogs)
-
-    #if COG_CORE_ARENA
     if !isCancelled {
       cogs.arenaCore.reconcileReactionLeases(
         for: arenaSlot,
@@ -300,72 +197,21 @@ internal final class CogReaction: CogState, CogConsumer {
         in: cogs
       )
     }
-    #endif
 
-    markChecked(at: cogs.revision)
-    #if COG_CORE_ARENA
     cogs.arenaCore.completeReactionRun(arenaSlot)
-    #endif
     cogs.drainQueuedTurnsIfPossible()
   }
 
-  /// Replaces this registration's lease set after one completed tracking run.
-  private func reconcileExternalLeases(in cogs: Cogs) {
-    // Self-cancellation releases the old set immediately. Reads after that
-    // point are ignored, and finishing the now-cancelled run must not acquire
-    // anything again.
-    guard !isCancelled else { return }
-
-    var nextLeasedDependencies: [any CogLifetimeLeaseState] = []
-    for dependency in dependencies {
-      guard
-        let leaseState = dependency as? any CogLifetimeLeaseState,
-        case .whileObserved = leaseState.lifetime,
-        !nextLeasedDependencies.contains(where: { $0 === leaseState })
-      else { continue }
-      nextLeasedDependencies.append(leaseState)
-    }
-
-    // Acquire additions first to avoid a false zero-lease gap.
-    for dependency in nextLeasedDependencies
-    where !leasedDependencies.contains(where: { $0 === dependency }) {
-      cogs.acquireExternalLease(on: dependency)
-    }
-    for dependency in leasedDependencies
-    where !nextLeasedDependencies.contains(where: { $0 === dependency }) {
-      cogs.releaseExternalLease(on: dependency)
-    }
-
-    leasedDependencies = nextLeasedDependencies
-  }
-
-  /// Releases every lease at explicit cancellation or final token cleanup.
-  private func releaseExternalLeases() {
-    #if COG_CORE_ARENA
+  /// Releases every arena lease at explicit cancellation or final token cleanup.
+  private func releaseArenaLeases() {
     if let cogs {
       cogs.arenaCore.releaseReactionLeases(&arenaLeasedDependencies, in: cogs)
     } else {
       arenaLeasedDependencies.removeAll(keepingCapacity: true)
     }
     arenaLeaseScratch.removeAll(keepingCapacity: true)
-    #endif
-
-    if let cogs {
-      for dependency in leasedDependencies {
-        cogs.releaseExternalLease(on: dependency)
-      }
-    } else {
-      // A context normally clears this list during its isolated deinit. Keep a
-      // raw balancing fallback so a retained token cannot hide an invariant if
-      // its weak owner has already disappeared.
-      for dependency in leasedDependencies {
-        dependency.decrementExternalLeaseCount()
-      }
-    }
-    leasedDependencies.removeAll()
   }
 
-  #if COG_CORE_ARENA
   /// Retires the generated terminal after capture has fully unwound.
   ///
   /// A token may outlive its context. In that case the context-owned arena is
@@ -375,7 +221,6 @@ internal final class CogReaction: CogState, CogConsumer {
     cogs?.arenaCore.releaseReaction(arenaSlot)
     arenaSlotIsReleased = true
   }
-  #endif
 }
 
 /// One entry in the active flush's registration-ordered reaction queue.

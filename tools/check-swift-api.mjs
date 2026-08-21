@@ -5,14 +5,16 @@
 //
 // `COG_API_BASELINE` is the environment counterpart of the optional argument.
 // When neither is present, the highest semantic-version tag is the baseline.
-// The candidate always uses Cog's shipping representation selectors so a
-// developer's benchmark environment cannot accidentally change the API being
-// checked.
+// The candidate always clears Cog's manifest selectors so a developer's stale
+// test or documentation environment cannot accidentally change the package
+// being checked.
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import process from "node:process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const USAGE = "usage: node tools/check-swift-api.mjs [baseline]\n";
@@ -59,13 +61,16 @@ function latestReleaseTag() {
 const baseline = parseArgs(process.argv.slice(2));
 capture("git", ["rev-parse", "--verify", "--quiet", `${baseline}^{commit}`]);
 
-const environment = { ...process.env };
-environment.COG_TEST_CORE = "simple";
-environment.COG_TEST_VALUE_REFERENCE_LAYOUT = "inline";
-delete environment.COG_TEST_EDGE;
-delete environment.COG_DOCC;
+const environment = shippingManifestEnvironment(process.env);
+const allowlistPath = resolve(REPO_ROOT, "tools", "api-breakage-allowlists", `${baseline}.txt`);
+const allowlistArguments = existsSync(allowlistPath)
+  ? ["--breakage-allowlist-path", allowlistPath]
+  : [];
 
 process.stdout.write(`Comparing Cog and CogTesting APIs with ${baseline}\n`);
+if (allowlistArguments.length > 0) {
+  process.stdout.write(`Applying reviewed breakage allowlist for ${baseline}\n`);
+}
 const result = spawnSync(
   "swift",
   [
@@ -73,6 +78,7 @@ const result = spawnSync(
     "--scratch-path",
     resolve(REPO_ROOT, ".build/api-compatibility"),
     "diagnose-api-breaking-changes",
+    ...allowlistArguments,
     baseline,
     "--products",
     "Cog",

@@ -9,11 +9,11 @@
 /// it as a dependency.
 ///
 /// Every tracking run replaces the reaction's dependency set. A tracked read of
-/// a `whileObserved` derived or async state also gives the reaction a durable
+/// a `whileObserved` automatic or async state also gives the reaction a durable
 /// lease on that exact root. Peeking does not; async peek is one-shot demand and
 /// uses the state's grace policy when nothing else observes it.
 ///
-/// To write, call an op on the context. Its commit runs as a new turn after the
+/// To write, call an op on the context. Its turn runs as a new turn after the
 /// active flush. Like ``Reader``, this value is valid only during its run, and
 /// saved use traps. The reader, body, graph access, and dependency reconciliation
 /// are all MainActor-isolated and synchronous.
@@ -47,39 +47,27 @@ public struct ReactionReader {
   /// - Parameter valueReference: The source identity to track.
   /// - Returns: Its current completed-turn value.
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
-    cogs.requireTracking(reaction)
+    cogs.arenaCore.requireTracking(reaction.arenaSlot)
 
-    #if COG_CORE_ARENA
     guard !reaction.isCancelled else { return cogs.peek(valueReference) }
     return cogs.arenaCore.read(valueReference, for: reaction.arenaSlot)
-    #else
-    let producer = cogs.manualState(for: valueReference)
-    reaction.recordDependency(on: producer)
-    return producer.currentValue
-    #endif
   }
 
-  /// Reads a derived cog and records it as a dependency of this reaction run.
+  /// Reads an automatic cog and records it as a dependency of this reaction run.
   ///
   /// Cog settles the producer and its dirty dependencies before returning. A
   /// later equality-confirmed change schedules this reaction, while an equal
-  /// recomputation stops the wave. The registration holds the exact derived
+  /// recomputation stops the wave. The registration holds the exact automatic
   /// root's `whileObserved` lease until a later run drops the edge or the token
   /// is cancelled.
   ///
-  /// - Parameter valueReference: The derived identity to settle and track.
+  /// - Parameter valueReference: The automatic identity to settle and track.
   /// - Returns: Its newest fully settled value.
   public subscript<Value>(_ valueReference: Cog<Value>) -> Value {
-    cogs.requireTracking(reaction)
+    cogs.arenaCore.requireTracking(reaction.arenaSlot)
 
-    #if COG_CORE_ARENA
     guard !reaction.isCancelled else { return cogs.peek(valueReference) }
     return cogs.arenaCore.read(valueReference, for: reaction.arenaSlot, in: cogs)
-    #else
-    let producer = cogs.derivedState(for: valueReference)
-    reaction.recordDependency(on: producer)
-    return producer.settledValue(in: cogs)
-    #endif
   }
 
   /// Reads an async cog's value and records it as a reaction dependency.
@@ -106,7 +94,7 @@ public struct ReactionReader {
   /// `c.status[asyncValue]` inside a reaction records the async state itself
   /// as the dependency, so every pending, success, and failure turn reruns
   /// the reaction — the opposite gating from the value read beside it. The
-  /// lens has no spelling for manual or derived cogs: synchronous state has
+  /// lens has no spelling for manual or automatic cogs: synchronous state has
   /// no request status, and asking for it is a type error.
   public var status: Status {
     Status(cogs: cogs, reaction: reaction)
@@ -148,9 +136,8 @@ public struct ReactionReader {
     /// - Parameter valueReference: The async value whose status to track.
     /// - Returns: Its newest settled status in this context.
     public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
-      cogs.requireTracking(reaction)
+      cogs.arenaCore.requireTracking(reaction.arenaSlot)
 
-      #if COG_CORE_ARENA
       guard !reaction.isCancelled else { return cogs.status.peek(valueReference) }
       return cogs.arenaCore.readAsyncStatus(
         descriptor: valueReference.descriptor,
@@ -158,12 +145,6 @@ public struct ReactionReader {
         for: reaction.arenaSlot,
         in: cogs
       )
-      #else
-      let producer = cogs.asyncState(for: valueReference)
-      let status = producer.settledStatus(in: cogs)
-      reaction.recordDependency(on: producer)
-      return status
-      #endif
     }
 
     /// Peeks at an async cog's status without recording a dependency.
@@ -177,7 +158,7 @@ public struct ReactionReader {
     /// - Parameter valueReference: The async value whose status to read once.
     /// - Returns: Its newest settled status in this context.
     public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
-      cogs.requireTracking(reaction)
+      cogs.arenaCore.requireTracking(reaction.arenaSlot)
       return cogs.status.peek(valueReference)
     }
   }
@@ -201,21 +182,21 @@ public struct ReactionReader {
   /// - Parameter valueReference: The source identity to read once.
   /// - Returns: Its value from the latest completed turn.
   public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
-    cogs.requireTracking(reaction)
+    cogs.arenaCore.requireTracking(reaction.arenaSlot)
     return cogs.peek(valueReference)
   }
 
-  /// Peeks at a derived cog without recording it as a reaction dependency.
+  /// Peeks at an automatic cog without recording it as a reaction dependency.
   ///
   /// A dirty value is settled before it is returned, but later changes do not
   /// schedule this reaction and no lifetime lease is acquired. If nothing else
   /// observes the default `whileObserved` state, the peek starts or renews its
   /// ordinary grace window.
   ///
-  /// - Parameter valueReference: The derived identity to settle and read once.
+  /// - Parameter valueReference: The automatic identity to settle and read once.
   /// - Returns: Its newest fully settled value.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
-    cogs.requireTracking(reaction)
+    cogs.arenaCore.requireTracking(reaction.arenaSlot)
     return cogs.peek(valueReference)
   }
 
@@ -230,7 +211,7 @@ public struct ReactionReader {
   /// - Parameter valueReference: The async value to read once.
   /// - Returns: Its newest settled value in this context.
   public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
-    cogs.requireTracking(reaction)
+    cogs.arenaCore.requireTracking(reaction.arenaSlot)
     return cogs.peek(valueReference)
   }
 

@@ -18,7 +18,8 @@ private nonisolated func actor03IsSendable<T>(_: T.Type) -> Bool { false }
 private nonisolated func actor03IsSendable<T: Sendable>(_: T.Type) -> Bool { true }
 
 @MainActor
-@Test func `ACTOR-03 cogs hold and derive a MainActor-bound non-Sendable value directly`() {
+@Test func `ACTOR-03 manual and automatic cogs hold a MainActor-bound non-Sendable value directly`()
+{
   #expect(actor03IsSendable(Int.self))
   #expect(actor03IsSendable(Actor03MainActorValue.self) == false)
 

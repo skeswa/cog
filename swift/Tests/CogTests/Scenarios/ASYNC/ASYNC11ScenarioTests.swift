@@ -81,15 +81,15 @@ private final class Async11WorkProbe {
   #expect(selectorValues == [10])
 
   await probe.waitUntilSuspended(1)
-  cogs.commit { c in c[workInput] = 21 }
+  cogs.turn { c in c[workInput] = 21 }
   probe.release(1)
   await probe.waitUntilCompleted(1)
   #expect(probe.observations == [.init(selectorValue: 10, workValue: 21)])
 
-  cogs.commit { c in c[workInput] = 22 }
+  cogs.turn { c in c[workInput] = 22 }
   #expect(selectorValues == [10])
 
-  cogs.commit { c in c[selectorInput] = 11 }
+  cogs.turn { c in c[selectorInput] = 11 }
   try #require(selectorValues == [10, 11])
 
   await probe.waitUntilSuspended(2)

@@ -17,14 +17,14 @@ import Testing
 
   #expect(cogs.peek(doubled) == 2)
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
   #expect(inputsSeen == [1])
   #expect(cogs.peek(doubled) == 4)
   #expect(inputsSeen == [1, 2])
 
   // The catch-up read above must not leave the root hot. A later turn dirties
   // it but does not run it, and another peek still settles it.
-  cogs.commit { c in c[source] = 3 }
+  cogs.turn { c in c[source] = 3 }
   #expect(cogs.peek(source) == 3)
   #expect(inputsSeen == [1, 2])
   #expect(cogs.peek(doubled) == 6)
@@ -54,7 +54,7 @@ import Testing
   #expect(innerInputs == [1])
   #expect(outerRuns == 1)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[source] = 2
     c[trigger] = 1
   }
@@ -65,7 +65,7 @@ import Testing
 
   // A source-only turn dirties the inner cog. If the peek had linked
   // it to the ambient selector, pulling the selector would now rerun it.
-  cogs.commit { c in c[source] = 3 }
+  cogs.turn { c in c[source] = 3 }
   #expect(cogs.peek(source) == 3)
   #expect(innerInputs == [1, 2])
   #expect(cogs.peek(snapshot) == 4)

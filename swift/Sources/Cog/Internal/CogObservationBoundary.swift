@@ -1,4 +1,8 @@
+#if !COG_ARENA_COMPACT
+public import Observation
+#else
 import Observation
+#endif
 
 /// The Observation boundary for one UI-read Cog state.
 ///
@@ -10,13 +14,16 @@ import Observation
 /// The state owns the boundary, and the context's ordered boundary list retains
 /// that state for the rest of the context lifetime; this permanent pin is the UI
 /// lifetime lease for a `.whileObserved` state.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated final class CogObservationBoundary: Observable, @unchecked Sendable {
   private let registrar = ObservationRegistrar()
   #if DEBUG
   @MainActor private var hasDeferredChange = false
   #endif
 
-  /// The key path used by manual and derived value reads.
+  /// The key path used by manual and automatic value reads.
   private var value: Bool { false }
 
   /// The key path used by ``CogStatus/kind`` reads.
@@ -38,7 +45,7 @@ internal nonisolated final class CogObservationBoundary: Observable, @unchecked 
   ///
   /// Registration and the corresponding state read are one synchronous
   /// MainActor operation, so no turn can publish between them. A synchronous
-  /// derived subscript registers before its pull; the async subscript settles
+  /// automatic subscript registers before its pull; the async subscript settles
   /// first so initial pending can be installed without invalidating that new
   /// Observation baseline.
   func accessValue() {
@@ -75,6 +82,9 @@ internal nonisolated final class CogObservationBoundary: Observable, @unchecked 
   /// The context calls this after all pending sources have published and the UI
   /// root has settled, but before reactions run for the same completed revision.
   @MainActor
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func notifyValueChange() {
     registrar.withMutation(of: self, keyPath: \.value) {}
   }
@@ -115,64 +125,6 @@ internal nonisolated final class CogObservationBoundary: Observable, @unchecked 
   #endif
 }
 
-/// State that may acquire a lazy UI observation boundary.
-///
-/// `observationBoundary == nil` means no UI read has ever pinned this exact
-/// descriptor-and-key state. Boundaries are never removed or transferred.
-@MainActor
-internal protocol CogObservationState: CogState {
-  /// The permanent UI boundary after first access, or `nil` before any UI read.
-  var observationBoundary: CogObservationBoundary? { get set }
-  /// The erased state key included in debug notice history.
-  var observationKey: CogKey? { get }
-  /// Position in boundary-creation order, assigned once at registration.
-  ///
-  /// The registry walk got notice order for free by iterating in creation
-  /// order. A changed-boundary queue arrives in invalidation order instead, so
-  /// the flush sorts on this to publish the order it always published.
-  var observationOrder: Int { get set }
-  /// Whether this state is already on the context's changed-boundary queue.
-  ///
-  /// One state reached by two invalidation paths in one turn must notify once.
-  var noticeQueued: Bool { get set }
-  /// Sends the field-appropriate Observation mutations for this state's change.
-  func notifyObservationChange()
-}
-
-extension CogObservationState {
-  /// Gets or creates this state's boundary without choosing an observed field.
-  ///
-  /// Creation permanently pins the state in deterministic boundary-flush
-  /// order. The caller records either an ordinary value read or a particular
-  /// async status field after this method returns.
-  @discardableResult
-  func ensureObservationBoundary(in cogs: Cogs) -> CogObservationBoundary {
-    let boundary: CogObservationBoundary
-    if let existing = observationBoundary {
-      boundary = existing
-    } else {
-      boundary = CogObservationBoundary()
-      observationBoundary = boundary
-      cogs.registerObservationState(self)
-    }
-
-    return boundary
-  }
-
-  /// Records one ordinary value read through this state's stable boundary.
-  @discardableResult
-  func accessObservationBoundary(in cogs: Cogs) -> CogObservationBoundary {
-    let boundary = ensureObservationBoundary(in: cogs)
-    boundary.accessValue()
-    return boundary
-  }
-
-  /// Sends the normal single-value mutation for manual and derived states.
-  func notifyObservationChange() {
-    observationBoundary?.notifyValueChange()
-  }
-}
-
 /// The independently observable fields of one ``CogStatus`` publication.
 internal nonisolated struct CogStatusObservationFields: OptionSet, Sendable {
   /// The compact bitset representation used only inside the Observation boundary.
@@ -205,55 +157,6 @@ extension Cogs {
   /// current baseline and joins the next flush; notifying it in the same pass
   /// could report a change predating its first observed value.
   internal func flushObservationBoundaries() {
-    #if COG_CORE_ARENA
     arenaCore.flushObservationBoundaries(in: self)
-    #else
-    flushClassObservationBoundaries()
-    #endif
-  }
-
-  /// Flushes the simple core's class-backed UI roots.
-  ///
-  /// Manual, synchronous derived, and async states all use this path when the
-  /// correctness core is selected. The arena build compiles the call out and
-  /// flushes its descriptor-dispatched scalar roots instead.
-  private func flushClassObservationBoundaries() {
-    guard !changedBoundaryQueue.isEmpty else { return }
-
-    // Notice order is boundary-creation order. The registry walk had it for
-    // free; a queue arrives in invalidation order, so restore it here. The
-    // changed set is the point of the queue, so this sorts a handful of entries
-    // rather than every key the screen has ever shown.
-    changedBoundaryQueue.sort()
-
-    // Snapshot the count for the reason the registry walk did: a notice can run
-    // a synchronous Observation handler that reads new state, and a boundary
-    // that queues while this pass runs has established its own baseline and
-    // belongs to the next flush.
-    let queuedCount = changedBoundaryQueue.count
-    for index in 0..<queuedCount {
-      let state = observationStates[changedBoundaryQueue[index]]
-      state.noticeQueued = false
-
-      if state.settleState != .clean, let derived = state.asDerivedSettleState {
-        settle(derived)
-      }
-
-      let changedThisTurn = state.changedAt == revision
-      #if DEBUG
-      let changedBySeed = state.observationBoundary?.consumeDeferredChange() ?? false
-      guard changedThisTurn || changedBySeed else { continue }
-      recordHistoryNotice(label: state.label, key: state.observationKey)
-      #else
-      guard changedThisTurn else { continue }
-      #endif
-      if changedThisTurn {
-        state.notifyObservationChange()
-      } else {
-        state.observationBoundary?.notifyValueChange()
-      }
-    }
-
-    changedBoundaryQueue.removeFirst(queuedCount)
   }
 }

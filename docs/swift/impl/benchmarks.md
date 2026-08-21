@@ -1,6 +1,6 @@
 # Cog for Swift: benchmark results
 
-_August 20, 2026_
+_August 21, 2026_
 
 This document records benchmark results and the choices they support. It puts
 current results first. Older results appear only when they explain a choice,
@@ -17,36 +17,59 @@ means Swift's automatic reference-counting work.
 
 ## Current core decision
 
-The **simple core** remains the shipping default. It stores graph states as
-class objects with edge arrays. The **arena core** stores states in shared
-columns and edges in a shared pool. It remains available for research through
-`COG_TEST_CORE=arena`.
+The **specialized arena** is the sole shipping core and default implementation.
+It stores states in shared columns, edges in a shared pool, and exposes a stable
+typed frontier so client compilation can specialize Cog's generic value work.
+The former **simple core** is retired. Applications that prioritize binary size
+can explicitly suppress the typed frontier with the non-default `CompactArena`
+package trait. That public trait is also the supported way to benchmark the
+compact arena configuration.
 
-Current evidence favors the arena for future work:
+Current evidence explains the default and its opt-out:
 
-- It is 18% faster on a steady turn and 27% faster on a 100-node chain.
-- It is 12.5× to 66× faster on every graph-backed Storefront cut.
-- It uses 28% fewer bytes for Storefront's 2,402-state graph.
-- It loses the pinned-key turn by about 15%.
-- It takes 2.2× as long to build a simple 1,000-state keyed graph.
+- The unspecialized arena is 18% faster than simple on a steady turn and 27%
+  faster on a 100-node chain.
+- In E5 scouting, the specialized arena extends those wins to 45% and 50%
+  against the earlier E2 simple results; it is 32% faster than the earlier
+  unspecialized-arena result on both shapes. These were separate sessions, not
+  a paired three-way run.
+- In the back-to-back E6 whole-graph run, specialized arena was 64% to 79%
+  faster than simple and 29% to 55% faster than unspecialized arena across the
+  diamond, deep, broad, and unstable shapes.
+- Unspecialized arena is 12.5× to 66× faster than simple on every graph-backed
+  Storefront cut. The specialized Storefront executable has a size result but
+  no corrected headless timing yet.
+- Unspecialized arena uses 28% fewer bytes for Storefront's 2,402-state graph.
+- Unspecialized arena loses the pinned-key turn by about 15%; specialization
+  reduces the scouting result to about 2.4 µs, near the simple result.
+- Unspecialized arena takes 2.2× as long as simple to build a 1,000-state keyed
+  graph. Specialization closes that gap to about 3%.
 
-The simple core stays in place because the Storefront result comes from one
-host and one session. A core swap is a major storage change. `M10-09` owns the
-Storefront follow-up, and `M9-18` owns the next core decision. Both are open.
+These results selected specialized arena on runtime evidence; stakeholder
+research changed the product weighting after about 80% of users said they would
+accept its binary-size cost for the speed and overhead gains. The default now
+serves that majority. `CompactArena` preserves an explicit application-level
+escape hatch for the remaining size-sensitive users without restoring the
+simple implementation. Pinned-host Storefront and UI follow-up remains owed for
+release qualification, not for reopening the core choice.
 
 ### Warm execution
 
-`M9-23`, environment E2. These are the latest warm results. Work after `M9-17`
-removed the arena's main exclusivity and metadata costs.
+`M9-23`, environment E2, supplies the historical simple and
+unspecialized-arena columns.
+Work after `M9-17` removed the arena's main exclusivity and metadata costs. The
+specialized-arena column is the median of three independently recorded p50s in
+environment E5. It is scouting across the same host and toolchain, not a
+paired three-way release qualification.
 
-| Shape                 |   simple |    arena | result         |
-| --------------------- | -------: | -------: | -------------- |
-| steady turn, p50      | 1,639 ns | 1,337 ns | arena by 18%   |
-| steady turn, retains  |       62 |       38 | arena          |
-| 16-consumer fan, p50  |    37 µs |    13 µs | arena by 2.8×  |
-| 100-node chain, p50   |   128 µs |    94 µs | arena by 27%   |
-| pinned-key turn, p50  |  ~2.2 µs |  ~2.6 µs | simple by ~15% |
-| allocations, all four |        0 |        0 | tie            |
+| Shape                 |   simple | arena, unspecialized | arena, specialized | specialized result                      |
+| --------------------- | -------: | -------------------: | -----------------: | --------------------------------------- |
+| steady turn, p50      | 1,639 ns |             1,337 ns |             909 ns | 45% vs. simple; 32% vs. arena           |
+| steady turn, retains  |       62 |                   38 |                 31 | lowest                                  |
+| 16-consumer fan, p50  |    37 µs |                13 µs |             7.6 µs | 4.9× vs. simple; 41% faster than arena  |
+| 100-node chain, p50   |   128 µs |                94 µs |              64 µs | 50% vs. simple; 32% vs. arena           |
+| pinned-key turn, p50  |  ~2.2 µs |              ~2.6 µs |            ~2.4 µs | near simple; about 8% faster than arena |
+| allocations, all four |        0 |                    0 |                  0 | tie                                     |
 
 The warm gap is a storage cost, not an allocation cost. The simple core keeps
 each state in a class. Its forward edges hold `any CogState` references, and
@@ -56,36 +79,65 @@ ARC, weak loads, actor checks, and existential access at each step. In the
 turn; actor checks were 8.9% against 2.2%. The arena instead walks integer rows
 and scalar edges, and it updates a matching edge in place.
 
-The diamond, deep, broad, and unstable graphs were last run at `M9-17`. Later
-work made the arena 21% faster, then another 22% faster. This should turn the
-old deep-graph loss into a win, but that is an estimate. The four shapes need a
-fresh run before they help decide the core.
+### Whole-graph propagation
+
+PERF-10, environment E6. Historical simple, unspecialized arena, and specialized
+arena ran back to back in that order on the same host. Each benchmark performs
+its own warmup and gathers samples for up to three seconds. This closes the
+stale `M9-17` comparison and supplies the evidence for retiring simple, but
+remains scouting because Xcode 26.4 is not the repository's pinned Xcode 26.6
+release environment.
+
+| Shape    | simple p50 | arena p50 | specialized p50 | specialized vs. simple | specialized vs. arena | samples, simple / arena / specialized |
+| -------- | ---------: | --------: | --------------: | ---------------------: | --------------------: | ------------------------------------: |
+| diamond  |   5.112 ms |  2.918 ms |        1.859 ms |             64% faster |            36% faster |                     398 / 971 / 1,603 |
+| deep     |   2.511 ms |  2.009 ms |        0.907 ms |             64% faster |            55% faster |                   833 / 1,390 / 3,245 |
+| broad    |      13 ms |  7.909 ms |        4.313 ms |             67% faster |            45% faster |                       212 / 304 / 693 |
+| unstable |   2.693 ms |  0.787 ms |        0.559 ms |             79% faster |            29% faster |                 1,044 / 3,611 / 5,214 |
+
+The instruction counter moved in the same direction and is less sensitive to
+host scheduling than wall clock:
+
+| Shape    | simple instructions | arena instructions | specialized instructions | specialized vs. simple | specialized vs. arena |
+| -------- | ------------------: | -----------------: | -----------------------: | ---------------------: | --------------------: |
+| diamond  |                84 M |               65 M |                     41 M |              51% fewer |             37% fewer |
+| deep     |                43 M |               47 M |                     21 M |              51% fewer |             55% fewer |
+| broad    |               221 M |              166 M |                     92 M |              58% fewer |             45% fewer |
+| unstable |                43 M |               18 M |                     13 M |              70% fewer |             28% fewer |
+
+The unspecialized arena still used 9% more instructions than simple on deep,
+despite finishing 20% sooner. Specialization removes that last whole-graph
+instruction loss. Process-level resident peak remained 14–15 MB and did not
+separate the configurations.
 
 ### Graph construction
 
 `M9-25`, environment E2. Each measured region built and settled a graph with
 500 keyed sources and 500 keyed consumers. Seven paired runs were taken. The
-benchmark released the context after `stopMeasurement()`, so teardown is not
-part of the 2.2× result.
+specialized results are medians from the seven paired baseline/frontier runs in
+E5. The benchmark released the context after `stopMeasurement()`, so teardown
+is not part of these results.
 
-| Measure                    |    simple |     arena | result          |
-| -------------------------- | --------: | --------: | --------------- |
-| build + settle, p50        | ~1,068 µs | ~2,320 µs | simple by 2.2×  |
-| resident-memory delta, p50 | ~1,345 KB | ~1,541 KB | no clear winner |
+| Measure                    |    simple | arena, unspecialized | arena, specialized | specialized result                           |
+| -------------------------- | --------: | -------------------: | -----------------: | -------------------------------------------- |
+| build + settle, p50        | ~1,068 µs |            ~2,320 µs |           1,102 µs | 3% slower than simple; 52% faster than arena |
+| resident-memory delta, p50 | ~1,345 KB |            ~1,541 KB |           1,508 KB | no clear winner                              |
 
-The memory ranges overlapped: 1,279–1,656 KB for simple and 1,082–1,918 KB for
-arena. Resident memory is sampled in whole pages, so this test cannot separate
-the cores. Storefront's counted footprint test gives a clearer result.
+The memory ranges overlapped: 1,279–1,656 KB for simple, 1,082–1,918 KB for
+unspecialized arena, and 1,049–1,689 KB for specialized arena. Resident memory
+is sampled in whole pages, so this test cannot separate the cores. Storefront's
+counted footprint test gives a clearer result.
 
 `M9-26` added a standalone profile of the same graph shape. Its context was
 local, so this profile included teardown even though the benchmark above did
-not.
+not. E5 repeated the allocation counter after specialization; that probe did
+not capture retains or releases.
 
-| Counter     | simple |  arena |
-| ----------- | -----: | -----: |
-| allocations |  4,525 |  5,697 |
-| retains     | 22,504 | 17,527 |
-| releases    | 38,052 | 24,745 |
+| Counter     | simple | arena, unspecialized | arena, specialized |
+| ----------- | -----: | -------------------: | -----------------: |
+| allocations |  4,525 |                5,697 |              1,699 |
+| retains     | 22,504 |               17,527 |       not captured |
+| releases    | 38,052 |               24,745 |       not captured |
 
 The arena allocated 26% more, but that is too small to explain a 2.2× time
 gap. It also did less ARC work. The CPU profile found the missing cost:
@@ -107,18 +159,65 @@ array code. New rows also grow nine scalar columns and two typed value arrays.
 
 `M9-23` avoids most lookup and metadata work for keyless state by memoizing its
 slot and column. This test is fully keyed, so it always takes the uncached path.
-Specialized keyed storage is the likely fix.
+E5 validates the typed frontier as the fix: it cut the paired median time by
+49.1%, instructions by about 51%, and standalone allocations by 70.2%.
 
-The diagnosis is strong, but the exact share of the 2.2× gap remains
-approximate because `M9-25` and `M9-26` used different teardown boundaries.
-There is no current evidence that arena teardown itself is 2.2× slower.
+The diagnosis is validated, but the exact share of the original 2.2× gap
+remains approximate because `M9-25` and `M9-26` used different teardown
+boundaries. There is no evidence that arena teardown itself was 2.2× slower.
+
+### Default arena specialization and compact opt-out
+
+Typed-frontier experiment, environment E5. By default, the arena's public
+generic reads, descriptor-and-key resolution, record-closure formation, and
+typed value-column operations ship as stable `@inlinable` bodies. The
+`CompactArena` trait suppresses those annotations while the scalar graph
+machinery remains opaque in both configurations. Seven paired PERF-03 runs used
+identical build-and-settle boundaries:
+
+| Measure                        | arena baseline | specialized arena | change         |
+| ------------------------------ | -------------: | ----------------: | -------------- |
+| paired-run median of p50s      |       2,163 µs |          1,102 µs | **-49.1%**     |
+| paired-run median instructions |           55 M |              27 M | **about -51%** |
+| standalone probe allocations   |          5,697 |             1,699 | **-70.2%**     |
+
+The temporary exported-specialization control arm measured about 1.20 ms and
+26–27 million instructions, so the stable frontier reached the intended
+ceiling. The generic entry points remain as behavior-identical fallbacks.
+
+The original 5% cost gate rejected making this universal. The later stakeholder
+decision accepts the measured cost by default and retains the compact trait as
+the opt-out. Retained clean release artifacts measured the final executable's
+arm64 Mach-O `__TEXT` segment and its `__text` machine-code section:
+
+| Artifact and comparison                      | baseline bytes | specialized arena bytes | absolute growth | relative growth |
+| -------------------------------------------- | -------------: | ----------------------: | --------------: | --------------: |
+| `CogGraph` `__TEXT`, vs. unspecialized arena |      2,506,752 |               2,670,592 |        +163,840 |           +6.5% |
+| Storefront `__TEXT`, vs. historical simple   |        827,392 |                 991,232 |        +163,840 |          +19.8% |
+| Storefront `__text`, vs. historical simple   |        688,821 |                 838,229 |        +149,408 |          +21.7% |
+
+These percentages describe the complete executable segment or section, not a
+standalone Cog library and not the app bundle or compressed download. The
+absolute increase comes from the linked arena implementation and specialized
+copies at Cog's generic value and key call sites. It can grow with the number
+and type diversity of those compile-time call sites, but not with the number of
+runtime state instances and not proportionally with unrelated application
+code. Unrelated machine code enlarges the `__TEXT` denominator, reducing the
+percentage; assets generally live outside `__TEXT`. `CompactArena` exists for
+applications whose size budget outweighs the measured runtime gains.
+
+The experiment ran on E5 rather than the repository's Xcode 26.6 release pin;
+the recorded numbers establish the direction and the product trade, while the
+pinned runner still owns release qualification.
 
 ### Evidence needed for the next decision
 
 1. Repeat the corrected Storefront run in the pinned CI environment.
 2. Rerun the Storefront UI suite. Its old results are withdrawn.
-3. Rerun the four whole-graph shapes after `M9-23`.
-4. Test whether keyed storage can be specialized without adding public API.
+3. Repeat E6's three-way PERF-10 run on the pinned Xcode to qualify the scouting
+   result.
+4. Qualify both the specialized default and `CompactArena` release archives on
+   the pinned Xcode.
 5. Measure build, first settlement, and teardown as separate phases under the
    same profiler boundary.
 
@@ -126,12 +225,14 @@ There is no current evidence that arena teardown itself is 2.2× slower.
 
 All benchmark runs used release builds.
 
-| ID  | Date       | Environment                                                                                                                                      |
-| --- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| E1  | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                   |
-| E2  | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2               |
-| E3  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores run back to back on an idle host |
-| E4  | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                     |
+| ID  | Date       | Environment                                                                                                                                                                                                                            |
+| --- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                         |
+| E2  | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                     |
+| E3  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores run back to back on an idle host                                                                                       |
+| E4  | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                           |
+| E5  | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; scouting because the pinned Xcode 26.6 was unavailable |
+| E6  | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 Cog shapes run back to back as simple, unspecialized arena, then specialized arena          |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used
@@ -157,8 +258,9 @@ allocations and adds no global storage. Interned tokens are smaller, but their
 table never shrinks and each new key takes a lock. Generic references would add
 public overloads and were about 6% slower on the diamond.
 
-The two other layouts remain behind `COG_TEST_VALUE_REFERENCE_LAYOUT` so tests
-can prove that behavior does not depend on this choice.
+The two rejected layouts were removed after the comparison. Their measured
+results remain here so the choice can be audited without keeping permanent
+conditional API and storage paths.
 
 ### Arena edges
 
@@ -177,7 +279,9 @@ normal, mostly static shape. All layouts had the same median time and allocation
 count. Prefix arrays won only the forced-churn instruction count and added ARC
 work. Inline plus overflow won neither test.
 
-The other layouts remain behind `COG_TEST_EDGE` for comparison.
+The two rejected layouts were removed after the comparison. Their measured
+results remain here so the selected storage can be understood without keeping
+three propagation implementations in production source.
 
 ## Current cost checks
 
@@ -207,7 +311,7 @@ operations, or 90 and 110 per turn.
 | releases           |        93 |       76 |
 | p50 time           |  2.202 µs | 1.676 µs |
 
-Zero held at every percentile across 1,751 samples. A commit with no read also
+Zero held at every percentile across 1,751 samples. A turn with no read also
 allocates nothing. The gate requires exact zero, not a tolerance around zero.
 The latest steady time is 1.639 µs after later shared work.
 
@@ -216,7 +320,7 @@ chain uses much more. Issue #373 tracks that work.
 
 ### Settling a node allocates nothing
 
-`M9-15`, environment E2. This pulls one source through 100 derived nodes.
+`M9-15`, environment E2. This pulls one source through 100 automatic nodes.
 
 | Metric             | before M9 |    now | per node |
 | ------------------ | --------: | -----: | -------: |
@@ -247,7 +351,9 @@ The exact gate makes sure Cog creates boundaries only for observed values.
 
 `M6-11c`, environment E1. These are older than the latest core work, but they
 remain the recorded comparison with swift-state-graph and raw Observation.
-Each cell shows instructions and median time.
+The current Cog-only three-way comparison is under “Whole-graph propagation”
+above. The external runtimes were not rerun in E6, so this table preserves the
+older common-session comparison. Each cell shows instructions and median time.
 
 | Runtime                |      diamond p50 |           deep p50 |        broad p50 |       unstable p50 |
 | ---------------------- | ---------------: | -----------------: | ---------------: | -----------------: |
@@ -256,7 +362,7 @@ Each cell shows instructions and median time.
 | swift-state-graph 0.28 |    506 M / 25 ms |      301 M / 14 ms |    715 M / 36 ms |   152 M / 7.479 ms |
 | raw `@Observable`      |  16 M / 0.787 ms | 4.106 M / 0.205 ms |  45 M / 2.130 ms | 7.094 M / 0.327 ms |
 
-Raw Observation is a lower bound because it has no derived-value cache. It was
+Raw Observation is a lower bound because it has no automatic-value cache. It was
 fastest in all four shapes. swift-state-graph was slowest in all four.
 
 Process-level peak memory did not separate the runtimes:
@@ -282,8 +388,10 @@ choosing a core.
 
 `mise run bench:thresholds:check` checks these limits and the exact
 zero-allocation rules. It first runs an allocating witness, so a broken counter
-cannot report a false zero. `mise run bench:thresholds:sentinel` proves the gate
-rejects an impossible limit.
+cannot report a false zero. The task always builds the shipping default; retired
+representation selectors are manifest errors, and the separate
+`bench:compact` task does not apply these thresholds. `mise run
+bench:thresholds:sentinel` proves the gate rejects an impossible limit.
 
 ## Storefront macrobenchmark
 
@@ -436,9 +544,9 @@ Extra allocation probes from `M5-06`:
 | manual-source `peek`, 10,000 times     |  about 0 total |
 | keyed reference creation, 10,000 times |        0 total |
 | clean tracked read, 10,000 times       | about 12 total |
-| clean derived `peek`                   |         6 each |
-| commit with no read                    |         6 each |
-| commit plus tracked read               |         7 each |
+| clean automatic `peek`                 |         6 each |
+| turn with no read                      |         6 each |
+| turn plus tracked read                 |         7 each |
 
 `M5-07b` measured the simple core's 1,000-state resident-memory growth at
 0.87–1.28 MB at p50 and 1.28–1.56 MB at p100, or about 1.4 KB per state. This

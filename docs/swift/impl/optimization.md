@@ -51,8 +51,8 @@ recording modes are separate.
 
 | Allocation | Call site                                              | What it is                                        |
 | ---------- | ------------------------------------------------------ | ------------------------------------------------- |
-| 1          | `CogOps.commit(_:to:name:)`, CogOps.swift:96           | escaping closure box for the write sugar          |
-| 2          | `Cogs.commit(named:_:)`, Writer.swift:81               | escaping closure box `withTurn` receives          |
+| 1          | `CogOps.turn(_:to:name:)`, CogOps.swift:96             | escaping closure box for the write sugar          |
+| 2          | `Cogs.turn(named:_:)`, Writer.swift:81                 | escaping closure box `withTurn` receives          |
 | 3          | `Cogs.startTurn(named:)`, CogTurn.swift:283            | the `CogTurnID` object                            |
 | 4          | `Cogs.startTurn(named:)`, CogTurn.swift:283            | the `CogTurn` object                              |
 | 5          | `CogTurn.touch(_:)`, CogTurn.swift:59                  | `touchedSources` regrown from empty               |
@@ -65,7 +65,7 @@ reuse their capacity: two are regrown from empty, and the dependency list
 reallocates because `run(in:)` holds the previous list in `previousDependencies`
 while clearing `dependencies`, so `keepingCapacity: true` cannot keep anything. That is why the arena reached five rather
 than zero: the representation swap could only ever move the minority of this
-list it owns. A commit with no read costs the same seven; a tracked read of a
+list it owns. A turn with no read costs the same seven; a tracked read of a
 clean value costs none, so all seven belong to the write.
 
 **Where a steady turn's time goes, simple core.** Leaf attribution over 5,073
@@ -122,7 +122,7 @@ keys **79.9% of the turn's leaf samples are ARC**, and the site is one line:
 it changed (CogObservationBoundary.swift:212).
 
 **Per-node settle cost, depth-100 keyed chain.** One source write pulled
-through a hundred derived nodes.
+through a hundred automatic nodes.
 
 | Core   | mallocs / turn | retains / turn | releases / turn | wall clock / turn |
 | ------ | -------------: | -------------: | --------------: | ----------------: |
@@ -219,7 +219,7 @@ Attribution, by the Cog frame beneath each cost:
 | metadata    | `CogArenaCore.manualRecord(for:)`        |     531 |
 | metadata    | `CogArenaValueColumn.installedRow(for:)` |     527 |
 | exclusivity | `CogArenaStorage.index(of:)`             |     382 |
-| metadata    | `CogArenaValueColumn.commit(at:)`        |     384 |
+| metadata    | `CogArenaValueColumn.publish(at:)`       |     384 |
 | metadata    | `CogArenaValueColumn.stage(_:at:)`       |     359 |
 | metadata    | `CogArenaCore.manualLocation(for:)`      |     292 |
 | exclusivity | `CogArenaCore.settle(_:in:)`             |     175 |
@@ -337,7 +337,7 @@ shape where the arena loses.
 
 **The remaining metadata is not reachable this way.** 782 of the 1,007 residual
 samples are inside `CogArenaValueColumn` itself — `installedRow`, `stage`,
-`commit`, `current` — where the cost is `ContiguousArray<Value?>` access in
+`publish`, `current` — where the cost is `ContiguousArray<Value?>` access in
 unspecialized generic code. No per-call-site cache helps that; it needs
 specialization, which is a different route.
 
@@ -395,3 +395,36 @@ cache can skip a second time; it is unspecialized generic code, so the route is
 specialization, which is the same conclusion `M9-24` reached from the steady
 turn. Route F's remaining question is whether that is reachable without
 widening the public API.
+
+**The typed frontier recovers specialization, now the default size trade** —
+2026-08-21, environment E5 in [benchmarks.md](./benchmarks.md). The staged
+experiment implemented the stable route recorded by `M9-26`: make only the
+value-typed frontier `@inlinable` and promote exactly the
+internal declarations those bodies name to `@usableFromInline`. Record-closure
+formation stays on that frontier, so client compilation sees the concrete
+`Value` through recomputation rather than specializing only array access.
+
+Across seven paired PERF-03 runs, the median baseline p50 was 2,163 µs and the
+frontier median was 1,102 µs, a 49.1% reduction. Median instructions fell from
+55 million to 27 million. The standalone build probe's allocations fell from
+5,697 to 1,699. A temporary exported-specialization control arm measured about
+1.20 ms and 26–27 million instructions: the stable mechanism reached the same
+ceiling without an underscored compiler attribute.
+
+The binary records the cost of making this the default. The specialized arena's
+arm64 Storefront `__TEXT` measured 991,232 bytes against 827,392 for the compact
+historical simple build, about 20% larger. Rescue experiments that pulled record
+creation and progressively colder operations back behind opaque calls reduced
+the win before they reduced size enough; none met both the plan's 20% speed gate
+and 5% app-size gate. Later stakeholder research found about 80% of users would
+accept that size cost for the speed and overhead improvements, changing the
+product weighting rather than the measurement.
+
+The specialized arena with pool edges is therefore the sole core and the
+default. The simple selector is retired. The additive `CompactArena` package
+trait is the explicit opt-out: it suppresses this frontier while leaving the
+arena representation, generic compiled fallbacks, debug behavior, and Cog's
+public API unchanged. The trait keeps the unspecialized arena measurable. Since
+SwiftPM unions traits across the graph, the final application owns the compact
+choice rather than a reusable dependency choosing it on the application's
+behalf.

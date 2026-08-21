@@ -127,7 +127,7 @@ private final class Async32ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-32 a status watch sees turns an equal-success value watch gates away`()
+@Test func `ASYNC-32 a status watch sees transitions an equal-success value watch gates away`()
   async
 {
   let (cogs, m) = probedContext()

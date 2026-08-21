@@ -19,14 +19,14 @@ private struct WeatherMechanism: Mechanism {
 }
 
 @MainActor
-@Test func `MECH-05 registration names compose under the derived mechanism name`() async {
+@Test func `MECH-05 registration names compose under the default mechanism name`() async {
   let (taskNames, taskNameContinuation) = AsyncStream.makeStream(of: String?.self)
 
   let cogs = Cogs.forTesting(mechanisms: [
     WeatherMechanism(taskNames: taskNameContinuation)
   ])
 
-  cogs.commit("warm up") { c in c[niceTemperatureCog] = 80 }
+  cogs.turn("warm up") { c in c[niceTemperatureCog] = 80 }
 
   #if DEBUG
   // The watch ran under its composed name: the type name minus "Mechanism",

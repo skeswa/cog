@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `TURN-08 queued commits finish one full flush at a time in FIFO order`() {
+@Test func `TURN-08 queued turns finish one full flush at a time in FIFO order`() {
   let (cogs, m) = probedContext()
   let trigger = ManualCog<Int>(0)
   let value = ManualCog<Int>(0)
@@ -19,7 +19,7 @@ import Testing
     guard c[trigger] == 1 else { return }
 
     for next in 1...3 {
-      cogs.commit("queued.\(next)") { c in
+      cogs.turn("queued.\(next)") { c in
         events.append("body:\(next)")
         c[value] = next
       }
@@ -31,7 +31,7 @@ import Testing
   }
 
   events.removeAll()
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
 
   // No UI boundary is registered in this host test, so the notify phase is
   // empty. Seeing each reaction complete before the next body begins proves

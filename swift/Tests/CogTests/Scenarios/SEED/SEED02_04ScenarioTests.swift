@@ -44,7 +44,7 @@ import Testing
 
   // Quietness was not cancellation: the retained registration still wakes on
   // the next real turn and observes the latest value.
-  cogs.commit("seed.followup") { c in c[source] = 3 }
+  cogs.turn("seed.followup") { c in c[source] = 3 }
   #expect(seen == [1, 3])
 }
 
@@ -97,15 +97,15 @@ import Testing
   cogs.seed(currentZipSource, to: zip)
   cogs.seed(weatherReportSource[zip], to: .cloudy(60))
 
-  // Setup changed both sources without settling the derived cog or running its
-  // alert. Do not read the derived cog here: the pending dirty path is the
+  // Setup changed both sources without settling the automatic cog or running its
+  // alert. Do not read the automatic cog here: the pending dirty path is the
   // behavior this story is proving.
   #expect(cogs.peek(currentZipSource) == zip)
   #expect(cogs.peek(weatherReportSource[zip]) == .cloudy(60))
   #expect(weatherReads == 0)
   #expect(alerts.isEmpty)
 
-  cogs.commit("weather.stub") { c in
+  cogs.turn("weather.stub") { c in
     c[weatherReportSource[zip]] = .clear(75)
   }
 

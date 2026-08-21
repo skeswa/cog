@@ -2,14 +2,14 @@ import Benchmark
 internal import Cog
 import CogTesting
 
-/// The fan PERF-02 measures: one source, `fanWidth` derived consumers, all
+/// The fan PERF-02 measures: one source, `fanWidth` automatic consumers, all
 /// read every turn.
 ///
 /// A fan rather than a chain. Retain and release traffic during propagation is
 /// a per-*node* cost, and a fan makes the node count the only thing that
 /// changes between this shape and the single-consumer graph PERF-01 measures.
 /// Subtracting one from the other therefore attributes ARC traffic to
-/// propagation rather than to the commit boundary, which is what PERF-02 is
+/// propagation rather than to the turn boundary, which is what PERF-02 is
 /// actually about — a turn has a fixed cost no matter how small the graph, and
 /// that fixed cost is not propagation.
 ///
@@ -19,7 +19,7 @@ import CogTesting
 /// here are process-global.
 @MainActor
 enum PropagationHarness {
-  /// Derived consumers hanging off the one source.
+  /// Automatic consumers hanging off the one source.
   ///
   /// Sixteen is enough that the per-node term dominates the fixed per-turn
   /// term, and small enough that a run stays cheap.
@@ -55,13 +55,13 @@ enum PropagationHarness {
   static func runPropagatingTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.commit(fanSourceCog, to: iteration, name: "perf.fan.turn")
+      cogs.turn(fanSourceCog, to: iteration, name: "perf.fan.turn")
       for fanCog in fanCogs { blackHole(cogs[fanCog]) }
     }
   }
 }
 
-/// The chain PERF-13 measures: one source pulled through `chainDepth` derived
+/// The chain PERF-13 measures: one source pulled through `chainDepth` automatic
 /// nodes, every turn.
 ///
 /// A chain rather than a fan, because PERF-13 is about the settle *walk* — what
@@ -116,7 +116,7 @@ enum DeepChainHarness {
   static func runChainTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.commit(chainSourceCog, to: iteration, name: "perf.chain.turn")
+      cogs.turn(chainSourceCog, to: iteration, name: "perf.chain.turn")
       blackHole(cogs[chainCogs[chainDepth]])
     }
   }

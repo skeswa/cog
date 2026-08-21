@@ -1,0 +1,12 @@
+API breakage: var Cogs.valueReferenceLayoutName has been removed
+API breakage: func Cogs.acknowledgeNextDerivedRelease(with:) has been removed
+API breakage: func Cogs.acknowledgeNextDerivedReleaseCheck(with:) has been removed
+API breakage: func CogOps.turn(named:_:) has been added as a protocol requirement
+API breakage: func CogOps.commit(named:_:) has been removed
+API breakage: func CogOps.commit(_:_:) has been removed
+API breakage: func CogOps.commit(_:to:name:) has been removed
+API breakage: func Cogs.acknowledgeNextDerivedRelease(_:) has been removed
+API breakage: func Cogs.acknowledgeNextDerivedReleaseCheck(_:) has been removed
+API breakage: var Cogs.valueReferenceLayoutNameForTesting has been removed
+API breakage: func Cogs.commit(named:_:) has been removed
+API breakage: func MechanismController.commit(named:_:) has been removed

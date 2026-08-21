@@ -3,10 +3,16 @@
 _August 6, 2026_
 
 This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. The comparisons in §9.6 select inline `AnyHashable`
-value references and the shared linked edge pool within the arena candidate,
-but retain the simple core as the shipping implementation. Hash-table and
+an implementation plan. The comparisons in §9.6 selected inline `AnyHashable`
+value references and the shared linked edge pool. M9's later typed-frontier
+measurements selected the specialized arena as the sole shipping core; the
+simple implementation is retired, while the compact unspecialized arena
+remains available through an explicit package trait. Hash-table and
 exclusivity layouts remain benchmark-gated.
+
+The [shared state model](../../design.md) owns the cross-platform cost order:
+avoid work before optimizing representation, and never buy speed with torn
+reads or fragmented state. This file owns the Swift representation.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
@@ -95,7 +101,7 @@ per read. A descriptor reaches its known column type through a checked setup
 path and an internal downcast. A keyed box also stores typed keys in its
 column, so selectors do not reopen erased keys during normal computation.
 
-Manual, derived, and async states share topology; their descriptors differ in
+Manual, automatic, and async states share topology; their descriptors differ in
 how they produce a row. One keyed box stores one compute closure, not one
 closure per key.
 
@@ -128,7 +134,8 @@ The shared pool won the expected mostly-static shape on instructions. The
 prefix candidate won high churn on instructions, but not wall time, while
 adding per-turn ARC. The inline-plus-overflow candidate won neither shape.
 §9.6 records the complete comparison and selection. Both losing candidates
-remain behind test-and-benchmark selectors so the decision stays reproducible.
+were removed after the decision; reproducibility rests on the recorded inputs,
+environment, and results rather than permanent conditional implementations.
 
 ### 3.4 Propagation
 
@@ -227,14 +234,14 @@ measurement shows that old keyed states or notices are costly.
 leptos once exposed copyable arena-slot handles. Data could outlive the scope
 that owned its slot, causing leaks and stale handles. Cog avoids that design:
 
-- A value reference is a stable name: descriptor plus key. If a derived state is released,
+- A value reference is a stable name: descriptor plus key. If an automatic state is released,
   the same value reference can later create a fresh slot.
 - ARC owns descriptors. The app context arena owns state rows.
 - Manual and UI-boundary states live for the app context by default.
 - Only `.whileObserved` rows use graph subscriber and explicit lease counts.
   `.cache` rows use cache limits and retention time.
 
-Releasing a sync-derived row drops its value, returns edges to the free list,
+Releasing a sync-automatic row drops its value, returns edges to the free list,
 and increases the slot generation. Releasing an async row first cancels its
 task and increases the async generation, so late results fail before they can
 touch a reused slot. Debug builds also check stale internal slot access.
@@ -247,7 +254,7 @@ order — maps to the storage plan in four passes:
 1. **Accumulate:** writer subscripts update the pending value column and add
    each slot to a reused touched list. Reading through the writer sees staged
    values, so `c[countCog] += 1` works. Every access checks the turn ID.
-2. **Commit sources (flush steps 1–2):** compare pending with current, keep
+2. **Publish sources (flush steps 1–2):** compare pending with current, keep
    real changes, increase `changedAt`, and push flags. Do not run selectors.
 3. **Settle hot roots (flush step 3):** pull UI-boundary rows, active exports,
    and current reaction dependencies. Keep cold branches dirty.

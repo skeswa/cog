@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `EXPORT-14 equal derived recomputation offers no value`() async {
+@Test func `EXPORT-14 equal automatic recomputation offers no value`() async {
   let sourceCog = ManualCog<Int>(0)
   var selectorRuns = 0
   let bucketCog = Cog<Int> { c in
@@ -16,8 +16,8 @@ import Testing
 
   #expect(await iterator.next() == 0)
 
-  cogs.commit(sourceCog, to: 1)
-  cogs.commit(sourceCog, to: 10)
+  cogs.turn(sourceCog, to: 1)
+  cogs.turn(sourceCog, to: 10)
 
   #expect(selectorRuns == 3)
   #expect(await iterator.next() == 1)

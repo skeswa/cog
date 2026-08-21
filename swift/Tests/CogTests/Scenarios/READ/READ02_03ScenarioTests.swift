@@ -25,7 +25,7 @@ import Testing
 }
 
 @MainActor
-@Test func `READ-02 a shared derived cog runs once for all its readers`() {
+@Test func `READ-02 a shared automatic cog runs once for all its readers`() {
   // The cache belongs to the cog, not to the reader, so a value two consumers
   // both need is computed once — the property that keeps a diamond from
   // computing its shared parent twice.
@@ -93,7 +93,7 @@ import Testing
 // MARK: - READ-03
 
 @MainActor
-@Test func `READ-03 one commit presents two changed sources as one settled pair`() {
+@Test func `READ-03 one turn presents two changed sources as one settled pair`() {
   var pairsSeen: [String] = []
 
   let cogs = Cogs.forTesting()
@@ -109,7 +109,7 @@ import Testing
 
   #expect(cogs.peek(pair) == "1:10")
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[left] = 2
     c[right] = 20
   }

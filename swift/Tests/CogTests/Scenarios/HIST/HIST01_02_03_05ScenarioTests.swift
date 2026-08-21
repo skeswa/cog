@@ -9,7 +9,7 @@ import Testing
 
 extension Cogs {
   fileprivate func bumpTheCounter(_ count: ManualCog<Int>) {
-    commit { c in c[count] += 1 }
+    turn { c in c[count] += 1 }
   }
 }
 
@@ -20,8 +20,8 @@ extension Cogs {
 
   #expect(cogs.debugHistory.count == 0)
 
-  cogs.commit("first") { c in c[count] = 1 }
-  cogs.commit("second") { c in c[count] = 2 }
+  cogs.turn("first") { c in c[count] = 1 }
+  cogs.turn("second") { c in c[count] = 2 }
 
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.count == 2)
@@ -30,7 +30,7 @@ extension Cogs {
 }
 
 @MainActor
-@Test func `HIST-01 an unnamed turn lands under the op that committed it`() {
+@Test func `HIST-01 an unnamed turn lands under the op that published it`() {
   let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
@@ -56,7 +56,7 @@ extension Cogs {
   #expect(afterFirstRead.filter { $0.event == .recompute }.count == 1)
   #expect(afterFirstRead.filter { $0.event == .write }.isEmpty)
 
-  cogs.commit("raise") { c in c[source] = 5 }
+  cogs.turn("raise") { c in c[source] = 5 }
   #expect(cogs.peek(doubled) == 10)
 
   let afterWrite = cogs.debugHistory.entries
@@ -65,7 +65,7 @@ extension Cogs {
   // The write belongs to the turn that made it, not to the read before it.
   #expect(afterWrite.first { $0.event == .write }?.turn == 1)
 
-  cogs.commit("raise again") { c in c[source] = 5 }
+  cogs.turn("raise again") { c in c[source] = 5 }
   #expect(cogs.peek(doubled) == 10)
 
   // A write that changed nothing is not a write, and causes no recomputation.
@@ -90,7 +90,7 @@ extension Cogs {
 
   #expect(cogs.peek(weather["home"]) == "temp: 60")
 
-  cogs.commit("warm up") { c in c[temperatures["home"]] = 80 }
+  cogs.turn("warm up") { c in c[temperatures["home"]] = 80 }
   #expect(cogs.peek(weather["home"]) == "temp: 80")
 
   let entries = cogs.debugHistory.entries
@@ -111,7 +111,7 @@ extension Cogs {
   #expect(cogs.peek(sum) == 5)
   #expect(cogs.debugHistory.entries.filter { $0.event == .recompute }.count == 3)
 
-  cogs.commit("bump") { c in c[source] = 2 }
+  cogs.turn("bump") { c in c[source] = 2 }
   #expect(cogs.peek(sum) == 7)
 
   let entries = cogs.debugHistory.entries
@@ -134,7 +134,7 @@ extension Cogs {
     }
   ])
 
-  cogs.commit("warm up") { c in c[temperature] = 80 }
+  cogs.turn("warm up") { c in c[temperature] = 80 }
 
   // The watch really ran, so history has a run to account for.
   #expect(alerts == 1)
@@ -174,7 +174,7 @@ extension Cogs {
   // Each of these turns writes nothing, so it records exactly one entry and
   // the arithmetic below is exact.
   for index in 0..<(capacity + extra) {
-    cogs.commit("turn \(index)") { _ in }
+    cogs.turn("turn \(index)") { _ in }
     highWaterMark = max(highWaterMark, cogs.debugHistory.count)
   }
 

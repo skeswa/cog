@@ -16,16 +16,11 @@ package enum CogExternalObservationTrackingMode: Sendable {
 /// The selector consumer that owns one closure-form external observation.
 ///
 /// A call-site identity alone would collide when a shared selector helper runs
-/// for several keyed states. The exact class state or generation-checked arena
-/// slot supplies the missing per-consumer namespace.
+/// for several keyed states. The exact generation-checked arena slot supplies
+/// the missing per-consumer namespace.
 internal nonisolated enum CogExternalObservationConsumerIdentity: Hashable {
-  /// One class-state selector consumer.
-  case simple(ObjectIdentifier)
-
-  #if COG_CORE_ARENA
   /// One exact lifetime of an arena selector row.
   case arena(CogArenaSlot)
-  #endif
 }
 
 /// The context-local identity of one linked external read.
@@ -141,8 +136,8 @@ internal final class CogLegacyObservationShim<Value> {
 /// One runtime-appropriate Observation read feeding one hidden Cog source.
 ///
 /// The source is an implementation detail: selectors record an ordinary graph
-/// edge to it, so both storage cores reuse their existing invalidation,
-/// settlement, equality, and turn machinery. The bridge stays MainActor-bound
+/// edge to it, so the arena reuses its existing invalidation, settlement,
+/// equality, and turn machinery. The bridge stays MainActor-bound
 /// with the external model and never sends its possibly non-Sendable value
 /// across an isolation boundary.
 @MainActor
@@ -218,7 +213,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
         }
         guard let cogs else { return }
         let value = read()
-        cogs.commit(turnName) { c in c[sourceCog] = value }
+        cogs.turn(turnName) { c in c[sourceCog] = value }
       }
     }
   }
@@ -226,7 +221,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
   /// Starts the one-shot observer used before the continuous runtime API.
   ///
   /// The shim owns deferral past `willSet` and re-arm ordering. This bridge
-  /// only turns each accepted newest value into an ordinary hidden-source turn.
+  /// converts each accepted newest value into an ordinary hidden-source turn.
   private func startLegacyObservation(in cogs: Cogs) {
     let read = read
     let sourceCog = sourceCog
@@ -235,7 +230,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
       read: read,
       didChange: { [weak cogs] value in
         guard let cogs else { return }
-        cogs.commit(turnName) { c in c[sourceCog] = value }
+        cogs.turn(turnName) { c in c[sourceCog] = value }
         cogs.acknowledgeExternalObservationRearmIfRequested()
       }
     )

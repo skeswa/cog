@@ -5,16 +5,24 @@
 /// reference is one descriptor plus its key (§2.3, perf §4).
 /// The immutable descriptor is shared across contexts; each context owns the
 /// current and staged value for each descriptor-and-key identity separately.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class ManualCogDescriptor<Value>: CogDescriptor {
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let label: CogLabel
 
   /// Manual state stays resident until its context ends by default.
   ///
   /// Releasing a source would reset it to its starting value. A later manual
   /// lifetime option may select `whileObserved`.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   let lifetime: CogStateLifetime
 
-  #if COG_CORE_ARENA
   /// Arena context whose keyless location the two fields below memoize.
   ///
   /// Zero means "no memo". A context identity is process-unique and strictly
@@ -30,7 +38,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// checked downcast of the erased column, and a second dictionary lookup for
   /// the slot — on **every** keyless read, write, and lifetime renewal. They
   /// are mutated only on the MainActor, like every other graph field.
-  private var memoizedArenaContext: UInt64 = 0
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal var memoizedArenaContext: UInt64 = 0
 
   /// Typed value column this declaration owns inside `memoizedArenaContext`.
   ///
@@ -38,7 +49,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// read through a dangling pointer. The retention is bounded: at most one
   /// column per declaration, replaced the first time the declaration is used
   /// with another context, and cleared outright by that context's teardown.
-  private var memoizedArenaColumn: CogArenaValueColumn<Value>?
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal var memoizedArenaColumn: CogArenaValueColumn<Value>?
 
   /// Exact slot lifetime of this declaration's **keyless** state there.
   ///
@@ -50,21 +64,29 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// advances that generation before it can be reused, so a caller that finds
   /// the memo stale learns it from ``CogArenaStorage/contains(_:)`` rather than
   /// from any invalidation hook.
-  private var memoizedArenaSlot: CogArenaSlot?
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
   #endif
+  internal var memoizedArenaSlot: CogArenaSlot?
 
   /// Where a state of this declaration gets its first value.
   ///
   /// The descriptor stores either one constant or a per-key closure. Callers
   /// use ``startingValue(forKey:)`` without knowing which form was declared.
-  private let start: ManualCogStartingValue<Value>
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let start: ManualCogStartingValue<Value>
 
   /// Whether two values count as the same state, or `nil` when every write
   /// must conservatively count as a change.
   ///
   /// All keys and contexts use the declaration's rule. `Equatable` overloads
   /// install `==`; opaque values leave this `nil`.
-  private let equals: (@MainActor (Value, Value) -> Bool)?
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let equals: (@MainActor (Value, Value) -> Bool)?
 
   /// Declares a source whose states all start at the same value.
   init(
@@ -103,6 +125,9 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// initializer unless a future releasable-manual policy recreates the state.
   ///
   /// - Parameter key: The state's key, or `nil` for a keyless declaration.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func startingValue(forKey key: CogKey?) -> Value {
     switch start {
     case .constant(let value):
@@ -116,11 +141,13 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   ///
   /// Without a comparator, every write counts as changed. Public overloads
   /// choose this statically instead of discovering `Equatable` at runtime.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
     equals?(oldValue, newValue) ?? false
   }
 
-  #if COG_CORE_ARENA
   /// The keyless arena location memoized for `context`, if one is filed.
   ///
   /// The caller still has to prove the slot is live — the memo deliberately
@@ -129,6 +156,9 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// - Parameter context: The reading context's ``CogArenaCore/contextIdentity``.
   /// - Returns: The declaration's keyless slot and typed column in that exact
   ///   context, or `nil` when this declaration has not been resolved there.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func memoizedArenaLocation(
     in context: UInt64
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>)? {
@@ -144,6 +174,9 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// Writing a memo for a different context replaces the previous one whole,
   /// which is what keeps a declaration shared by a test, a preview, and an app
   /// from retaining more than one context's column at a time.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func memoizeArenaLocation(
     slot: CogArenaSlot,
     column: CogArenaValueColumn<Value>,
@@ -159,13 +192,15 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// Release and teardown both call this. Guarding on the context matters:
   /// one context tearing down must not evict a memo another context is still
   /// using, which would be a silent slowdown rather than a visible failure.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func forgetMemoizedArenaLocation(in context: UInt64) {
     guard context == memoizedArenaContext else { return }
     memoizedArenaContext = 0
     memoizedArenaColumn = nil
     memoizedArenaSlot = nil
   }
-  #endif
 
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.
@@ -178,6 +213,9 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 /// select the case from `(0)` or `{ key in ... }`. The per-key closure is
 /// MainActor-isolated because lazy state creation is graph work; the erased key
 /// adapter restores the public key type before user code observes it.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal enum ManualCogStartingValue<Value> {
   /// Every state of the declaration starts at this value.
   case constant(Value)

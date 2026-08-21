@@ -18,9 +18,9 @@
 /// while every copy used in the same context reaches the same source.
 ///
 /// Manual state changes only through a ``Writer`` inside a named
-/// ``Cogs/commit(_:_:)`` turn (or debug-only test seeding). A writer reads
+/// ``Cogs/turn(_:_:)`` turn (or debug-only test seeding). A writer reads
 /// that turn's staged value, while normal reads continue to see the latest
-/// completed turn until the commit boundary. Multiple writes in one turn
+/// completed turn until the turn boundary. Multiple writes in one turn
 /// collapse to the final staged value before equality and propagation.
 ///
 /// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
@@ -29,12 +29,18 @@
 @MainActor
 public struct ManualCog<Value> {
   /// Stable declaration identity and behavior shared by reference copies.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   internal let descriptor: ManualCogDescriptor<Value>
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// A `CogKey?`, whose physical layout `CogKey` chooses (perf §4). The type is not
-  /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
+  /// `CogKey` carries the erased key inline. The public reference stays
+  /// resilient so this storage remains an implementation detail (perf §4).
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   internal let key: CogKey?
 
   /// Declares a source of state that starts at `startingValue`.
@@ -78,9 +84,9 @@ public struct ManualCog<Value> {
   ///
   /// Cog calls `equals` once at flush with the latest completed value and the
   /// final value staged by the turn. Returning `true` suppresses downstream
-  /// work; returning `false` commits and propagates the new value. This also
+  /// work; returning `false` publishes and propagates the new value. This also
   /// makes a change followed by a reversion in one turn count as no change.
-  /// The comparison runs on the MainActor at the commit boundary.
+  /// The comparison runs on the MainActor at the turn boundary.
   ///
   /// - Parameters:
   ///   - startingValue: The value reads see until something writes.

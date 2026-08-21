@@ -26,7 +26,7 @@ import Testing
   #expect(reactionPairs == ["1:10"])
   #expect(pairsSeen == ["1:10"])
 
-  cogs.commit { c in c[a] = 2 }
+  cogs.turn { c in c[a] = 2 }
 
   #expect(cogs.peek(d) == "2:20")
   #expect(pairsSeen == ["1:10", "2:20"])

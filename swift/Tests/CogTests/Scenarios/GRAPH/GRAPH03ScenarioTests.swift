@@ -46,7 +46,7 @@ private final class Graph03ChainStorage {
   #expect(cogs?.peek(root) == depth)
 
   storage.recordsSettlement = true
-  cogs?.commit { c in c[source] = 1 }
+  cogs?.turn { c in c[source] = 1 }
   let settledValue = cogs?.peek(root)
   storage.recordsSettlement = false
 

@@ -95,6 +95,6 @@ private func readColdChain(depth: Int) -> Int {
   let topCog = storage.valueReferences[depth - 1]
   #expect(cogs.peek(topCog) == depth)
 
-  cogs.commit { c in c[sourceCog] = 1 }
+  cogs.turn { c in c[sourceCog] = 1 }
   #expect(cogs.peek(topCog) == depth + 1)
 }

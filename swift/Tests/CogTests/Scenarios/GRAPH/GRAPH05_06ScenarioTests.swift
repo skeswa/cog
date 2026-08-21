@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-// Selector-owned counters make derived equality visible through public reads.
+// Selector-owned counters make automatic equality visible through public reads.
 
 @MainActor
 @Test func `GRAPH-05 an equal middle value stops the downstream wave`() {
@@ -24,7 +24,7 @@ import Testing
   #expect(middleRuns == 1)
   #expect(leafRuns == 1)
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   #expect(cogs.peek(message) == "positive")
   #expect(middleRuns == 2)
@@ -32,7 +32,7 @@ import Testing
 }
 
 @MainActor
-@Test func `GRAPH-05 custom derived equality can stop the downstream wave`() {
+@Test func `GRAPH-05 custom automatic equality can stop the downstream wave`() {
   struct Summary {
     let bucket: Int
     let raw: Int
@@ -58,7 +58,7 @@ import Testing
 
   #expect(cogs.peek(bucket) == 1)
 
-  cogs.commit { c in c[source] = 12 }
+  cogs.turn { c in c[source] = 12 }
 
   #expect(cogs.peek(bucket) == 1)
   #expect(middleRuns == 2)
@@ -89,7 +89,7 @@ import Testing
   #expect(cogs.peek(leaf) == "value=3")
 
   for next in 2...4 {
-    cogs.commit { c in c[source] = next }
+    cogs.turn { c in c[source] = next }
     #expect(cogs.peek(leaf) == "value=\(next * 2 + 1)")
   }
 
@@ -120,7 +120,7 @@ import Testing
 
   #expect(cogs.peek(message) == "odd")
 
-  cogs.commit { c in c[source] = 3 }
+  cogs.turn { c in c[source] = 3 }
 
   #expect(cogs.peek(message) == "odd")
   #expect(middleRuns == 2)

@@ -36,9 +36,8 @@ enum BoundaryHarness {
   /// boundaries exist.
   ///
   /// The count comes from `CogTesting`'s narrow seam: a number, never the
-  /// boundary objects or the states themselves, so this stays true across the
-  /// state-storage and core swaps COUNT-09 through COUNT-11 require the suite
-  /// to survive.
+  /// boundary objects or the states themselves, so this stayed true while the
+  /// storage candidates were selected and remains true for `CompactArena`.
   ///
   /// - Returns: The Observation boundaries the context owns.
   static func countBoundaries() -> Int {

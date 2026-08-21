@@ -10,7 +10,7 @@ import Testing
   let value = source.readOnly
   let binding = Binding(
     get: { cogs[value] },
-    set: { cogs.commit(source, to: $0, name: "edit binding value") }
+    set: { cogs.turn(source, to: $0, name: "edit binding value") }
   )
 
   #expect(binding.wrappedValue == "old")

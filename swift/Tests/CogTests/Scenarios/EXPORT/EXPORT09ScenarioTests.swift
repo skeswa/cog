@@ -11,13 +11,13 @@ import Testing
 
   #expect(await iterator.next() == "initial")
 
-  var completedCommits: [String] = []
+  var completedTurns: [String] = []
   for phase in ["A", "B", "C"] {
-    cogs.commit(phaseCog, to: phase)
-    completedCommits.append(phase)
+    cogs.turn(phaseCog, to: phase)
+    completedTurns.append(phase)
   }
 
-  #expect(completedCommits == ["A", "B", "C"])
+  #expect(completedTurns == ["A", "B", "C"])
   #expect(cogs.peek(phaseCog) == "C")
   #expect(await iterator.next() == "A")
   #expect(await iterator.next() == "B")

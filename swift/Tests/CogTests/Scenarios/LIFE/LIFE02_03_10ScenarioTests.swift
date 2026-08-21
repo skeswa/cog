@@ -3,18 +3,18 @@ import CogTesting
 import Testing
 import os
 
-private nonisolated enum DerivedLifetimeSleepOutcome {
+private nonisolated enum AutomaticLifetimeSleepOutcome {
   case cancelled
   case due
   case scheduled
 }
 
 @MainActor
-@Test func `LIFE-02 an unobserved derived cog is released after injected grace`() async throws {
-  let clock = DerivedLifetimeTestClock()
+@Test func `LIFE-02 an unobserved automatic cog is released after injected grace`() async throws {
+  let clock = AutomaticLifetimeTestClock()
   let watcherAlive = ManualCog<Bool>(true)
   var selectorRuns = 0
-  let derived = Cog<Int> { _ in
+  let automatic = Cog<Int> { _ in
     selectorRuns += 1
     return 10
   }
@@ -24,21 +24,21 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
     whileObservedGrace: .seconds(10)
   )
   m.whenever(watcherAlive) { s in
-    s.run { c in _ = c[derived] }
+    s.run { c in _ = c[automatic] }
   }
   #expect(selectorRuns == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   // Lowering the gate tears the watching reaction down: the last watcher
   // leaves and grace begins.
-  cogs.commit(watcherAlive, to: false)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
 
   #expect(released.hasBeenAcknowledged)
-  #expect(cogs.peek(derived) == 10)
+  #expect(cogs.peek(automatic) == 10)
   #expect(selectorRuns == 2)
 }
 
@@ -46,11 +46,11 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
 @Test func `LIFE-03 the same value reference recreates from current state after release`()
   async throws
 {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let watcherAlive = ManualCog<Bool>(true)
   let source = ManualCog<Int>(1)
   var previousValues: [Int?] = []
-  let derived = Cog<Int> { c in
+  let automatic = Cog<Int> { c in
     previousValues.append(c.curr)
     return c[source]
   }
@@ -60,45 +60,45 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
     whileObservedGrace: .seconds(10)
   )
   m.whenever(watcherAlive) { s in
-    s.run { c in _ = c[derived] }
+    s.run { c in _ = c[automatic] }
   }
   #expect(previousValues == [nil])
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(watcherAlive, to: false)
-  cogs.commit { c in c[source] = 2 }
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(watcherAlive, to: false)
+  cogs.turn { c in c[source] = 2 }
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
 
-  #expect(cogs.peek(derived) == 2)
+  #expect(cogs.peek(automatic) == 2)
   #expect(previousValues == [nil, nil])
 }
 
 @MainActor
-@Test func `LIFE-10 one-shot derived peek renews grace then releases and recreates`()
+@Test func `LIFE-10 one-shot automatic peek renews grace then releases and recreates`()
   async throws
 {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
   let source = ManualCog<Int>(1)
   var previousValues: [Int?] = []
-  let derived = Cog<Int> { c in
+  let automatic = Cog<Int> { c in
     previousValues.append(c.curr)
     return c[source]
   }
 
-  #expect(cogs.peek(derived) == 1)
+  #expect(cogs.peek(automatic) == 1)
   try await clock.waitForScheduledSleep()
   #expect(clock.activeSleeperCount == 1)
 
   clock.advance(by: .seconds(4))
   for _ in 0..<32 {
-    #expect(cogs.peek(derived) == 1)
+    #expect(cogs.peek(automatic) == 1)
     try await clock.waitForScheduledSleep()
     #expect(clock.activeSleeperCount == 1)
   }
@@ -109,17 +109,17 @@ private nonisolated enum DerivedLifetimeSleepOutcome {
   #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   clock.advance(by: .seconds(4))
   try await released.wait()
   #expect(clock.activeSleeperCount == 0)
 
-  cogs.commit { c in c[source] = 2 }
-  #expect(cogs.peek(derived) == 2)
+  cogs.turn { c in c[source] = 2 }
+  #expect(cogs.peek(automatic) == 2)
   #expect(previousValues == [nil, nil])
 }
 
-nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
+nonisolated final class AutomaticLifetimeTestClock: Clock, @unchecked Sendable {
   private struct Sleeper {
     let id: UInt64
     let deadline: Instant
@@ -192,7 +192,7 @@ nonisolated final class DerivedLifetimeTestClock: Clock, @unchecked Sendable {
         (continuation: CheckedContinuation<Void, any Error>) in
         let outcome = state.withLock { state in
           if state.cancelledSleeperIDs.remove(sleeperID) != nil || Task.isCancelled {
-            return DerivedLifetimeSleepOutcome.cancelled
+            return AutomaticLifetimeSleepOutcome.cancelled
           }
           guard deadline > state.now else { return .due }
           state.sleepers.append(

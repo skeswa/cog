@@ -1,7 +1,7 @@
 import Cog
 import SwiftUI
 
-// Weather's whole state layer: the sources, the values derived from them, and
+// Weather's whole state layer: the sources, the automatic values, and
 // the ops that write them.
 //
 // Everything here is main-actor-isolated without saying so. The target builds
@@ -75,7 +75,7 @@ let weatherForecastCogs = AsyncCogBox<WeatherReading?, ZipCode>(
 
 /// Whether the latest successful reading for a ZIP depicts a sunny condition.
 ///
-/// The plain value read keeps this derivation stable across reload pending
+/// The plain value read keeps this automatic value stable across reload pending
 /// and failure status; it changes only when the accepted reading does.
 let isSunnyCogs = CogBox<Bool, ZipCode>(
   { c, zip in
@@ -90,7 +90,7 @@ let isSunnyCogs = CogBox<Bool, ZipCode>(
 
 /// Whether the latest accepted weather and advisories are suitable for being outside.
 ///
-/// This keyed derivation is shared by cards and the location-specific reaction,
+/// This keyed automatic value is shared by cards and the location-specific reaction,
 /// so the app has one definition of "nice" and equality gates both consumers.
 let isNiceOutsideCogs = CogBox<Bool, ZipCode>(
   { c, zip in
@@ -127,9 +127,9 @@ let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
   name: "weather.receivesHourlyUpdates"
 )
 
-/// The map destination derived from the currently selected refresh location.
+/// The automatic map destination for the currently selected refresh location.
 ///
-/// This is a real derivation rather than a bundle of reads: it maps a domain
+/// This is genuinely automatic state rather than a bundle of reads: it maps a domain
 /// selection to the coordinates a platform camera needs. A visible map leases
 /// it through `values(of:)`; when that view disappears, normal observed
 /// lifetime can release the otherwise unused projection.
@@ -147,17 +147,17 @@ extension CogOps {
   /// One definition serves both capabilities: views and app code call it on
   /// `cogs`, and the weather mechanism could call it on its controller.
   func selectCurrentLocation(_ zip: ZipCode?) {
-    commit(currentZipSourceCog, to: zip)
+    turn(currentZipSourceCog, to: zip)
   }
 
   /// Publishes the cadence owned by the bootstrap-registered mechanism.
   func setRefreshInterval(_ interval: Duration?) {
-    commit(refreshIntervalSourceCog, to: interval)
+    turn(refreshIntervalSourceCog, to: interval)
   }
 
   /// Demands a fresh forecast for one ZIP.
   ///
-  /// `refresh` is a primitive, like `commit`: it is how the graph is asked to
+  /// `refresh` is a primitive, like `turn`: it is how the graph is asked to
   /// do something, not what this app calls the asking. Wrapping it in a named
   /// op keeps the same rule for demands as for writes — a view says what it
   /// wants in domain words, and the declaration it resolves to stays here with

@@ -352,7 +352,7 @@ public nonisolated enum ShippingMethod: String, Hashable, Sendable, CaseIterable
 
 /// A coupon the shopper has applied, as the shopper typed it.
 ///
-/// Validation is a derived value, not a property of this type: a coupon code
+/// Validation is an automatic value, not a property of this type: a coupon code
 /// is a string until the promotion optimizer has seen the cart, and modelling
 /// it as pre-validated would move real work out of the graph.
 public nonisolated struct CouponCode: Hashable, Sendable {
@@ -599,9 +599,9 @@ public nonisolated struct ProductBadges: OptionSet, Hashable, Sendable {
 
 /// Everything one product row renders, and nothing more.
 ///
-/// A row value exists because a list row should read **one** derived value and
+/// A row value exists because a list row should read **one** automatic value and
 /// map it to views, not read nine. That is not a projection type in the sense
-/// the conventions forbid: it is a genuinely derived value with its own
+/// the conventions forbid: it is a genuinely automatic value with its own
 /// equality, computed by a keyed declaration, and a row that reads it depends
 /// on the row rather than on nine unrelated things.
 public nonisolated struct ProductRow: Hashable, Sendable, Identifiable {

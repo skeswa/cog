@@ -3,13 +3,13 @@ import Observation
 /// One stored property instrumented by Swift's Observation macro.
 ///
 /// Only mutable values use storage because raw Observation does not provide a
-/// derived-value graph or memoization primitive. Derived adapter nodes are
+/// automatic-value graph or memoization primitive. Automatic adapter nodes are
 /// ordinary closures; their reads still reach this accessor and therefore pay
 /// the registrar access that an `@Observable` model pays in application code.
 @MainActor
 @Observable
 private final class RawObservationSource {
-  /// The source value reached by derived and root reads.
+  /// The source value reached by automatic and root reads.
   var value: Int
 
   /// Creates one independently registered observable property.
@@ -23,7 +23,7 @@ private enum RawObservationNode {
   case source(RawObservationSource)
 
   /// An uncached Swift computation, because Observation supplies no cache.
-  case derived(@MainActor (RuntimeComparisonReader) -> Int)
+  case automatic(@MainActor (RuntimeComparisonReader) -> Int)
 }
 
 /// PERF-10's raw `@Observable` lower-bound adapter.
@@ -31,7 +31,7 @@ private enum RawObservationNode {
 /// This adapter intentionally does not grow a hand-built dirty graph around
 /// Observation. Such a graph would benchmark that implementation rather than
 /// the standard-library registrar. A source maps to an `@Observable` stored
-/// property, a derived value maps to an ordinary computed read, a root read is
+/// property, an automatic value maps to an ordinary computed read, a root read is
 /// tracked with `withObservationTracking`, and a write maps to ordinary
 /// property assignment. The shared run counter makes the resulting lack of
 /// memoization explicit instead of letting it hide in a slower timing number.
@@ -48,11 +48,11 @@ final class RawObservationComparisonGraph: RuntimeComparisonGraph {
   }
 
   /// Makes one uncached computed read.
-  func derived(
+  func automatic(
     _ compute: @escaping @MainActor (RuntimeComparisonReader) -> Int
   ) -> RuntimeComparisonValue {
     let value = RuntimeComparisonValue(index: nodes.count)
-    nodes.append(.derived(compute))
+    nodes.append(.automatic(compute))
     return value
   }
 
@@ -75,7 +75,7 @@ final class RawObservationComparisonGraph: RuntimeComparisonGraph {
   private func evaluate(_ value: RuntimeComparisonValue) -> Int {
     switch nodes[value.index] {
     case .source(let source): return source.value
-    case .derived(let compute):
+    case .automatic(let compute):
       return compute(
         RuntimeComparisonReader { [unowned self] dependency in
           self.evaluate(dependency)

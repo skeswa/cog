@@ -7,36 +7,21 @@ system; inside it uses its own MainActor graph.
 This file is the map for the Swift design. The documents share section
 numbers, so a reference such as §6.4 works across files.
 
-## Design principles
+## Shared foundation
 
-Four principles guide every API and implementation choice:
-
-1. **Cog should feel simple.** Declaring, reading, and changing state should
-   look like normal Swift. Common code should be easy to read and reason
-   about; runtime complexity stays behind the API.
-2. **Every state read should be correct.** A read must match the latest
-   committed source state after settling every dependency it needs. It must
-   not expose a torn update, stale derived value, or half-finished change.
-   Uncertain async state must be explicit in `CogStatus`.
-3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
-   allocation, reference counting, locks, and UI updates. Measure competing
-   implementations instead of guessing.
-4. **Cog state should be singular.** One running app has one authoritative
-   `Cogs`, and each mutable fact represented in Cog has one writable source
-   in it. Scenes, screens, and features must not create competing contexts or
-   mirror sources. A test or preview is a separate runtime with one context.
-
-Correctness and singular state are never traded for speed, and a faster
-internal design must keep the common API simple.
+The [shared state model](../design.md) owns Cog's principles, vocabulary, and
+cross-platform behavior. On Swift, its single runtime is one MainActor-confined
+`Cogs`; correct reads settle through that graph; async uncertainty is explicit
+in `CogStatus`; and Observation exists only at the SwiftUI boundary. This set
+owns those Swift choices rather than projecting them onto Kotlin.
 
 ## The documents
 
 The design lives beside this file in `design/`; the implementation effort
 lives in `impl/`. Read them in this order:
 
-1. **[dump-2026-08-06.md](../dump-2026-08-06.md): history.** Frozen notes from
-   the Dart and Flutter design. They explain the original problems but do not
-   define the Swift design.
+1. **[Shared state model](../design.md): cross-platform foundation.** The
+   motivation, terms, and invariants Swift and Kotlin share.
 2. **[design/exploration.md](./design/exploration.md): core design (§1–§5,
    §7–§11).** The graph, public API, write rules, async state, SwiftUI
    boundary, open questions, and spike plan.
@@ -79,12 +64,9 @@ lives in `impl/`. Read them in this order:
     optimization record.** Where the time actually goes and what each change
     bought. Separate from item 11 because it is obtained with a sampler and
     purpose-built probes rather than with the benchmark suite.
-13. **[impl/arena-optimization-plan-2026-08-20.md](./impl/arena-optimization-plan-2026-08-20.md):
-    arena specialization research and design.** Frozen research report
-    answering `M9-26`'s open question: the evidence that an `@inlinable`
-    typed frontier can recover the arena core's measured specialization
-    ceiling with stable Swift, the ranked alternatives, and the staged proof
-    plan with go/no-go gates.
+13. **[Design history](../history.md): lineage.** How the Dart and Flutter work
+    became the shared model and then separate native designs. Historical
+    context only; the Swift documents above remain normative for Swift.
 
 This list is the source of truth for reading order, and the sidebar on
 [the published site](https://skeswa.github.io/cog/swift/) mirrors it by hand in
@@ -93,21 +75,23 @@ same revision.
 
 ## Building and testing
 
-Releases are implemented through M8: the simple shipping core, SwiftUI
+Releases are implemented through M8: the original simple core, SwiftUI
 boundary, mechanisms, lifetimes, async policies and streams, exports, external
 Observation tracking, and first-party lint plugins are all present. M9's
-shared-turn performance work and M10's Storefront measurement infrastructure
-have landed, while their closing decisions remain open. The measured arena core
-remains an internal comparison build. The repository is a SwiftPM package
-rooted at the git root, with every Swift target under `swift/`. Commands are
-mise tasks; `mise tasks` lists them all.
+shared-turn performance work, specialized arena, and M10's Storefront
+measurement infrastructure have landed. On `main`, specialized arena with pool
+edges is the sole core and the default implementation. A final application can
+explicitly trade speed for binary size through the non-default `CompactArena`
+SwiftPM package trait. The repository is a SwiftPM package rooted at the git
+root, with every Swift target under `swift/`. Commands are mise tasks; `mise
+tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
 mise run fmt:check        # the same checks, writing nothing
 mise run test             # the default isolation leg
 mise run test:matrix      # all four isolation legs
-mise run test:cores       # verify default simple; behavior under both cores
+mise run test:arena-configurations # behavior through default and compact arena
 mise run test:release     # the default leg in release configuration
 mise run test:compilefail # batched swiftc pass over swift/CompileFail/
 mise run test:storefront  # the macrobenchmark workload's correctness suite
@@ -119,7 +103,8 @@ exits 0 when `--filter` selects nothing, so a raw filtered run can report a
 green for work it never ran. The wrapper enumerates the built tests before the
 run and checks the executed-test count after it, and gives each leg its own
 scratch path. Arguments pass through, as in
-`mise run test --filter 'DECL-01|ONE-05' --parallel`.
+`mise run test --filter 'DECL-01|ONE-05'`. Root-package runs are serialized so
+the benchmark-sized graph scenarios cannot starve time-bounded actor tests.
 
 The four legs are {MainActor-default, nonisolated} ×
 {`NonisolatedNonsendingByDefault` on, off}, selected through
@@ -195,7 +180,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(countCog) == 0)
-  cogs.commit { c in c[countCog] = 1 }
+  cogs.turn { c in c[countCog] = 1 }
   #expect(cogs.peek(countCog) == 1)
 }
 ```
@@ -226,12 +211,12 @@ preview setup.
 
 These choices are settled; §10 of the core document has the full record.
 
-- `commit` is the only write entry point. Its scalar overload keeps ordinary
+- `turn` is the only write entry point. Its scalar overload keeps ordinary
   setters compact; its writer overload makes related writes atomic. Ops are
   normal methods in `CogOps` extensions, so `Cogs` and a mechanism's
   controller share every op. `private` or `fileprivate` plus `.readOnly`
   control which code may name writable state. A turn ID stops an escaped writer from writing later.
-- One outer `commit` is one turn. The context moves through idle,
+- One outer call to `turn` is one graph turn. The context moves through idle,
   accumulating, and flushing. Reactions run at the end of the turn; writes
   from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
   reports long causal chains through an internal diagnostic seam.
@@ -253,8 +238,8 @@ These choices are settled; §10 of the core document has the full record.
   key. A value reference is a value; its identity lives in an internal
   final-class descriptor plus key. Boxes create keyed value references without
   allocating new descriptors. Keyed-diamond and churn benchmarks selected
-  inline `AnyHashable?` for v1; the interned-token and generic-keyed layouts
-  remain test-and-benchmark-only comparison builds.
+  inline `AnyHashable?` for v1; the interned-token and generic-keyed candidates
+  were removed after their measurements were recorded.
 - State declaration names expose that shape at the use site: one keyless value
   reference ends in `Cog` (`currentZipCog`), while a box ends in plural `Cogs`
   (`weatherForecastCogs`). Qualifiers such as `Source` precede the suffix. The
@@ -289,7 +274,7 @@ These choices are settled; §10 of the core document has the full record.
   An error from the still-current stream publishes failure while retaining
   that value or default; only cancellation Cog initiated for replacement or
   release stays silent. Equal `Equatable` stream elements are state no-ops;
-  values without equality conservatively commit every element.
+  values without equality conservatively publish every element.
 - `.exhaustLatest` finishes current work, then catches up once. True event
   dropping belongs to imperative ops.
 - Side effects bundle into first-class `Mechanism` values — a protocol with a
@@ -324,7 +309,7 @@ These choices are settled; §10 of the core document has the full record.
   fixture from `CogTesting`, so they cannot leak global install state across
   the suite.
 - Manual state and states seen by the UI live for the app context by default.
-  Graph-only derived and async states may be released when unused. Query caches
+  Graph-only automatic and async states may be released when unused. Query caches
   have their own retention rules. A `whileObserved` declaration with no
   explicit grace uses the context default: 30 seconds in production, with an
   explicit `CogTesting` override for deterministic timed tests. An ephemeral
@@ -335,14 +320,14 @@ These choices are settled; §10 of the core document has the full record.
 - Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
   `cogs.peek` outside) skip
   the dependency edge but still settle the value they return; they are never
-  stale. A synchronous derived or async peek is transient demand: without a
+  stale. A synchronous automatic or async peek is transient demand: without a
   durable consumer it renews normal `whileObserved` grace, and expiry releases
   the state. Peeking or refreshing a never-read async value starts exactly one
   initial run with `kind == .pending`, `value == default`, and
   `hasSucceeded == false` without a dependency, subscription, or Observation
   boundary; expiry also cancels its work and rejects late results. Exported
   streams (`cogs.values(of:)`) start from the current settled value and never
-  make a commit wait: `.newest(1)` may skip turns for a slow reader,
+  make a turn wait: `.newest(1)` may skip turns for a slow reader,
   `.oldest(n)` delivers the oldest n in order and drops newer while full, and
   `.unbounded` delivers everything.
 - External `@Observable` inputs publish the newest post-mutation value at each
@@ -356,21 +341,20 @@ These choices are settled; §10 of the core document has the full record.
   dirtied. Apps importing only `Cog` cannot seed.
 - Dynamic cycles are programmer errors. Diagnostics show the keyed path.
   Synchronous selectors do not throw in v1.
-- Derived computation is read-only through selector execution, dependency
-  reconciliation, custom equality, and result publication. A commit attempted
+- Automatic computation is read-only through selector execution, dependency
+  reconciliation, custom equality, and result publication. A turn attempted
   in that region fails immediately in every build, names the cog/key and turn,
-  and tells the caller to invoke the op outside derived computation, from event
+  and tells the caller to invoke the op outside automatic computation, from event
   handling or a reaction.
-- The shipping runtime remains the simple class-state core. M9 made boundary
-  notices O(changed), removed steady-turn allocations from shared machinery,
-  and profiled both implementations under the same public behavior suite. The
-  arena now wins warm whole-graph and Storefront work while retaining less, but
-  it remains an internal selector-only candidate because keyed reads and graph
-  construction still pay an erased generic-storage cost. The frozen arena
-  specialization report records a stable `@inlinable` frontier that could
-  remove that cost without changing public API; implementation and the next
-  core decision remain open. Public value references remain names, never arena
-  slot handles.
+- The shipping runtime is the specialized arena with shared pool edges. M9 made
+  boundary notices O(changed), removed steady-turn allocations from shared
+  machinery, and proved the stable `@inlinable` typed frontier against the
+  simple and unspecialized arena implementations. The frontier removes the
+  erased generic-storage cost that dominated keyed graph construction and wins
+  every measured warm whole-graph shape. The simple core is retired. The
+  `CompactArena` package trait is the explicit binary-size opt-out and disables
+  specialization without changing public behavior. Public value references
+  remain names, never arena slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -436,11 +420,10 @@ full review.
 [impl/plan.md](./impl/plan.md) is the execution plan,
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
 [impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M7 and M8 are
-published as 0.3.0 and 0.4.0. M9's shared-turn and O(changed) work has landed,
-and M10's Storefront workload, headless cuts, SwiftUI benchmark app, and first
-paired core measurements are present. The next decisions are `M9-18` and
-`M10-09`: reconcile the corrected application measurements with the synthetic
-graph results, turn the arena specialization report into measured
-implementation tasks if its route still holds, and only then revisit the
-shipping core. The simple implementation remains the consumer default until
-that evidence is recorded.
+published as 0.3.0 and 0.4.0. M9's shared-turn, O(changed), and specialization
+work has landed, and M10's Storefront workload, headless cuts, SwiftUI benchmark
+app, and first paired core measurements are present. The specialized arena is
+now the consumer default and the simple implementation is retired. The
+remaining release work is to repeat the scouting measurements and Storefront UI
+qualification on the pinned Xcode, then calibrate thresholds for the new
+shipping configuration.
