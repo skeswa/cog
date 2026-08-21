@@ -63,7 +63,7 @@ private final class Async20ControlledWork {
   }
   #expect(valueConsumerRuns == 2)
 
-  cogs.commit { c in c[request] = 1 }
+  cogs.turn { c in c[request] = 1 }
   guard let reloadPending = await statusIterator.next(),
     reloadPending.kind == .pending, reloadPending.value == 42, reloadPending.hasSucceeded
   else {

@@ -51,18 +51,12 @@ extension CogScenario {
   /// - Parameters:
   ///   - layers: Four-node layers above the sources. Upstream runs 1,000 and
   ///     2,500.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   /// - Returns: A scenario whose final value packs the four end values before
   ///   the turn and the four after it, in that order — see
   ///   ``CogScenario/packCellxValues(_:)``.
-  public static func cellxLattice(
-    layers: Int = 1000,
-    layout: CogValueReferenceLayout = .inline
-  ) -> CogScenario {
+  public static func cellxLattice(layers: Int = 1000) -> CogScenario {
     CogScenario(
       name: "COUNT-06-CellxLattice",
-      layout: layout,
       expectedRuns: 8 * layers
     ) { cogs, counter in
       // Flat ownership, for the reason `kairoDeep` gives: a thousand layers of
@@ -97,7 +91,7 @@ extension CogScenario {
       let before = endCogs.map { cogs.peek($0) }
 
       // Upstream's single turn: all four sources, reversed, in one batch.
-      cogs.commit("cellx.turn") { c in
+      cogs.turn("cellx.turn") { c in
         for property in 0..<CellxLattice.width {
           c[lattice.sourceCogs[property]] = CellxLattice.width - property
         }

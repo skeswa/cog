@@ -37,7 +37,7 @@ private final class Async37ControlledWork {
 @MainActor
 @Test func `ASYNC-37 releasing one key cancels only that key's work`() async throws {
   // Lifetime, work, and generations are all per exact keyed state: one key's
-  // grace expiry cancels and releases that key alone, its late result commits
+  // grace expiry cancels and releases that key alone, its late result turns
   // nothing, the sibling key's work completes untouched, and re-reading the
   // released key starts fresh.
   let clock = TestClock()
@@ -64,13 +64,13 @@ private final class Async37ControlledWork {
   #expect(await startIterator.next() == "away")
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(awayWatcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(awayWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
 
-  // Only away's work was told to stop, and its late result commits nothing.
+  // Only away's work was told to stop, and its late result turns nothing.
   #expect(await cancellationIterator.next() == "away")
   try await resolveAsyncStatus(in: cogs) {
     work.finish("away", with: 99)
@@ -82,12 +82,12 @@ private final class Async37ControlledWork {
   #expect(awayResultTurns.isEmpty)
   #endif
 
-  // The watched sibling is untouched: still pending, and its result commits.
+  // The watched sibling is untouched: still pending, and its result turns.
   try await resolveAsyncStatus(in: cogs) {
     work.finish("home", with: 70)
   }
   guard let homeSuccess = await homeIterator.next(), homeSuccess.kind == .success else {
-    Issue.record("Home's result did not commit after away's release")
+    Issue.record("Home's result did not publish after away's release")
     return
   }
   #expect(homeSuccess.value == 70)

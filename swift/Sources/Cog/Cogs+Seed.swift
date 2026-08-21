@@ -31,29 +31,18 @@ extension Cogs {
     _ valueReference: ManualCog<Value>,
     to value: Value
   ) {
-    guard case .idle = turnPhase, trackedConsumer == nil, seedBarrierDepth == 0 else {
+    guard case .idle = turnPhase, arenaCore.isSettlementIdle, seedBarrierDepth == 0 else {
       fatalError("Cog seed can run only during idle test setup, outside a selector or reaction.")
     }
 
     seedBarrierDepth += 1
     defer { seedBarrierDepth -= 1 }
 
-    #if COG_CORE_ARENA
     let currentValue = arenaCore.manualValue(for: valueReference)
     guard !valueReference.descriptor.valuesAreEqual(currentValue, value) else { return }
 
     advanceRevision()
     arenaCore.publishTestingSeed(value, for: valueReference)
-    #else
-    let state = manualState(for: valueReference)
-    guard !state.descriptor.valuesAreEqual(state.currentValue, value) else { return }
-
-    let revision = advanceRevision()
-    state.currentValue = value
-    state.markChanged(at: revision)
-    state.observationBoundary?.deferChange()
-    invalidateSubscribers(of: state)
-    #endif
   }
 }
 

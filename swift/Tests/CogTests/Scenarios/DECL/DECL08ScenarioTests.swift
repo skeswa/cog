@@ -7,7 +7,7 @@ private struct Decl08ZipCode: Hashable {
 }
 
 @MainActor
-@Test func `DECL-08 each derived box key computes from its matching keyed source`() {
+@Test func `DECL-08 each automatic box key computes from its matching keyed source`() {
   let cogs = Cogs.forTesting()
   let here = Decl08ZipCode(digits: "90210")
   let there = Decl08ZipCode(digits: "10001")
@@ -32,7 +32,7 @@ private struct Decl08ZipCode: Hashable {
 }
 
 @MainActor
-@Test func `DECL-08 a derived box delivers optional keys without losing nil`() {
+@Test func `DECL-08 an automatic box delivers optional keys without losing nil`() {
   let cogs = Cogs.forTesting()
   let descriptions = CogBox<String, Int?> { _, key in
     key.map(String.init) ?? "none"

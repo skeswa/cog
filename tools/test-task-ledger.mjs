@@ -201,12 +201,6 @@ const CASES = [
     checks: ["release-after-gate"],
     mentions: ["M1-03", "transitively depends on no _(Gate)_ task"],
   },
-  {
-    name: "arena filter that leaves a scenario behind",
-    ledger: resolve(FIXTURES, "integration-hole.md"),
-    checks: ["arena-integration-coverage"],
-    mentions: ["DECL-03", "M1-03", "COG_TEST_CORE=arena", "Arena-coverage exceptions"],
-  },
 ];
 
 /** @param {string} ledger */

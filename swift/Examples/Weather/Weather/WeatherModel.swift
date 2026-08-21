@@ -61,7 +61,7 @@ extension ZipCode: CustomStringConvertible {
 
 /// The map destination corresponding to one recognized demo ZIP.
 ///
-/// Cog owns the selected destination as a derivation of the authoritative ZIP.
+/// Cog owns the selected destination as an automatic value computed from the authoritative ZIP.
 /// A visible map converts these plain coordinates into `MapCameraPosition`,
 /// which remains view-local platform state rather than a second domain source.
 nonisolated struct WeatherMapLocation: Equatable, Sendable {

@@ -13,7 +13,7 @@ behavior comes from three smaller tools.
 
 #### 1. Dynamic dependencies switch state
 
-A derived cog depends on what it read during its last run:
+An automatic cog depends on what it read during its last run:
 
 ```swift
 let weatherHereCog = Cog { c in
@@ -51,7 +51,7 @@ runs:
 - `.exhaustLatest` finishes the active run, then catches up once with the
   newest state.
 
-A derived value cannot forget state changes forever and remain correct, so
+An automatic value cannot forget state changes forever and remain correct, so
 true drop or exhaust behavior belongs to imperative ops, whose inputs are
 events.
 
@@ -76,7 +76,7 @@ let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
 }
 ```
 
-Cog commits each changed sequence element as its own turn; equal `Equatable`
+Cog publishes each changed sequence element in its own turn; equal `Equatable`
 elements are state no-ops. If `accuracy` changes, Cog cancels the old sequence
 and starts the new one — `flatMapLatest` at a graph state. A stream may use only
 `.latest`; other policies have no safe v1 meaning for work that may never end.
@@ -85,7 +85,7 @@ and starts the new one — `flatMapLatest` at a graph state. A stream may use on
 
 | Rx operator            | Cog equivalent                                                                                                                                      |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map`, `combineLatest` | A derived cog. Multiple `c[...]` reads combine current values.                                                                                      |
+| `map`, `combineLatest` | An automatic cog. Multiple `c[...]` reads combine current values.                                                                                   |
 | `withLatestFrom`       | `c.peek(...)`: read the current value without tracking it.                                                                                          |
 | `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.                                                                          |
 | `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                                                                                         |

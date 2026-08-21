@@ -128,9 +128,9 @@ private struct CogDeclarationEvidence {
   init?(nominalName: String) {
     switch nominalName {
     case "Cog":
-      self.init(shape: .keyless, origin: .derived, access: .direct)
+      self.init(shape: .keyless, origin: .automatic, access: .direct)
     case "CogBox":
-      self.init(shape: .box, origin: .derived, access: .direct)
+      self.init(shape: .box, origin: .automatic, access: .direct)
     case "ManualCog":
       self.init(shape: .keyless, origin: .writableSource, access: .direct)
     case "ManualCogBox":
@@ -174,7 +174,7 @@ private struct CogDeclarationEvidence {
   private func mergedOrigin(with other: CogDeclarationEvidence) -> CogDeclarationOrigin {
     if origin == .writableSource || other.origin == .writableSource { return .writableSource }
     if origin == .asynchronous || other.origin == .asynchronous { return .asynchronous }
-    return .derived
+    return .automatic
   }
 }
 

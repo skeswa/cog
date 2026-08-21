@@ -23,7 +23,7 @@ import Testing
     }
   )
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   #expect(deliveries == ["1->2"])
   _ = token

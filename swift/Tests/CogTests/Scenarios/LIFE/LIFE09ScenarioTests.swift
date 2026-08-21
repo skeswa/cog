@@ -10,7 +10,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-09 an internal edge does not keep an upstream cog alive`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let watcherAlive = ManualCog<Bool>(true)
   let source = ManualCog<Int>(1)
   var upstreamRuns = 0
@@ -35,8 +35,8 @@ import Testing
   #expect(downstreamRuns == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(watcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
 
   // One deadline, not two. The reaction leased only what it read, so the
@@ -53,7 +53,7 @@ import Testing
 
   // Reading recreates both from current values, not from what they cached
   // before the source changed.
-  cogs.commit { c in c[source] = 10 }
+  cogs.turn { c in c[source] = 10 }
   #expect(cogs.peek(downstream) == 22)
   #expect(upstreamRuns == 2)
   #expect(downstreamRuns == 2)
@@ -61,7 +61,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-09 reading one released cog recreates only what it needs`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let watcherAlive = ManualCog<Bool>(true)
   let source = ManualCog<Int>(1)
   var upstreamRuns = 0
@@ -84,13 +84,13 @@ import Testing
   }
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(watcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()
 
-  cogs.commit { c in c[source] = 10 }
+  cogs.turn { c in c[source] = 10 }
 
   // Reading the upstream value reference alone brings back that state and no
   // other: a released graph comes back a cog at a time, on demand.

@@ -35,7 +35,7 @@ import Testing
   var startIterator = taskStarts.makeAsyncIterator()
   _ = await startIterator.next()
 
-  cogs.commit("drop gate while changing the dependency") { c in
+  cogs.turn("drop gate while changing the dependency") { c in
     c[dependency] = 1
     c[scopeOpen] = false
   }
@@ -49,7 +49,7 @@ import Testing
   #expect(cogs.peek(dependency) == 1)
   #expect(cogs.peek(scopeOpen) == false)
 
-  cogs.commit { c in c[dependency] = 2 }
+  cogs.turn { c in c[dependency] = 2 }
   #expect(scopedSeen == [0])
   _ = holdContinuation
 }

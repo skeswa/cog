@@ -1,51 +1,46 @@
 /// The write capability for one accumulating turn.
 ///
-/// A writer exists inside ``Cogs/commit(_:_:)``. Its subscript reads staged
-/// values and stages writes until the outer commit body returns. Application
+/// A writer exists inside ``Cogs/turn(_:_:)``. Its subscript reads staged
+/// values and stages writes until the outer turn body returns. Application
 /// code cannot construct one.
 ///
 /// All access is MainActor-isolated and names only ``ManualCog`` sources;
-/// derived cogs and read-only projections deliberately have no writer
+/// automatic cogs and read-only projections deliberately have no writer
 /// subscript. A normal read sees the latest completed turn, but a writer read
 /// sees this accumulating turn's most recently staged value so read-modify-write
 /// operations compose correctly.
 ///
 /// Do not save a writer in an escaping closure or `Task`. Reads and writes trap
-/// after the commit body ends because the staged view no longer exists.
+/// after the turn body ends because the staged view no longer exists.
 @MainActor
 public struct Writer {
   /// The graph that owns the accumulating turn and source states.
-  private let cogs: Cogs
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let cogs: Cogs
 
   /// The turn this writer may act on.
   ///
   /// Held strongly so object identity cannot be reused while a writer exists.
-  private let turnID: CogTurnID
-
-  /// Creates the capability for one exact accumulating turn.
-  ///
-  /// The context and identity are deliberately paired: validating object
-  /// identity on every access prevents an escaped writer from joining a later
-  /// turn that happens to run in the same context.
-  ///
-  /// - Parameters:
-  ///   - cogs: The graph that owns the active turn and manual state.
-  ///   - turnID: The retained identity that must still match that active turn.
-  internal init(cogs: Cogs, turnID: CogTurnID) {
-    self.cogs = cogs
-    self.turnID = turnID
-  }
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let turnID: CogTurnID
 
   /// Reads or stages one manual source in this writer's turn.
   ///
   /// The getter returns the last value staged through this turn, or the latest
   /// completed value when the source has not been written yet. The setter
   /// replaces that staged value; only the final value reaches equality checks
-  /// and the commit boundary. Reads and writes through an escaped writer trap
+  /// and the turn boundary. Reads and writes through an escaped writer trap
   /// in every build.
   ///
   /// - Parameter valueReference: The writable descriptor-and-key identity to
   ///   read or stage.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
     get { cogs.writerRead(valueReference, turnID: turnID) }
     nonmutating set { cogs.writerStage(valueReference, value: newValue, turnID: turnID) }
@@ -55,61 +50,61 @@ public struct Writer {
 extension Cogs {
   /// Starts or schedules one named, synchronous state transition.
   ///
-  /// From idle, `body` starts a turn. A nested commit joins an accumulating
+  /// From idle, `body` starts a turn. A nested turn joins an accumulating
   /// turn. During a flush, it enters the FIFO queue as a later turn. That
-  /// queued call returns immediately; the outer commit drains the queue before
+  /// queued call returns immediately; the outer turn drains the queue before
   /// returning.
   ///
-  /// The writer's changes cross the commit boundary together. Ops are
+  /// The writer's changes cross the turn boundary together. Ops are
   /// `Cogs` methods that wrap this primitive. Normal reads made before the
-  /// boundary still see the prior completed snapshot; reactions, derived
+  /// boundary still see the prior completed snapshot; reactions, automatic
   /// settlement, Observation notices, and debug history run only as the turn
   /// flushes.
   ///
-  /// Calling `commit` during a derived computation traps before `body` runs.
+  /// Calling `turn` during an automatic computation traps before `body` runs.
   /// The error names the active cog and attempted turn. The method is
   /// MainActor-isolated through `Cogs`; `body` is synchronous even though
   /// it is escaping for queued-turn storage.
   ///
   /// - Parameters:
   ///   - name: The turn name recorded for diagnostics and history. The
-  ///     defaulted ``CogOps/commit(_:_:)`` sugar passes the calling
+  ///     defaulted ``CogOps/turn(_:_:)`` sugar passes the calling
   ///     op's `#function`.
   ///   - body: The synchronous writes that make up the turn. The writer it
   ///     receives is valid only while that body is executing.
-  public func commit(named name: String, _ body: @escaping (Writer) -> Void) {
+  public func turn(named name: String, _ body: @escaping (Writer) -> Void) {
     withTurn(name) { turn in
       body(Writer(cogs: self, turnID: turn.id))
     }
   }
 
-  /// Commits one value to one manual source, without building a closure.
+  /// Writes one value to one manual source in its own turn, without building a closure.
   ///
-  /// This shadows ``CogOps/commit(_:to:name:)`` for a caller whose static type
+  /// This shadows ``CogOps/turn(_:to:name:)`` for a caller whose static type
   /// is `Cogs`, which is every application write. The protocol-extension
   /// spelling remains for `any CogOps` and for a mechanism's controller.
   ///
   /// The sugar used to reach the primitive through two escaping closures — one
   /// per layer — and `M9-01` measured both as heap allocations on every turn.
-  /// Only a commit during a flush genuinely escapes, because it is stored and
+  /// Only a turn during a flush genuinely escapes, because it is stored and
   /// run after the current flush returns, so only that case still pays.
   ///
   /// - Parameters:
   ///   - valueReference: The state-owned source to update.
-  ///   - value: The value to publish at the commit boundary.
+  ///   - value: The value to publish at the turn boundary.
   ///   - name: The turn name recorded for diagnostics and history.
-  public func commit<Value>(
+  public func turn<Value>(
     _ valueReference: ManualCog<Value>,
     to value: Value,
     name: String = #function
   ) {
-    requireOutsideDerivedComputation(forTurnNamed: name)
+    requireOutsideAutomaticComputation(forTurnNamed: name)
 
     // Nothing between this test and the calls below can change the phase: the
     // context is MainActor-confined and neither step reaches user code.
     //
     // The queued path goes through `withTurn` rather than back through
-    // `commit(named:)`. Reaching for the public primitive here would have been
+    // `turn(named:)`. Reaching for the public primitive here would have been
     // the library calling its own op vocabulary from inside the implementation,
     // which `primitives-only-in-ops` exists to prevent and which Cog's own
     // linter caught. It is also less work: the queued body stages directly and
@@ -130,24 +125,22 @@ extension Cogs {
   ///
   /// Validation precedes state lookup so an escaped writer cannot lazily create
   /// state outside its turn.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   internal func writerRead<Value>(_ valueReference: ManualCog<Value>, turnID: CogTurnID) -> Value {
     requireWriterTurn(turnID, usage: .reading, target: valueReference)
 
-    #if COG_CORE_ARENA
     return arenaCore.writerValue(for: valueReference)
-    #else
-    let state = manualState(for: valueReference)
-    guard case .some(let pending) = state.pendingValue else {
-      return state.currentValue
-    }
-    return pending
-    #endif
   }
 
   /// Replaces a source's staged value and marks it touched once for this turn.
   ///
   /// Touching delegates deduplication to the turn, so repeated writes preserve
-  /// the last staged value without duplicating commit-boundary work.
+  /// the last staged value without duplicating turn-boundary work.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   internal func writerStage<Value>(
     _ valueReference: ManualCog<Value>,
     value: Value,
@@ -155,20 +148,8 @@ extension Cogs {
   ) {
     let turn = requireWriterTurn(turnID, usage: .writing, target: valueReference)
 
-    #if COG_CORE_ARENA
     arenaCore.writerStage(valueReference, value: value, in: turn)
     arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
-    #else
-    let state = manualState(for: valueReference)
-    state.pendingValue = .some(value)
-    turn.touch(state)
-
-    // Writing an ephemeral source is transient demand, exactly like a one-shot
-    // read: it renews grace but installs no consumer, so a source only ever
-    // written and never observed still goes away instead of accumulating keys
-    // forever. `.app` sources — every source that did not opt in — ignore this.
-    scheduleLifetimeReleaseIfUnobserved(state)
-    #endif
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.
@@ -180,8 +161,11 @@ extension Cogs {
   ///
   /// `fatalError` keeps the composed message under optimization, including
   /// `-Ounchecked`. `preconditionFailure` does not.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   @discardableResult
-  private func requireWriterTurn<Value>(
+  internal func requireWriterTurn<Value>(
     _ turnID: CogTurnID,
     usage: WriterUsage,
     target valueReference: ManualCog<Value>
@@ -196,7 +180,10 @@ extension Cogs {
 }
 
 /// Which half of the writer subscript ran into an ended turn.
-private enum WriterUsage {
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
+internal enum WriterUsage {
   case reading
   case writing
 
@@ -209,20 +196,20 @@ private enum WriterUsage {
   }
 }
 
-/// What Cog says when a writer is used after its commit ended.
+/// What Cog says when a writer is used after its turn ended.
 ///
-/// Names the escaped writer's target and tells the caller to open a new commit.
+/// Names the escaped writer's target and tells the caller to open a new turn.
 @MainActor
 private func escapedWriterMessage<Value>(
   usage: WriterUsage,
   target valueReference: ManualCog<Value>
 ) -> String {
   """
-  This Cog writer outlived the commit that created it, so \(usage.attempt) \
+  This Cog writer outlived the turn that created it, so \(usage.attempt) \
   \(escapedWriterTargetName(valueReference)) through it is not part of any turn. A writer \
-  is valid only while the body of the commit that made it is still running, so \
+  is valid only while the body of the turn that made it is still running, so \
   never stash one in a variable, capture it in an escaping closure, or carry \
-  it into a Task. To write state now, call commit again and use the writer it \
+  it into a Task. To write state now, call turn again and use the writer it \
   passes to your body.
   """
 }

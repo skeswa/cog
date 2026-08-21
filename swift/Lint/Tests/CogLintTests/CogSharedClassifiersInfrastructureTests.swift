@@ -67,7 +67,7 @@ import Testing
 
         var body: some View {
           Button("Increment") {
-            cogs.commit { c in c[countSourceCog] += 1 }
+            cogs.turn { c in c[countSourceCog] += 1 }
           }
         }
       }
@@ -75,7 +75,7 @@ import Testing
       struct CounterMechanism: Mechanism {
         func operate(_ m: Cog.MechanismController) {
           m.run { c in _ = c[countCog] }
-          m.commit { c in c[countSourceCog] = 0 }
+          m.turn { c in c[countSourceCog] = 0 }
           m.whenever(enabledCog) { s in
             s.run { c in _ = c[countCog] }
           }
@@ -85,10 +85,10 @@ import Testing
       struct CounterApp: App {
         init() {
           let cogs = Cogs.bootstrapApp()
-          cogs.commit { c in c[countSourceCog] = 1 }
+          cogs.turn { c in c[countSourceCog] = 1 }
 
           let hiddenCogs = makeCogs()
-          hiddenCogs.commit { c in c[countSourceCog] = 2 }
+          hiddenCogs.turn { c in c[countSourceCog] = 2 }
           unknown.run { c in _ = c[countCog] }
         }
       }

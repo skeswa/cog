@@ -7,11 +7,11 @@ extension CogLintFixtureRegistry {
     rule: PrimitivesOnlyInOpsRule(),
     documentation: CogLintRuleDocumentation(
       violation:
-        "Production code calls `commit` or `refresh` outside a bare primitive call in an `extension CogOps` domain operation.",
+        "Production code calls `turn` or `refresh` outside a bare primitive call in an `extension CogOps` domain operation.",
       rationale:
         "Graph primitives describe how Cog performs work, not what the application is asking for. Named operations keep the domain verb beside its state declarations, give every call site one readable intent, and apply the same boundary to views, mechanisms, selectors, writers, and runtime helpers.",
       repair:
-        "Move the primitive into a named method on `CogOps`, spell `commit(...)` or `refresh(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly."
+        "Move the primitive into a named method on `CogOps`, spell `turn(...)` or `refresh(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly."
     ),
     triggering: [
       CogLintTriggeringExample(
@@ -24,13 +24,13 @@ extension CogLintFixtureRegistry {
             struct CounterCard: View {
               @Environment(\\.cogs) private var cogs
               func increment() {
-                cogs.commit { c in c[countSourceCog] += 1 }
+                cogs.turn { c in c[countSourceCog] += 1 }
                 self.cogs.refresh(forecastCog)
               }
             }
             func launch() {
               let appGraph = Cogs.bootstrapApp()
-              appGraph.commit(countSourceCog, to: 1)
+              appGraph.turn(countSourceCog, to: 1)
               appGraph.refresh(forecastCog)
             }
             """
@@ -50,13 +50,13 @@ extension CogLintFixtureRegistry {
           source:
             """
             let invalidCog = Cog<Int> { c in c.refresh(forecastCog); return 0 }
-            func overwrite(_ c: Writer) { c.commit(named: "nested") { _ in } }
+            func overwrite(_ c: Writer) { c.turn(named: "nested") { _ in } }
             struct Loader: Mechanism {
               func operate(_ m: MechanismController) {
-                m.commit(countSourceCog, to: 1)
+                m.turn(countSourceCog, to: 1)
                 m.refresh(forecastCog)
                 m.run { c in c.refresh(forecastCog) }
-                m.whenever(enabledCog) { child in child.commit(countSourceCog, to: 2) }
+                m.whenever(enabledCog) { child in child.turn(countSourceCog, to: 2) }
               }
             }
             """
@@ -79,12 +79,12 @@ extension CogLintFixtureRegistry {
             """
             extension Cogs {
               func resetInline() {
-                commit(countSourceCog, to: 0)
+                turn(countSourceCog, to: 0)
                 self.refresh(forecastCog)
               }
             }
             extension CogOps {
-              func wronglyQualified() { self.commit(countSourceCog, to: 0) }
+              func wronglyQualified() { self.turn(countSourceCog, to: 0) }
             }
             """
         ),
@@ -104,10 +104,10 @@ extension CogLintFixtureRegistry {
           """
           extension CogOps {
             func selectCount(_ value: Int) {
-              commit(countSourceCog, to: value)
-              commit { c in
+              turn(countSourceCog, to: value)
+              turn { c in
                 c[countSourceCog] = value
-                withAnimation { commit(otherSourceCog, to: value) }
+                withAnimation { turn(otherSourceCog, to: value) }
               }
             }
             func refreshForecast() { refresh(forecastCog) }
@@ -124,7 +124,7 @@ extension CogLintFixtureRegistry {
         source:
           """
           func update(cache: Cache) {
-            cache.commit()
+            cache.turn()
             cache.refresh()
           }
           """
@@ -138,7 +138,7 @@ extension CogLintFixtureRegistry {
         source:
           """
           typealias Controller = MechanismController
-          func hidden(_ controller: Controller) { controller.commit(countSourceCog, to: 1) }
+          func hidden(_ controller: Controller) { controller.turn(countSourceCog, to: 1) }
           func inferred() {
             let graph = makeCogs()
             graph.refresh(forecastCog)

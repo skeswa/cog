@@ -4,7 +4,7 @@ import Testing
 
 extension CogOps {
   fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
-    commit("reaction.writeback") { c in c[source] = value }
+    turn("reaction.writeback") { c in c[source] = value }
   }
 }
 
@@ -30,7 +30,7 @@ extension CogOps {
 }
 
 @MainActor
-@Test func `REACT-02 REACT-07 a change wakes the reaction before the commit returns`() {
+@Test func `REACT-02 REACT-07 a change wakes the reaction before the turn returns`() {
   let source = ManualCog<Int>(1)
   var seen: [Int] = []
 
@@ -42,11 +42,11 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   // One assertion carries both claims: the reaction reran because its
   // dependency changed (REACT-02), and it had already completed when the line
-  // after the commit ran — no await, polling, or callback (REACT-07).
+  // after the turn ran — no await, polling, or callback (REACT-07).
   #expect(seen == [1, 2])
 }
 
@@ -65,7 +65,7 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[unrelated] = 11 }
+  cogs.turn { c in c[unrelated] = 11 }
 
   #expect(runs == 1)
 }
@@ -76,7 +76,7 @@ extension CogOps {
   var events: [String] = []
   let doubled = Cog<Int> { c in
     let value = c[source] * 2
-    events.append("derive:\(value)")
+    events.append("automatic:\(value)")
     return value
   }
 
@@ -90,9 +90,9 @@ extension CogOps {
   ])
 
   events.removeAll()
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
-  #expect(events == ["derive:4", "react:begin", "react:value:4"])
+  #expect(events == ["automatic:4", "react:begin", "react:value:4"])
 }
 
 @MainActor
@@ -118,7 +118,7 @@ extension CogOps {
   ])
 
   order.removeAll()
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
 
   #expect(order == [1, 2, 3])
 }
@@ -155,14 +155,14 @@ extension CogOps {
     }
   ])
 
-  cogs.commit(secondAlive, to: false)
+  cogs.turn(secondAlive, to: false)
   m.run { c in
     _ = c[source]
     order.append(4)
   }
 
   order.removeAll()
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
 
   #expect(order == [1, 3, 4])
 }
@@ -182,16 +182,16 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[y] = 11 }
+  cogs.turn { c in c[y] = 11 }
   #expect(seen == [1])
 
-  cogs.commit { c in c[useX] = false }
+  cogs.turn { c in c[useX] = false }
   #expect(seen == [1, 11])
 
-  cogs.commit { c in c[y] = 12 }
+  cogs.turn { c in c[y] = 12 }
   #expect(seen == [1, 11, 12])
 
-  cogs.commit { c in c[x] = 2 }
+  cogs.turn { c in c[x] = 2 }
   #expect(seen == [1, 11, 12])
 }
 
@@ -213,13 +213,13 @@ extension CogOps {
         m.run { c in
           _ = c[trigger]
           events.append("third:initial")
-          m.commit("third.writeback") { c in c[writeback] = 1 }
+          m.turn("third.writeback") { c in c[writeback] = 1 }
         }
         spawned += 1
         m.run { c in
           _ = c[trigger]
           events.append("fourth:initial")
-          m.commit("fourth.writeback") { c in c[writeback] = 2 }
+          m.turn("fourth.writeback") { c in c[writeback] = 2 }
         }
         spawned += 1
         events.append("first:end")
@@ -238,7 +238,7 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
 
   #expect(
     events == [
@@ -307,7 +307,7 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
 
   #expect(
     events == [
@@ -345,7 +345,7 @@ extension CogOps {
     }
   ])
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
 
   #expect(deliveries == ["0->1", "1->2"])
 }

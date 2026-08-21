@@ -24,7 +24,7 @@ enum ReadOnlyWriteRejected {
   static func stagesThroughAReadOnlyValueReference(
     cogs: Cogs, currentZipCode: CogProjection<Int>
   ) {
-    cogs.commit { c in
+    cogs.turn { c in
       // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       c[currentZipCode] = 90210
     }
@@ -33,7 +33,7 @@ enum ReadOnlyWriteRejected {
   /// Read-modify-write, which the writer's subscript supports for a real
   /// source (`c[count] += 1`) and must not offer here.
   static func mutatesThroughAReadOnlyValueReference(cogs: Cogs, retryLimit: CogProjection<Int>) {
-    cogs.commit { c in
+    cogs.turn { c in
       // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
       c[retryLimit] += 1
     }
@@ -46,7 +46,7 @@ enum ReadOnlyWriteRejected {
     cogs: Cogs,
     weatherReport: CogBoxProjection<Int, String>
   ) {
-    cogs.commit { c in
+    cogs.turn { c in
       // expect-error: to expected argument type 'ManualCog<Int>'
       c[weatherReport["90210"]] = 72
     }

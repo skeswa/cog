@@ -149,7 +149,7 @@ private func isSelfMember(_ expression: ExprSyntax) -> Bool {
   return base.baseName.text == "self"
 }
 
-/// Whether an expression is exactly the reference node rather than a derived use.
+/// Whether an expression is exactly the reference node rather than an indirect use.
 private func isDirectReference(
   _ expression: ExprSyntax,
   to reference: DeclReferenceExprSyntax

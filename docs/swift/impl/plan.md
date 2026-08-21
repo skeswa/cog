@@ -98,7 +98,7 @@ Execution constraints from the design docs:
 
 - One app-wide `Cogs`; guarded production construction; tests and previews
   get isolated contexts from the testing product.
-- `commit` is the only write entry point: a compact scalar overload, a writer
+- `turn` is the only write entry point: a compact scalar overload, a writer
   overload with turn IDs, three context phases, and the six-step flush order
   (§3.2).
 - Lazy pull plus pushed dirty flags; CLEAN, CHECK, DIRTY with versions;
@@ -346,9 +346,9 @@ The class-state build. Correctness first; no perf tricks.
 - Cogs: states stored by descriptor plus key, created lazily; tracked
   subscripts, `peek`, and `curr` on the read capability; a MainActor-confined
   tracking slot. Non-tracking peeks still settle and return the latest value.
-- Turns: `commit(_ name: String = #function, _ body: (Writer) -> Void)`;
+- Turns: `turn(_ name: String = #function, _ body: (Writer) -> Void)`;
   `Writer` subscripts read and write, so `c[countCog] += 1` works; unforgeable
-  turn IDs; idle → accumulating → flushing; nested commits join; commits
+  turn IDs; idle → accumulating → flushing; nested turns join; turns
   during a flush wait in a FIFO queue.
 - Flush: the six normative steps of §3.2. Equality-gate staged writes, push
   dirty flags, settle hot roots (cold branches stay dirty), notify boundaries
@@ -395,7 +395,7 @@ The class-state build. Correctness first; no perf tricks.
   no-consumer warning, and cross-executor cleanup acknowledgements are named
   diagnostic seams exposed through `CogTesting` — narrow behavior contracts,
   never peeks at state storage or graph representation. Trap guarantees (a
-  second production context, an escaped writer, a commit during derived
+  second production context, an escaped writer, a turn during automatic
   computation) are proven with Swift Testing exit tests in the debug and
   release legs, so no trap check crashes the suite process and no guard needs
   a test-only failure hook in the library.
@@ -409,7 +409,7 @@ MainActor execution and non-`Sendable` values; second-production-context
 rejection; scene recreation without manual-state loss; equality-gated
 notifications; manual lifetime; `whileObserved` release and recreate without
 graph edges acting as leases; seed-then-turn settling (the §6.6 alert test
-verbatim); sibling commits as separate turns; off-MainActor context deinit
+verbatim); sibling calls as separate turns; off-MainActor context deinit
 tearing down mechanism scopes with deterministic MainActor cleanup
 acknowledgements; preview isolation; bootstrap ordering, duplicate-name
 rejection, `whenever` gating, retained mechanism-resource lifetime, and
@@ -434,8 +434,8 @@ mechanism-attributed runs in history.
 - Implement the §3 feature in `swift/Examples/Weather`: per-ZIP keyed updates,
   `fileprivate` sources plus ops, a bootstrap-registered weather mechanism,
   and bindings.
-  Verify per-ZIP invalidation, equality-gated derived notices, and a view that
-  reads two values changed in one commit without ever rendering a torn pair.
+  Verify per-ZIP invalidation, equality-gated automatic notices, and a view that
+  reads two values changed in one turn without ever rendering a torn pair.
   Verify that boundary notices and their history entries precede reaction
   runs. Test UIKit automatic tracking on an iOS 26 simulator (files behind
   `#if canImport(UIKit)` in `CogBoundaryTests`) and AppKit automatic tracking
@@ -484,7 +484,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
   and returns that status.
 - `AsyncCog` and `AsyncCogBox`: synchronous tracked selectors returning
   `Work.run`; the `.latest` policy with generation numbers (the MainActor
-  commits a result only if its generation is still current); each visible
+  publishes a result only if its generation is still current); each visible
   status change is its own turn; replaced-cancelled work publishes no failure.
 - Safe release: cancel and advance the generation on `.whileObserved` expiry
   (§5.3).
@@ -497,7 +497,7 @@ Limit this milestone to the async pieces needed for 0.1.0:
   grace, after which release cancels the work and rejects late results if no
   consumer arrived. Refresh does not initialize and then replace the first
   run.
-- A one-shot peek of synchronous derived state is the same kind of transient
+- A one-shot peek of synchronous automatic state is the same kind of transient
   demand: it installs no durable consumer, renews ordinary `whileObserved`
   grace, and releases and recreates from current dependencies after expiry.
 - Tests: cancellation, stale-generation rejection, status-per-turn sequencing,
@@ -506,9 +506,9 @@ Limit this milestone to the async pieces needed for 0.1.0:
   turns with the last successful value, MainActor-by-default and `@concurrent`
   work isolation, task naming, invalidation during unobserved grace, one-grace
   release through `.latest`, keyed `.latest` spelling, refresh rejection
-  during selector computation, non-reentrant UI reads through async-derived
+  during selector computation, non-reentrant UI reads through async automatic
   values, bounded grace scheduling under repeated one-shot demand, and release
-  of one-shot synchronous derived demand. Use injected clocks and
+  of one-shot synchronous automatic demand. Use injected clocks and
   continuations; do not sleep.
 - Revise `swift/Examples/Weather` around the completed slice: one keyed
   `AsyncCogBox` owns forecast request status and tasks; cards retain the last
@@ -543,7 +543,7 @@ query caching.
 - `Cog.docc`: landing page, Getting Started, and an article on the
   one-context rule and testing with `CogTesting`. Start `CHANGELOG.md`.
 - Close the behavior-coverage corners the scenario audit surfaced before the
-  freeze: commit-boundary settlement and the shortcut diamond (TURN-15,
+  freeze: turn-boundary settlement and the shortcut diamond (TURN-15,
   GRAPH-13), the keyed cycle release trap and the debug seed-misuse guard
   (CYCLE-07, SEED-08), mid-flush gated-scope teardown, per-key
   lifetime, queued-turn history, and per-render Observation retracking
@@ -614,8 +614,9 @@ query caching.
   [impl/benchmarks.md](./benchmarks.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6. Every behavior scenario
-  implemented through M5 must pass under each value-reference layout selected by
-  `COG_TEST_VALUE_REFERENCE_LAYOUT`; `mise run test:value-references` loops the complete set.
+  implemented through M5 passed under each candidate before the comparison
+  selected inline `AnyHashable`; the rejected implementations and their
+  selector were then retired, while the result remains in the benchmark record.
 
 <a id="plan-m6"></a>
 
@@ -623,9 +624,9 @@ query caching.
 
 - M6a, runnable edge-layout gate: build arena allocation, typed value columns,
   and explicit-stack propagation over one baseline edge implementation first.
-  Put both representations behind the internal test-only `COG_TEST_CORE` and
-  `COG_TEST_EDGE` selectors. Only after that vertical slice runs the M5
-  scenarios, implement the remaining perf §3.3 candidates (Reactively-style
+  The milestone put both representations behind internal test-only core and
+  edge selectors. Only after that vertical slice ran the M5 scenarios did it
+  implement the remaining perf §3.3 candidates (Reactively-style
   per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
@@ -645,11 +646,11 @@ query caching.
   turns, graph and cycles, reactions and lifetimes, then UI and async — using
   the internal simple/arena selector. Integration and measurement stay
   outcome-neutral: every check through `M6-12a` runs through the selector,
-  and switching the default core is a publication-grade step (`M6-13`) that
-  runs only after `M6-12a` records the decision. If the simple core stays,
-  `M6-13` keeps the simple default and records the arena's selector-only
-  disposition, so no completed work needs reverting. `mise run test:cores`
-  loops the complete suite over both implementations.
+  and switching the default core was a publication-grade step (`M6-13`) that
+  ran only after `M6-12a` recorded the decision. The comparison selector and
+  simple implementation were retired after M9 selected the specialized arena;
+  the public `CompactArena` trait now carries the one supported representation
+  comparison.
 - Follow the perf §5 rules (no ARC, locks, or existentials in graph walks)
   until a benchmark disproves one.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
@@ -679,7 +680,7 @@ release gates.
   `.stream` `.latest`-only by construction (§5.2).
 - `Work.stream`: each changed element is its own turn under ordinary state
   equality; a dependency change cancels and restarts the sequence; release of
-  a live stream cancels it, and late elements commit nothing. Settle the open
+  a live stream cancels it, and late elements publish nothing. Settle the open
   §10 questions on stream termination and failure before implementing.
 - `cogs.values(of:buffering:)`: a current-value-first multicast
   `AsyncSequence`; `.newest(1)` default, plus `.oldest(n)` and `.unbounded`;
@@ -757,9 +758,11 @@ M9 acts on the post-M6 performance backlog (issue #373) with the profile
 "Post-M6 call-site profile" — and it reordered that backlog. The routes worth
 scheduling are the ones in **shared** machinery, which no core swap can reach,
 because about six percent of a steady turn is Cog's own compiled code and the
-rest is Swift runtime work that both cores pay. M9 changes no public API and
-adds no feature; every scenario implemented through M8 passes unchanged, and
-the core selector keeps its M6 disposition throughout.
+rest is Swift runtime work that both cores paid. M9 changes no public API and
+adds no feature; every scenario implemented through M8 passes unchanged. Its
+final measurements supersede the M6 disposition: the specialized arena becomes
+the sole shipping core, while a package trait retains the compact arena as an
+explicit binary-size opt-out.
 
 - **Make the observation-boundary flush O(changed), not O(pinned keys).** This
   is `M6-12a`'s stated trigger for reconsidering the core, and the profile
@@ -790,12 +793,12 @@ deinit`s pay executor checks on top of their mallocs. The remaining three are
   dependency traversal, one descriptor resolution and one cycle check per node,
   a short circuit for clean rows — since the per-node cost this milestone
   targets is the sum of those constants.
-- **Remeasure, then decide.** `M9-17` reruns the pinned simple-versus-arena
-  comparison on steady, deep, broad, and unstable shapes only after the shared
-  work lands, because rerunning it first would measure the same coat on both
-  candidates, which is what `M6-12a` already did. `M9-18` records whether that
-  changes the core decision, which of issue #373's remaining routes become
-  scheduled work, and whether M9's result justifies a patch release.
+- **Remeasure, specialize, then decide.** `M9-17` reruns the
+  simple-versus-arena comparison on steady, deep, broad, and unstable shapes
+  only after the shared work lands. `M9-25` and `M9-26` then identify the
+  arena's unspecialized generic construction boundary. `M9-27` proves and makes
+  the stable typed frontier the default, retires simple, and exposes compact
+  arena as the opt-out; `M9-18` records the resulting product decision.
 - **Steady state is not the whole comparison.** Every benchmark above builds
   its graph outside the measured region and then drives turns through it, which
   is right for the question it asks and blind to what construction costs.
@@ -803,14 +806,14 @@ deinit`s pay executor checks on top of their mallocs. The remaining three are
   `M9-26` attributes whatever gap it finds, so `M9-18` weighs a core that is
   faster to run against one that is cheaper to create rather than deciding on
   turns alone.
-- **Not in scope.** Instruction-level work (perf §5's borrowed records, unsafe
-  buffers, `@inlinable` paths) and the per-read hashing follow-ups of perf §4
-  stay backlog on #373. They are real, but they are tuning below a machinery
-  cost that dominates them; `M9-18` is where they are promoted or left.
-  Unchecked exclusivity left this list when `M9-21` measured it at a third of
-  an arena turn, and the per-state footprint probe left it when route F's
-  question turned out to be answerable with a benchmark already in the suite;
-  `M9-22` and `M9-25` own them.
+- **Bounded specialization scope.** Instruction-level work generally remains
+  backlog on #373, but profiling promoted one exception: the stable
+  `@inlinable` typed frontier that removes the measured generic construction
+  boundary. The scalar graph remains opaque, and the public API remains
+  unchanged. Unchecked exclusivity left the backlog when `M9-21` measured it at
+  a third of an arena turn, and the per-state footprint probe left it when route
+  F's question became answerable with a benchmark already in the suite;
+  `M9-22`, `M9-25`, and `M9-27` own those outcomes.
 - **No publication.** M9 is a performance milestone behind an unchanged public
   API, so it carries no release chain. If `M9-18` records that a version is
   warranted, that decision adds the candidate → tag → verification → release
@@ -845,7 +848,7 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   does not.
 - **Correct before fast.** Every cut proves its own work before reporting:
   visible identifiers, exact money totals in integer cents, accepted async
-  generations, derived-reaction run counts, visible-versus-offscreen
+  generations, automatic-reaction run counts, visible-versus-offscreen
   invalidation, release after lifetime grace, and an output checksum — all
   compared against a shadow model recomputed from the profile and the events,
   never against numbers copied out of a passing run. A workload that computed
@@ -976,19 +979,19 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   UIKit check on an iOS 26 simulator. Run the pinned iOS 17 boundary subset
   when that nightly job is available.
 - M3 (`M3-11`): async tests deterministic and green; a pending fetch cancelled
-  by release commits nothing; initial and reload failures each produce the
+  by release publishes nothing; initial and reload failures each produce the
   specified pending and failure turns.
 - M4 (`M4-05b` → `M4-05e`): approve a non-mutating candidate, push the tag,
   then prove a scratch iOS 17 app consumes exact 0.1.0 and the DocC site
   deploys before publishing the GitHub Release.
-- M5 (`M5-10`): run-count tests are green under every value-reference candidate selected
-  by `COG_TEST_VALUE_REFERENCE_LAYOUT`; `box[key]` creation measures
+- M5 (`M5-10`): the recorded comparison shows run-count tests green under every
+  value-reference candidate; the retained `box[key]` creation path measures
   `mallocCountTotal == 0` and steady turns hold the cost impl/benchmarks.md records;
   value-reference layout numbers are recorded in impl/benchmarks.md before the choice settles.
-- M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
-  arena edge candidate; `mise run test:cores` is green; edge-layout and
-  runtime-comparison numbers are recorded before choices settle; the default
-  core matches the decision `M6-12a` recorded. Continue through `M6-12c`–
+- M6 (`M6-05a`, then `M6-13` → `M6-12b`): the record proves the M5 set green
+  under every arena edge candidate; edge-layout and runtime-comparison numbers
+  are recorded before choices settle; the current suite is green on the
+  selected implementation. Continue through `M6-12c`–
   `M6-12e` only if `M6-12a` approves 0.2.0.
 - M7 (`M7-16a` → `M7-16e`): exact export buffers, subscriber independence,
   stream-before-reaction order, and external post-mutation value tests are
@@ -1001,10 +1004,10 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   scratch app resolves exactly 0.4.0, runs its matching plugin binary, and
   reaches the matching docs.
 - M10 (`M10-10`): the Storefront workload's correctness and shape suites green;
-  the five headless cuts registered and reporting under both cores; the release
-  UI performance suite executing on the pinned simulator; linter and formatter
-  clean; `impl/benchmarks.md` carrying the measurements, their environment, and the
-  workload's stated limits.
+  the five headless cuts registered and reporting under the specialized default
+  and compact arena; the release UI performance suite executing on the pinned
+  simulator; linter and formatter clean; `impl/benchmarks.md` carrying the
+  measurements, their environment, and the workload's stated limits.
 - Always: formatting and task-ledger checks clean; path-filtered CI green.
 
 ## Flagged uncertainties (verify at implementation time)

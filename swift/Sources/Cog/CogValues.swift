@@ -9,20 +9,20 @@ public nonisolated enum CogValuesBuffering: Sendable, Equatable {
   ///
   /// A limit must be greater than zero. ``Cogs/values(of:buffering:)-(Cog<Value>,_)``
   /// defaults to `.newest(1)`, so a paused reader resumes with the latest
-  /// settled value without making intervening commits wait.
+  /// settled value without making intervening turns wait.
   case newest(Int)
 
   /// Keep the first `limit` undelivered values, discarding newer overflow.
   ///
   /// A limit must be greater than zero. This policy preserves the earliest
   /// unseen transitions for consumers that prefer ordered backlog over the
-  /// newest state, while commits remain non-blocking when that backlog is full.
+  /// newest state, while turns remain non-blocking when that backlog is full.
   case oldest(Int)
 
   /// Keep every undelivered value in settlement order.
   ///
   /// This policy is lossless while the iterator remains subscribed, but a
-  /// stalled reader permits its backlog to grow without bound. Commits remain
+  /// stalled reader permits its backlog to grow without bound. Turns remain
   /// synchronous and never wait for the reader.
   case unbounded
 
@@ -213,7 +213,7 @@ extension Cogs {
   /// Iterator creation installs an independent subscription. The first
   /// `next()` returns the source's current completed-turn value; later changed
   /// writes are offered in turn order. The subscription never gives write
-  /// capability and never makes a synchronous commit wait for its reader.
+  /// capability and never makes a synchronous turn wait for its reader.
   ///
   /// - Parameters:
   ///   - valueReference: The manual source value to export.
@@ -231,14 +231,14 @@ extension Cogs {
     )
   }
 
-  /// Subscribes to a derived cog, starting with its current settled value.
+  /// Subscribes to an automatic cog, starting with its current settled value.
   ///
-  /// Creating the iterator settles a cold derived graph before placing the
+  /// Creating the iterator settles a cold automatic graph before placing the
   /// first element. Later turns offer a value only when the declaration's
   /// equality rule reports a change. Each iterator owns its own subscription.
   ///
   /// - Parameters:
-  ///   - valueReference: The derived value to settle and export.
+  ///   - valueReference: The automatic value to settle and export.
   ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
   public func values<Value>(

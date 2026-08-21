@@ -48,7 +48,7 @@ private final class Async25ControlledWork {
 
 @MainActor
 @Test func `ASYNC-25 value-only demand releases its pending chain after one grace`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0
@@ -67,8 +67,8 @@ private final class Async25ControlledWork {
   #expect(await startIterator.next() == 0)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(firstWatcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(firstWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()

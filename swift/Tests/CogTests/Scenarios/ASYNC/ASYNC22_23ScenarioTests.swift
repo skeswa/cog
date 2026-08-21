@@ -97,7 +97,7 @@ private final class AsyncColdDemandControlledWork {
   #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   clock.advance(by: .seconds(4))
   try await released.wait()
   #expect(await cancellationIterator.next() == 0)
@@ -201,7 +201,7 @@ private final class AsyncColdDemandControlledWork {
   #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   clock.advance(by: .seconds(4))
   try await released.wait()
   #expect(await cancellationIterator.next() == 32)

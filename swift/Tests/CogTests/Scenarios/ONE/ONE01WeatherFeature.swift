@@ -7,7 +7,7 @@ import Cog
 extension Cogs {
   /// The feature op: an ordinary context method beside the source it owns.
   func selectZip(_ zip: String?) {
-    commit { c in
+    turn { c in
       c[selectedZipSourceCog] = zip
     }
   }

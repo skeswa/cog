@@ -7,7 +7,7 @@ import Testing
 // One op definition on the shared protocol serves both capabilities.
 @MainActor extension CogOps {
   fileprivate func advanceStep() {
-    commit { c in c[stepCountCog] += 1 }
+    turn { c in c[stepCountCog] += 1 }
   }
 }
 

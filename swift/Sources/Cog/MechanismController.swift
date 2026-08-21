@@ -26,7 +26,7 @@ public final class MechanismController {
   ///
   /// Weak because the runtime owns the controller through its scope; a strong
   /// reference would keep an isolated test context alive through its own
-  /// registrations. After the runtime deinitializes, registration and commit
+  /// registrations. After the runtime deinitializes, registration and turn
   /// calls become inert.
   private weak var cogtext: Cogs?
 
@@ -64,7 +64,7 @@ public final class MechanismController {
 
   /// The runtime for a value-producing call, which cannot be inert.
   ///
-  /// Registrations and commits after runtime teardown simply do nothing, but
+  /// Registrations and turns after runtime teardown simply do nothing, but
   /// a read must return a value. Reaching this trap means work captured the
   /// controller strongly across the runtime's death instead of re-promoting a
   /// weak reference around each unit of graph work.
@@ -149,7 +149,7 @@ extension MechanismController {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change
-  ///     and the value after it. The body runs on the MainActor; commits it
+  ///     and the value after it. The body runs on the MainActor; turns it
   ///     requests during a flush become later FIFO turns.
   public func watch<Value>(
     _ valueReference: ManualCog<Value>,
@@ -169,7 +169,7 @@ extension MechanismController {
     }
   }
 
-  /// Registers a reaction that watches one derived cog and receives its old
+  /// Registers a reaction that watches one automatic cog and receives its old
   /// and new values.
   ///
   /// Installation settles the exact descriptor-and-key state, records it as
@@ -182,7 +182,7 @@ extension MechanismController {
   /// Later changed turns run watches in registration order after dependencies
   /// settle. An equality-gated cog keeps the watch quiet when recomputation
   /// is equal. The registration holds a `whileObserved` lease on the exact
-  /// derived state; the end of this controller's scope cancels both and may
+  /// automatic state; the end of this controller's scope cancels both and may
   /// begin grace.
   ///
   /// - Parameters:
@@ -197,7 +197,7 @@ extension MechanismController {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change
-  ///     and the value after it. The body runs on the MainActor; commits it
+  ///     and the value after it. The body runs on the MainActor; turns it
   ///     requests during a flush become later FIFO turns.
   public func watch<Value>(
     _ valueReference: Cog<Value>,
@@ -248,7 +248,7 @@ extension MechanismController {
   ///   - line: The registration's line for diagnostics. Leave this at its
   ///     default.
   ///   - body: Synchronous effect code, given the value before this change
-  ///     and the value after it. The body runs on the MainActor; commits it
+  ///     and the value after it. The body runs on the MainActor; turns it
   ///     requests during a flush become later FIFO turns.
   public func watch<Value>(
     _ valueReference: AsyncCog<Value>,
@@ -367,7 +367,7 @@ extension MechanismController {
   /// compose.
   ///
   /// - Parameters:
-  ///   - gate: The derived Bool that opens and closes this scope.
+  ///   - gate: The automatic Bool that opens and closes this scope.
   ///   - name: What Cog should call this scope, composed under the
   ///     mechanism's name for the gate's history entries and the scope's
   ///     registrations. An unnamed scope composes its registrations directly
@@ -394,7 +394,7 @@ extension MechanismController {
 
   /// Runs a nested scope while a manual Bool source reads true.
   ///
-  /// Semantics match the derived-gate overload exactly.
+  /// Semantics match the automatic-gate overload exactly.
   public func whenever(
     _ gate: ManualCog<Bool>,
     name: String? = nil,
@@ -411,7 +411,7 @@ extension MechanismController {
 
   /// Runs a nested scope while a read-only Bool projection reads true.
   ///
-  /// Semantics match the derived-gate overload exactly.
+  /// Semantics match the automatic-gate overload exactly.
   public func whenever(
     _ gate: CogProjection<Bool>,
     name: String? = nil,
@@ -564,11 +564,11 @@ extension MechanismController: CogOps {
   ///
   /// The turn name composes under the controller's name path, so history
   /// records which mechanism asked for the write — `Weather.checkWeather`
-  /// rather than a bare `checkWeather`. After the runtime is gone the commit
+  /// rather than a bare `checkWeather`. After the runtime is gone the turn
   /// is inert: there is no graph left to write.
-  public func commit(named name: String, _ body: @escaping (Writer) -> Void) {
+  public func turn(named name: String, _ body: @escaping (Writer) -> Void) {
     guard let cogtext else { return }
-    cogtext.commit(named: "\(namePath).\(name)", body)
+    cogtext.turn(named: "\(namePath).\(name)", body)
   }
 
   /// Reads a source without creating a dependency edge; see ``Cogs/peek(_:)-(ManualCog<Value>)``.
@@ -579,7 +579,7 @@ extension MechanismController: CogOps {
     requiredRuntime.peek(valueReference)
   }
 
-  /// Reads a derived cog without creating a dependency edge.
+  /// Reads an automatic cog without creating a dependency edge.
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
     requiredRuntime.peek(valueReference)
   }

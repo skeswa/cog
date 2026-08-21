@@ -16,7 +16,7 @@ private final class StateGraphComparisonStorage {
   func read(_ value: RuntimeComparisonValue) -> Int {
     switch nodes[value.index] {
     case .source(let source): source.wrappedValue
-    case .derived(let derived): derived.wrappedValue
+    case .automatic(let automatic): automatic.wrappedValue
     }
   }
 }
@@ -28,13 +28,13 @@ private enum StateGraphComparisonNode {
   case source(Stored<Int>)
 
   /// A memoized `Computed<Int>` value.
-  case derived(Computed<Int>)
+  case automatic(Computed<Int>)
 }
 
 /// PERF-10 adapter for swift-state-graph 0.28.0.
 ///
 /// The mapping stays on the library's primitive surface: `Stored` for mutable
-/// values, `Computed` for derived values, `wrappedValue` for tracked reads, and
+/// values, `Computed` for automatic values, `wrappedValue` for tracked reads, and
 /// `withGraphTransaction` for the write boundary. Root reads additionally sit
 /// under Swift Observation tracking, matching the Cog and raw-Observation
 /// adapters' UI-facing read scope.
@@ -58,12 +58,12 @@ final class StateGraphRuntimeComparisonGraph: RuntimeComparisonGraph {
   /// structurally MainActor-confined. `assumeIsolated` documents and checks
   /// that synchronous invariant at the one crossing point; StateGraph invokes
   /// the rule from the root read performed by this adapter on the MainActor.
-  func derived(
+  func automatic(
     _ compute: @escaping @MainActor (RuntimeComparisonReader) -> Int
   ) -> RuntimeComparisonValue {
     let value = RuntimeComparisonValue(index: storage.nodes.count)
     let storage = storage
-    let derived = Computed<Int>(name: "perf.compare.derived") { [unowned storage] _ in
+    let automatic = Computed<Int>(name: "perf.compare.automatic") { [unowned storage] _ in
       MainActor.assumeIsolated {
         compute(
           RuntimeComparisonReader { dependency in
@@ -72,7 +72,7 @@ final class StateGraphRuntimeComparisonGraph: RuntimeComparisonGraph {
         )
       }
     }
-    storage.nodes.append(.derived(derived))
+    storage.nodes.append(.automatic(automatic))
     return value
   }
 

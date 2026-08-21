@@ -12,7 +12,7 @@ import Testing
   let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[count] = 4
     #expect(c[count] == 4)
 
@@ -37,7 +37,7 @@ import Testing
 
   #expect(cogs.peek(doubled) == 0)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[source] = 1
     #expect(c[source] == 1)
 
@@ -56,11 +56,11 @@ import Testing
   let note = ManualCog<String>("old")
   let retryLimit = ManualCog<Int>(3)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[count] = 3
   }
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[note] = "new"
     #expect(c[count] == 3)
 
@@ -71,11 +71,11 @@ import Testing
 }
 
 @MainActor
-@Test func `TURN-04 normal reads stay committed while the writer accumulates`() {
+@Test func `TURN-04 normal reads stay published while the writer accumulates`() {
   let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(0)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[count] = 7
 
     #expect(c[count] == 7)
@@ -90,7 +90,7 @@ import Testing
   let cogs = Cogs.forTesting()
   let unreadCounts = ManualCogBox<Int, String>(0)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[unreadCounts["inbox"]] += 1
 
     #expect(c[unreadCounts["inbox"]] == 1)

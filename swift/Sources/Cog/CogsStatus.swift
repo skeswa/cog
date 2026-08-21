@@ -8,7 +8,7 @@
 /// `peek`, and a `watch`, with identical demand and lifetime rules. The UI
 /// subscript tracks each returned field independently; selector and reaction
 /// reads and explicit watches track the complete status. The lens deliberately
-/// has no spelling for manual or derived cogs: synchronous state has no request
+/// has no spelling for manual or automatic cogs: synchronous state has no request
 /// status, so asking for it is a type error rather than a degenerate success.
 ///
 /// Bind the result to the declaration's unsuffixed domain name, just like a
@@ -63,14 +63,7 @@ extension Cogs {
     /// - Parameter valueReference: The async value whose status the UI reads.
     /// - Returns: The newest settled status in this context.
     public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
-      #if COG_CORE_ARENA
       return cogs.arenaCore.observedAsyncStatus(for: valueReference, in: cogs)
-      #else
-      let state = cogs.asyncState(for: valueReference)
-      let status = state.settledStatus(in: cogs)
-      let boundary = state.ensureObservationBoundary(in: cogs)
-      return status.observed(by: boundary)
-      #endif
     }
 
     /// Reads an async cog's current status without creating a dependency edge.
@@ -89,16 +82,9 @@ extension Cogs {
     /// - Returns: Its current full status, beginning with pending on first
     ///   demand.
     public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
-      #if COG_CORE_ARENA
       let status = cogs.arenaCore.asyncStatus(for: valueReference, in: cogs)
       cogs.arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: cogs)
       return status
-      #else
-      let state = cogs.asyncState(for: valueReference)
-      let status = state.settledStatus(in: cogs)
-      cogs.scheduleLifetimeReleaseIfUnobserved(state)
-      return status
-      #endif
     }
   }
 }

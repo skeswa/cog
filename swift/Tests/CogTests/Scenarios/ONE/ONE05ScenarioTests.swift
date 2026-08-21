@@ -16,12 +16,12 @@ private let one05StateCog = ManualCog<Int>(41, name: "one05.state")
   #expect(testContext.peek(one05StateCog) == 41)
   #expect(previewContext.peek(one05StateCog) == 41)
 
-  testContext.commit("test.write") { c in c[one05StateCog] = 101 }
+  testContext.turn("test.write") { c in c[one05StateCog] = 101 }
 
   #expect(testContext.peek(one05StateCog) == 101)
   #expect(previewContext.peek(one05StateCog) == 41)
 
-  previewContext.commit("preview.write") { c in c[one05StateCog] = 202 }
+  previewContext.turn("preview.write") { c in c[one05StateCog] = 202 }
 
   #expect(testContext.peek(one05StateCog) == 101)
   #expect(previewContext.peek(one05StateCog) == 202)
@@ -41,7 +41,7 @@ private let one05StateCog = ManualCog<Int>(41, name: "one05.state")
     #expect(current.peek(one05StateCog) == 41)
 
     let written = 1_000 + index
-    current.commit("sequential.write") { c in c[one05StateCog] = written }
+    current.turn("sequential.write") { c in c[one05StateCog] = written }
 
     #expect(current.peek(one05StateCog) == written)
     previous = (current, written)
@@ -66,7 +66,7 @@ private let one05StateCog = ManualCog<Int>(41, name: "one05.state")
     #expect(app.peek(one05StateCog) == 41)
     #expect(duringInstall.peek(one05StateCog) == 41)
 
-    duringInstall.commit("isolated.during-app") { c in c[one05StateCog] = 303 }
+    duringInstall.turn("isolated.during-app") { c in c[one05StateCog] = 303 }
 
     #expect(duringInstall.peek(one05StateCog) == 303)
     #expect(app.peek(one05StateCog) == 41)

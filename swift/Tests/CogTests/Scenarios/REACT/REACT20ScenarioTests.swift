@@ -17,7 +17,7 @@ import Testing
 
   #expect(await iterator.next() == 0)
 
-  cogs.commit("change exported source") { c in c[sourceCog] = 1 }
+  cogs.turn("change exported source") { c in c[sourceCog] = 1 }
 
   #expect(reactionValues == [0, 1])
   #expect(await iterator.next() == 1)

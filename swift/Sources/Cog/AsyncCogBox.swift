@@ -1,4 +1,4 @@
-/// A family of asynchronously derived values sharing one declaration.
+/// A family of asynchronously automatic values sharing one declaration.
 ///
 /// A box owns one declaration descriptor and builds lightweight ``AsyncCog``
 /// value references for its keys. Each descriptor-and-key pair has its own
@@ -44,35 +44,9 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   internal let descriptor: AsyncCogDescriptor<Value>
 
   /// Stable value-projection identity shared by all keys and box copies.
-  internal let valueDescriptor: DerivedCogDescriptor<Value>
+  internal let valueDescriptor: AutomaticCogDescriptor<Value>
 
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  /// An async value reference that retains this box's concrete key type.
-  ///
-  /// The reference shares the box's status and total-value descriptors. It
-  /// owns no task or state; each context resolves those lazily for `key`.
-  public struct ValueReference {
-    /// The status declaration shared by every key from this box.
-    internal let descriptor: AsyncCogDescriptor<Value>
-
-    /// The total-value projection declaration shared by every key.
-    internal let valueDescriptor: DerivedCogDescriptor<Value>
-
-    /// The exact state key, stored in its specialized concrete type.
-    internal let key: Key
-
-    /// Adapts the candidate after it enters the class-state runtime shell.
-    internal var simpleCoreReference: AsyncCog<Value> {
-      AsyncCog(
-        descriptor: descriptor,
-        valueDescriptor: valueDescriptor,
-        key: CogKey(key)
-      )
-    }
-  }
-  #endif
-
-  /// Declares a keyed async derived value with an explicit resting default.
+  /// Declares a keyed async automatic value with an explicit resting default.
   ///
   /// This creates one async descriptor and one value-projection descriptor,
   /// regardless of how many keys are later used. The synchronous selector runs
@@ -85,7 +59,7 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// `hasSucceeded == false`; that key's value read rests on the same default
   /// until its first success. Under
   /// `.latest`, a reload cancels and supersedes only that key's prior task, and
-  /// a stale completion cannot commit. By default, each unobserved key is
+  /// a stale completion cannot publish. By default, each unobserved key is
   /// released independently after grace and pending work is cancelled.
   ///
   /// - Parameters:
@@ -180,11 +154,6 @@ public struct AsyncCogBox<Value, Key: Hashable> {
   /// - Parameter key: The hashable value forming the state identity together
   ///   with this box's descriptor.
   /// - Returns: A lightweight async value reference for that identity.
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  public subscript(key: Key) -> ValueReference {
-    ValueReference(descriptor: descriptor, valueDescriptor: valueDescriptor, key: key)
-  }
-  #else
   public subscript(key: Key) -> AsyncCog<Value> {
     AsyncCog(
       descriptor: descriptor,
@@ -192,7 +161,6 @@ public struct AsyncCogBox<Value, Key: Hashable> {
       key: CogKey(key)
     )
   }
-  #endif
 
   /// Builds the box's one async descriptor, wrapping the keyed selector in
   /// the erased-key resolution every state of this declaration shares.

@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-15 a live subscription holds state across every grace period`() async {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let sourceCog = ManualCog<Int>(0)
   var selectorRuns = 0
   let doubledCog = Cog<Int> { c in
@@ -22,7 +22,7 @@ import Testing
 
   for value in 1...5 {
     clock.advance(by: .seconds(10))
-    cogs.commit(sourceCog, to: value)
+    cogs.turn(sourceCog, to: value)
     #expect(await iterator.next() == value * 2)
     #expect(clock.activeSleeperCount == 0)
   }

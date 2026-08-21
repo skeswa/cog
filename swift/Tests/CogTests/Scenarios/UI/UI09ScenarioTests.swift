@@ -18,7 +18,7 @@ import os
 
   #expect(initial == 1)
 
-  cogs.commit { c in c[count] = 2 }
+  cogs.turn { c in c[count] = 2 }
 
   #expect(cogs.peek(count) == 2)
   #expect(notices.withLock { $0 } == 0)

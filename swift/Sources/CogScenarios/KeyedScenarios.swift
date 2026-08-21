@@ -8,9 +8,9 @@ internal import Cog
 // Cog does have keyed declarations — one `CogBox` names a family of states that
 // `box[key]` reaches — and their whole promise is that the family behaves like
 // independent graphs. That promise is exactly a run-count claim, so it belongs
-// in the counted suite rather than in a timing chart, and it is the shape whose
-// physical cost depends on the value-reference layout the benchmarks will
-// choose (perf §4).
+// in the counted suite rather than in a timing chart. The same shape supplied
+// the behavior proof while the inline value-reference layout was selected
+// (perf §4).
 
 extension CogScenario {
   /// A keyed diamond per key: one keyed source, `width` keyed arms, one keyed
@@ -44,17 +44,13 @@ extension CogScenario {
   ///   - width: Parallel arms between each key's source and its consumer.
   ///   - turns: Changing turns after the first read, each writing one key,
   ///     cycling through them.
-  ///   - layout: The value-reference layout to build the keyed references
-  ///     with. This is the shape that layout choice actually moves.
   public static func keyedDiamond(
     keys: Int = 100,
     width: Int = 5,
-    turns: Int = 500,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 500
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-07-KeyedDiamond",
-      layout: layout,
       expectedRuns: (keys + turns) * (width + 1)
     ) { cogs, counter in
       let sourceCogs = ManualCogBox<Int, Int>(0, name: "keyed.diamond.head")
@@ -93,7 +89,7 @@ extension CogScenario {
         // One key per turn, cycling. Every write moves its key by `keys`, or
         // off zero the first time, so no turn is ever gated away as equal.
         let key = turn % keys
-        cogs.commit("keyed.diamond.turn") { c in c[sourceCogs[key]] = turn }
+        cogs.turn("keyed.diamond.turn") { c in c[sourceCogs[key]] = turn }
         total = readEveryKey()
       }
       return total
@@ -135,16 +131,12 @@ extension CogScenario {
   ///   - turns: Turns after the first read. Each advances the window by one
   ///     key and bumps the epoch, so the family ends up holding
   ///     `window + turns` keys and reading `window` of them.
-  ///   - layout: The value-reference layout to build the keyed references
-  ///     with.
   public static func keyChurn(
     window: Int = 10,
-    turns: Int = 500,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 500
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-08-KeyChurn",
-      layout: layout,
       expectedRuns: (window + 1) + turns * (window + 2)
     ) { cogs, counter in
       // Read by every key that has ever been created, so a dropped key that
@@ -173,7 +165,7 @@ extension CogScenario {
 
       var roster = cogs.peek(rosterCog)
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("churn.turn") { c in
+        cogs.turn("churn.turn") { c in
           c[epochSourceCog] = turn
           c[windowStartSourceCog] = turn
         }

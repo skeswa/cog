@@ -13,7 +13,7 @@
 // description of the run, never a selection of tests, which is why the
 // expansion rule reads code spans alone.
 //
-// Commands may carry environment prefixes (`COG_TEST_CORE=arena mise run …`)
+// Commands may carry environment prefixes (`MODE=release mise run …`)
 // and may be negated (`! mise run test --filter DOES-NOT-EXIST` asserts the
 // command *fails*, so it proves no coverage). Filters may be single-quoted,
 // double-quoted, or bare.
@@ -29,8 +29,8 @@ const FILTER_RE = /--filter[=\s]+(?:'([^']*)'|"([^"]*)"|(\S+))/;
 
 /**
  * Matches the run of `NAME=value` assignments immediately ahead of a command,
- * anchored to the end of the text that precedes it. `COG_TEST_CORE=arena
- * COG_TEST_EDGE=pool mise run test …` yields both assignments; a trailing
+ * anchored to the end of the text that precedes it. `MODE=release
+ * FEATURE=1 mise run test …` yields both assignments; a trailing
  * `--filter=x` does not, because an assignment has to start at a separator.
  */
 const ENV_PREFIX_RE =
@@ -64,8 +64,7 @@ export const SCENARIO_FILTER_COMMANDS = new Set([
   "test:lint",
   "test:matrix",
   "test:release",
-  "test:value-references",
-  "test:cores",
+  "test:arena-configurations",
 ]);
 
 /**

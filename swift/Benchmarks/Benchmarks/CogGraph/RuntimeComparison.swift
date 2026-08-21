@@ -35,7 +35,7 @@ struct RuntimeComparisonReader {
 /// The small signal-runtime surface shared by every PERF-10 adapter.
 ///
 /// It deliberately mirrors the primitives used by `js-reactivity-benchmark`:
-/// a mutable value, a derived value, a root read, and a write boundary. It does
+/// a mutable value, an automatic value, a root read, and a write boundary. It does
 /// not require effects because Cog's counted ports keep their roots hot by
 /// reading them after each write. That pull shape lets raw Observation remain
 /// genuinely raw instead of hiding a bespoke invalidation graph behind it.
@@ -44,8 +44,8 @@ protocol RuntimeComparisonGraph: AnyObject {
   /// Makes a mutable value with the supplied initial state.
   func source(_ initialValue: Int) -> RuntimeComparisonValue
 
-  /// Makes a derived value whose reads flow through the adapter's tracker.
-  func derived(
+  /// Makes an automatic value whose reads flow through the adapter's tracker.
+  func automatic(
     _ compute: @escaping @MainActor (RuntimeComparisonReader) -> Int
   ) -> RuntimeComparisonValue
 
@@ -124,12 +124,12 @@ nonisolated enum RuntimeComparisonWorkload: String, CaseIterable, Sendable {
     let turns = 500
     let source = graph.source(0)
     let arms = (0..<width).map { _ in
-      graph.derived { c in
+      graph.automatic { c in
         counter.record()
         return c[source] + 1
       }
     }
-    let sum = graph.derived { c in
+    let sum = graph.automatic { c in
       counter.record()
       return arms.reduce(0) { $0 + c[$1] }
     }
@@ -154,7 +154,7 @@ nonisolated enum RuntimeComparisonWorkload: String, CaseIterable, Sendable {
     var tail = source
     for _ in 0..<depth {
       let below = tail
-      tail = graph.derived { c in
+      tail = graph.automatic { c in
         counter.record()
         return c[below] + 1
       }
@@ -178,11 +178,11 @@ nonisolated enum RuntimeComparisonWorkload: String, CaseIterable, Sendable {
     let turns = 50
     let source = graph.source(0)
     let leaves = (0..<width).map { arm in
-      let offset = graph.derived { c in
+      let offset = graph.automatic { c in
         counter.record()
         return c[source] + arm
       }
-      return graph.derived { c in
+      return graph.automatic { c in
         counter.record()
         return c[offset] + 1
       }
@@ -206,15 +206,15 @@ nonisolated enum RuntimeComparisonWorkload: String, CaseIterable, Sendable {
     let iterations = 20
     let turns = 100
     let source = graph.source(0)
-    let doubled = graph.derived { c in
+    let doubled = graph.automatic { c in
       counter.record()
       return c[source] * 2
     }
-    let inverse = graph.derived { c in
+    let inverse = graph.automatic { c in
       counter.record()
       return -c[source]
     }
-    let sum = graph.derived { c in
+    let sum = graph.automatic { c in
       counter.record()
       let head = c[source]
       var result = 0
@@ -236,14 +236,14 @@ nonisolated enum RuntimeComparisonWorkload: String, CaseIterable, Sendable {
 /// Correctness evidence produced alongside one timing sample.
 ///
 /// Final values are common across adapters. Computation counts are allowed to
-/// describe real semantic differences: Cog memoizes derived reads and settles
+/// describe real semantic differences: Cog memoizes automatic reads and settles
 /// one previously recorded unstable dependency, while raw Observation offers
 /// no computed-value cache and therefore evaluates every repeated read.
 nonisolated struct RuntimeComparisonResult: Sendable {
   /// Graph shape that produced the result.
   let workload: RuntimeComparisonWorkload
 
-  /// Derived-body invocations observed during the run.
+  /// Automatic-body invocations observed during the run.
   let actualRuns: Int
 
   /// Exact invocations required by this adapter's semantics.
@@ -271,9 +271,9 @@ nonisolated struct RuntimeComparisonResult: Sendable {
 /// Mutable run counter shared by the closures in one comparison graph.
 @MainActor
 private final class RuntimeComparisonCounter {
-  /// Number of derived bodies invoked so far.
+  /// Number of automatic bodies invoked so far.
   private(set) var runs = 0
 
-  /// Records one derived-body invocation.
+  /// Records one automatic-body invocation.
   func record() { runs += 1 }
 }

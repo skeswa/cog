@@ -209,7 +209,7 @@ mise run bench:baseline:check  [name]   # compare, refusing to cross environment
 
 A benchmark number means nothing without the machine and toolchain that
 produced it, so `update` writes a fingerprint — architecture, host, OS, Xcode,
-Swift, harness and interposer versions, allocator backend — next to the
+Swift, harness and interposer versions, and allocator backend — next to the
 baseline, and `check` refuses to compare against a baseline recorded elsewhere.
 A cross-environment comparison does not produce an obviously wrong answer; it
 produces a plausible one, which is worse.
@@ -238,7 +238,9 @@ files under `Thresholds/`: one exact allocation workload and twelve PERF-10
 runtime/workload pairs. The wrapper fails before measuring if even one file is
 missing or its benchmark is no longer registered. It also runs
 `perf-witness-allocating` first, because a zero malloc result is evidence only
-after a workload known to allocate reports nonzero.
+after a workload known to allocate reports nonzero. Committed thresholds
+describe the specialized pool-edge shipping default, so the wrapper refuses to
+apply them while any representation comparison selector chooses another build.
 
 There is a subtle but load-bearing encoding here. Upstream compares a measured
 p90 to the number in the static file, then applies the benchmark's configured
@@ -250,12 +252,13 @@ one-sided ceiling: `0...ceiling` passes and only a value above the ceiling can
 fail. PERF-06 has both reference and tolerance zero, preserving exactness.
 
 The wall-clock ceilings are roughly three times the slower pinned p90 in each
-cell. Cog's row covers both simple and arena builds so the gate remains valid
-through the M6 core decision.
+cell. Cog's row was originally calibrated across both historical cores and
+therefore remains conservative for the specialized arena default and compact
+opt-out.
 
 | Runtime           | diamond |  deep |  broad | unstable |
 | ----------------- | ------: | ----: | -----: | -------: |
-| Cog, either core  |   20 ms | 10 ms |  40 ms |    10 ms |
+| Cog               |   20 ms | 10 ms |  40 ms |    10 ms |
 | raw `@Observable` |    3 ms |  1 ms |   8 ms |     2 ms |
 | swift-state-graph |   80 ms | 50 ms | 120 ms |    25 ms |
 
@@ -351,13 +354,13 @@ Each graph is built and settled once, then held by one durable mechanism
 reaction. The measured region neither drops a `Cogs` nor starts grace work, so
 wall clock and instructions can travel beside the process-global malloc,
 object-allocation, retain, and release counters.
-Run each exact benchmark name with `COG_TEST_CORE=arena` and one of
-`COG_TEST_EDGE=pool`, `prefix`, or `inline`. M6-05c's same-session comparison
-selected the shared pool: it won the expected mostly-static instruction count,
-all candidates tied on p50 wall time and allocations, prefix arrays added ARC
-under churn, and inline-plus-overflow won neither shape. `impl/benchmarks.md` records
-the raw comparison and rationale; the selectors retain both losing candidates
-for reproduction.
+M6-05c's same-session comparison selected the shared pool: it won the expected
+mostly-static instruction count, all candidates tied on p50 wall time and
+allocations, prefix arrays added ARC under churn, and inline-plus-overflow won
+neither shape. `impl/benchmarks.md` records the raw comparison and rationale.
+The rejected implementations and their selectors were removed once the
+direction was settled; the measurements remain the reproducible decision
+record.
 
 ## Runtime comparison adapters
 
@@ -369,11 +372,11 @@ computation count before the harness may report a number. This keeps an
 incorrect or unexpectedly duplicated computation from hiding inside timing.
 
 The raw adapter is deliberately literal: mutable values are `@Observable`
-stored properties, derived values are ordinary uncached Swift computations,
+stored properties, computed values are ordinary uncached Swift computations,
 root reads use `withObservationTracking`, and writes are ordinary property
 assignments. The tracking callback is empty because the common driver pulls
 the root after each write, but registration and write notification still run.
-Observation does not provide a derived-value graph, cache, or batching
+Observation does not provide a computed-value graph, cache, or batching
 primitive, and adding those behind the adapter would measure a second graph
 implementation rather than the standard library's registrar. The unstable
 workload's repeated branch reads therefore run repeatedly under raw
@@ -394,11 +397,12 @@ The exact-name workloads are:
 - `perf-10-observation-{diamond,deep,broad,unstable}`; and
 - `perf-10-state-graph-{diamond,deep,broad,unstable}`.
 
-Set `COG_TEST_CORE=simple` or `COG_TEST_CORE=arena` when building the benchmark
-package to choose which implementation the `cog` adapter measures. The adapter
-itself uses only the shared public declarations, and its root reads use Cog's
-public Observation-tracked subscript under the same tracking scope as the raw
-adapter. No comparison-only branch enters either core.
+The `cog` adapter measures the specialized arena by default. Run
+`mise run bench:compact` to rebuild the benchmark package with its
+`CompactArena` trait and forward that public trait to Cog. The retired simple
+core is preserved only in the historical report. The adapter itself uses only
+public declarations, and its root reads use Cog's public Observation-tracked
+subscript under the same tracking scope as the raw adapter.
 
 ## The Storefront macrobenchmark
 
@@ -524,7 +528,7 @@ package correctness suite runs the detailed phase-by-phase checks.
 
 ```console
 mise run bench --filter 'perf-15-storefront-.*'
-COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
+mise run bench:compact --filter 'perf-15-storefront-.*'
 mise run test:storefront        # the correctness gate the numbers rest on
 ```
 
@@ -536,9 +540,9 @@ shape, and what it does not cover.
 
 ## What is coming
 
-The comparison and its CI gate are complete. `M6-12a` uses the recorded data
-to select the shipping core, and `M6-13` executes that decision without
-changing these shared workloads or their ceilings.
+The comparison and its CI gate are complete. The specialized arena now ships by
+default, while these shared workloads and their ceilings continue to cover its
+compact opt-out.
 
 Per-callsite ARC attribution stays a manual `xcrun xctrace` workflow, documented
 here when a count moves and the question becomes which line moved it.

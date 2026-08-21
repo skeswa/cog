@@ -20,19 +20,22 @@ private nonisolated struct CogArenaInvalidationFrame {
   let strength: CogArenaInvalidationStrength
 }
 
-/// Pushes arena invalidation flags over one concrete indexed edge candidate.
+/// Pushes arena invalidation flags through the shared linked-edge pool.
 ///
 /// The context owns one instance and reuses its contiguous LIFO buffer across
 /// turns. The walk carries only row indices and a scalar strength, so even deep
 /// graphs use no recursion, state references, weak loads, or per-turn work-item
 /// allocation after the buffer has reached its high-water mark.
 @MainActor
-internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStorageProtocol> {
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
+internal final class CogArenaDirtyPropagation {
   /// Scalar rows whose flags this walk mutates.
   private let arena: CogArenaStorage
 
-  /// Selected candidate supplying each producer's subscriber chain.
-  private let edges: EdgeStorage
+  /// Shared pool supplying each producer's subscriber chain.
+  private let edges: CogLinkedEdgePool
 
   /// Rows whose UI boundary could have changed in the accumulating turn.
   ///
@@ -55,7 +58,7 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
   var stackCapacity: Int { stack.capacity }
 
   /// Binds one invalidator to an arena and the edge storage containing its graph.
-  init(arena: CogArenaStorage, edges: EdgeStorage) {
+  init(arena: CogArenaStorage, edges: CogLinkedEdgePool) {
     self.arena = arena
     self.edges = edges
   }
@@ -64,6 +67,9 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
   ///
   /// Typed columns check this before publishing, preventing equal row numbers
   /// from accidentally crossing isolated test or preview contexts.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func belongs(to candidate: CogArenaStorage) -> Bool {
     arena === candidate
   }
@@ -74,6 +80,9 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
   /// already at equal or greater strength cuts off its branch, which preserves
   /// direct invalidation in diamonds and bounds repeated propagation from
   /// multiple changed sources in one turn.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func invalidateSubscribers(of producer: CogArenaSlot) {
     _ = arena.index(of: producer)
     guard stack.isEmpty else {
@@ -101,11 +110,15 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
       fatalError("Cog found an arena edge whose producer row was out of range.")
     }
 
-    var cursor = edges.firstSubscriber(of: producerRow, in: arena)
+    guard producerRow >= 0, Int(producerRow) < arena.rowCount else {
+      fatalError("Cog found an arena edge whose producer row was out of range.")
+    }
+
+    var cursor = arena.subs[Int(producerRow)]
     while cursor != .none {
-      let subscriber = edges.subscriber(at: cursor)
-      stack.append(CogArenaInvalidationFrame(row: subscriber.consumer, strength: strength))
-      cursor = subscriber.next
+      let edge = edges.edge(at: cursor)
+      stack.append(CogArenaInvalidationFrame(row: edge.sub, strength: strength))
+      cursor = edge.nextSub
     }
   }
 
@@ -193,7 +206,7 @@ internal final class CogArenaDirtyPropagation<EdgeStorage: CogArenaEdgeStoragePr
     arena.flags[row].remove(.noticeQueued)
   }
 
-  // Written out, and `nonisolated`, because generic classes under the
-  // package's MainActor default otherwise crash the pinned release optimizer.
+  // Written out, and `nonisolated`, so deallocation does not ask the
+  // concurrency runtime to hop to the MainActor.
   nonisolated deinit {}
 }

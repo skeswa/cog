@@ -22,8 +22,8 @@ import Testing
   #expect(await starts.next() == 0)
   try await resolveAsyncStatus(in: cogs) { work.succeed(0, with: 0) }
 
-  cogs.commit("request one") { c in c[inputCog] = 1 }
-  cogs.commit("request two") { c in c[inputCog] = 2 }
+  cogs.turn("request one") { c in c[inputCog] = 1 }
+  cogs.turn("request two") { c in c[inputCog] = 2 }
   #expect(await starts.next() == 1)
   #expect(await starts.next() == 2)
 

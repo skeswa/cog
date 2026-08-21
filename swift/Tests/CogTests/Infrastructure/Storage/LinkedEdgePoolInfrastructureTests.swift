@@ -2,7 +2,7 @@ import Testing
 
 @testable import Cog
 
-// Internal proofs for the first runnable edge-layout candidate. These tests
+// Internal proofs for the arena's selected linked edge storage. These tests
 // inspect raw links deliberately; later arena integration tests prove graph
 // behavior without depending on the pool representation.
 
@@ -248,7 +248,7 @@ import Testing
 }
 
 @MainActor
-@Test func `LinkedEdgePoolInfrastructure keeps the candidate entry at twenty four bytes`() {
+@Test func `LinkedEdgePoolInfrastructure keeps each entry at twenty four bytes`() {
   #expect(MemoryLayout<CogPoolEdge>.size == 24)
   #expect(MemoryLayout<CogPoolEdge>.stride == 24)
   #expect(MemoryLayout<CogEdgeIndex>.size == 4)

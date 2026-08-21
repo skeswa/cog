@@ -19,9 +19,9 @@ import Testing
   #expect(await iterator.next() == 4)
   #expect(selectorRuns == 1)
 
-  cogs.commit(sourceCog, to: 3)
+  cogs.turn(sourceCog, to: 3)
   #expect(await iterator.next() == 6)
-  cogs.commit(sourceCog, to: 5)
+  cogs.turn(sourceCog, to: 5)
   #expect(await iterator.next() == 10)
   #expect(selectorRuns == 3)
 }

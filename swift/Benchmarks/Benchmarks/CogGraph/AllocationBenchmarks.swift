@@ -15,7 +15,7 @@ enum AllocationHarness {
   /// The source a steady turn writes.
   static let counterSourceCog = ManualCog<Int>(0, name: "perf.counter")
 
-  /// One derived consumer, so a turn actually propagates.
+  /// One automatic consumer, so a turn actually propagates.
   static let doubledCog = Cog<Int>(
     { c in c[AllocationHarness.counterSourceCog] * 2 },
     name: "perf.doubled"
@@ -30,7 +30,7 @@ enum AllocationHarness {
   /// Builds and fully settles the graph once, outside any measured region.
   ///
   /// Settling is what makes the measured region *steady*: the first read of a
-  /// derived cog computes it, and computing is not what PERF-01 is about.
+  /// automatic cog computes it, and computing is not what PERF-01 is about.
   ///
   /// Once, not once per iteration, and that is load-bearing twice over. A
   /// steady turn is "same graph shape, new values", so a benchmark that built
@@ -58,7 +58,7 @@ enum AllocationHarness {
   static func runSteadyTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.commit(counterSourceCog, to: iteration, name: "perf.turn")
+      cogs.turn(counterSourceCog, to: iteration, name: "perf.turn")
       blackHole(cogs[doubledCog])
     }
   }
@@ -193,7 +193,7 @@ let allocationBenchmarks: @Sendable () -> Void = {
   }
 
   // PERF-06. Measured at zero, exactly as the scenario words it, at every
-  // percentile. The committed static p90 reference is zero, and p90's
+  // percentile. The published static p90 reference is zero, and p90's
   // tolerance is also zero, so the CI gate retains the exact zero-malloc
   // requirement. Other percentiles keep the baseline-only noise tolerance;
   // the static gate reads p90 exclusively.

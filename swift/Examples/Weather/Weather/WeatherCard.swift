@@ -19,7 +19,7 @@ struct WeatherCard: View {
   /// and its kind describes the current request without a parallel lifecycle
   /// read. SwiftUI observes only those two fields; the unused error and flags
   /// do not participate in this body's invalidation.
-  /// `isNiceOutsideCogs` demonstrates a separately equality-gated derivation over
+  /// `isNiceOutsideCogs` demonstrates a separately equality-gated automatic value over
   /// the ordinary async value. All reads settle within one completed graph
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
@@ -204,16 +204,16 @@ private struct RefreshButton: View {
 }
 
 #if DEBUG
-/// The graph-derived values captured together by one test render.
+/// The automatic values captured together by one test render.
 ///
 /// Integration tests use this value to prove a card never combines a forecast
-/// from one completed turn with the derived `isNice` result from another.
+/// from one completed turn with the automatic `isNice` result from another.
 nonisolated struct WeatherCardSnapshot: Equatable, Sendable {
   /// The card identity rendered.
   let zip: ZipCode
   /// The last accepted forecast visible in that render.
   let report: Weather?
-  /// The suitability derivation settled in that same render.
+  /// The automatic suitability value settled in that same render.
   let isNice: Bool
 }
 #endif

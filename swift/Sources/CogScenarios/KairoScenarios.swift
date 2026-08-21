@@ -41,16 +41,12 @@ extension CogScenario {
   ///     Defaults to upstream's 5.
   ///   - turns: Changing turns after the first read. Defaults to upstream's
   ///     500.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   public static func kairoDiamond(
     width: Int = 5,
-    turns: Int = 500,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 500
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-01-KairoDiamond",
-      layout: layout,
       expectedRuns: (width + 1) * (1 + turns)
     ) { cogs, counter in
       let sourceCog = ManualCog<Int>(0, name: "kairo.diamond.head")
@@ -73,14 +69,14 @@ extension CogScenario {
 
       var sum = cogs.peek(sumCog)
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("kairo.diamond.turn") { c in c[sourceCog] = turn }
+        cogs.turn("kairo.diamond.turn") { c in c[sourceCog] = turn }
         sum = cogs.peek(sumCog)
       }
       return sum
     }
   }
 
-  /// Kairo's deep propagation: a straight chain of `depth` derived cogs.
+  /// Kairo's deep propagation: a straight chain of `depth` automatic cogs.
   ///
   /// Where the diamond catches redundant work across a fan-in, this catches it
   /// along a chain, and it is the shape that punishes a recursive settle: the
@@ -98,16 +94,12 @@ extension CogScenario {
   /// - Parameters:
   ///   - depth: Links in the chain. Defaults to upstream's 50.
   ///   - turns: Changing turns after the first read. Defaults to upstream's 50.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   public static func kairoDeep(
     depth: Int = 50,
-    turns: Int = 50,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 50
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-02-KairoDeep",
-      layout: layout,
       expectedRuns: depth * (1 + turns)
     ) { cogs, counter in
       let sourceCog = ManualCog<Int>(0, name: "kairo.deep.head")
@@ -137,7 +129,7 @@ extension CogScenario {
 
       var tail = cogs.peek(tailCog)
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("kairo.deep.turn") { c in c[sourceCog] = turn }
+        cogs.turn("kairo.deep.turn") { c in c[sourceCog] = turn }
         tail = cogs.peek(tailCog)
       }
       return tail
@@ -175,16 +167,12 @@ extension CogScenario {
   ///     upstream's 50.
   ///   - turns: Changing turns after the first read. Defaults to upstream's
   ///     50.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   public static func kairoBroad(
     width: Int = 50,
-    turns: Int = 50,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 50
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-03-KairoBroad",
-      layout: layout,
       expectedRuns: 2 * width * (1 + turns)
     ) { cogs, counter in
       let sourceCog = ManualCog<Int>(0, name: "kairo.broad.head")
@@ -212,7 +200,7 @@ extension CogScenario {
       var last = width
       for leafCog in leafCogs { last = cogs.peek(leafCog) }
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("kairo.broad.turn") { c in c[sourceCog] = turn }
+        cogs.turn("kairo.broad.turn") { c in c[sourceCog] = turn }
         for leafCog in leafCogs { last = cogs.peek(leafCog) }
       }
       return last
@@ -260,16 +248,12 @@ extension CogScenario {
   ///     the arithmetic and not the expectation.
   ///   - turns: Changing turns after the first read. Defaults to upstream's
   ///     100.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   public static func kairoUnstable(
     iterations: Int = 20,
-    turns: Int = 100,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 100
   ) -> CogScenario {
     CogScenario(
       name: "COUNT-04-KairoUnstable",
-      layout: layout,
       expectedRuns: 2 + 3 * turns
     ) { cogs, counter in
       let sourceCog = ManualCog<Int>(0, name: "kairo.unstable.head")
@@ -302,7 +286,7 @@ extension CogScenario {
 
       var total = cogs.peek(sumCog)
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("kairo.unstable.turn") { c in c[sourceCog] = turn }
+        cogs.turn("kairo.unstable.turn") { c in c[sourceCog] = turn }
         total = cogs.peek(sumCog)
       }
       return total

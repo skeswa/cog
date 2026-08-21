@@ -13,37 +13,30 @@ extension Cogs {
   ///
   /// - Parameter valueReference: The source identity to observe.
   /// - Returns: Its value from the latest completed turn.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
-    #if COG_CORE_ARENA
     return arenaCore.observedManualValue(for: valueReference)
-    #else
-    let state = manualState(for: valueReference)
-    state.accessObservationBoundary(in: self)
-    return state.currentValue
-    #endif
   }
 
-  /// Reads a derived cog and registers its exact state with the active UI
+  /// Reads an automatic cog and registers its exact state with the active UI
   /// consumer.
   ///
   /// The read settles the value before returning it. Later turns invalidate
   /// the consumer only when the settled value changes. Settlement happens
-  /// before boundary access, so a cold async-backed derivation can establish
+  /// before boundary access, so cold async-backed automatic state can establish
   /// pending without reentering this read or sending a redundant baseline
-  /// notice. The boundary pins this exact derived state for the context lifetime
+  /// notice. The boundary pins this exact automatic state for the context lifetime
   /// in v1.
   ///
-  /// - Parameter valueReference: The derived identity to settle and observe.
+  /// - Parameter valueReference: The automatic identity to settle and observe.
   /// - Returns: Its newest fully settled value.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   public subscript<Value>(_ valueReference: Cog<Value>) -> Value {
-    #if COG_CORE_ARENA
-    return arenaCore.observedDerivedValue(for: valueReference, in: self)
-    #else
-    let state = derivedState(for: valueReference)
-    let value = state.settledValue(in: self)
-    state.accessObservationBoundary(in: self)
-    return value
-    #endif
+    return arenaCore.observedAutomaticValue(for: valueReference, in: self)
   }
 
   /// Reads an async cog's value through the Observation boundary.

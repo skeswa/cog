@@ -1,4 +1,4 @@
-/// A declaration and value reference for synchronously derived state.
+/// A declaration and value reference for synchronously automatic state.
 ///
 /// Declare one next to the state it summarizes, and write it as a plain
 /// function of the cogs it reads:
@@ -42,12 +42,18 @@
 @MainActor
 public struct Cog<Value> {
   /// Stable declaration identity and behavior shared by reference copies.
-  internal let descriptor: DerivedCogDescriptor<Value>
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let descriptor: AutomaticCogDescriptor<Value>
 
   /// The keyed state this reference names, or `nil` for a keyless declaration.
   ///
-  /// A `CogKey?`, whose physical layout `CogKey` chooses (perf §4). The type is not
-  /// `@frozen`, so benchmarks may select another layout (perf §4, §9).
+  /// `CogKey` carries the erased key inline. The public reference stays
+  /// resilient so this storage remains an implementation detail (perf §4).
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   internal let key: CogKey?
 
   /// Declares one keyless value computed by `selector`.
@@ -70,7 +76,7 @@ public struct Cog<Value> {
     line: UInt = #line
   ) {
     self.init(
-      descriptor: DerivedCogDescriptor(
+      descriptor: AutomaticCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: nil,
         lifetime: .whileObserved(grace: nil),
@@ -80,11 +86,11 @@ public struct Cog<Value> {
     )
   }
 
-  /// Declares a derived value with an explicit equality rule.
+  /// Declares an automatic value with an explicit equality rule.
   ///
   /// Cog calls `equals` after a rerun with the cached value and the newly
   /// computed value. Returning `true` keeps the cached value and stops the
-  /// downstream wave; returning `false` commits the new value and lets
+  /// downstream wave; returning `false` publishes the new value and lets
   /// downstream cogs follow it. Equality does not skip a selector rerun that
   /// dependency settlement already required.
   ///
@@ -105,7 +111,7 @@ public struct Cog<Value> {
     line: UInt = #line
   ) {
     self.init(
-      descriptor: DerivedCogDescriptor(
+      descriptor: AutomaticCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: equals,
         lifetime: .whileObserved(grace: nil),
@@ -119,14 +125,14 @@ public struct Cog<Value> {
   ///
   /// ``CogBox`` and async value projections use this path so subscripting
   /// packages identity without allocating another descriptor or graph state.
-  internal init(descriptor: DerivedCogDescriptor<Value>, key: CogKey?) {
+  internal init(descriptor: AutomaticCogDescriptor<Value>, key: CogKey?) {
     self.descriptor = descriptor
     self.key = key
   }
 }
 
 extension Cog where Value: Equatable {
-  /// Declares an `Equatable` derived value whose equal reruns stop the wave.
+  /// Declares an `Equatable` automatic value whose equal reruns stop the wave.
   ///
   /// This overload is selected automatically when `Value` conforms to
   /// `Equatable`. Use ``init(_:equals:name:fileID:line:)`` to
@@ -146,7 +152,7 @@ extension Cog where Value: Equatable {
     line: UInt = #line
   ) {
     self.init(
-      descriptor: DerivedCogDescriptor(
+      descriptor: AutomaticCogDescriptor(
         selector: { c, _ in selector(c) },
         equals: { oldValue, newValue in oldValue == newValue },
         lifetime: .whileObserved(grace: nil),

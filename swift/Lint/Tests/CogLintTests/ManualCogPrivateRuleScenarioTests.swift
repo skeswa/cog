@@ -34,6 +34,6 @@ import Testing
   #expect(execution.exitCode == 1)
   #expect(
     execution.xcodeOutput
-      == "State.swift:1:5: error: [manual-cog-private] writable Cog sources must be `private` or `fileprivate`; expose `.readOnly` or a derived cog — https://skeswa.github.io/cog/documentation/cog/manualcogprivate\n"
+      == "State.swift:1:5: error: [manual-cog-private] writable Cog sources must be `private` or `fileprivate`; expose `.readOnly` or an automatic cog — https://skeswa.github.io/cog/documentation/cog/manualcogprivate\n"
   )
 }

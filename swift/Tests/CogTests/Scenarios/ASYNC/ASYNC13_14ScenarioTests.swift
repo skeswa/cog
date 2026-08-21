@@ -54,8 +54,8 @@ private final class Async13ControlledWork {
 
   #expect(await startIterator.next() == 0)
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(watcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
@@ -94,8 +94,8 @@ private final class Async13ControlledWork {
 
   #expect(await startIterator.next() == 0)
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(firstWatcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(firstWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()

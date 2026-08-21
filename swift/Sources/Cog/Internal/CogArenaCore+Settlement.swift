@@ -1,5 +1,3 @@
-#if COG_CORE_ARENA
-
 // MARK: - Settlement
 
 /// Iterative pull settlement, dependency reconciliation, and cycle detection.
@@ -8,7 +6,10 @@
 /// only after dependencies are current, and publication completes before the
 /// active row leaves the computing path.
 extension CogArenaCore {
-  /// Pulls one derived row current through reusable scalar enter/exit frames.
+  /// Pulls one automatic row current through reusable scalar enter/exit frames.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func settle(_ root: CogArenaSlot, in cogs: Cogs) {
     defer { cogs.drainQueuedTurnsIfPossible() }
     cogs.settleDepth += 1
@@ -49,7 +50,7 @@ extension CogArenaCore {
         let mustRecompute = arena.flags[row].contains(.dirty) || dependencyChanged(for: frame.row)
         if mustRecompute {
           guard let recompute = record.recompute else {
-            fatalError("Cog found a derived arena row without a recompute function.")
+            fatalError("Cog found an automatic arena row without a recompute function.")
           }
           let slot = CogArenaSlot(index: frame.row, generation: arena.generation[row])
           recompute(self, cogs, slot, record.key(at: row))
@@ -64,40 +65,43 @@ extension CogArenaCore {
 
   /// Appends stale producers of `consumerRow` for settlement before its exit.
   func appendDependencies(of consumerRow: Int32) {
-    var cursor = edges.firstDependency(of: consumerRow, in: arena)
+    var cursor = arena.deps[liveRow(consumerRow)]
     while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == consumerRow else {
+      let dependency = edges.edge(at: cursor)
+      guard dependency.sub == consumerRow else {
         fatalError("Cog found another consumer's edge in an arena dependency list.")
       }
-      let producerRow = liveRow(dependency.producer)
+      let producerRow = liveRow(dependency.dep)
       if needsSettlement(producerRow) {
-        pullFrames.append(CogArenaPullFrame(row: dependency.producer, phase: .enter))
+        pullFrames.append(CogArenaPullFrame(row: dependency.dep, phase: .enter))
       }
-      cursor = dependency.next
+      cursor = dependency.nextDep
     }
   }
 
   /// Whether any dependency changed after this consumer was last current.
   func dependencyChanged(for consumerRow: Int32) -> Bool {
     let checkedAt = arena.checkedAt[Int(consumerRow)]
-    var cursor = edges.firstDependency(of: consumerRow, in: arena)
+    var cursor = arena.deps[liveRow(consumerRow)]
     while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == consumerRow else {
+      let dependency = edges.edge(at: cursor)
+      guard dependency.sub == consumerRow else {
         fatalError("Cog found another consumer's edge in an arena dependency list.")
       }
-      if arena.changedAt[liveRow(dependency.producer)] > checkedAt {
+      if arena.changedAt[liveRow(dependency.dep)] > checkedAt {
         return true
       }
-      cursor = dependency.next
+      cursor = dependency.nextDep
     }
     return false
   }
 
   /// Runs one typed selector and publishes or backdates its completed result.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func recompute<Value>(
-    descriptor: DerivedCogDescriptor<Value>,
+    descriptor: AutomaticCogDescriptor<Value>,
     column: CogArenaValueColumn<Value>,
     slot: CogArenaSlot,
     key: CogKey?,
@@ -119,7 +123,7 @@ extension CogArenaCore {
     let changed: Bool
     if case .some = previousValue {
       column.stage(value, at: slot)
-      changed = column.commit(at: slot)
+      changed = column.publish(at: slot)
     } else {
       column.insert(value, at: slot)
       changed = true
@@ -168,6 +172,9 @@ extension CogArenaCore {
   }
 
   /// Runs one selector with a nested static-prefix dependency cursor.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func withDependencyCapture<Result>(
     for consumer: CogArenaSlot,
     _ body: () -> Result
@@ -176,7 +183,7 @@ extension CogArenaCore {
     captures.append(
       CogArenaDependencyCapture(
         consumer: consumer,
-        cursor: edges.firstDependency(of: Int32(row), in: arena),
+        cursor: arena.deps[row],
         previous: .none
       )
     )
@@ -196,6 +203,9 @@ extension CogArenaCore {
   }
 
   /// Reuses the next matching edge or appends one cold static dependency.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func recordDependency(from consumer: CogArenaSlot, on producer: CogArenaSlot) {
     guard let captureIndex = captures.indices.last else {
       fatalError("Cog recorded an arena dependency outside selector capture.")
@@ -206,14 +216,14 @@ extension CogArenaCore {
     }
 
     if capture.cursor != .none {
-      let dependency = edges.dependency(at: capture.cursor)
-      if dependency.producer == producer.index, dependency.consumer == consumer.index {
+      let dependency = edges.edge(at: capture.cursor)
+      if dependency.dep == producer.index, dependency.sub == consumer.index {
         edges.updateVersion(
           of: capture.cursor,
           to: arena.changedAt[arena.index(of: producer)]
         )
         capture.previous = capture.cursor
-        capture.cursor = dependency.next
+        capture.cursor = dependency.nextDep
         captures[captureIndex] = capture
         return
       }
@@ -263,7 +273,7 @@ extension CogArenaCore {
   /// Marks and appends one row after cycle detection has succeeded.
   func beginComputing(_ row: Int) {
     guard cyclePath(ifEnteringRow: row) == nil else {
-      fatalError("Cog tried to enter an arena derived cycle without reporting it.")
+      fatalError("Cog tried to enter an arena automatic cycle without reporting it.")
     }
     arena.flags[row].insert(.computing)
     computingPath.append(Int32(row))
@@ -272,7 +282,7 @@ extension CogArenaCore {
   /// Clears the innermost row while enforcing balanced nested settlement.
   func endComputing(_ row: Int) {
     guard computingPath.last == Int32(row) else {
-      fatalError("Cog tried to finish arena derived computation out of path order.")
+      fatalError("Cog tried to finish arena automatic computation out of path order.")
     }
     computingPath.removeLast()
     arena.flags[row].remove(.computing)
@@ -288,7 +298,7 @@ extension CogArenaCore {
     )
   }
 
-  /// Diagnoses a hypothetical derived read without creating a row or edge.
+  /// Diagnoses a hypothetical automatic read without creating a row or edge.
   ///
   /// The lookup is intentionally observational. A missing descriptor-and-key
   /// identity returns `nil`, preserving lazy row creation and later edge order.
@@ -316,4 +326,3 @@ extension CogArenaCore {
     return row
   }
 }
-#endif

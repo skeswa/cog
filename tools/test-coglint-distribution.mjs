@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 
 /** The repository root and stable ignored LINT-20 scratch space. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -252,18 +253,7 @@ let package = Package(
 
 /** Removes manifest selectors so the ordinary graph uses Cog shipping defaults. */
 function cleanEnvironment() {
-  const environment = { ...process.env };
-  for (const name of [
-    "COG_DOCC",
-    "COG_TEST_CORE",
-    "COG_TEST_EDGE",
-    "COG_TEST_ISOLATION",
-    "COG_TEST_NNBD",
-    "COG_TEST_VALUE_REFERENCE_LAYOUT",
-  ]) {
-    delete environment[name];
-  }
-  return environment;
+  return shippingManifestEnvironment(process.env);
 }
 
 /** Runs one command that must succeed. */

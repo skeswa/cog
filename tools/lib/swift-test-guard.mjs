@@ -1,23 +1,75 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** Collects every `--filter <expr>` and `--filter=<expr>` value, in order. */
-export function extractFilters(args, fail) {
-  const filters = [];
+/**
+ * Collects recognized value and flag options with one SwiftPM argument scan.
+ *
+ * @param {string[]} args
+ * @param {{ value: string[], flags?: string[] }} recognized
+ * @param {(message: string) => never} fail
+ */
+function extractArguments(args, recognized, fail) {
+  const values = new Map(recognized.value.map((name) => [name, []]));
+  const selected = [];
+  const flags = new Set(recognized.flags ?? []);
+
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === "--filter") {
-      const value = args[index + 1];
-      if (value === undefined) {
-        fail("`--filter` was passed without an expression");
+    let matched = false;
+    for (const name of recognized.value) {
+      if (argument === name) {
+        const value = args[index + 1];
+        if (value === undefined) fail(`\`${name}\` was passed without a value`);
+        values.get(name).push(value);
+        selected.push(argument, value);
+        index += 1;
+        matched = true;
+        break;
       }
-      filters.push(value);
-      index += 1;
-    } else if (argument.startsWith("--filter=")) {
-      filters.push(argument.slice("--filter=".length));
+      const prefix = `${name}=`;
+      if (argument.startsWith(prefix)) {
+        values.get(name).push(argument.slice(prefix.length));
+        selected.push(argument);
+        matched = true;
+        break;
+      }
     }
+    if (!matched && flags.has(argument)) selected.push(argument);
   }
-  return filters;
+  return { selected, values };
+}
+
+/** Collects every `--filter <expr>` and `--filter=<expr>` value, in order. */
+export function extractFilters(args, fail) {
+  return extractArguments(args, { value: ["--filter"] }, fail).values.get("--filter");
+}
+
+/** Returns the SwiftPM trait options that affect package resolution. */
+export function extractTraitArguments(args, fail) {
+  return extractArguments(
+    args,
+    {
+      value: ["--traits"],
+      flags: ["--enable-all-traits", "--disable-default-traits"],
+    },
+    fail,
+  ).selected;
+}
+
+/** Whether the extracted SwiftPM trait options enable one named trait. */
+export function traitArgumentsEnable(traitArguments, trait) {
+  if (traitArguments.includes("--enable-all-traits")) return true;
+  return traitArguments.some((argument, index) => {
+    let value;
+    if (argument === "--traits") value = traitArguments[index + 1];
+    else if (argument.startsWith("--traits=")) value = argument.slice("--traits=".length);
+    return (
+      value
+        ?.split(",")
+        .map((name) => name.trim())
+        .includes(trait) ?? false
+    );
+  });
 }
 
 /** Whether an argument is a caller-supplied xUnit report destination. */

@@ -1,5 +1,3 @@
-#if COG_CORE_ARENA
-
 // MARK: - History
 
 /// Debug-only history recording and materialization for the arena core.
@@ -11,11 +9,6 @@ extension CogArenaCore {
   /// Records one outer turn in the arena-owned total history order.
   func recordHistoryTurn(named name: String) {
     historyLog.recordTurn(named: name)
-  }
-
-  /// Records a class-backed state event while its capability is still bridged.
-  func recordHistoryState(event: CogHistoryEvent, label: CogLabel, key: CogKey?) {
-    historyLog.recordState(event: event, label: label, key: key)
   }
 
   /// Records one export offer beside arena graph events.
@@ -36,6 +29,9 @@ extension CogArenaCore {
   }
 
   /// Records an arena row as integer descriptor identity plus its erased key.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func recordHistoryState(event: CogHistoryEvent, slot: CogArenaSlot) {
     let row = arena.index(of: slot)
     let record = descriptorRecord(forRow: row)
@@ -47,4 +43,3 @@ extension CogArenaCore {
   }
   #endif
 }
-#endif

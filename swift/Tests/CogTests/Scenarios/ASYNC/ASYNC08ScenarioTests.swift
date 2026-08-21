@@ -39,7 +39,7 @@ private final class Async08ControlledWork {
 
   _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
   _ = await statusIterator.next()
   #expect(await startIterator.next() == 1)
 
@@ -61,6 +61,6 @@ private final class Async08ControlledWork {
   if success.kind == .success {
     #expect(success.value == 200)
   } else {
-    Issue.record("Expected only the newest result to commit")
+    Issue.record("Expected only the newest result to turn")
   }
 }

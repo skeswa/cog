@@ -5,17 +5,12 @@ _Authored August 6, 2026._
 Cog should feel like normal Kotlin and normal Compose. It should not ask an app
 to learn a second UI model.
 
-The four rules are:
-
-1. Cog is simple to use, read, and reason about.
-2. Every read is correct.
-3. Cog cuts runtime cost without weakening the other rules.
-4. One running app has one Cog state graph. Each mutable fact represented in
-   Cog has one writable source. Screens and features do not create state
-   islands or mirror sources.
+The [shared state model](../design.md) defines the principles, vocabulary, and
+behavioral invariants Swift and Kotlin have in common. This document maps that
+model onto Kotlin and owns every Android-specific choice.
 
 The main decision is to build on the Compose snapshot runtime. It already gives
-us tracked reads, cached derived state, atomic writes, and exact UI
+us tracked reads, cached automatic state, atomic writes, and exact UI
 invalidation. Cog adds the missing product rules.
 
 For all pieces in one place, see the
@@ -55,7 +50,7 @@ flowchart TB
     end
     subgraph Runtime["Compose runtime"]
         Source["MutableState"]
-        Derived["derivedStateOf"]
+        Automatic["derivedStateOf"]
         Snapshot["snapshots"]
         Observe["read observation"]
     end
@@ -82,7 +77,7 @@ Cog does not replace durable data. It gives UI a fine-grained view of it.
 
 Do not keep the same business value writable in both Cog and a repository.
 Pick one owner. Adapt the other side. Inside Cog, do not copy one mutable fact
-into two `ManualCog` sources. Keep one source and derive every other
+into two `ManualCog` sources. Keep one source and compute every other
 view.
 
 ### 1.3 Production has one store
@@ -112,7 +107,7 @@ state; an explicit operation does.
 
 1. A descriptor names a state.
 2. One app-wide `CogStore` owns state values and runtime state.
-3. Compose snapshot state stores and derives values.
+3. Compose snapshot state stores sources and computes automatic values.
 4. Leases say which graph roots must stay hot.
 
 A descriptor has no app value inside it. Production resolves it in the app
@@ -128,7 +123,7 @@ flowchart LR
 
 ### 2.2 Reads settle what they need
 
-A normal read sees the latest completed turn. It settles every derived state
+A normal read sees the latest completed turn. It settles every automatic state
 needed for that value before it returns.
 
 A grouped read pins one read-only snapshot:
@@ -141,8 +136,8 @@ val header = cogs.read {
 
 Both fields come from one completed view. A reader never sees half a turn.
 
-A writer read is different. Inside `commit`, it sees source values already
-staged by that same turn. Derived reads also settle against those staged
+A writer read is different. Inside `turn`, it sees source values already
+staged by that same turn. Automatic reads also settle against those staged
 values.
 
 ### 2.3 Descriptors name state; the store holds it
@@ -170,7 +165,7 @@ is in a store.
 
 ### 2.4 Dependencies are captured on every run
 
-A derived body calls `get`. Each call becomes a dependency for that run.
+An automatic body calls `get`. Each call becomes a dependency for that run.
 Old dependencies are removed after the run.
 
 ```kotlin
@@ -186,7 +181,7 @@ After sign-in, they do.
 
 ### 2.5 Equality stops needless work
 
-Every state has an equality rule. The default is Kotlin `==`. A derived
+Every state has an equality rule. The default is Kotlin `==`. An automatic
 state uses an explicit Compose structural equality policy.
 
 If a new value equals the old value:
@@ -237,22 +232,22 @@ reference. Normal reads should not allocate one.
 Business writes live in small operation functions:
 
 ```kotlin
-fun CogStore.selectZip(zip: ZipCode) = commit("select zip") {
+fun CogStore.selectZip(zip: ZipCode) = turn("select zip") {
     currentZipSource.value = zip
 }
 
 fun CogStore.acceptWeather(
     zip: ZipCode,
     report: WeatherReport,
-) = commit("weather loaded") {
+) = turn("weather loaded") {
     weatherSource[zip] = report
 }
 ```
 
-The commit receiver grants write access through member extensions. Code
+The `turn` closure's receiver grants write access through member extensions. Code
 outside it cannot assign to `ManualCog`.
 
-One outer `commit` is one turn:
+One outer call to `turn` creates one graph turn:
 
 1. run the body in an isolated mutable snapshot;
 2. let reads see staged source values;
@@ -261,7 +256,7 @@ One outer `commit` is one turn:
 5. run dirty reactions in registration order;
 6. notify debug tools.
 
-Nested commits join the outer turn. Writer access carries its turn. When the
+Nested turns join the outer turn. Writer access carries its turn. When the
 outer body returns, the turn closes, and an escaped writer fails in every
 build, debug and release; a silent late write would break read correctness
 exactly where it is hardest to see. A failed body applies nothing.
@@ -273,7 +268,7 @@ sequenceDiagram
     participant S as Mutable snapshot
     participant R as Reactions
     participant U as Compose
-    E->>C: commit("save")
+    E->>C: turn("save")
     C->>S: stage source writes
     S-->>C: writer reads staged values
     C->>S: apply once
@@ -283,7 +278,7 @@ sequenceDiagram
     R-->>C: later writes queue a new turn
 ```
 
-A reaction may request a commit. That commit goes into a FIFO queue and starts
+A reaction may request a turn. That turn goes into a FIFO queue and starts
 after the current flush. It never changes the turn that caused the reaction.
 
 ### 3.3 Reactions
@@ -356,7 +351,7 @@ to hide every parameter behind a global store.
 Candidate state storage:
 
 - source state: private `MutableState<T>`;
-- derived state: `State<T>` from
+- automatic state: `State<T>` from
   `derivedStateOf(structuralEqualityPolicy())`;
 - reaction observation: `SnapshotStateObserver`;
 - turn: one isolated mutable snapshot applied on the store lane.
@@ -380,15 +375,15 @@ The runtime must enforce:
 - a grouped read is internally consistent;
 - a writer sees its turn's staged writes;
 - a writer cannot write after its turn has closed, in any build;
-- a derived body is pure and cannot commit;
-- a composition body cannot commit;
+- an automatic body is pure and cannot mutate;
+- a composition body cannot mutate;
 - a reaction cannot alter the turn it is observing;
 - a cycle fails with the full descriptor-and-key path;
 - an exception never leaves a state marked as computing;
 - a stale async result cannot publish;
 - a wrong-lane call fails.
 
-Code should never depend on the order in which sibling derived states settle.
+Code should never depend on the order in which sibling automatic states settle.
 
 ### 4.3 Collections
 
@@ -408,7 +403,7 @@ These things own root leases:
 - an active Flow collector;
 - an explicit host lease.
 
-A root keeps its needed derived path alive. When the last root goes away, the
+A root keeps its needed automatic path alive. When the last root goes away, the
 store can release keyed states, stop async work, and drop cached edges after a
 short grace period.
 
@@ -421,14 +416,14 @@ flowchart TD
     UI["Compose read"] --> L["root lease"]
     RX["reaction"] --> L
     F["Flow collector"] --> L
-    L --> D["derived state"]
+    L --> D["automatic state"]
     D --> S1["source"]
     D --> S2["keyed source"]
     L -. last lease closes .-> G["grace period"]
     G --> X["cancel work<br/>drop edges and keyed states"]
 ```
 
-Source defaults remain available. Derived values use
+Source defaults remain available. Automatic values use
 `whileObserved(gracePeriod)` by default. Query-like boxes may opt into
 a bounded cache. Exact cache layout is benchmark-gated.
 
@@ -593,10 +588,10 @@ collection. Measure the gain and offer a compatible fallback.
 - graph access is confined to one UI lane;
 - descriptors are separate from stored values;
 - writable descriptors have distinct read-only wrappers;
-- all source writes happen inside one `commit` primitive;
-- nested commits join the outer turn;
+- all source writes happen inside one `turn` primitive;
+- nested turns join the outer turn;
 - an escaped writer fails in every build, not only in debug;
-- derived dependencies are dynamic;
+- automatic dependencies are dynamic;
 - equality gates publication;
 - UI reads a state directly as Compose `State`;
 - boxes use direct descriptor-and-key reads on the hot path;
@@ -626,8 +621,8 @@ collection. Measure the gain and offer a compatible fallback.
 
 Build a small vertical slice before freezing names.
 
-1. Implement guarded app bootstrap, source, derived, box, grouped read, and
-   commit.
+1. Implement guarded app bootstrap, source, automatic, box, grouped read, and
+   turn.
 2. Prove staged reads and atomic apply with hostile tests.
 3. Add direct Compose reads and count recompositions.
 4. Add dynamic dependencies, equality, cycles, and exceptions.
@@ -648,14 +643,14 @@ thread-safe, conflated by equality, and familiar.
 
 It is a weaker base for this graph:
 
-- each derived chain must be wired by hand;
+- each automatic chain must be wired by hand;
 - changing dependencies become `flatMapLatest` trees;
 - separate flows do not form one atomic multi-value turn;
 - collecting each leaf adds coroutines and UI adapters;
 - updating one StateFlow walks its active subscribers.
 
 One large `StateFlow<ScreenState>` is a good simple choice for many
-screens. Cog is for apps that need fine-grained shared derivation, keyed state,
+screens. Cog is for apps that need fine-grained shared automatic state, keyed state,
 and graph tools.
 
 ## Appendix B: prior art and research
@@ -697,11 +692,11 @@ These projects guide the design. None is an API contract for Cog.
   isolated test store;
 - **process singleton:** the one production store inside one Android process;
   it is not durable or shared with another process;
-- **turn:** one outer commit and its atomic publication;
+- **turn:** one outer call to `turn` and its atomic publication;
 - **settle:** compute a dirty value before returning it;
 - **root:** a value observed by UI, a reaction, Flow, or a host;
 - **lease:** an owned reason that a root must stay live;
-- **staged value:** a source write visible inside the current commit but not
+- **staged value:** a source write visible inside the current turn but not
   yet visible outside it;
 - **hot:** kept observed and ready because a root needs it.
 

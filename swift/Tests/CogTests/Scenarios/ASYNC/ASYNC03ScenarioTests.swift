@@ -52,7 +52,7 @@ private final class Async03ControlledWork {
     Issue.record("Expected a successful nil value")
   }
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
 
   guard let reload = await statusIterator.next() else {
     Issue.record("The status stream ended before reload pending")

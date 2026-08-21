@@ -41,11 +41,11 @@ import Testing
 
   // Lowering the outer gate alone tears down the inner scope's reaction and
   // task along with the outer scope's own registrations.
-  cogs.commit(sessionOpen, to: false)
+  cogs.turn(sessionOpen, to: false)
   var cancellationIterator = cancellations.makeAsyncIterator()
   _ = await cancellationIterator.next()
 
-  cogs.commit { c in c[uploads] = 1 }
+  cogs.turn { c in c[uploads] = 1 }
   #expect(outerSeen == [0])
   #expect(innerSeen == [0])
   _ = holdContinuation

@@ -28,7 +28,7 @@ private final class Async24ControlledWork {
 
 @MainActor
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let request = ManualCog<Int>(0)
   let work = Async24ControlledWork()
@@ -52,9 +52,9 @@ private final class Async24ControlledWork {
   }
   #expect(await startIterator.next() == 0)
 
-  cogs.commit(initialWatcherAlive, to: false)
+  cogs.turn(initialWatcherAlive, to: false)
   try await clock.waitForScheduledSleep()
-  cogs.commit("change request while cold") { c in c[request] = 1 }
+  cogs.turn("change request while cold") { c in c[request] = 1 }
 
   let staleChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
@@ -77,7 +77,7 @@ private final class Async24ControlledWork {
   guard let returningSuccess = await returningStatusIterator.next(),
     returningSuccess.kind == .success, returningSuccess.value == 200
   else {
-    Issue.record("Expected only work selected from the newest source value to commit")
+    Issue.record("Expected only work selected from the newest source value to turn")
     return
   }
 

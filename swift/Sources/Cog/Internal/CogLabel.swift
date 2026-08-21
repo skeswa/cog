@@ -8,6 +8,9 @@
 /// `Sendable` for diagnostic snapshots, but it is never a state key: two
 /// declarations at the same printed location remain distinct by descriptor
 /// object identity.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal struct CogLabel: Sendable, CustomStringConvertible {
   /// The name the declaration passed as `name:`, or `nil` when it did not.
   let name: String?
@@ -31,6 +34,9 @@ internal struct CogLabel: Sendable, CustomStringConvertible {
   ///
   /// Rendering is intentionally deferred until diagnostics, task naming, or
   /// history presentation asks for it; normal state lookup compares no strings.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   var description: String {
     if let name {
       return name

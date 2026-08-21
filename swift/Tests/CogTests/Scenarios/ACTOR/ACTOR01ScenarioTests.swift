@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `ACTOR-01 derived selectors execute on the MainActor`() {
+@Test func `ACTOR-01 automatic selectors execute on the MainActor`() {
   let (cogs, m) = probedContext()
   let source = ManualCog<Int>(21)
   var selectorRuns = 0
@@ -18,13 +18,13 @@ import Testing
 }
 
 @MainActor
-@Test func `ACTOR-01 commit bodies execute on the MainActor`() {
+@Test func `ACTOR-01 turn bodies execute on the MainActor`() {
   let (cogs, m) = probedContext()
   let source = ManualCog<Int>(0)
   var bodyRuns = 0
 
-  cogs.commit { c in
-    MainActor.preconditionIsolated("Cog commit body")
+  cogs.turn { c in
+    MainActor.preconditionIsolated("Cog turn body")
     bodyRuns += 1
     c[source] = 1
   }
@@ -44,7 +44,7 @@ import Testing
     deliveries.append("\(old)->\(new)")
   }
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   #expect(deliveries == ["1->1", "1->2"])
 }
@@ -62,7 +62,7 @@ import Testing
 
   #expect(seen == [0])
 
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
 
   #expect(seen == [0, 1])
 }

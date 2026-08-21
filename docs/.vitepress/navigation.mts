@@ -24,6 +24,7 @@ const swiftSidebar: DefaultTheme.SidebarItem[] = [
     text: "Cog for Swift",
     link: "/swift/",
     items: [
+      { text: "Shared state model", link: "/design" },
       {
         text: "Design",
         items: [
@@ -43,12 +44,9 @@ const swiftSidebar: DefaultTheme.SidebarItem[] = [
           { text: "Task breakdown", link: "/swift/impl/tasks" },
           { text: "Benchmark results", link: "/swift/impl/benchmarks" },
           { text: "Profiling and optimization", link: "/swift/impl/optimization" },
-          {
-            text: "Arena specialization research",
-            link: "/swift/impl/arena-optimization-plan-2026-08-20",
-          },
         ],
       },
+      { text: "Design history", link: "/history" },
     ],
   },
 ];
@@ -58,11 +56,13 @@ const kotlinSidebar: DefaultTheme.SidebarItem[] = [
     text: "Cog for Kotlin",
     link: "/kotlin/",
     items: [
+      { text: "Shared state model", link: "/design" },
       { text: "Core design", link: "/kotlin/exploration" },
       { text: "Worked weather example", link: "/kotlin/example" },
       { text: "Flow map", link: "/kotlin/flows" },
       { text: "Effects and background work", link: "/kotlin/effects" },
       { text: "Performance model", link: "/kotlin/perf" },
+      { text: "Design history", link: "/history" },
     ],
   },
 ];
@@ -77,10 +77,15 @@ const maintainersSidebar: DefaultTheme.SidebarItem[] = [
   },
 ];
 
-const historySidebar: DefaultTheme.SidebarItem[] = [
+const sharedSidebar: DefaultTheme.SidebarItem[] = [
   {
-    text: "History",
-    items: [{ text: "Dart and Flutter snapshot", link: "/dump-2026-08-06" }],
+    text: "Shared foundation",
+    items: [
+      { text: "Shared state model", link: "/design" },
+      { text: "Design history", link: "/history" },
+      { text: "Swift design", link: "/swift/" },
+      { text: "Kotlin design", link: "/kotlin/" },
+    ],
   },
 ];
 
@@ -88,7 +93,8 @@ export const sidebar: DefaultTheme.Sidebar = {
   "/swift/": swiftSidebar,
   "/kotlin/": kotlinSidebar,
   "/maintainers/": maintainersSidebar,
-  "/dump-2026-08-06": historySidebar,
+  "/design": sharedSidebar,
+  "/history": sharedSidebar,
 };
 
 export const nav: DefaultTheme.NavItem[] = [
@@ -109,8 +115,9 @@ export const nav: DefaultTheme.NavItem[] = [
   {
     text: "More",
     items: [
+      { text: "Shared state model", link: "/design" },
+      { text: "Design history", link: "/history" },
       { text: "Maintainer runbooks", link: "/maintainers/ci" },
-      { text: "Dart and Flutter snapshot", link: "/dump-2026-08-06" },
       { text: "Changelog", link: "https://github.com/skeswa/cog/blob/main/CHANGELOG.md" },
       { text: "Contributing", link: "https://github.com/skeswa/cog/blob/main/CONTRIBUTING.md" },
     ],

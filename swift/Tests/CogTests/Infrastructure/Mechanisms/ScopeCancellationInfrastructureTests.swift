@@ -27,7 +27,7 @@ import Testing
   #expect(runs == 1)
 
   scope.cancel()
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
   #expect(runs == 1)
   #expect(cogs.reactions.isEmpty)
 
@@ -57,7 +57,7 @@ import Testing
   #expect(runs == 1)
   #expect(token.reaction.isCancelled)
 
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
   #expect(runs == 1)
   #expect(cogs.reactions.isEmpty)
 }
@@ -79,7 +79,7 @@ import Testing
   parent.adopt(child: child)
 
   parent.cancel()
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
   #expect(childRuns == 1)
 
   // A child handed to an already-cancelled parent is cancelled on arrival.
@@ -92,6 +92,6 @@ import Testing
     }
   )
   parent.adopt(child: lateChild)
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
   #expect(lateRuns == 1)
 }

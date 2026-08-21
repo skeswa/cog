@@ -13,6 +13,32 @@ accordingly:
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## [Unreleased]
+
+### Breaking
+
+- Rename the graph mutation primitive from `commit` to `turn`, including the
+  `CogOps`, `Cogs`, and `MechanismController` entry points. The old spellings
+  are removed rather than deprecated.
+- Use “automatic” for non-manual cogs throughout the library and rename the
+  corresponding `CogTesting` lifetime seams. The old “derived” spellings are
+  removed rather than retained as aliases.
+- Remove `Cogs.valueReferenceLayoutName` from `CogTesting`. The losing generic
+  and interned layout experiments and their public testing selector are gone.
+
+### Added
+
+- The `CompactArena` SwiftPM package trait, allowing final applications to
+  trade runtime speed for less generated code by disabling the typed
+  specialization frontier.
+
+### Changed
+
+- Make the specialized arena with shared linked edges and inline
+  `AnyHashable` keys the sole default runtime. The simple core, alternative
+  edge layouts, alternative value-reference layouts, and their comparison
+  selectors are retired.
+
 ## [0.4.0] - 2026-08-18
 
 Cog conventions are now executable. The first-party `coglint` binary ships
@@ -68,13 +94,13 @@ the simple core as the shipping default.
   the newest selection, and `.merged` overlaps runs and publishes in landing
   order. The `LatestPolicy` and `OrderedPolicy` type split makes stream work
   latest-only at compile time.
-- `Work.stream`, which turns each changed element of a selected
-  `AsyncSequence` into its own Cog turn. Dependency replacement and state
+- `Work.stream`, which publishes each changed element of a selected
+  `AsyncSequence` in its own Cog turn. Dependency replacement and state
   release cancel the iterator and reject late elements; natural completion
   preserves the last success, and a current failure retains the last value in
   `CogStatus`.
 - `cogs.values(of:buffering:)`, a current-value-first multicast
-  `AsyncSequence` for manual, derived, and async values. Each iterator owns an
+  `AsyncSequence` for manual, automatic, and async values. Each iterator owns an
   independent graph lease and buffer with `.newest(1)`, `.oldest(n)`, and
   `.unbounded` policies.
 - `Reader.track`, in key-path and closure forms, for making properties of an
@@ -126,7 +152,7 @@ SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
   reactions, watches, tasks, and state-gated `whenever` scopes, with
   duplicate-name rejection and write-back that queues a new turn.
 - Declared lifetime: `.app` for sources, `whileObserved` with a grace period
-  for derived and async state, and an opt-in `ManualCogLifetime` for ephemeral
+  for automatic and async state, and an opt-in `ManualCogLifetime` for ephemeral
   sources.
 - Async state: `AsyncCog`, `AsyncCogBox`, total value reads over a declared
   default, the `status` lens, `CogStatus`, `Work`, `.latest`, and

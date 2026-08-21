@@ -52,7 +52,7 @@ extension Cogs {
   /// Reads a read-only value reference's current value without creating a dependency edge.
   ///
   /// This one-shot read observes the latest completed turn and never sees a
-  /// value staged by an in-progress commit. Use a ``Reader`` or
+  /// value staged by an in-progress turn. Use a ``Reader`` or
   /// ``ReactionReader`` subscript when later writes should retrigger work.
   ///
   /// - Parameter valueReference: The read-only value reference to read.

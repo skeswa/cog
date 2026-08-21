@@ -1,5 +1,3 @@
-#if COG_CORE_ARENA
-
 // MARK: - Observation and lifetime
 
 /// Cold Observation-boundary ownership and `whileObserved` lifetime release.
@@ -9,6 +7,9 @@
 /// before this extension removes a value and its disconnected dependency chain.
 extension CogArenaCore {
   /// Records one ordinary UI value access on a slot's stable boundary.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func accessObservationBoundary(for slot: CogArenaSlot) {
     ensureObservationBoundary(for: slot).accessValue()
   }
@@ -90,6 +91,9 @@ extension CogArenaCore {
   /// Internal subscribers do not block scheduling. If they still retain the
   /// state at expiry, the check clears `pendingGeneration` and leaves the row
   /// for its downstream root's later release cascade.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func scheduleLifetimeReleaseIfUnobserved(
     _ slot: CogArenaSlot,
     in cogs: Cogs
@@ -145,7 +149,7 @@ extension CogArenaCore {
     guard arena.leaseCount[row] == 0 else { return }
     guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
     guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
-    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { return }
+    guard arena.subs[row] == .none else { return }
 
     releaseUnobservedClosure(startingAt: slot)
     cogs.acknowledgeLifetimeReleaseIfRequested()
@@ -170,7 +174,7 @@ extension CogArenaCore {
       guard arena.leaseCount[row] == 0 else { continue }
       guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { continue }
       guard arena.boundary[row] == CogArenaStorage.noIndex else { continue }
-      guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { continue }
+      guard arena.subs[row] == .none else { continue }
       guard slot == root || lifetimeEntries[row].pendingGeneration == nil else { continue }
 
       releaseValueState(slot, appendingDependenciesTo: &candidates)
@@ -194,24 +198,24 @@ extension CogArenaCore {
     guard arena.leaseCount[row] == 0 else {
       fatalError("Cog tried to release an arena state with durable leases.")
     }
-    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
+    guard arena.subs[row] == .none else {
       fatalError("Cog tried to release an arena state with live subscribers.")
     }
     guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
       fatalError("Cog tried to release an arena state during active graph work.")
     }
 
-    var cursor = edges.firstDependency(of: slot.index, in: arena)
+    var cursor = arena.deps[row]
     while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == slot.index else {
+      let dependency = edges.edge(at: cursor)
+      guard dependency.sub == slot.index else {
         fatalError("Cog found another consumer's edge in an arena release list.")
       }
-      let producerRow = liveRow(dependency.producer)
+      let producerRow = liveRow(dependency.dep)
       candidates.append(
-        CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
+        CogArenaSlot(index: dependency.dep, generation: arena.generation[producerRow])
       )
-      cursor = dependency.next
+      cursor = dependency.nextDep
     }
 
     let key = record.key(at: row)
@@ -289,6 +293,9 @@ extension CogArenaCore {
   }
 
   /// Resolves one row's descriptor record without retaining it in the walk.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func descriptorRecord(forRow row: Int) -> CogArenaDescriptorRecord {
     let descriptorIndex = arena.descriptor[row]
     guard descriptorIndex >= 0, Int(descriptorIndex) < records.count else {
@@ -307,4 +314,3 @@ extension CogArenaCore {
   }
   #endif
 }
-#endif

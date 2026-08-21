@@ -3,30 +3,48 @@
 /// Each descriptor creates one column of its `Value` type inside an arena
 /// context. Rows belonging to other descriptors remain empty, so a normal read
 /// returns concrete `Value` without `Any`, existential dispatch, or per-state
-/// objects. Current and pending cells are separate to preserve the turn commit
+/// objects. Current and pending cells are separate to preserve the turn
 /// boundary and writer read-your-writes semantics.
 ///
 /// The outer optional in each cell records storage presence. If `Value` is
 /// itself optional, `.some(.none)` is a stored or staged domain `nil`, while
 /// outer `.none` means this descriptor has no value at that arena row.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogArenaValueColumn<Value> {
   /// Scalar arena whose slot lifetimes govern every cell in this column.
-  private let arena: CogArenaStorage
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let arena: CogArenaStorage
 
   /// Latest completed value at each occupied row for this descriptor.
-  private var currentValues: ContiguousArray<Value?> = []
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal var currentValues: ContiguousArray<Value?> = []
 
   /// Final value staged by the accumulating turn at each touched row.
-  private var pendingValues: ContiguousArray<Value?> = []
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal var pendingValues: ContiguousArray<Value?> = []
 
-  /// Descriptor-level equality rule, or `nil` when every commit changes.
-  private let equals: (@MainActor (Value, Value) -> Bool)?
+  /// Descriptor-level equality rule, or `nil` when every turn changes.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  internal let equals: (@MainActor (Value, Value) -> Bool)?
 
   /// Creates the typed column belonging to one descriptor in `arena`.
   ///
   /// The comparator is installed once from the descriptor. Reads and staging
-  /// therefore stay concrete; only commit invokes this stored function.
+  /// therefore stay concrete; only publication invokes this stored function.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   init(
     in arena: CogArenaStorage,
     equals: (@MainActor (Value, Value) -> Bool)? = nil
@@ -40,6 +58,9 @@ internal final class CogArenaValueColumn<Value> {
   /// Sparse columns grow through the slot's row and leave intervening rows
   /// empty for other descriptors. Reinstalling a live descriptor row is a
   /// lifecycle error; callers must remove it before the arena slot is released.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func insert(_ value: Value, at slot: CogArenaSlot) {
     let row = arena.index(of: slot)
     ensureStorage(through: row)
@@ -50,6 +71,9 @@ internal final class CogArenaValueColumn<Value> {
   }
 
   /// Reads the latest value published by a completed turn.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func current(at slot: CogArenaSlot) -> Value {
     let row = installedRow(for: slot)
     guard case .some(let value) = currentValues[row] else {
@@ -60,8 +84,11 @@ internal final class CogArenaValueColumn<Value> {
 
   /// Returns the completed value when this descriptor has published one.
   ///
-  /// A cold derived row legitimately has no cell yet. The returned outer
+  /// A cold automatic row legitimately has no cell yet. The returned outer
   /// optional preserves a published optional domain `nil` as `.some(.none)`.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func storedValue(at slot: CogArenaSlot) -> Value? {
     let row = arena.index(of: slot)
     guard row < currentValues.count else { return .none }
@@ -72,6 +99,9 @@ internal final class CogArenaValueColumn<Value> {
   ///
   /// Writers use this path so multiple mutations in one accumulating turn see
   /// their own final staged state without publishing it to ordinary readers.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func writerValue(at slot: CogArenaSlot) -> Value {
     let row = installedRow(for: slot)
     if case .some(let pending) = pendingValues[row] {
@@ -84,12 +114,18 @@ internal final class CogArenaValueColumn<Value> {
   }
 
   /// Replaces the final value staged for this slot by the accumulating turn.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func stage(_ value: Value, at slot: CogArenaSlot) {
     let row = installedRow(for: slot)
     pendingValues[row] = .some(value)
   }
 
   /// Whether the accumulating turn currently owns a staged cell for `slot`.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func hasPendingValue(at slot: CogArenaSlot) -> Bool {
     let row = installedRow(for: slot)
     if case .some = pendingValues[row] {
@@ -104,7 +140,10 @@ internal final class CogArenaValueColumn<Value> {
   /// value. Equal reversion still clears pending storage but returns `false`,
   /// telling the caller not to advance versions or propagate dirty flags.
   @discardableResult
-  func commit(at slot: CogArenaSlot) -> Bool {
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func publish(at slot: CogArenaSlot) -> Bool {
     let row = installedRow(for: slot)
     guard case .some(let pending) = pendingValues[row] else { return false }
     pendingValues[row] = .none
@@ -118,17 +157,20 @@ internal final class CogArenaValueColumn<Value> {
     return true
   }
 
-  /// Publishes one manual source commit and pushes its arena invalidation wave.
+  /// Publishes one manual source value and pushes its arena invalidation wave.
   ///
   /// The supplied revision belongs to the enclosing turn. A real change marks
   /// the source current at that revision before any consumer sees DIRTY or
   /// CHECK. An equal final staged value consumes pending storage but preserves
   /// both versions and sends no propagation.
   @discardableResult
-  func commitSource<EdgeStorage: CogArenaEdgeStorageProtocol>(
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func publishSource(
     at slot: CogArenaSlot,
     revision: UInt32,
-    propagatingWith propagation: CogArenaDirtyPropagation<EdgeStorage>
+    propagatingWith propagation: CogArenaDirtyPropagation
   ) -> Bool {
     guard propagation.belongs(to: arena) else {
       fatalError("Cog tried to propagate a value through another arena context.")
@@ -139,7 +181,7 @@ internal final class CogArenaValueColumn<Value> {
     guard revision > arena.checkedAt[row] else {
       fatalError("Cog tried to publish an arena source with a stale graph revision.")
     }
-    guard commit(at: slot) else { return false }
+    guard publish(at: slot) else { return false }
     guard !arena.flags[row].contains(.computing) else {
       fatalError("Cog tried to publish an arena source while it was computing.")
     }
@@ -159,11 +201,14 @@ internal final class CogArenaValueColumn<Value> {
   /// so this path must install the supplied value exactly once and must not run
   /// the descriptor comparator again. It marks arena subscribers for later
   /// settlement but does not flush reactions, boundaries, or debug history.
-  func publishSeed<EdgeStorage: CogArenaEdgeStorageProtocol>(
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func publishSeed(
     _ value: Value,
     at slot: CogArenaSlot,
     revision: UInt32,
-    propagatingWith propagation: CogArenaDirtyPropagation<EdgeStorage>
+    propagatingWith propagation: CogArenaDirtyPropagation
   ) {
     guard propagation.belongs(to: arena) else {
       fatalError("Cog tried to propagate a testing seed through another arena context.")
@@ -193,6 +238,9 @@ internal final class CogArenaValueColumn<Value> {
   /// Clearing first releases reference-valued payloads under the context's
   /// MainActor confinement and prevents a later occupant of the same row from
   /// observing stale pending state.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func remove(at slot: CogArenaSlot) {
     let row = installedRow(for: slot)
     currentValues[row] = .none
@@ -200,6 +248,9 @@ internal final class CogArenaValueColumn<Value> {
   }
 
   /// Whether this descriptor currently owns a value at the exact slot lifetime.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func contains(_ slot: CogArenaSlot) -> Bool {
     guard arena.contains(slot) else { return false }
     let row = Int(slot.index)
@@ -211,7 +262,10 @@ internal final class CogArenaValueColumn<Value> {
   }
 
   /// Extends both optional-backed arrays in lockstep through `row`.
-  private func ensureStorage(through row: Int) {
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func ensureStorage(through row: Int) {
     guard row >= currentValues.count else { return }
     let missing = row + 1 - currentValues.count
     currentValues.append(contentsOf: repeatElement(.none, count: missing))
@@ -219,7 +273,10 @@ internal final class CogArenaValueColumn<Value> {
   }
 
   /// Resolves an exact live slot and verifies this descriptor owns its row.
-  private func installedRow(for slot: CogArenaSlot) -> Int {
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func installedRow(for slot: CogArenaSlot) -> Int {
     let row = arena.index(of: slot)
     guard row < currentValues.count else {
       fatalError("Cog tried to use an arena slot outside its descriptor column.")

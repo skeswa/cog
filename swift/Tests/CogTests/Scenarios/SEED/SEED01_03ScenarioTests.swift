@@ -19,7 +19,7 @@ import Testing
 }
 
 @MainActor
-@Test func `SEED-03 seed dirties a transitive derived chain`() {
+@Test func `SEED-03 seed dirties a transitive automatic chain`() {
   var middleRuns = 0
   var rootRuns = 0
 
@@ -48,7 +48,7 @@ import Testing
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
 
-  // The settled result is cached like any other derived value.
+  // The settled result is cached like any other automatic value.
   #expect(cogs.peek(root) == 12)
   #expect(middleRuns == 2)
   #expect(rootRuns == 2)
