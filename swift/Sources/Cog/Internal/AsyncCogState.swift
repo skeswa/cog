@@ -756,6 +756,18 @@ internal final class AsyncCogState<Value>:
   }
 
   // Written out, and `nonisolated`, per the generic-class release rule.
+  /// Answers ``CogState/asDerivedSettleState`` without a runtime lookup.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { self }
+
+  /// Answers ``CogState/asObservationState`` without a runtime lookup.
+  var asObservationState: (any CogObservationState)? { self }
+
+  /// Position in boundary-creation order; `-1` until registered.
+  var observationOrder: Int = -1
+
+  /// Whether a notice for this state is already queued for the flush.
+  var noticeQueued = false
+
   nonisolated deinit {}
 }
 

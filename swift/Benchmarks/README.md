@@ -46,8 +46,9 @@ another job.
 
 ## What is here today
 
-One target, `CogGraph`, carries the allocation, graph-shape, layout, and
-four-runtime comparison workloads described below. Baseline tolerances pin
+One target, `CogGraph`, carries the allocation, graph-shape, layout,
+four-runtime comparison, and Storefront macrobenchmark workloads described
+below. Baseline tolerances pin
 counting metrics against drift. Committed static files add the portable CI
 gate: PERF-06's exact zero-allocation p90 plus PERF-10's generous wall-clock
 ceilings.
@@ -222,7 +223,7 @@ lives in `tools/bench-baseline.mjs`.
 Baselines live in the git-ignored `.benchmarkBaselines/`. Upstream calls the
 stored format unstable, and a baseline is a statement about one machine;
 numbers meant to outlive a session belong in
-[`perf.md`](../../docs/swift/design/perf.md) §9.6 with their environment
+[`benchmarks.md`](../../docs/swift/impl/benchmarks.md) with their environment
 written beside them.
 
 ## Committed CI thresholds
@@ -354,7 +355,7 @@ Run each exact benchmark name with `COG_TEST_CORE=arena` and one of
 `COG_TEST_EDGE=pool`, `prefix`, or `inline`. M6-05c's same-session comparison
 selected the shared pool: it won the expected mostly-static instruction count,
 all candidates tied on p50 wall time and allocations, prefix arrays added ARC
-under churn, and inline-plus-overflow won neither shape. `perf.md` §9.6 records
+under churn, and inline-plus-overflow won neither shape. `impl/benchmarks.md` records
 the raw comparison and rationale; the selectors retain both losing candidates
 for reproduction.
 
@@ -398,6 +399,140 @@ package to choose which implementation the `cog` adapter measures. The adapter
 itself uses only the shared public declarations, and its root reads use Cog's
 public Observation-tracked subscript under the same tracking scope as the raw
 adapter. No comparison-only branch enters either core.
+
+## The Storefront macrobenchmark
+
+`M10` adds the suite's one _application_ workload. Everything else here measures
+a shape — a diamond, a fan, a chain, a thousand keyed states — chosen because it
+isolates one cost. The Storefront measures a composed commerce session instead:
+a search funnel over the whole catalog, a sixteen-policy pricing ladder per
+product, keyed inventory and personalized offers, a cart whose totals depend on
+two sibling async quotes, and an inventory feed that touches rows nobody is
+looking at.
+
+Its declarations, fixtures, kernels, scripted service, and interaction trace
+live in **`swift/Storefront`**, a package of its own, because the SwiftUI
+benchmark application in `swift/Examples/Storefront` drives the same workload
+and an iOS application target cannot depend on _this_ package without resolving
+the harness, the interposer, and swift-state-graph. That package depends on the
+root by path and on nothing else. Read
+[`swift/Storefront/README.md`](../Storefront/README.md) first.
+
+Six cuts, and which metrics each may carry is decided entirely by `M5-11`'s
+quiescence rule:
+
+| Cut                                  | What it measures                                            | Counting metrics |
+| ------------------------------------ | ----------------------------------------------------------- | ---------------- |
+| `perf-15-storefront-cold`            | bootstrap, graph construction, first complete screen        | no               |
+| `perf-15-storefront-session`         | the whole eleven-phase interaction trace                    | no               |
+| `perf-15-storefront-interactions`    | settled, quiescent favorite / cart / variant / multi-write  | **yes**          |
+| `perf-15-storefront-async-burst`     | one inventory burst accepted and settled                    | no               |
+| `perf-15-storefront-footprint`       | what a 2,402-state keyed funnel costs to build and **hold** | **yes**          |
+| `perf-15-storefront-compute-control` | the same four kernels over the same inputs, no graph        | **yes**          |
+
+The three that say "no" build or drop a runtime and accept async completions,
+which is exactly the shape the null-`swift_release_hook` crash came from. The
+three that say "yes" never let a task complete inside the measured region.
+
+### Measuring heap, and why not with resident memory
+
+`peakMemoryResident` and `peakMemoryResidentDelta` are the only memory metrics a
+non-quiescent cut may carry, and they are weak instruments: resident memory is
+OS-sampled, page-granular, and a high-water mark that never comes down. Left to
+a duration budget they are worse than weak — a core that runs ten times faster
+completes ten times as many build-and-drop cycles in the same window, and gives
+the allocator ten times as many chances to reach higher, so the column compares
+throughput while looking like it compares footprint. Every cut that reports them
+therefore pins `maxIterations`.
+
+The footprint cut answers the question properly, with the interposer's exact
+counters rather than a sampled one:
+
+| Metric              | What it means here                                       |
+| ------------------- | -------------------------------------------------------- |
+| `mallocCountTotal`  | allocations made while building the funnel               |
+| `freeCountTotal`    | allocations returned                                     |
+| `mallocFreeDelta`   | allocations that **survived** — the graph's footprint    |
+| `mallocBytesCount`  | gross bytes requested                                    |
+| `memoryLeakedBytes` | bytes that **survived** — the closest countable "held"   |
+| `storefrontStates`  | states materialized, so the columns above have a divisor |
+
+"Survived" is a **flow balance across the measured window**, not a census of the
+live heap: mallocs minus frees observed between `startMeasurement()` and
+`stopMeasurement()`, in calls and in requested bytes. So a free inside the window
+of something allocated before it counts against the delta and can make it
+negative; something allocated inside and freed just after the window still counts
+as having survived; and "requested bytes" carries no allocator rounding, no
+malloc header, and no page granularity, which makes it a lower bound on resident
+growth rather than a measure of it. Upstream calls the byte metric
+`memoryLeakedBytes`; in a build-and-hold region the retention is intentional and
+the name is a misnomer.
+
+Read the delta columns rather than subtracting the two count columns: the
+harness's table rounds to K and M, so the printed counts do not reconcile.
+`--format metricP90AbsoluteThresholds --path stdout` prints exact p90 integers
+when you need them to.
+
+For a steady-state region such as `-interactions`, both delta columns should
+read **zero**; a non-zero one is an interaction that grows the heap every time a
+shopper performs it. For a build region such as `-footprint`, the delta columns
+_are_ the answer.
+
+That cut never releases a context. Releasing one between iterations would drop
+thousands of states and cancel their grace sleepers, and the frees would land
+inside the next iteration's measured region — the exact misattribution `M5-11`
+recorded. `maxIterations` is 3 because each retained context is a whole
+standard-profile graph, and because these are exact counts rather than a sampled
+distribution: agreement from p0 to p100 is the result.
+
+One consequence worth knowing before reading a number: the footprint cut's
+retained graphs raise the process's resident baseline for every cut registered
+after it. `peakMemoryResidentDelta` is a delta and survives that;
+`peakMemoryResident` does not, so read the absolute column only from a run where
+the timing cuts were filtered on their own.
+
+The interaction cut deliberately excludes query changes. Typing materializes new
+rows, new rows start inventory and offer requests, and a measured region that
+starts async work is not a region process-global counters may be attached to.
+Search cost is measured by the session cut, on wall clock alone.
+
+Its retained state does not reset between samples, so neither does its operation
+sequence. Before counters are armed, one complete viewport lap materializes
+every keyed source and stabilizes the cart and favorite collections. A monotonic
+ordinal then rotates across the visible products, alternates each product's cart
+quantity between one and two on successive laps, advances its variant, toggles
+its favorite, and assigns a new view rank. After the timer stops, the harness
+replays that exact ordinal range into the plain Storefront shadow and compares
+the rendered checksum. This prevents the cut from quietly becoming a loop of
+equality-gated writes after its first sample.
+
+The compute-only control is reported **beside** the application cuts and never
+subtracted from them. It is also the check on the core comparison: it contains
+no graph, so swapping cores must not move it. Its cart products are priced
+directly through the same sixteen-policy kernel rather than looked up in the
+search-candidate price table; the two product sets need not overlap. A committed
+semantic checksum test covers those prices along with search, ranking,
+promotions, stock state, and recommendations.
+
+The correctness verifier is outside every reported timing. Cold and session
+drivers reuse immutable fixture-derived shadow storage prepared before
+`startMeasurement()`, suppress phase checkpoint evaluation until the timer is
+stopped, and then require the final visible identifiers, rendered checksum, and
+zero-outstanding-request ledger to agree. The burst cut likewise chooses its
+demanded identifiers before timing and advances its shadow after timing. The
+package correctness suite runs the detailed phase-by-phase checks.
+
+```console
+mise run bench --filter 'perf-15-storefront-.*'
+COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
+mise run test:storefront        # the correctness gate the numbers rest on
+```
+
+Nothing here is gated. There are no committed threshold files for `perf-15`,
+and `tools/bench-baseline.mjs` names none, because these are first measurements
+on one host and a threshold with no repeated pinned-CI history behind it is a
+guess. `impl/benchmarks.md` records the numbers, the environment, the workload's exact
+shape, and what it does not cover.
 
 ## What is coming
 

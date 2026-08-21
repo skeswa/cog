@@ -77,6 +77,10 @@ done
 description = "Run the Swift tests on the default leg in release configuration"
 run = "node {{config_root}}/tools/swift-test.mjs release"
 
+[tasks."api:check"]
+description = "Compare supported Swift APIs with the latest release tag"
+run = "node {{config_root}}/tools/check-swift-api.mjs"
+
 [tasks."test:simulator"]
 description = "Run only the boundary tests on the latest iOS simulator"
 run = "node {{config_root}}/tools/swift-simulator-test.mjs"
@@ -95,6 +99,36 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weat
 [tasks."test:weather"]
 description = "Run the Weather example's tests on an iOS simulator"
 run = "node {{config_root}}/tools/weather-test.mjs"
+
+# The Storefront macrobenchmark's shared workload is a package of its own under
+# `swift/Storefront`, so its correctness suite needs a wrapper of its own. The
+# guards are the ones every other Swift test command has: enumerate first,
+# require every filter alternative to match, and read an authoritative executed
+# count back out of an xUnit report the wrapper owns. This suite is the gate the
+# Storefront benchmark numbers rest on, so a silently empty run would be worse
+# here than almost anywhere else.
+
+[tasks."test:storefront"]
+description = "Run the guarded Storefront workload package tests"
+run = "node {{config_root}}/tools/storefront-test.mjs"
+
+# The Storefront benchmark application is a second Xcode example beside
+# Weather, and it needs the same build/test split for the same reason:
+# xcodebuild's `build` action builds only the scheme's build-action entries, and
+# the StorefrontBench scheme lists just `Storefront.app` there.
+#
+# Its tests run in **release**, unlike Weather's. Apple's performance-test
+# guidance is explicit that a measured run builds for testing with the Release
+# configuration and the debugger, code coverage, and runtime diagnostics off;
+# the scheme carries those settings and the wrapper carries the configuration.
+
+[tasks."build:storefront"]
+description = "Build the Storefront benchmark app for the iOS simulator"
+run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Storefront/Storefront.xcodeproj" -scheme StorefrontBench -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/storefront-derived-data" CODE_SIGNING_ALLOWED=NO build"""
+
+[tasks."test:storefront-ui"]
+description = "Run the Storefront UI performance tests on a pinned iOS simulator"
+run = "node {{config_root}}/tools/storefront-ui-test.mjs"
 
 # Compile-fail fixtures live outside every SwiftPM target and are type-checked
 # in one batched `swiftc` pass, never one compiler invocation per test. The
@@ -115,20 +149,24 @@ description = "Run the guarded CogLint package tests"
 run = "node {{config_root}}/tools/swift-lint-test.mjs"
 
 [tasks."lint:swift"]
-description = "Test CogLint, then check library and Weather target sources"
+description = "Test CogLint, then check library, example, and workload sources"
 depends = ["test:lint"]
 run = """
 set -euo pipefail
-echo "==> Cog and Weather production targets"
+echo "==> Cog, example app, and workload production targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role production \
   "{{config_root}}/swift/Sources" \
-  "{{config_root}}/swift/Examples/Weather/Weather"
-echo "==> Cog and Weather test targets"
+  "{{config_root}}/swift/Storefront/Sources" \
+  "{{config_root}}/swift/Examples/Weather/Weather" \
+  "{{config_root}}/swift/Examples/Storefront/Storefront"
+echo "==> Cog, example app, and workload test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role test \
   "{{config_root}}/swift/Tests" \
-  "{{config_root}}/swift/Examples/Weather/WeatherTests"
+  "{{config_root}}/swift/Storefront/Tests" \
+  "{{config_root}}/swift/Examples/Weather/WeatherTests" \
+  "{{config_root}}/swift/Examples/Storefront/StorefrontUITests"
 """
 
 # CogLint ships as a checksummed SwiftPM artifact bundle with one native
@@ -221,7 +259,7 @@ run = "swift package benchmark"
 #
 # Baselines live in the git-ignored `swift/Benchmarks/.benchmarkBaselines/`:
 # upstream calls that format unstable, and numbers meant to outlive a session
-# belong in perf.md §9.6 with their environment written beside them.
+# belong in docs/swift/impl/benchmarks.md with their environment beside them.
 
 [tasks."bench:baseline:update"]
 description = "Record a benchmark baseline with the environment that produced it"

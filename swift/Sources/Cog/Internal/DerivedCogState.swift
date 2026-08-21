@@ -51,6 +51,16 @@ internal final class DerivedCogState<Value>:
   /// keeps repeats; M6 may replace the layout after benchmarks (perf §3.3).
   internal private(set) var dependencies: [any CogState] = []
 
+  /// Where the previous dependency list is parked while a run captures the next.
+  ///
+  /// A run needs both lists to retire abandoned reverse edges. Copying
+  /// `dependencies` to get the previous one shares its buffer, which is exactly
+  /// what stops `removeAll(keepingCapacity:)` below from keeping anything — so
+  /// the list reallocated on every recompute of every node. Swapping into this
+  /// property moves the buffer instead, leaving both arrays uniquely referenced
+  /// and both capacities reusable.
+  private var previousDependencies: [any CogState] = []
+
   /// Fresh derived states are DIRTY because they have no value to return yet.
   var settleState: CogSettleState
 
@@ -215,7 +225,7 @@ internal final class DerivedCogState<Value>:
     #endif
 
     let previousValue = cachedValue
-    let previousDependencies = dependencies
+    swap(&previousDependencies, &dependencies)
     dependencies.removeAll(keepingCapacity: true)
 
     let value = cogs.tracking(self) {
@@ -226,6 +236,9 @@ internal final class DerivedCogState<Value>:
     where !dependencies.contains(where: { $0 === previousDependency }) {
       previousDependency.removeSubscriber(self)
     }
+    // The parked list has done its work; drop its contents but keep its buffer
+    // so the next run swaps into storage it has already paid for.
+    previousDependencies.removeAll(keepingCapacity: true)
 
     if case .some(let previousValue) = previousValue,
       descriptor.valuesAreEqual(previousValue, value)
@@ -243,5 +256,17 @@ internal final class DerivedCogState<Value>:
 
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. Removing it crashes the release build.
+  /// Answers ``CogState/asDerivedSettleState`` without a runtime lookup.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { self }
+
+  /// Answers ``CogState/asObservationState`` without a runtime lookup.
+  var asObservationState: (any CogObservationState)? { self }
+
+  /// Position in boundary-creation order; `-1` until registered.
+  var observationOrder: Int = -1
+
+  /// Whether a notice for this state is already queued for the flush.
+  var noticeQueued = false
+
   nonisolated deinit {}
 }

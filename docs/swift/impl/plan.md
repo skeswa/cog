@@ -215,17 +215,19 @@ prior milestone is a barrier only where the table below or an explicit
 without weakening a milestone gate. Gates diagnose but never absorb repairs;
 the smallest repair task is inserted before a failed gate is rerun.
 
-| Plan milestone                   | Task ledger                     | Decisions before dependent work                                                            | Closing path                                                                                                                                                                                  |
-| -------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks) | `M0-05a` runner topology                                                                   | `M0-10`                                                                                                                                                                                       |
-| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks) | `M1-34a`, `M1-15a`, `M1-16a`, `M1-36`                                                      | `M1-33c` host matrix, then `M1-32` release gate                                                                                                                                               |
-| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks) | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy         | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available                                                                       |
-| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks) | `M3-08a` never-read async behavior                                                         | `M3-11`                                                                                                                                                                                       |
-| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks) | `M4-01a` public-name review; `M4-07a` value-first async reads                              | `M4-05b` candidate → `M4-05c` tag → `M4-15` environment repair → `M4-05d` verification → `M4-05e` GitHub Release                                                                              |
-| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks) | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility                 | `M5-10`                                                                                                                                                                                       |
-| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks) | `M6-12a` core/release decision                                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                                                |
-| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks) | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                                                |
-| M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks) | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-18` identity repair → `M8-15g` exact-consumer gate |
+| Plan milestone                   | Task ledger                       | Decisions before dependent work                                                            | Closing path                                                                                                                                                                                  |
+| -------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Scaffolding                  | [M0 tasks](./tasks.md#m0-tasks)   | `M0-05a` runner topology                                                                   | `M0-10`                                                                                                                                                                                       |
+| M1: Simple correctness core      | [M1 tasks](./tasks.md#m1-tasks)   | `M1-34a`, `M1-15a`, `M1-16a`, `M1-36`                                                      | `M1-33c` host matrix, then `M1-32` release gate                                                                                                                                               |
+| M2: SwiftUI and Weather          | [M2 tasks](./tasks.md#m2-tasks)   | `M2-17a` read spelling; `M2-07` warning feasibility; `M2-18a` floor-runtime policy         | `M2-16` Weather gate, then `M2-20`; iOS 17 floor coverage was explicitly retired when no reliable runtime was available                                                                       |
+| M3: First async slice            | [M3 tasks](./tasks.md#m3-tasks)   | `M3-08a` never-read async behavior                                                         | `M3-11`                                                                                                                                                                                       |
+| M4: API review and 0.1.0         | [M4 tasks](./tasks.md#m4-tasks)   | `M4-01a` public-name review; `M4-07a` value-first async reads                              | `M4-05b` candidate → `M4-05c` tag → `M4-15` environment repair → `M4-05d` verification → `M4-05e` GitHub Release                                                                              |
+| M5: Benchmark port               | [M5 tasks](./tasks.md#m5-tasks)   | `M5-05ba` package/metric pins; `M5-05bb` allocator/isolation compatibility                 | `M5-10`                                                                                                                                                                                       |
+| M6: Data-oriented core           | [M6 tasks](./tasks.md#m6-tasks)   | `M6-12a` core/release decision                                                             | `M6-05a` edge gate, then `M6-13` core default, then `M6-12b`; `M6-12c`, `M6-12d`, and `M6-12e` run only when 0.2.0 is approved                                                                |
+| M7: Async completion and exports | [M7 tasks](./tasks.md#m7-tasks)   | `M7-01a`, `M7-01b`, `M7-01c`, and `M7-01d` ordered/stream decisions                        | `M7-16a` suite → `M7-16b` candidate → `M7-16c` tag → `M7-16d` verification → `M7-16e` GitHub Release; `M7-14c` is non-blocking                                                                |
+| M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks)   | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-18` identity repair → `M8-15g` exact-consumer gate |
+| M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks)   | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-25` and `M9-26` build cost, `M9-18` decision, and `M9-19` closeout                                                                 |
+| M10: Storefront macrobenchmark   | [M10 tasks](./tasks.md#m10-tasks) | `M10-01` workload shape and package boundary; `M10-09` threshold and follow-up decision    | `M10-05` headless results, `M10-07` UI results, `M10-08` core comparison, `M10-09` decision, then `M10-10` closeout                                                                           |
 
 ## Task bookkeeping
 
@@ -606,7 +608,7 @@ query caching.
   gating yet).
 - Compare the three value-reference layouts (inline `AnyHashable`, interned tokens,
   generic keyed value references) on keyed diamonds and key churn. Record results in
-  [perf.md](../design/perf.md); layouts stay open until the numbers exist. Edge
+  [impl/benchmarks.md](./benchmarks.md); layouts stay open until the numbers exist. Edge
   layouts cannot be compared yet: the perf §3.3 candidates presume the arena
   core, so benchmark them at the start of M6. Every behavior scenario
   implemented through M5 must pass under each value-reference layout selected by
@@ -624,7 +626,7 @@ query caching.
   per-state prefix arrays and inline-plus-overflow), run the same correctness
   set over all three, and close the runnable edge gate at `M6-05a`. Measure
   mostly-static and high-churn dependencies next. Record the numbers in
-  perf.md; only then settle the layout. Because this rewrite owns the settle
+  impl/benchmarks.md; only then settle the layout. Because this rewrite owns the settle
   walk, it also carries the cold first-read frame cycle `M4-14` measured: nine
   of the eleven frames per cold link are Cog's own, so collapsing them raises
   that bound for free.
@@ -650,7 +652,7 @@ query caching.
 - Measure against the simple build, swift-state-graph, and raw `@Observable`
   (perf §9.3–§9.5). Enable `baseline check` gating in CI: the noise-free
   `mallocCountTotal == 0` threshold plus generous absolute time thresholds.
-  Update perf.md and §10 with what the data settled.
+  Update impl/benchmarks.md and exploration §10 with what the data settled.
 - Tag `0.2.0` when the data-oriented core replaces the simple one (`M6-13`
   executes whichever outcome `M6-12a` records). If it does not, record why
   the simple core stays. After `M6-12b` approves that release candidate (or
@@ -743,6 +745,132 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   0.4.0, run the matching binary through the plugin, and reach the matching
   rule docs.
 
+<a id="plan-m9"></a>
+
+### M9: Shared turn machinery and O(changed) notices
+
+M9 acts on the post-M6 performance backlog (issue #373) with the profile
+`M6-12a` asked for actually in hand. `M9-01` recorded it — impl/optimization.md,
+"Post-M6 call-site profile" — and it reordered that backlog. The routes worth
+scheduling are the ones in **shared** machinery, which no core swap can reach,
+because about six percent of a steady turn is Cog's own compiled code and the
+rest is Swift runtime work that both cores pay. M9 changes no public API and
+adds no feature; every scenario implemented through M8 passes unchanged, and
+the core selector keeps its M6 disposition throughout.
+
+- **Make the observation-boundary flush O(changed), not O(pinned keys).** This
+  is `M6-12a`'s stated trigger for reconsidering the core, and the profile
+  makes it the largest single defect: at a thousand pinned keys, four-fifths of
+  a turn's leaf samples are ARC from one loop that retains and releases every
+  boundary whether or not it changed. Both cores admit the same rewrite — a
+  changed-boundary queue fed where a source is already stamped, with a dedupe
+  bit — and both must keep notice ordering and the rule that a boundary created
+  during a flush joins the next one. The arena's guard hoist lands first and
+  alone, because it halves that core's slope in one line.
+- **Zero the steady turn's shared machinery.** Four of the simple core's seven
+  steady-turn allocations are the turn boundary itself: two escaping closure
+  boxes and the per-turn `CogTurnID` and `CogTurn` pair, whose `isolated
+deinit`s pay executor checks on top of their mallocs. The remaining three are
+  per-turn arrays that cannot reuse capacity. A non-escaping fast path, a
+  reused turn buffer behind a monotonic token, and capacity reuse remove all
+  seven, for both cores, and they are prerequisite to any future candidate
+  demonstrating zero.
+- **Delete the runtime lookups the profile found on the common path.** Roughly
+  a quarter of a steady turn is generic-metadata instantiation and dynamic
+  conformance lookup, and an eighth is dynamic actor-isolation checking. None
+  of it was in view when issue #373 was opened. The settle walk casts
+  `state as? any DerivedCogSettleState` twice per node per turn, state lookup
+  casts a stored existential back to a concrete generic state on every
+  resolution, and dependency re-recording asks the concurrency runtime which
+  executor it is on. Each has a static replacement.
+- **Fold in the settle-walk cleanups** issue #373 already named — one fused
+  dependency traversal, one descriptor resolution and one cycle check per node,
+  a short circuit for clean rows — since the per-node cost this milestone
+  targets is the sum of those constants.
+- **Remeasure, then decide.** `M9-17` reruns the pinned simple-versus-arena
+  comparison on steady, deep, broad, and unstable shapes only after the shared
+  work lands, because rerunning it first would measure the same coat on both
+  candidates, which is what `M6-12a` already did. `M9-18` records whether that
+  changes the core decision, which of issue #373's remaining routes become
+  scheduled work, and whether M9's result justifies a patch release.
+- **Steady state is not the whole comparison.** Every benchmark above builds
+  its graph outside the measured region and then drives turns through it, which
+  is right for the question it asks and blind to what construction costs.
+  `M9-25` measures a graph's footprint and its build cost on both cores, and
+  `M9-26` attributes whatever gap it finds, so `M9-18` weighs a core that is
+  faster to run against one that is cheaper to create rather than deciding on
+  turns alone.
+- **Not in scope.** Instruction-level work (perf §5's borrowed records, unsafe
+  buffers, `@inlinable` paths) and the per-read hashing follow-ups of perf §4
+  stay backlog on #373. They are real, but they are tuning below a machinery
+  cost that dominates them; `M9-18` is where they are promoted or left.
+  Unchecked exclusivity left this list when `M9-21` measured it at a third of
+  an arena turn, and the per-state footprint probe left it when route F's
+  question turned out to be answerable with a benchmark already in the suite;
+  `M9-22` and `M9-25` own them.
+- **No publication.** M9 is a performance milestone behind an unchanged public
+  API, so it carries no release chain. If `M9-18` records that a version is
+  warranted, that decision adds the candidate → tag → verification → release
+  link to the ledger, at the end of the existing serialized chain.
+
+<a id="plan-m10"></a>
+
+### M10: Storefront macrobenchmark
+
+Every benchmark in the suite so far measures a _shape_ — a diamond, a fan, a
+chain, a thousand keyed states — chosen because it isolates one cost. That is
+the right way to attribute a regression and the wrong way to notice one that
+only appears when an application's shapes are composed. M10 adds the missing
+half: one representative commerce session, driven the way an application drives
+a graph, measured headlessly and again through a real SwiftUI interface.
+
+- **One workload, two drivers.** The declarations, fixtures, domain operations,
+  deterministic service, and interaction trace live in a package of their own
+  under `swift/Storefront`, and both the headless benchmark cuts and the SwiftUI
+  benchmark application drive exactly those. Two drivers exercising two
+  similar-looking workloads would let a UI result and a headless result disagree
+  without either being wrong. The package is separate from `swift/Benchmarks`
+  because an iOS application target cannot depend on that package without
+  resolving the benchmark harness, the malloc interposer, and swift-state-graph;
+  it depends on the root by path and on nothing else, so the consumer graph the
+  root ships stays empty.
+- **Representative, and honest about it.** There is no such thing as a typical
+  application without production telemetry, so this is a **representative
+  workload v1**: the scale is an explicit, configurable, asserted choice rather
+  than a claim about real apps. `M10-01` settles it, `StorefrontShapeTests`
+  checks it mechanically, and `impl/benchmarks.md` records both what it covers and what it
+  does not.
+- **Correct before fast.** Every cut proves its own work before reporting:
+  visible identifiers, exact money totals in integer cents, accepted async
+  generations, derived-reaction run counts, visible-versus-offscreen
+  invalidation, release after lifetime grace, and an output checksum — all
+  compared against a shadow model recomputed from the profile and the events,
+  never against numbers copied out of a passing run. A workload that computed
+  the wrong answer traps instead of producing a timing.
+- **Deterministic asynchrony, not timed asynchrony.** The benchmark-only service
+  records every request under a semantic identity, lets the driver await the
+  exact set that has _started_, and releases responses by name in a deliberately
+  out-of-order sequence. Superseded requests stay suspended rather than resuming
+  on cancellation, which removes the last race between the driver and Cog's
+  one-shot async-completion acknowledgement — and makes a stale completion
+  something the trace schedules on purpose.
+- **Report first, gate later.** Nothing in M10 lands a committed threshold.
+  These are first measurements on one host, and `M5-11` is the standing lesson
+  about what a threshold with no repeated history behind it costs. `M10-09`
+  records which cuts have earned one and what the pinned CI runner would have to
+  confirm first.
+- **A UI measurement is a UI measurement.** The application suite runs in
+  release with the debugger, code coverage, automatic screenshots, and every
+  runtime diagnostic disabled, on one pinned device, orientation, locale, Dynamic
+  Type setting, fixture, and row height. Its hitch and timing figures are a
+  pinned regression signal; an absolute hitch-ratio target belongs on a pinned
+  physical device, and `impl/benchmarks.md` says so rather than borrowing Apple's Organizer
+  thresholds as if they applied.
+- **Not in scope.** Committed CI thresholds, a physical-device lane, and
+  attribution of the cold-start cost to call sites. `M10-09` is where those are
+  promoted or left.
+- **No publication.** M10 adds no public API and carries no release chain.
+
 ## Release process
 
 - Tags: use bare, annotated semver git tags (`0.1.0`) permanently. Bare tags
@@ -812,7 +940,7 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
 
 - Settled decisions → exploration §10 and the [README.md](../README.md)
   "Where things stand" snapshot.
-- Benchmark results → perf.md; representation choices stay open until
+- Benchmark results → impl/benchmarks.md; representation choices stay open until
   measured.
 - Build, test, and bench commands → `CLAUDE.md` and `AGENTS.md`, in sync.
 - New documents → mapped in `docs/swift/README.md` or the root `README.md`.
@@ -849,8 +977,8 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   deploys before publishing the GitHub Release.
 - M5 (`M5-10`): run-count tests are green under every value-reference candidate selected
   by `COG_TEST_VALUE_REFERENCE_LAYOUT`; `box[key]` creation measures
-  `mallocCountTotal == 0` and steady turns hold the cost perf.md records;
-  value-reference layout numbers are recorded in perf.md before the choice settles.
+  `mallocCountTotal == 0` and steady turns hold the cost impl/benchmarks.md records;
+  value-reference layout numbers are recorded in impl/benchmarks.md before the choice settles.
 - M6 (`M6-05a`, then `M6-13` → `M6-12b`): the M5 set is green under every
   arena edge candidate; `mise run test:cores` is green; edge-layout and
   runtime-comparison numbers are recorded before choices settle; the default
@@ -866,6 +994,11 @@ tracks may overlap M5–M7. The 0.4.0 publication remains serialized behind the
   repository lints clean in production and test target roles; the terminal
   scratch app resolves exactly 0.4.0, runs its matching plugin binary, and
   reaches the matching docs.
+- M10 (`M10-10`): the Storefront workload's correctness and shape suites green;
+  the five headless cuts registered and reporting under both cores; the release
+  UI performance suite executing on the pinned simulator; linter and formatter
+  clean; `impl/benchmarks.md` carrying the measurements, their environment, and the
+  workload's stated limits.
 - Always: formatting and task-ledger checks clean; path-filtered CI green.
 
 ## Flagged uncertainties (verify at implementation time)

@@ -1,6 +1,12 @@
-# SwiftPM
+# SwiftPM. `.build-*` covers the alternate scratch paths the probes and test
+# wrappers use, such as the `M9-01` probe's `--scratch-path .build-arena`.
+# The probe's interposer is built by the clang line in its method document
+# rather than by SwiftPM, so its products are ignored by name.
+swift/Benchmarks/probes/**/libcogprof.dylib
+swift/Benchmarks/probes/**/libcogprof.dylib.dSYM/
 .build-mechanisms/
 .build/
+.build-*/
 .swiftpm/
 Package.resolved.bak
 

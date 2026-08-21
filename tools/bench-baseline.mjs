@@ -41,7 +41,7 @@
 // Baselines and their metadata live under
 // `swift/Benchmarks/.benchmarkBaselines/`, which is git-ignored on purpose:
 // the format is upstream-unstable, and a baseline is a statement about one
-// machine. Numbers that outlive a session belong in perf.md §9.6, written by
+// machine. Numbers that outlive a session belong in docs/swift/impl/benchmarks.md, written by
 // hand, with their environment beside them. Portable zero references live in
 // `swift/Benchmarks/Thresholds/`; their one-sided tolerances live in benchmark
 // source so a code review sees the effective ceilings.
@@ -62,7 +62,10 @@ const WITNESS_BENCHMARK = "perf-witness-allocating";
 
 /** Benchmarks whose committed p90 references form the CI performance gate. */
 const THRESHOLDED_BENCHMARKS = [
+  "perf-01-steady-turn",
   "perf-06-value-reference",
+  "perf-11-pinned-key-slope-1000",
+  "perf-13-deep-chain",
   "perf-10-cog-diamond",
   "perf-10-cog-deep",
   "perf-10-cog-broad",
@@ -76,6 +79,21 @@ const THRESHOLDED_BENCHMARKS = [
   "perf-10-state-graph-broad",
   "perf-10-state-graph-unstable",
 ];
+
+/**
+ * Which metrics each gated benchmark commits a reference for.
+ *
+ * Most of the gate is wall clock. Four are not: PERF-01, PERF-06 and PERF-13
+ * promise an allocation-free steady turn, value reference, and settle walk, and
+ * PERF-11 promises that a thousand pinned keys cost a turn what one does, which
+ * is a claim about ARC rather than about time.
+ */
+const STATIC_THRESHOLD_METRICS = {
+  "perf-01-steady-turn": ["mallocCountTotal", "objectAllocCount"],
+  "perf-06-value-reference": ["mallocCountTotal", "objectAllocCount"],
+  "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
+  "perf-13-deep-chain": ["mallocCountTotal", "objectAllocCount"],
+};
 
 /** One exact regular expression, so CI measures no ungated workload by accident. */
 const THRESHOLD_FILTER = `^(${THRESHOLDED_BENCHMARKS.join("|")})$`;
@@ -279,10 +297,7 @@ function assertStaticThresholdsComplete(directory) {
     if (!existsSync(path)) fail(`missing static threshold file: ${path}`);
 
     const thresholds = JSON.parse(readFileSync(path, "utf8"));
-    const expectedMetrics =
-      benchmark === "perf-06-value-reference"
-        ? ["mallocCountTotal", "objectAllocCount"]
-        : ["wallClock"];
+    const expectedMetrics = STATIC_THRESHOLD_METRICS[benchmark] ?? ["wallClock"];
     const actualMetrics = Object.keys(thresholds).sort();
     if (JSON.stringify(actualMetrics) !== JSON.stringify(expectedMetrics.sort())) {
       fail(

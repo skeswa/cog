@@ -1,14 +1,29 @@
-// Every generic class in Cog writes an explicit `nonisolated deinit`.
+// Every class in Cog writes an explicit `deinit`, and it is `nonisolated`
+// unless deallocation genuinely has to reach the graph.
 //
 // The package compiles with `.defaultIsolation(MainActor.self)`, which makes a
-// class's *synthesized* `deinit` main-actor-isolated. On the pinned toolchain
-// (Apple Swift 6.3, swiftlang-6.3.0.123.5) an isolated synthesized `deinit` on
-// a generic class crashes the release optimizer in `EarlyPerfInliner`. Debug
+// class's *synthesized* `deinit` main-actor-isolated. That is wrong twice over.
+//
+// For a generic class it is a build problem: on the pinned toolchain (Apple
+// Swift 6.3, swiftlang-6.3.0.123.5) an isolated synthesized `deinit` on a
+// generic class crashes the release optimizer in `EarlyPerfInliner`. Debug
 // builds are unaffected, so the test matrix does not catch it.
 //
+// For every class it is a cost. An isolated `deinit` compiles to
+// `swift_task_deinitOnExecutor`, so each deallocation asks the concurrency
+// runtime which executor it is on and can hop if the answer is wrong. `M9-01`
+// measured that traffic at about an eighth of a steady turn; `M9-13` annotated
+// the classes that were still paying it. A controlled two-file comparison
+// confirms the mechanism: a bare main-actor class references
+// `swift_task_deinitOnExecutor`, `swift_task_isCurrentExecutor`, and
+// `swift_task_reportUnexpectedExecutor`, and the same class with
+// `nonisolated deinit {}` references none of them.
+//
 // These deinitializers only release their stored properties and must not touch
-// MainActor-isolated graph state. Remove them together only after the
-// toolchain is fixed and a release build proves the workaround unnecessary.
+// MainActor-isolated graph state. A class whose cleanup does need the graph
+// writes `isolated deinit` instead and must not be generic; `ReactionToken` is
+// the worked example. The two spellings solve opposite problems and neither is
+// a fix for the other.
 
 /// The shape every declaration's descriptor shares.
 ///

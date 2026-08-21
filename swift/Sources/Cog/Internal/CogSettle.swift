@@ -59,6 +59,12 @@ internal enum CogSettleState: UInt8, Comparable {
 /// the reverse edge weak prevents those two arrays from forming a retain cycle
 /// when a context or, later, a released state lets the graph go.
 internal final class CogSubscriberEdge {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// The consumer to invalidate, or `nil` after it has been released.
   weak var state: (any CogState)?
 
@@ -154,7 +160,11 @@ internal enum CogSettleFrame {
   /// Inspect a state and schedule its dirty producers before its exit.
   case enter(any CogState)
   /// Decide whether the now-parent-current state must recompute.
-  case exit(any CogState)
+  ///
+  /// Narrowed, because only a derived state ever gets an exit frame. Storing
+  /// the wider type here meant re-narrowing it on the way out of every node,
+  /// for a fact the push site already knew.
+  case exit(any DerivedCogSettleState)
 }
 
 /// The context-owned traversal storage reused by every settle walk.
@@ -201,7 +211,7 @@ internal struct CogSettleStack {
   }
 
   /// Appends an exit frame that runs after the state's scheduled dependencies.
-  mutating func pushExit(_ state: any CogState) {
+  mutating func pushExit(_ state: any DerivedCogSettleState) {
     frames.append(.exit(state))
   }
 
@@ -242,9 +252,11 @@ internal struct CogSettleStack {
   /// The state bit is set before frames for its parents run, making a nested read
   /// of this state detect the cycle even if the raw frame suffix changes.
   mutating func beginComputing(_ state: any DerivedCogSettleState) {
-    guard cyclePath(ifEntering: state) == nil else {
-      fatalError("Cog tried to enter a derived cycle without reporting it.")
-    }
+    // An assertion, not a check. Every caller has already asked `cyclePath` and
+    // reported what it found; this only catches a caller that forgot, which is
+    // a Cog bug and cannot be provoked from outside. Running it again in release
+    // scanned the active path a second time for every node the walk entered.
+    assert(cyclePath(ifEntering: state) == nil, "Cog entered a derived cycle without reporting it.")
     state.isComputing = true
     computingPath.append(state)
   }
@@ -273,20 +285,27 @@ extension Cogs {
   /// least as strongly marked also cuts off that traversal branch, which both
   /// preserves DIRTY and bounds diamond propagation.
   internal func invalidateSubscribers(of producer: any CogState) {
-    var work: [(any CogState, CogSettleState)] = []
+    assert(invalidationWork.isEmpty, "The invalidation walk re-entered itself.")
+
+    // The producer changed by definition; the walk below reaches everything
+    // else that could. Between them they are exactly the boundaries a flush
+    // has any reason to visit.
+    enqueueBoundaryNotice(for: producer)
+
     for edge in producer.subscribers {
       if let subscriber = edge.state {
-        work.append((subscriber, .dirty))
+        invalidationWork.append((subscriber, .dirty))
       }
     }
 
-    while let (state, requestedState) = work.popLast() {
+    while let (state, requestedState) = invalidationWork.popLast() {
       guard state.settleState < requestedState else { continue }
 
       state.settleState = requestedState
+      enqueueBoundaryNotice(for: state)
       for edge in state.subscribers {
         if let subscriber = edge.state {
-          work.append((subscriber, .check))
+          invalidationWork.append((subscriber, .check))
         }
       }
     }
@@ -337,7 +356,7 @@ extension Cogs {
       switch frame {
       case .enter(let state):
         guard state.settleState != .clean else { continue }
-        guard let derived = state as? any DerivedCogSettleState else {
+        guard let derived = state.asDerivedSettleState else {
           // Sources are settled when their pending value moves to current, so
           // an invalid source here would be an internal propagation mistake.
           state.markChecked(at: revision)
@@ -355,8 +374,7 @@ extension Cogs {
           settleStack.pushEnter(dependency)
         }
 
-      case .exit(let state):
-        guard let derived = state as? any DerivedCogSettleState else { continue }
+      case .exit(let derived):
         defer { settleStack.endComputing(derived) }
 
         let parentChanged = derived.dependencies.contains {

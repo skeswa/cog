@@ -125,6 +125,16 @@ internal protocol CogObservationState: CogState {
   var observationBoundary: CogObservationBoundary? { get set }
   /// The erased state key included in debug notice history.
   var observationKey: CogKey? { get }
+  /// Position in boundary-creation order, assigned once at registration.
+  ///
+  /// The registry walk got notice order for free by iterating in creation
+  /// order. A changed-boundary queue arrives in invalidation order instead, so
+  /// the flush sorts on this to publish the order it always published.
+  var observationOrder: Int { get set }
+  /// Whether this state is already on the context's changed-boundary queue.
+  ///
+  /// One state reached by two invalidation paths in one turn must notify once.
+  var noticeQueued: Bool { get set }
   /// Sends the field-appropriate Observation mutations for this state's change.
   func notifyObservationChange()
 }
@@ -208,11 +218,24 @@ extension Cogs {
   /// correctness core is selected. The arena build compiles the call out and
   /// flushes its descriptor-dispatched scalar roots instead.
   private func flushClassObservationBoundaries() {
-    let boundaryCount = observationStates.count
-    for state in observationStates.prefix(boundaryCount) {
-      if state.settleState != .clean,
-        let derived = state as? any DerivedCogSettleState
-      {
+    guard !changedBoundaryQueue.isEmpty else { return }
+
+    // Notice order is boundary-creation order. The registry walk had it for
+    // free; a queue arrives in invalidation order, so restore it here. The
+    // changed set is the point of the queue, so this sorts a handful of entries
+    // rather than every key the screen has ever shown.
+    changedBoundaryQueue.sort()
+
+    // Snapshot the count for the reason the registry walk did: a notice can run
+    // a synchronous Observation handler that reads new state, and a boundary
+    // that queues while this pass runs has established its own baseline and
+    // belongs to the next flush.
+    let queuedCount = changedBoundaryQueue.count
+    for index in 0..<queuedCount {
+      let state = observationStates[changedBoundaryQueue[index]]
+      state.noticeQueued = false
+
+      if state.settleState != .clean, let derived = state.asDerivedSettleState {
         settle(derived)
       }
 
@@ -230,5 +253,7 @@ extension Cogs {
         state.observationBoundary?.notifyValueChange()
       }
     }
+
+    changedBoundaryQueue.removeFirst(queuedCount)
   }
 }

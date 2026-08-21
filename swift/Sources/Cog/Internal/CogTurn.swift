@@ -17,10 +17,18 @@
 
 /// An identity only Cog can mint for one turn.
 ///
-/// Object identity ties a writer to the context's accumulating turn and prevents
-/// an escaped writer from operating in a later turn. Application code cannot
-/// construct a matching token.
-internal final class CogTurnID {}
+/// Ties a writer to the context's accumulating turn and prevents an escaped
+/// writer from operating in a later one. Application code cannot construct a
+/// matching token: the initializer is private to this file's minting.
+///
+/// A value rather than an object. Object identity did the same job and cost an
+/// allocation and an isolated deallocation on every turn, which `M9-01`
+/// measured; a monotonically increasing integer is unforgeable for the same
+/// reason a fresh object was — the context is the only thing that advances it.
+internal nonisolated struct CogTurnID: Hashable, Sendable {
+  /// Position in the context's turn sequence, starting at one.
+  fileprivate let rawValue: UInt64
+}
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
@@ -28,11 +36,17 @@ internal final class CogTurnID {}
 /// so one ordered flush can assign a single revision before invalidation reaches
 /// Observation boundaries and reactions.
 internal final class CogTurn {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// The unforgeable capability owned by writers for this exact turn.
-  let id: CogTurnID
+  private(set) var id = CogTurnID(rawValue: 0)
 
   /// The diagnostic and history name of this outer turn.
-  let name: String
+  private(set) var name = ""
 
   /// Sources written while this turn accumulates. Repeated entries are safe:
   /// the first flush consumes the one pending slot and later entries are
@@ -44,8 +58,22 @@ internal final class CogTurn {
   private var touchedArenaSources: ContiguousArray<CogArenaSlot> = []
   #endif
 
-  /// Creates one accumulating turn with its unforgeable writer capability.
-  init(id: CogTurnID, name: String) {
+  /// Creates the one turn object a context reuses for its whole life.
+  init() {}
+
+  /// Rebinds this object to a new turn.
+  ///
+  /// One object per context rather than one per turn, so the staged-source
+  /// buffers keep the capacity they reached instead of growing from zero every
+  /// time a source is written. Turns never overlap — a nested commit joins the
+  /// accumulating turn and a commit during a flush is queued — so a single
+  /// object is the whole of the state a turn needs.
+  ///
+  /// The buffers must already be empty: `flushPendingSources` drains them, and
+  /// a turn that ended without flushing would otherwise leak its writes into
+  /// the next one.
+  func begin(id: CogTurnID, name: String) {
+    assert(touchedSources.isEmpty, "A Cog turn began while a previous turn's sources were staged.")
     self.id = id
     self.name = name
   }
@@ -232,6 +260,38 @@ extension Cogs {
     drainQueuedTurns()
   }
 
+  /// Joins or runs one turn whose body cannot outlive this call.
+  ///
+  /// The same sequence as ``withTurn(_:_:)`` minus the one case that forces a
+  /// heap-allocated closure: a commit that arrives during a flush has to be
+  /// stored and run later, and only an escaping body can be stored. Callers
+  /// therefore test the phase first and route that case to `withTurn`, which is
+  /// why reaching `.flushing` here is a Cog bug rather than a caller's mistake.
+  ///
+  /// `requireOutsideDerivedComputation` is the caller's obligation, so the
+  /// rejection message names the op rather than this seam.
+  internal func withNonEscapingTurn(_ name: String, _ body: (CogTurn) -> Void) {
+    switch turnPhase {
+    case .accumulating(let turn):
+      body(turn)
+      return
+
+    case .flushing:
+      fatalError("Cog routed a non-escaping turn body into a flush, which cannot store it.")
+
+    case .idle:
+      break
+    }
+
+    #if DEBUG
+    turnChainTracker.beginChain()
+    defer { turnChainTracker.endChain() }
+    #endif
+
+    runOuterTurn(named: name, body)
+    drainQueuedTurns()
+  }
+
   /// Runs one idle → accumulating → flushing → idle transition.
   ///
   /// Flush order is part of correctness: publish staged state, settle and notify
@@ -280,7 +340,9 @@ extension Cogs {
       fatalError("A new outer Cog turn can start only while its context is idle.")
     }
 
-    let turn = CogTurn(id: CogTurnID(), name: name)
+    nextTurnToken += 1
+    let turn = reusedTurn
+    turn.begin(id: CogTurnID(rawValue: nextTurnToken), name: name)
     turnPhase = .accumulating(turn)
 
     // Record when the turn is created. Nested commits do not reach this point,
@@ -295,7 +357,7 @@ extension Cogs {
 
   /// Closes the writer boundary and begins publication and propagation.
   internal func startFlushing(_ id: CogTurnID) {
-    guard case .accumulating(let turn) = turnPhase, turn.id === id else {
+    guard case .accumulating(let turn) = turnPhase, turn.id == id else {
       fatalError("Only the context's accumulating Cog turn can start its flush.")
     }
 
@@ -304,7 +366,7 @@ extension Cogs {
 
   /// Returns the context to idle only after publication and reactions finish.
   internal func finishTurn(_ id: CogTurnID) {
-    guard case .flushing(let turn) = turnPhase, turn.id === id else {
+    guard case .flushing(let turn) = turnPhase, turn.id == id else {
       fatalError("Only the context's flushing Cog turn can finish.")
     }
 

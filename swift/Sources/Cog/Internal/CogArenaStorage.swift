@@ -36,6 +36,13 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 
   /// The accumulating turn has staged this source once.
   static let touched = CogArenaStateFlags(rawValue: 1 << 4)
+
+  /// This row's boundary is already on the changed-boundary queue.
+  ///
+  /// Dedupe for the O(changed) flush: a row reached by two invalidation paths
+  /// in one turn notifies once. A spare bit rather than a set, because the walk
+  /// that sets it is already holding the flag word.
+  static let noticeQueued = CogArenaStateFlags(rawValue: 1 << 5)
 }
 
 /// Context-owned scalar storage for the data-oriented core.
@@ -47,28 +54,59 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 /// measured representations without changing this row-ownership contract.
 @MainActor
 internal final class CogArenaStorage {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Sentinel for no Observation boundary.
   static let noIndex: Int32 = -1
 
   /// Packed liveness, settlement, and computation marks by slot.
+  /// Dynamic exclusivity enforcement is off for the scalar columns below.
+  ///
+  /// `M9-22` measured it at a third of an arena turn: every `flags[row]` and
+  /// every column touch is a class-property access, so Swift brackets it with
+  /// `swift_beginAccess`/`swift_endAccess` and thread-local bookkeeping, and one
+  /// turn touches these arrays dozens of times.
+  ///
+  /// Safe here by construction rather than by convention, on three counts. The
+  /// class is `@MainActor`, so no second thread can hold an access. Every
+  /// element type is trivial — `Int32`, `UInt32`, `UInt16`, `CogEdgeIndex`,
+  /// `CogArenaStateFlags` — so no destructor, library or user, can run inside an
+  /// access and re-enter. And no method here holds an access open across a call.
+  ///
+  /// That last one is an invariant a future edit could break, so it is stated
+  /// rather than assumed: **do not add a method that passes one of these columns
+  /// `inout`, or calls out while a subscript access is live.** The typed value
+  /// columns deliberately keep full enforcement, because their element type is
+  /// the user's and releasing one can run arbitrary `deinit` code.
+  @exclusivity(unchecked)
   var flags: ContiguousArray<CogArenaStateFlags> = []
 
   /// Last revision in which each row's value changed.
+  @exclusivity(unchecked)
   var changedAt: ContiguousArray<UInt32> = []
 
   /// Last revision through which each row was proved current.
+  @exclusivity(unchecked)
   var checkedAt: ContiguousArray<UInt32> = []
 
   /// Head of each row's dependency list.
+  @exclusivity(unchecked)
   var deps: ContiguousArray<CogEdgeIndex> = []
 
   /// Head of each row's subscriber list.
+  @exclusivity(unchecked)
   var subs: ContiguousArray<CogEdgeIndex> = []
 
   /// Context-local descriptor dispatch index for each occupied row.
+  @exclusivity(unchecked)
   var descriptor: ContiguousArray<Int32> = []
 
   /// Observation-boundary index per row, or ``noIndex`` until a UI read.
+  @exclusivity(unchecked)
   var boundary: ContiguousArray<Int32> = []
 
   /// Durable external consumers retaining each `whileObserved` row.
@@ -76,9 +114,11 @@ internal final class CogArenaStorage {
   /// Direct reaction roots and the first UI boundary each contribute one.
   /// Internal graph edges deliberately do not: they can defer an expired
   /// release, but they never turn dependency reachability into observation.
+  @exclusivity(unchecked)
   var leaseCount: ContiguousArray<UInt32> = []
 
   /// Occupant generation per row, advanced before an index may be reused.
+  @exclusivity(unchecked)
   var generation: ContiguousArray<UInt16> = []
 
   /// Released indices whose generation can still advance, in reuse order.
@@ -86,6 +126,7 @@ internal final class CogArenaStorage {
   /// LIFO reuse keeps recently touched scalar rows hot and makes allocation a
   /// single pop. A row at `UInt16.max` is retired instead of entering this list
   /// so generation wraparound can never make an old token current again.
+  @exclusivity(unchecked)
   private var reusableSlots: ContiguousArray<Int32> = []
 
   /// Number of rows whose `occupied` bit is set.

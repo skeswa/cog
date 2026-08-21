@@ -44,7 +44,7 @@ import Testing
       }
       innerTurn = inner.id
 
-      #expect(inner.id === outer.id)
+      #expect(inner.id == outer.id)
       #expect(inner.name == "outer")
       #expect(c[source] == 1)
 
@@ -59,8 +59,8 @@ import Testing
   }
 
   #expect(outerTurn != nil)
-  #expect(innerTurn === outerTurn)
-  #expect(flushingTurn === outerTurn)
+  #expect(innerTurn == outerTurn)
+  #expect(flushingTurn == outerTurn)
   #expect(comparisons == 1)
   #expect(cogs.peek(source) == 2)
   #expect(cogs.revision > .initial)
@@ -108,7 +108,7 @@ import Testing
     Issue.record("The sibling commits did not both capture a turn")
     return
   }
-  #expect(turnIDs[0] !== turnIDs[1])
+  #expect(turnIDs[0] != turnIDs[1])
   #expect(turnNames == ["first", "second"])
   #expect(cogs.peek(source) == 2)
   #expect(cogs.revision > firstRevision)

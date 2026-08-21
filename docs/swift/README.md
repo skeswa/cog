@@ -47,9 +47,10 @@ The design lives in [design/](./design/); the implementation effort lives in
 4. **[design/rx.md](./design/rx.md): Rx mapping (§5.4).** How common stream
    operators map to state dependencies, async policies, and real event
    streams.
-5. **[design/perf.md](./design/perf.md): implementation and benchmarks.** The
-   planned data-oriented core and the tests that must choose its physical
-   layout.
+5. **[design/perf.md](./design/perf.md): performance architecture.** The cost
+   order, the data-oriented core, the ARC and exclusivity rules, and the
+   measurement plan that chooses the physical layout. Design only — the numbers
+   it produced live in items 11 and 12.
 6. **[design/prior-art.md](./design/prior-art.md): prior-art review.** The
    swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
    two libraries line up, tracked reads versus capture lists, and the
@@ -69,15 +70,32 @@ The design lives in [design/](./design/); the implementation effort lives in
     into dependency-aware tasks of half an engineering day or less, each with
     explicit closing verification; every scenario is covered by exactly one
     task's _Greens:_ line.
+11. **[impl/benchmarks.md](./impl/benchmarks.md): benchmark results.** Every
+    number the measurement plan has produced, with the environment that
+    produced it, the decision it drove, and the withdrawal when a measurement
+    turned out not to be trustworthy. Split out of design/perf.md, which had
+    become four fifths results.
+12. **[impl/optimization.md](./impl/optimization.md): profiling and
+    optimization record.** Where the time actually goes and what each change
+    bought. Separate from item 11 because it is obtained with a sampler and
+    purpose-built probes rather than with the benchmark suite.
+13. **[impl/arena-optimization-plan-2026-08-20.md](./impl/arena-optimization-plan-2026-08-20.md):
+    arena specialization research and design.** Frozen research report
+    answering `M9-26`'s open question: the evidence that an `@inlinable`
+    typed frontier can recover the arena core's measured specialization
+    ceiling with stable Swift, the ranked alternatives, and the staged proof
+    plan with go/no-go gates.
 
 ## Building and testing
 
-The package is implemented through M7: the simple shipping core, SwiftUI
-boundary, mechanisms, lifetimes, async policies and streams, exports, and
-external Observation tracking are all present. The measured arena core remains
-an internal comparison build. The repository is a SwiftPM package rooted at the
-git root, with every Swift target under `swift/`. Commands are mise tasks;
-`mise tasks` lists them all.
+Releases are implemented through M8: the simple shipping core, SwiftUI
+boundary, mechanisms, lifetimes, async policies and streams, exports, external
+Observation tracking, and first-party lint plugins are all present. M9's
+shared-turn performance work and M10's Storefront measurement infrastructure
+have landed, while their closing decisions remain open. The measured arena core
+remains an internal comparison build. The repository is a SwiftPM package
+rooted at the git root, with every Swift target under `swift/`. Commands are
+mise tasks; `mise tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
@@ -87,6 +105,7 @@ mise run test:matrix      # all four isolation legs
 mise run test:cores       # verify default simple; behavior under both cores
 mise run test:release     # the default leg in release configuration
 mise run test:compilefail # batched swiftc pass over swift/CompileFail/
+mise run test:storefront  # the macrobenchmark workload's correctness suite
 mise run tasks:check      # validate impl/tasks.md against the plan and scenarios
 ```
 
@@ -103,8 +122,9 @@ The four legs are {MainActor-default, nonisolated} ×
 one leg per job using the leg names as wrapper modes (`mainactor-nnbd-on`,
 `mainactor-nnbd-off`, `nonisolated-nnbd-on`, `nonisolated-nnbd-off`). Running
 the tests needs a full Xcode; the Command Line Tools alone fail with
-`no such module 'Testing'`. The root [README.md](../../README.md) records the
-pinned version and the runner topology.
+`no such module 'Testing'`. The maintainer
+[CI runbook](../maintainers/ci.md) records the pinned version and runner
+topology.
 
 ## Production, tests, and previews
 
@@ -197,7 +217,7 @@ registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
 and non-nestable: do not put `await` in it, and do not use it as general test or
 preview setup.
 
-## Where things stand (2026-08-17)
+## Where things stand (2026-08-20)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -336,15 +356,16 @@ These choices are settled; §10 of the core document has the full record.
   in that region fails immediately in every build, names the cog/key and turn,
   and tells the caller to invoke the op outside derived computation, from event
   handling or a reaction.
-- The shipping runtime remains the simple class-state core. The data-oriented
-  arena passes the same 248 public behavior scenarios and uses the selected
-  shared linked edge pool, but its measured gains are mixed and it misses M6's
-  defining cost targets: five allocations remain per steady turn, propagation
-  still performs ARC traffic, and notice work remains O(pinned keys) with two
-  retain/release pairs per key rather than simple's one. Arena remains an
-  internal selector-only research and benchmark candidate; M6 recommends no
-  0.2.0 release. Public value references remain names, never arena slot
-  handles.
+- The shipping runtime remains the simple class-state core. M9 made boundary
+  notices O(changed), removed steady-turn allocations from shared machinery,
+  and profiled both implementations under the same public behavior suite. The
+  arena now wins warm whole-graph and Storefront work while retaining less, but
+  it remains an internal selector-only candidate because keyed reads and graph
+  construction still pay an erased generic-storage cost. The frozen arena
+  specialization report records a stable `@inlinable` frontier that could
+  remove that cost without changing public API; implementation and the next
+  core decision remain open. Public value references remain names, never arena
+  slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -384,7 +405,7 @@ debug-history tools, and persistence helpers. Also open are several
 edge behaviors: debounce/throttle timing modifiers (deferred backlog).
 Custom hash tables also remain open until benchmarks justify them. Inline
 `AnyHashable` value references and the shared linked edge pool are selected by
-the measurements in design/perf.md §9.6.
+the measurements in impl/benchmarks.md.
 
 ## Prior art
 
@@ -409,10 +430,12 @@ full review.
 
 [impl/plan.md](./impl/plan.md) is the execution plan,
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
-[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
-without a 0.2.0 release: its measured core decision keeps the simple
-implementation as the shipping default and the arena as an internal comparison
-build. M7 is published as 0.3.0. M8 implementation and its complete fixture,
-artifact, plugin, documentation, distribution, and dogfood gate are green; the
-0.4.0 release chain is preparing the binary-backed Cog release before it
-publishes the version-matched Channel B plugin package.
+[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M7 and M8 are
+published as 0.3.0 and 0.4.0. M9's shared-turn and O(changed) work has landed,
+and M10's Storefront workload, headless cuts, SwiftUI benchmark app, and first
+paired core measurements are present. The next decisions are `M9-18` and
+`M10-09`: reconcile the corrected application measurements with the synthetic
+graph results, turn the arena specialization report into measured
+implementation tasks if its route still holds, and only then revisit the
+shipping core. The simple implementation remains the consumer default until
+that evidence is recorded.

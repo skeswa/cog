@@ -19,7 +19,7 @@ package nonisolated struct CogArenaSlotReuseSnapshot: Sendable {
 }
 
 /// Production role of one descriptor in the arena vertical slice.
-private nonisolated enum CogArenaDescriptorKind: Equatable {
+internal nonisolated enum CogArenaDescriptorKind: Equatable {
   /// A source whose typed column owns current and pending values.
   case manual
 
@@ -36,7 +36,13 @@ private nonisolated enum CogArenaDescriptorKind: Equatable {
 /// graph walks instead use the scalar descriptor index on each row and invoke
 /// one descriptor-level function, never a per-state closure or existential.
 @MainActor
-private final class CogArenaDescriptorRecord {
+internal final class CogArenaDescriptorRecord {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Process identity of the public declaration represented by this record.
   let identity: ObjectIdentifier
 
@@ -80,12 +86,21 @@ private final class CogArenaDescriptorRecord {
   /// Cancels descriptor-owned cold work before the context releases its arena.
   let prepareForContextTeardown: @MainActor () -> Void
 
+  /// Drops the declaration's memoized keyless location for one context.
+  ///
+  /// Release and teardown reach a descriptor only through its erased record,
+  /// so the typed memo is evicted by dispatching once here rather than by
+  /// storing a second closure on every arena row. The argument is the calling
+  /// context's identity: a descriptor shared with another live context must
+  /// keep that context's memo.
+  let forgetMemoizedLocation: @MainActor (UInt64) -> Void
+
   /// Erased selector key by global arena row.
   ///
   /// The current vertical slice exercises keyless rows. Keeping keys on the
   /// descriptor record already avoids a graph-wide key table; later keyed
   /// integration can specialize this storage without changing row dispatch.
-  private var keys: ContiguousArray<CogKey?> = []
+  var keys: ContiguousArray<CogKey?> = []
 
   /// Creates one immutable descriptor dispatch record.
   init(
@@ -100,7 +115,8 @@ private final class CogArenaDescriptorRecord {
     recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
     notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
     removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
-    prepareForContextTeardown: @escaping @MainActor () -> Void
+    prepareForContextTeardown: @escaping @MainActor () -> Void,
+    forgetMemoizedLocation: @escaping @MainActor (UInt64) -> Void
   ) {
     self.identity = identity
     self.label = label
@@ -114,6 +130,7 @@ private final class CogArenaDescriptorRecord {
     self.notifyObservation = notifyObservation
     self.removeValue = removeValue
     self.prepareForContextTeardown = prepareForContextTeardown
+    self.forgetMemoizedLocation = forgetMemoizedLocation
   }
 
   /// Installs the selector key for one newly allocated row.
@@ -146,7 +163,7 @@ private final class CogArenaDescriptorRecord {
 }
 
 /// Phase of one scalar frame in the iterative pull walk.
-private nonisolated enum CogArenaPullPhase {
+internal nonisolated enum CogArenaPullPhase {
   /// Schedule stale dependencies before the consumer.
   case enter
 
@@ -155,7 +172,7 @@ private nonisolated enum CogArenaPullPhase {
 }
 
 /// One row-only frame retained in the context pull buffer.
-private nonisolated struct CogArenaPullFrame {
+internal nonisolated struct CogArenaPullFrame {
   /// Arena row to settle.
   let row: Int32
 
@@ -164,7 +181,7 @@ private nonisolated struct CogArenaPullFrame {
 }
 
 /// Cursor state for one selector currently capturing dependency reads.
-private nonisolated struct CogArenaDependencyCapture {
+internal nonisolated struct CogArenaDependencyCapture {
   /// Derived row receiving every read in this scope.
   let consumer: CogArenaSlot
 
@@ -180,7 +197,7 @@ private nonisolated struct CogArenaDependencyCapture {
 /// The scalar arena row stores this entry's index. Keeping the boundary object
 /// and generation-bearing slot together lets the cold UI flush validate that
 /// a permanent boundary was never detached from its original state.
-private nonisolated struct CogArenaObservationEntry {
+internal nonisolated struct CogArenaObservationEntry {
   /// State lifetime whose UI reads and changes this boundary represents.
   let slot: CogArenaSlot
 
@@ -194,7 +211,7 @@ private nonisolated struct CogArenaObservationEntry {
 /// this independent generation rejects a cancelled or renewed sleeper for the
 /// same occupant. Keeping the task out of ``CogArenaStorage`` prevents lifetime
 /// policy from adding a reference-valued column to hot graph walks.
-private struct CogArenaLifetimeEntry {
+internal struct CogArenaLifetimeEntry {
   /// Monotonic token advanced before cancellation or replacement.
   var generation: UInt64 = 0
 
@@ -213,6 +230,12 @@ private struct CogArenaLifetimeEntry {
 /// function each; state rows own no classes or closures.
 @MainActor
 internal final class CogArenaCore {
+  // Written out, and `nonisolated`, per the rule at the top of
+  // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
+  // class is main-actor-isolated too, so every deallocation asks the
+  // concurrency runtime which executor it is on (`M9-13`).
+  nonisolated deinit {}
+
   /// Scalar state rows shared by every descriptor column.
   let arena: CogArenaStorage
 
@@ -225,47 +248,70 @@ internal final class CogArenaCore {
   /// Latest graph revision assigned by the enclosing context turn.
   private(set) var revision: UInt32 = 0
 
+  /// Process-unique identity of this graph, issued once at construction.
+  ///
+  /// Descriptors are shared across contexts — a test, a preview, and an app
+  /// each build their own `Cogs` over the same declarations — so anything a
+  /// declaration remembers about "its" graph has to say which graph it means.
+  /// Object identity cannot: a deallocated context's address is reusable, and
+  /// a memo compared against a recycled address would silently read another
+  /// context's state. A strictly increasing counter is never reused, so a
+  /// stale memo simply fails to match.
+  let contextIdentity: UInt64
+
+  /// Source of the identities above, advanced once per arena graph.
+  ///
+  /// MainActor-isolated with the rest of the core, so the increment needs no
+  /// atomic. `0` is reserved as the "no memo" sentinel a descriptor starts at.
+  private static var nextContextIdentity: UInt64 = 1
+
   /// Stable descriptor-and-key names resolved to exact slot lifetimes.
-  private var slots: [CogStateIdentity: CogArenaSlot] = [:]
+  var slots: [CogStateIdentity: CogArenaSlot] = [:]
 
   /// Strong registry retaining each descriptor record exactly once.
-  private var recordsByIdentity: [ObjectIdentifier: CogArenaDescriptorRecord] = [:]
+  var recordsByIdentity: [ObjectIdentifier: CogArenaDescriptorRecord] = [:]
 
   /// Integer-indexed unretained view of `recordsByIdentity` for graph walks.
-  private var records: ContiguousArray<Unmanaged<CogArenaDescriptorRecord>> = []
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
+  var records: ContiguousArray<Unmanaged<CogArenaDescriptorRecord>> = []
 
   /// Reused enter/exit storage for iterative warm settlement.
-  private var pullFrames: ContiguousArray<CogArenaPullFrame> = []
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
+  var pullFrames: ContiguousArray<CogArenaPullFrame> = []
 
   /// Reused roots copied from one reaction terminal before its dependencies settle.
   ///
   /// Pulling a producer may recapture edges elsewhere in the shared pool. The
   /// snapshot keeps reaction traversal independent of those mutations without
   /// allocating again after reaching its high-water mark.
-  private var reactionPullRoots: ContiguousArray<CogArenaSlot> = []
+  var reactionPullRoots: ContiguousArray<CogArenaSlot> = []
 
   /// Nested selector scopes, outermost first.
-  private var captures: ContiguousArray<CogArenaDependencyCapture> = []
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
+  var captures: ContiguousArray<CogArenaDependencyCapture> = []
 
   /// UI-read roots in boundary creation order.
   ///
   /// Interior and unread rows never enter this table. Entries are permanent in
   /// v1, making the boundary itself the durable UI lease while the row's scalar
   /// `boundary` column keeps hot storage to one optional index.
-  private var observationEntries: ContiguousArray<CogArenaObservationEntry> = []
+  var observationEntries: ContiguousArray<CogArenaObservationEntry> = []
 
   /// Grace metadata indexed by scalar row for installed value states.
   ///
   /// Reaction-only rows need no entry. The array grows lazily when a value row
   /// is installed and entries reset before a released index changes identity.
-  private var lifetimeEntries: ContiguousArray<CogArenaLifetimeEntry> = []
+  var lifetimeEntries: ContiguousArray<CogArenaLifetimeEntry> = []
 
   #if DEBUG
   /// Fixed-capacity integer history owned by the arena context.
   ///
   /// This property and every use compile out of release. Arena state events
   /// enter it by descriptor index; labels resolve only through `historySnapshot`.
-  private var historyLog = CogArenaHistoryLog()
+  var historyLog = CogArenaHistoryLog()
   #endif
 
   /// Derived rows whose settlement has entered but not completed, outermost first.
@@ -273,7 +319,9 @@ internal final class CogArenaCore {
   /// This stays separate from `pullFrames`: an exit frame is popped before its
   /// selector and equality run, while the row must remain visibly computing
   /// until both have completed.
-  private var computingPath: ContiguousArray<Int32> = []
+  // Unchecked for the reason `CogArenaStorage` records; every element is trivial.
+  @exclusivity(unchecked)
+  var computingPath: ContiguousArray<Int32> = []
 
   /// Whether traversal, selector capture, and post-selector publication are idle.
   ///
@@ -305,6 +353,12 @@ internal final class CogArenaCore {
     self.arena = arena
     self.edges = edges
     self.propagation = CogArenaDirtyPropagation(arena: arena, edges: edges)
+
+    guard Self.nextContextIdentity < UInt64.max else {
+      fatalError("Cog exhausted its UInt64 arena context identity space.")
+    }
+    self.contextIdentity = Self.nextContextIdentity
+    Self.nextContextIdentity += 1
   }
 
   /// Advances the compact arena revision once for an enclosing context turn.
@@ -313,1494 +367,6 @@ internal final class CogArenaCore {
       fatalError("Cog exhausted its UInt32 arena revision space.")
     }
     revision += 1
-  }
-
-  #if COG_CORE_ARENA
-  /// Stages one typed source and registers its row once with the active turn.
-  func writerStage<Value>(
-    _ valueReference: ManualCog<Value>,
-    value: Value,
-    in turn: CogTurn
-  ) {
-    let location = manualLocation(for: valueReference)
-    location.column.stage(value, at: location.slot)
-    touchArenaSource(location.slot, in: turn)
-  }
-
-  /// Registers one staged arena source exactly once with its accumulating turn.
-  ///
-  /// Manual values and async statuses share the same scalar touched bit and
-  /// ordered source list; their descriptor record restores the typed commit.
-  func touchArenaSource(_ slot: CogArenaSlot, in turn: CogTurn) {
-    let row = arena.index(of: slot)
-    guard !arena.flags[row].contains(.touched) else { return }
-    arena.flags[row].insert(.touched)
-    turn.touchArenaSource(slot)
-  }
-
-  /// Publishes every source row touched by one arena turn.
-  func flushPendingSources(_ touchedSources: ContiguousArray<CogArenaSlot>) {
-    for slot in touchedSources {
-      let row = arena.index(of: slot)
-      guard arena.flags[row].contains(.touched) else {
-        fatalError("Cog found an arena turn entry whose source was not touched.")
-      }
-      let record = descriptorRecord(forRow: row)
-      guard record.kind != .derived, let commit = record.commitSource else {
-        fatalError("Cog tried to flush a non-source arena row as pending state.")
-      }
-
-      let changed = commit(slot, revision, propagation)
-      #if DEBUG
-      if changed, record.kind == .manual {
-        recordHistoryState(event: .write, slot: slot)
-      }
-      #endif
-      arena.flags[row].remove(.touched)
-    }
-  }
-  #endif
-
-  /// Reads the pending overlay or current value of one source for a writer.
-  func writerValue<Value>(for valueReference: ManualCog<Value>) -> Value {
-    let location = manualLocation(for: valueReference)
-    return location.column.writerValue(at: location.slot)
-  }
-
-  /// Reads one source without recording a dependency.
-  func manualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
-    let location = manualLocation(for: valueReference)
-    return location.column.current(at: location.slot)
-  }
-
-  #if DEBUG
-  /// Publishes one pre-compared testing seed at the current arena revision.
-  ///
-  /// ``Cogs.seedForTesting(_:to:)`` owns the idle barrier, equality decision,
-  /// and synchronized revision advance. This method updates only arena value
-  /// and propagation columns, deliberately opening no turn or history event.
-  /// An already-installed UI boundary remembers the quiet change so the next
-  /// real turn can emit its one deferred notice without seed doing so itself.
-  func publishTestingSeed<Value>(_ value: Value, for valueReference: ManualCog<Value>) {
-    let location = manualLocation(for: valueReference)
-    location.column.publishSeed(
-      value,
-      at: location.slot,
-      revision: revision,
-      propagatingWith: propagation
-    )
-    observationBoundary(for: location.slot)?.deferChange()
-  }
-  #endif
-
-  /// Pulls one derived value current without recording a dependency.
-  func derivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
-    let location = derivedLocation(for: valueReference)
-    settle(location.slot, in: cogs)
-    return location.column.current(at: location.slot)
-  }
-
-  /// Renews grace after one transient manual-source demand.
-  ///
-  /// The value operation stays pure so testing seeds and internal tracked reads
-  /// cannot accidentally create a sleeper. Public `peek` and ordinary writes
-  /// call this explicit lifetime half after resolving the same stable identity.
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: ManualCog<Value>,
-    in cogs: Cogs
-  ) {
-    let location = manualLocation(for: valueReference)
-    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
-  }
-
-  /// Renews grace after one transient synchronous-derived demand.
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: Cog<Value>,
-    in cogs: Cogs
-  ) {
-    let location = derivedLocation(for: valueReference)
-    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
-  }
-
-  /// Renews grace after one transient async status demand.
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: AsyncCog<Value>,
-    in cogs: Cogs
-  ) {
-    let location = asyncLocation(
-      descriptor: valueReference.descriptor,
-      key: valueReference.key
-    )
-    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
-  }
-
-  /// Reads one source through its lazily allocated Observation boundary.
-  ///
-  /// Resolving the value first installs the arena row; boundary access then
-  /// records the exact public read without creating a graph dependency.
-  func observedManualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
-    let location = manualLocation(for: valueReference)
-    accessObservationBoundary(for: location.slot)
-    return location.column.current(at: location.slot)
-  }
-
-  /// Settles and reads one derived row through its Observation boundary.
-  ///
-  /// Settlement precedes registration so cold computation establishes the
-  /// consumer's baseline before later completed turns can invalidate it.
-  func observedDerivedValue<Value>(for valueReference: Cog<Value>, in cogs: Cogs) -> Value {
-    let location = derivedLocation(for: valueReference)
-    settle(location.slot, in: cogs)
-    accessObservationBoundary(for: location.slot)
-    return location.column.current(at: location.slot)
-  }
-
-  /// Settles and reads one async status through its field-level UI boundary.
-  func observedAsyncStatus<Value>(
-    for valueReference: AsyncCog<Value>,
-    in cogs: Cogs
-  ) -> CogStatus<Value> {
-    let location = asyncLocation(
-      descriptor: valueReference.descriptor,
-      key: valueReference.key
-    )
-    settle(location.slot, in: cogs)
-    let boundary = ensureObservationBoundary(for: location.slot)
-    return location.column.status(at: location.slot).observed(by: boundary)
-  }
-
-  /// Settles and returns one async status without installing a graph consumer.
-  func asyncStatus<Value>(
-    for valueReference: AsyncCog<Value>,
-    in cogs: Cogs
-  ) -> CogStatus<Value> {
-    asyncStatus(
-      descriptor: valueReference.descriptor,
-      key: valueReference.key,
-      in: cogs
-    )
-  }
-
-  /// Settles an async descriptor-and-key status used by its value projection.
-  func asyncStatus<Value>(
-    descriptor: AsyncCogDescriptor<Value>,
-    key: CogKey?,
-    in cogs: Cogs
-  ) -> CogStatus<Value> {
-    let location = asyncLocation(descriptor: descriptor, key: key)
-    settle(location.slot, in: cogs)
-    return location.column.status(at: location.slot)
-  }
-
-  /// Forces one fresh arena async generation and returns its exact waiter.
-  func refresh<Value>(_ valueReference: AsyncCog<Value>, in cogs: Cogs) -> CogRefresh<Value> {
-    let location = asyncLocation(
-      descriptor: valueReference.descriptor,
-      key: valueReference.key
-    )
-    let waiter = CogRefreshWaiter<Value>()
-    let refresh = CogRefresh(waiter: waiter)
-    guard location.column.hasStatus(at: location.slot) else {
-      settle(location.slot, in: cogs)
-      location.column.register(
-        waiter,
-        for: location.column.generation(at: location.slot),
-        at: location.slot
-      )
-      return refresh
-    }
-
-    cogs.withSystemTurn("\(renderedName(for: location.slot)) pending") { turn in
-      guard self.stillStores(location.slot, descriptor: valueReference.descriptor) else {
-        waiter.resolve(.released)
-        return
-      }
-      let row = self.arena.index(of: location.slot)
-      if let cycle = self.cyclePath(ifEnteringRow: row) {
-        fatalError(cycle.message)
-      }
-      self.beginComputing(row)
-      defer { self.endComputing(row) }
-      self.recomputeAsync(
-        descriptor: valueReference.descriptor,
-        column: location.column,
-        slot: location.slot,
-        key: valueReference.key,
-        publishingPendingIn: turn,
-        refreshWaiter: waiter,
-        in: cogs
-      )
-    }
-    return refresh
-  }
-
-  /// Number of arena rows permanently pinned by a UI boundary.
-  var observationBoundaryCount: Int {
-    observationEntries.count
-  }
-
-  /// Whether an already-created descriptor-and-key row owns a UI boundary.
-  ///
-  /// The lookup is observational: an unknown identity returns `false` without
-  /// allocating a row, descriptor record, value cell, or boundary.
-  func hasObservationBoundary(for identity: CogStateIdentity) -> Bool {
-    guard let slot = slots[identity], arena.contains(slot) else { return false }
-    return arena.boundary[arena.index(of: slot)] != CogArenaStorage.noIndex
-  }
-
-  /// Descriptor lifetime restored by an installed manual arena row.
-  ///
-  /// This internal diagnostic lets infrastructure tests prove that the arena
-  /// dispatch record, rather than only the declaration object, carries policy.
-  func lifetimePolicy<Value>(for valueReference: ManualCog<Value>) -> CogStateLifetime {
-    let location = manualLocation(for: valueReference)
-    return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
-  }
-
-  /// Descriptor lifetime restored by an installed derived arena row.
-  func lifetimePolicy<Value>(for valueReference: Cog<Value>) -> CogStateLifetime {
-    let location = derivedLocation(for: valueReference)
-    return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
-  }
-
-  /// Durable reaction and UI owners of one installed manual arena row.
-  func leaseCount<Value>(for valueReference: ManualCog<Value>) -> UInt32 {
-    let location = manualLocation(for: valueReference)
-    return arena.leaseCount[arena.index(of: location.slot)]
-  }
-
-  /// Durable reaction and UI owners of one installed derived arena row.
-  func leaseCount<Value>(for valueReference: Cog<Value>) -> UInt32 {
-    let location = derivedLocation(for: valueReference)
-    return arena.leaseCount[arena.index(of: location.slot)]
-  }
-
-  /// Settles and notifies the boundary roots changed in this arena revision.
-  ///
-  /// The count snapshot preserves the simple core's baseline rule: a boundary
-  /// created while another root settles joins the next flush and cannot receive
-  /// a notice for a change that predates its first observed value.
-  func flushObservationBoundaries(in cogs: Cogs) {
-    let boundaryCount = observationEntries.count
-    for entry in observationEntries.prefix(boundaryCount) {
-      let row = arena.index(of: entry.slot)
-      let record = descriptorRecord(forRow: row)
-      if record.kind != .manual, needsSettlement(row) {
-        settle(entry.slot, in: cogs)
-      }
-
-      let changedThisTurn = arena.changedAt[row] == revision
-      #if DEBUG
-      let changedBySeed = entry.boundary.consumeDeferredChange()
-      guard changedThisTurn || changedBySeed else { continue }
-      recordHistoryState(event: .notice, slot: entry.slot)
-      #else
-      guard changedThisTurn else { continue }
-      #endif
-      record.notifyObservation(entry.slot, entry.boundary)
-    }
-  }
-
-  /// Releases one unobserved derived row and allocates a replacement row.
-  ///
-  /// This package diagnostic drives PERF-05 through real descriptor lookup,
-  /// typed-column removal, edge cleanup, identity removal, and arena reuse. The
-  /// replacement is settled before the result returns, proving its new slot
-  /// lifetime carries an independent value rather than stale column storage.
-  func slotReuseSnapshot<ReleasedValue, ReplacementValue>(
-    releasing releasedReference: Cog<ReleasedValue>,
-    replacingWith replacementReference: Cog<ReplacementValue>,
-    in cogs: Cogs
-  ) -> CogArenaSlotReuseSnapshot {
-    _ = derivedValue(for: releasedReference, in: cogs)
-    let released = releaseDerivedState(for: releasedReference)
-
-    let replacement = derivedLocation(for: replacementReference)
-    settle(replacement.slot, in: cogs)
-
-    return CogArenaSlotReuseSnapshot(
-      releasedIndex: released.index,
-      releasedGeneration: released.generation,
-      replacementIndex: replacement.slot.index,
-      replacementGeneration: replacement.slot.generation
-    )
-  }
-
-  /// Runs the PERF-05 reuse path and deliberately resolves the retired token.
-  ///
-  /// Called only inside a debug exit test. The final access must terminate with
-  /// the arena's stale-generation diagnostic rather than reaching the new
-  /// occupant that now owns the same integer row.
-  func trapOnStaleSlotAccess<ReleasedValue, ReplacementValue>(
-    releasing releasedReference: Cog<ReleasedValue>,
-    replacingWith replacementReference: Cog<ReplacementValue>,
-    in cogs: Cogs
-  ) {
-    _ = derivedValue(for: releasedReference, in: cogs)
-    let released = releaseDerivedState(for: releasedReference)
-
-    let replacement = derivedLocation(for: replacementReference)
-    settle(replacement.slot, in: cogs)
-
-    _ = arena.index(of: released)
-  }
-
-  #if DEBUG
-  /// Records one outer turn in the arena-owned total history order.
-  func recordHistoryTurn(named name: String) {
-    historyLog.recordTurn(named: name)
-  }
-
-  /// Records a class-backed state event while its capability is still bridged.
-  func recordHistoryState(event: CogHistoryEvent, label: CogLabel, key: CogKey?) {
-    historyLog.recordState(event: event, label: label, key: key)
-  }
-
-  /// Records one export offer beside arena graph events.
-  func recordHistoryOffer(label: CogLabel) {
-    historyLog.recordOffer(label: label)
-  }
-
-  /// Records one reaction or watch body beside arena graph events.
-  func recordHistoryEffect(label: CogLabel) {
-    historyLog.recordEffect(label: label)
-  }
-
-  /// Public debug snapshot with descriptor labels resolved off the hot path.
-  var historySnapshot: CogHistory {
-    historyLog.snapshot { descriptorIndex in
-      descriptorRecord(at: descriptorIndex).label
-    }
-  }
-
-  /// Records an arena row as integer descriptor identity plus its erased key.
-  private func recordHistoryState(event: CogHistoryEvent, slot: CogArenaSlot) {
-    let row = arena.index(of: slot)
-    let record = descriptorRecord(forRow: row)
-    historyLog.recordState(
-      event: event,
-      descriptor: record.index,
-      key: record.key(at: row)
-    )
-  }
-  #endif
-
-  /// Allocates one value-less terminal row for a reaction registration.
-  ///
-  /// The reaction object still owns its closure and cancellation identity, but
-  /// dependency and subscriber topology terminates at this generated slot. A
-  /// terminal has no descriptor, value column, boundary, or subscribers.
-  func allocateReaction() -> CogArenaSlot {
-    let slot = arena.allocate()
-    arena.checkedAt[arena.index(of: slot)] = revision
-    return slot
-  }
-
-  /// Reconciles one reaction terminal's ordered arena dependency prefix.
-  ///
-  /// Nested derived settlement temporarily pushes selector captures above this
-  /// one. The generated slot therefore participates in the same concrete edge
-  /// storage without a class-backed bridge or a second selector run.
-  func captureReactionDependencies<Result>(
-    for reaction: CogArenaSlot,
-    _ body: () -> Result
-  ) -> Result {
-    _ = requireReactionRow(reaction)
-    return withDependencyCapture(for: reaction, body)
-  }
-
-  /// Reconciles the durable leases owned by one completed reaction run.
-  ///
-  /// Only unique, directly read `whileObserved` producers enter the next set.
-  /// Acquisitions happen before removals, so retracking a still-read root never
-  /// exposes a false zero-count instant to the lifetime engine. Both buffers
-  /// belong to the reaction object and trade roles after the pass, retaining
-  /// their high-water capacities across steady runs.
-  func reconcileReactionLeases(
-    for reaction: CogArenaSlot,
-    current: inout ContiguousArray<CogArenaSlot>,
-    scratch: inout ContiguousArray<CogArenaSlot>,
-    in cogs: Cogs
-  ) {
-    _ = requireReactionRow(reaction)
-    scratch.removeAll(keepingCapacity: true)
-
-    var cursor = edges.firstDependency(of: reaction.index, in: arena)
-    while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == reaction.index else {
-        fatalError("Cog found another consumer's edge in an arena reaction lease list.")
-      }
-      let producerRow = liveRow(dependency.producer)
-      let record = descriptorRecord(forRow: producerRow)
-      if case .whileObserved = record.lifetime {
-        let producer = CogArenaSlot(
-          index: dependency.producer,
-          generation: arena.generation[producerRow]
-        )
-        if !scratch.contains(producer) {
-          scratch.append(producer)
-        }
-      }
-      cursor = dependency.next
-    }
-
-    for producer in scratch where !current.contains(producer) {
-      incrementLease(on: producer)
-    }
-    for producer in current where !scratch.contains(producer) {
-      decrementLease(on: producer, schedulingIn: cogs)
-    }
-
-    swap(&current, &scratch)
-    scratch.removeAll(keepingCapacity: true)
-  }
-
-  /// Releases every durable root owned by a cancelled arena reaction.
-  func releaseReactionLeases(
-    _ leases: inout ContiguousArray<CogArenaSlot>,
-    in cogs: Cogs
-  ) {
-    for producer in leases {
-      decrementLease(on: producer, schedulingIn: cogs)
-    }
-    leases.removeAll(keepingCapacity: true)
-  }
-
-  /// Balances reaction ownership while the enclosing context is disappearing.
-  ///
-  /// Teardown cancels all arena sleepers in one later pass, so beginning fresh
-  /// grace here would create work that no state in this context can outlive.
-  func releaseReactionLeasesForContextTeardown(
-    _ leases: inout ContiguousArray<CogArenaSlot>
-  ) {
-    for producer in leases {
-      decrementLeaseWithoutScheduling(on: producer)
-    }
-    leases.removeAll(keepingCapacity: true)
-  }
-
-  /// Whether propagation left CHECK or DIRTY work on one reaction terminal.
-  func reactionNeedsSettlement(_ reaction: CogArenaSlot) -> Bool {
-    needsSettlement(requireReactionRow(reaction))
-  }
-
-  /// Settles a reaction's arena producers and reports whether its body must run.
-  ///
-  /// Producer slots are copied into reused storage before pulls begin because a
-  /// derived recomputation may recapture other lists in the shared edge pool.
-  /// Equal recomputations leave their older `changedAt`, allowing this terminal
-  /// to backdate and stay quiet exactly like an ordinary derived consumer.
-  func settleReactionDependencies(_ reaction: CogArenaSlot, in cogs: Cogs) -> Bool {
-    let reactionRow = requireReactionRow(reaction)
-    guard needsSettlement(reactionRow) else { return false }
-    guard reactionPullRoots.isEmpty else {
-      fatalError("Cog tried to reenter arena reaction dependency settlement.")
-    }
-    defer { reactionPullRoots.removeAll(keepingCapacity: true) }
-
-    var cursor = edges.firstDependency(of: reaction.index, in: arena)
-    while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == reaction.index else {
-        fatalError("Cog found another consumer's edge in an arena reaction list.")
-      }
-      let producerRow = liveRow(dependency.producer)
-      if needsSettlement(producerRow) {
-        let record = descriptorRecord(forRow: producerRow)
-        guard record.kind != .manual else {
-          fatalError("Cog found an unsettled manual source behind an arena reaction.")
-        }
-        reactionPullRoots.append(
-          CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
-        )
-      }
-      cursor = dependency.next
-    }
-
-    for producer in reactionPullRoots {
-      settle(producer, in: cogs)
-    }
-
-    let mustRun =
-      arena.flags[reactionRow].contains(.dirty)
-      || dependencyChanged(for: reaction.index)
-    if !mustRun {
-      completeReactionRun(reaction)
-    }
-    return mustRun
-  }
-
-  /// Marks a completed reaction body current and clears its terminal flags.
-  func completeReactionRun(_ reaction: CogArenaSlot) {
-    let row = requireReactionRow(reaction)
-    arena.checkedAt[row] = revision
-    arena.flags[row].remove(.check)
-    arena.flags[row].remove(.dirty)
-  }
-
-  /// Removes one cancelled reaction's edges and returns its terminal slot.
-  func releaseReaction(_ reaction: CogArenaSlot) {
-    let row = requireReactionRow(reaction)
-    guard !captures.contains(where: { $0.consumer == reaction }) else {
-      fatalError("Cog tried to release an arena reaction during dependency capture.")
-    }
-    guard edges.firstSubscriber(of: reaction.index, in: arena) == .none else {
-      fatalError("Cog found subscribers on an arena reaction terminal.")
-    }
-    guard arena.leaseCount[row] == 0 else {
-      fatalError("Cog found durable leases on an arena reaction terminal.")
-    }
-    edges.removeDependencySuffix(of: reaction, after: .none, in: arena)
-    guard arena.deps[row] == .none, arena.subs[row] == .none else {
-      fatalError("Cog tried to release a linked arena reaction terminal.")
-    }
-    arena.release(reaction)
-  }
-
-  /// Reads and records one manual dependency for the active arena selector.
-  func read<Value>(
-    _ valueReference: ManualCog<Value>,
-    for consumer: CogArenaSlot
-  ) -> Value {
-    requireTracking(consumer)
-    let producer = manualLocation(for: valueReference)
-    recordDependency(from: consumer, on: producer.slot)
-    return producer.column.current(at: producer.slot)
-  }
-
-  /// Pulls, reads, and records one derived dependency for the active selector.
-  func read<Value>(
-    _ valueReference: Cog<Value>,
-    for consumer: CogArenaSlot,
-    in cogs: Cogs
-  ) -> Value {
-    requireTracking(consumer)
-    let producer = derivedLocation(for: valueReference)
-    settle(producer.slot, in: cogs)
-    requireTracking(consumer)
-    recordDependency(from: consumer, on: producer.slot)
-    return producer.column.current(at: producer.slot)
-  }
-
-  /// Pulls, reads, and records one async status dependency for an arena consumer.
-  func readAsyncStatus<Value>(
-    descriptor: AsyncCogDescriptor<Value>,
-    key: CogKey?,
-    for consumer: CogArenaSlot,
-    in cogs: Cogs
-  ) -> CogStatus<Value> {
-    requireTracking(consumer)
-    let producer = asyncLocation(descriptor: descriptor, key: key)
-    settle(producer.slot, in: cogs)
-    requireTracking(consumer)
-    recordDependency(from: consumer, on: producer.slot)
-    return producer.column.status(at: producer.slot)
-  }
-
-  /// Previous completed value of the active derived selector, if one exists.
-  func previousValue<Value>(for consumer: CogArenaSlot, as: Value.Type) -> Value? {
-    requireTracking(consumer)
-    let row = arena.index(of: consumer)
-    let record = descriptorRecord(forRow: row)
-    guard let column = record.column as? CogArenaValueColumn<Value> else {
-      fatalError("Cog restored an arena selector through the wrong typed value column.")
-    }
-    return column.storedValue(at: consumer)
-  }
-
-  /// Requires `consumer` to own the innermost active dependency capture.
-  func requireTracking(_ consumer: CogArenaSlot) {
-    guard captures.last?.consumer == consumer else {
-      fatalError("A Cog reader is valid only inside the selector run that handed it out.")
-    }
-  }
-
-  /// Resolves a live descriptor-less row reserved for one reaction terminal.
-  private func requireReactionRow(_ reaction: CogArenaSlot) -> Int {
-    let row = arena.index(of: reaction)
-    guard arena.descriptor[row] == CogArenaStorage.noIndex else {
-      fatalError("Cog tried to use a value-state row as an arena reaction terminal.")
-    }
-    guard arena.boundary[row] == CogArenaStorage.noIndex else {
-      fatalError("Cog found an Observation boundary on an arena reaction terminal.")
-    }
-    return row
-  }
-
-  /// Resolves or creates one manual row and its typed descriptor column.
-  private func manualLocation<Value>(
-    for valueReference: ManualCog<Value>
-  ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
-    let setup = manualRecord(for: valueReference.descriptor)
-    let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
-      key: valueReference.key
-    )
-    if let slot = existingSlot(for: identity, record: setup.record) {
-      return (slot, setup.column)
-    }
-
-    let slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
-    setup.column.insert(
-      valueReference.descriptor.startingValue(forKey: valueReference.key), at: slot)
-    return (slot, setup.column)
-  }
-
-  /// Resolves or creates one cold derived row and its typed descriptor column.
-  private func derivedLocation<Value>(
-    for valueReference: Cog<Value>
-  ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
-    let setup = derivedRecord(for: valueReference.descriptor)
-    let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
-      key: valueReference.key
-    )
-    if let slot = existingSlot(for: identity, record: setup.record) {
-      return (slot, setup.column)
-    }
-
-    let slot = installSlot(for: identity, record: setup.record, key: valueReference.key)
-    arena.flags[arena.index(of: slot)].insert(.dirty)
-    return (slot, setup.column)
-  }
-
-  /// Resolves or creates one cold async status row and its descriptor sidecars.
-  private func asyncLocation<Value>(
-    descriptor: AsyncCogDescriptor<Value>,
-    key: CogKey?
-  ) -> (slot: CogArenaSlot, column: CogArenaAsyncColumn<Value>) {
-    let setup = asyncRecord(for: descriptor)
-    let identity = CogStateIdentity(descriptor: descriptor.identity, key: key)
-    if let slot = existingSlot(for: identity, record: setup.record) {
-      return (slot, setup.column)
-    }
-
-    let slot = installSlot(for: identity, record: setup.record, key: key)
-    setup.column.install(at: slot)
-    arena.flags[arena.index(of: slot)].insert(.dirty)
-    return (slot, setup.column)
-  }
-
-  /// Restores the manual descriptor's concrete column through checked setup.
-  private func manualRecord<Value>(
-    for descriptor: ManualCogDescriptor<Value>
-  ) -> (record: CogArenaDescriptorRecord, column: CogArenaValueColumn<Value>) {
-    if let record = recordsByIdentity[descriptor.identity] {
-      guard record.kind == .manual,
-        let column = record.column as? CogArenaValueColumn<Value>
-      else {
-        fatalError("Cog restored a manual arena descriptor with the wrong value type.")
-      }
-      return (record, column)
-    }
-
-    let column = CogArenaValueColumn<Value>(
-      in: arena,
-      equals: { descriptor.valuesAreEqual($0, $1) }
-    )
-    let record = makeRecord(
-      identity: descriptor.identity,
-      label: descriptor.label,
-      kind: .manual,
-      lifetime: descriptor.lifetime,
-      column: column,
-      asyncColumn: nil,
-      commitSource: { slot, revision, propagation in
-        column.commitSource(at: slot, revision: revision, propagatingWith: propagation)
-      },
-      recompute: nil,
-      notifyObservation: { _, boundary in boundary.notifyValueChange() },
-      removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: {}
-    )
-    return (record, column)
-  }
-
-  /// Restores the derived descriptor's concrete column and recompute function.
-  private func derivedRecord<Value>(
-    for descriptor: DerivedCogDescriptor<Value>
-  ) -> (record: CogArenaDescriptorRecord, column: CogArenaValueColumn<Value>) {
-    if let record = recordsByIdentity[descriptor.identity] {
-      guard record.kind == .derived,
-        let column = record.column as? CogArenaValueColumn<Value>
-      else {
-        fatalError("Cog restored a derived arena descriptor with the wrong value type.")
-      }
-      return (record, column)
-    }
-
-    let column = CogArenaValueColumn<Value>(
-      in: arena,
-      equals: { descriptor.valuesAreEqual($0, $1) }
-    )
-    let record = makeRecord(
-      identity: descriptor.identity,
-      label: descriptor.label,
-      kind: .derived,
-      lifetime: descriptor.lifetime,
-      column: column,
-      asyncColumn: nil,
-      commitSource: nil,
-      recompute: { core, cogs, slot, key in
-        core.recompute(descriptor: descriptor, column: column, slot: slot, key: key, in: cogs)
-      },
-      notifyObservation: { _, boundary in boundary.notifyValueChange() },
-      removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: {}
-    )
-    return (record, column)
-  }
-
-  /// Restores one async descriptor's concrete status and task sidecars.
-  private func asyncRecord<Value>(
-    for descriptor: AsyncCogDescriptor<Value>
-  ) -> (record: CogArenaDescriptorRecord, column: CogArenaAsyncColumn<Value>) {
-    if let record = recordsByIdentity[descriptor.identity] {
-      guard record.kind == .async,
-        let column = record.asyncColumn as? CogArenaAsyncColumn<Value>
-      else {
-        fatalError("Cog restored an async arena descriptor with the wrong value type.")
-      }
-      return (record, column)
-    }
-
-    let column = CogArenaAsyncColumn(in: arena, descriptor: descriptor)
-    let record = makeRecord(
-      identity: descriptor.identity,
-      label: descriptor.label,
-      kind: .async,
-      lifetime: descriptor.lifetime,
-      column: column.statuses,
-      asyncColumn: column,
-      commitSource: { slot, revision, propagation in
-        column.commitPending(
-          at: slot,
-          revision: revision,
-          propagatingWith: propagation
-        )
-      },
-      recompute: { core, cogs, slot, key in
-        core.recomputeAsync(
-          descriptor: descriptor,
-          column: column,
-          slot: slot,
-          key: key,
-          in: cogs
-        )
-      },
-      notifyObservation: { slot, boundary in
-        column.notifyObservation(at: slot, through: boundary)
-      },
-      removeValue: { slot in column.remove(at: slot) },
-      prepareForContextTeardown: { column.prepareForContextTeardown() }
-    )
-    return (record, column)
-  }
-
-  /// Registers one descriptor and returns its dense dispatch record.
-  private func makeRecord(
-    identity: ObjectIdentifier,
-    label: CogLabel,
-    kind: CogArenaDescriptorKind,
-    lifetime: CogStateLifetime,
-    column: AnyObject,
-    asyncColumn: AnyObject?,
-    commitSource: (@MainActor (CogArenaSlot, UInt32, CogSelectedArenaDirtyPropagation) -> Bool)?,
-    recompute: (@MainActor (CogArenaCore, Cogs, CogArenaSlot, CogKey?) -> Void)?,
-    notifyObservation: @escaping @MainActor (CogArenaSlot, CogObservationBoundary) -> Void,
-    removeValue: @escaping @MainActor (CogArenaSlot) -> Void,
-    prepareForContextTeardown: @escaping @MainActor () -> Void
-  ) -> CogArenaDescriptorRecord {
-    guard records.count <= Int(Int32.max) else {
-      fatalError("Cog exhausted its Int32 arena descriptor index space.")
-    }
-    let record = CogArenaDescriptorRecord(
-      identity: identity,
-      label: label,
-      index: Int32(records.count),
-      kind: kind,
-      lifetime: lifetime,
-      column: column,
-      asyncColumn: asyncColumn,
-      commitSource: commitSource,
-      recompute: recompute,
-      notifyObservation: notifyObservation,
-      removeValue: removeValue,
-      prepareForContextTeardown: prepareForContextTeardown
-    )
-    recordsByIdentity[identity] = record
-    records.append(.passUnretained(record))
-    return record
-  }
-
-  /// Returns the exact live slot already filed for `identity`, when present.
-  private func existingSlot(
-    for identity: CogStateIdentity,
-    record: CogArenaDescriptorRecord
-  ) -> CogArenaSlot? {
-    guard let slot = slots[identity] else { return nil }
-    let row = arena.index(of: slot)
-    guard arena.descriptor[row] == record.index else {
-      fatalError("Cog found an arena state filed under another descriptor record.")
-    }
-    return slot
-  }
-
-  /// Whether one exact slot still belongs to the supplied async descriptor.
-  ///
-  /// Work completions combine this context identity check with the descriptor
-  /// column's UInt64 generation, so cancellation and scalar slot reuse are both
-  /// advisory rather than correctness boundaries.
-  func stillStores<Value>(
-    _ slot: CogArenaSlot,
-    descriptor: AsyncCogDescriptor<Value>
-  ) -> Bool {
-    guard arena.contains(slot) else { return false }
-    let row = Int(slot.index)
-    let record = descriptorRecord(forRow: row)
-    guard record.identity == descriptor.identity else { return false }
-    let identity = CogStateIdentity(descriptor: descriptor.identity, key: record.key(at: row))
-    return slots[identity] == slot
-  }
-
-  /// Renders one live row with the diagnostic naming rule shared by task turns.
-  private func renderedName(for slot: CogArenaSlot) -> String {
-    let row = arena.index(of: slot)
-    let record = descriptorRecord(forRow: row)
-    guard let key = record.key(at: row) else { return "\(record.label)" }
-    return "\(record.label)[\(key.erased.base)]"
-  }
-
-  /// Allocates and files one row for a descriptor-and-key identity.
-  private func installSlot(
-    for identity: CogStateIdentity,
-    record: CogArenaDescriptorRecord,
-    key: CogKey?
-  ) -> CogArenaSlot {
-    let slot = arena.allocate()
-    let row = arena.index(of: slot)
-    arena.descriptor[row] = record.index
-    resetLifetimeEntry(at: row)
-    record.install(key: key, at: row)
-    slots[identity] = slot
-    return slot
-  }
-
-  /// Removes one settled, unobserved derived state for the slot-reuse probe.
-  ///
-  /// Production grace expiry reaches the same erased release sequence. This
-  /// typed entry only proves that the diagnostic names the expected descriptor
-  /// before it deliberately returns the retired token to its caller.
-  private func releaseDerivedState<Value>(for valueReference: Cog<Value>) -> CogArenaSlot {
-    let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
-      key: valueReference.key
-    )
-    guard let slot = slots[identity] else {
-      fatalError("Cog tried to release an arena derived state that was not installed.")
-    }
-
-    let setup = derivedRecord(for: valueReference.descriptor)
-    let row = arena.index(of: slot)
-    guard arena.descriptor[row] == setup.record.index else {
-      fatalError("Cog tried to release an arena row through another descriptor.")
-    }
-    var ignoredDependencies: ContiguousArray<CogArenaSlot> = []
-    releaseValueState(slot, appendingDependenciesTo: &ignoredDependencies)
-    return slot
-  }
-
-  /// Records one ordinary UI value access on a slot's stable boundary.
-  private func accessObservationBoundary(for slot: CogArenaSlot) {
-    ensureObservationBoundary(for: slot).accessValue()
-  }
-
-  /// Returns an existing boundary after validating its exact slot lifetime.
-  ///
-  /// Unlike ``ensureObservationBoundary(for:)``, this lookup never creates or
-  /// pins a boundary. Debug seed uses it so setup cannot make an unread state
-  /// pay the permanent UI-lifetime cost merely to remember a deferred change.
-  private func observationBoundary(for slot: CogArenaSlot) -> CogObservationBoundary? {
-    let row = arena.index(of: slot)
-    let existingIndex = arena.boundary[row]
-    guard existingIndex != CogArenaStorage.noIndex else { return nil }
-    guard existingIndex >= 0, Int(existingIndex) < observationEntries.count else {
-      fatalError("Cog found an arena row with an invalid Observation boundary index.")
-    }
-    let entry = observationEntries[Int(existingIndex)]
-    guard entry.slot == slot else {
-      fatalError("Cog found an Observation boundary attached to another arena slot lifetime.")
-    }
-    return entry.boundary
-  }
-
-  /// Returns the slot's existing boundary or creates its sole cold entry.
-  ///
-  /// The row stores only an `Int32` index. The ordered table owns the registrar
-  /// object and exact slot generation, so graph walks never load a reference
-  /// merely because a different row crossed the UI boundary.
-  private func ensureObservationBoundary(for slot: CogArenaSlot) -> CogObservationBoundary {
-    let row = arena.index(of: slot)
-    if let existing = observationBoundary(for: slot) { return existing }
-
-    guard observationEntries.count <= Int(Int32.max) else {
-      fatalError("Cog exhausted its Int32 Observation boundary index space.")
-    }
-    let boundary = CogObservationBoundary()
-    incrementLease(on: slot)
-    arena.boundary[row] = Int32(observationEntries.count)
-    observationEntries.append(CogArenaObservationEntry(slot: slot, boundary: boundary))
-    return boundary
-  }
-
-  /// Adds one durable owner to a releasable row without permitting wraparound.
-  ///
-  /// App-lifetime rows need no count: their descriptor policy alone keeps them
-  /// resident. The count therefore stays a precise ownership proof only for
-  /// rows whose zero transition can later begin grace.
-  private func incrementLease(on slot: CogArenaSlot) {
-    let row = arena.index(of: slot)
-    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
-    cancelPendingLifetimeRelease(on: slot)
-    guard arena.leaseCount[row] < UInt32.max else {
-      fatalError("A Cog arena state's durable lifetime lease count overflowed.")
-    }
-    arena.leaseCount[row] += 1
-  }
-
-  /// Removes one durable owner and begins grace at the exact zero transition.
-  private func decrementLease(on slot: CogArenaSlot, schedulingIn cogs: Cogs) {
-    decrementLeaseWithoutScheduling(on: slot)
-    let row = arena.index(of: slot)
-    guard arena.leaseCount[row] == 0 else { return }
-    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
-    scheduleLifetimeReleaseIfUnobserved(slot, in: cogs)
-  }
-
-  /// Removes one owner without creating graph work during context teardown.
-  private func decrementLeaseWithoutScheduling(on slot: CogArenaSlot) {
-    let row = arena.index(of: slot)
-    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
-    guard arena.leaseCount[row] > 0 else {
-      fatalError("A Cog arena state's durable lifetime lease count underflowed.")
-    }
-    arena.leaseCount[row] -= 1
-  }
-
-  /// Starts or renews the sole grace sleeper for one transiently demanded row.
-  ///
-  /// Internal subscribers do not block scheduling. If they still retain the
-  /// state at expiry, the check clears `pendingGeneration` and leaves the row
-  /// for its downstream root's later release cascade.
-  private func scheduleLifetimeReleaseIfUnobserved(
-    _ slot: CogArenaSlot,
-    in cogs: Cogs
-  ) {
-    let row = arena.index(of: slot)
-    let record = descriptorRecord(forRow: row)
-    guard case .whileObserved(let declaredGrace) = record.lifetime else { return }
-    guard arena.leaseCount[row] == 0 else { return }
-    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
-
-    lifetimeEntries[row].task?.cancel()
-    let generation = advanceLifetimeReleaseGeneration(at: row)
-    lifetimeEntries[row].pendingGeneration = generation
-    let grace = declaredGrace ?? cogs.defaultWhileObservedGrace
-    let clock = cogs.clock
-
-    lifetimeEntries[row].task = Task { @MainActor [weak self, weak cogs] in
-      do {
-        try await clock.sleep(for: grace)
-      } catch {
-        return
-      }
-
-      guard let self, let cogs else { return }
-      self.releaseValueStateIfEligible(
-        slot,
-        lifetimeGeneration: generation,
-        in: cogs
-      )
-    }
-  }
-
-  /// Checks one completed grace deadline against its exact row occupant.
-  ///
-  /// The check acknowledgement is consumed even when a lease, boundary,
-  /// subscriber, renewal, release, or slot reuse makes the deadline ineligible.
-  private func releaseValueStateIfEligible(
-    _ slot: CogArenaSlot,
-    lifetimeGeneration: UInt64,
-    in cogs: Cogs
-  ) {
-    defer { cogs.acknowledgeLifetimeReleaseCheckIfRequested() }
-
-    guard arena.contains(slot) else { return }
-    let row = arena.index(of: slot)
-    guard row < lifetimeEntries.count else { return }
-    if lifetimeEntries[row].pendingGeneration == lifetimeGeneration {
-      lifetimeEntries[row].pendingGeneration = nil
-      lifetimeEntries[row].task = nil
-    }
-
-    guard lifetimeEntries[row].generation == lifetimeGeneration else { return }
-    guard arena.leaseCount[row] == 0 else { return }
-    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { return }
-    guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
-    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { return }
-
-    releaseUnobservedClosure(startingAt: slot)
-    cogs.acknowledgeLifetimeReleaseIfRequested()
-  }
-
-  /// Releases the root and newly disconnected unobserved dependencies.
-  ///
-  /// A dependency with a future deadline keeps that independent grace. One
-  /// whose own deadline already elapsed while subscribed has no pending token
-  /// and leaves in this same iterative cascade, so internal edges never grant a
-  /// second grace period.
-  private func releaseUnobservedClosure(startingAt root: CogArenaSlot) {
-    var candidates: ContiguousArray<CogArenaSlot> = [root]
-    var index = 0
-
-    while index < candidates.count {
-      let slot = candidates[index]
-      index += 1
-
-      guard arena.contains(slot) else { continue }
-      let row = arena.index(of: slot)
-      guard arena.leaseCount[row] == 0 else { continue }
-      guard case .whileObserved = descriptorRecord(forRow: row).lifetime else { continue }
-      guard arena.boundary[row] == CogArenaStorage.noIndex else { continue }
-      guard edges.firstSubscriber(of: slot.index, in: arena) == .none else { continue }
-      guard slot == root || lifetimeEntries[row].pendingGeneration == nil else { continue }
-
-      releaseValueState(slot, appendingDependenciesTo: &candidates)
-    }
-  }
-
-  /// Removes one exact value row from topology, typed storage, and identity.
-  ///
-  /// Dependencies are captured before edge removal so newly unreferenced
-  /// upstream states can join the same lifetime cascade. Every owner clears
-  /// before the scalar index is returned for reuse.
-  private func releaseValueState(
-    _ slot: CogArenaSlot,
-    appendingDependenciesTo candidates: inout ContiguousArray<CogArenaSlot>
-  ) {
-    let row = arena.index(of: slot)
-    let record = descriptorRecord(forRow: row)
-    guard arena.boundary[row] == CogArenaStorage.noIndex else {
-      fatalError("Cog tried to release an arena state pinned by a UI boundary.")
-    }
-    guard arena.leaseCount[row] == 0 else {
-      fatalError("Cog tried to release an arena state with durable leases.")
-    }
-    guard edges.firstSubscriber(of: slot.index, in: arena) == .none else {
-      fatalError("Cog tried to release an arena state with live subscribers.")
-    }
-    guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
-      fatalError("Cog tried to release an arena state during active graph work.")
-    }
-
-    var cursor = edges.firstDependency(of: slot.index, in: arena)
-    while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == slot.index else {
-        fatalError("Cog found another consumer's edge in an arena release list.")
-      }
-      let producerRow = liveRow(dependency.producer)
-      candidates.append(
-        CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
-      )
-      cursor = dependency.next
-    }
-
-    let key = record.key(at: row)
-    let identity = CogStateIdentity(descriptor: record.identity, key: key)
-    cancelPendingLifetimeRelease(on: slot)
-    edges.removeDependencySuffix(of: slot, after: .none, in: arena)
-    record.removeValue(slot)
-    record.removeKey(at: row)
-    guard slots.removeValue(forKey: identity) == slot else {
-      fatalError("Cog removed a different arena slot from state identity storage.")
-    }
-    arena.release(slot)
-  }
-
-  /// Cancels a sleeper before a lease, release, or context teardown can race it.
-  private func cancelPendingLifetimeRelease(on slot: CogArenaSlot) {
-    let row = arena.index(of: slot)
-    _ = advanceLifetimeReleaseGeneration(at: row)
-    lifetimeEntries[row].pendingGeneration = nil
-    lifetimeEntries[row].task?.cancel()
-    lifetimeEntries[row].task = nil
-  }
-
-  /// Advances a row's deadline token without permitting stale-token wraparound.
-  private func advanceLifetimeReleaseGeneration(at row: Int) -> UInt64 {
-    guard lifetimeEntries[row].generation < UInt64.max else {
-      fatalError("A Cog arena state's lifetime release generation overflowed.")
-    }
-    lifetimeEntries[row].generation += 1
-    return lifetimeEntries[row].generation
-  }
-
-  /// Installs empty cold metadata for a newly allocated value-row occupant.
-  private func resetLifetimeEntry(at row: Int) {
-    if row >= lifetimeEntries.count {
-      lifetimeEntries.append(
-        contentsOf: repeatElement(CogArenaLifetimeEntry(), count: row + 1 - lifetimeEntries.count)
-      )
-      return
-    }
-
-    lifetimeEntries[row].task?.cancel()
-    lifetimeEntries[row] = CogArenaLifetimeEntry()
-  }
-
-  /// Cancels every arena-owned sleeper before the enclosing context disappears.
-  func prepareForContextTeardown() {
-    for record in records {
-      record.takeUnretainedValue().prepareForContextTeardown()
-    }
-    for row in lifetimeEntries.indices where lifetimeEntries[row].task != nil {
-      guard lifetimeEntries[row].generation < UInt64.max else {
-        fatalError("A Cog arena state's lifetime release generation overflowed.")
-      }
-      lifetimeEntries[row].generation += 1
-      lifetimeEntries[row].pendingGeneration = nil
-      lifetimeEntries[row].task?.cancel()
-      lifetimeEntries[row].task = nil
-    }
-  }
-
-  /// Resolves one row's descriptor record without retaining it in the walk.
-  private func descriptorRecord(forRow row: Int) -> CogArenaDescriptorRecord {
-    let descriptorIndex = arena.descriptor[row]
-    guard descriptorIndex >= 0, Int(descriptorIndex) < records.count else {
-      fatalError("Cog found a live arena row without descriptor dispatch.")
-    }
-    return records[Int(descriptorIndex)].takeUnretainedValue()
-  }
-
-  #if DEBUG
-  /// Resolves one descriptor dispatch index while materializing debug history.
-  private func descriptorRecord(at rawIndex: Int32) -> CogArenaDescriptorRecord {
-    guard rawIndex >= 0, Int(rawIndex) < records.count else {
-      fatalError("Cog found an invalid arena descriptor index in debug history.")
-    }
-    return records[Int(rawIndex)].takeUnretainedValue()
-  }
-  #endif
-
-  /// Pulls one derived row current through reusable scalar enter/exit frames.
-  private func settle(_ root: CogArenaSlot, in cogs: Cogs) {
-    defer { cogs.drainQueuedTurnsIfPossible() }
-    cogs.settleDepth += 1
-    defer { cogs.settleDepth -= 1 }
-    if cogs.settleDepth > Cogs.maximumSettleDepth {
-      fatalError(
-        cogs.coldSettleDepthMessage(
-          innermostComputingNames: innermostComputingNames(8)
-        )
-      )
-    }
-
-    let rootRow = arena.index(of: root)
-    let boundary = pullFrames.count
-    pullFrames.append(CogArenaPullFrame(row: Int32(rootRow), phase: .enter))
-
-    while pullFrames.count > boundary, let frame = pullFrames.popLast() {
-      let row = liveRow(frame.row)
-      switch frame.phase {
-      case .enter:
-        guard needsSettlement(row) else { continue }
-        let record = descriptorRecord(forRow: row)
-        guard record.kind != .manual else {
-          fatalError("Cog found an invalid manual source in the arena pull walk.")
-        }
-
-        if let cycle = cyclePath(ifEnteringRow: row) {
-          fatalError(cycle.message)
-        }
-
-        beginComputing(row)
-        pullFrames.append(CogArenaPullFrame(row: frame.row, phase: .exit))
-        appendDependencies(of: frame.row)
-
-      case .exit:
-        defer { endComputing(row) }
-        let record = descriptorRecord(forRow: row)
-        let mustRecompute = arena.flags[row].contains(.dirty) || dependencyChanged(for: frame.row)
-        if mustRecompute {
-          guard let recompute = record.recompute else {
-            fatalError("Cog found a derived arena row without a recompute function.")
-          }
-          let slot = CogArenaSlot(index: frame.row, generation: arena.generation[row])
-          recompute(self, cogs, slot, record.key(at: row))
-        } else {
-          arena.checkedAt[row] = revision
-          arena.flags[row].remove(.check)
-          arena.flags[row].remove(.dirty)
-        }
-      }
-    }
-  }
-
-  /// Appends stale producers of `consumerRow` for settlement before its exit.
-  private func appendDependencies(of consumerRow: Int32) {
-    var cursor = edges.firstDependency(of: consumerRow, in: arena)
-    while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == consumerRow else {
-        fatalError("Cog found another consumer's edge in an arena dependency list.")
-      }
-      let producerRow = liveRow(dependency.producer)
-      if needsSettlement(producerRow) {
-        pullFrames.append(CogArenaPullFrame(row: dependency.producer, phase: .enter))
-      }
-      cursor = dependency.next
-    }
-  }
-
-  /// Whether any dependency changed after this consumer was last current.
-  private func dependencyChanged(for consumerRow: Int32) -> Bool {
-    let checkedAt = arena.checkedAt[Int(consumerRow)]
-    var cursor = edges.firstDependency(of: consumerRow, in: arena)
-    while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == consumerRow else {
-        fatalError("Cog found another consumer's edge in an arena dependency list.")
-      }
-      if arena.changedAt[liveRow(dependency.producer)] > checkedAt {
-        return true
-      }
-      cursor = dependency.next
-    }
-    return false
-  }
-
-  /// Runs one typed selector and publishes or backdates its completed result.
-  private func recompute<Value>(
-    descriptor: DerivedCogDescriptor<Value>,
-    column: CogArenaValueColumn<Value>,
-    slot: CogArenaSlot,
-    key: CogKey?,
-    in cogs: Cogs
-  ) {
-    #if DEBUG
-    // Dependency capture ends before equality and publication below. Keep seed
-    // blocked across that complete interval so a selector or comparator cannot
-    // mutate a source and then have this run clean over the resulting dirty mark.
-    cogs.seedBarrierDepth += 1
-    defer { cogs.seedBarrierDepth -= 1 }
-    recordHistoryState(event: .recompute, slot: slot)
-    #endif
-    let previousValue = column.storedValue(at: slot)
-    let value = withDependencyCapture(for: slot) {
-      descriptor.compute(Reader(cogs: cogs, arenaState: slot), key: key)
-    }
-
-    let changed: Bool
-    if case .some = previousValue {
-      column.stage(value, at: slot)
-      changed = column.commit(at: slot)
-    } else {
-      column.insert(value, at: slot)
-      changed = true
-    }
-
-    let row = arena.index(of: slot)
-    if changed {
-      arena.changedAt[row] = revision
-    }
-    arena.checkedAt[row] = revision
-    arena.flags[row].remove(.check)
-    arena.flags[row].remove(.dirty)
-  }
-
-  /// Runs one async selector, reconciles indexed dependencies, and starts work.
-  private func recomputeAsync<Value>(
-    descriptor: AsyncCogDescriptor<Value>,
-    column: CogArenaAsyncColumn<Value>,
-    slot: CogArenaSlot,
-    key: CogKey?,
-    publishingPendingIn pendingTurn: CogTurn? = nil,
-    refreshWaiter: CogRefreshWaiter<Value>? = nil,
-    in cogs: Cogs
-  ) {
-    #if DEBUG
-    cogs.seedBarrierDepth += 1
-    defer { cogs.seedBarrierDepth -= 1 }
-    #endif
-    let work = withDependencyCapture(for: slot) {
-      descriptor.makeWork(Reader(cogs: cogs, arenaState: slot), key: key)
-    }
-    column.startWork(
-      work,
-      at: slot,
-      key: key,
-      publishingPendingIn: pendingTurn,
-      refreshWaiter: refreshWaiter,
-      in: self,
-      cogs: cogs
-    )
-
-    let row = arena.index(of: slot)
-    arena.checkedAt[row] = revision
-    arena.flags[row].remove(.check)
-    arena.flags[row].remove(.dirty)
-  }
-
-  /// Runs one selector with a nested static-prefix dependency cursor.
-  private func withDependencyCapture<Result>(
-    for consumer: CogArenaSlot,
-    _ body: () -> Result
-  ) -> Result {
-    let row = arena.index(of: consumer)
-    captures.append(
-      CogArenaDependencyCapture(
-        consumer: consumer,
-        cursor: edges.firstDependency(of: Int32(row), in: arena),
-        previous: .none
-      )
-    )
-    defer {
-      guard let finished = captures.popLast(), finished.consumer == consumer else {
-        fatalError("Cog finished arena dependency capture out of order.")
-      }
-      if finished.cursor != .none {
-        edges.removeDependencySuffix(
-          of: consumer,
-          after: finished.previous,
-          in: arena
-        )
-      }
-    }
-    return body()
-  }
-
-  /// Reuses the next matching edge or appends one cold static dependency.
-  private func recordDependency(from consumer: CogArenaSlot, on producer: CogArenaSlot) {
-    guard let captureIndex = captures.indices.last else {
-      fatalError("Cog recorded an arena dependency outside selector capture.")
-    }
-    var capture = captures[captureIndex]
-    guard capture.consumer == consumer else {
-      fatalError("Cog recorded an arena dependency for a non-active selector.")
-    }
-
-    if capture.cursor != .none {
-      let dependency = edges.dependency(at: capture.cursor)
-      if dependency.producer == producer.index, dependency.consumer == consumer.index {
-        edges.updateVersion(
-          of: capture.cursor,
-          to: arena.changedAt[arena.index(of: producer)]
-        )
-        capture.previous = capture.cursor
-        capture.cursor = dependency.next
-        captures[captureIndex] = capture
-        return
-      }
-
-      edges.removeDependencySuffix(
-        of: consumer,
-        after: capture.previous,
-        in: arena
-      )
-      capture.cursor = .none
-    }
-
-    let added = edges.add(
-      producer: producer,
-      consumer: consumer,
-      after: capture.previous,
-      version: arena.changedAt[arena.index(of: producer)],
-      in: arena
-    )
-    capture.previous = added
-
-    captures[captureIndex] = capture
-  }
-
-  /// Whether one row carries CHECK or DIRTY work.
-  private func needsSettlement(_ row: Int) -> Bool {
-    arena.flags[row].contains(.check) || arena.flags[row].contains(.dirty)
-  }
-
-  /// Returns the closed active-path suffix when `row` is already computing.
-  ///
-  /// The packed row bit is the common fast path. Only a detected cycle scans
-  /// and renders the ordered path, so ordinary settlement does no identity or
-  /// key work beyond the scalar flag check.
-  private func cyclePath(ifEnteringRow row: Int) -> CogCyclePath? {
-    guard arena.flags[row].contains(.computing) else { return nil }
-    let rawRow = Int32(row)
-    guard let first = computingPath.firstIndex(of: rawRow) else {
-      fatalError("An arena row was marked computing without an active path entry.")
-    }
-    let steps =
-      computingPath[first...].map { cycleStep(forRow: liveRow($0)) }
-      + [cycleStep(forRow: row)]
-    return CogCyclePath(steps: steps)
-  }
-
-  /// Marks and appends one row after cycle detection has succeeded.
-  private func beginComputing(_ row: Int) {
-    guard cyclePath(ifEnteringRow: row) == nil else {
-      fatalError("Cog tried to enter an arena derived cycle without reporting it.")
-    }
-    arena.flags[row].insert(.computing)
-    computingPath.append(Int32(row))
-  }
-
-  /// Clears the innermost row while enforcing balanced nested settlement.
-  private func endComputing(_ row: Int) {
-    guard computingPath.last == Int32(row) else {
-      fatalError("Cog tried to finish arena derived computation out of path order.")
-    }
-    computingPath.removeLast()
-    arena.flags[row].remove(.computing)
-  }
-
-  /// Erases one row into the renderer shared by both runtime cores.
-  private func cycleStep(forRow row: Int) -> CogCycleStep {
-    let record = descriptorRecord(forRow: row)
-    return CogCycleStep(
-      descriptor: record.identity,
-      label: record.label,
-      key: record.key(at: row)
-    )
-  }
-
-  /// Diagnoses a hypothetical derived read without creating a row or edge.
-  ///
-  /// The lookup is intentionally observational. A missing descriptor-and-key
-  /// identity returns `nil`, preserving lazy row creation and later edge order.
-  func cycleDiagnosticSnapshot<Value>(
-    ifReading valueReference: Cog<Value>
-  ) -> CogCycleDiagnosticSnapshot? {
-    let identity = CogStateIdentity(
-      descriptor: valueReference.descriptor.identity,
-      key: valueReference.key
-    )
-    guard let slot = slots[identity] else { return nil }
-    let row = arena.index(of: slot)
-    return cyclePath(ifEnteringRow: row)?.snapshot
-  }
-
-  /// Validates one raw edge row and returns its native array index.
-  private func liveRow(_ rawRow: Int32) -> Int {
-    guard rawRow >= 0 else {
-      fatalError("Cog found a negative arena state row in graph topology.")
-    }
-    let row = Int(rawRow)
-    guard row < arena.rowCount, arena.flags[row].contains(.occupied) else {
-      fatalError("Cog found a released arena state row in graph topology.")
-    }
-    return row
   }
 }
 #endif

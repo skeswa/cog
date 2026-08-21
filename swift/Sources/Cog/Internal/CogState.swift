@@ -32,6 +32,30 @@ internal protocol CogState: AnyObject {
   /// Reverse edges let writes invalidate consumers without scanning the graph.
   /// M6 replaces the class-reference layout.
   var subscribers: [CogSubscriberEdge] { get set }
+
+  /// This state seen as a UI-observed root, or `nil` when nothing observes it.
+  ///
+  /// The invalidation walk asks this of every state it marks, so it cannot be
+  /// a dynamic cast for the reason ``asDerivedSettleState`` is not one.
+  var asObservationState: (any CogObservationState)? { get }
+
+  /// This state seen as a derived settle participant, or `nil` for a source.
+  ///
+  /// The settle walk needs this narrowing on every node it enters, and `as? any
+  /// DerivedCogSettleState` buys it from the runtime's conformance lookup, which
+  /// `M9-01` measured reaching `_dyld_find_protocol_conformance_on_disk` on a
+  /// steady turn. A protocol requirement answers the same question through the
+  /// witness table the walk has already loaded.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { get }
+}
+
+extension CogState {
+  /// Every state class in the correctness core is observable, so each overrides
+  /// this; the default keeps the requirement satisfiable by a state that is not.
+  var asObservationState: (any CogObservationState)? { nil }
+
+  /// Sources are not derived. The two derived state classes override this.
+  var asDerivedSettleState: (any DerivedCogSettleState)? { nil }
 }
 
 /// What a ``Cogs`` files a state under: a declaration plus a key.

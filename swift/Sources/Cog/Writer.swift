@@ -83,6 +83,49 @@ extension Cogs {
     }
   }
 
+  /// Commits one value to one manual source, without building a closure.
+  ///
+  /// This shadows ``CogOps/commit(_:to:name:)`` for a caller whose static type
+  /// is `Cogs`, which is every application write. The protocol-extension
+  /// spelling remains for `any CogOps` and for a mechanism's controller.
+  ///
+  /// The sugar used to reach the primitive through two escaping closures — one
+  /// per layer — and `M9-01` measured both as heap allocations on every turn.
+  /// Only a commit during a flush genuinely escapes, because it is stored and
+  /// run after the current flush returns, so only that case still pays.
+  ///
+  /// - Parameters:
+  ///   - valueReference: The state-owned source to update.
+  ///   - value: The value to publish at the commit boundary.
+  ///   - name: The turn name recorded for diagnostics and history.
+  public func commit<Value>(
+    _ valueReference: ManualCog<Value>,
+    to value: Value,
+    name: String = #function
+  ) {
+    requireOutsideDerivedComputation(forTurnNamed: name)
+
+    // Nothing between this test and the calls below can change the phase: the
+    // context is MainActor-confined and neither step reaches user code.
+    //
+    // The queued path goes through `withTurn` rather than back through
+    // `commit(named:)`. Reaching for the public primitive here would have been
+    // the library calling its own op vocabulary from inside the implementation,
+    // which `primitives-only-in-ops` exists to prevent and which Cog's own
+    // linter caught. It is also less work: the queued body stages directly and
+    // never builds a `Writer`.
+    if case .flushing = turnPhase {
+      withTurn(name) { turn in
+        self.writerStage(valueReference, value: value, turnID: turn.id)
+      }
+      return
+    }
+
+    withNonEscapingTurn(name) { turn in
+      writerStage(valueReference, value: value, turnID: turn.id)
+    }
+  }
+
   /// Reads the staged overlay after proving the writer belongs to the active turn.
   ///
   /// Validation precedes state lookup so an escaped writer cannot lazily create
@@ -143,7 +186,7 @@ extension Cogs {
     usage: WriterUsage,
     target valueReference: ManualCog<Value>
   ) -> CogTurn {
-    guard case .accumulating(let turn) = turnPhase, turn.id === turnID else {
+    guard case .accumulating(let turn) = turnPhase, turn.id == turnID else {
       // Composed inside the autoclosure, so a live write pays nothing to build
       // a message it never prints.
       fatalError(escapedWriterMessage(usage: usage, target: valueReference))

@@ -5,36 +5,32 @@ mirrors it for other coding agents; keep the two files in sync.
 
 ## What this is
 
-The design workspace for **Cog**, a fine-grained state-management project for
-native mobile UI. Cog is planned as:
+The repository for **Cog**, a fine-grained state-management project for native
+mobile UI. Cog consists of:
 
 - a Swift library for SwiftUI on iOS, built over `@Observable` at the boundary
   with one app-wide MainActor-confined dependency graph inside; and
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
-The Swift and Kotlin designs exist. Swift work has started: the repository is
-now a SwiftPM package rooted at the git root, with the M0 scaffolding
-milestone built except its closing gate. The scaffolding is real — package,
-formatter, test wrappers, compile-fail harness, document checkers, and CI —
-but the library itself is a stub. No Cog API exists yet, and Kotlin has no
-implementation at all. The next phase for each platform is the spike in its
-`exploration.md` §11, as amended by its `perf.md` §9. For Swift,
-`docs/swift/impl/plan.md` turns that spike into milestones with package
-layout, tooling, CI, and release steps; `docs/swift/impl/scenarios.md` breaks
-those milestones into the test scenarios that drive red-green implementation;
-and `docs/swift/impl/tasks.md` decomposes the milestones into dependency-aware
-execution tasks scoped to half a day or less, with explicit verification and
-every scenario covered by exactly one task.
+The Swift library is implemented and published through 0.4.0. Post-release
+performance work, the arena comparison core, the Storefront macrobenchmark,
+and their open decisions continue under the same checked plan and scenario
+ledger. Kotlin has a complete first design but no implementation. The canonical
+current snapshots live in `docs/swift/README.md` and `docs/kotlin/README.md`;
+keep milestone state there rather than copying it into this instruction file.
 
 ## Layout
 
-- `README.md` — project overview, shared principles, platform status, the CI
-  topology record, and documentation entry points.
+- `README.md` — consumer-facing project overview, shared principles, platform
+  status, installation, and documentation entry points.
+- `CONTRIBUTING.md` — contributor setup, verification, test organization,
+  documentation obligations, and the Jujutsu workflow.
+- `SECURITY.md` — supported releases and private vulnerability reporting.
 - `Package.swift` — the SwiftPM manifest. The package root is the git root;
   every Swift target reaches under `swift/` through an explicit `path:`. The
   manifest reads the isolation, value-reference, core, and edge selectors
   described under "Commands" below.
-- `swift/Sources/` — `Cog` (the library, a stub today), `CogTesting` (the
+- `swift/Sources/` — `Cog` (the shipping library), `CogTesting` (the
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
 - `swift/Tests/` — `CogTests` (correctness), `CogScenarioTests` (run counts),
@@ -58,8 +54,26 @@ every scenario covered by exactly one task.
   swift-syntax and swift-argument-parser pins without exposing them to a Cog
   consumer. Its committed `Package.resolved` fixes those revisions, and its
   scaffold test asks SwiftPM to prove the root dependency graph remains empty.
+- `swift/Storefront/` — the **separate** `cog-storefront` SwiftPM package
+  holding the Storefront macrobenchmark's shared workload: its state
+  declarations, deterministic fixtures, heavy kernels, sixteen-policy pricing
+  ladder, domain operations, scripted async service, eleven-phase interaction
+  trace, and the shadow model its checkpoints compare against. It depends on the
+  root by path and on **nothing else**, which is the whole reason it is not part
+  of `swift/Benchmarks`: an iOS application target cannot depend on that package
+  without also resolving the benchmark harness, the malloc interposer, and
+  swift-state-graph. Both the headless benchmark cuts and the SwiftUI benchmark
+  app drive exactly this workload. Its `README.md` explains the boundary and the
+  three profiles.
+- `swift/Examples/` — two Xcode example apps. `Weather/` is the worked
+  feature example; `Storefront/` is the SwiftUI benchmark application, whose
+  `StorefrontUITests` target measures launch, scrolling, search, navigation, and
+  cart interaction in release through XCUIAutomation. Both are hand-written
+  objectVersion-77 projects that reference the root package by relative path;
+  Storefront also references `swift/Storefront`.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
-  `swift-simulator-test.mjs`, `weather-test.mjs`, `check-compile-fail.mjs`,
+  `swift-simulator-test.mjs`, `weather-test.mjs`, `storefront-test.mjs`,
+  `storefront-ui-test.mjs`, `check-compile-fail.mjs`,
   `check-task-ledger.mjs`, and `check-workflows.mjs`, plus shared test guards,
   the checkers' own fixture suites (`test-task-ledger.mjs`,
   `test-workflows.mjs`), and `fixtures/`.
@@ -79,23 +93,31 @@ every scenario covered by exactly one task.
   Design docs live in `docs/swift/design/`: `exploration.md` covers the core
   architecture and API; `mechanisms.md` covers mechanisms — the bootstrap-registered
   home for every side effect — and background work;
-  `rx.md` maps Rx concepts; `perf.md` covers the data-oriented implementation
-  and benchmark plan. Implementation docs live in `docs/swift/impl/`:
+  `rx.md` maps Rx concepts; `perf.md` covers the cost order, the data-oriented
+  implementation, and the measurement plan — design only, since its recorded
+  results were split out. Implementation docs live in `docs/swift/impl/`:
   `plan.md` is the implementation plan with milestones, tooling, CI, and
   the release process; `scenarios.md` is the test-scenario tree; `tasks.md`
   is the dependency-aware half-day task graph with explicit verification,
-  covering every scenario exactly once.
+  covering every scenario exactly once; `benchmarks.md` is the measurement
+  record, every number with the environment that produced it; and
+  `optimization.md` is the profiling record — where the time goes and what each
+  change bought, obtained with a sampler and probes rather than the suite.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
+- `docs/maintainers/` — operational runbooks. `ci.md` owns the Xcode pin,
+  self-hosted runner topology, hosted fork lane, and workflow security record;
+  `releasing.md` turns the Swift release policy into the candidate, tag, and
+  verification checklist.
 
 ## Commands
 
 Every command is a mise task defined in `mise.toml`, which is authoritative;
-`mise tasks` prints the current list. mise cannot pin Xcode, so the required
-Xcode version lives in the root `README.md` under "Continuous integration".
+`mise tasks` prints the current list. mise cannot pin Xcode, so the tested
+Xcode version lives in `docs/maintainers/ci.md`.
 A full Xcode is required, not the Command Line Tools alone: CLT can build and
 lint but `swift test` fails there with `no such module 'Testing'`.
 
@@ -125,6 +147,10 @@ directly:
 - `mise run test:value-references` — the full behavior suite under the
   `inline`, `interned`, and `generic` value-reference layouts.
 - `mise run test:release` — the default leg in release configuration.
+- `mise run api:check [baseline]` — compares the supported `Cog` and
+  `CogTesting` public APIs with the newest semantic-version release tag, or an
+  explicit baseline. The non-API `_CogScenarios` product is deliberately
+  excluded.
 - `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
   simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
 - `mise run test:compilefail` — type-checks every fixture in
@@ -134,11 +160,15 @@ directly:
   wrapper enumerates tests before every run and requires a nonzero executed
   count from its own xUnit report. Extra arguments pass through, as in
   `mise run test:lint --filter LINT-02`.
-- `mise run lint:swift` — first run the guarded CogLint suite, then lint root
-  library and Weather production target sources with production rules and
-  every tracked unit test target source with the explicit test-role primitive
-  exemption. Empty Xcode-created target directories are not command inputs;
-  CogLint continues to reject any named input that does not exist.
+- `mise run lint:swift` — first run the guarded CogLint suite, then lint the
+  root library, the Storefront workload package, and both example apps'
+  production sources with production rules, and every tracked test target source
+  with the explicit test-role primitive exemption. The Storefront workload is
+  linted like application code on purpose: it is the worked example of what a
+  large Cog app looks like, and a benchmark that broke the conventions it exists
+  to measure would be measuring the wrong thing. Empty Xcode-created target
+  directories are not command inputs; CogLint continues to reject any named
+  input that does not exist.
 - `mise run build:lint-artifact [version]` — build native macOS 14 `arm64` and
   `x86_64` CogLint executables, assemble the release artifact bundle, and
   record its SwiftPM checksum. The version defaults to `0.4.0`.
@@ -169,6 +199,10 @@ directly:
 
 - `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
+  The Storefront macrobenchmark's five cuts are
+  `mise run bench --filter 'perf-15-storefront-.*'`, and they run under either
+  core through the same selector the rest of the suite uses
+  (`COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'`).
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
   `swift/Benchmarks` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator
@@ -177,7 +211,7 @@ directly:
   environments, assert the allocation witness still reports a non-zero malloc
   count, then check the run against that baseline. Baselines live in the
   git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
-  outlive a session go in `docs/swift/design/perf.md` §9.6.
+  outlive a session go in `docs/swift/impl/benchmarks.md`.
 - `mise run bench:thresholds:check` — assert the allocation witness is live,
   require every gated benchmark and its committed static threshold, then
   enforce PERF-06's exact p90 zero-allocation result and PERF-10's one-sided
@@ -186,7 +220,7 @@ directly:
   temporary impossible threshold and pass only when the gate rejects it as a
   regression.
 
-The example app uses the same pinned Xcode as the library:
+The example apps use the same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS
   Simulator destination without launching one.
@@ -195,6 +229,24 @@ The example app uses the same pinned Xcode as the library:
   command because `build:weather` uses xcodebuild's `build` action, which
   never compiles a target the Weather scheme lists only under its test
   action.
+- `mise run build:storefront` — build the Storefront benchmark app for a
+  generic iOS Simulator destination without launching one. The same
+  build-action split applies as for Weather.
+- `mise run test:storefront-ui` — run `StorefrontUITests` in **release** on a
+  pinned iOS simulator, and read the result bundle back to require a nonzero
+  executed count. Release rather than debug because Apple's performance-test
+  guidance is explicit that a measured run builds for testing with the Release
+  configuration and the debugger, code coverage, and runtime diagnostics off;
+  the scheme carries those settings. Set `COG_STOREFRONT_DESTINATION` to
+  override the destination, which local exploration may want and CI must not.
+
+The Storefront macrobenchmark's shared workload is a package of its own, so its
+correctness suite has a wrapper of its own:
+
+- `mise run test:storefront` — run the guarded `swift/Storefront` package
+  tests: the declaration-census and profile shape assertions, and the
+  eleven-phase interaction trace end to end. This suite is the gate every
+  Storefront benchmark number rests on.
 
 Extra arguments pass straight through, as in
 `mise run test --filter 'DECL-01|ONE-05' --parallel`. **Never run a filtered
@@ -386,12 +438,17 @@ that runtime.
   unchanged across the value-reference layout and core swaps, so a scenario test able to
   observe state storage would fail a swap it should not care about. Reach for
   `@testable` only in infrastructure tests, which green no scenario.
-- **Give every generic class an explicit `nonisolated deinit`.** With
-  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` on a generic
-  class is main-actor-isolated, and Swift 6.3.0 and 6.3.3 both crash the
-  optimizer on it in release configuration. Debug builds are fine, so
-  `mise run test:matrix` will not catch it — only `mise run test:release`
-  will. This applies to states, boxes, descriptors, and async state alike.
+- **Give every class an explicit `nonisolated deinit`.** With
+  `.defaultIsolation(MainActor.self)`, a synthesized `deinit` is
+  main-actor-isolated, which is wrong twice over. On a **generic** class it is a
+  build problem: Swift 6.3.0 and 6.3.3 both crash the optimizer on it in release
+  configuration. Debug builds are fine, so `mise run test:matrix` will not catch
+  it — only `mise run test:release` will. On **any** class it is also a cost: an
+  isolated `deinit` compiles to `swift_task_deinitOnExecutor`, so every
+  deallocation asks the concurrency runtime which executor it is on. `M9-01`
+  measured that at about an eighth of a steady turn. This applies to states,
+  boxes, descriptors, async state, turn objects, edges, and arena storage
+  alike.
 - **A `deinit` that must touch the graph is spelled `isolated deinit`, and
   its class must not be generic.** A written `deinit` is nonisolated unless it
   says otherwise, so it cannot call a MainActor-isolated method at all — the

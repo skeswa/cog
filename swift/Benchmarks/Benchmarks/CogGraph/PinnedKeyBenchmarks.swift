@@ -109,4 +109,47 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
       benchmark.stopMeasurement()
     }
   }
+
+  // PERF-11. The same turn beside one pinned key and beside a thousand. PERF-07
+  // above pins the traffic against drift at three sizes; this pair exists to
+  // make the *slope* the thing under test, because O(pinned keys) is a claim
+  // about shape and no single number can carry it. `M9-06` commits the static
+  // ceiling that holds the thousand-key shape to the one-key cost.
+  // The thousand-key shape carries a committed p90 ceiling rather than a drift
+  // tolerance, because the claim is absolute: a turn beside a thousand pinned
+  // keys costs what a turn beside one costs. The ceiling sits just above the
+  // one-key measurement `M9-06` recorded, so a returning slope fails while it
+  // is still one key wide rather than after it has grown into the noise.
+  //
+  // **In raw sums, not the per-operation figures the report prints.** These
+  // benchmarks scale by `.kilo`, so the 71 retains a one-key turn shows in the
+  // table are 71,000 here, and a ceiling written as 90 would gate nothing while
+  // looking like it gated everything. `M9-06` found this the way `M5-11` found
+  // it for baselines: by watching a deliberately impossible ceiling pass.
+  let slopeThresholds: [BenchmarkMetric: BenchmarkThresholds] = [
+    .retainCount: BenchmarkThresholds(absolute: [.p90: 90_000]),
+    .releaseCount: BenchmarkThresholds(absolute: [.p90: 110_000]),
+    .objectAllocCount: gate,
+    .mallocCountTotal: gate,
+    .wallClock: BenchmarkThresholds(),
+  ]
+
+  for pinnedKeyCount in [1, 1000] {
+    Benchmark(
+      "perf-11-pinned-key-slope-\(pinnedKeyCount)",
+      configuration: .init(
+        metrics: metrics,
+        warmupIterations: 2,
+        scalingFactor: .kilo,
+        maxDuration: .seconds(3),
+        thresholds: pinnedKeyCount == 1 ? thresholds : slopeThresholds
+      )
+    ) { benchmark in
+      await PinnedKeyHarness.settle(pinnedKeyCount: pinnedKeyCount)
+      let count = benchmark.scaledIterations.count
+      benchmark.startMeasurement()
+      await PinnedKeyHarness.runLiveKeyTurns(count, pinnedKeyCount: pinnedKeyCount)
+      benchmark.stopMeasurement()
+    }
+  }
 }

@@ -1,0 +1,117 @@
+# The Storefront workload
+
+A **separate SwiftPM package**, and — like `swift/Benchmarks` and `swift/Lint` —
+that separation is the whole design of this directory.
+
+The Storefront is one realistic commerce graph shared by two very different
+drivers:
+
+- the headless benchmark cuts in
+  [`swift/Benchmarks`](../Benchmarks/Benchmarks/CogGraph/StorefrontBenchmarks.swift),
+  which produce stable, Cog-specific measurements; and
+- the SwiftUI benchmark application in
+  [`swift/Examples/Storefront`](../Examples/Storefront), which XCTest drives
+  through a real interface.
+
+They share the state declarations, the fixtures, the domain operations, the
+deterministic async service, and the interaction trace. That sharing is the
+point: two drivers exercising two similar-looking workloads would let a UI
+result and a headless result disagree without either being wrong.
+
+## Why it is not part of `swift/Benchmarks`
+
+Because an iOS application cannot depend on that package. `swift/Benchmarks`
+depends on the ordo-one benchmark harness, its malloc interposer, and
+swift-state-graph; an application target that consumed a library product from it
+would resolve all three. This package depends on the root Cog package by path
+and on **nothing else**, for the same reason the root itself resolves with no
+dependencies at all.
+
+The arrows only ever point one way:
+
+```text
+cog (root, zero dependencies)
+  ^                    ^
+  |                    |
+cog-storefront   <---- cog-benchmarks (harness, interposer, state-graph)
+  ^
+  |
+Storefront.app (Xcode, iOS)
+```
+
+## What "representative" means here, and what it does not
+
+This is a **representative workload v1**. There is no such thing as a typical
+application without production telemetry, so the scale is an explicit,
+configurable, asserted choice rather than a claim about real apps.
+`StorefrontProfile` holds every number, `StorefrontShapeTests` checks them, and
+[`benchmarks.md`](../../docs/swift/impl/benchmarks.md) records what the workload
+covers **and what it does not**.
+
+Three profiles, three questions:
+
+| Profile    | Question                                        | Where it runs                                   |
+| ---------- | ----------------------------------------------- | ----------------------------------------------- |
+| `smoke`    | is it correct, and does the screen come up?     | this package's tests, and the simulator UI runs |
+| `standard` | what does a representative session cost?        | the reported benchmark cuts                     |
+| `stress`   | does it still behave at several times the size? | local and nightly only, never reported          |
+
+## What is deterministic, and how
+
+Everything. There is no network, no `Date`, no `Task.sleep`, no unseeded
+randomness, and no `Foundation` import anywhere in this target — a fixture that
+folded case or trimmed whitespace by the host's locale rules would make the
+workload's inputs depend on device settings.
+
+Asynchrony is scripted rather than timed. Every async selector registers its
+semantic request synchronously before returning work to Cog. `StorefrontScript`
+then moves that request from a lock-backed **scheduled** ledger to its actor's
+**started** and suspended ledgers. The driver can therefore drain work selected
+by the graph even when the task has not reached the service actor yet; an empty
+drain proves there is neither scheduled nor suspended work, rather than merely
+winning a scheduler race.
+
+The driver releases responses by name in a deliberately out-of-order sequence.
+Superseded requests stay suspended instead of resuming on cancellation, which
+keeps the headless driver free of races with Cog's one-shot async-completion
+acknowledgement — and makes a stale completion something the driver can schedule
+on purpose rather than hope for.
+
+## Running it
+
+```console
+mise run test:storefront          # this package's correctness and shape suites
+mise run bench --filter 'perf-15-storefront-.*'
+COG_TEST_CORE=arena mise run bench --filter 'perf-15-storefront-.*'
+
+# read the absolute resident-memory column only from a run of the timing cuts
+# alone: the footprint cut retains its graphs, which raises the baseline.
+mise run bench --filter 'perf-15-storefront-(cold|session|async-burst)'
+```
+
+The correctness suite is the gate every reported number depends on. It runs the
+trace with every phase checkpoint enabled. Reported samples disable those
+deliberately expensive checks while their timer is running, then compare the
+sample's final visible identifiers and rendered checksum with the independent
+shadow and require exactly zero outstanding requests after the timer stops.
+
+The same boundary applies to the specialized cuts. Inventory-burst identifiers
+are snapshotted before timing and their shadow generations advance afterward.
+The retained interaction cut primes one complete viewport lap before counters
+are armed, then uses one monotonic ordinal across warmups and samples, alternates
+each product's quantity between one and two, advances its variant every viewport
+lap, and replays the exact measured operations into the shadow after timing. The
+compute-only control's stable signature covers search, ranking, directly priced
+cart lines, promotions, and recommendations.
+
+## The eleven-phase trace
+
+`StorefrontSessionDriver.runStandardTrace()` performs one fixed story —
+bootstrap, root data, initial row data, scroll, search, filters, cart, detail,
+checkout, inventory burst, teardown — and records a `StorefrontCheckpoint` at
+every claim when checkpoint recording is enabled. Expectations come from
+`StorefrontWorld`, a shadow model updated from the profile and the events the
+driver issued, never from a number copied out of a passing run. Benchmark cuts
+prepare its catalog, indexes, and lookup dictionaries before starting their
+timers; the runtime under measurement still obtains its own catalog through the
+scripted service.
