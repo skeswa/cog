@@ -214,7 +214,7 @@ registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
 and non-nestable: do not put `await` in it, and do not use it as general test or
 preview setup.
 
-## Where things stand (2026-08-17)
+## Where things stand (2026-08-20)
 
 These choices are settled; §10 of the core document has the full record.
 
@@ -353,18 +353,16 @@ These choices are settled; §10 of the core document has the full record.
   in that region fails immediately in every build, names the cog/key and turn,
   and tells the caller to invoke the op outside derived computation, from event
   handling or a reaction.
-- The shipping runtime remains the simple class-state core. The data-oriented
-  arena passes the same 248 public behavior scenarios and uses the selected
-  shared linked edge pool, but its measured gains are mixed and it misses M6's
-  defining cost targets: five allocations remain per steady turn, propagation
-  still performs ARC traffic, and notice work remains O(pinned keys) with two
-  retain/release pairs per key rather than simple's one. Arena remains an
-  internal selector-only research and benchmark candidate; M6 recommends no
-  0.2.0 release. Public value references remain names, never arena slot
-  handles. M9's call-site profile explains the mixed result: about six percent
-  of a steady turn is Cog's own compiled code, so most of what M6 measured is
-  machinery both cores share, and M9 fixes that before the comparison is
-  rerun.
+- The shipping runtime remains the simple class-state core. M9 made boundary
+  notices O(changed), removed steady-turn allocations from shared machinery,
+  and profiled both implementations under the same public behavior suite. The
+  arena now wins warm whole-graph and Storefront work while retaining less, but
+  it remains an internal selector-only candidate because keyed reads and graph
+  construction still pay an erased generic-storage cost. The frozen arena
+  specialization report records a stable `@inlinable` frontier that could
+  remove that cost without changing public API; implementation and the next
+  core decision remain open. Public value references remain names, never arena
+  slot handles.
 - Tests are fully optimistic, as fast and cheap as possible, and as
   implementation agnostic as possible: every wait is a definite injected
   signal (clocks, continuations, acknowledgements), host-side `swift test` is
@@ -429,15 +427,12 @@ full review.
 
 [impl/plan.md](./impl/plan.md) is the execution plan,
 [impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
-[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M6 is closed
-without a 0.2.0 release: its measured core decision keeps the simple
-implementation as the shipping default and the arena as an internal comparison
-build. M7 is published as 0.3.0. M8 implementation and its complete fixture,
-artifact, plugin, documentation, distribution, and dogfood gate are green; the
-0.4.0 release chain is preparing the binary-backed Cog release before it
-publishes the version-matched Channel B plugin package. M9 is planned but not
-started: it acts on the post-M6 performance backlog (issue #373) with the
-`M9-01` profile in hand, making pinned-key notice work O(changed), zeroing the
-steady turn's shared machinery, and deleting the runtime lookups that profile
-found on the common path — behind an unchanged public API, and with no release
-of its own unless `M9-18` records that one is warranted.
+[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M7 and M8 are
+published as 0.3.0 and 0.4.0. M9's shared-turn and O(changed) work has landed,
+and M10's Storefront workload, headless cuts, SwiftUI benchmark app, and first
+paired core measurements are present. The next decisions are `M9-18` and
+`M10-09`: reconcile the corrected application measurements with the synthetic
+graph results, turn the arena specialization report into measured
+implementation tasks if its route still holds, and only then revisit the
+shipping core. The simple implementation remains the consumer default until
+that evidence is recorded.

@@ -5,36 +5,32 @@ it for Claude Code; keep the two files in sync.
 
 ## What this is
 
-The design workspace for **Cog**, a fine-grained state-management project for
-native mobile UI. Cog is planned as:
+The repository for **Cog**, a fine-grained state-management project for native
+mobile UI. Cog consists of:
 
 - a Swift library for SwiftUI on iOS, built over `@Observable` at the boundary
   with one app-wide MainActor-confined dependency graph inside; and
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph.
 
-The Swift and Kotlin designs exist. Swift work has started: the repository is
-now a SwiftPM package rooted at the git root, with the M0 scaffolding
-milestone built except its closing gate. The scaffolding is real — package,
-formatter, test wrappers, compile-fail harness, document checkers, and CI —
-but the library itself is a stub. No Cog API exists yet, and Kotlin has no
-implementation at all. The next phase for each platform is the spike in its
-`exploration.md` §11, as amended by its `perf.md` §9. For Swift,
-`docs/swift/impl/plan.md` turns that spike into milestones with package
-layout, tooling, CI, and release steps; `docs/swift/impl/scenarios.md` breaks
-those milestones into the test scenarios that drive red-green implementation;
-and `docs/swift/impl/tasks.md` decomposes the milestones into dependency-aware
-execution tasks scoped to half a day or less, with explicit verification and
-every scenario covered by exactly one task.
+The Swift library is implemented and published through 0.4.0. Post-release
+performance work, the arena comparison core, the Storefront macrobenchmark,
+and their open decisions continue under the same checked plan and scenario
+ledger. Kotlin has a complete first design but no implementation. The canonical
+current snapshots live in `docs/swift/README.md` and `docs/kotlin/README.md`;
+keep milestone state there rather than copying it into this instruction file.
 
 ## Layout
 
-- `README.md` — project overview, shared principles, platform status, the CI
-  topology record, and documentation entry points.
+- `README.md` — consumer-facing project overview, shared principles, platform
+  status, installation, and documentation entry points.
+- `CONTRIBUTING.md` — contributor setup, verification, test organization,
+  documentation obligations, and the Jujutsu workflow.
+- `SECURITY.md` — supported releases and private vulnerability reporting.
 - `Package.swift` — the SwiftPM manifest. The package root is the git root;
   every Swift target reaches under `swift/` through an explicit `path:`. The
   manifest reads the isolation, value-reference, core, and edge selectors
   described under "Commands" below.
-- `swift/Sources/` — `Cog` (the library, a stub today), `CogTesting` (the
+- `swift/Sources/` — `Cog` (the shipping library), `CogTesting` (the
   isolated-context factory for tests and previews), and `CogScenarios` (the
   shared scenario graphs, exported as the non-API `_CogScenarios` product).
 - `swift/Tests/` — `CogTests` (correctness), `CogScenarioTests` (run counts),
@@ -112,12 +108,14 @@ every scenario covered by exactly one task.
   `example.md` gives a full worked feature; `effects.md` covers effects and
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
+- `docs/maintainers/` — operational runbooks. `ci.md` owns the Xcode pin,
+  self-hosted runner topology, hosted fork lane, and workflow security record.
 
 ## Commands
 
 Every command is a mise task defined in `mise.toml`, which is authoritative;
-`mise tasks` prints the current list. mise cannot pin Xcode, so the required
-Xcode version lives in the root `README.md` under "Continuous integration".
+`mise tasks` prints the current list. mise cannot pin Xcode, so the tested
+Xcode version lives in `docs/maintainers/ci.md`.
 A full Xcode is required, not the Command Line Tools alone: CLT can build and
 lint but `swift test` fails there with `no such module 'Testing'`.
 
