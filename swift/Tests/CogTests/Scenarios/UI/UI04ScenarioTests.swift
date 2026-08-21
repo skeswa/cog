@@ -5,7 +5,7 @@ import Testing
 import os
 
 @MainActor
-@Test func `UI-04 an equal derived recomputation sends no Observation notice`() {
+@Test func `UI-04 an equal automatic recomputation sends no Observation notice`() {
   let cogs = Cogs.forTesting()
   let count = ManualCog<Int>(1)
   var selectorRuns = 0
@@ -24,7 +24,7 @@ import os
   )
   #expect(selectorRuns == 1)
 
-  cogs.commit { c in c[count] = 3 }
+  cogs.turn { c in c[count] = 3 }
 
   #expect(selectorRuns == 2)
   #expect(cogs.peek(isOdd))
@@ -45,7 +45,7 @@ import os
 
   #expect(initial == "ready")
 
-  cogs.commit { c in c[status] = "ready" }
+  cogs.turn { c in c[status] = "ready" }
 
   #expect(cogs.peek(status) == "ready")
   #expect(notices.withLock { $0 } == 0)

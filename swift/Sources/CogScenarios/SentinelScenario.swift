@@ -4,13 +4,13 @@ extension CogScenario {
   /// The smallest shape that can catch duplicate work: one diamond, driven for
   /// `turns` turns.
   ///
-  /// A source feeds two derived cogs, and a third reads both. It is the
+  /// A source feeds two automatic cogs, and a third reads both. It is the
   /// shape a naive push implementation gets wrong — the shared consumer runs
   /// twice per turn, once per changed parent — so a harness that cannot fail
   /// on this one cannot be trusted on the ported cases either.
   ///
   /// The expectation is arithmetic, not observation. Settling the diamond
-  /// costs one run of each of its three derived cogs, and every turn that
+  /// costs one run of each of its three automatic cogs, and every turn that
   /// changes the source costs the same three again:
   ///
   /// ```text
@@ -21,20 +21,14 @@ extension CogScenario {
   /// wave and the arithmetic stays exact.
   ///
   /// - Parameters:
-  ///   - turns: How many changing turns to commit after the first read.
+  ///   - turns: How many changing turns to run after the first read.
   ///     Defaults to a small count because reduced sizes are legitimate here:
   ///     the expected count derives from this parameter, so a short run proves
   ///     the same property as a long one.
-  ///   - layout: The value-reference layout to build with. The sentinel is
-  ///     keyless, so this only travels with the result.
   /// - Returns: A runnable scenario named `M5ScenarioSentinel`.
-  public static func sentinel(
-    turns: Int = 4,
-    layout: CogValueReferenceLayout = .inline
-  ) -> CogScenario {
+  public static func sentinel(turns: Int = 4) -> CogScenario {
     CogScenario(
       name: "M5ScenarioSentinel",
-      layout: layout,
       expectedRuns: 3 * (1 + turns)
     ) { cogs, counter in
       let sourceCog = ManualCog<Int>(0, name: "sentinel.source")
@@ -65,7 +59,7 @@ extension CogScenario {
       var sum = cogs.peek(sumCog)
 
       for turn in 1...max(turns, 1) where turns > 0 {
-        cogs.commit("sentinel.turn") { c in c[sourceCog] = turn }
+        cogs.turn("sentinel.turn") { c in c[sourceCog] = turn }
         sum = cogs.peek(sumCog)
       }
       return sum

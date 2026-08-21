@@ -1,6 +1,6 @@
 // scenario: DECL-12
 //
-// A derived Cog's selector is synchronous and nonthrowing in v1. The valid
+// An automatic Cog's selector is synchronous and nonthrowing in v1. The valid
 // declaration first proves this fixture resolved the real public initializer;
 // the otherwise-identical throwing function must fail at that initializer's
 // type boundary.

@@ -9,7 +9,7 @@ import Testing
   // ASYNC-21 proves a newer refresh supersedes a handle; this proves a
   // dependency change replaces the generation the same way. The handle
   // resolves as superseded at replacement and never drifts forward to the
-  // dependency-started run, whose result alone may commit.
+  // dependency-started run, whose result alone may turn.
   let (cogs, m) = probedContext()
   let request = ManualCog<Int>(0)
   let work = AsyncStatusControlledWork<Int>()
@@ -45,7 +45,7 @@ import Testing
   }
   #expect(await startIterator.next() == 1)
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
   if case .superseded = await refresh.outcome {
   } else {
     Issue.record("The dependency change did not resolve the refresh handle as superseded")
@@ -57,7 +57,7 @@ import Testing
   }
   #expect(await startIterator.next() == 2)
 
-  // The superseded generation's late result commits nothing; only the
+  // The superseded generation's late result turns nothing; only the
   // dependency-started run may.
   try await resolveAsyncStatus(in: cogs) {
     work.succeed(1, with: 20)

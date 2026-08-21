@@ -15,7 +15,7 @@ import UIKit
 /// synchronous on the MainActor, so a real body evaluation only happens after
 /// the turn completes. A turn that mutates several of the card's boundaries —
 /// a forecast's status and its
-/// `isNice` derivation — therefore invalidates once, exactly like a frame.
+/// automatic `isNice` value — therefore invalidates once, exactly like a frame.
 /// Tests call ``renderFrame()`` at their settle points to evaluate the body
 /// and re-arm.
 @MainActor
@@ -251,7 +251,7 @@ func `EXPORT-07 a disappearing Weather map ends its value loop and lease`() asyn
   )
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   mountedHost.willMove(toParent: nil)
   mountedHost.view.removeFromSuperview()
   mountedHost.removeFromParent()

@@ -31,19 +31,19 @@ Three benchmarks, all metrics enabled, 50 samples each, release:
 enum ProbeHarness {
   static var cogs: Cogs?
   static var sourceCog = ManualCog<Int>(0, name: "probe.source")
-  static var derivedCog = Cog<Int>({ c in c[ProbeHarness.sourceCog] + 1 }, name: "probe.derived")
+  static var automaticCog = Cog<Int>({ c in c[ProbeHarness.sourceCog] + 1 }, name: "probe.automatic")
 
   static func setUp() {
     let context = Cogs.forTesting()
-    blackHole(context.peek(derivedCog))
+    blackHole(context.peek(automaticCog))
     cogs = context
   }
 
   static func runTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.commit("probe.turn") { c in c[sourceCog] = iteration }
-      blackHole(cogs.peek(derivedCog))
+      cogs.turn("probe.turn") { c in c[sourceCog] = iteration }
+      blackHole(cogs.peek(automaticCog))
     }
   }
 
@@ -203,7 +203,7 @@ that moves wall-clock percentiles without moving code.
 
 ## Reproducing
 
-The probe target was deliberately not committed — `M5-05c` owns adding the
+The probe target was deliberately not published — `M5-05c` owns adding the
 dependency. To rerun: add
 `.package(url: "https://github.com/ordo-one/benchmark", exact: "1.36.2")` to
 `swift/Benchmarks/Package.swift`, add an executable target at

@@ -2,6 +2,10 @@
 
 _Authored August 6, 2026._
 
+The [shared state model](../design.md) keeps effects outside automatic state.
+This document owns the Android lifetimes, APIs, and background-work choices
+that implement that boundary.
+
 ## 6. Side effects, worked
 
 State describes the app. An effect changes something outside the graph.
@@ -126,7 +130,7 @@ An effect writes only through a normal operation:
 
 ```kotlin
 fun CogStore.markDraftSaved(revision: Revision) =
-    commit("draft saved") {
+    turn("draft saved") {
         savedRevisionSource.value = revision
     }
 
@@ -159,7 +163,7 @@ sequenceDiagram
     T1->>E: draft changed
     E->>IO: save
     IO-->>E: revision
-    E->>T2: commit("draft saved")
+    E->>T2: turn("draft saved")
     Note over T1,T2: never one re-entrant turn
 ```
 
@@ -197,7 +201,7 @@ Tests use a test dispatcher and a store bound to the test lane.
 A good effect test should:
 
 1. install the group;
-2. make one named commit;
+2. make one named turn;
 3. advance the test scheduler;
 4. assert the outside call;
 5. assert any later write-back turn;

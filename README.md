@@ -9,17 +9,17 @@ planned as two platform-native libraries:
   Compose snapshot runtime with one app-wide store plus turn, lifetime, and
   async rules.
 
-The two libraries will share the same goals, but each should fit its platform
-instead of forcing one platform's API onto the other.
+The libraries implement one [shared state model](./docs/design.md), while each
+fits its platform instead of forcing one platform's API onto the other.
 
 ## Design principles
 
 1. **Cog should feel simple.** Declaring, reading, and changing state should
    look natural on each platform. Common code should be easy to read and
    reason about.
-2. **Every state read should be correct.** A read must use the latest committed
+2. **Every state read should be correct.** A read must use the latest completed
    source state after settling every dependency it needs. It must not expose a
-   torn update, stale derived value, or half-finished change.
+   torn update, stale automatic value, or half-finished change.
 3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
    allocation, synchronization, and UI updates. Use benchmarks to choose
    implementation details.
@@ -33,21 +33,24 @@ should also keep the common API simple.
 
 ## Status
 
-The Swift library is real and usable. Releases through 0.4.0 include the simple
-shipping core, SwiftUI boundary, mechanisms, declared lifetimes, async policies
-and streams, value exports, the external Observation bridge, and first-party
-CogLint plugins. Post-release performance work has made graph notices
-O(changed), removed steady-turn allocations from shared machinery, and added a
-representative Storefront workload. The faster arena core remains an internal
-research candidate while its keyed construction and specialization tradeoffs
-are resolved. The Android library has not been started.
+The Swift library is real and usable. Releases through 0.4.0 include the
+original simple core, SwiftUI boundary, mechanisms, declared lifetimes, async
+policies and streams, value exports, the external Observation bridge, and
+first-party CogLint plugins. Post-release performance work has made graph
+notices O(changed), removed steady-turn allocations from shared machinery, and
+added a representative Storefront workload. On `main`, the specialized arena
+is the sole core and the default implementation. Applications that prioritize
+binary size can explicitly disable its typed specialization frontier with the
+non-default `CompactArena` package trait. The Android library has not been
+started.
 
 The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
 shows the production-bootstrap and isolated-test call sites, and
 [CHANGELOG.md](./CHANGELOG.md) records what each release contains.
 
 The earlier Dart and Flutter experiment has been removed from the current
-tree. It remains available in the repository history.
+tree. [Design history](./docs/history.md) carries forward its motivation,
+decisions, and source trail; the complete dump remains in repository history.
 
 ## Using Cog in an app
 
@@ -65,6 +68,27 @@ dependencies: [
 
 or, in Xcode, add the same URL under **File ▸ Add Package Dependencies** with
 the **Up to Next Minor Version** rule.
+
+The default above selects the fastest measured implementation: specialized
+arena with shared pool edges. That change and `CompactArena` are new on `main`
+and are not part of 0.4.0. Once consuming a release or revision that contains
+them, a final application can opt out of typed specialization with the
+trait-aware dependency overload. For example, if it ships in 0.5.x:
+
+```swift
+.package(
+  url: "https://github.com/skeswa/cog.git",
+  "0.5.0"..<"0.6.0",
+  traits: ["CompactArena"]
+)
+```
+
+Package traits are additive across the dependency graph. Enable this trait
+only when the final application owns the binary-size decision; a reusable
+library should not force the compact configuration on every application that
+also resolves Cog. The trait changes no Cog API or behavior and does not
+restore the retired simple core. It keeps the arena and shared edge pool while
+suppressing the client-specializable typed value frontier.
 
 Pin to a **minor**, not a major. Cog is in 0.x, where a minor release may break
 source compatibility and says so in the changelog, while a patch release only
@@ -109,10 +133,12 @@ readable in this repository.
   hardening contract.
 - **[Releasing Cog for Swift](./docs/maintainers/releasing.md):** candidate,
   annotated-tag, publication, and post-release verification steps.
+- **[Shared state model](./docs/design.md):** the problem, vocabulary, and
+  behavioral invariants both platform libraries implement.
+- **[Design history](./docs/history.md):** the Dart and Flutter lineage, how the
+  model evolved, what survived, and the original source trail.
 - **[Swift design](./docs/swift/README.md):** the reading order, current
   decisions, open questions, and implementation plan for SwiftUI.
 - **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose
   snapshot architecture, worked example, Flow and effects guidance, and
   Android benchmark plan.
-- **[Dart and Flutter design snapshot](./docs/dump-2026-08-06.md):** frozen
-  historical context. It is not normative for either current library.

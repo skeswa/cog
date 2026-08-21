@@ -8,13 +8,13 @@ import Testing
 // (SEED-05), so both child processes here are debug children.
 
 @MainActor
-@Test func `SEED-08 seeding inside a commit body traps with a clear error`() async {
+@Test func `SEED-08 seeding inside a turn body traps with a clear error`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
       let count = ManualCog<Int>(0, name: "count")
 
-      cogs.commit { _ in
+      cogs.turn { _ in
         cogs.seed(count, to: 7)
       }
     }

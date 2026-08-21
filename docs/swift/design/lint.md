@@ -301,7 +301,7 @@ also the intended implementation shape:
 - **Views.** A type with a written `View` conformance in the file, or a
   `body` property typed `some View`.
 - **Graph receivers.** `cogs` bound by `@Environment(\.cogs)`, the `c`
-  parameter of selectors, reactions, and commit closures, and a mechanism's
+  parameter of selectors, reactions, and turn closures, and a mechanism's
   controller. A local bound directly from `Cogs.bootstrapApp` is also a graph
   receiver, so entry-point rules and primitive rules share the same identity.
 - **App entry points.** A type with a written `App` conformance. This
@@ -344,8 +344,8 @@ gap.
 ### 4.3 `primitives-only-in-ops`
 
 The only sanctioned call site for a primitive is an `extension CogOps` body,
-where it is spelled bare — `commit(...)`, `refresh(...)`, no receiver.
-Everywhere else, a `.commit(` or `.refresh(` call on a classified graph
+where it is spelled bare — `turn(...)`, `refresh(...)`, no receiver.
+Everywhere else, a `.turn(` or `.refresh(` call on a classified graph
 receiver is a violation, as is a bare or `self.`-qualified primitive call
 inside an `extension Cogs`; the fix is a domain verb in a `CogOps`
 extension. Test targets are exempt by configuration, because tests
@@ -356,7 +356,7 @@ classification at all. It catches the inline `refresh` in a view action and a
 primitive inside an `extension Cogs` binding helper. It does not claim to
 detect initial state expressed through a correctly wrapped named op;
 `initial-state-in-mechanism` owns that separate boundary. A nested `Writer`
-commit stays legal for free: it is lexically inside the op's
+turn stays legal for free: it is lexically inside the op's
 `extension CogOps` body.
 
 ### 4.4 `initial-state-in-mechanism`
@@ -364,7 +364,7 @@ commit stays legal for free: it is lexically inside the op's
 Inside an app entry point's initializer, the rule finds a local bound directly
 from `Cogs.bootstrapApp(...)`. That local may appear only in the retention
 assignment, such as `_cogs = State(initialValue: cogs)`. Any other reference
-is a violation, whether it calls `commit`, `refresh`, a named op such as
+is a violation, whether it calls `turn`, `refresh`, a named op such as
 `selectCurrentLocation`, a read, or another helper. The fix is to express the
 initial world through a mechanism supplied to bootstrap; its `operate` runs
 and settles before bootstrap returns.
@@ -387,7 +387,7 @@ A declaration the classifier recognizes as `ManualCog` or `ManualCogBox`
 must be `private` or `fileprivate`; either spelling satisfies the rule. Any
 wider access level — including the implicit `internal` of a bare `let` — is
 a violation; the fix is to narrow the source and expose `.readOnly` or a
-derived cog. Accepting both spellings keeps the rule semantic rather than
+automatic cog. Accepting both spellings keeps the rule semantic rather than
 stylistic: at file scope the two are identical, and spelling there already
 belongs to the formatter, whose `FileScopedDeclarationPrivacy` pass
 rewrites file-scope `fileprivate` to `private` — a linter taking a side
@@ -408,7 +408,7 @@ Members with no declared return value and members whose written return type is
 
 This exact structural rule catches issue #318's `weatherCardReading(for:)`
 helper without growing a syntax visitor into a data-flow analyzer. A genuinely
-derived value belongs in a derived cog; values merely used together belong on
+automatic value belongs in an automatic cog; values merely used together belong on
 their own lines at the consuming boundary. A helper outside `Cogs`/`CogOps`,
 or a repackaging path that requires following values through assignments, is
 an accepted v1 miss and waits for the measured type-aware upgrade path (§5).

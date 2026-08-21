@@ -1,4 +1,3 @@
-#if COG_CORE_ARENA
 public import Cog
 
 /// Identity-free evidence that an arena row was safely reused.
@@ -27,10 +26,10 @@ public nonisolated struct ArenaSlotReuse: Equatable, Sendable {
 }
 
 extension Cogs {
-  /// Releases one derived state, creates another, and reports allocator facts.
+  /// Releases one automatic state, creates another, and reports allocator facts.
   ///
   /// Both declarations run through normal arena settlement. The first must be
-  /// unobserved and have no subscribers, matching a lifetime-eligible derived
+  /// unobserved and have no subscribers, matching a lifetime-eligible automatic
   /// row; the replacement is settled before the result returns.
   public func probeArenaSlotReuse<ReleasedValue, ReplacementValue>(
     releasing releasedReference: Cog<ReleasedValue>,
@@ -62,4 +61,3 @@ extension Cogs {
     )
   }
 }
-#endif

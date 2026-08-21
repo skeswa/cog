@@ -72,7 +72,7 @@ import Testing
 
   #expect(cogs.peek(advice) == "coat")
 
-  cogs.commit("warm up") { c in c[temperature] = 80 }
+  cogs.turn("warm up") { c in c[temperature] = 80 }
   #expect(cogs.peek(advice) == "shorts")
 
   let entries = cogs.debugHistory.entries
@@ -88,12 +88,12 @@ import Testing
   let temperature = ManualCog<Int>(60)
   let afterSource = UInt(#line)
 
-  let beforeDerived = UInt(#line)
+  let beforeAutomatic = UInt(#line)
   let advice = Cog<String> { c in c[temperature] > 70 ? "shorts" : "coat" }
-  let afterDerived = UInt(#line)
+  let afterAutomatic = UInt(#line)
 
   #expect(cogs.peek(advice) == "coat")
-  cogs.commit("warm up") { c in c[temperature] = 80 }
+  cogs.turn("warm up") { c in c[temperature] = 80 }
   #expect(cogs.peek(advice) == "shorts")
 
   let entries = cogs.debugHistory.entries
@@ -110,7 +110,7 @@ import Testing
   #expect(recomputes.count == 1)
   let recomputeSite = declarationSite(recomputes.first)
   #expect(recomputeSite?.file.hasSuffix("DECL10_11ScenarioTests.swift") == true)
-  #expect(recomputeSite.map { $0.line > beforeDerived && $0.line < afterDerived } == true)
+  #expect(recomputeSite.map { $0.line > beforeAutomatic && $0.line < afterAutomatic } == true)
 }
 
 #endif

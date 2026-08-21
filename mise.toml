@@ -37,45 +37,23 @@ run = "swift format lint --strict --parallel --recursive swift Package.swift"
 # built tests before running and fails when the expression selects none.
 # SwiftPM exits 0 on an empty selection, so a raw `swift test --filter` can
 # report a green for work it never ran. Extra arguments are passed straight
-# through: `mise run test --filter 'DECL-01|ONE-04' --parallel`.
+# through: `mise run test --filter 'DECL-01|ONE-04'`.
 
 [tasks.test]
 description = "Run the Swift tests on the default matrix leg"
-run = "node {{config_root}}/tools/swift-test.mjs default"
+run = "node {{config_root}}/tools/swift-test.mjs default --no-parallel"
 
 [tasks."test:matrix"]
 description = "Run the Swift tests across all four isolation-matrix legs"
-run = "node {{config_root}}/tools/swift-test.mjs matrix"
+run = "node {{config_root}}/tools/swift-test.mjs matrix --no-parallel"
 
-[tasks."test:cores"]
-description = "Verify the shipping core and run Swift behavior against both implementations"
-run = """
-set -euo pipefail
-unset COG_TEST_CORE COG_TEST_EDGE
-echo "==> shipping default (simple)"
-node "{{config_root}}/tools/swift-test.mjs" default \
-  --no-parallel --filter 'CoreSelectorInfrastructure'
-behavior_filter='[A-Z]+-[0-9][0-9]'
-for core in simple arena; do
-  echo "==> core ${core}"
-  COG_TEST_CORE="${core}" node "{{config_root}}/tools/swift-test.mjs" default \
-    --no-parallel --filter "${behavior_filter}"
-done
-"""
-
-[tasks."test:value-references"]
-description = "Run the Swift tests across all value-reference layouts"
-run = """
-set -euo pipefail
-for layout in inline interned generic; do
-  echo "==> value-reference layout ${layout}"
-  COG_TEST_VALUE_REFERENCE_LAYOUT="${layout}" node "{{config_root}}/tools/swift-test.mjs" default
-done
-"""
+[tasks."test:arena-configurations"]
+description = "Test the specialized default and CompactArena trait"
+run = "node {{config_root}}/tools/swift-test.mjs arena-configurations"
 
 [tasks."test:release"]
 description = "Run the Swift tests on the default leg in release configuration"
-run = "node {{config_root}}/tools/swift-test.mjs release"
+run = "node {{config_root}}/tools/swift-test.mjs release --no-parallel"
 
 [tasks."api:check"]
 description = "Compare supported Swift APIs with the latest release tag"
@@ -247,6 +225,11 @@ run = "node {{config_root}}/tools/test-workflows.mjs"
 description = "Run the Cog benchmarks in release"
 dir = "{{config_root}}/swift/Benchmarks"
 run = "swift package benchmark"
+
+[tasks."bench:compact"]
+description = "Run the Cog benchmarks with the CompactArena trait"
+dir = "{{config_root}}/swift/Benchmarks"
+run = "swift package --traits CompactArena benchmark"
 
 # Benchmark baselines, through `tools/bench-baseline.mjs`. The benchmark
 # package is a package of its own, so these tasks run there rather than at the

@@ -3,7 +3,7 @@ import Testing
 
 @testable import Cog
 
-// Internal phase checks for one commit. Scenario tests cover public commit
+// Internal phase checks for one turn. Scenario tests cover public turn
 // behavior.
 
 @MainActor
@@ -79,25 +79,4 @@ private func defaultTurnName(in cogs: Cogs) -> String {
   #expect(first != nil)
   #expect(second != nil)
   #expect(first != second)
-}
-
-@MainActor
-@Test func `TurnStateInfrastructure keeps keyless pending state apart from committed state`() {
-  let cogs = Cogs.forTesting()
-  let selectedZip = ManualCog<String?>("10001")
-  let state = cogs.manualState(for: selectedZip)
-
-  #expect(state.key == nil)
-  #expect(state.currentValue == "10001")
-  #expect(state.pendingValue == nil)
-
-  // The outer optional means "a write is staged"; the inner one is the
-  // source's value. A staged nil must not look like no staged write.
-  state.pendingValue = .some(nil)
-
-  #expect(state.currentValue == "10001")
-  guard case .some(.none) = state.pendingValue else {
-    Issue.record("A staged nil was lost")
-    return
-  }
 }

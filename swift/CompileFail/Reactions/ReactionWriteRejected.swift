@@ -3,7 +3,7 @@
 // A reaction receives a read controller, not a writer. It can read a source to
 // establish a dependency, but its subscript is read-only. A reaction that
 // needs to change state instead calls an op on its mechanism's controller, so
-// the write follows `commit`'s normal turn rules.
+// the write follows `turn`'s normal turn rules.
 
 import Cog
 

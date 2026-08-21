@@ -18,7 +18,7 @@ import os
 
   #expect(initial == nil)
 
-  cogs.commit { c in c[weather["90210"]] = "sunny" }
+  cogs.turn { c in c[weather["90210"]] = "sunny" }
 
   #expect(notices.withLock { $0 } == 0)
   #expect(cogs.peek(weather["10001"]) == nil)

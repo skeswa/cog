@@ -7,7 +7,7 @@ import Testing
 // without depending on reactions.
 
 @MainActor
-@Test func `TurnQueueInfrastructure defers a commit requested during flush`() {
+@Test func `TurnQueueInfrastructure defers a turn requested during flush`() {
   let cogs = Cogs.forTesting()
   let queuedSource = ManualCog<Int>(0)
   var events: [String] = []
@@ -24,7 +24,7 @@ import Testing
       outerTurn = turn.id
       events.append("outer flush before enqueue")
 
-      cogs.commit("queued") { c in
+      cogs.turn("queued") { c in
         guard case .accumulating(let turn) = cogs.turnPhase else {
           Issue.record("The queued body did not run while accumulating")
           return
@@ -41,7 +41,7 @@ import Testing
     }
   )
 
-  cogs.commit("outer") { c in
+  cogs.turn("outer") { c in
     events.append("outer body")
     c[trigger] = 1
   }
@@ -86,7 +86,7 @@ import Testing
     0,
     equals: { oldValue, newValue in
       events.append("first flush")
-      cogs.commit("late") { c in
+      cogs.turn("late") { c in
         recordQueuedTurn("late")
         events.append("late body")
         valuesSeen.append(c[value])
@@ -101,7 +101,7 @@ import Testing
     equals: { oldValue, newValue in
       events.append("outer flush")
 
-      cogs.commit("first") { c in
+      cogs.turn("first") { c in
         recordQueuedTurn("first")
         events.append("first body")
         valuesSeen.append(c[value])
@@ -109,7 +109,7 @@ import Testing
         c[value] = 1
       }
 
-      cogs.commit("second") { c in
+      cogs.turn("second") { c in
         recordQueuedTurn("second")
         events.append("second body")
         valuesSeen.append(c[value])
@@ -120,7 +120,7 @@ import Testing
     }
   )
 
-  cogs.commit("outer") { c in c[outerFlushTrigger] = 1 }
+  cogs.turn("outer") { c in c[outerFlushTrigger] = 1 }
 
   #expect(
     events == [

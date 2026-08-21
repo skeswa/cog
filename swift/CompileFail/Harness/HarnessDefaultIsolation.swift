@@ -2,7 +2,7 @@
 //
 // Sentinel. Proves the runner really applies the library's build settings
 // rather than plain `swiftc` defaults. This file only fails to compile because
-// the harness derived BOTH `-swift-version 6` and `-default-isolation
+// the harness automatic BOTH `-swift-version 6` and `-default-isolation
 // MainActor` from `Package.swift`; drop either and it compiles cleanly and the
 // harness reports `no-diagnostic`.
 //

@@ -3,11 +3,17 @@
 /// `-1` is the universal list terminator. Live indices are dense non-negative
 /// `Int32` values so arena scalar rows and edge entries can link without ARC,
 /// optional payloads, or pointer-sized storage.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated struct CogEdgeIndex: Hashable, Sendable {
   /// Position in the pool's contiguous entry array, or `-1` for no edge.
   let rawValue: Int32
 
   /// End of a dependency, subscriber, or free list.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   static let none = CogEdgeIndex(rawValue: -1)
 }
 
@@ -15,7 +21,7 @@ internal nonisolated struct CogEdgeIndex: Hashable, Sendable {
 ///
 /// The producer side is doubly linked for O(1) reverse unlink. The consumer
 /// side preserves selector read order with one forward link. Six four-byte
-/// fields keep the measured candidate at the 24-byte shape proposed by perf
+/// fields keep the selected representation at the 24-byte shape proposed by perf
 /// §3.3.
 internal nonisolated struct CogPoolEdge: Sendable {
   /// Producer arena slot.
@@ -54,7 +60,7 @@ internal nonisolated struct CogPoolEdge: Sendable {
   }
 }
 
-/// Shared linked-edge storage for the arena pool candidate.
+/// Shared linked-edge storage for the arena.
 ///
 /// Adding an edge appends to one consumer's ordered dependency list and pushes
 /// onto one producer's subscriber list. Removal repairs both topologies before
@@ -62,12 +68,21 @@ internal nonisolated struct CogPoolEdge: Sendable {
 /// stores no references; arena slots must remain live until their edges have
 /// been removed.
 @MainActor
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogLinkedEdgePool {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
   // class is main-actor-isolated too, so every deallocation asks the
   // concurrency runtime which executor it is on (`M9-13`).
   nonisolated deinit {}
+
+  /// Creates empty edge storage for one arena context.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  init() {}
 
   /// Contiguous live and reusable entries.
   ///
@@ -90,6 +105,9 @@ internal final class CogLinkedEdgePool {
   /// first read. Requiring the tail makes ordered capture O(1) without a second
   /// per-consumer scalar. The same edge becomes the newest subscriber of its
   /// producer so reverse invalidation also stays O(1).
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func add(
     producer: CogArenaSlot,
     consumer: CogArenaSlot,
@@ -188,6 +206,9 @@ internal final class CogLinkedEdgePool {
   /// its producer in O(1) and joins the in-entry free list. The preserved
   /// prefix remains in selector read order and becomes the append tail.
   @discardableResult
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func removeDependencySuffix(
     of consumer: CogArenaSlot,
     after previous: CogEdgeIndex,
@@ -238,6 +259,9 @@ internal final class CogLinkedEdgePool {
   }
 
   /// Refreshes the producer version captured by one reused dependency edge.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func updateVersion(of index: CogEdgeIndex, to version: UInt32) {
     edges[liveEntryIndex(index)].version = version
   }

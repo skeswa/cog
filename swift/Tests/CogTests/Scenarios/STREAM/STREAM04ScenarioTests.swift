@@ -26,8 +26,8 @@ import Testing
   #expect(observedStatuses.map(\.kind) == [.pending])
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
-  cogs.commit(watcherAlive, to: false)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   clock.advance(by: .seconds(10))
   try await released.wait()

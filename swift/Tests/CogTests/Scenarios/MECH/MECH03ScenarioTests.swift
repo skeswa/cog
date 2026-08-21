@@ -32,7 +32,7 @@ import Testing
 
   // A real turn wakes only the listed mechanism's reaction; the declared but
   // unlisted mechanism still has nothing registered.
-  cogs.commit { c in c[source] = 1 }
+  cogs.turn { c in c[source] = 1 }
   #expect(listedRuns == 2)
   #expect(unlistedRuns == 0)
   _ = unlisted

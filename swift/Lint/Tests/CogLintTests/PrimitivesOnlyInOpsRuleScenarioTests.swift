@@ -45,7 +45,7 @@ import Testing
     source:
       """
       func drive(_ c: Writer) {
-        c.commit(named: "test") { _ in }
+        c.turn(named: "test") { _ in }
         c.refresh(forecastCog)
       }
       """
@@ -61,9 +61,9 @@ import Testing
       """
       extension CogOps {
         func update() {
-          commit { c in
+          turn { c in
             c[countSourceCog] = 1
-            helper { commit(otherSourceCog, to: 2) }
+            helper { turn(otherSourceCog, to: 2) }
           }
         }
       }

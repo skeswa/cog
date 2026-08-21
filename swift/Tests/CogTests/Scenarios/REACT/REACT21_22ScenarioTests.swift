@@ -29,9 +29,9 @@ import Testing
   #expect(parityRuns == 1)
   #expect(reactionRuns == 1)
 
-  cogs.commit { c in c[count] = 4 }
+  cogs.turn { c in c[count] = 4 }
 
-  // The source really changed, so the derived cog really recomputed — this is
+  // The source really changed, so the automatic cog really recomputed — this is
   // not a turn that quietly did nothing.
   #expect(parityRuns == 2)
   #expect(cogs.peek(isEven) == true)
@@ -39,7 +39,7 @@ import Testing
   // the reaction never ran.
   #expect(reactionRuns == 1)
 
-  cogs.commit { c in c[count] = 5 }
+  cogs.turn { c in c[count] = 5 }
 
   // A recomputation that does change the value still wakes it.
   #expect(parityRuns == 3)
@@ -62,12 +62,12 @@ import Testing
 
   #expect(reactionRuns == 1)
 
-  cogs.commit("write the same value") { c in c[source] = 7 }
+  cogs.turn("write the same value") { c in c[source] = 7 }
 
   #expect(cogs.peek(source) == 7)
   #expect(reactionRuns == 1)
 
-  cogs.commit("write a different value") { c in c[source] = 8 }
+  cogs.turn("write a different value") { c in c[source] = 8 }
 
   #expect(reactionRuns == 2)
 }
@@ -87,9 +87,9 @@ import Testing
     }
   ])
 
-  cogs.commit { c in c[source] = 7 }
+  cogs.turn { c in c[source] = 7 }
   #expect(deliveries.isEmpty)
 
-  cogs.commit { c in c[source] = 8 }
+  cogs.turn { c in c[source] = 8 }
   #expect(deliveries == ["7->8"])
 }

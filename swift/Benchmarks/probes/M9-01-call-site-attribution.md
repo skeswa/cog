@@ -47,9 +47,9 @@ value-reference selectors. Sources live beside this document in
   root, carrying the library's own Swift settings so `@MainActor` default
   isolation matches.
 - `Sources/CogProfile/main.swift` — the workloads: `steady` (one write and one
-  tracked read), `commit` (a write with no read), `read` (a tracked read of a
+  tracked read), `turn` (a write with no read), `read` (a tracked read of a
   clean value), `pinned` (one live key beside `K` pinned ones), `deep` (a
-  source pulled through a chain of `K` derived nodes), and `build` (`K` keyed
+  source pulled through a chain of `K` automatic nodes), and `build` (`K` keyed
   source-and-consumer pairs constructed in a fresh context).
 - `interpose.c` — the profiler.
 
@@ -78,7 +78,14 @@ of calls does not report a smaller number; it reports a different shape.
 Recording is guarded by a thread-local reentrancy flag, since `backtrace` and
 the report path allocate.
 
-## Running it
+## Historical invocation
+
+This probe is a measurement record, not a command for the current tree. The
+commands below describe revision `M9-01`, when a bare build selected the simple
+core and `COG_TEST_CORE=arena` selected its comparison. The current manifest
+rejects that retired selector deliberately. Use `mise run bench` for the
+specialized arena or `mise run bench:compact` for the supported public compact
+comparison; neither can recreate the removed simple core.
 
 ```sh
 cd swift/Benchmarks/probes/M9-01
@@ -87,7 +94,7 @@ cd swift/Benchmarks/probes/M9-01
 clang -dynamiclib -O1 -g -o libcogprof.dylib interpose.c \
   -L/usr/lib/swift -lswiftCore -lobjc
 
-# The shipping simple core, and the arena for comparison.
+# On the M9-01 revision: the then-shipping simple core and arena comparison.
 swift build -c release -Xswiftc -g
 COG_TEST_CORE=arena swift build -c release -Xswiftc -g --scratch-path .build-arena
 ```

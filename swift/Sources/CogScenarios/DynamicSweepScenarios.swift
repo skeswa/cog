@@ -78,15 +78,12 @@ extension CogScenario {
   ///     only with `sourcesPerNode >= width`, which saturates at row 1.
   ///   - turns: Changing turns after the first settle. Each writes one source,
   ///     cycling through them the way upstream does.
-  ///   - layout: The value-reference layout to build with. This shape is
-  ///     keyless, so it only travels with the result.
   public static func dynamicSweep(
     width: Int = 10,
     layers: Int = 5,
     sourcesPerNode: Int = 2,
     dynamicStride: Int = 0,
-    turns: Int = 100,
-    layout: CogValueReferenceLayout = .inline
+    turns: Int = 100
   ) -> CogScenario {
     let rowCount = max(layers - 1, 0)
     var runsPerTurn = 0
@@ -96,7 +93,6 @@ extension CogScenario {
 
     return CogScenario(
       name: "COUNT-05-DynamicSweep",
-      layout: layout,
       expectedRuns: rowCount * width + turns * runsPerTurn
     ) { cogs, counter in
       // Flat ownership, for the reason `kairoDeep` gives: if a node's selector
@@ -145,7 +141,7 @@ extension CogScenario {
         // Every write moves its source by `width`, so no turn is ever gated
         // away as equal and the count above stays exact.
         let index = turn % width
-        cogs.commit("sweep.turn") { c in c[graph.sourceCogs[index]] = turn + index }
+        cogs.turn("sweep.turn") { c in c[graph.sourceCogs[index]] = turn + index }
         for leafCog in leafCogs { last = cogs.peek(leafCog) }
       }
       return last

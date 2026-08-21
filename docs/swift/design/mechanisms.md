@@ -5,7 +5,9 @@ _August 14, 2026_
 This file is §6 of [exploration.md](./exploration.md). It covers mechanisms —
 the home for every side effect — their bootstrap, gating, testing, and work
 that can outlive the app process. Other section numbers point to the core
-file.
+file. The state-versus-effect boundary comes from the
+[shared state model](../../design.md); this file owns its Swift lifecycle and
+API.
 
 ## 6. Side effects, worked
 
@@ -103,7 +105,7 @@ its pieces have narrow jobs:
 - `m.peek` makes an untracked read (§2.4); an `operate`-time read never
   becomes a dependency, because `operate` is registration, not a reaction.
 - Ops are available on `m` directly, because ops extend `CogOps` and
-  the controller conforms (§3.2). `m.commit` and `m.refresh` are the
+  the controller conforms (§3.2). `m.turn` and `m.refresh` are the
   primitives beneath them.
 - Every registration is attributed. `watch`, `run`, and `task` names compose
   under the mechanism's `name` — the task above appears as
@@ -201,7 +203,7 @@ The consequences are deliberate:
   test catches immediately.
 - **Order is exact.** Cross-mechanism reaction order is array order, because
   reactions run in registration order (§3.3). Writes made during `operate`
-  commit as ordinary named turns and settle before bootstrap returns, so a
+  `turn` as ordinary named turns and settle before bootstrap returns, so a
   mechanism may seed demand — `m.refresh(...)` — or configure state, and a
   later mechanism observes the result.
 - **Names are enforced.** Two mechanisms with the same `name` fail fast with
@@ -226,13 +228,13 @@ harnesses (§2.3).
 
 Reactions may cause writes, but never into the turn they are flushing:
 
-1. The outer `commit` settles state.
+1. The outer `turn` call settles state.
 2. Reactions run synchronously, in registration order, against that settled
    state.
 3. A reaction receives only a read controller. To write, it calls an op or
-   another API that opens `commit`.
-4. That commit waits in a FIFO queue and becomes a new turn after the current
-   flush. Nested commits during the earlier accumulating phase still join the
+   another API that opens `turn`.
+4. That turn waits in a FIFO queue and becomes a new turn after the current
+   flush. Nested turns during the earlier accumulating phase still join the
    current turn (§3.2).
 
 An old captured writer also fails its turn-ID check, and async writes
@@ -296,7 +298,7 @@ let weatherSeedTargetsCogs = weatherReportSourceCogs
 
 extension CogOps {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
-        commit { c in c[weatherReportSourceCogs[zip]] = report }
+        turn { c in c[weatherReportSourceCogs[zip]] = report }
     }
 }
 #endif
@@ -316,7 +318,7 @@ extension Cogs {
 ```
 
 `seed` comes from `CogTesting` and is quiet: no turn, history record, UI
-notice, or reaction. `commit` is loud and runs a real named turn. The feature
+notice, or reaction. `turn` is loud and runs a real named turn. The feature
 chooses its exact test surface instead of exposing all source value
 references or linking test setup into the app target.
 
@@ -376,7 +378,7 @@ rules follow:
    creates and configures it once, mechanisms and all, even when no scene
    appears. UI-only work stays safe because it lives in views. A background
    task owns its deadline; expiration cancels its op, while a cancellation
-   shield can protect the final commit (`withTaskCancellationShield` in Swift
+   shield can protect the final turn (`withTaskCancellationShield` in Swift
    6.4).
 3. **System-owned work is not an `AsyncCog`.** An async cog models a task
    owned by the current process. A background `URLSession` transfer can
@@ -452,8 +454,8 @@ The full flow:
 
 1. The system launches the app without a scene. The app bootstraps the graph
    from the store with its mechanisms.
-2. Feed refresh commits new episode rows.
-3. The derived desired set changes. The reconciler hands IDs to the background
+2. Feed refresh turns new episode rows.
+3. The automatic desired-set cog changes. The reconciler hands IDs to the background
    session, then the short refresh task returns without downloading files.
 4. The app may stop. `nsurlsessiond` keeps transferring.
 5. Completion launches the app again. The engine reconnects to its session

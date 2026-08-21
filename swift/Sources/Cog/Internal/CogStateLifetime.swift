@@ -4,6 +4,9 @@
 /// A later manual-state API will also choose whether recreation resets to the
 /// starting value. The policy is immutable declaration metadata; each keyed
 /// state owns its own lease count, grace generation, and deadline task.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated enum CogStateLifetime: Equatable {
   /// Retain the state until its app or isolated testing context ends.
   case app

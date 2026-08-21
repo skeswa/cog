@@ -145,7 +145,7 @@ private struct StorefrontFilterBar: View {
         Spacer(minLength: 0)
 
         // One tap, three sources, one turn. A storefront that wrote the
-        // category, the sort, and the stock switch as three commits would
+        // category, the sort, and the stock switch as three turns would
         // settle — and render — two screens no shopper ever asked for on the
         // way to the one they did.
         Button("Deals") {

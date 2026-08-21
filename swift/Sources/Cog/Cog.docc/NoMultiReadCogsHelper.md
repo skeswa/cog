@@ -8,7 +8,7 @@ Reads in one consumer already come from one settled turn and register independen
 
 ## How to fix it
 
-Read each value flatly on its own line at the consuming boundary. If the combined value is real derived state rather than values merely used together, declare a derived cog and read that single declaration instead.
+Read each value flatly on its own line at the consuming boundary. If the combined value is genuinely automatic state rather than values merely used together, declare an automatic cog and read that single declaration instead.
 
 <!-- Generated from the no-multi-read-cogs-helper CogLint fixture corpus; do not edit. -->
 

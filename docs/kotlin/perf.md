@@ -2,6 +2,10 @@
 
 _Authored August 6, 2026._
 
+The [shared state model](../design.md) owns the cross-platform rule that work
+avoidance comes before representation tricks. This document owns the Android
+cost model and the measurements that will choose its runtime.
+
 Correct reads come first. The public API comes second. Data layout comes third.
 An internal win is not a win if it weakens correctness, the public API, or the
 singular graph.
@@ -23,7 +27,7 @@ The first three usually beat a clever hash table.
 
 ```mermaid
 flowchart LR
-    W["source write"] --> D{"derived output<br/>changed?"}
+    W["source write"] --> D{"automatic output<br/>changed?"}
     D -->|no| Stop["stop"]
     D -->|yes| H{"live reader?"}
     H -->|no| Lazy["leave lazy"]
@@ -42,7 +46,7 @@ The Compose runtime already invests in:
 
 - snapshot records and atomic apply;
 - read observation;
-- cached derived state;
+- cached automatic state;
 - mutation policies;
 - primitive snapshot state;
 - low-allocation internal collections;
@@ -54,8 +58,8 @@ costly or cannot meet turn semantics.
 The snapshot-backed prototype must use:
 
 - direct `State.value` reads in the smallest useful Compose scope;
-- explicit structural equality for every derived state;
-- one mutable snapshot per outer commit;
+- explicit structural equality for every automatic state;
+- one mutable snapshot per outer turn;
 - one observer per store or effect group, not per state;
 - stable descriptor objects;
 - descriptor-and-key reads without a temporary handle.
@@ -75,11 +79,11 @@ large edge set every read may lose even when it saves later work.
 Use Kotlin `==` by default. Pass
 `structuralEqualityPolicy()` to `derivedStateOf`.
 
-The policy argument matters. A derived state without one may invalidate readers
+The policy argument matters. An automatic state without one may invalidate readers
 whenever a dependency changes, even when its result stays equal.
 
 Android's own guidance calls `derivedStateOf` expensive. Cog uses it for
-real shared derivation, not simple string joining. The spike must still measure
+real shared automatic computation, not simple string joining. The spike must still measure
 its cost across a large graph.
 
 Equality itself can be costly for large values. Prefer small immutable values,
@@ -88,7 +92,7 @@ referential equality just to hide in-place mutation.
 
 ### 3.3 Lazy and hot work
 
-Cold derived states compute on read. Hot roots settle after a commit so
+Cold automatic states compute on read. Hot roots settle after a turn so
 reactions and UI have ready, equality-gated values.
 
 The prototype must compare:
@@ -110,17 +114,17 @@ shows composition is the cost.
 
 ## 4. Storage candidates
 
-### 4.1 Sources and derived values
+### 4.1 Sources and automatic values
 
 First candidate:
 
-| State data     | Candidate                      |
-| -------------- | ------------------------------ |
-| source value   | private `MutableState<T>`      |
-| derived value  | `derivedStateOf(policy)`       |
-| reaction reads | shared `SnapshotStateObserver` |
-| Cog metadata   | store-owned flat table         |
-| UI boundary    | the same state `State<T>`      |
+| State data      | Candidate                      |
+| --------------- | ------------------------------ |
+| source value    | private `MutableState<T>`      |
+| automatic value | `derivedStateOf(policy)`       |
+| reaction reads  | shared `SnapshotStateObserver` |
+| Cog metadata    | store-owned flat table         |
+| UI boundary     | the same state `State<T>`      |
 
 This gives one value cell rather than a Cog value plus a copied UI value.
 
@@ -160,7 +164,7 @@ Candidates:
 - a small mutable set per state;
 - packed integer arrays with tombstones;
 - a shared edge arena;
-- store only live-root paths and rebuild on derived runs.
+- store only live-root paths and rebuild on automatic runs.
 
 Measure dynamic churn, not only a fixed diamond. Any arena must reclaim edges
 when keyed states die.
@@ -269,7 +273,7 @@ Key metrics:
 
 - nanoseconds per turn at several graph sizes;
 - allocations per steady turn;
-- derived compute count;
+- automatic compute count;
 - dirty states visited;
 - UI recomposition and skip count;
 - frame timing and jank;
@@ -291,11 +295,11 @@ The same tests run against the snapshot-backed and custom-graph candidates:
 
 - chain, diamond, broad fan-out, and broad fan-in;
 - dynamic branch switch;
-- equal derived result after unequal source writes;
-- nested commit;
+- equal automatic result after unequal source writes;
+- nested turn;
 - staged writer read;
 - escaped writer use after its turn closes;
-- failed commit;
+- failed turn;
 - read and write cycle;
 - reaction order and reaction write-back;
 - key collision and mutable-key misuse;
@@ -318,7 +322,7 @@ Port useful shapes from
 - many sources with one sum;
 - dependency switching;
 - keyed create/read/release churn;
-- one commit with 1, 10, and 100 writes;
+- one turn with 1, 10, and 100 writes;
 - equal-output propagation;
 - Compose lease enter/leave.
 

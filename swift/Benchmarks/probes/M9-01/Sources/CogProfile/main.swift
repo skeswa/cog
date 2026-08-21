@@ -57,13 +57,13 @@ func blackHole<Value>(_ value: Value) {
 /// The source a steady turn writes.
 let counterSourceCog = ManualCog<Int>(0, name: "prof.counter")
 
-/// One derived consumer, so a turn actually propagates.
+/// One automatic consumer, so a turn actually propagates.
 let doubledCog = Cog<Int>({ c in c[counterSourceCog] * 2 }, name: "prof.doubled")
 
 /// The keyed source family the pinned-key workload writes one key of.
 let rowSourceCogs = ManualCogBox<Int, Int>(0, name: "prof.pinned.source")
 
-/// One derived consumer per row, so a write reaches a boundary rather than
+/// One automatic consumer per row, so a write reaches a boundary rather than
 /// stopping at the source.
 let rowCogs = CogBox<Int, Int>(
   { c, key in c[rowSourceCogs[key]] &+ key },
@@ -73,7 +73,7 @@ let rowCogs = CogBox<Int, Int>(
 /// The source at the head of the deep chain.
 let chainSourceCog = ManualCog<Int>(0, name: "prof.chain.source")
 
-/// A chain of derived nodes, each reading the one below it.
+/// A chain of automatic nodes, each reading the one below it.
 ///
 /// Keyed rather than declared per depth so the chain length is a parameter.
 /// This is deliberately **not** the Kairo deep benchmark shape: it isolates
@@ -87,11 +87,11 @@ let chainCogs = CogBox<Int, Int>(
 
 /// The keyed source family the build workload populates from scratch.
 ///
-/// PERF-03's shape exactly: one keyed source and one keyed derived consumer per
+/// PERF-03's shape exactly: one keyed source and one keyed automatic consumer per
 /// entry, which is how a screen actually reaches a thousand states.
 let buildSourceCogs = ManualCogBox<Int, Int>(0, name: "prof.build.source")
 
-/// One derived consumer per built entry.
+/// One automatic consumer per built entry.
 let buildCogs = CogBox<Int, Int>(
   { c, key in c[buildSourceCogs[key]] &+ key },
   name: "prof.build.entry"
@@ -120,7 +120,7 @@ func run(_ body: (Int) -> Void) {
   disarmProfiler()
 }
 
-/// Builds and releases one fresh context holding `pairs` source-derived pairs.
+/// Builds and releases one fresh context holding `pairs` source-and-automatic pairs.
 ///
 /// The context is local, so it is released before the next iteration begins and
 /// each measured iteration reports one complete build rather than a cumulative
@@ -144,15 +144,15 @@ case "steady":
   // and would measure lifetime machinery instead of a turn (`impl/optimization.md`).
   blackHole(cogs[doubledCog])
   run { iteration in
-    cogs.commit(counterSourceCog, to: iteration, name: "prof.turn")
+    cogs.turn(counterSourceCog, to: iteration, name: "prof.turn")
     blackHole(cogs[doubledCog])
   }
 
-case "commit":
+case "turn":
   // A write with no read, to separate the turn boundary from the read.
   blackHole(cogs[doubledCog])
   run { iteration in
-    cogs.commit(counterSourceCog, to: iteration, name: "prof.turn")
+    cogs.turn(counterSourceCog, to: iteration, name: "prof.turn")
   }
 
 case "read":
@@ -168,22 +168,22 @@ case "pinned":
   // doing work it has no business doing.
   for key in 0..<max(parameter, 1) { blackHole(cogs[rowCogs[key]]) }
   run { iteration in
-    cogs.commit(rowSourceCogs[0], to: iteration, name: "prof.pinned.turn")
+    cogs.turn(rowSourceCogs[0], to: iteration, name: "prof.pinned.turn")
     blackHole(cogs[rowCogs[0]])
   }
 
 case "deep":
-  // One write pulled through `parameter` derived nodes, so dividing by
+  // One write pulled through `parameter` automatic nodes, so dividing by
   // `parameter` gives per-node settle cost.
   blackHole(cogs[chainCogs[max(parameter, 1)]])
   run { iteration in
-    cogs.commit(chainSourceCog, to: iteration, name: "prof.deep.turn")
+    cogs.turn(chainSourceCog, to: iteration, name: "prof.deep.turn")
     blackHole(cogs[chainCogs[max(parameter, 1)]])
   }
 
 case "build":
   // Construction rather than steady state: a *fresh* context each iteration,
-  // populated with `parameter` source-and-derived pairs. Everything the other
+  // populated with `parameter` source-and-automatic pairs. Everything the other
   // workloads deliberately push behind their warm-up — slot allocation, column
   // growth, identity filing — is the measured work here, so dividing by twice
   // `parameter` gives the per-state cost of bringing a state into existence.

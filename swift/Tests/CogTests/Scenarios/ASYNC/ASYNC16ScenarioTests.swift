@@ -47,7 +47,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
 }
 
 @MainActor
-@Test func `ASYNC-16 concurrent work runs off actor and newest result commits on MainActor`()
+@Test func `ASYNC-16 concurrent work runs off actor and newest result publishes on MainActor`()
   async throws
 {
   let (cogs, m) = probedContext()
@@ -89,7 +89,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
       == Async16Run(request: 0, ranWithoutActorIsolation: true)
   )
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
   guard await statusIterator.next() != nil else {
     Issue.record("The status stream ended before replacement pending")
     return
@@ -116,6 +116,6 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   if completed.kind == .success {
     #expect(completed.value == Async16Run(request: 1, ranWithoutActorIsolation: true))
   } else {
-    Issue.record("Expected the newest concurrent result to commit")
+    Issue.record("Expected the newest concurrent result to turn")
   }
 }

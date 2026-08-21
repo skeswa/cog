@@ -21,8 +21,7 @@ copying command spellings from an old issue or review.
 mise run fmt:check
 mise run test
 mise run test:matrix
-mise run test:cores
-mise run test:value-references
+mise run test:arena-configurations
 mise run test:release
 mise run api:check
 mise run test:compilefail
@@ -32,9 +31,11 @@ mise run workflows:check
 ```
 
 Filtered test runs always go through a mise wrapper, for example
-`mise run test --filter 'DECL-01|ONE-05' --parallel`. Never invoke a filtered
+`mise run test --filter 'DECL-01|ONE-05'`. Never invoke a filtered
 `swift test` directly: SwiftPM exits successfully when the filter selects
-nothing, while Cog's wrapper verifies selection and the executed count.
+nothing, while Cog's wrapper verifies selection and the executed count. Root
+package test tasks run serially because the benchmark-sized graph scenarios
+otherwise starve time-bounded actor tests on the MainActor.
 
 Apple-boundary and example verification use `mise run test:simulator`,
 `mise run build:weather`, `mise run test:weather`,

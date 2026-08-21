@@ -59,7 +59,7 @@ private final class Async19ControlledWork {
     Issue.record("Expected the first work to succeed")
   }
 
-  cogs.commit("first reload") { c in c[request] = 1 }
+  cogs.turn("first reload") { c in c[request] = 1 }
   guard let failedReloadPending = await statusIterator.next() else {
     Issue.record("The status stream ended before reload pending")
     return
@@ -83,7 +83,7 @@ private final class Async19ControlledWork {
     Issue.record("Expected failure to retain the last success")
   }
 
-  cogs.commit("second reload") { c in c[request] = 2 }
+  cogs.turn("second reload") { c in c[request] = 2 }
   guard let repeatedReload = await statusIterator.next() else {
     Issue.record("The status stream ended before repeated reload pending")
     return

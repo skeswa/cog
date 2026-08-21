@@ -2,9 +2,9 @@
 ///
 /// This is deliberately not a diagnostic seam. A scenario increments its own
 /// counter in its own closure, using nothing but the public API, so the count
-/// stays true across the value-reference and core swaps that COUNT-09 through
-/// COUNT-11 require the whole suite to survive. A counter that read Cog's
-/// internals would fail exactly the swap it exists to police.
+/// stayed true while the value-reference and core candidates were selected and
+/// remains true for the public `CompactArena` trait. A counter that read Cog's
+/// internals would fail exactly the representation boundary it exists to police.
 ///
 /// MainActor-confined because selectors are: the counter is touched only from
 /// inside a running selector, never across executors.

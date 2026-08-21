@@ -80,10 +80,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ROOT = resolve(REPO_ROOT, "swift/CompileFail");
-const MANIFEST = resolve(REPO_ROOT, "Package.swift");
 const SCENARIOS = resolve(REPO_ROOT, "docs/swift/impl/scenarios.md");
 const DEFAULT_SCRATCH = resolve(REPO_ROOT, ".build/compilefail");
 
@@ -182,210 +182,70 @@ function parseArgs(argv) {
 // MARK: - Package.swift → compiler flags
 
 /**
- * Returns the contents of the bracketed list that starts at the first `[` at or
- * after `from`, balancing nested brackets.
+ * Resolves Package.swift without traits or ambient selectors and translates
+ * Cog's resulting settings into the direct `swiftc` fixture invocation.
  *
- * @param {string} source
- * @param {number} from
- */
-function bracketedList(source, from) {
-  const open = source.indexOf("[", from);
-  if (open === -1) return null;
-  let depth = 0;
-  for (let index = open; index < source.length; index += 1) {
-    const character = source[index];
-    if (character === "[") depth += 1;
-    else if (character === "]") {
-      depth -= 1;
-      if (depth === 0) return source.slice(open + 1, index);
-    }
-  }
-  return null;
-}
-
-/**
- * Splits a Swift array literal body into its top-level elements, ignoring
- * commas nested inside brackets, parentheses, or string literals.
- *
- * @param {string} body
- */
-function listElements(body) {
-  /** @type {string[]} */
-  const elements = [];
-  let depth = 0;
-  let inString = false;
-  let current = "";
-  for (let index = 0; index < body.length; index += 1) {
-    const character = body[index];
-    if (inString) {
-      current += character;
-      if (character === '"' && body[index - 1] !== "\\") inString = false;
-      continue;
-    }
-    if (character === '"') {
-      inString = true;
-      current += character;
-      continue;
-    }
-    if (character === "[" || character === "(") depth += 1;
-    if (character === "]" || character === ")") depth -= 1;
-    if (character === "," && depth === 0) {
-      elements.push(current);
-      current = "";
-      continue;
-    }
-    current += character;
-  }
-  elements.push(current);
-  return elements
-    .map((element) =>
-      element
-        .split("\n")
-        .map((line) => line.replace(/\/\/.*$/, "").trim())
-        .filter((line) => line.length > 0)
-        .join(" "),
-    )
-    .filter((element) => element.length > 0);
-}
-
-/**
- * Collects every element of the manifest's `librarySettings`, following one
- * level of composition.
- *
- * `librarySettings` is not always a bare array literal. Since `M5-09a` it is
- * `baseLibrarySettings + valueReferenceLayoutSettings`, because the
- * value-reference layout is chosen by an environment variable and cannot be
- * written as a literal — and M6 adds core and edge selectors the same way.
- * Reading only the literal would silently drop those defines, which is exactly
- * the drift between fixtures and library this whole function exists to prevent.
- *
- * So two shapes are understood, and nothing else:
- *
- *   - `let name: [SwiftSetting] = [ … ]` — the literal's elements.
- *   - `A + B` — each identifier resolved as a literal above, plus every
- *     `identifier.append(element)` statement anywhere in the manifest, which is
- *     how a `switch` builds a settings list.
- *
- * Anything else aborts, for the same reason an unrecognized setting does.
- *
- * @param {string} source The manifest text.
- * @returns {string[]} Setting expressions, in no particular order.
- */
-function librarySettingElements(source) {
-  const anchor = source.indexOf("let librarySettings");
-  if (anchor === -1) fail("Package.swift no longer declares `librarySettings`");
-  const assign = source.indexOf("=", anchor);
-  if (assign === -1) fail("`librarySettings` has no initializer");
-
-  // Swift-format may wrap a long `+` chain after `=` or around an operator.
-  // Read identifiers separated by `+` across whitespace rather than treating
-  // the first physical line as semantic. The expression is still deliberately
-  // restricted to the one-level composition documented above.
-  const remainder = source.slice(assign + 1);
-  const initializerMatch = /^\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*\+\s*[A-Za-z_][A-Za-z0-9_]*)*)/.exec(
-    remainder,
-  );
-  const initializer = initializerMatch?.[1].replace(/\s+/g, " ") ?? "";
-
-  if (remainder.trimStart().startsWith("[")) {
-    const body = bracketedList(source, assign);
-    if (body === null) fail("cannot read the `librarySettings` array literal");
-    return listElements(body);
-  }
-
-  const names = initializer.split("+").map((name) => name.trim());
-  if (names.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
-    fail(
-      "unknown-setting: Package.swift initializes `librarySettings` from " +
-        `\`${initializer}\`, which tools/check-compile-fail.mjs only understands as ` +
-        "an array literal or a `+` chain of settings-array names. Teach it that " +
-        "shape so the fixtures stay in sync with the library.",
-    );
-  }
-
-  /** @type {string[]} */
-  const elements = [];
-  for (const name of names) {
-    const declaration = new RegExp(`(?:let|var)\\s+${name}\\s*:\\s*\\[SwiftSetting\\]\\s*=`).exec(
-      source,
-    );
-    if (declaration === null) {
-      fail(
-        `unknown-setting: Package.swift's \`librarySettings\` names \`${name}\`, which ` +
-          "is not declared as a `[SwiftSetting]` array in the same file.",
-      );
-    }
-    const body = bracketedList(source, declaration.index + declaration[0].length - 1);
-    if (body !== null) elements.push(...listElements(body));
-
-    // A settings list built by a `switch` appends to itself.
-    const appended = new RegExp(`${name}\\.append\\(([^\\n]*)\\)\\s*$`, "gm");
-    let match;
-    while ((match = appended.exec(source)) !== null) elements.push(match[1].trim());
-  }
-
-  if (elements.length === 0) {
-    fail("`librarySettings` resolved to no settings at all, which cannot be right");
-  }
-  return elements;
-}
-
-/**
- * Translates the manifest's `librarySettings` and `.macOS` platform into the
- * `swiftc` flags a fixture must be type-checked with.
- *
- * Deliberately strict: an element of `librarySettings` this function does not
- * recognize aborts the run instead of being dropped.
+ * SwiftPM, rather than a source-text append scan, chooses conditional branches.
+ * That guarantees fixtures model the specialized pool-edge shipping default.
+ * Deliberately strict: an unfamiliar resolved setting aborts the run.
  */
 function compilerSettingsFromManifest() {
-  let source;
-  try {
-    source = readFileSync(MANIFEST, "utf8");
-  } catch (error) {
-    fail(`cannot read ${repoPath(MANIFEST)}: ${error.message}`);
+  const environment = shippingManifestEnvironment(process.env);
+  const dumped = spawnSync("swift", ["package", "dump-package", "--disable-default-traits"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    env: environment,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (dumped.error) fail(`cannot run \`swift package dump-package\`: ${dumped.error.message}`);
+  if (dumped.status !== 0) {
+    process.stderr.write(dumped.stderr ?? "");
+    fail("`swift package dump-package` failed while resolving shipping fixture settings");
   }
+
+  const manifest = JSON.parse(dumped.stdout);
+  const cog = manifest.targets?.find((target) => target.name === "Cog");
+  if (cog === undefined) fail("the resolved package no longer contains the Cog target");
 
   /** @type {string[]} */
   const flags = [];
-  for (const element of librarySettingElements(source)) {
-    let match;
-    if ((match = /^\.swiftLanguageMode\(\.v(\d+)\)$/.exec(element))) {
-      flags.push("-swift-version", match[1]);
-    } else if ((match = /^\.defaultIsolation\((\w+)\.self\)$/.exec(element))) {
-      flags.push("-default-isolation", match[1]);
-    } else if (/^\.defaultIsolation\(nil\)$/.test(element)) {
-      flags.push("-default-isolation", "nonisolated");
-    } else if ((match = /^\.enableUpcomingFeature\("([^"]+)"\)$/.exec(element))) {
-      flags.push("-enable-upcoming-feature", match[1]);
-    } else if ((match = /^\.enableExperimentalFeature\("([^"]+)"\)$/.exec(element))) {
-      flags.push("-enable-experimental-feature", match[1]);
-    } else if ((match = /^\.define\("([^"]+)"\)$/.exec(element))) {
-      flags.push(`-D${match[1]}`);
-    } else if ((match = /^\.unsafeFlags\(\[(.*)\]\)$/.exec(element))) {
-      for (const raw of match[1].split(",")) {
-        const flag = raw.trim().replace(/^"|"$/g, "");
-        if (flag.length > 0) flags.push(flag);
-      }
-    } else {
-      fail(
-        `unknown-setting: Package.swift's librarySettings contains \`${element}\`, ` +
-          "which tools/check-compile-fail.mjs does not know how to translate into a " +
-          "swiftc flag. Teach it that translation so the fixtures stay in sync with " +
-          "the library.",
-      );
+  for (const setting of cog.settings ?? []) {
+    if ((setting.condition?.traits?.length ?? 0) > 0) continue;
+    const entries = Object.entries(setting.kind ?? {});
+    if (setting.tool !== "swift" || entries.length !== 1) {
+      fail(`unknown-setting: unresolved Cog setting ${JSON.stringify(setting)}`);
+    }
+    const [kind, payload] = entries[0];
+    const value = payload?._0;
+    switch (kind) {
+      case "swiftLanguageMode":
+        flags.push("-swift-version", value);
+        break;
+      case "defaultIsolation":
+        flags.push("-default-isolation", value ?? "nonisolated");
+        break;
+      case "enableUpcomingFeature":
+        flags.push("-enable-upcoming-feature", value);
+        break;
+      case "enableExperimentalFeature":
+        flags.push("-enable-experimental-feature", value);
+        break;
+      case "define":
+        flags.push(`-D${value}`);
+        break;
+      case "unsafeFlags":
+        flags.push(...(Array.isArray(value) ? value : [value]));
+        break;
+      default:
+        fail(`unknown-setting: resolved Cog setting ${JSON.stringify(setting)}`);
     }
   }
 
-  const platformsAnchor = source.indexOf("platforms:");
-  if (platformsAnchor === -1) fail("Package.swift no longer declares `platforms:`");
-  const platformsBody = bracketedList(source, platformsAnchor) ?? "";
-  const macOS = /\.macOS\((?:\.v([\d_]+)|"([\d.]+)")\)/.exec(platformsBody);
-  if (macOS === null) fail("Package.swift no longer declares a `.macOS` platform");
-  const version =
-    macOS[2] ?? (macOS[1].includes("_") ? macOS[1].replace(/_/g, ".") : `${macOS[1]}.0`);
+  const macOS = manifest.platforms?.find((platform) => platform.platformName === "macos");
+  if (macOS === undefined) fail("Package.swift no longer declares a macOS platform");
   const arch = process.arch === "arm64" ? "arm64" : "x86_64";
 
-  return { flags, target: `${arch}-apple-macosx${version}` };
+  return { flags, target: `${arch}-apple-macosx${macOS.version}` };
 }
 
 // MARK: - Fixture discovery and parsing
@@ -590,6 +450,7 @@ function ensureModules(scratchPath, build) {
     const result = spawnSync("swift", ["build", "--scratch-path", scratchPath], {
       cwd: REPO_ROOT,
       encoding: "utf8",
+      env: shippingManifestEnvironment(process.env),
       maxBuffer: 64 * 1024 * 1024,
     });
     if (result.error) fail(`cannot run \`swift build\`: ${result.error.message}`);

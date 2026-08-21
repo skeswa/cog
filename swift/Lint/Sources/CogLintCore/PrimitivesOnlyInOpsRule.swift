@@ -75,7 +75,7 @@ private final class PrimitiveCallVisitor: SyntaxVisitor {
   }
 }
 
-/// The syntactic form and method token of one `commit` or `refresh` call.
+/// The syntactic form and method token of one `turn` or `refresh` call.
 private struct PrimitiveCall {
   /// Whether the call is bare or names a direct receiver.
   enum Form {
@@ -114,7 +114,7 @@ private func primitiveCall(in call: FunctionCallExprSyntax) -> PrimitiveCall? {
 
 /// Whether a call name is one of the two public graph-demand primitives.
 private func isPrimitive(_ name: String) -> Bool {
-  name == "commit" || name == "refresh"
+  name == "turn" || name == "refresh"
 }
 
 /// Extracts an identifier from `receiver.method` or `self.receiver.method`.

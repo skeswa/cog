@@ -7,7 +7,7 @@ import Testing
 // MARK: - DECL-07
 
 @MainActor
-@Test func `DECL-07 a derived cog reads back what its selector computed`() {
+@Test func `DECL-07 an automatic cog reads back what its selector computed`() {
   let cogs = Cogs.forTesting()
 
   let width = ManualCog<Int>(3)
@@ -18,8 +18,8 @@ import Testing
 }
 
 @MainActor
-@Test func `DECL-07 a derived cog computes from whatever its sources hold`() {
-  // Two contexts, one declaration, different source values: the derived value
+@Test func `DECL-07 an automatic cog computes from whatever its sources hold`() {
+  // Two contexts, one declaration, different source values: the automatic value
   // follows the state it was computed from rather than the declaration.
   let quiet = Cogs.forTesting()
   let busy = Cogs.forTesting()
@@ -27,15 +27,15 @@ import Testing
   let attempts = ManualCog<Int>(0)
   let hasRetried = Cog<Bool> { c in c[attempts] > 1 }
 
-  busy.commit { c in c[attempts] = 4 }
+  busy.turn { c in c[attempts] = 4 }
 
   #expect(quiet.peek(hasRetried) == false)
   #expect(busy.peek(hasRetried) == true)
 }
 
 @MainActor
-@Test func `DECL-07 a derived cog can compute from another derived cog`() {
-  // `c[valueReference]` reads a derived cog the same way it reads a source, so a chain is
+@Test func `DECL-07 an automatic cog can compute from another automatic cog`() {
+  // `c[valueReference]` reads an automatic cog the same way it reads a source, so a chain is
   // written the same way a leaf is — and reading the top computes the whole
   // chain.
   let cogs = Cogs.forTesting()
@@ -50,7 +50,7 @@ import Testing
 }
 
 @MainActor
-@Test func `DECL-07 a derived cog's selector is an ordinary function`() {
+@Test func `DECL-07 an automatic cog's selector is an ordinary function`() {
   // Branches, early returns, and locals are all fine: a selector is normal
   // Swift, and the dependencies are whatever the run actually read.
   let cogs = Cogs.forTesting()
@@ -67,8 +67,8 @@ import Testing
 }
 
 @MainActor
-@Test func `DECL-07 a derived cog may compute an optional value`() {
-  // A derived cog whose value is itself optional is not a special case: `nil`
+@Test func `DECL-07 an automatic cog may compute an optional value`() {
+  // An automatic cog whose value is itself optional is not a special case: `nil`
   // is a computed value like any other.
   let cogs = Cogs.forTesting()
 
@@ -84,7 +84,7 @@ import Testing
 // MARK: - DECL-09
 
 @MainActor
-@Test func `DECL-09 declaring a derived cog runs nothing`() {
+@Test func `DECL-09 declaring an automatic cog runs nothing`() {
   var runs = 0
 
   let cogs = Cogs.forTesting()
@@ -100,7 +100,7 @@ import Testing
 
   // Nor does using the context for something else wake it.
   #expect(cogs.peek(source) == 1)
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
   #expect(runs == 0)
 
   // Keep the declaration alive to the end of the test so nothing above can be
@@ -109,7 +109,7 @@ import Testing
 }
 
 @MainActor
-@Test func `DECL-09 a derived cog nobody reads never runs`() {
+@Test func `DECL-09 an automatic cog nobody reads never runs`() {
   var readRuns = 0
   var unreadRuns = 0
 

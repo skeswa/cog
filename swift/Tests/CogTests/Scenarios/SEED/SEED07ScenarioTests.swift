@@ -28,7 +28,7 @@ import os
   #expect(notices.withLock { $0 } == 0)
   #expect(cogs.debugHistory.entries.filter { $0.event == .notice }.isEmpty)
 
-  cogs.commit("seed.followup") { c in c[unrelated] = true }
+  cogs.turn("seed.followup") { c in c[unrelated] = true }
 
   #expect(notices.withLock { $0 } == 1)
   let notice = cogs.debugHistory.entries.filter { $0.event == .notice }.last

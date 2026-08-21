@@ -10,7 +10,7 @@ private nonisolated struct ObservedPair: Equatable, Sendable {
 }
 
 @MainActor
-@Test func `UI-13 one commit never exposes a torn pair to an observed consumer`() {
+@Test func `UI-13 one turn never exposes a torn pair to an observed consumer`() {
   let cogs = Cogs.forTesting()
   let first = ManualCog<Int>(0)
   let second = ManualCog<Int>(0)
@@ -26,7 +26,7 @@ private nonisolated struct ObservedPair: Equatable, Sendable {
   }
   renderedPairs.withLock { $0.append(initial) }
 
-  cogs.commit("change pair") { c in
+  cogs.turn("change pair") { c in
     c[first] = 1
     c[second] = 1
   }

@@ -46,8 +46,8 @@ private nonisolated struct LifetimeOpaqueValue {
 }
 
 @MainActor
-@Test func `LifetimePolicyInfrastructure derived declarations select one shared policy`() {
-  let descriptorDefault = DerivedCogDescriptor<LifetimeOpaqueValue>(
+@Test func `LifetimePolicyInfrastructure automatic declarations select one shared policy`() {
+  let descriptorDefault = AutomaticCogDescriptor<LifetimeOpaqueValue>(
     selector: { _, _ in LifetimeOpaqueValue(rawValue: 0) },
     equals: nil,
     label: CogLabel(name: "descriptor default", fileID: #fileID, line: #line)

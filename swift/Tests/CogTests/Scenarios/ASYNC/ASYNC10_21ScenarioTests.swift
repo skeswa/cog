@@ -114,7 +114,7 @@ private final class Async10ControlledWork {
   try await staleChecked.wait()
   let statusAfterStaleCompletion = cogs.status.peek(forecast)
   if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.hasSucceeded {
-    Issue.record("The replaced run committed after refresh")
+    Issue.record("The replaced run published after refresh")
   }
 
   let replacedChecked = MainActorCleanupAcknowledgement()
@@ -130,7 +130,7 @@ private final class Async10ControlledWork {
   if success.kind == .success {
     #expect(success.value == 200)
   } else {
-    Issue.record("Expected only refreshed work to commit")
+    Issue.record("Expected only refreshed work to turn")
   }
   if case .success(let value) = await newestRefresh.outcome {
     #expect(value == 200)

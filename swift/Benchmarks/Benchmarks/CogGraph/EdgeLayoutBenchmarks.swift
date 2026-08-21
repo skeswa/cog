@@ -21,10 +21,10 @@ private struct EdgeLayoutObserverMechanism: Mechanism {
   /// Unique bootstrap attribution within the benchmark context.
   let name: String
 
-  /// Arena-derived value whose completed turns the sink receives.
+  /// Automatic arena value whose completed turns the sink receives.
   let valueReference: Cog<Int>
 
-  /// Stable terminal cell read after each synchronous commit flush.
+  /// Stable terminal cell read after each synchronous turn flush.
   let sink: EdgeLayoutValueSink
 
   /// Registers one reaction whose initial run settles the graph before return.
@@ -36,7 +36,7 @@ private struct EdgeLayoutObserverMechanism: Mechanism {
 /// Fixed-width graphs that isolate stable reuse from dependency-list churn.
 ///
 /// Both roots read one control followed by 32 data sources, so the selected
-/// edge candidate traverses the same 33 entries per selector run. The mostly
+/// edge storage traverses the same 33 entries per selector run. The mostly
 /// static root always reads the same sources. The churn root preserves only
 /// its control prefix and replaces all 32 later entries every turn. Keeping
 /// both contexts alive makes the measured regions quiescent: they neither drop
@@ -147,7 +147,7 @@ enum EdgeLayoutHarness {
     for _ in 0..<max(count, 1) {
       staticTurn &+= 1
       let index = staticTurn % dependencyWidth
-      cogs.commit("perf.edge.static.turn") { c in
+      cogs.turn("perf.edge.static.turn") { c in
         c[staticSourceCogs[index]] &+= dependencyWidth
       }
       staticExpected &+= dependencyWidth
@@ -182,7 +182,7 @@ enum EdgeLayoutHarness {
     var result = churnExpected[churnTurn % churnSourceCount]
     for _ in 0..<max(count, 1) {
       churnTurn &+= 1
-      cogs.commit(churnControlSourceCog, to: churnTurn, name: "perf.edge.churn.turn")
+      cogs.turn(churnControlSourceCog, to: churnTurn, name: "perf.edge.churn.turn")
       result = churnSink.value
     }
 
@@ -192,7 +192,7 @@ enum EdgeLayoutHarness {
   }
 }
 
-/// Registers the two exact-name PERF-09 edge-layout measurements.
+/// Registers the two exact-name PERF-09 workloads on the selected edge pool.
 let edgeLayoutBenchmarks: @Sendable () -> Void = {
   let metrics: [BenchmarkMetric] = [
     .wallClock, .instructions, .mallocCountTotal, .objectAllocCount, .retainCount, .releaseCount,

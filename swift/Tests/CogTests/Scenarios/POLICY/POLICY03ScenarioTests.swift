@@ -24,12 +24,12 @@ import Testing
   #expect(await starts.next() == 0)
   try await resolveAsyncStatus(in: cogs) { work.succeed(0) }
 
-  cogs.commit("request one") { c in c[inputCog] = 1 }
+  cogs.turn("request one") { c in c[inputCog] = 1 }
   #expect(await starts.next() == 1)
   let pendingCountBeforeBurst = statusKinds.count(where: { $0 == .pending })
 
   for input in 2...11 {
-    cogs.commit("request \(input)") { c in c[inputCog] = input }
+    cogs.turn("request \(input)") { c in c[inputCog] = input }
   }
 
   guard statusKinds.count(where: { $0 == .pending }) == pendingCountBeforeBurst else {

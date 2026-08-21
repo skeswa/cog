@@ -9,7 +9,7 @@ Cog does not replace Flow. It splits two jobs:
 - Cog handles current state inside the UI graph.
 - Flow carries async streams across system and repository boundaries.
 
-This keeps derived state synchronous. It also keeps cancellation visible where
+This keeps automatic state synchronous. It also keeps cancellation visible where
 real work starts.
 
 ```mermaid
@@ -106,8 +106,8 @@ read-only state calculation, not an event recorder.
 
 | Flow or Rx idea            | Cog shape                                       |
 | -------------------------- | ----------------------------------------------- |
-| `map`                      | derived cog                                     |
-| `combine`                  | one derived body with several `get` calls       |
+| `map`                      | automatic cog                                   |
+| `combine`                  | one automatic body with several `get` calls     |
 | `distinctUntilChanged`     | state equality policy                           |
 | `flatMapLatest` over state | dynamic dependency                              |
 | `flatMapLatest` over work  | `AsyncPolicy.Latest`                            |
@@ -146,7 +146,7 @@ state, and precise invalidation.
 1. Keep existing repository Flows.
 2. Create the one app-wide `CogStore`.
 3. Adapt repository streams at feature edges in that store.
-4. Move expensive or shared UI derivation into cogs.
+4. Move expensive or shared UI computation into automatic cogs.
 5. Keep leaf composables on plain values and callbacks.
 6. Export Flow only for old consumers that still need it.
 

@@ -21,7 +21,7 @@ import Testing
     _ = c[second]
   }
 
-  cogs.commit("change pair") { c in
+  cogs.turn("change pair") { c in
     c[first] = 1
     c[second] = 1
   }
@@ -46,7 +46,7 @@ import Testing
   } onChange: {
   }
 
-  cogs.commit("update weather") { c in
+  cogs.turn("update weather") { c in
     c[weather[zip]] = "sunny"
   }
 

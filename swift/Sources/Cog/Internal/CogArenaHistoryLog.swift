@@ -1,4 +1,4 @@
-#if DEBUG && COG_CORE_ARENA
+#if DEBUG
 
 /// One compact event in the arena core's fixed-capacity debug ring.
 ///
@@ -28,9 +28,6 @@ private enum CogArenaHistorySubject {
   /// Integer descriptor dispatch identity plus the exact keyed row identity.
   case arenaCog(descriptor: Int32, key: CogKey?)
 
-  /// Transitional class-state event not yet migrated to an arena row.
-  case cog(label: CogLabel, key: CogKey?)
-
   /// Export label retained while offers use their class terminal bridge.
   case offer(CogLabel)
 
@@ -47,7 +44,7 @@ private enum CogArenaHistorySubject {
 /// values only when a debugger or test asks to display it.
 @MainActor
 internal struct CogArenaHistoryLog {
-  /// Same bounded history capacity exposed by the simple core.
+  /// Bounded history capacity shared by every arena configuration.
   static let capacity = 256
 
   /// Compact records in physical ring order.
@@ -77,11 +74,6 @@ internal struct CogArenaHistoryLog {
     record(event: event, subject: .arenaCog(descriptor: descriptor, key: key))
   }
 
-  /// Records one class-backed state event during incremental arena migration.
-  mutating func recordState(event: CogHistoryEvent, label: CogLabel, key: CogKey?) {
-    record(event: event, subject: .cog(label: label, key: key))
-  }
-
   /// Records one export offer in the shared arena event order.
   mutating func recordOffer(label: CogLabel) {
     record(event: .offer, subject: .offer(label))
@@ -105,8 +97,6 @@ internal struct CogArenaHistoryLog {
           .turn(name)
         case .arenaCog(let descriptor, let key):
           .cog(resolveDescriptor(descriptor), key)
-        case .cog(let label, let key):
-          .cog(label, key)
         case .offer(let label):
           .offer(label)
         case .effect(let label):

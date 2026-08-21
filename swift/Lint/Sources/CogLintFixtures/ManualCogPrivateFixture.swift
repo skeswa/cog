@@ -11,7 +11,7 @@ extension CogLintFixtureRegistry {
       rationale:
         "Cog state is singular, so each mutable fact has one writable source owned by the file that defines it. Exporting the manual declaration exports a writer target and lets unrelated code bypass the named domain operations that explain who may change that fact.",
       repair:
-        "Narrow the writable source to `private` or `fileprivate`. When another file needs to read it, expose the source's `.readOnly` projection or a genuinely derived cog instead of the manual declaration itself."
+        "Narrow the writable source to `private` or `fileprivate`. When another file needs to read it, expose the source's `.readOnly` projection or a genuinely automatic cog instead of the manual declaration itself."
     ),
     triggering: [
       CogLintTriggeringExample(
@@ -53,7 +53,7 @@ extension CogLintFixtureRegistry {
       CogLintFixtureExample(
         name: "File-owned sources and public reads",
         explanation:
-          "Bare private access owns writer targets, while derived and read-only names may remain wider.",
+          "Bare private access owns writer targets, while automatic and read-only names may remain wider.",
         source:
           """
           private let countSourceCog = ManualCog(0)

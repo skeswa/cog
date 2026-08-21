@@ -167,7 +167,7 @@ final class DependencyStreamWork {
   let initialStart = await startIterator.next()
   #expect(initialStart == DependencyStreamStart(generation: 0, dependency: 0))
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
   #expect(await cancellationIterator.next() == 0)
   let replacementStart = await startIterator.next()
   #expect(replacementStart == DependencyStreamStart(generation: 1, dependency: 1))

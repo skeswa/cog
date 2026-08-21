@@ -6,7 +6,7 @@ import Testing
 // message in debug and release builds.
 
 @MainActor
-@Test func `TURN-07 writing through a writer that outlived its commit traps`() async {
+@Test func `TURN-07 writing through a writer that outlived its turn traps`() async {
   // `.failure` rather than a named signal: the scenario is about being stopped,
   // not about how a given CPU spells a trap.
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
@@ -15,7 +15,7 @@ import Testing
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?
-      cogs.commit { c in
+      cogs.turn { c in
         escaped = c
       }
 
@@ -27,20 +27,20 @@ import Testing
 }
 
 @MainActor
-@Test func `TURN-07 reading through a writer that outlived its commit traps`() async {
+@Test func `TURN-07 reading through a writer that outlived its turn traps`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Writer?
-      cogs.commit { c in
+      cogs.turn { c in
         c[count] = 1
         escaped = c
       }
 
       // A writer read means "what this turn staged." Once the turn is over
-      // there is no such value, and quietly answering with the committed one
+      // there is no such value, and quietly answering with the published one
       // would be a plausible wrong answer rather than an error.
       _ = escaped![count]
     }
@@ -50,9 +50,9 @@ import Testing
 }
 
 @MainActor
-@Test func `TURN-07 a writer captured into an async task traps after its commit`() async {
+@Test func `TURN-07 a writer captured into an async task traps after its turn`() async {
   // The story's second escape route: not a stashed variable but a capture into
-  // a task whose body runs only after the commit ended. The trap must fire on
+  // a task whose body runs only after the turn ended. The trap must fire on
   // that asynchronous use exactly as it does on the synchronous one.
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     let lateWrite = await MainActor.run { () -> Task<Void, Never> in
@@ -60,7 +60,7 @@ import Testing
       let count = ManualCog<Int>(0, name: "count")
 
       var escaped: Task<Void, Never>?
-      cogs.commit { c in
+      cogs.turn { c in
         escaped = Task { @MainActor in
           c[count] = 1
         }
@@ -76,8 +76,8 @@ import Testing
 // MARK: - The message
 
 /// Checks that the trap said the two things the trap's own file and line
-/// cannot: that the writer outlived its commit, and that the way to write now
-/// is another `commit`.
+/// cannot: that the writer outlived its turn, and that the way to write now
+/// is another `turn`.
 ///
 /// Asserted in every configuration on purpose, release included. A guard whose
 /// message only survives in debug is half a guard, and this is exactly the
@@ -90,7 +90,7 @@ private func expectEscapedWriterMessage(
 ) {
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
 
-  #expect(stderr.contains("outlived the commit that created it"), "stderr was: \(stderr)")
+  #expect(stderr.contains("outlived the turn that created it"), "stderr was: \(stderr)")
   #expect(stderr.contains(attempt), "stderr was: \(stderr)")
-  #expect(stderr.contains("call commit again"), "stderr was: \(stderr)")
+  #expect(stderr.contains("call turn again"), "stderr was: \(stderr)")
 }

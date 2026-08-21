@@ -28,7 +28,7 @@ import Testing
   #expect(selectorRuns == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   reader.cancel()
   await reader.value
   try await clock.waitForScheduledSleep()

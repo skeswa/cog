@@ -25,8 +25,7 @@ for its version. Do not use this runbook to bypass either one.
    mise run tasks:check
    mise run api:check 0.4.0
    mise run test:matrix
-   mise run test:cores
-   mise run test:value-references
+   mise run test:arena-configurations
    mise run test:release
    mise run test:compilefail
    mise run test:simulator

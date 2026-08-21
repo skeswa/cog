@@ -16,14 +16,14 @@ import Testing
 
   m.run { c in
     guard c[trigger] == 1 else { return }
-    cogs.commit("chain.middle") { c in c[middle] = 1 }
+    cogs.turn("chain.middle") { c in c[middle] = 1 }
   }
   m.run { c in
     guard c[middle] == 1 else { return }
-    cogs.commit("chain.leaf") { c in c[leaf] = 1 }
+    cogs.turn("chain.leaf") { c in c[leaf] = 1 }
   }
 
-  cogs.commit("chain.start") { c in c[trigger] = 1 }
+  cogs.turn("chain.start") { c in c[trigger] = 1 }
 
   let entries = cogs.debugHistory.entries
   let turns = entries.filter { $0.event == .turn }

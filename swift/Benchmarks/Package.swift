@@ -23,11 +23,21 @@ let package = Package(
   // MainActor code, so there is nothing an iOS destination would add beyond
   // simulator noise.
   platforms: [.macOS(.v14)],
+  traits: [
+    // Mirrors the root package's public binary-size trade so a benchmark run
+    // can compare the exact configuration applications select.
+    .trait(name: "CompactArena")
+  ],
   dependencies: [
     // Cog itself, by local path — never a version. Benchmarks measure the
     // working tree, so resolving Cog from a tag would make every measurement a
-    // statement about a commit that is not the one being changed.
-    .package(path: "../.."),
+    // statement about a turn that is not the one being changed.
+    .package(
+      path: "../..",
+      traits: [
+        .trait(name: "CompactArena", condition: .when(traits: ["CompactArena"]))
+      ]
+    ),
     // The shared Storefront macrobenchmark workload, also by local path. It
     // lives in a package of its own rather than in this one because the SwiftUI
     // benchmark application consumes the same workload, and an iOS application

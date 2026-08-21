@@ -16,13 +16,15 @@
 //      gets its own scratch path so the legs cannot thrash or reuse each
 //      other's artifacts.
 //
-// Usage: `swift-test.mjs <default|release|matrix> [swift test arguments...]`
+// Usage:
+// `swift-test.mjs <default|release|matrix|arena-configurations> [swift test arguments...]`
 //
 // Everything after the mode is passed through to `swift test` untouched, so
-// `--filter`, `--parallel`, `--verbose` and friends all work. The exit status
+// `--filter`, `--verbose` and other options all work. The exit status
 // is the first failing leg's; a matrix run stops at that leg.
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,9 +33,12 @@ import {
   assertFiltersSelectTests,
   assertRunSelectedTests,
   extractFilters,
+  extractTraitArguments,
   isXUnitArgument,
   parseSpecifiers,
+  traitArgumentsEnable,
 } from "./lib/swift-test-guard.mjs";
+import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 
 /**
  * The four legs of the isolation matrix.
@@ -78,6 +83,10 @@ main(process.argv.slice(2));
 
 function main(argv) {
   const [mode, ...passthrough] = argv;
+  if (mode === "arena-configurations") {
+    runArenaConfigurations(passthrough);
+    return;
+  }
   const selection = MODES.get(mode);
   if (selection === undefined) {
     fail(
@@ -86,10 +95,54 @@ function main(argv) {
     );
   }
 
-  const filters = extractFilters(passthrough);
+  const filters = extractFilters(passthrough, fail);
+  const traitArguments = extractTraitArguments(passthrough, fail);
   for (const leg of selection.legs) {
-    runLeg(leg, selection.configuration, filters, passthrough);
+    runLeg(leg, selection.configuration, filters, traitArguments, passthrough);
   }
+}
+
+/**
+ * Runs the shipping specialization and public CompactArena opt-out from an
+ * environment with no ambient retired selectors.
+ */
+function runArenaConfigurations(passthrough) {
+  if (extractTraitArguments(passthrough, fail).length > 0) {
+    fail("arena-configurations owns its trait arguments; do not pass another trait option");
+  }
+  if (passthrough.includes("--parallel")) {
+    fail("arena-configurations is serialized; remove `--parallel`");
+  }
+
+  const serialized = passthrough.includes("--no-parallel")
+    ? passthrough
+    : ["--no-parallel", ...passthrough];
+  const requestedFilters = extractFilters(serialized, fail);
+  const behaviorArguments =
+    requestedFilters.length > 0 ? serialized : [...serialized, "--filter", "[A-Z]+-[0-9][0-9]"];
+  const sentinelArguments = ["--no-parallel", "--filter", "ArenaSpecializationInfrastructure"];
+  const shippingEnvironment = shippingManifestEnvironment(process.env);
+
+  console.log("==> shipping default (specialized arena)");
+  runOneConfiguration(sentinelArguments, shippingEnvironment);
+  runOneConfiguration(behaviorArguments, shippingEnvironment);
+
+  console.log("==> public opt-out (CompactArena trait)");
+  const traitArguments = ["--traits", "CompactArena"];
+  runOneConfiguration([...traitArguments, ...sentinelArguments], shippingEnvironment);
+  runOneConfiguration([...traitArguments, ...behaviorArguments], shippingEnvironment);
+}
+
+/** Runs one default-leg configuration with guards derived from its arguments. */
+function runOneConfiguration(arguments_, environment) {
+  runLeg(
+    DEFAULT_LEG,
+    "debug",
+    extractFilters(arguments_, fail),
+    extractTraitArguments(arguments_, fail),
+    arguments_,
+    environment,
+  );
 }
 
 /**
@@ -98,9 +151,16 @@ function main(argv) {
  * Exits the process on the first failure rather than returning, so a failing
  * leg always fails the whole command.
  */
-function runLeg(leg, configuration, filters, passthrough) {
-  const scratchPath = `.build/${leg.name}-${configuration}`;
-  const environment = legEnvironment(leg);
+function runLeg(
+  leg,
+  configuration,
+  filters,
+  traitArguments,
+  passthrough,
+  baseEnvironment = process.env,
+) {
+  const environment = legEnvironment(leg, baseEnvironment, traitArguments);
+  const scratchPath = `.build/${leg.name}-${configuration}` + scratchVariant(traitArguments);
   const common = ["-c", configuration, "--scratch-path", scratchPath];
 
   // Escape hatch for `M0-04`: SwiftPM does not treat `Context.environment`
@@ -118,7 +178,7 @@ function runLeg(leg, configuration, filters, passthrough) {
   );
 
   if (filters.length > 0) {
-    const listed = spawnSync("swift", ["test", "list", ...common], {
+    const listed = spawnSync("swift", ["test", "list", ...common, ...traitArguments], {
       cwd: REPO_ROOT,
       encoding: "utf8",
       env: environment,
@@ -154,12 +214,27 @@ function runLeg(leg, configuration, filters, passthrough) {
 }
 
 /** The environment one leg builds and runs under. */
-function legEnvironment(leg) {
-  return {
-    ...process.env,
+function legEnvironment(leg, baseEnvironment, traitArguments) {
+  const environment = {
+    ...baseEnvironment,
     COG_TEST_ISOLATION: leg.isolation,
     COG_TEST_NNBD: leg.nnbd,
   };
+  delete environment.COG_EXPECT_COMPACT_ARENA_TRAIT;
+  if (traitArgumentsEnable(traitArguments, "CompactArena")) {
+    environment.COG_EXPECT_COMPACT_ARENA_TRAIT = "1";
+  }
+  return environment;
+}
+
+/** Keeps package variants from overwriting or invalidating one another's artifacts. */
+function scratchVariant(traitArguments) {
+  if (traitArguments.length === 0) return "";
+  const digest = createHash("sha256")
+    .update(JSON.stringify(traitArguments))
+    .digest("hex")
+    .slice(0, 12);
+  return `-package-${digest}`;
 }
 
 /** Propagates a child process's failure, including death by signal. */

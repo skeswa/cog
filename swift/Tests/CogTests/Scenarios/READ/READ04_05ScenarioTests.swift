@@ -17,17 +17,17 @@ import Testing
   #expect(cogs.peek(total) == 1)
   #expect(previousValues == [nil])
 
-  cogs.commit { c in c[input] = 2 }
+  cogs.turn { c in c[input] = 2 }
   #expect(cogs.peek(total) == 3)
   #expect(previousValues == [nil, 1])
 
-  cogs.commit { c in c[input] = 3 }
+  cogs.turn { c in c[input] = 3 }
   #expect(cogs.peek(total) == 6)
   #expect(previousValues == [nil, 1, 3])
 }
 
 @MainActor
-@Test func `READ-04 each key of a derived box folds with its own previous value`() {
+@Test func `READ-04 each key of an automatic box folds with its own previous value`() {
   // `c.curr` belongs to the exact state, so a keyed selector accumulates per
   // key: one key's fold never sees another key's total.
   let cogs = Cogs.forTesting()
@@ -36,18 +36,18 @@ import Testing
     (c.curr ?? 0) + c[inputs[key]]
   }
 
-  cogs.commit { c in c[inputs["home"]] = 1 }
+  cogs.turn { c in c[inputs["home"]] = 1 }
   #expect(cogs.peek(totals["home"]) == 1)
   #expect(cogs.peek(totals["work"]) == 0)
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[inputs["home"]] = 2
     c[inputs["work"]] = 10
   }
   #expect(cogs.peek(totals["home"]) == 3)
   #expect(cogs.peek(totals["work"]) == 10)
 
-  cogs.commit { c in c[inputs["work"]] = 5 }
+  cogs.turn { c in c[inputs["work"]] = 5 }
   #expect(cogs.peek(totals["work"]) == 15)
   #expect(cogs.peek(totals["home"]) == 3)
 }
@@ -76,7 +76,7 @@ import Testing
   #expect(cogs.peek(value) == nil)
   #expect(previousStates == ["no previous run"])
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
   #expect(cogs.peek(value) == nil)
   #expect(previousStates == ["no previous run", "previous nil"])
 }

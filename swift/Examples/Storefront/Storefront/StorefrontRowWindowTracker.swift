@@ -37,7 +37,7 @@ final class StorefrontRowWindowTracker {
   /// The window most recently handed to the graph.
   ///
   /// Kept so a realization that does not move either bound produces no turn at
-  /// all. A list re-realizing the same rows is not a scroll, and committing an
+  /// all. A list re-realizing the same rows is not a scroll, and publishing an
   /// identical window would be a turn whose only effect is to cost one.
   private var committedWindow = RowWindow(offset: 0, length: 0)
 
@@ -84,7 +84,7 @@ final class StorefrontRowWindowTracker {
     return changedWindow()
   }
 
-  /// The current window, or `nil` when it matches the last one committed.
+  /// The current window, or `nil` when it matches the last one published.
   private func changedWindow() -> RowWindow? {
     let window: RowWindow
     if let first = firstVisibleRow, let last = lastVisibleRow, last >= first {

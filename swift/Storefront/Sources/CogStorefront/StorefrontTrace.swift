@@ -296,7 +296,7 @@ extension StorefrontSessionDriver {
   ///
   /// The multi-source verb comes first, and the claim about it is the sharp
   /// one: three sources changed and the browse reaction ran **once**. Three
-  /// separate commits would have run it three times and rendered two screens
+  /// separate turns would have run it three times and rendered two screens
   /// no shopper asked for.
   public func runFilterPhase() async throws {
     let phase = StorefrontPhase.filters.rawValue
@@ -550,7 +550,7 @@ extension StorefrontSessionDriver {
     }
 
     let generation = 1
-    let runsBeforeCommit = sink.browseRuns
+    let runsBeforeTurn = sink.browseRuns
     cogs.publishInventoryBurst(burst, generation: generation)
     for id in burst { world.inventoryGenerations[id] = generation }
     // A generation change makes the reading stale; it does not make it wrong.
@@ -558,9 +558,9 @@ extension StorefrontSessionDriver {
     // so the screen does not flicker back to a resting value on the way.
     check(
       phase: phase,
-      "burst commit renders nothing new",
+      "burst turn renders nothing new",
       expected: 0,
-      actual: sink.browseRuns - runsBeforeCommit
+      actual: sink.browseRuns - runsBeforeTurn
     )
 
     await awaitStarted(
@@ -620,7 +620,7 @@ extension StorefrontSessionDriver {
   ///
   /// Extracted from the burst phase so the async-burst benchmark cut can drive
   /// exactly this round trip repeatedly without replaying the ten phases ahead
-  /// of it. It is the same commit, the same barrier, the same release order,
+  /// of it. It is the same turn, the same barrier, the same release order,
   /// and the same graph settlement the trace performs. The benchmark validates
   /// the resulting checksum and demanded set after stopping measurement.
   ///
@@ -640,7 +640,7 @@ extension StorefrontSessionDriver {
   /// The benchmark snapshots the demanded product identifiers before starting
   /// its timer and calls this method inside it. Choosing those identifiers and
   /// updating its shadow therefore remain verifier work outside the measured
-  /// round trip, while the graph commit, async tasks, responses, and reactions
+  /// round trip, while the graph turn, async tasks, responses, and reactions
   /// remain inside.
   ///
   /// - Parameters:
@@ -698,7 +698,7 @@ extension StorefrontSessionDriver {
     // Advance past grace on the injected clock, and wait for the release
     // decision itself rather than for a duration.
     let released = MainActorCleanupAcknowledgement()
-    cogs.acknowledgeNextDerivedReleaseCheck(with: released)
+    cogs.acknowledgeNextAutomaticReleaseCheck(with: released)
     clock.advance(by: .seconds(120))
     try await released.wait()
 

@@ -35,7 +35,7 @@ import PackageDescription
 //
 // The path dependency is a path and never a version, for the reason
 // `swift/Benchmarks/README.md` records: a measurement resolved from a tag is a
-// statement about a commit that is not the one being changed.
+// statement about a turn that is not the one being changed.
 
 let package = Package(
   name: "cog-storefront",

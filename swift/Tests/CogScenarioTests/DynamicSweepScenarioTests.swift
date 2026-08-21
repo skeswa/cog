@@ -20,7 +20,7 @@ nonisolated struct DynamicSweepCase: Sendable, CustomStringConvertible {
 
   var description: String { label }
 
-  /// Selector runs the shape costs, derived the way the scenario derives it.
+  /// Selector runs the shape costs, calculated the way the scenario derives it.
   ///
   /// Written out again here rather than read off the scenario, so a mistake in
   /// the formula has to be made twice, in two places, to pass.

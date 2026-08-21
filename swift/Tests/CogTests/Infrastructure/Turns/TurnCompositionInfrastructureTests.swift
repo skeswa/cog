@@ -3,11 +3,11 @@ import Testing
 
 @testable import Cog
 
-// Internal checks for nested-commit phases, identities, revisions, and pending
+// Internal checks for nested-turn phases, identities, revisions, and pending
 // storage.
 
 @MainActor
-@Test func `TurnCompositionInfrastructure nested commits join one outer turn`() {
+@Test func `TurnCompositionInfrastructure nested turns join one outer turn`() {
   let cogs = Cogs.forTesting()
   var comparisons = 0
   var flushingTurn: CogTurnID?
@@ -27,7 +27,7 @@ import Testing
   var outerTurn: CogTurnID?
   var innerTurn: CogTurnID?
 
-  cogs.commit("outer") { c in
+  cogs.turn(named: "outer") { c in
     guard case .accumulating(let outer) = cogs.turnPhase else {
       Issue.record("The outer body did not accumulate")
       return
@@ -37,7 +37,7 @@ import Testing
 
     c[source] = 1
 
-    cogs.commit("inner") { c in
+    cogs.turn(named: "inner") { c in
       guard case .accumulating(let inner) = cogs.turnPhase else {
         Issue.record("The inner body did not join accumulation")
         return
@@ -50,12 +50,12 @@ import Testing
 
       c[source] = 2
       #expect(cogs.peek(source) == 0)
-      #expect(cogs.revision == .initial)
+      #expect(cogs.arenaCore.revision == 0)
     }
 
     #expect(c[source] == 2)
     #expect(cogs.peek(source) == 0)
-    #expect(cogs.revision == .initial)
+    #expect(cogs.arenaCore.revision == 0)
   }
 
   #expect(outerTurn != nil)
@@ -63,7 +63,7 @@ import Testing
   #expect(flushingTurn == outerTurn)
   #expect(comparisons == 1)
   #expect(cogs.peek(source) == 2)
-  #expect(cogs.revision > .initial)
+  #expect(cogs.arenaCore.revision > 0)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The joined turn did not finish idle")
     return
@@ -71,13 +71,13 @@ import Testing
 }
 
 @MainActor
-@Test func `TurnCompositionInfrastructure sibling commits are separate turns`() {
+@Test func `TurnCompositionInfrastructure sibling turns are separate turns`() {
   let cogs = Cogs.forTesting()
   let source = ManualCog<Int>(0)
   var turnIDs: [CogTurnID] = []
   var turnNames: [String] = []
 
-  cogs.commit("first") { c in
+  cogs.turn(named: "first") { c in
     guard case .accumulating(let turn) = cogs.turnPhase else {
       Issue.record("The first sibling did not accumulate")
       return
@@ -87,14 +87,14 @@ import Testing
     c[source] = 1
   }
 
-  let firstRevision = cogs.revision
+  let firstRevision = cogs.arenaCore.revision
   #expect(cogs.peek(source) == 1)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The first sibling did not finish before the second began")
     return
   }
 
-  cogs.commit("second") { c in
+  cogs.turn(named: "second") { c in
     guard case .accumulating(let turn) = cogs.turnPhase else {
       Issue.record("The second sibling did not accumulate")
       return
@@ -105,13 +105,13 @@ import Testing
   }
 
   guard turnIDs.count == 2 else {
-    Issue.record("The sibling commits did not both capture a turn")
+    Issue.record("The sibling turns did not both capture a turn")
     return
   }
   #expect(turnIDs[0] != turnIDs[1])
   #expect(turnNames == ["first", "second"])
   #expect(cogs.peek(source) == 2)
-  #expect(cogs.revision > firstRevision)
+  #expect(cogs.arenaCore.revision > firstRevision)
   guard case .idle = cogs.turnPhase else {
     Issue.record("The second sibling did not finish idle")
     return

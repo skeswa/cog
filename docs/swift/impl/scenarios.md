@@ -113,7 +113,7 @@ justifies a slow, flaky, or core-coupled test.
  2. DECL   Declaring state
  3. READ   Reading state
  4. TURN   Writing state and turns
- 5. GRAPH  Derived values stay right and lazy
+ 5. GRAPH  Automatic values stay right and lazy
  6. CYCLE  Cycles and mistakes
  7. REACT  Reactions
  8. MECH   Mechanisms and timers
@@ -141,7 +141,7 @@ _Milestone M1. Design: §2.3, §6.3, §6.6._
 My whole app shares one Cog world. Tests get their own little worlds.
 
 - **ONE-01.** App bootstrap installs the one Cog context at launch. An op
-  declared in one feature file commits a write, and a read made elsewhere
+  declared in one feature file performs a write, and a read made elsewhere
   through the installed context sees it — no other setup, no second
   context anywhere.
 - **ONE-02.** Some code tries to install a second app context. Cog stops
@@ -179,14 +179,14 @@ I declare state at the top of a file and it just works.
 - **DECL-06.** I try to write through a `.readOnly` value reference. The compiler says
   no. (Proof: compile-fail.)
 
-### 2.2 Derived cogs
+### 2.2 Automatic cogs
 
 - **DECL-07.** I declare a `Cog` that computes from other cogs. Reading it
   gives the computed value.
-- **DECL-08.** I declare a derived `CogBox`. The closure receives the key
+- **DECL-08.** I declare an automatic `CogBox`. The closure receives the key
   as a parameter and passes it to inner keyed reads by normal lexical
   capture, and each key computes with its own key.
-- **DECL-09.** Declaring cogs runs nothing. A derived cog's closure runs
+- **DECL-09.** Declaring cogs runs nothing. An automatic cog's closure runs
   for the first time only when someone first reads it.
 
 ### 2.3 Names
@@ -198,24 +198,24 @@ I declare state at the top of a file and it just works.
 
 ### 2.4 Selector shape
 
-- **DECL-12.** I declare a derived cog whose selector throws. The
+- **DECL-12.** I declare an automatic cog whose selector throws. The
   compiler says no: synchronous selectors do not throw in v1. (Proof: compile-fail.)
 
 ## 3. READ — Reading state
 
 _Milestone M1. Design: §2.2, §2.4._
 
-Every read I make is correct: the latest committed state, fully settled.
+Every read I make is correct: the latest published state, fully settled.
 
-- **READ-01.** I write a source in a commit. After the commit, every read
+- **READ-01.** I write a source in a turn. After the turn, every read
   sees the new value.
-- **READ-02.** I read a derived cog twice with nothing changing in
+- **READ-02.** I read an automatic cog twice with nothing changing in
   between. Its closure ran only once; the second read used the cache.
-- **READ-03.** I change two sources in one commit. A derived cog that
+- **READ-03.** I change two sources in one turn. An automatic cog that
   combines them sees both new values together, never one new and one old.
 - **READ-04.** A selector uses `c.curr` to see its own previous value and
   keeps a running total. Each turn folds the new input into the total, and
-  each key of a derived box folds with its own previous value — one key's
+  each key of an automatic box folds with its own previous value — one key's
   fold never sees another key's total.
 - **READ-05.** The very first run of a `c.curr` selector has no previous
   value, and the selector can tell.
@@ -225,63 +225,63 @@ Every read I make is correct: the latest committed state, fully settled.
   settled value. Peeking is only ever the absence of an edge, never the
   removal of one: a selector that both tracks and peeks the same cog keeps
   the dependency.
-- **READ-07.** I leave a derived cog cold while its source changes, then
-  use one-shot `cogs.peek`. It settles the derived cog and returns its
+- **READ-07.** I leave an automatic cog cold while its source changes, then
+  use one-shot `cogs.peek`. It settles the automatic cog and returns its
   newest value without creating a subscription.
 
 ## 4. TURN — Writing state and turns
 
 _Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
 
-`commit` is the only door for writes, and every commit is one named turn.
+`turn` is the only door for writes, and every outer call creates one named graph turn.
 
 ### 4.1 The writer
 
-- **TURN-01.** Inside one commit, `c[countCog] += 1` works: the writer reads
+- **TURN-01.** Inside one turn, `c[countCog] += 1` works: the writer reads
   back the value it just staged.
-- **TURN-02.** I write the same source twice in one commit. The last
+- **TURN-02.** I write the same source twice in one turn. The last
   write wins, and downstream sees exactly one change.
 - **TURN-03.** The writer reads a source I have not written this turn. It
-  sees the current committed value.
-- **TURN-04.** While a commit body is still running, a normal read (not
+  sees the current published value.
+- **TURN-04.** While a turn body is still running, a normal read (not
   through the writer) still sees the old values. Staged values are
   visible only to the writer.
-- **TURN-15.** While a commit body is still running, I read a derived cog
-  that is not yet settled. It settles from committed values — never this
-  turn's staged writes — and after the commit it recomputes from the newly
-  committed values.
+- **TURN-15.** While a turn body is still running, I read an automatic cog
+  that is not yet settled. It settles from published values — never this
+  turn's staged writes — and after the turn it recomputes from the newly
+  published values.
 
 ### 4.2 Turns join, queue, and end
 
-- **TURN-05.** A commit inside a commit joins the outer turn. Everything
+- **TURN-05.** A turn inside a turn joins the outer turn. Everything
   flushes once, when the outer body ends, and reactions run once.
 - **TURN-06.** A turn takes its name from the op method that made it, or
   from a custom name I pass. That name is what history shows.
-- **TURN-07.** I sneak the writer out of the commit — stashed in a
-  variable or captured into an async task — and use it after the commit
+- **TURN-07.** I sneak the writer out of the turn — stashed in a
+  variable or captured into an async task — and use it after the turn
   ended. Cog stops me with an error, in every kind of build. (Proof: exit
   test.)
-- **TURN-08.** Several commits queue up during a flush. They run one at a
+- **TURN-08.** Several turns queue up during a flush. They run one at a
   time in the order they arrived, and each queued turn finishes
   completely — settle, notify, react — before the next one starts.
 
 ### 4.3 Equal writes are not changes
 
-- **TURN-09.** I write a source to the value it already has. A derived cog
+- **TURN-09.** I write a source to the value it already has. An automatic cog
   that reads it does not recompute.
-- **TURN-10.** In one commit I change a value and then change it back.
+- **TURN-10.** In one turn I change a value and then change it back.
   At flush time that counts as no change at all.
 - **TURN-11.** I give a cog a custom `equals:`. Cog uses my rule to
   decide whether a new value counts as a change.
 - **TURN-12.** A cog holds a value with no `Equatable`. Cog plays it safe
   and treats every write as a change.
-- **TURN-13.** I run two sibling commits back to back in one event
+- **TURN-13.** I run two sibling turns back to back in one event
   handler. Each is its own named turn: two history entries, and reactions
   run after each one.
-- **TURN-14.** Inside one commit, `c[box[k]] += 1` works: the writer
+- **TURN-14.** Inside one turn, `c[box[k]] += 1` works: the writer
   reads back the value staged for that key, and other keys are untouched.
 
-## 5. GRAPH — Derived values stay right and lazy
+## 5. GRAPH — Automatic values stay right and lazy
 
 _Milestone M1, except GRAPH-13 (M4). Design: §2.2, §2.4, §5.4._
 
@@ -304,7 +304,7 @@ half-finished picture.
   one read nests. Past a bound Cog fails with a clear error naming the chain
   and what to do instead, rather than exhausting the stack. (Proof: exit
   test.)
-- **GRAPH-04.** One source feeds many derived cogs. Each one I read is
+- **GRAPH-04.** One source feeds many automatic cogs. Each one I read is
   right, and only the ones I read recompute.
 - **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,
   so the two paths differ in length. I change A once. D recomputes once,
@@ -319,7 +319,7 @@ half-finished picture.
 
 ### 5.3 Laziness
 
-- **GRAPH-07.** Nobody is watching a derived cog. I change its source.
+- **GRAPH-07.** Nobody is watching an automatic cog. I change its source.
   Its closure does not run. When I later read it, it runs then.
 - **GRAPH-08.** A cold cog misses ten turns of changes. When I finally
   read it, it computes once, from the newest values — not once per
@@ -354,10 +354,10 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
 - **CYCLE-04.** A cycle only exists when a condition is true. Everything
   works until the condition flips; then Cog catches it.
 - **CYCLE-06.** A keyed selector or its custom equality rule calls a named op
-  that commits while the derived cog is computing. Cog rejects both paths
-  before the attempted commit body runs or that attempt mutates graph state,
+  that turns while the automatic cog is computing. Cog rejects both paths
+  before the attempted turn body runs or that attempt mutates graph state,
   in debug and release. The message names the cog, key, and attempted turn and
-  tells me to invoke the op outside derived computation, from event handling
+  tells me to invoke the op outside automatic computation, from event handling
   or a reaction. (Proof: exit test.)
 - **CYCLE-07.** The keyed cycle from CYCLE-03 reaches the real trap instead
   of the diagnostic seam. The crash message walks the whole path with each
@@ -387,7 +387,7 @@ these stories run inside a small test mechanism's `operate`.
   they run in the order I registered them.
 - **REACT-06.** A reaction's reads change from run to run, like a
   selector's. It is re-tracked every run.
-- **REACT-07.** Reactions run before the op that committed the turn
+- **REACT-07.** Reactions run before the op that published the turn
   returns. The very next line of my test can check what the reaction did.
 - **REACT-23.** While one reaction runs during a flush, it registers several
   more. Their initial tracking runs do not re-enter it: they wait behind every
@@ -401,7 +401,7 @@ these stories run inside a small test mechanism's `operate`.
 
 - **REACT-14.** A reaction gets a read-only view of the graph. It cannot
   write directly. (Proof: compile-fail.)
-- **REACT-15.** A reaction calls an op that commits. That write becomes a
+- **REACT-15.** A reaction calls an op that turns. That write becomes a
   brand-new turn after the current flush — never a change to the turn
   being flushed.
 - **REACT-16.** Reaction A's write wakes reaction B, whose write wakes C.
@@ -419,7 +419,7 @@ these stories run inside a small test mechanism's `operate`.
   its subscriber buffers before any reaction runs — flush step 4 before
   step 5. (Checked through history or an internal seam once M7 exports
   exist.)
-- **REACT-21.** A reaction watches a derived cog. A turn changes that
+- **REACT-21.** A reaction watches an automatic cog. A turn changes that
   cog's source, but the recompute lands on an equal value. The reaction
   does not run: only changed reactions run in flush step 5.
 - **REACT-22.** A reaction reads a manual source. I write that source to
@@ -437,12 +437,12 @@ it. Retired IDs stay retired.)
 
 - **MECH-01.** I bootstrap with a list of mechanisms. Each `operate` runs
   synchronously in list order, and when bootstrap returns every mechanism is
-  live: a commit on the very next line wakes their reactions, and reactions
+  live: a turn on the very next line wakes their reactions, and reactions
   from two mechanisms run in list order when one turn wakes both.
 - **MECH-02.** A mechanism configures state and seeds demand during
   `operate` through ops on its controller. Those turns settle before
   bootstrap returns, and a mechanism later in the list observes the earlier
-  mechanism's committed values during its own `operate`.
+  mechanism's published values during its own `operate`.
 - **MECH-03.** Declaring a mechanism does nothing by itself. Its reactions
   and tasks exist only when it is listed at bootstrap; a mechanism left off
   the list never runs.
@@ -511,10 +511,10 @@ test waits wall-clock time.
 
 - **LIFE-01.** Nobody watches a manual cog for a long time. Its value
   survives anyway, because manual state defaults to app lifetime.
-- **LIFE-02.** A derived cog defaults to `whileObserved`. After its last
+- **LIFE-02.** An automatic cog defaults to `whileObserved`. After its last
   watcher leaves and the grace period passes, Cog lets it go. The next
   read simply computes it fresh.
-- **LIFE-03.** A released derived cog is read again through the same value reference.
+- **LIFE-03.** A released automatic cog is read again through the same value reference.
   It comes back with the correct current value, as if it never left.
 - **LIFE-04.** A watcher leaves and comes back within the grace period.
   The cog was never released and did not recompute.
@@ -525,15 +525,15 @@ test waits wall-clock time.
   reads stay alive.
 - **LIFE-08.** Once a view has read a cog, that cog is pinned for the
   life of the app context. It is never released behind SwiftUI's back.
-- **LIFE-09.** Derived cog B reads derived cog A, then both lose their last
+- **LIFE-09.** Automatic cog B reads automatic cog A, then both lose their last
   external consumer. Their internal graph edge does not keep them alive.
   After the grace period, reading either value reference recreates the needed states
   with the correct current values.
-- **LIFE-10.** I use one-shot `cogs.peek` on a default `whileObserved` derived
+- **LIFE-10.** I use one-shot `cogs.peek` on a default `whileObserved` automatic
   cog. It settles current state without a durable consumer, starts or renews
   one ordinary grace window, and releases after expiry. A later peek recreates
   it from current dependencies.
-- **LIFE-11.** One key of a derived box loses its last watcher while a
+- **LIFE-11.** One key of an automatic box loses its last watcher while a
   sibling key stays watched. After the grace period only that key's state is
   released: the watched key never recomputes and keeps answering warm, and
   reading the released key recreates it from current values.
@@ -543,28 +543,28 @@ test waits wall-clock time.
 _Milestone M1, except SEED-07 (M2) and SEED-08 (M4). Design: §6.6, §4._
 
 My tests import `CogTesting` to set up state quietly with `seed`, or use a real
-commit for a loud domain operation.
+turn for a loud domain operation.
 
 - **SEED-01.** I seed a source. The next read returns the seeded value.
 - **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
   and no reaction runs.
-- **SEED-03.** Seeding still marks dependents dirty: a derived cog read
+- **SEED-03.** Seeding still marks dependents dirty: an automatic cog read
   after the seed recomputes from the seeded value. A seed obeys the
   source's equality rule the way a write does — seeding an equal value is
   not a change.
 - **SEED-04.** The §6.6 alert story, verbatim: bootstrap a weather
   mechanism whose alert reaction watches for nice weather, seeding the zip
   and cloudy weather first (no alert), then stub sunny weather with a real
-  commit. The alert fires exactly once, even though the reaction's first
+  turn. The alert fires exactly once, even though the reaction's first
   run never read the weather.
 - **SEED-05.** `CogTesting.seed` exists only in debug builds. A release build
   has no way to seed. (Proof: release configuration.)
-- **SEED-06.** I try to seed a derived cog. The compiler says no: only
+- **SEED-06.** I try to seed an automatic cog. The compiler says no: only
   manual sources can be seeded. (Proof: compile-fail.)
 - **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
   read. Seeding sends no UI notice; the next real turn still settles and
   notices the value dirtied by the seed.
-- **SEED-08.** I call `seed` at the wrong time — inside a commit body, or
+- **SEED-08.** I call `seed` at the wrong time — inside a turn body, or
   from a selector or reaction. Cog stops me right away with a clear error
   saying seed is only for idle test setup. The guard is debug-only surface
   proven by debug exit tests; a release build has no seed at all (SEED-05).
@@ -586,7 +586,7 @@ When I wonder what happened, the debug history can tell me.
   history under that name, composed beneath its mechanism's name.
 - **HIST-06.** Once M2 boundaries exist, history records each changed UI
   notice with the cog's human-readable label.
-- **HIST-07.** Several commits queue during a flush. History shows each
+- **HIST-07.** Several turns queue during a flush. History shows each
   queued turn as its own entry, in execution order, and attributes every
   write to the turn that made it; entries from different turns never
   interleave.
@@ -606,7 +606,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
   re-render.
 - **UI-03.** A card reads `weather[zipA]`. Writing `weather[zipB]`
   re-renders only zipB's card, never zipA's.
-- **UI-04.** A derived cog recomputes to an equal value, or a manual source
+- **UI-04.** An automatic cog recomputes to an equal value, or a manual source
   is written to an equal value. Cog sends no Observation notice, and views
   reading them do not re-render.
 - **UI-05.** Only cogs that a view actually read get an Observation
@@ -616,15 +616,15 @@ wall-clock waits; real rendering is proven once by the Weather example.
   through the `\.cogs` environment key. Intermediate views neither accept nor
   forward the context.
 - **UI-07.** An application-owned SwiftUI binding reads the current Cog value,
-  and setting it writes through a named domain commit that shows up in history.
+  and setting it writes through a named domain turn that shows up in history.
 - **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes
   to that cog do not re-render the view.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
   an iOS 26 simulator. (Proof: simulator.)
 - **UI-12.** AppKit automatic tracking works through the same boundary on
   a macOS 26 host.
-- **UI-13.** A view reads two cogs, A and B. One commit changes both. Every
-  render sees either the old pair before the commit or the new pair after
+- **UI-13.** A view reads two cogs, A and B. One turn changes both. Every
+  render sees either the old pair before the turn or the new pair after
   it — never one old value and one new value.
 - **UI-16.** A view's first render reads cogs A and B; its next render
   reads only B. Changing A no longer re-renders the view, and changing B
@@ -679,7 +679,7 @@ renderable, and whether any generation has succeeded.
   consumer quiet, the lens still shows its consumers every pending, success,
   and failure turn.
 - **ASYNC-33.** The `status` lens refuses synchronous state: asking
-  `cogs.status` or a selector's `c.status` for a manual or derived cog does
+  `cogs.status` or a selector's `c.status` for a manual or automatic cog does
   not compile. (Proof: compile-fail.)
 - **ASYNC-34.** An async declaration without `default:` does not compile.
   Optional values are not special: they state `default: nil` explicitly.
@@ -700,7 +700,7 @@ renderable, and whether any generation has succeeded.
   work is cancelled and new work starts — whether the policy was spelled
   `.latest` or omitted, since `.latest` is the default.
 - **ASYNC-08.** The old work finishes anyway, ignoring cancellation. Its
-  result is thrown away. Only the newest run may commit.
+  result is thrown away. Only the newest run may publish.
 - **ASYNC-09.** Work that was cancelled because it was replaced publishes
   no failure status.
 - **ASYNC-10.** I call `cogs.refresh(valueReference)`. The work runs again even
@@ -714,21 +714,21 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-35.** A dependency changes while an explicit refresh's work is in
   flight. The handle resolves as `superseded` at replacement — a dependency
   change supersedes a refresh exactly as a newer refresh does — and never
-  drifts forward: the superseded generation's late result commits nothing,
-  and only the dependency-started run may commit.
+  drifts forward: the superseded generation's late result publishes nothing,
+  and only the dependency-started run may publish.
 
 ### 13.3 Safe release
 
 - **ASYNC-13.** An unwatched async cog is released while its work is
   pending. The work is cancelled, and if a late result sneaks through, it
-  commits nothing. An exact refresh handle waiting on that generation resolves
+  publishes nothing. An exact refresh handle waiting on that generation resolves
   as `released` rather than hanging or following a recreated state.
 - **ASYNC-14.** After a release, reading the value reference again starts fresh work
   and fresh status, unpolluted by anything from before.
 - **ASYNC-37.** One key of an `AsyncCogBox` loses its last consumer while a
   sibling key stays watched. Grace expiry cancels and releases only that
-  key's work and state: its late result commits nothing, the sibling's work
-  completes and commits untouched, and reading the released key starts
+  key's work and state: its late result publishes nothing, the sibling's work
+  completes and turns untouched, and reading the released key starts
   fresh work and status.
 
 ### 13.4 Work isolation and retained values
@@ -736,7 +736,7 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-15.** An async cog's work body runs on the MainActor by
   default. A runtime precondition inside the work proves it in every leg.
 - **ASYNC-16.** Expensive work opts into `@concurrent`. It runs off the
-  main actor, and its result still commits on the MainActor under the
+  main actor, and its result still turns on the MainActor under the
   same generation check.
 - **ASYNC-17.** The internal task that runs an async cog's work carries
   the descriptor's name and key, so Instruments can show it. (Checked
@@ -755,13 +755,13 @@ renderable, and whether any generation has succeeded.
   no change: no recompute, no re-render.
 - **ASYNC-21.** I call `cogs.refresh(valueReference)` while work is already in
   flight. Under `.latest`, the in-flight run is cancelled and only the
-  newest run may commit — a refresh replaces work the same way a
+  newest run may publish — a refresh replaces work the same way a
   dependency change does. Its exact handle resolves as `superseded` when a
   still newer refresh replaces it; it never drifts forward to that newer run.
 - **ASYNC-36.** `@concurrent` work replaced by a dependency change receives
   cooperative cancellation off the actor — replacement is a stop request to
   the old task, not merely a ban on its result — and the replacement's
-  result still commits on the MainActor.
+  result still turns on the MainActor.
 
 ### 13.5 Cold one-shot demand
 
@@ -772,7 +772,7 @@ renderable, and whether any generation has succeeded.
   status from `cogs.status.peek` — and installs no durable consumer. Another
   peek sees that same generation instead of starting a second run and renews
   its grace window. With no durable consumer, injected grace expiry cancels
-  and releases the state; a late result commits nothing, and a later read
+  and releases the state; a late result publishes nothing, and a later read
   starts fresh work.
 - **ASYNC-23.** I refresh a never-read async value reference. Refresh is one
   initial load, not a no-op or an initialize-then-replace sequence: the
@@ -784,7 +784,7 @@ renderable, and whether any generation has succeeded.
   leaves while work ignores cancellation inside grace. The source changes
   before that work finishes. Its now-stale result cannot clear the dependency
   invalidation; a consumer returning during grace starts work from the newest
-  source value, and only that result may commit.
+  source value, and only that result may publish.
 - **ASYNC-25.** A consumer reads only an async cog's value and then leaves.
   One injected grace window releases the internal value projection and its
   now-unobserved async dependency together, cancelling pending work without a
@@ -793,14 +793,14 @@ renderable, and whether any generation has succeeded.
   value spelling. Equal keys share one value-projection state, different keys
   stay independent, and an equal success does not notify that key's value
   consumer.
-- **ASYNC-27.** An async or derived selector calls `cogs.refresh` while it is
-  computing. Cog traps with the same clear commit-during-derivation error in
+- **ASYNC-27.** An async or automatic selector calls `cogs.refresh` while it is
+  computing. Cog traps with the same clear turn-during-automatic-computation error in
   debug and release instead of starting a nested system turn. (Proof: exit
   test.)
-- **ASYNC-28.** I read a derived cog backed by an async cog through the UI
+- **ASYNC-28.** I read an automatic cog backed by an async cog through the UI
   boundary, including the documented `cogs[forecastCog]` value spelling. Its
-  initial pending publication does not re-enter the derived computation or
-  flush reactions mid-derivation: the read returns the current value, records
+  initial pending publication does not re-enter the automatic computation or
+  flush reactions mid-computation: the read returns the current value, records
   one named pending turn, and later work completion updates it.
 - **ASYNC-29.** Repeated one-shot `peek` or `refresh` demand renews an async
   state's grace while keeping at most one scheduled grace sleeper for that
@@ -817,12 +817,12 @@ When order matters more than speed, I pick a policy that says so.
   changes under `.queue` make exactly three additional runs, one at a time
   and in input order. Each run starts only after the preceding one
   finishes.
-- **POLICY-02.** With `.queue`, results commit in run order, so the final
+- **POLICY-02.** With `.queue`, results publish in run order, so the final
   value always matches the newest input.
 - **POLICY-03.** With `.exhaustLatest`, changes during a run — one or
   ten — start no new runs. When the run finishes, exactly one catch-up
   run uses the newest state.
-- **POLICY-04.** With `.merged`, runs overlap, and each result commits as
+- **POLICY-04.** With `.merged`, runs overlap, and each result publishes as
   its own turn when it lands.
 - **POLICY-05.** A `.stream` selector cannot use `.queue`,
   `.exhaustLatest`, or `.merged`. The type system says no. (Proof: compile-fail.)
@@ -839,14 +839,14 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-- **STREAM-01.** A `.stream` cog commits each changed element of its sequence
-  as its own turn. Watchers see every committed value.
+- **STREAM-01.** A `.stream` cog publishes each changed element of its sequence
+  as its own turn. Watchers see every published value.
 - **STREAM-02.** Before the first element arrives, the cog reports
   loading.
 - **STREAM-03.** A dependency changes. The old sequence is cancelled and
-  a new one starts; late elements from the old sequence commit nothing.
+  a new one starts; late elements from the old sequence publish nothing.
 - **STREAM-04.** An unwatched `.stream` cog is released while its
-  sequence is live. The sequence is cancelled, and late elements commit
+  sequence is live. The sequence is cancelled, and late elements publish
   nothing.
 - **STREAM-05.** A stream emits a value and then ends naturally. Ending
   publishes no extra turn or notice, starts no replacement, and leaves the
@@ -870,9 +870,9 @@ Some state really is a stream — locations, sockets, database watches.
   ordinary published failure.
 - **STREAM-10.** An `Equatable` stream yields the same value twice, then a
   different value. The duplicate creates no turn, value or status notice,
-  reaction, or history entry; the later changed element commits normally.
+  reaction, or history entry; the later changed element publishes normally.
 - **STREAM-11.** A stream value has no equality rule. Cog conservatively
-  commits every element, including two whose fields happen to match, so no
+  turns every element, including two whose fields happen to match, so no
   implicit reflection or event loss hides a possible change.
 
 ## 16. EXPORT — Exports and interop
@@ -886,11 +886,11 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
   before; subscribing settles it.
 - **EXPORT-02.** After that, I get a value each time it changes.
 - **EXPORT-03.** After consuming the initial value, I pause a default
-  `.newest(1)` reader and commit A, B, then C. Its next value is settled C;
-  A and B may be skipped, and none of the commits waits for the reader.
+  `.newest(1)` reader and publish A, B, then C. Its next value is settled C;
+  A and B may be skipped, and none of the turns waits for the reader.
 - **EXPORT-04.** After consuming the initial value, I pause an `.oldest(2)`
-  reader and commit A, B, then C. It receives settled A and B in order and
-  drops C; none of the commits waits for the reader.
+  reader and publish A, B, then C. It receives settled A and B in order and
+  drops C; none of the turns waits for the reader.
 - **EXPORT-05.** Two subscribers to the same cog own independent buffers
   and graph leases. Pausing or cancelling one neither drops values from nor
   releases the lease of the other.
@@ -905,7 +905,7 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
   Repeating this after each propagation boundary keeps returning the newest
   value; mutations within one boundary may coalesce. (Proof: simulator.)
 - **EXPORT-09.** After consuming the initial value, I pause an `.unbounded`
-  reader and commit A, B, then C. It receives every settled value in order.
+  reader and publish A, B, then C. It receives every settled value in order.
 - **EXPORT-10.** I track one property of an outside `@Observable` object.
   Changing another property on that object does not recompute my dependent
   cogs. (Proof: simulator.)
@@ -922,10 +922,10 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 - **EXPORT-13.** I link outside state in with `c.track`'s closure form
   instead of a key path. It has the same post-mutation value, coalescing,
   and pre-iOS-26 re-arm semantics as the key-path form. (Proof: simulator.)
-- **EXPORT-14.** I subscribe to a derived cog. A turn recomputes it to an
+- **EXPORT-14.** I subscribe to an automatic cog. A turn recomputes it to an
   equal value. Nothing is offered to my buffer: only changed values reach
   subscribers.
-- **EXPORT-15.** A `whileObserved` derived cog's only consumer is my
+- **EXPORT-15.** A `whileObserved` automatic cog's only consumer is my
   `values(of:)` subscription. Grace periods come and go; the cog is never
   released while my subscription lives, and each change still reaches me.
 
@@ -949,35 +949,35 @@ since expected counts derive from the parameters.
 - **COUNT-07.** Keyed diamonds: runs match exactly.
 - **COUNT-08.** Key churn (keys added and removed over and over): runs
   match exactly, and dropped keys stop running.
-- **COUNT-09.** Every behavior scenario implemented through M5 passes
-  unchanged over every value-reference layout under test. (Proof: suite.)
-- **COUNT-10.** Every behavior scenario implemented through M6 passes
-  unchanged with the data-oriented core selected in place of the simple
-  core, before any default switch. (Proof: suite.)
+- **COUNT-09.** The selection record proves every behavior scenario through M5
+  passed unchanged over all three measured value-reference layouts; the suite
+  remains green on the retained inline layout. (Proof: suite.)
+- **COUNT-10.** The selection record proves every behavior scenario through M6
+  passed unchanged when the data-oriented core replaced the simple core; the
+  suite remains green on the retained arena. (Proof: suite.)
 - **COUNT-11.** After M7, the complete behavior suite passes unchanged on
-  the selected value-reference layout and data-oriented core. (Proof: suite.)
+  the retained inline value-reference layout and arena. (Proof: suite.)
 
 ## 18. PERF — Performance guarantees
 
 _Milestones M5, M6, M9, and M10, in the benchmark package. Design: perf §5–§9._
 
-Benchmark-gated: thresholds stay provisional and representation choices stay
-open until impl/benchmarks.md records numbers. This group is the declared exception to
-implementation agnosticism: it gates the implementation itself, lives in the
-benchmark package, and never constrains the behavior suite. Every scenario
-in this group has proof mode `benchmark` by default; no per-scenario marker
-is needed.
+Benchmark-gated: thresholds stay provisional until impl/benchmarks.md records
+numbers, and any future representation choice remains open until measurements
+select it. This group is the declared exception to implementation agnosticism:
+it gates the implementation itself, lives in the benchmark package, and never
+constrains the behavior suite. Every scenario in this group has proof mode
+`benchmark` by default; no per-scenario marker is needed.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates what
-  impl/benchmarks.md records and no more; the recorded cost only ever ratchets downward.
-  Allocating nothing (`mallocCountTotal == 0`) is the target; the simple core
-  does not reach it, so pinning the count against drift is what stops the cost
-  creeping upward until the data-oriented core does.
+  impl/benchmarks.md records and no more; the recorded cost only ever ratchets
+  downward. The retained arena reaches the zero-allocation target, so the
+  published `mallocCountTotal == 0` threshold prevents that result from
+  regressing.
 - **PERF-02.** Propagation's retain and release traffic is what impl/benchmarks.md
   records and no more; the recorded cost only ever ratchets downward. Doing
-  none of it is the target (perf §5); the simple core walks class states, so
-  pinning the traffic against drift is what stops it growing until the
-  data-oriented core reaches zero.
+  none of it remains the target (perf §5); pinning the retained arena's traffic
+  against drift keeps the remaining runtime work from growing unnoticed.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
   baseline threshold recorded in impl/benchmarks.md. While no baseline exists, this
   check is red, never skipped.
@@ -989,21 +989,24 @@ is needed.
 - **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
   impl/benchmarks.md. While no baseline exists, this check is red, never skipped.
-- **PERF-08.** Keyed diamonds and key churn run under inline `AnyHashable`,
-  interned-token, and generic-keyed value-reference layouts in one pinned environment.
-  Results land in impl/benchmarks.md before the value-reference layout is selected.
-- **PERF-09.** Mostly static and high-churn graphs run under the shared
-  edge pool, per-state prefix arrays, and inline-plus-overflow edge layouts
-  in one pinned environment. Results land in impl/benchmarks.md before the edge layout
-  is selected.
-- **PERF-10.** The selected core is measured against the simple core,
-  swift-state-graph, and raw `@Observable` in one pinned environment.
-  impl/benchmarks.md records wall-clock results and generous absolute regression
-  thresholds before timing gates enter CI.
+- **PERF-08.** Keyed diamonds and key churn were measured under inline
+  `AnyHashable`, interned-token, and generic-keyed value-reference layouts in
+  one pinned environment. The recorded result selects inline `AnyHashable`;
+  the rejected implementations no longer remain as build configurations.
+- **PERF-09.** Mostly static and high-churn graphs were measured under the
+  shared edge pool, per-state prefix arrays, and inline-plus-overflow edge
+  layouts in one pinned environment. The recorded result selects the shared
+  pool; the rejected implementations no longer remain as build configurations.
+- **PERF-10.** The specialized arena is measured against compact arena,
+  swift-state-graph, and raw `@Observable` in one pinned environment. Historical
+  simple-core results remain in impl/benchmarks.md but are not a build
+  configuration. The report records wall-clock results and generous absolute
+  regression thresholds before timing gates enter CI.
 - **PERF-11.** A pinned keyed state that stops changing costs a turn
   nothing. A turn that writes and reads one key of a family performs the
   same retain and release traffic whether one key or a thousand are pinned
-  beside it, on either core, and the notices it delivers keep their order.
+  beside it, and the notices it delivers keep their order. The historical
+  simple-versus-arena comparison remains in the benchmark record.
 - **PERF-12.** A steady turn's shared machinery allocates nothing: the turn
   boundary, the writer it hands out, and the arrays a turn accumulates into
   reuse their storage rather than being rebuilt. The recorded steady-turn
@@ -1012,10 +1015,11 @@ is needed.
 - **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md records
   and no more — allocations, retains, and releases per node — and the
   recorded cost only ever ratchets downward.
-- **PERF-14.** After the shared machinery work, the simple and data-oriented
-  cores are remeasured against each other on steady, deep, broad, and
-  unstable shapes in one pinned environment. impl/benchmarks.md records the new
-  comparison, including whether any common-path cost regressed.
+- **PERF-14.** After the shared machinery work, the historical simple core,
+  compact arena, and specialized arena were compared on steady, deep, broad,
+  and unstable shapes in one environment. impl/benchmarks.md records the
+  comparison; only the specialized default and public `CompactArena` trait
+  remain selectable.
 - **PERF-15.** A representative commerce session — a catalog of a thousand-odd
   products, a sixteen-policy pricing ladder, keyed inventory and offers, and a
   cart whose totals depend on async quotes — is measured as six named cuts: a
@@ -1034,10 +1038,11 @@ is needed.
   identical application state. impl/benchmarks.md records the results, and records that a
   simulator hitch figure is a pinned regression signal rather than a
   user-experience guarantee.
-- **PERF-17.** The representative headless workload runs under both the simple
-  and the data-oriented core in one session, so the tradeoff between what a
-  graph costs to build and what it costs to run is measured on an application
-  shape rather than on a synthetic one. impl/benchmarks.md records the paired comparison.
+- **PERF-17.** The representative headless workload runs under the specialized
+  default and public `CompactArena` trait, so the supported binary-size trade
+  is measured on an application shape rather than only on synthetic graphs.
+  impl/benchmarks.md preserves the earlier simple-core comparison alongside
+  the current paired measurement.
 
 ## 19. LEG — Build-settings matrix
 
@@ -1068,12 +1073,12 @@ _Milestone M1. Design: §1.2, §2.5, §7._
 The graph has one execution lane regardless of my target's default isolation
 settings.
 
-- **ACTOR-01.** Selectors, commit bodies, and reactions all execute on the
+- **ACTOR-01.** Selectors, turn bodies, and reactions all execute on the
   MainActor. Runtime preconditions prove it in every build-settings leg.
 - **ACTOR-02.** Code on another executor tries to access the synchronous
   graph API without a MainActor hop. The compiler says no. (Proof: compile-fail.)
 - **ACTOR-03.** A manual cog holds a non-`Sendable`, MainActor-bound value,
-  and a derived cog reads it without a wrapper or an unchecked conformance.
+  and an automatic cog reads it without a wrapper or an unchecked conformance.
 
 ## 21. LINT — First-party lint tooling
 
@@ -1109,7 +1114,7 @@ locations in my editor and CI, without making my app compile the linter.
   recognized view's stored properties, initializer parameters, and method
   parameters, including optional and generic positions, and points to
   `@Environment(\.cogs)` as the conforming boundary.
-- **LINT-08.** `primitives-only-in-ops` rejects `commit` and `refresh` on
+- **LINT-08.** `primitives-only-in-ops` rejects `turn` and `refresh` on
   classified production graph receivers and rejects bare or
   `self`-qualified primitives inside `extension Cogs`, including environment,
   bootstrap-local, selector, reaction, and mechanism-controller spellings.

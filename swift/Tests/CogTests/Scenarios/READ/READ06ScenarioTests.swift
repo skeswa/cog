@@ -22,12 +22,12 @@ import Testing
   #expect(cogs.peek(snapshot) == "0:2")
   #expect((selectorRuns, xRuns) == (1, 1))
 
-  cogs.commit { c in c[xSource] = 2 }
+  cogs.turn { c in c[xSource] = 2 }
   #expect(cogs.peek(xSource) == 2)
   #expect(cogs.peek(snapshot) == "0:2")
   #expect((selectorRuns, xRuns) == (1, 1))
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
   #expect(cogs.peek(snapshot) == "1:4")
   #expect((selectorRuns, xRuns) == (2, 2))
 }
@@ -56,7 +56,7 @@ import Testing
   #expect(cogs.peek(peekSecond) == "2:2")
   #expect((peekFirstRuns, peekSecondRuns) == (1, 1))
 
-  cogs.commit { c in c[xSource] = 2 }
+  cogs.turn { c in c[xSource] = 2 }
 
   #expect(cogs.peek(peekFirst) == "4:4")
   #expect(cogs.peek(peekSecond) == "4:4")
@@ -81,7 +81,7 @@ import Testing
   #expect(cogs.peek(snapshot) == "0:1:10")
   #expect(snapshots == ["0:1:10"])
 
-  cogs.commit { c in
+  cogs.turn { c in
     c[manual] = 2
     c[owned] = 20
   }
@@ -90,7 +90,7 @@ import Testing
   #expect(cogs.peek(snapshot) == "0:1:10")
   #expect(snapshots == ["0:1:10"])
 
-  cogs.commit { c in c[trigger] = 1 }
+  cogs.turn { c in c[trigger] = 1 }
   #expect(cogs.peek(snapshot) == "1:2:20")
   #expect(snapshots == ["0:1:10", "1:2:20"])
 }

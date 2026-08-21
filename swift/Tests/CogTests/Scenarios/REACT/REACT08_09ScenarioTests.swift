@@ -23,13 +23,13 @@ import Testing
   // Installing the watch calls nothing at all.
   #expect(deliveries.isEmpty)
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   // The first real change calls once, with the value from before the change
   // and the value after it.
   #expect(deliveries == ["2->4"])
 
-  cogs.commit { c in c[source] = 3 }
+  cogs.turn { c in c[source] = 3 }
 
   // The old value advances with the watch, so it really is the previous value
   // rather than the one captured at install time.
@@ -53,7 +53,7 @@ import Testing
   // has no transition to report, so the current value is both halves.
   #expect(deliveries == ["1->1"])
 
-  cogs.commit { c in c[source] = 2 }
+  cogs.turn { c in c[source] = 2 }
 
   // After its install call it is an ordinary watch.
   #expect(deliveries == ["1->1", "1->2"])

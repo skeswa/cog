@@ -4,7 +4,7 @@ import CogTesting
 
 /// The thousand-state graph PERF-03 measures.
 ///
-/// Five hundred keyed sources and five hundred keyed derived consumers, one
+/// Five hundred keyed sources and five hundred keyed automatic consumers, one
 /// consumer per source, all settled. A thousand states from two declarations,
 /// which is how a real screen reaches that number — per-entity state comes
 /// from `box[key]`, not from a thousand hand-written `let`s.
@@ -18,7 +18,7 @@ enum MemoryHarness {
   /// The keyed sources.
   static let entrySourceCogs = ManualCogBox<Int, Int>(0, name: "perf.memory.source")
 
-  /// One derived consumer per key.
+  /// One automatic consumer per key.
   static let entryCogs = CogBox<Int, Int>(
     { c, key in c[MemoryHarness.entrySourceCogs[key]] &+ key },
     name: "perf.memory.entry"

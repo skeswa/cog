@@ -10,7 +10,7 @@ public import Cog
 /// meaningless.
 ///
 /// A scenario owns its whole story. `run(in:)` builds the declarations, reads
-/// them, commits turns, and reports what happened, so nothing about the shape
+/// them, runs turns, and reports what happened, so nothing about the shape
 /// leaks into the caller and a test cannot accidentally change the workload it
 /// is asserting on.
 @MainActor
@@ -18,12 +18,9 @@ public struct CogScenario {
   /// What this scenario is called in results and test names.
   public let name: String
 
-  /// The value-reference layout its keyed declarations were built with.
-  public let layout: CogValueReferenceLayout
-
-  /// How many selector runs the shape costs, derived from its parameters.
+  /// How many selector runs the shape costs, calculated from its parameters.
   ///
-  /// Derived, never a recorded observation: an expected count computed from
+  /// Automatic, never a recorded observation: an expected count computed from
   /// the graph's own size and turn count is a claim about how Cog *should*
   /// behave, whereas a count copied from a passing run only says what it did
   /// once. Duplicate work has to fail this comparison to be worth running.
@@ -33,25 +30,21 @@ public struct CogScenario {
   /// selectors, and returns the value it finished on.
   private let body: @MainActor (Cogs, CogRunCounter) -> Int
 
-  /// Creates a scenario from its shape and its derived expectation.
+  /// Creates a scenario from its shape and its calculated expectation.
   ///
   /// - Parameters:
   ///   - name: Identifier used in results and in the test that asserts on it.
-  ///   - layout: The value-reference layout `body` builds keyed references
-  ///     with. Keyless shapes still record it, so a result set is uniform.
   ///   - expectedRuns: Selector runs the shape must cost, computed from the
   ///     caller's parameters rather than measured.
-  ///   - body: Builds declarations, reads them, and commits turns. It receives
+  ///   - body: Builds declarations, reads them, and runs turns. It receives
   ///     the context to run in and the counter its selectors increment, and
   ///     returns the value its root cog finished on.
   public init(
     name: String,
-    layout: CogValueReferenceLayout,
     expectedRuns: Int,
     body: @escaping @MainActor (Cogs, CogRunCounter) -> Int
   ) {
     self.name = name
-    self.layout = layout
     self.expectedRuns = expectedRuns
     self.body = body
   }
@@ -60,19 +53,18 @@ public struct CogScenario {
   /// expected.
   ///
   /// Each call uses a fresh counter, so a scenario may be run repeatedly — in
-  /// a benchmark loop, or once per value-reference layout — without earlier
-  /// runs contaminating the count. Give each call its own isolated context:
+  /// a benchmark loop — without earlier runs contaminating the count. Give
+  /// each call its own isolated context:
   /// declarations create their state lazily per context, so a reused context
   /// would start warm and undercount.
   ///
   /// - Parameter cogs: The isolated context to build this graph in.
-  /// - Returns: The name, layout, and the two counts to compare.
+  /// - Returns: The name, final value, and the two counts to compare.
   public func run(in cogs: Cogs) -> CogScenarioResult {
     let counter = CogRunCounter()
     let finalValue = body(cogs, counter)
     return CogScenarioResult(
       name: name,
-      layout: layout,
       actualRuns: counter.runs,
       expectedRuns: expectedRuns,
       finalValue: finalValue
@@ -87,9 +79,6 @@ public struct CogScenario {
 public nonisolated struct CogScenarioResult: Sendable, Equatable {
   /// The scenario that produced this result.
   public let name: String
-
-  /// The value-reference layout it was built with.
-  public let layout: CogValueReferenceLayout
 
   /// Selector runs that actually happened.
   public let actualRuns: Int
@@ -115,13 +104,11 @@ public nonisolated struct CogScenarioResult: Sendable, Equatable {
   /// Creates a result. Scenarios produce these; callers compare them.
   public init(
     name: String,
-    layout: CogValueReferenceLayout,
     actualRuns: Int,
     expectedRuns: Int,
     finalValue: Int
   ) {
     self.name = name
-    self.layout = layout
     self.actualRuns = actualRuns
     self.expectedRuns = expectedRuns
     self.finalValue = finalValue

@@ -391,9 +391,9 @@ jobs:
         run: node tools/select-xcode.mjs
 
       # The cached directory is the leg's SwiftPM scratch path, which
-      # `tools/swift-test.mjs` derives as `.build/<leg>-<configuration>`. The
-      # names have to match the wrapper's exactly or the cache restores into a
-      # directory nothing reads.
+      # `tools/swift-test.mjs` derives as `.build/<leg>-<configuration>`. Trait
+      # and package-trait variants add `-package-<fingerprint>` so they cannot
+      # invalidate that shipping-default directory.
       #
       # The key covers the manifest, the resolved dependency graph, and the
       # pinned tooling. It deliberately does not name a compiler: nothing here
@@ -403,7 +403,9 @@ jobs:
       - name: Restore the leg's build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .build/${{ matrix.leg }}-debug
+          path: |
+            .build/${{ matrix.leg }}-debug
+            .build/${{ matrix.leg }}-debug-package-*
           key: swift-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
           restore-keys: |
             swift-${{ matrix.leg }}-debug-${{ runner.arch }}-
@@ -411,7 +413,11 @@ jobs:
       - name: Run the host tests for this leg
         env:
           COG_TEST_LEG: ${{ matrix.leg }}
-        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --parallel
+        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --no-parallel
+
+      - name: Test the CompactArena public trait
+        if: matrix.leg == 'mainactor-nnbd-on'
+        run: mise run test:arena-configurations
 
   test-simulator:
     name: Simulator boundary tests (self-hosted)
@@ -695,7 +701,9 @@ jobs:
       - name: Restore the leg's build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .build/${{ matrix.leg }}-debug
+          path: |
+            .build/${{ matrix.leg }}-debug
+            .build/${{ matrix.leg }}-debug-package-*
           key: swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
           restore-keys: |
             swift-fork-${{ matrix.leg }}-debug-${{ runner.arch }}-
@@ -703,7 +711,11 @@ jobs:
       - name: Run the host tests for this leg
         env:
           COG_TEST_LEG: ${{ matrix.leg }}
-        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --parallel
+        run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --no-parallel
+
+      - name: Test the CompactArena public trait
+        if: matrix.leg == 'mainactor-nnbd-on'
+        run: mise run test:arena-configurations
 
       - name: Check the supported public APIs against the latest release
         if: matrix.leg == 'mainactor-nnbd-on'

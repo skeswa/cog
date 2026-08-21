@@ -16,8 +16,8 @@ extension Cogs {
   ///
   /// The optional is storage presence, not value optionality. A watch on an
   /// optional value keeps "nothing delivered yet" distinct from "delivered
-  /// nil", the same way ``ManualCogState`` keeps a staged nil distinct from no
-  /// staged write at all.
+  /// nil", the same way the arena's pending column keeps a staged nil distinct
+  /// from no staged write at all.
   ///
   /// Reading precedes delivery so the reaction's dependency and lease set are
   /// reconciled before any queued graph-owned turn can flush. In particular, a

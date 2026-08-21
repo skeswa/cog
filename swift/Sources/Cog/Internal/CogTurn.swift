@@ -1,8 +1,8 @@
 // A turn is one synchronous, atomic state publication. Application turns begin
-// at `Cogs.commit`; graph-owned system turns publish async status through the
+// at `Cogs.turn`; graph-owned system turns publish async status through the
 // same flush machinery without pretending to be application writes.
 //
-// For example, if a commit writes `firstName` and `lastName`, its body stages
+// For example, if a turn writes `firstName` and `lastName`, its body stages
 // both values. The flush then publishes both together, settles affected cogs,
 // and runs reactions. Normal readers see the old pair before the flush and the
 // new pair after it, never half of the update.
@@ -11,7 +11,7 @@
 //
 //   idle → accumulating writes → flushing changes and reactions → idle
 //
-// A nested commit joins the accumulating turn. Any application or system turn
+// A nested turn joins the accumulating turn. Any application or system turn
 // requested while flushing waits in one FIFO because consumers must finish the
 // current completed revision before another becomes visible.
 
@@ -25,6 +25,9 @@
 /// allocation and an isolated deallocation on every turn, which `M9-01`
 /// measured; a monotonically increasing integer is unforgeable for the same
 /// reason a fresh object was — the context is the only thing that advances it.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal nonisolated struct CogTurnID: Hashable, Sendable {
   /// Position in the context's turn sequence, starting at one.
   fileprivate let rawValue: UInt64
@@ -32,9 +35,12 @@ internal nonisolated struct CogTurnID: Hashable, Sendable {
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
-/// Manual values and async status both conform to the pending-source contract,
-/// so one ordered flush can assign a single revision before invalidation reaches
-/// Observation boundaries and reactions.
+/// Manual values and async status share arena slots, so one ordered flush can
+/// assign a single revision before invalidation reaches Observation boundaries
+/// and reactions.
+#if !COG_ARENA_COMPACT
+@usableFromInline
+#endif
 internal final class CogTurn {
   // Written out, and `nonisolated`, per the rule at the top of
   // `CogDescriptor.swift`. A synthesized `deinit` on a main-actor-isolated
@@ -48,15 +54,8 @@ internal final class CogTurn {
   /// The diagnostic and history name of this outer turn.
   private(set) var name = ""
 
-  /// Sources written while this turn accumulates. Repeated entries are safe:
-  /// the first flush consumes the one pending slot and later entries are
-  /// no-ops. A future measured representation may deduplicate this work.
-  private var touchedSources: [any PendingCogSource] = []
-
-  #if COG_CORE_ARENA
   /// Arena source slots touched once in writer order by this turn.
   private var touchedArenaSources: ContiguousArray<CogArenaSlot> = []
-  #endif
 
   /// Creates the one turn object a context reuses for its whole life.
   init() {}
@@ -65,29 +64,22 @@ internal final class CogTurn {
   ///
   /// One object per context rather than one per turn, so the staged-source
   /// buffers keep the capacity they reached instead of growing from zero every
-  /// time a source is written. Turns never overlap — a nested commit joins the
-  /// accumulating turn and a commit during a flush is queued — so a single
+  /// time a source is written. Turns never overlap — a nested turn joins the
+  /// accumulating turn and a turn during a flush is queued — so a single
   /// object is the whole of the state a turn needs.
   ///
   /// The buffers must already be empty: `flushPendingSources` drains them, and
   /// a turn that ended without flushing would otherwise leak its writes into
   /// the next one.
   func begin(id: CogTurnID, name: String) {
-    assert(touchedSources.isEmpty, "A Cog turn began while a previous turn's sources were staged.")
+    assert(
+      touchedArenaSources.isEmpty,
+      "A Cog turn began while a previous turn's sources were staged."
+    )
     self.id = id
     self.name = name
   }
 
-  /// Registers a source whose staged slot must become visible in this turn.
-  ///
-  /// A repeated touch is harmless because the first flush consumes the slot;
-  /// retaining duplicates keeps the correctness core simple until benchmarks
-  /// justify deduplication.
-  func touch(_ source: any PendingCogSource) {
-    touchedSources.append(source)
-  }
-
-  #if COG_CORE_ARENA
   /// Registers one arena source whose pending typed cell must be published.
   ///
   /// ``CogArenaStateFlags/touched`` performs row-level deduplication before
@@ -95,7 +87,6 @@ internal final class CogTurn {
   func touchArenaSource(_ source: CogArenaSlot) {
     touchedArenaSources.append(source)
   }
-  #endif
 
   /// Publishes all staged slots under one newly assigned graph revision.
   ///
@@ -103,15 +94,9 @@ internal final class CogTurn {
   /// transition remains part of global turn order. Each source decides whether
   /// its staged value changes and which consumers to invalidate.
   func flushPendingSources(in cogs: Cogs) {
-    let revision = cogs.advanceRevision()
-    #if COG_CORE_ARENA
+    cogs.advanceRevision()
     cogs.arenaCore.flushPendingSources(touchedArenaSources)
     touchedArenaSources.removeAll(keepingCapacity: true)
-    #endif
-    for source in touchedSources {
-      source.flushPendingValue(in: cogs, at: revision)
-    }
-    touchedSources.removeAll(keepingCapacity: true)
   }
 }
 
@@ -148,45 +133,34 @@ extension Cogs {
   /// An idle context is not sufficient: a selector or reaction may be tracking
   /// outside a turn. System publication waits until both tracking and settlement
   /// have completed, so Observation and reactions never run through an active
-  /// consumer. Both settle representations are checked because a popped exit
-  /// frame leaves its derived state on the computing path through recomputation.
+  /// consumer. A popped pull frame still leaves its arena row on the computing
+  /// path through recomputation, so arena settlement must be completely idle.
   internal var canRunSystemTurnImmediately: Bool {
     guard case .idle = turnPhase else { return false }
-    guard settleStack.isEmpty && settleStack.isComputingEmpty && trackedConsumer == nil else {
-      return false
-    }
-    #if COG_CORE_ARENA
     return arenaCore.isSettlementIdle
-    #else
-    return true
-    #endif
   }
 
-  /// Rejects an application operation before it can open a turn during derivation.
+  /// Rejects an application operation before it can open a turn during automatic computation.
   ///
   /// The guard happens before state lookup or body execution. That keeps the
   /// whole selector region—including dependency reconciliation and equality—
   /// read-only and prevents a failed attempt from partially mutating the graph.
-  internal func requireOutsideDerivedComputation(forTurnNamed name: String) {
-    #if COG_CORE_ARENA
+  internal func requireOutsideAutomaticComputation(forTurnNamed name: String) {
     let computingName = arenaCore.innermostComputingName
-    #else
-    let computingName = settleStack.innermostComputingState.map { CogCycleStep(state: $0).name }
-    #endif
     if let cogName = computingName {
       fatalError(
         """
-        Cog cannot commit turn \(String(reflecting: name)) while derived cog \(cogName) is \
-        computing. Derived computation may only read Cog state. Invoke this op outside \
-        derived computation, from event handling or a reaction.
+        Cog cannot start turn \(String(reflecting: name)) while automatic cog \(cogName) is \
+        computing. Automatic computation may only read Cog state. Invoke this op outside \
+        automatic computation, from event handling or a reaction.
         """
       )
     }
   }
 
-  /// Runs one graph-owned turn without applying the public commit guard.
+  /// Runs one graph-owned turn without applying the public turn guard.
   ///
-  /// Async status publication originates from derived computation itself. It is
+  /// Async status publication originates from automatic computation itself. It is
   /// still a named turn, but it is not an application write and therefore may
   /// be requested while the async selector is on the computation path. This
   /// exception is internal-only: it must stage runtime-owned status, never
@@ -231,12 +205,12 @@ extension Cogs {
 
   /// Joins an accumulating turn, or runs one new outer turn through its flush.
   ///
-  /// Nested commits join the turn so a call tree still publishes atomically.
-  /// Sibling commits start separate turns. Commits during flush enter the FIFO
-  /// queue, allowing reaction write-back without reentrant propagation. Derived
-  /// computation rejects a commit before any of these paths run.
+  /// Nested turns join the turn so a call tree still publishes atomically.
+  /// Sibling turns start separate turns. Turns during flush enter the FIFO
+  /// queue, allowing reaction write-back without reentrant propagation. Automatic
+  /// computation rejects a turn before any of these paths run.
   internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
-    requireOutsideDerivedComputation(forTurnNamed: name)
+    requireOutsideAutomaticComputation(forTurnNamed: name)
 
     switch turnPhase {
     case .accumulating(let turn):
@@ -263,12 +237,12 @@ extension Cogs {
   /// Joins or runs one turn whose body cannot outlive this call.
   ///
   /// The same sequence as ``withTurn(_:_:)`` minus the one case that forces a
-  /// heap-allocated closure: a commit that arrives during a flush has to be
+  /// heap-allocated closure: a turn that arrives during a flush has to be
   /// stored and run later, and only an escaping body can be stored. Callers
   /// therefore test the phase first and route that case to `withTurn`, which is
   /// why reaching `.flushing` here is a Cog bug rather than a caller's mistake.
   ///
-  /// `requireOutsideDerivedComputation` is the caller's obligation, so the
+  /// `requireOutsideAutomaticComputation` is the caller's obligation, so the
   /// rejection message names the op rather than this seam.
   internal func withNonEscapingTurn(_ name: String, _ body: (CogTurn) -> Void) {
     switch turnPhase {
@@ -332,7 +306,7 @@ extension Cogs {
 
   /// Starts a new outer turn while the context is idle.
   ///
-  /// Only outer turns get a history entry and chain record; nested commits share
+  /// Only outer turns get a history entry and chain record; nested turns share
   /// their accumulating turn and therefore do not manufacture extra revisions.
   @discardableResult
   internal func startTurn(named name: String) -> CogTurn {
@@ -345,10 +319,10 @@ extension Cogs {
     turn.begin(id: CogTurnID(rawValue: nextTurnToken), name: name)
     turnPhase = .accumulating(turn)
 
-    // Record when the turn is created. Nested commits do not reach this point,
+    // Record when the turn is created. Nested turns do not reach this point,
     // and the entry precedes the work it caused.
     #if DEBUG
-    recordHistoryTurn(named: name)
+    arenaCore.recordHistoryTurn(named: name)
     turnChainTracker.recordTurn(named: name)
     #endif
 

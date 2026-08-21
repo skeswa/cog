@@ -28,7 +28,7 @@ import Testing
 }
 
 @MainActor
-@Test func `ArenaValueColumnInfrastructure keeps staged writes behind the commit boundary`() {
+@Test func `ArenaValueColumnInfrastructure keeps staged writes behind the turn boundary`() {
   let arena = CogArenaStorage()
   let column = CogArenaValueColumn<Int?>(in: arena, equals: ==)
   let slot = arena.allocate()
@@ -39,13 +39,13 @@ import Testing
   #expect(column.current(at: slot) == 7)
   #expect(column.writerValue(at: slot) == nil)
   #expect(column.hasPendingValue(at: slot))
-  #expect(column.commit(at: slot))
+  #expect(column.publish(at: slot))
   #expect(column.current(at: slot) == nil)
   #expect(!column.hasPendingValue(at: slot))
 }
 
 @MainActor
-@Test func `ArenaValueColumnInfrastructure commits only a descriptor level change`() {
+@Test func `ArenaValueColumnInfrastructure publishes only a descriptor level change`() {
   let arena = CogArenaStorage()
   var comparisons: [(String, String)] = []
   let column = CogArenaValueColumn<String>(
@@ -59,13 +59,13 @@ import Testing
   column.insert("Cog", at: slot)
 
   column.stage("COG", at: slot)
-  #expect(!column.commit(at: slot))
+  #expect(!column.publish(at: slot))
   #expect(column.current(at: slot) == "Cog")
   #expect(column.writerValue(at: slot) == "Cog")
   #expect(!column.hasPendingValue(at: slot))
 
   column.stage("Cogs", at: slot)
-  #expect(column.commit(at: slot))
+  #expect(column.publish(at: slot))
   #expect(column.current(at: slot) == "Cogs")
   #expect(comparisons.map { [$0.0, $0.1] } == [["Cog", "COG"], ["Cog", "Cogs"]])
 }

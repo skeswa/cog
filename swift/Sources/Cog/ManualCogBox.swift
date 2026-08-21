@@ -31,36 +31,12 @@
 /// closure are MainActor-isolated.
 ///
 /// Keys may be any `Hashable` type. Prefer a small domain type such as
-/// `ZipCode` or `Document.ID` over `String` or `Int`. The inline candidate
-/// stores the key as `AnyHashable`; the generic candidate keeps `Key` concrete
-/// through the public read surface and erases it only when the current simple
-/// core enters heterogeneous storage (perf §4).
+/// `ZipCode` or `Document.ID` over `String` or `Int`. A value reference stores
+/// its key inline as `AnyHashable` (perf §4).
 @MainActor
 public struct ManualCogBox<Value, Key: Hashable> {
   /// Stable declaration identity and behavior shared by every key and box copy.
   internal let descriptor: ManualCogDescriptor<Value>
-
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  /// A writable value reference that retains this box's concrete key type.
-  ///
-  /// Only the generic value-reference candidate exposes this inferred type.
-  /// The reference remains a stable descriptor-and-key name and stores no
-  /// context state. Runtime APIs erase the key only when the simple core files
-  /// heterogeneous state; `box[key]` itself retains specialized `Key` storage.
-  public struct ValueReference {
-    /// The declaration shared by every reference this box creates.
-    internal let descriptor: ManualCogDescriptor<Value>
-
-    /// The exact state key, in its declared concrete type.
-    internal let key: Key
-
-    /// Adapts the candidate to the class-state correctness core after a public
-    /// runtime API has received the specialized reference.
-    internal var simpleCoreReference: ManualCog<Value> {
-      ManualCog(descriptor: descriptor, key: CogKey(key))
-    }
-  }
-  #endif
 
   /// Declares a keyed source whose every key starts at `startingValue`.
   ///
@@ -228,15 +204,9 @@ public struct ManualCogBox<Value, Key: Hashable> {
   ///
   /// - Parameter key: Which of this declaration's values to name.
   /// - Returns: A writable value reference for that key.
-  #if COG_VALUE_REFERENCE_LAYOUT_GENERIC
-  public subscript(key: Key) -> ValueReference {
-    ValueReference(descriptor: descriptor, key: key)
-  }
-  #else
   public subscript(key: Key) -> ManualCog<Value> {
     ManualCog(descriptor: descriptor, key: CogKey(key))
   }
-  #endif
 
   /// Builds the descriptor shared by the per-key initializer overloads.
   ///

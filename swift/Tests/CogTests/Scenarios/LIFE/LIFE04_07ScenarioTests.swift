@@ -10,10 +10,10 @@ import Testing
 
 @MainActor
 @Test func `LIFE-04 a watcher returning within grace cancels the pending release`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let watcherAlive = ManualCog<Bool>(true)
   var selectorRuns = 0
-  let derived = Cog<Int> { _ in
+  let automatic = Cog<Int> { _ in
     selectorRuns += 1
     return 10
   }
@@ -23,20 +23,20 @@ import Testing
     whileObservedGrace: .seconds(10)
   )
   m.whenever(watcherAlive) { s in
-    s.run { c in _ = c[derived] }
+    s.run { c in _ = c[automatic] }
   }
   #expect(selectorRuns == 1)
   #expect(clock.activeSleeperCount == 0)
 
   // The watcher leaves. Grace begins, but the state is still here.
-  cogs.commit(watcherAlive, to: false)
+  cogs.turn(watcherAlive, to: false)
   try await clock.waitForScheduledSleep()
   #expect(clock.activeSleeperCount == 1)
   clock.advance(by: .seconds(6))
   #expect(clock.activeSleeperCount == 1)
 
   // The watcher comes back with time to spare. The deadline goes away with it.
-  cogs.commit(watcherAlive, to: true)
+  cogs.turn(watcherAlive, to: true)
   #expect(clock.activeSleeperCount == 0)
 
   // Well past the original deadline, and past a whole second grace window: a
@@ -46,13 +46,13 @@ import Testing
 
   // The returning watcher found the same live state, so nothing recomputed —
   // neither its own tracking run nor this read.
-  #expect(cogs.peek(derived) == 10)
+  #expect(cogs.peek(automatic) == 10)
   #expect(selectorRuns == 1)
 }
 
 @MainActor
 @Test func `LIFE-07 a registered reaction leases the cogs it reads`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let source = ManualCog<Int>(1)
   var leasedRuns = 0
   var unleasedRuns = 0
@@ -81,7 +81,7 @@ import Testing
   #expect(clock.activeSleeperCount == 1)
 
   let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextDerivedRelease(with: released)
+  cogs.acknowledgeNextAutomaticRelease(with: released)
   clock.advance(by: .seconds(10))
   try await released.wait()
   #expect(clock.activeSleeperCount == 0)
@@ -97,10 +97,10 @@ import Testing
 
 @MainActor
 @Test func `LIFE-07 a leased cog survives its own retracking`() async throws {
-  let clock = DerivedLifetimeTestClock()
+  let clock = AutomaticLifetimeTestClock()
   let source = ManualCog<Int>(1)
   var selectorRuns = 0
-  let derived = Cog<Int> { c in
+  let automatic = Cog<Int> { c in
     selectorRuns += 1
     return c[source] * 2
   }
@@ -110,19 +110,19 @@ import Testing
     whileObservedGrace: .seconds(10)
   )
   var observed: [Int] = []
-  m.run { c in observed.append(c[derived]) }
+  m.run { c in observed.append(c[automatic]) }
   #expect(observed == [2])
 
   // Waking the reaction retracks its dependencies. Retracking releases and
   // reacquires leases, so this is exactly where a lease could be dropped for
   // an instant and a grace window started by mistake.
-  cogs.commit { c in c[source] = 5 }
+  cogs.turn { c in c[source] = 5 }
   #expect(observed == [2, 10])
   #expect(clock.activeSleeperCount == 0)
   #expect(clock.maximumActiveSleeperCount == 0)
 
   clock.advance(by: .seconds(60))
   #expect(clock.activeSleeperCount == 0)
-  #expect(cogs.peek(derived) == 10)
+  #expect(cogs.peek(automatic) == 10)
   #expect(selectorRuns == 2)
 }

@@ -5,9 +5,9 @@ _Authored August 6, 2026._
 This example shows one small Android feature from end to end. It uses:
 
 - `ManualCog` for writable single values;
-- `Cog` for derived single values;
+- `Cog` for automatic single values;
 - `ManualCogBox` for writable keyed values;
-- `CogBox` for derived keyed values;
+- `CogBox` for automatic keyed values;
 - `AsyncCogBox` for keyed network work;
 - `CogEffects` for analytics and saved preferences;
 - direct Cog reads in Compose.
@@ -25,7 +25,7 @@ flowchart LR
     UI["WeatherScreen"] -->|"operations"| Store["App CogStore<br/>one per process"]
     Store --> Manual["ManualCog<br/>selected city · units"]
     Store --> ManualBox["ManualCogBox<br/>favorite · reload"]
-    Manual --> Derived["Cog<br/>title · refresh enabled"]
+    Manual --> Automatic["Cog<br/>title · refresh enabled"]
     ManualBox --> Box["CogBox<br/>city label"]
     Manual --> Async["AsyncCogBox<br/>forecast by city"]
     ManualBox --> Async
@@ -118,9 +118,9 @@ val isFavorite = favoriteSource.readOnly
 ```
 
 The first three public values are manual state. They change only through a
-commit.
+turn.
 
-Now add normal derived state:
+Now add normal automatic state:
 
 ```kotlin
 val selectedTitle = Cog {
@@ -134,7 +134,7 @@ val cityLabel = CogBox<String, CityId> { cityId ->
 }
 ```
 
-`selectedTitle` is one derived value. `cityLabel` is one derived
+`selectedTitle` is one automatic value. `cityLabel` is one automatic
 descriptor with a separate state for each city key.
 
 The forecast is async and keyed:
@@ -161,7 +161,7 @@ The selector reads all Cog inputs before suspension. A unit change restarts
 each live forecast. A reload change restarts only its keyed forecast.
 `Latest` cancels old work. A generation guard also blocks a late result.
 
-Normal cogs can derive from async cogs:
+Automatic cogs can read async cogs:
 
 ```kotlin
 val selectedForecast = Cog {
@@ -181,7 +181,7 @@ The operations are the only write path:
 fun CogStore.installWeather(
     repository: WeatherRepository,
     preferences: WeatherPreferences,
-) = commit("install weather") {
+) = turn("install weather") {
     repositorySource.value = repository
     selectedCitySource.value = preferences.selectedCity
     unitsSource.value = preferences.units
@@ -193,28 +193,28 @@ fun CogStore.installWeather(
 }
 
 fun CogStore.selectCity(city: CityId) =
-    commit("select city") {
+    turn("select city") {
         selectedCitySource.value = city
     }
 
 fun CogStore.setUnits(value: Units) =
-    commit("set weather units") {
+    turn("set weather units") {
         unitsSource.value = value
     }
 
 fun CogStore.toggleFavorite(city: CityId) =
-    commit("toggle favorite") {
+    turn("toggle favorite") {
         favoriteSource[city] = !favoriteSource[city]
     }
 
 fun CogStore.refreshSelectedCity() =
-    commit("refresh selected city") {
+    turn("refresh selected city") {
         val city = get(selectedCity)
         reloadSource[city] += 1
     }
 ```
 
-Writer reads see values already staged in the same commit. No public caller can
+Writer reads see values already staged in the same turn. No public caller can
 write `repositorySource`, `selectedCitySource`,
 `favoriteSource`, or `reloadSource`.
 
@@ -499,7 +499,7 @@ coroutine.
 
 ## 5. What happens on a tap
 
-Selecting London starts one turn. That turn changes the selected city. Derived
+Selecting London starts one turn. That turn changes the selected city. Automatic
 state, async work, effects, and UI then react to the completed turn.
 
 ```mermaid
@@ -513,16 +513,16 @@ sequenceDiagram
     participant R as Repository
 
     U->>VM: selectCity(London)
-    VM->>S: commit("select city")
+    VM->>S: turn("select city")
     S-->>C: selection, title, and keyed read changed
     S->>A: restart London forecast
-    A->>S: commit loading phase
+    A->>S: turn loading phase
     S-->>C: phase is loading
     A->>R: forecast(London, units)
     S->>E: opened city and preferences changed
     E->>R: save preferences
     R-->>A: London forecast
-    A->>S: commit async result
+    A->>S: publish async result
     S-->>C: forecast phase changed
 ```
 
@@ -536,8 +536,8 @@ gets another later turn.
 | -------------------- | --------------------------------------- |
 | `selectedCitySource` | writable single state                   |
 | `favoriteSource`     | writable state per city                 |
-| `selectedTitle`      | cached single derivation                |
-| `cityLabel`          | cached derivation per city              |
+| `selectedTitle`      | cached single automatic value           |
+| `cityLabel`          | cached automatic value per city         |
 | `forecast`           | keyed async work and phase              |
 | operations           | named, atomic writes                    |
 | effects              | analytics and durable preference writes |

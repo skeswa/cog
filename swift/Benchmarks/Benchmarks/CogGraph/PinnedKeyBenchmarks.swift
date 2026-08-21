@@ -25,7 +25,7 @@ enum PinnedKeyHarness {
   /// The keyed source a turn writes.
   static let rowSourceCogs = ManualCogBox<Int, Int>(0, name: "perf.pinned.source")
 
-  /// One derived consumer per row, so a write actually propagates to a
+  /// One automatic consumer per row, so a write actually propagates to a
   /// boundary rather than stopping at the source.
   static let rowCogs = CogBox<Int, Int>(
     { c, key in c[PinnedKeyHarness.rowSourceCogs[key]] &+ key },
@@ -64,7 +64,7 @@ enum PinnedKeyHarness {
   static func runLiveKeyTurns(_ count: Int, pinnedKeyCount: Int) {
     guard let cogs = contexts[pinnedKeyCount] else { return }
     for iteration in 1...max(count, 1) {
-      cogs.commit(rowSourceCogs[liveKey], to: iteration, name: "perf.pinned.turn")
+      cogs.turn(rowSourceCogs[liveKey], to: iteration, name: "perf.pinned.turn")
       blackHole(cogs[rowCogs[liveKey]])
     }
   }
@@ -113,9 +113,9 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
   // PERF-11. The same turn beside one pinned key and beside a thousand. PERF-07
   // above pins the traffic against drift at three sizes; this pair exists to
   // make the *slope* the thing under test, because O(pinned keys) is a claim
-  // about shape and no single number can carry it. `M9-06` commits the static
+  // about shape and no single number can carry it. `M9-06` turns the static
   // ceiling that holds the thousand-key shape to the one-key cost.
-  // The thousand-key shape carries a committed p90 ceiling rather than a drift
+  // The thousand-key shape carries a published p90 ceiling rather than a drift
   // tolerance, because the claim is absolute: a turn beside a thousand pinned
   // keys costs what a turn beside one costs. The ceiling sits just above the
   // one-key measurement `M9-06` recorded, so a returning slope fails while it

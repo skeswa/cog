@@ -1,11 +1,9 @@
-#if COG_CORE_ARENA
-
 // MARK: - Reactions
 
 /// Reaction terminal allocation, dependency capture, leasing, and settlement.
 ///
 /// A reaction remains closure-backed at the context boundary while this
-/// extension gives it a scalar terminal in the same edge topology as derived
+/// extension gives it a scalar terminal in the same edge topology as automatic
 /// values. Its buffers retain their high-water capacity across runs.
 extension CogArenaCore {
   /// Allocates one value-less terminal row for a reaction registration.
@@ -21,7 +19,7 @@ extension CogArenaCore {
 
   /// Reconciles one reaction terminal's ordered arena dependency prefix.
   ///
-  /// Nested derived settlement temporarily pushes selector captures above this
+  /// Nested automatic settlement temporarily pushes selector captures above this
   /// one. The generated slot therefore participates in the same concrete edge
   /// storage without a class-backed bridge or a second selector run.
   func captureReactionDependencies<Result>(
@@ -48,24 +46,24 @@ extension CogArenaCore {
     _ = requireReactionRow(reaction)
     scratch.removeAll(keepingCapacity: true)
 
-    var cursor = edges.firstDependency(of: reaction.index, in: arena)
+    var cursor = arena.deps[liveRow(reaction.index)]
     while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == reaction.index else {
+      let dependency = edges.edge(at: cursor)
+      guard dependency.sub == reaction.index else {
         fatalError("Cog found another consumer's edge in an arena reaction lease list.")
       }
-      let producerRow = liveRow(dependency.producer)
+      let producerRow = liveRow(dependency.dep)
       let record = descriptorRecord(forRow: producerRow)
       if case .whileObserved = record.lifetime {
         let producer = CogArenaSlot(
-          index: dependency.producer,
+          index: dependency.dep,
           generation: arena.generation[producerRow]
         )
         if !scratch.contains(producer) {
           scratch.append(producer)
         }
       }
-      cursor = dependency.next
+      cursor = dependency.nextDep
     }
 
     for producer in scratch where !current.contains(producer) {
@@ -111,9 +109,9 @@ extension CogArenaCore {
   /// Settles a reaction's arena producers and reports whether its body must run.
   ///
   /// Producer slots are copied into reused storage before pulls begin because a
-  /// derived recomputation may recapture other lists in the shared edge pool.
+  /// automatic recomputation may recapture other lists in the shared edge pool.
   /// Equal recomputations leave their older `changedAt`, allowing this terminal
-  /// to backdate and stay quiet exactly like an ordinary derived consumer.
+  /// to backdate and stay quiet exactly like an ordinary automatic consumer.
   func settleReactionDependencies(_ reaction: CogArenaSlot, in cogs: Cogs) -> Bool {
     let reactionRow = requireReactionRow(reaction)
     guard needsSettlement(reactionRow) else { return false }
@@ -122,23 +120,23 @@ extension CogArenaCore {
     }
     defer { reactionPullRoots.removeAll(keepingCapacity: true) }
 
-    var cursor = edges.firstDependency(of: reaction.index, in: arena)
+    var cursor = arena.deps[liveRow(reaction.index)]
     while cursor != .none {
-      let dependency = edges.dependency(at: cursor)
-      guard dependency.consumer == reaction.index else {
+      let dependency = edges.edge(at: cursor)
+      guard dependency.sub == reaction.index else {
         fatalError("Cog found another consumer's edge in an arena reaction list.")
       }
-      let producerRow = liveRow(dependency.producer)
+      let producerRow = liveRow(dependency.dep)
       if needsSettlement(producerRow) {
         let record = descriptorRecord(forRow: producerRow)
         guard record.kind != .manual else {
           fatalError("Cog found an unsettled manual source behind an arena reaction.")
         }
         reactionPullRoots.append(
-          CogArenaSlot(index: dependency.producer, generation: arena.generation[producerRow])
+          CogArenaSlot(index: dependency.dep, generation: arena.generation[producerRow])
         )
       }
-      cursor = dependency.next
+      cursor = dependency.nextDep
     }
 
     for producer in reactionPullRoots {
@@ -168,7 +166,7 @@ extension CogArenaCore {
     guard !captures.contains(where: { $0.consumer == reaction }) else {
       fatalError("Cog tried to release an arena reaction during dependency capture.")
     }
-    guard edges.firstSubscriber(of: reaction.index, in: arena) == .none else {
+    guard arena.subs[liveRow(reaction.index)] == .none else {
       fatalError("Cog found subscribers on an arena reaction terminal.")
     }
     guard arena.leaseCount[row] == 0 else {
@@ -182,6 +180,9 @@ extension CogArenaCore {
   }
 
   /// Reads and records one manual dependency for the active arena selector.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func read<Value>(
     _ valueReference: ManualCog<Value>,
     for consumer: CogArenaSlot
@@ -192,14 +193,17 @@ extension CogArenaCore {
     return producer.column.current(at: producer.slot)
   }
 
-  /// Pulls, reads, and records one derived dependency for the active selector.
+  /// Pulls, reads, and records one automatic dependency for the active selector.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func read<Value>(
     _ valueReference: Cog<Value>,
     for consumer: CogArenaSlot,
     in cogs: Cogs
   ) -> Value {
     requireTracking(consumer)
-    let producer = derivedLocation(for: valueReference)
+    let producer = automaticLocation(for: valueReference)
     settle(producer.slot, in: cogs)
     requireTracking(consumer)
     recordDependency(from: consumer, on: producer.slot)
@@ -221,7 +225,10 @@ extension CogArenaCore {
     return producer.column.status(at: producer.slot)
   }
 
-  /// Previous completed value of the active derived selector, if one exists.
+  /// Previous completed value of the active automatic selector, if one exists.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
   func previousValue<Value>(for consumer: CogArenaSlot, as: Value.Type) -> Value? {
     requireTracking(consumer)
     let row = arena.index(of: consumer)
@@ -233,6 +240,9 @@ extension CogArenaCore {
   }
 
   /// Requires `consumer` to own the innermost active dependency capture.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
   func requireTracking(_ consumer: CogArenaSlot) {
     guard captures.last?.consumer == consumer else {
       fatalError("A Cog reader is valid only inside the selector run that handed it out.")
@@ -251,4 +261,3 @@ extension CogArenaCore {
     return row
   }
 }
-#endif

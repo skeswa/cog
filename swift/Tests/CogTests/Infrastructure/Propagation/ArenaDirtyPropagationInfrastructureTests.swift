@@ -7,7 +7,7 @@ import Testing
 // machinery before the public runtime switches cores.
 
 @MainActor
-@Test func `ArenaDirtyPropagationInfrastructure commits a source then pushes dirty and check`() {
+@Test func `ArenaDirtyPropagationInfrastructure publishes a source then pushes dirty and check`() {
   let arena = CogArenaStorage()
   let edges = CogLinkedEdgePool()
   let propagation = CogArenaDirtyPropagation(arena: arena, edges: edges)
@@ -39,7 +39,7 @@ import Testing
   #expect(arena.flags[arena.index(of: directConsumer)] == .occupied)
   #expect(arena.flags[arena.index(of: downstreamConsumer)] == .occupied)
 
-  #expect(values.commitSource(at: source, revision: 7, propagatingWith: propagation))
+  #expect(values.publishSource(at: source, revision: 7, propagatingWith: propagation))
 
   let sourceRow = arena.index(of: source)
   #expect(values.current(at: source) == 2)
@@ -75,7 +75,7 @@ import Testing
   values.stage(11, at: source)
   values.stage(10, at: source)
 
-  #expect(!values.commitSource(at: source, revision: 1, propagatingWith: propagation))
+  #expect(!values.publishSource(at: source, revision: 1, propagatingWith: propagation))
   #expect(values.current(at: source) == 10)
   #expect(!values.hasPendingValue(at: source))
   #expect(arena.changedAt[arena.index(of: source)] == 0)

@@ -50,7 +50,7 @@ import Testing
   #expect(cogs.peek(conditional) == 42)
   #expect(diagnostic == nil)
 
-  cogs.commit { c in c[closesCycle] = true }
+  cogs.turn { c in c[closesCycle] = true }
 
   #expect(cogs.peek(conditional) == -1)
   #expect(diagnostic?.path == ["conditional", "conditional"])

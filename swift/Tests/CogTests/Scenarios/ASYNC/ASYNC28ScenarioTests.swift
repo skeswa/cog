@@ -30,7 +30,7 @@ private final class Async28ControlledWork {
 }
 
 @MainActor
-@Test func `ASYNC-28 an initial UI value read does not reenter derived computation`()
+@Test func `ASYNC-28 an initial UI value read does not reenter automatic computation`()
   async throws
 {
   let cogs = Cogs.forTesting()

@@ -66,7 +66,7 @@ private final class Async07WorkProbe {
   #expect(Set(initialStarts.map(\.name)) == ["default", "explicit"])
   #expect(initialStarts.allSatisfy { $0.request == 0 })
 
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
 
   let cancelled = [await cancellationIterator.next(), await cancellationIterator.next()]
     .compactMap { $0 }
@@ -93,7 +93,7 @@ private final class Async07WorkProbe {
   var cancellationIterator = probe.cancellations.makeAsyncIterator()
 
   #expect(await startIterator.next() == Async07RunEvent(name: "forecast", request: 0))
-  cogs.commit("change request") { c in c[request] = 1 }
+  cogs.turn("change request") { c in c[request] = 1 }
   #expect(await cancellationIterator.next() == Async07RunEvent(name: "forecast", request: 0))
   #expect(await startIterator.next() == Async07RunEvent(name: "forecast", request: 1))
 

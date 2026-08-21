@@ -11,7 +11,7 @@ package enum CogGraphReceiverKind: Equatable, Sendable {
   /// A tracked reaction's inferred or explicitly typed reader.
   case reactionReader
 
-  /// A commit closure's inferred or explicitly typed writer.
+  /// A turn closure's inferred or explicitly typed writer.
   case writer
 
   /// A mechanism `operate` parameter or `whenever` child controller.
@@ -224,7 +224,7 @@ private final class CogCallReceiverVisitor: SyntaxVisitor {
     super.init(viewMode: .sourceAccurate)
   }
 
-  /// Recognizes `commit`, mechanism `run`, and mechanism `whenever` closures.
+  /// Recognizes `turn`, mechanism `run`, and mechanism `whenever` closures.
   override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
     guard let member = node.calledExpression.as(MemberAccessExprSyntax.self),
       let baseName = receiverBaseName(member.base),
@@ -240,7 +240,7 @@ private final class CogCallReceiverVisitor: SyntaxVisitor {
     let kind: CogGraphReceiverKind
     let token: TokenSyntax?
     switch method {
-    case "commit":
+    case "turn":
       kind = .writer
       token = closureParameterTokens(in: closure).first(where: { $0.text == "c" })
     case "run" where base.kind == .mechanismController:
