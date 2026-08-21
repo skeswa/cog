@@ -254,7 +254,7 @@ https://skeswa.github.io/cog/documentation/cog/primitivesonlyinops
 
 - Each rule has an article in `Cog.docc` — the violation, why the convention
   exists, the conforming rewrite, and the rule's accepted evasions — published
-  with the matching Cog tag through the existing `swift-docs.yml` Pages
+  with the matching Cog tag through the existing `docs.yml` Pages
   pipeline. The diagnostic is the teaching moment; the page is the lesson.
   This is the same posture as
   Cog's runtime diagnostics (the cycle path, the escaped-writer message):

@@ -281,6 +281,8 @@ Key metrics:
 One number is not enough. Report median and tail values and keep raw benchmark
 output.
 
+<a id="9-spike-and-benchmark-plan"></a>
+
 ## 9. Spike and benchmark plan
 
 ### 9.1 Correctness corpus

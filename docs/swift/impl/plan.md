@@ -121,11 +121,14 @@ cog/                                  (git root = SwiftPM package root)
 ├── .swift-format
 ├── .github/workflows/
 │   ├── swift-ci.yml                  # path-filtered for all Swift inputs
-│   ├── swift-docs.yml                # DocC → GitHub Pages, on tag push
+│   ├── docs.yml                      # DocC + VitePress → GitHub Pages
 │   └── markdown.yml                  # oxfmt --check, ubuntu, *.md paths
+├── package.json                      # docs-site deps only; never SwiftPM's
 ├── tools/
-│   └── check-task-ledger.mjs         # plan/task/scenario alignment + task DAG
+│   ├── check-task-ledger.mjs         # plan/task/scenario alignment + task DAG
+│   └── assemble-docs-site.mjs        # merges DocC + VitePress into one site
 ├── docs/                             # living design and implementation docs
+│   └── .vitepress/                   # the site that publishes them
 ├── swift/
 │   ├── Sources/
 │   │   ├── Cog/                      # the library; Cog.docc/ catalog inside
@@ -886,8 +889,11 @@ a graph, measured headlessly and again through a real SwiftUI interface.
   `CHANGELOG.md` calls out breaking changes per minor. No `@frozen`, no
   stability promises before 1.0.
 - Docs: publish DocC to GitHub Pages through the env-gated swift-docc-plugin in
-  `swift-docs.yml` on tag push (`upload-pages-artifact` plus
-  `deploy-pages`); URL `https://skeswa.github.io/cog/documentation/cog/`.
+  `docs.yml` (`upload-pages-artifact` plus `deploy-pages`); URL
+  `https://skeswa.github.io/cog/documentation/cog/`. That workflow merges the
+  archive with the VitePress site built from `docs/` and publishes both as one
+  deployment, always building the archive from the newest release tag so the
+  reference describes released code.
   M8 rule diagnostics use permanent native article URLs beneath that prefix;
   the six exact paths are fixed in lint.md §7 and require no redirect layer.
   Fallback: `xcodebuild docbuild` plus `docc process-archive`, which needs

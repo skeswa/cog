@@ -31,8 +31,8 @@ internal design must keep the common API simple.
 
 ## The documents
 
-The design lives in [design/](./design/); the implementation effort lives in
-[impl/](./impl/). Read them in this order:
+The design lives beside this file in `design/`; the implementation effort
+lives in `impl/`. Read them in this order:
 
 1. **[dump-2026-08-06.md](../dump-2026-08-06.md): history.** Frozen notes from
    the Dart and Flutter design. They explain the original problems but do not
@@ -85,6 +85,11 @@ The design lives in [design/](./design/); the implementation effort lives in
     typed frontier can recover the arena core's measured specialization
     ceiling with stable Swift, the ranked alternatives, and the staged proof
     plan with go/no-go gates.
+
+This list is the source of truth for reading order, and the sidebar on
+[the published site](https://skeswa.github.io/cog/swift/) mirrors it by hand in
+`docs/.vitepress/navigation.mts`. A document added here belongs there in the
+same revision.
 
 ## Building and testing
 

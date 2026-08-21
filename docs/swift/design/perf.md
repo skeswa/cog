@@ -297,7 +297,7 @@ argument this document exists to make. They now live next door:
 - [impl/optimization.md](../impl/optimization.md) — profiler attribution: where
   the time actually goes, and what each change bought. A different instrument
   from the suite, so a different document.
-- [`swift/Benchmarks/README.md`](../../../swift/Benchmarks/README.md) — how to
+- [`swift/Benchmarks/README.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md) — how to
   run any of it, and how a committed threshold is encoded.
 
 What stays here is the design: the cost order, the representation, the ARC and

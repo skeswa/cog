@@ -207,6 +207,8 @@ A good effect test should:
 Also test cancellation, an error, and a dependency that switches at runtime.
 Do not use real delays.
 
+<a id="67-work-that-outlives-the-screen-or-process"></a>
+
 ### 6.7 Work that outlives the screen or process
 
 Use WorkManager when work must run after the screen and may need to resume

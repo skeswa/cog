@@ -198,7 +198,7 @@ harness at 1.36.2 and, transitively, `malloc-interposer` 1.4.0 — the backend
 every malloc threshold depends on.
 
 This is a different file from the **root** `Package.resolved`, which must never
-be committed and which `swift-docs.yml` fails the build over.
+be committed and which `docs.yml` fails the build over.
 
 ## Baselines
 

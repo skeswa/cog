@@ -117,12 +117,12 @@ const CASES = [
   },
   {
     name: "the Pages deploy exception is granted, and only to its own job",
-    workflow: resolve(FIXTURES, "swift-docs.yml"),
+    workflow: resolve(FIXTURES, "docs.yml"),
     checks: [],
   },
   {
     name: "the Pages exception does not stretch to extra scopes, other jobs, or the mini",
-    workflow: resolve(FIXTURES, "pages-exception-abused/swift-docs.yml"),
+    workflow: resolve(FIXTURES, "pages-exception-abused/docs.yml"),
     checks: ["least-privilege-permissions", "self-hosted-guard"],
     mentions: ["`deploy`", "contents: write", "`smuggler`", "`deploy-mini`", "pages: write"],
   },

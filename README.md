@@ -93,6 +93,11 @@ authoritative command list. Maintainer-only details live in the
 
 ## Documentation
 
+Everything below is published as a website at
+**[skeswa.github.io/cog](https://skeswa.github.io/cog/)**, with search and
+navigation, alongside the generated API reference. The same documents are
+readable in this repository.
+
 - **[CHANGELOG.md](./CHANGELOG.md):** what changed in each Swift release, and
   what a 0.x minor is allowed to break.
 - **[CONTRIBUTING.md](./CONTRIBUTING.md):** local setup, verification, test

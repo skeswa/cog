@@ -57,6 +57,25 @@ listed by `mise tasks`.
 - Performance claims require the guarded benchmark commands and an environment
   recorded beside every durable number.
 
+## The documentation site
+
+`docs/` is published at [skeswa.github.io/cog](https://skeswa.github.io/cog/)
+by a VitePress site whose configuration lives in `docs/.vitepress/`. Working on
+it needs the repository's only npm dependency tree — the Swift package itself
+still resolves with none:
+
+```sh
+npm ci
+mise run docs:dev       # hot-reloading local site
+mise run docs:build     # production build; fails on any dead link
+mise run docs           # the whole site, DocC reference included
+```
+
+`mise run docs:build` treats a broken cross-document link as a build failure, so
+run it after moving or renaming a document. Adding a document means adding it to
+the sidebar in `docs/.vitepress/navigation.mts` as well as to the platform
+README that lists the reading order.
+
 ## Documentation and plans
 
 The Swift design documents are normative for behavior. `impl/plan.md` owns
