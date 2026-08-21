@@ -284,18 +284,47 @@ run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-check"
 description = "Prove the absolute benchmark threshold gate rejects a regression"
 run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-sentinel"
 
-# The DocC archive. swift-docc-plugin is env-gated behind `COG_DOCC=1` so that
-# an ordinary consumer resolves this package with no dependencies at all; that
-# gate is exactly why the docs build needs a task of its own rather than a
-# remembered incantation.
+# The published documentation site has two halves that are built by different
+# toolchains and merged into one GitHub Pages deployment.
 #
-# Two details are not optional. `--hosting-base-path cog` is what makes the
-# archive work under `skeswa.github.io/cog/` instead of a root domain. And the
-# resolve writes a `Package.resolved` carrying the plugin's pins next to
-# `Package.swift`, which must never be committed — the task deletes it, and
-# `swift-docs.yml` fails the build if one survives anyway.
+# `docs:api` is the DocC archive — the generated reference for the shipping
+# Swift library. `docs:build` is the VitePress site over `docs/`, which is
+# where the design and implementation record lives. `docs` runs both and
+# assembles them; see `tools/assemble-docs-site.mjs` for why one deployment has
+# to contain both.
+#
+# swift-docc-plugin is env-gated behind `COG_DOCC=1` so that an ordinary
+# consumer resolves this package with no dependencies at all; that gate is
+# exactly why the DocC build needs a task of its own rather than a remembered
+# incantation.
+#
+# Three details are not optional. `--hosting-base-path cog` is what makes the
+# archive work under `skeswa.github.io/cog/` instead of a root domain, and the
+# VitePress `base` has to agree with it. The resolve writes a `Package.resolved`
+# carrying the plugin's pins next to `Package.swift`, which must never be
+# committed — the task deletes it, and `docs.yml` fails the build if one
+# survives anyway.
+#
+# And `--experimental-transform-for-static-hosting-with-content` is what gives
+# each page an identity. Without it every one of the ~250 route files is a
+# byte-identical single-page-app shell titled "Documentation", so anything that
+# does not run JavaScript — a search crawler, a link unfurl in Slack or
+# Messages, a reader with scripting off — sees nothing at all, while the
+# VitePress half of the same site has real titles and real text. With it each
+# file carries its own `<title>`, a `<meta name="description">`, and the whole
+# article inside `<noscript>`, and the app still hydrates over the top as
+# before. This is about being readable and linkable, not about matching the
+# site's appearance: DocC keeps its own look deliberately.
+#
+# The flag is experimental, so `tools/assemble-docs-site.mjs` asserts the
+# content actually arrived rather than trusting that it did.
 
 [tasks."docs"]
+description = "Build the whole documentation site: DocC, VitePress, and the merge"
+depends = ["docs:api", "docs:build"]
+run = "node {{config_root}}/tools/assemble-docs-site.mjs"
+
+[tasks."docs:api"]
 description = "Build the Cog DocC archive into .build/docs"
 run = """
 set -euo pipefail
@@ -309,7 +338,25 @@ COG_DOCC=1 swift package \
   --target Cog \
   --disable-indexing \
   --transform-for-static-hosting \
+  --experimental-transform-for-static-hosting-with-content \
   --hosting-base-path cog \
   --output-path "{{config_root}}/.build/docs/Cog.doccarchive"
 rm -f "{{config_root}}/Package.resolved"
 """
+
+# The VitePress half. These shell out to the locally installed `vitepress`
+# binary rather than through an npm script, matching how every other task here
+# invokes its tool directly. `npm ci` must have run first; the site is the only
+# thing in this repository with a dependency tree.
+
+[tasks."docs:build"]
+description = "Build the VitePress documentation site from docs/"
+run = "{{config_root}}/node_modules/.bin/vitepress build {{config_root}}/docs"
+
+[tasks."docs:dev"]
+description = "Serve the VitePress documentation site with hot reload"
+run = "{{config_root}}/node_modules/.bin/vitepress dev {{config_root}}/docs"
+
+[tasks."docs:preview"]
+description = "Preview the built VitePress site without the DocC half"
+run = "{{config_root}}/node_modules/.bin/vitepress preview {{config_root}}/docs"

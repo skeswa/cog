@@ -69,7 +69,7 @@ The topology:
   installed applications and asks each toolchain for its identity, which is
   the only selection that works in both lanes. Changing the pin means changing
   `COG_XCODE_VERSION` and `COG_XCODE_BUILD` in `swift-ci.yml`, in
-  `swift-docs.yml`, and this record together.
+  `docs.yml`, and this record together.
 
   **A full Xcode is required; the Command Line Tools are not enough.** CLT
   carries `swift` and `swift-format`, so building and linting succeed, but
@@ -226,7 +226,7 @@ blocks, `persist-credentials: false`, and job timeouts — lives in the
 workflows themselves and is enforced by `mise run workflows:check`.
 
 That contract allows exactly one write grant, and it is written down rather
-than waived: the `deploy` job of `swift-docs.yml` holds `pages: write` and
+than waived: the `deploy` job of `docs.yml` holds `pages: write` and
 `id-token: write`, because GitHub Pages cannot be published with a read-only
 token. Two things bound it. The exception names that one file, that one job id,
 and those two scopes in `PERMISSION_EXCEPTIONS`
@@ -236,3 +236,51 @@ GitHub-hosted job, so a write-scoped token never reaches the persistent Mac
 mini — moving that job to `cog-mini` turns the exception off rather than
 carrying it along. Fixtures cover both the granted case and each way of
 overreaching it.
+
+## The documentation site
+
+`docs.yml` publishes `skeswa.github.io/cog/`. It replaced `swift-docs.yml`,
+which published the DocC archive alone.
+
+A repository gets one GitHub Pages deployment and `actions/deploy-pages`
+replaces it wholesale, so the site's two halves — the VitePress site built from
+`docs/` and the DocC archive built from the Swift sources — are merged into one
+artifact by `tools/assemble-docs-site.mjs` before publication. That script's
+header records why the overlay is safe and which routes it asserts.
+
+Four jobs, in the order they run:
+
+| Job          | Runner        | Does                                                                             |
+| ------------ | ------------- | -------------------------------------------------------------------------------- |
+| `docc-cache` | hosted ubuntu | Resolves the newest release tag and asks whether a DocC archive for it is cached |
+| `docc`       | `cog-mini`    | Builds that archive — **only on a cache miss**                                   |
+| `assemble`   | hosted ubuntu | Installs npm dependencies, builds VitePress, merges, uploads the Pages artifact  |
+| `deploy`     | hosted ubuntu | Publishes the artifact, and nothing else                                         |
+
+Three properties of that split are deliberate.
+
+**The API reference always describes a release, never `main`.** The `docc` job
+checks out the newest release tag rather than the commit being published, so
+pushing prose to `main` republishes the site around an unchanged API reference.
+This preserves what `M4-05c` guaranteed when deployment was tag-gated.
+
+**An ordinary documentation change does not wake the Mac mini.** `docc-cache`
+runs on a hosted runner and only probes the cache; the mini is scheduled solely
+on a miss. A cache entry is scoped to the ref that created it, so the first push
+to `main` after a release misses and rebuilds once, and every push after that
+hits.
+
+**The job that runs third-party code is not the job that holds the token.**
+`assemble` executes `npm ci`, so it is deliberately read-only; `deploy` holds
+the `pages: write` and `id-token: write` grant and consists of a single action
+invocation with no repository code in it.
+
+`docs.yml` has no `paths:` filter, and should not gain one. GitHub applies path
+filters to tag pushes as well as branch pushes, and a release tag usually points
+at a commit whose diff touches nothing under `docs/`, so the filter would
+silently skip the release publish — the one run that must never be skipped.
+
+If the site is ever published without its API reference, `assemble` has failed
+to find the archive; re-running the workflow rebuilds it on the mini. The merge
+script fails closed rather than deploying a site that 404s its own
+`documentation/cog/` routes.

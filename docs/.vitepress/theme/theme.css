@@ -1,0 +1,75 @@
+/*
+ * A light touch over the default theme: the documents are long and reference-
+ * shaped, so the changes here buy reading width and calmer diagrams rather
+ * than a new visual identity.
+ */
+
+:root {
+  /* Several documents carry wide tables — `docs/swift/impl/plan.md` has rows
+     well past 300 columns — and the stock 688px content column forces those
+     into a cramped horizontal scroll. */
+  --vp-layout-max-width: 1520px;
+  --content-width: 900px;
+}
+
+.VPDoc.has-aside .content-container {
+  max-width: var(--content-width);
+}
+
+/* Mermaid renders into an SVG that carries its own colours, so it needs a
+   frame of its own rather than inheriting the prose styles around it. */
+.mermaid-diagram {
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background-color: var(--vp-c-bg-soft);
+  overflow-x: auto;
+}
+
+.mermaid-diagram__output {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-diagram__output svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mermaid sizes each label box from the text it measures in the DOM, and these
+   diagrams render inside `.vp-doc`, where `p` carries a 16px margin and a 28px
+   line-height meant for prose. Left alone, a two-line node label — the Kotlin
+   diagrams use `<br/>` in several — is laid out at prose metrics and overflows
+   the box mermaid drew for it, clipping the second line.
+ 
+   Neutralising the prose typography inside the diagram fixes measurement and
+   painting together, because the rule is in effect before mermaid measures.
+   These are plain descendant selectors on purpose: `:deep()` is Vue
+   scoped-style syntax and is silently dropped from an ordinary stylesheet. */
+.mermaid-diagram svg p,
+.mermaid-diagram svg div,
+.mermaid-diagram svg span,
+.mermaid-diagram foreignObject p,
+.mermaid-diagram foreignObject div,
+.mermaid-diagram foreignObject span {
+  margin: 0;
+  padding: 0;
+  line-height: normal;
+}
+
+.mermaid-diagram__status {
+  margin: 0;
+  text-align: center;
+  color: var(--vp-c-text-3);
+  font-size: 14px;
+}
+
+.mermaid-diagram__error {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+}
+
+.mermaid-diagram__error p {
+  margin: 0 0 8px;
+}

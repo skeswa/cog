@@ -53,7 +53,7 @@ const READ_ONLY_PERMISSIONS = new Set(["read", "none"]);
  */
 const PERMISSION_EXCEPTIONS = new Map([
   [
-    "swift-docs.yml",
+    "docs.yml",
     new Map([
       [
         "deploy",

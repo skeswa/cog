@@ -8,7 +8,7 @@ This is attribution work, and it is a different instrument from the benchmark
 suite. A benchmark counts a cost at a boundary; the entries here open that
 boundary and say which call sites the cost belongs to — with `sample`, with
 `xctrace`, and with the purpose-built probe packages under
-[`swift/Benchmarks/probes/`](../../../swift/Benchmarks/probes). That is why they
+[`swift/Benchmarks/probes/`](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/probes). That is why they
 live apart from [benchmarks.md](./benchmarks.md), which records what the suite
 measured, and from [design/perf.md](../design/perf.md), which owns the rules this
 work exists to satisfy. Bare section references such as `perf §5` resolve in the
@@ -38,7 +38,7 @@ measurement lies. Recording is armed for exactly one turn after two hundred
 warm-up turns, so every count below is one turn's cost rather than an average.
 Leaf time comes from `sample` at 1 ms over a six-second window. The harness and
 its exact commands are recorded in
-[`swift/Benchmarks/probes/M9-01-call-site-attribution.md`](../../../swift/Benchmarks/probes/M9-01-call-site-attribution.md).
+[`swift/Benchmarks/probes/M9-01-call-site-attribution.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/probes/M9-01-call-site-attribution.md).
 
 The method reproduces every recorded count it overlaps: seven mallocs for a
 simple-core steady turn (`M5-06`), five for the arena (`M6-11c`), and one retain

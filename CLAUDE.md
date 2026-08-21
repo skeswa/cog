@@ -82,8 +82,8 @@ keep milestone state there rather than copying it into this instruction file.
   compile-fail
   fixtures, and the ledger check, in a self-hosted lane and a GitHub-hosted
   fork lane, plus the manual candidate artifact's downloaded-byte proof on a
-  hosted Intel runner), `swift-docs.yml` (the DocC archive on the mini, published to
-  GitHub Pages from a hosted job on tag push), and `markdown.yml` (Oxfmt and
+  hosted Intel runner), `docs.yml` (the DocC archive on the mini, the
+  VitePress site on a hosted runner, merged and published to GitHub Pages), and `markdown.yml` (Oxfmt and
   the workflow-contract check on GitHub-hosted ubuntu).
 - `mise.toml`, `.oxfmtrc.json`, `.swift-format`, `.gitignore`, `LICENSE` —
   task definitions, formatter configuration, and the license.
@@ -108,6 +108,12 @@ keep milestone state there rather than copying it into this instruction file.
   `example.md` gives a full worked feature; `effects.md` covers effects and
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
+- `docs/.vitepress/` — the VitePress site that publishes `docs/`. `config.mts`
+  holds the site configuration, `navigation.mts` the hand-written sidebar (it
+  mirrors the reading order in `docs/swift/README.md`, which stays the source of
+  truth), `mermaid-markdown.mts` the fence transform, and `theme/` a light
+  extension of the default theme. `package.json` at the repository root carries
+  its dependencies.
 - `docs/maintainers/` — operational runbooks. `ci.md` owns the Xcode pin,
   self-hosted runner topology, hosted fork lane, and workflow security record;
   `releasing.md` turns the Swift release policy into the candidate, tag, and
@@ -283,15 +289,43 @@ selector sentinels. M6's measured decision keeps ordinary consumer builds on
 the simple core and retains arena only for explicit behavior and benchmark
 comparison.
 
-Documentation is a task of its own, because swift-docc-plugin is env-gated
-behind `COG_DOCC=1` so ordinary consumers resolve this package with no
-dependencies:
+The published site at `skeswa.github.io/cog/` has two halves, built by two
+toolchains and merged into the one GitHub Pages deployment a repository gets:
 
-- `mise run docs` — builds the DocC archive into `.build/docs/Cog.doccarchive`,
-  transformed for static hosting under `--hosting-base-path cog`. It deletes
-  the `Package.resolved` the gated resolve writes; that file carries the
-  plugin's pins and must never be committed, and `swift-docs.yml` fails the
-  build if one survives.
+- `mise run docs:api` — builds the DocC archive into
+  `.build/docs/Cog.doccarchive`, transformed for static hosting under
+  `--hosting-base-path cog`. This is a task of its own because swift-docc-plugin
+  is env-gated behind `COG_DOCC=1` so ordinary consumers resolve this package
+  with no dependencies. It deletes the `Package.resolved` the gated resolve
+  writes; that file carries the plugin's pins and must never be committed, and
+  `docs.yml` fails the build if one survives. It also passes
+  `--experimental-transform-for-static-hosting-with-content`, which bakes each
+  page's title, description, and article text into its own HTML file instead of
+  emitting one identical app shell for every route — so the reference is
+  readable and linkable without JavaScript. That is a legibility choice, not a
+  styling one: DocC keeps its own appearance deliberately, and nothing tries to
+  make it resemble the VitePress half.
+- `mise run docs:build` — builds the VitePress site over `docs/` into
+  `docs/.vitepress/dist`. Its `base` must agree with the DocC
+  `--hosting-base-path`.
+- `mise run docs:dev` — serves that site with hot reload. `mise run docs:preview`
+  serves the built output, without the DocC half.
+- `mise run docs` — runs both and merges them into `.build/docs-site` through
+  `tools/assemble-docs-site.mjs`.
+
+All four VitePress-side commands need `npm ci` to have run first. The docs site
+is the only thing in this repository with a dependency tree; the Swift package
+still resolves with none.
+
+The merge is an overlay, and `tools/assemble-docs-site.mjs` explains why it is
+safe: DocC owns `documentation/`, `data/`, `css/`, `js/`, and `img/`, VitePress
+owns `assets/` and its route directories, and the only file VitePress takes over
+is the root `index.html` — which costs nothing, because the archive was
+transformed for static hosting and every documentation route already has its own
+`index.html`. `skeswa.github.io/cog/documentation/cog/` therefore keeps
+resolving, which matters because the root `README.md` and the release runbook
+link to it by name. The script asserts those exact routes survived and fails
+rather than publishing a site that 404s its own API reference.
 
 Document and workflow checks, each of which runs its own fixture suite first
 because a broken checker cannot validate anything:
@@ -300,7 +334,7 @@ because a broken checker cannot validate anything:
   `scenarios.md` and `plan.md`.
 - `mise run workflows:check` — validates the GitHub Actions hardening
   contract over `.github/workflows`. The contract allows exactly one write
-  grant: the `deploy` job of `swift-docs.yml` may hold `pages: write` and
+  grant: the `deploy` job of `docs.yml` may hold `pages: write` and
   `id-token: write`, because Pages deployment cannot be done with a read-only
   token. The exception is a named entry in `PERMISSION_EXCEPTIONS`
   (`tools/lib/workflows/checks.mjs`), applies only to that job on a

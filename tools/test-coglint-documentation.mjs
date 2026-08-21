@@ -57,7 +57,10 @@ function main() {
   verifySetupGuide();
 
   console.log("\n==> Build the statically hosted Cog.docc archive");
-  run("mise", ["run", "docs"], { cwd: REPO_ROOT, stdio: "inherit" });
+  // `docs:api`, not `docs`: this suite verifies DocC routes, and `docs` also
+  // builds the VitePress half and merges the two, which would make a CogLint
+  // documentation check depend on the docs site's npm dependency tree.
+  run("mise", ["run", "docs:api"], { cwd: REPO_ROOT, stdio: "inherit" });
   verifyArchive();
 
   if (existsSync(join(REPO_ROOT, "Package.resolved"))) {

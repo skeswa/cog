@@ -25,6 +25,14 @@ swift/Lint/Artifacts/CogLintBinary.artifactbundle/
 swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
 swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
 
+# The VitePress documentation site. `node_modules/` is the repository's only
+# dependency tree and belongs to the docs site alone — the Swift package still
+# resolves with nothing. The assembled site lands under `.build/`, already
+# ignored above.
+node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
 # Xcode
 DerivedData/
 *.xcuserstate

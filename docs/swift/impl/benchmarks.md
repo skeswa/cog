@@ -9,7 +9,7 @@ show progress, or record a withdrawn measurement.
 The benchmark design is in [design/perf.md](../design/perf.md). Profiler results
 and optimization details are in [optimization.md](./optimization.md). Commands,
 tool versions, and threshold file formats are in the
-[`swift/Benchmarks` README](../../../swift/Benchmarks/README.md).
+[`swift/Benchmarks` README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md).
 
 In the tables below, p50 is the median and p90 is the 90th percentile. Lower
 times, instruction counts, allocations, retains, and releases are better. ARC

@@ -1,0 +1,247 @@
+name: Docs
+
+# The documentation site → GitHub Pages.
+#
+# The site has two halves built by two toolchains. `docs/` is a VitePress site
+# holding the design and implementation record; the DocC archive is the
+# generated reference for the shipping Swift library. GitHub Pages serves one
+# deployment per repository and `actions/deploy-pages` replaces it wholesale,
+# so the halves are merged into a single artifact by
+# `tools/assemble-docs-site.mjs` and published together. Its header explains
+# why the overlay is safe.
+#
+# Four jobs, split by what each one needs:
+#
+#   `docc-cache` runs on GitHub-hosted ubuntu and only asks whether a DocC
+#   archive for the current release is already cached. It exists so an ordinary
+#   documentation change does not wake the Mac mini at all.
+#
+#   `docc` runs on the self-hosted Mac mini, and only on a cache miss. The DocC
+#   archive needs a full Xcode — `Cog` imports SwiftUI and Observation, so there
+#   is no Linux build of this package — and the same pinned toolchain the rest
+#   of CI uses.
+#
+#   `assemble` runs on GitHub-hosted ubuntu. It installs npm dependencies,
+#   builds the VitePress half, merges in the DocC half, and uploads the Pages
+#   artifact. It holds a read-only token: this is the job that executes third-
+#   party install scripts, so it is deliberately the job with nothing to grant.
+#
+#   `deploy` runs on GitHub-hosted ubuntu and does nothing but publish that
+#   artifact. It is the one job in this repository with a write scope, and it is
+#   hosted precisely so a `pages: write` / `id-token: write` token never lands
+#   on the persistent runner. `tools/check-workflows.mjs` names this exact file,
+#   job, and pair of scopes in `PERMISSION_EXCEPTIONS`, so the grant is reviewed
+#   policy rather than a hole in the check.
+#
+# DocC is always built from the newest release tag, never from `main`, so the
+# API reference keeps describing released code even though the site around it
+# republishes on every push. That was `M4-05c`'s guarantee and it survives here.
+#
+# There is deliberately no `paths:` filter. GitHub applies path filters to tag
+# pushes as well as branch pushes, and a release tag usually points at a commit
+# whose diff touches nothing under `docs/` — the filter would silently skip the
+# release publish, which is the one run that must never be skipped. Publishing
+# is idempotent and cheap, so running on every push to `main` is the safer
+# trade.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+# Keyed on the Pages deployment rather than on the ref, because that is the
+# resource two concurrent runs would actually fight over. Never cancel in
+# progress: a half-replaced Pages deployment is worse than a slow one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Kept in step with `swift-ci.yml`. Changing one without the other means the
+  # documentation describes a build nobody tested.
+  COG_XCODE_VERSION: "26.6"
+  COG_XCODE_BUILD: "17F113"
+  COG_MISE_VERSION: "2026.8.3"
+
+jobs:
+  docc-cache:
+    name: Look for a cached DocC archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      key: ${{ steps.release.outputs.key }}
+      hit: ${{ steps.probe.outputs.cache-hit }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags are how the DocC half is pinned, and a shallow clone has none.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the release the API reference should describe
+        id: release
+        # `github.ref_name` reaches the shell through the environment rather
+        # than through `${{ }}` interpolation, so a ref name can never be
+        # spliced into the script as code.
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "${REF_TYPE}" = "tag" ]; then
+            tag="${REF_NAME}"
+          elif ! tag="$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' 2>/dev/null)"; then
+            echo "::error title=No release tag::The API reference is built from the newest release tag, and this repository has none. Push a release tag before publishing the site."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "key=docc-${tag}-xcode${COG_XCODE_VERSION}-${COG_XCODE_BUILD}-v1" >> "$GITHUB_OUTPUT"
+          echo "Building the API reference from ${tag}."
+
+      - name: Ask whether that archive is already cached
+        id: probe
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/docs
+          key: ${{ steps.release.outputs.key }}
+          lookup-only: true
+
+  docc:
+    name: Build the DocC archive (self-hosted)
+    needs: docc-cache
+    # Only on a miss. A cache entry is scoped to the ref that created it, so the
+    # first run on `main` after a release will miss and rebuild once; every
+    # documentation push after that hits and skips this job entirely.
+    if: github.repository == 'skeswa/cog' && needs.docc-cache.outputs.hit != 'true'
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the release the archive documents
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.docc-cache.outputs.tag }}
+          clean: true
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: node tools/select-xcode.mjs
+
+      - name: Build the DocC archive
+        run: mise run docs:api
+
+      # `Package.resolved` exists only because `COG_DOCC=1` pulled in
+      # swift-docc-plugin. Consumers must resolve this package with no
+      # dependencies at all, so the file never leaves this job — and a
+      # surviving copy would be a real defect, not a tidiness issue.
+      - name: Prove the docs build left no dependency pins behind
+        run: |
+          set -euo pipefail
+          if [ -e Package.resolved ]; then
+            echo "::error title=Package.resolved survived::The docs build left dependency pins in the working tree. mise run docs:api must delete it."
+            exit 1
+          fi
+
+      - name: Cache the archive for later documentation pushes
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/docs
+          key: ${{ needs.docc-cache.outputs.key }}
+
+  assemble:
+    name: Build and assemble the site
+    needs: [docc-cache, docc]
+    # `docc` is skipped on a cache hit, and a skipped dependency would otherwise
+    # skip this job too. Guard on the jobs that must not have *failed* instead.
+    if: always() && needs.docc-cache.result == 'success' && needs.docc.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # VitePress reads each page's last-updated timestamp from git history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Restore the DocC archive
+        id: docc
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/docs
+          key: ${{ needs.docc-cache.outputs.key }}
+
+      # The merge script fails on a missing archive anyway. This says why first,
+      # because "no DocC archive" is a cache problem with a known remedy rather
+      # than a defect in the site.
+      - name: Require the DocC archive
+        if: steps.docc.outputs.cache-hit != 'true'
+        run: |
+          echo "::error title=No DocC archive::The archive for ${{ needs.docc-cache.outputs.tag }} was neither cached nor rebuilt. Re-run this workflow to rebuild it on the self-hosted runner."
+          exit 1
+
+      - name: Cache npm downloads and the VitePress build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.npm
+            docs/.vitepress/cache
+          key: docs-site-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('docs/**/*.md') }}
+          restore-keys: |
+            docs-site-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            docs-site-${{ runner.os }}-
+
+      - name: Install the documentation site's dependencies
+        run: npm ci
+
+      - name: Build the VitePress site
+        run: mise run docs:build
+
+      - name: Assemble both halves into one site
+        run: node tools/assemble-docs-site.mjs
+
+      - name: Package the site for Pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: .build/docs-site
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: assemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The repository's one write grant. See the header, and
+    # `PERMISSION_EXCEPTIONS` in `tools/lib/workflows/checks.mjs`.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the uploaded site
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
