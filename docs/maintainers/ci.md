@@ -63,13 +63,13 @@ The topology:
   identical toolchain rather than merely the same version number. mise cannot
   pin Xcode, hence this record.
 
-  CI finds Xcode by **version, never by path**: `xcodes` installs it as
-  `/Applications/Xcode.app`, while the hosted image uses
-  `/Applications/Xcode_<version>.app`. Every job scans `/Applications/
-Xcode*.app` and reads each bundle's `version.plist`, which is the only
-  spelling that works in both lanes. Changing the pin means changing
-  `COG_XCODE_VERSION` in `swift-ci.yml`, in `swift-docs.yml`, and this record
-  together.
+  CI finds Xcode by **version and build, never by path**: `xcodes` installs it
+  as `/Applications/Xcode.app`, while the hosted image uses
+  `/Applications/Xcode_<version>.app`. `tools/select-xcode.mjs` scans the
+  installed applications and asks each toolchain for its identity, which is
+  the only selection that works in both lanes. Changing the pin means changing
+  `COG_XCODE_VERSION` and `COG_XCODE_BUILD` in `swift-ci.yml`, in
+  `swift-docs.yml`, and this record together.
 
   **A full Xcode is required; the Command Line Tools are not enough.** CLT
   carries `swift` and `swift-format`, so building and linting succeed, but
