@@ -77,6 +77,10 @@ done
 description = "Run the Swift tests on the default leg in release configuration"
 run = "node {{config_root}}/tools/swift-test.mjs release"
 
+[tasks."api:check"]
+description = "Compare supported Swift APIs with the latest release tag"
+run = "node {{config_root}}/tools/check-swift-api.mjs"
+
 [tasks."test:simulator"]
 description = "Run only the boundary tests on the latest iOS simulator"
 run = "node {{config_root}}/tools/swift-simulator-test.mjs"

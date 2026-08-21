@@ -125,6 +125,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           clean: true
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up mise and the tools pinned in mise.toml
@@ -687,6 +688,9 @@ jobs:
       - name: Run the release-configuration tests
         run: mise run test:release
 
+      - name: Check the supported public APIs against the latest release
+        run: mise run api:check
+
   # The compile-fail fixtures, type-checked in one batched `swiftc` pass. Its
   # own scratch path, so it never contends with the test legs' caches.
   compile-fail:
@@ -767,6 +771,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up mise and the tools pinned in mise.toml
@@ -961,6 +966,10 @@ jobs:
         env:
           COG_TEST_LEG: ${{ matrix.leg }}
         run: mise exec -- node tools/swift-test.mjs "$COG_TEST_LEG" --parallel
+
+      - name: Check the supported public APIs against the latest release
+        if: matrix.leg == 'mainactor-nnbd-on'
+        run: mise run api:check
 
   fork-test-simulator:
     name: Simulator boundary tests (fork, GitHub-hosted)

@@ -145,6 +145,10 @@ directly:
 - `mise run test:value-references` — the full behavior suite under the
   `inline`, `interned`, and `generic` value-reference layouts.
 - `mise run test:release` — the default leg in release configuration.
+- `mise run api:check [baseline]` — compares the supported `Cog` and
+  `CogTesting` public APIs with the newest semantic-version release tag, or an
+  explicit baseline. The non-API `_CogScenarios` product is deliberately
+  excluded.
 - `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
   simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
 - `mise run test:compilefail` — type-checks every fixture in

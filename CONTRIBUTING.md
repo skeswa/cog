@@ -24,6 +24,7 @@ mise run test:matrix
 mise run test:cores
 mise run test:value-references
 mise run test:release
+mise run api:check
 mise run test:compilefail
 mise run lint:swift
 mise run tasks:check
