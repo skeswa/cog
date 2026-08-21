@@ -1,5 +1,7 @@
 public import Cog
 
+// MARK: - Observation-boundary inspection
+
 extension Cogs {
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///

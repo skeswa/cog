@@ -1,4 +1,4 @@
-/// Adds Swift Observation-tracked UI reads to a context.
+/// Swift Observation-tracked UI reads on a context.
 ///
 /// These subscripts are MainActor-isolated with ``Cogs``. Each one settles
 /// before returning and records the exact state with the caller's active

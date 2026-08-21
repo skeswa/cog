@@ -1,4 +1,4 @@
-// The process-wide production install guard. It enforces singular app state but
+// The app-wide production install guard. It enforces singular app state but
 // intentionally exposes no service-locator accessor; tests and previews do not
 // enter this registry.
 

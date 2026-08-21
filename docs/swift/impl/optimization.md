@@ -90,7 +90,7 @@ profile:
 
 - **Generic metadata and dynamic casts, ~23% together.** `Cogs.state(_:create:)`
   casts the stored existential back to a concrete `State` on every lookup
-  (Cogtext.swift:764), and `manualState(for:)` and `derivedState(for:)`
+  (Cogs.swift:764), and `manualState(for:)` and `derivedState(for:)`
   instantiate `ManualCogState<Value>` and `DerivedCogState<Value>` metadata to
   do it. The settle walk then casts `state as? any DerivedCogSettleState`
   **twice per node per turn** — once entering and once exiting

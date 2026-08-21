@@ -1,5 +1,7 @@
 public import Cog
 
+// MARK: - Bootstrap inspection
+
 extension Cogs {
   /// Runs `body` with an app context bootstrapped, and takes it back out
   /// again.

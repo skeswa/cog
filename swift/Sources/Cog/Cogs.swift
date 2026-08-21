@@ -1,4 +1,4 @@
-/// The container for one Cog state graph.
+/// The MainActor-confined runtime for one Cog state graph.
 ///
 /// A context creates state lazily as declarations are read, refreshed, or
 /// written. Declaration identity plus an optional box key names one state slot,

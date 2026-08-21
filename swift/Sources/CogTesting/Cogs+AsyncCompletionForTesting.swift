@@ -1,5 +1,7 @@
 public import Cog
 
+// MARK: - Async-completion inspection
+
 extension Cogs {
   /// Signals after the next async work completion reaches its generation check.
   ///

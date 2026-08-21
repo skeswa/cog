@@ -1,3 +1,5 @@
+// MARK: - Reactions
+
 extension Cogs {
   /// Registers one effect body under `label` and schedules its first tracking run.
   ///

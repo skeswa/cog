@@ -1,3 +1,5 @@
+// MARK: - Refreshing asynchronous values
+
 /// A handle for the exact async generation started by ``Cogs/refresh(_:)``.
 ///
 /// Awaiting ``outcome`` never drifts to a later request. Replacement resolves

@@ -1,3 +1,5 @@
+// MARK: - Watches
+
 /// The tracked-read machinery beneath every `MechanismController` watch.
 ///
 /// Watches are MainActor-isolated registrations owned by the context and, at

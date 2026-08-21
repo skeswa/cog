@@ -1,5 +1,7 @@
 public import Cog
 
+// MARK: - Isolated runtimes
+
 extension Cogs {
   /// A fresh, isolated context for one test or preview runtime.
   ///

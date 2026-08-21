@@ -1,5 +1,7 @@
 #if DEBUG
 
+// MARK: - Test seeding
+
 extension Cogs {
   /// Implements deterministic manual-source setup for `CogTesting`.
   ///

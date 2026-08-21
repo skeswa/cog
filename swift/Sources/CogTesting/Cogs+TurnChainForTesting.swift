@@ -2,6 +2,8 @@
 
 public import Cog
 
+// MARK: - Turn-chain inspection
+
 /// One turn or reaction in a long synchronous causal chain.
 public nonisolated enum CogTurnChainCause: Sendable, Equatable {
   /// A named graph turn in the order it entered the uninterrupted chain.

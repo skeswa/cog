@@ -1,5 +1,7 @@
 public import Cog
 
+// MARK: - Lifetime-release inspection
+
 extension Cogs {
   /// Signals after the next eligible derived root finishes graph removal.
   ///
