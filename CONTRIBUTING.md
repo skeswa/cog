@@ -74,8 +74,8 @@ to that snapshot instead of copying milestone state.
 Use `jj st`, `jj diff`, `jj commit`, `jj bookmark`, and `jj git push`. There is
 no staging area. Keep one logical change per revision and describe it with a
 scoped, imperative summary such as `docs(swift): align plan with task graph`.
-Use annotated Git tags only for releases, as documented in the maintainer
-runbook.
+Use annotated Git tags only for releases, as documented in the
+[Swift release runbook](./docs/maintainers/releasing.md).
 
 Every change must leave `mise run fmt:check` green and must run the smallest
 relevant behavior, release, simulator, or benchmark gates needed to support its

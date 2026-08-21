@@ -87,8 +87,9 @@ without adding lint dependencies to an ordinary Cog consumer.
 [CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, guarded test commands, the
 test topology, documentation obligations, and the Jujutsu workflow. Tooling is
 versioned with [mise](https://mise.jdx.dev), and `mise tasks` prints the
-authoritative command list. Maintainer-only runner and release details live in
-[docs/maintainers/ci.md](./docs/maintainers/ci.md).
+authoritative command list. Maintainer-only details live in the
+[CI operations](./docs/maintainers/ci.md) and
+[Swift release](./docs/maintainers/releasing.md) runbooks.
 
 ## Documentation
 
@@ -101,6 +102,8 @@ authoritative command list. Maintainer-only runner and release details live in
 - **[CI and runner operations](./docs/maintainers/ci.md):** the maintainer
   runbook for the self-hosted boundary, hosted fork lane, and workflow
   hardening contract.
+- **[Releasing Cog for Swift](./docs/maintainers/releasing.md):** candidate,
+  annotated-tag, publication, and post-release verification steps.
 - **[Swift design](./docs/swift/README.md):** the reading order, current
   decisions, open questions, and implementation plan for SwiftUI.
 - **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose

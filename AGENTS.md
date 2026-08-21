@@ -109,7 +109,9 @@ keep milestone state there rather than copying it into this instruction file.
   background work; `flows.md` maps Flow and reactive concepts; `perf.md`
   covers the runtime candidates and benchmark plan.
 - `docs/maintainers/` — operational runbooks. `ci.md` owns the Xcode pin,
-  self-hosted runner topology, hosted fork lane, and workflow security record.
+  self-hosted runner topology, hosted fork lane, and workflow security record;
+  `releasing.md` turns the Swift release policy into the candidate, tag, and
+  verification checklist.
 
 ## Commands
 

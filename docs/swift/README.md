@@ -88,12 +88,14 @@ The design lives in [design/](./design/); the implementation effort lives in
 
 ## Building and testing
 
-The package is implemented through M7: the simple shipping core, SwiftUI
-boundary, mechanisms, lifetimes, async policies and streams, exports, and
-external Observation tracking are all present. The measured arena core remains
-an internal comparison build. The repository is a SwiftPM package rooted at the
-git root, with every Swift target under `swift/`. Commands are mise tasks;
-`mise tasks` lists them all.
+Releases are implemented through M8: the simple shipping core, SwiftUI
+boundary, mechanisms, lifetimes, async policies and streams, exports, external
+Observation tracking, and first-party lint plugins are all present. M9's
+shared-turn performance work and M10's Storefront measurement infrastructure
+have landed, while their closing decisions remain open. The measured arena core
+remains an internal comparison build. The repository is a SwiftPM package
+rooted at the git root, with every Swift target under `swift/`. Commands are
+mise tasks; `mise tasks` lists them all.
 
 ```sh
 mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
@@ -120,8 +122,9 @@ The four legs are {MainActor-default, nonisolated} ×
 one leg per job using the leg names as wrapper modes (`mainactor-nnbd-on`,
 `mainactor-nnbd-off`, `nonisolated-nnbd-on`, `nonisolated-nnbd-off`). Running
 the tests needs a full Xcode; the Command Line Tools alone fail with
-`no such module 'Testing'`. The root [README.md](../../README.md) records the
-pinned version and the runner topology.
+`no such module 'Testing'`. The maintainer
+[CI runbook](../maintainers/ci.md) records the pinned version and runner
+topology.
 
 ## Production, tests, and previews
 
