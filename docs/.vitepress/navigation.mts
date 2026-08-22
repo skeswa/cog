@@ -71,6 +71,7 @@ const maintainersSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Maintainers",
     items: [
+      { text: "Change management", link: "/maintainers/changes" },
       { text: "CI and runner operations", link: "/maintainers/ci" },
       { text: "Releasing Cog for Swift", link: "/maintainers/releasing" },
     ],
@@ -117,7 +118,7 @@ export const nav: DefaultTheme.NavItem[] = [
     items: [
       { text: "Shared state model", link: "/design" },
       { text: "Design history", link: "/history" },
-      { text: "Maintainer runbooks", link: "/maintainers/ci" },
+      { text: "Change management", link: "/maintainers/changes" },
       { text: "Changelog", link: "https://github.com/skeswa/cog/blob/main/CHANGELOG.md" },
       { text: "Contributing", link: "https://github.com/skeswa/cog/blob/main/CONTRIBUTING.md" },
     ],

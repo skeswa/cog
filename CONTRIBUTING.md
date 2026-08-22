@@ -93,13 +93,11 @@ to that snapshot instead of copying milestone state.
 ## Revisions
 
 Use `jj st`, `jj diff`, `jj commit`, `jj bookmark`, and `jj git push`. There is
-no staging area. Keep one logical change per revision and use a Conventional
-Commit description: `type(optional-scope): imperative summary`. The accepted
-types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
-`revert`, `style`, and `test`; use `!` and a `BREAKING CHANGE` footer for
-breaking work. Maintainers alone may add `Release-As`. `mise run changes:check`
-lints the local `main..@` range, and GitHub checks the complete PR or push
-range.
+no staging area. Keep one logical change per revision and follow the
+[change-management process](./docs/maintainers/changes.md) for Conventional
+Commit syntax, breaking notes, version consequences, and the exact local and
+GitHub ranges. Maintainers alone may add `Release-As`. Run
+`mise run changes:check` before pushing.
 
 Pull requests use rebase merging so those revision descriptions remain the
 linear release history. Release Please turns that history into versions,
