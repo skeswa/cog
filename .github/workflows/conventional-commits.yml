@@ -1,5 +1,7 @@
 name: Conventional Commits
 
+# The full authoring and range contract lives in
+# `docs/maintainers/changes.md`.
 # Revision descriptions are Release Please's version and changelog input. This
 # check therefore has no path filter: every commit entering main is in scope,
 # even when its files would not wake a language-specific workflow.

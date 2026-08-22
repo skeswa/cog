@@ -115,7 +115,9 @@ without adding lint dependencies to an ordinary Cog consumer.
 [CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, guarded test commands, the
 test topology, documentation obligations, and the Jujutsu workflow. Tooling is
 versioned with [mise](https://mise.jdx.dev), and `mise tasks` prints the
-authoritative command list. Maintainer-only details live in the
+authoritative command list. The
+[change-management process](./docs/maintainers/changes.md) defines revision
+descriptions and their required check; maintainer-only details live in the
 [CI operations](./docs/maintainers/ci.md) and
 [Swift release](./docs/maintainers/releasing.md) runbooks.
 
@@ -137,6 +139,8 @@ readable in this repository.
   organization, and revision conventions.
 - **[SECURITY.md](./SECURITY.md):** supported releases and private
   vulnerability reporting.
+- **[Change management](./docs/maintainers/changes.md):** the authoritative
+  Conventional Commit authoring, validation, and release-input workflow.
 - **[CI and runner operations](./docs/maintainers/ci.md):** the maintainer
   runbook for the self-hosted boundary, hosted fork lane, and workflow
   hardening contract.

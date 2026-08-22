@@ -265,6 +265,10 @@ consumption. Fixtures cover the valid topology and drift at each boundary.
 
 ## Release and change-management workflows
 
+The authoritative revision-authoring and range-selection contract is the
+[change-management process](./changes.md). This runbook records the workflow's
+place in the wider Actions security boundary.
+
 `conventional-commits.yml` is a required, read-only hosted check with no path
 filters. It checks out the PR head rather than GitHub's synthetic merge commit
 and lints every commit in the PR or push range. The same command reads non-empty

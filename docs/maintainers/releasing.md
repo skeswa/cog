@@ -11,6 +11,8 @@ runs, and approving protected environments.
 The normative version policy remains in
 [`docs/swift/impl/plan.md` § Release process](../swift/impl/plan.md#release-process).
 This runbook owns the Actions UI sequence and the evidence a maintainer reviews.
+The [change-management process](./changes.md) owns Conventional Commit
+authoring and the exact local, pull-request, push, and candidate ranges.
 
 ## How a release is proposed
 

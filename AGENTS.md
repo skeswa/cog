@@ -31,6 +31,8 @@ keep milestone state there rather than copying it into this instruction file.
 - `CONTRIBUTING.md` — contributor setup, verification, test organization,
   documentation obligations, and the Jujutsu workflow.
 - `SECURITY.md` — supported releases and private vulnerability reporting.
+- `docs/maintainers/changes.md` — the authoritative Conventional Commit
+  authoring, validation, range-selection, and release-input process.
 - `Package.swift` — the SwiftPM manifest. The package root is the git root;
   every Swift target reaches under `swift/` through an explicit `path:`. The
   manifest reads the isolation selectors and public arena trait described
