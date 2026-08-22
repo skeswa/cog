@@ -1,0 +1,23 @@
+ci(release): adopt Release Please and Conventional Commits
+
+Move candidate validation, native artifact publication, release tagging,
+documentation dispatch, and the coupled plugin publication into GitHub Actions.
+
+Release-As: 0.5.0
+
+feat: rename the graph mutation primitive to turn
+
+BREAKING CHANGE: Rename the graph mutation primitive from commit to turn; the old spellings are
+removed.
+
+feat: rename derived cogs to automatic cogs
+
+BREAKING CHANGE: Use automatic for non-manual cogs throughout Cog and CogTesting; the old derived
+spellings are removed.
+
+feat: remove the value-reference layout testing selector
+
+BREAKING CHANGE: Remove Cogs.valueReferenceLayoutName and the retired generic and interned layout
+selectors from CogTesting.
+
+feat(swift): add the CompactArena package trait

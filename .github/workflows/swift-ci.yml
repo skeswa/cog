@@ -58,6 +58,15 @@ name: Swift CI
 # error — the lane simply never runs.
 on:
   workflow_dispatch:
+    inputs:
+      release_pr:
+        description: Release Please pull request number whose exact tree is being tested
+        required: true
+        type: string
+      recovery_tag:
+        description: Existing immutable release tag to rebuild after a publication failure
+        required: false
+        type: string
   pull_request:
     paths:
       - "Package.swift"
@@ -111,6 +120,56 @@ jobs:
   # ---------------------------------------------------------------------------
   # Self-hosted lane: pushes to `main` and same-repo pull requests.
   # ---------------------------------------------------------------------------
+
+  # Release Please PRs are created with the repository token, so GitHub does
+  # not emit their ordinary pull-request workflow events. The exact-head
+  # candidate dispatch supplies the same required check context explicitly;
+  # ordinary contributor PRs and pushes continue to use the dedicated
+  # `conventional-commits.yml` workflow.
+  candidate-changes:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    if: github.repository == 'skeswa/cog' && github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check out the exact candidate source and its history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Install the pinned Commitlint dependency tree
+        run: npm ci --ignore-scripts
+
+      - name: Lint the candidate's complete revision range
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ inputs.release_pr }}
+          RECOVERY_TAG: ${{ inputs.recovery_tag }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_PR" in
+            ''|*[!0-9]*) echo "::error title=Invalid release PR::release_pr must be a pull request number"; exit 1 ;;
+          esac
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${RELEASE_PR}")"
+          base_sha="$(jq -r .base.sha <<<"$pr")"
+          head_sha="$(jq -r .head.sha <<<"$pr")"
+          if [ -n "$RECOVERY_TAG" ]; then
+            head_sha="$GITHUB_SHA"
+            base_sha="$(git rev-parse "${GITHUB_SHA}^")"
+          fi
+          git cat-file -e "${base_sha}^{commit}"
+          git cat-file -e "${head_sha}^{commit}"
+          mise run changes:check -- --git "$base_sha" "$head_sha"
 
   format:
     name: Format (self-hosted)
@@ -177,10 +236,17 @@ jobs:
   # recorded in provenance. The dependent Intel job consumes these same bytes.
   lint-artifact:
     name: CogLint candidate artifact (self-hosted)
+    outputs:
+      version: ${{ steps.candidate.outputs.version }}
+      pr_head_sha: ${{ steps.candidate.outputs.pr_head_sha }}
+      source_sha: ${{ steps.candidate.outputs.source_sha }}
+      source_tree: ${{ steps.candidate.outputs.source_tree }}
+      mode: ${{ steps.candidate.outputs.mode }}
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
       contents: read
+      pull-requests: read
     if: >-
       github.repository == 'skeswa/cog' && github.event_name ==
       'workflow_dispatch' && (github.event_name != 'pull_request' ||
@@ -190,8 +256,74 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           clean: true
+          fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Bind the dispatch to the release PR or immutable recovery tag
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ inputs.release_pr }}
+          RECOVERY_TAG: ${{ inputs.recovery_tag }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_PR" in
+            ''|*[!0-9]*) echo "::error title=Invalid release PR::release_pr must be a pull request number"; exit 1 ;;
+          esac
+
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${RELEASE_PR}")"
+          base="$(jq -r .base.ref <<<"$pr")"
+          head_repo="$(jq -r .head.repo.full_name <<<"$pr")"
+          head_ref="$(jq -r .head.ref <<<"$pr")"
+          pr_head_sha="$(jq -r .head.sha <<<"$pr")"
+          pr_head_tree="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${pr_head_sha}" --jq .tree.sha)"
+          source_sha="$(git rev-parse HEAD)"
+          source_tree="$(git rev-parse 'HEAD^{tree}')"
+          version="$(tr -d '[:space:]' < version.txt)"
+
+          if [ "$base" != main ] || [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error title=Invalid release PR::PR #${RELEASE_PR} must target main from this repository"
+            exit 1
+          fi
+          case "$head_ref" in
+            release-please--branches--main*) ;;
+            *) echo "::error title=Invalid release PR::PR #${RELEASE_PR} is not a Release Please branch"; exit 1 ;;
+          esac
+
+          if [ -n "$RECOVERY_TAG" ]; then
+            if [ "$GITHUB_REF_TYPE" != tag ] || [ "$GITHUB_REF_NAME" != "$RECOVERY_TAG" ]; then
+              echo "::error title=Recovery ref mismatch::dispatch recovery at the exact ${RECOVERY_TAG} tag"
+              exit 1
+            fi
+            tag_sha="$(git rev-list -n 1 "$RECOVERY_TAG")"
+            if [ "$source_sha" != "$tag_sha" ] || [ "$version" != "$RECOVERY_TAG" ]; then
+              echo "::error title=Recovery source mismatch::tag, checkout, and version.txt must identify the same release"
+              exit 1
+            fi
+            mode=recovery
+          else
+            if [ "$source_sha" != "$pr_head_sha" ] || [ "$GITHUB_SHA" != "$pr_head_sha" ]; then
+              echo "::error title=Candidate ref mismatch::dispatch the workflow at PR #${RELEASE_PR}'s current head ${pr_head_sha}"
+              exit 1
+            fi
+            mode=candidate
+          fi
+
+          if [ "$source_tree" != "$pr_head_tree" ]; then
+            echo "::error title=Candidate tree mismatch::release PR and dispatched source trees differ"
+            exit 1
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=Invalid candidate version::version.txt contains ${version}"
+            exit 1
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "pr_head_sha=${pr_head_sha}" >> "$GITHUB_OUTPUT"
+          echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "source_tree=${source_tree}" >> "$GITHUB_OUTPUT"
+          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
 
       - name: Set up mise and the tools pinned in mise.toml
         uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
@@ -205,15 +337,22 @@ jobs:
         run: mise run test:lint-artifact -- --host arm64
 
       - name: Verify and record candidate provenance
+        env:
+          VERSION: ${{ steps.candidate.outputs.version }}
+          PR_HEAD_SHA: ${{ steps.candidate.outputs.pr_head_sha }}
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          SOURCE_TREE: ${{ steps.candidate.outputs.source_tree }}
+          MODE: ${{ steps.candidate.outputs.mode }}
+          RELEASE_PR: ${{ inputs.release_pr }}
         run: |
           set -euo pipefail
           archive="swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip"
           checksum_file="${archive}.checksum"
-          provenance="${archive}.provenance"
+          provenance="${archive}.provenance.json"
 
           source_sha="$(git rev-parse HEAD)"
-          if [ "$source_sha" != "$GITHUB_SHA" ]; then
-            echo "::error title=Candidate source mismatch::checked out ${source_sha}, expected ${GITHUB_SHA}"
+          if [ "$source_sha" != "$SOURCE_SHA" ]; then
+            echo "::error title=Candidate source mismatch::checked out ${source_sha}, expected ${SOURCE_SHA}"
             exit 1
           fi
 
@@ -236,27 +375,52 @@ jobs:
             exit 1
           fi
 
-          {
-            printf 'format=coglint-candidate-v1\n'
-            printf 'version=0.4.0\n'
-            printf 'source_sha=%s\n' "$source_sha"
-            printf 'xcode_version=%s\n' "$xcode_version"
-            printf 'xcode_build=%s\n' "$xcode_build"
-            printf 'swift_version=%s\n' "$swift_version"
-            printf 'artifact=%s\n' "$(basename "$archive")"
-            printf 'checksum=%s\n' "$computed_checksum"
-            printf 'arm64_probe=passed\n'
-          } > "$provenance"
-          cat "$provenance"
+          jq -n \
+            --arg version "$VERSION" \
+            --argjson release_pr "$RELEASE_PR" \
+            --arg pr_head_sha "$PR_HEAD_SHA" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg source_tree "$SOURCE_TREE" \
+            --arg mode "$MODE" \
+            --arg workflow "$GITHUB_WORKFLOW_REF" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg artifact "$(basename "$archive")" \
+            --arg checksum "$computed_checksum" \
+            --arg xcode_version "$xcode_version" \
+            --arg xcode_build "$xcode_build" \
+            --arg swift_version "$swift_version" \
+            '{
+              format: "coglint-candidate-v2",
+              version: $version,
+              release_pr: $release_pr,
+              pr_head_sha: $pr_head_sha,
+              source_sha: $source_sha,
+              source_tree: $source_tree,
+              mode: $mode,
+              workflow: $workflow,
+              workflow_run_id: ($run_id | tonumber),
+              artifact: $artifact,
+              checksum: $checksum,
+              architectures: ["arm64", "x86_64"],
+              build: {
+                runner: "self-hosted-cog-mini",
+                xcode_version: $xcode_version,
+                xcode_build: $xcode_build,
+                swift_version: $swift_version,
+                arm64_probe: "passed"
+              },
+              intel: null
+            }' > "$provenance"
+          jq . "$provenance"
 
-      - name: Retain the exact candidate archive and provenance
+      - name: Hand the exact candidate bytes to the Intel verifier
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: coglint-0.4.0-${{ github.sha }}
+          name: coglint-build-${{ steps.candidate.outputs.version }}-${{ steps.candidate.outputs.pr_head_sha }}
           path: |
             swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
             swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
-            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance.json
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -318,29 +482,48 @@ jobs:
       - name: Download the exact arm-built candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: coglint-0.4.0-${{ github.sha }}
+          name: coglint-build-${{ needs.lint-artifact.outputs.version }}-${{ needs.lint-artifact.outputs.pr_head_sha }}
           path: swift/Lint/Artifacts
 
       - name: Verify the Intel host and downloaded provenance
+        env:
+          VERSION: ${{ needs.lint-artifact.outputs.version }}
+          PR_HEAD_SHA: ${{ needs.lint-artifact.outputs.pr_head_sha }}
+          SOURCE_SHA: ${{ needs.lint-artifact.outputs.source_sha }}
+          SOURCE_TREE: ${{ needs.lint-artifact.outputs.source_tree }}
+          MODE: ${{ needs.lint-artifact.outputs.mode }}
+          RELEASE_PR: ${{ inputs.release_pr }}
         run: |
           set -euo pipefail
           archive="swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip"
           checksum_file="${archive}.checksum"
-          provenance="${archive}.provenance"
+          provenance="${archive}.provenance.json"
 
           if [ "$(uname -m)" != "x86_64" ]; then
             echo "::error title=Candidate host mismatch::expected x86_64, got $(uname -m)"
             exit 1
           fi
-          grep -Fx "format=coglint-candidate-v1" "$provenance"
-          grep -Fx "source_sha=${GITHUB_SHA}" "$provenance"
-          grep -Fx "xcode_version=${COG_XCODE_VERSION}" "$provenance"
-          grep -Fx "xcode_build=${COG_XCODE_BUILD}" "$provenance"
-          grep -Fx "arm64_probe=passed" "$provenance"
-
+          jq -e \
+            --arg version "$VERSION" \
+            --argjson release_pr "$RELEASE_PR" \
+            --arg pr_head_sha "$PR_HEAD_SHA" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg source_tree "$SOURCE_TREE" \
+            --arg mode "$MODE" \
+            '.format == "coglint-candidate-v2" and
+             .version == $version and
+             .release_pr == $release_pr and
+             .pr_head_sha == $pr_head_sha and
+             .source_sha == $source_sha and
+             .source_tree == $source_tree and
+             .mode == $mode and
+             .architectures == ["arm64", "x86_64"] and
+             .build.xcode_version == env.COG_XCODE_VERSION and
+             .build.xcode_build == env.COG_XCODE_BUILD and
+             .build.arm64_probe == "passed"' "$provenance"
           recorded_checksum="$(tr -d '[:space:]' < "$checksum_file")"
           computed_checksum="$(swift package compute-checksum "$archive")"
-          grep -Fx "checksum=${computed_checksum}" "$provenance"
+          jq -e --arg checksum "$computed_checksum" '.checksum == $checksum' "$provenance"
           if [ "$recorded_checksum" != "$computed_checksum" ]; then
             echo "::error title=Downloaded checksum mismatch::recorded ${recorded_checksum}, computed ${computed_checksum}"
             exit 1
@@ -351,6 +534,90 @@ jobs:
 
       - name: Exercise the exact x86_64 artifact variant
         run: mise run test:lint-artifact -- --from-archive --host x86_64
+
+      - name: Finalize and retain publication provenance
+        env:
+          VERSION: ${{ needs.lint-artifact.outputs.version }}
+          PR_HEAD_SHA: ${{ needs.lint-artifact.outputs.pr_head_sha }}
+        run: |
+          set -euo pipefail
+          provenance="swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance.json"
+          xcode_version="$(xcodebuild -version | sed -n 's/^Xcode //p')"
+          xcode_build="$(xcodebuild -version | sed -n 's/^Build version //p')"
+          swift_version="$(swift --version | head -n 1)"
+          jq \
+            --arg runner "macos-15-intel" \
+            --arg xcode_version "$xcode_version" \
+            --arg xcode_build "$xcode_build" \
+            --arg swift_version "$swift_version" \
+            '.intel = {
+              runner: $runner,
+              architecture: "x86_64",
+              xcode_version: $xcode_version,
+              xcode_build: $xcode_build,
+              swift_version: $swift_version,
+              x86_64_probe: "passed"
+            }' "$provenance" > "${provenance}.tmp"
+          mv "${provenance}.tmp" "$provenance"
+          jq -e '.intel.x86_64_probe == "passed"' "$provenance"
+
+      - name: Retain the publication-ready archive and provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coglint-candidate-${{ needs.lint-artifact.outputs.version }}-${{ needs.lint-artifact.outputs.pr_head_sha }}
+          path: |
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
+            swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+  candidate-extras:
+    name: Release-only integration and documentation (self-hosted)
+    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    if: >-
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out the exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Set up mise and the tools pinned in mise.toml
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          version: ${{ env.COG_MISE_VERSION }}
+
+      - name: Select the pinned Xcode and record the toolchain
+        run: node tools/select-xcode.mjs
+
+      - name: Install the documentation dependency tree
+        run: npm ci --ignore-scripts
+
+      - name: Verify all source and document formatting
+        run: mise run fmt:check
+
+      - name: Prove both CogLint plugin surfaces
+        run: |
+          mise run test:lint-build-tool-plugin
+          mise run test:lint-command-plugin
+          mise run test:lint-distribution
+          mise run test:lint-documentation
+
+      - name: Build the complete documentation site
+        run: mise run docs
+
+      - name: Run the Storefront UI macrobenchmark
+        run: mise run test:storefront-ui
 
   test-host:
     name: Host tests (self-hosted, ${{ matrix.leg }})
@@ -836,3 +1103,34 @@ jobs:
 
       - name: Check exact allocation and PERF-10 p90 ceilings
         run: mise run bench:thresholds:check
+
+  candidate-gate:
+    name: Release candidate
+    needs:
+      - candidate-changes
+      - format
+      - lint-swift
+      - lint-artifact-x86_64
+      - candidate-extras
+      - test-host
+      - test-simulator
+      - build-weather
+      - test-release
+      - compile-fail
+      - ledger
+      - bench-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    if: github.repository == 'skeswa/cog' && github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Record the complete exact-source candidate gate
+        env:
+          RELEASE_PR: ${{ inputs.release_pr }}
+          RECOVERY_TAG: ${{ inputs.recovery_tag }}
+        run: |
+          echo "Release PR #${RELEASE_PR} passed the complete candidate workflow at ${GITHUB_SHA}."
+          if [ -n "$RECOVERY_TAG" ]; then
+            echo "Recovery rebuild is bound to immutable tag ${RECOVERY_TAG}."
+          fi

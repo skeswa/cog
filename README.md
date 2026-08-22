@@ -33,16 +33,18 @@ should also keep the common API simple.
 
 ## Status
 
-The Swift library is real and usable. Releases through 0.4.0 include the
-original simple core, SwiftUI boundary, mechanisms, declared lifetimes, async
-policies and streams, value exports, the external Observation bridge, and
-first-party CogLint plugins. Post-release performance work has made graph
-notices O(changed), removed steady-turn allocations from shared machinery, and
-added a representative Storefront workload. On `main`, the specialized arena
-is the sole core and the default implementation. Applications that prioritize
-binary size can explicitly disable its typed specialization frontier with the
-non-default `CompactArena` package trait. The Android library has not been
-started.
+The Swift library is real and usable. It includes its SwiftUI boundary,
+mechanisms, declared lifetimes, async policies and streams, value exports, the
+external Observation bridge, first-party CogLint plugins, and the specialized
+arena with shared pool edges. Graph notices are O(changed), steady turns do not
+allocate, and `CompactArena` remains as an application-level binary-size
+opt-out. The Storefront macrobenchmark exercises the retained architecture end
+to end. The Android library has not been started.
+
+<!-- x-release-please-start-version -->
+
+The current published Swift release is 0.4.0.
+<!-- x-release-please-end -->
 
 The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
 shows the production-bootstrap and isolated-test call sites, and
@@ -58,29 +60,31 @@ Cog for Swift resolves with no dependencies of its own. Add it to a
 `Package.swift`:
 
 ```swift
+// x-release-please-start-version
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
     .upToNextMinor(from: "0.4.0")
   )
 ]
+// x-release-please-end
 ```
 
 or, in Xcode, add the same URL under **File ▸ Add Package Dependencies** with
 the **Up to Next Minor Version** rule.
 
 The default above selects the fastest measured implementation: specialized
-arena with shared pool edges. That change and `CompactArena` are new on `main`
-and are not part of 0.4.0. Once consuming a release or revision that contains
-them, a final application can opt out of typed specialization with the
-trait-aware dependency overload. For example, if it ships in 0.5.x:
+arena with shared pool edges. A final application can opt out of typed
+specialization with the trait-aware dependency overload:
 
 ```swift
+// x-release-please-start-version
 .package(
   url: "https://github.com/skeswa/cog.git",
-  "0.5.0"..<"0.6.0",
+  exact: "0.4.0",
   traits: ["CompactArena"]
 )
+// x-release-please-end
 ```
 
 Package traits are additive across the dependency graph. Enable this trait
@@ -115,6 +119,11 @@ authoritative command list. Maintainer-only details live in the
 [CI operations](./docs/maintainers/ci.md) and
 [Swift release](./docs/maintainers/releasing.md) runbooks.
 
+Releases are produced entirely by GitHub Actions. Release Please derives the
+next Swift version and changelog from Conventional Commit revision descriptions;
+protected workflows build and verify native artifacts, publish Cog and its
+documentation, then publish the matching `coglint-plugins` tag.
+
 ## Documentation
 
 Everything below is published as a website at
@@ -132,7 +141,7 @@ readable in this repository.
   runbook for the self-hosted boundary, hosted fork lane, and workflow
   hardening contract.
 - **[Releasing Cog for Swift](./docs/maintainers/releasing.md):** candidate,
-  annotated-tag, publication, and post-release verification steps.
+  protected publication, recovery, documentation, and sibling-workflow steps.
 - **[Shared state model](./docs/design.md):** the problem, vocabulary, and
   behavioral invariants both platform libraries implement.
 - **[Design history](./docs/history.md):** the Dart and Flutter lineage, how the

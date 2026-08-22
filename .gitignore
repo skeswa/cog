@@ -24,6 +24,7 @@ Thresholds/
 swift/Lint/Artifacts/CogLintBinary.artifactbundle/
 swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip
 swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum
+swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance.json
 
 # The VitePress documentation site. `node_modules/` is the repository's only
 # dependency tree and belongs to the docs site alone — the Swift package still

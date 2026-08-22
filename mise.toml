@@ -1,4 +1,5 @@
 [tools]
+jj = "0.41.0"
 node = "24"
 "npm:oxfmt" = "0.62.0"
 
@@ -214,6 +215,23 @@ run = "node {{config_root}}/tools/check-workflows.mjs"
 [tasks."workflows:check:fixtures"]
 description = "Run the workflow-contract checker against its fixtures"
 run = "node {{config_root}}/tools/test-workflows.mjs"
+
+# Revision descriptions are the release input, so the local jj range and the
+# authoritative GitHub PR/push range share one checker. Its fixture suite uses
+# real temporary git and colocated jj repositories in addition to individual
+# message cases.
+
+[tasks."changes:check"]
+description = "Lint Conventional Commit descriptions in the current revision range"
+depends = ["changes:check:fixtures"]
+run = "node {{config_root}}/tools/check-changes.mjs"
+
+[tasks."changes:check:fixtures"]
+description = "Test Conventional Commit messages and Git and jj range selection"
+run = """
+node {{config_root}}/tools/test-changes.mjs
+node {{config_root}}/tools/test-release-configuration.mjs
+"""
 
 # Benchmarks live in their own SwiftPM package under `swift/Benchmarks`, so
 # every benchmark command runs there rather than at the repository root. The

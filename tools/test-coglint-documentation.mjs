@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentVersion } from "./lib/version.mjs";
 
 /** Repository-owned source, generated, and archive locations. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -16,6 +17,7 @@ const SETUP_GUIDE = join(DOCC_CATALOG, "LintingYourApp.md");
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-documentation-test");
 const GENERATED = join(TEST_ROOT, "generated");
 const ARCHIVE = join(REPO_ROOT, ".build", "docs", "Cog.doccarchive");
+const VERSION = currentVersion();
 
 /** The settled route oracle, independent of the generator under test. */
 const RULES = [
@@ -89,10 +91,10 @@ function verifySetupGuide() {
   if (plugin[1] !== packageIdentity) {
     fail(`lint setup guide references package ${plugin[1]}; URL identity is ${packageIdentity}`);
   }
-  if (dependency[2] !== "0.4.0") {
-    fail(`lint setup guide pins ${dependency[2]}; expected the current release 0.4.0`);
+  if (dependency[2] !== VERSION) {
+    fail(`lint setup guide pins ${dependency[2]}; expected the current release ${VERSION}`);
   }
-  console.log(`==> Setup guide binds CogLintBuildToolPlugin to ${packageIdentity} 0.4.0`);
+  console.log(`==> Setup guide binds CogLintBuildToolPlugin to ${packageIdentity} ${VERSION}`);
 }
 
 /** Defines one canonical rule route and its two independent source owners. */

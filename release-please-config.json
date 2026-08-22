@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
+  "bootstrap-sha": "16ade4bac358bf1c6f6dbc6e95fad2d467600250",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "version-file": "version.txt",
+      "package-name": "Cog",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false,
+      "include-component-in-tag": false,
+      "include-v-in-tag": false,
+      "include-v-in-release-name": false,
+      "draft-pull-request": true,
+      "draft": true,
+      "force-tag-creation": true,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "AGENTS.md"
+        },
+        {
+          "type": "generic",
+          "path": "CLAUDE.md"
+        },
+        {
+          "type": "generic",
+          "path": "README.md"
+        },
+        {
+          "type": "generic",
+          "path": "docs/swift/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "swift/Sources/Cog/Cog.docc/GettingStarted.md"
+        },
+        {
+          "type": "generic",
+          "path": "swift/Sources/Cog/Cog.docc/LintingYourApp.md"
+        }
+      ]
+    }
+  }
+}

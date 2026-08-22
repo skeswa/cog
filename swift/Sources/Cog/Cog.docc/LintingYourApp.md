@@ -17,6 +17,7 @@ For SwiftPM, add both version-matched packages and attach
 `CogLintBuildToolPlugin` to each source target you want checked:
 
 ```swift
+// x-release-please-start-version
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
@@ -27,6 +28,7 @@ dependencies: [
     exact: "0.4.0"
   ),
 ],
+// x-release-please-end
 targets: [
   .target(
     name: "ForecastFeature",

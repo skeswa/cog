@@ -64,6 +64,23 @@ const PERMISSION_EXCEPTIONS = new Map([
       ],
     ]),
   ],
+  [
+    "release.yml",
+    new Map([
+      [
+        "release-please",
+        new Map([
+          ["contents", "write"],
+          ["pull-requests", "write"],
+          ["issues", "write"],
+        ]),
+      ],
+      ["recover-candidate", new Map([["actions", "write"]])],
+      ["publish", new Map([["contents", "write"]])],
+      ["dispatch-docs", new Map([["actions", "write"]])],
+    ]),
+  ],
+  ["publish.yml", new Map([["publish", new Map([["contents", "write"]])]])],
 ]);
 
 /** The action whose checkout token must not be left on disk. */
@@ -106,7 +123,7 @@ const COGLINT_ARTIFACT_CONDITION =
 const COGLINT_CANDIDATE_FILES = [
   "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip",
   "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.checksum",
-  "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance",
+  "swift/Lint/Artifacts/CogLintBinary.artifactbundle.zip.provenance.json",
 ];
 
 // ---------------------------------------------------------------------------
@@ -608,13 +625,24 @@ function cogLintArtifactCiContract(workflow) {
 
   /** @type {Diagnostic[]} */
   const diagnostics = [];
-  if (!workflow.triggers.some((trigger) => trigger.name === "workflow_dispatch")) {
+  const dispatch = workflow.triggers.find((trigger) => trigger.name === "workflow_dispatch");
+  if (dispatch === undefined) {
     diagnostics.push({
       path: workflow.path,
       line: 1,
       check: "coglint-artifact-ci-contract",
       message: "the exact-source CogLint candidate needs a `workflow_dispatch` trigger",
     });
+  } else {
+    const releasePr = get(get(dispatch.configuration, "inputs"), "release_pr");
+    if (text(get(releasePr, "required")) !== "true") {
+      diagnostics.push({
+        path: workflow.path,
+        line: dispatch.line,
+        check: "coglint-artifact-ci-contract",
+        message: "`workflow_dispatch` must require the Release Please PR number as `release_pr`",
+      });
+    }
   }
 
   const job = workflow.jobs.find((candidate) => candidate.id === "lint-artifact");
@@ -658,13 +686,14 @@ function cogLintArtifactCiContract(workflow) {
     });
   }
 
-  if (!hasExactContentsRead(job.permissions)) {
+  if (!hasExactPermissions(job.permissions, { contents: "read", "pull-requests": "read" })) {
     diagnostics.push({
       path: workflow.path,
       line: job.permissionsLine,
       check: "coglint-artifact-ci-contract",
       job: job.id,
-      message: "job `lint-artifact` needs its own exact `permissions: {contents: read}` block",
+      message:
+        "job `lint-artifact` needs exact read access to contents and pull requests, and nothing else",
     });
   }
 
@@ -678,6 +707,25 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: job.id,
       message: "job `lint-artifact` checkout must set `ref: ${{ github.sha }}`",
+    });
+  }
+
+  const binding = job.steps.find(
+    (step) =>
+      step.run?.includes("pulls/${RELEASE_PR}") === true &&
+      step.run.includes('source_sha" != "$pr_head_sha') &&
+      step.run.includes("GITHUB_REF_TYPE") &&
+      step.run.includes("pr_head_tree") &&
+      step.run.includes("source_tree"),
+  );
+  if (binding === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "coglint-artifact-ci-contract",
+      job: job.id,
+      message:
+        "job `lint-artifact` must bind an ordinary dispatch to the current release PR head and recovery to an immutable tag with the same tree",
     });
   }
 
@@ -697,10 +745,13 @@ function cogLintArtifactCiContract(workflow) {
 
   const provenance = job.steps.find(
     (step) =>
-      step.run?.includes("format=coglint-candidate-v1") === true &&
+      step.run?.includes('format: "coglint-candidate-v2"') === true &&
       step.run.includes("swift package compute-checksum") &&
       step.run.includes("$COG_XCODE_BUILD") &&
-      step.run.includes("arm64_probe=passed"),
+      step.run.includes("pr_head_sha") &&
+      step.run.includes("source_tree") &&
+      step.run.includes('architectures: ["arm64", "x86_64"]') &&
+      step.run.includes('arm64_probe: "passed"'),
   );
   if (provenance === undefined) {
     diagnostics.push({
@@ -709,7 +760,7 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: job.id,
       message:
-        "job `lint-artifact` must verify source, Xcode build, and checksum before writing v1 provenance",
+        "job `lint-artifact` must verify the PR/source tree, toolchain, architectures, and checksum before writing versioned JSON provenance",
     });
   }
 
@@ -725,7 +776,8 @@ function cogLintArtifactCiContract(workflow) {
   );
   const uploadSettingsValid =
     upload !== undefined &&
-    text(get(upload.with, "name")) === "coglint-0.4.0-${{ github.sha }}" &&
+    text(get(upload.with, "name")) ===
+      "coglint-build-${{ steps.candidate.outputs.version }}-${{ steps.candidate.outputs.pr_head_sha }}" &&
     COGLINT_CANDIDATE_FILES.every((path) => uploadedPaths.has(path)) &&
     text(get(upload.with, "if-no-files-found")) === "error" &&
     text(get(upload.with, "compression-level")) === "0";
@@ -736,7 +788,7 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: job.id,
       message:
-        "job `lint-artifact` must upload the SHA-named archive, checksum, and provenance without recompression",
+        "job `lint-artifact` must upload the version/PR-head-qualified build handoff, checksum, and JSON provenance without recompression",
     });
   }
 
@@ -838,7 +890,8 @@ function cogLintArtifactCiContract(workflow) {
   );
   if (
     download === undefined ||
-    text(get(download.with, "name")) !== "coglint-0.4.0-${{ github.sha }}" ||
+    text(get(download.with, "name")) !==
+      "coglint-build-${{ needs.lint-artifact.outputs.version }}-${{ needs.lint-artifact.outputs.pr_head_sha }}" ||
     text(get(download.with, "path")) !== "swift/Lint/Artifacts"
   ) {
     diagnostics.push({
@@ -847,16 +900,18 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: intelJob.id,
       message:
-        "job `lint-artifact-x86_64` must download the SHA-named candidate into `swift/Lint/Artifacts`",
+        "job `lint-artifact-x86_64` must download the version/PR-head-qualified build handoff into `swift/Lint/Artifacts`",
     });
   }
 
   const downloadedProof = intelJob.steps.find(
     (step) =>
       step.run?.includes("$(uname -m)") === true &&
-      step.run.includes("GITHUB_SHA") &&
       step.run.includes("swift package compute-checksum") &&
-      step.run.includes("arm64_probe=passed"),
+      step.run.includes("coglint-candidate-v2") &&
+      step.run.includes("PR_HEAD_SHA") &&
+      step.run.includes("SOURCE_TREE") &&
+      step.run.includes('arm64_probe == "passed"'),
   );
   if (downloadedProof === undefined) {
     diagnostics.push({
@@ -865,7 +920,7 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: intelJob.id,
       message:
-        "job `lint-artifact-x86_64` must verify its Intel host and the downloaded source, checksum, and arm64 proof",
+        "job `lint-artifact-x86_64` must verify its Intel host and the downloaded PR/source tree, checksum, architectures, and arm64 proof",
     });
   }
 
@@ -885,6 +940,357 @@ function cogLintArtifactCiContract(workflow) {
     });
   }
 
+  const finalUpload = intelJob.steps.find(
+    (step) =>
+      step.uses !== null &&
+      actionName(step.uses).toLowerCase() === "actions/upload-artifact" &&
+      text(get(step.with, "name")) ===
+        "coglint-candidate-${{ needs.lint-artifact.outputs.version }}-${{ needs.lint-artifact.outputs.pr_head_sha }}",
+  );
+  const finalPaths = new Set(
+    (text(get(finalUpload?.with, "path")) ?? "")
+      .split(/\r?\n/)
+      .map((path) => path.trim())
+      .filter(Boolean),
+  );
+  if (
+    finalUpload === undefined ||
+    !COGLINT_CANDIDATE_FILES.every((path) => finalPaths.has(path)) ||
+    text(get(finalUpload.with, "retention-days")) !== "90"
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: finalUpload?.line ?? intelJob.line,
+      check: "coglint-artifact-ci-contract",
+      job: intelJob.id,
+      message:
+        "job `lint-artifact-x86_64` must retain the publication-ready version/PR-head-qualified archive, checksum, and JSON provenance for 90 days",
+    });
+  }
+
+  const gate = workflow.jobs.find((candidate) => candidate.id === "candidate-gate");
+  const gateNeeds = new Set(
+    items(gate?.needs)
+      .map((entry) => text(entry))
+      .filter(Boolean),
+  );
+  const completeCandidateGraph = [
+    "candidate-changes",
+    "format",
+    "lint-swift",
+    "lint-artifact-x86_64",
+    "candidate-extras",
+    "test-host",
+    "test-simulator",
+    "build-weather",
+    "test-release",
+    "compile-fail",
+    "ledger",
+    "bench-build",
+  ];
+  if (
+    gate === undefined ||
+    gate.name !== "Release candidate" ||
+    !isHostedRunner(gate, "ubuntu-latest") ||
+    !hasExactContentsRead(gate.permissions) ||
+    completeCandidateGraph.some((dependency) => !gateNeeds.has(dependency))
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: gate?.needsLine ?? gate?.line ?? 1,
+      check: "coglint-artifact-ci-contract",
+      job: "candidate-gate",
+      message:
+        "the hosted `Release candidate` gate must depend on Conventional Commits and the complete format, test, simulator, example, lint, documentation, benchmark, and native-artifact graph",
+    });
+  }
+
+  return diagnostics;
+}
+
+/** Every PR and push is linted as release input, without path-based escape hatches. */
+function conventionalCommitsContract(workflow) {
+  if ((workflow.path.split("/").pop() ?? workflow.path) !== "conventional-commits.yml") return [];
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  for (const name of ["pull_request", "push"]) {
+    const trigger = workflow.triggers.find((candidate) => candidate.name === name);
+    if (trigger === undefined || get(trigger.configuration, "paths") !== undefined) {
+      diagnostics.push({
+        path: workflow.path,
+        line: trigger?.line ?? 1,
+        check: "conventional-commits-contract",
+        message: `Conventional Commits must run on every \`${name}\` with no path filters`,
+      });
+    }
+  }
+
+  const job = workflow.jobs.find((candidate) => candidate.id === "conventional-commits");
+  if (job === undefined) {
+    diagnostics.push({
+      path: workflow.path,
+      line: 1,
+      check: "conventional-commits-contract",
+      message: "missing required `conventional-commits` job",
+    });
+    return diagnostics;
+  }
+  if (!isHostedRunner(job, "ubuntu-latest") || !hasExactContentsRead(job.permissions)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "conventional-commits-contract",
+      job: job.id,
+      message: "the Conventional Commits job must be hosted and exactly read-only",
+    });
+  }
+  const checkout = findActionStep(job, CHECKOUT_ACTION);
+  if (
+    text(get(checkout?.with, "fetch-depth")) !== "0" ||
+    text(get(checkout?.with, "ref")) !==
+      "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: checkout?.line ?? job.line,
+      check: "conventional-commits-contract",
+      job: job.id,
+      message: "the check must fetch history at the authoritative PR head or push SHA",
+    });
+  }
+  if (
+    !job.steps.some((step) => step.run?.trim() === "npm ci --ignore-scripts") ||
+    !job.steps.some((step) => step.run?.trim() === "mise run changes:check")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: job.line,
+      check: "conventional-commits-contract",
+      job: job.id,
+      message: "the check must install the lockfile and run exactly `mise run changes:check`",
+    });
+  }
+  return diagnostics;
+}
+
+/** Release Please, protected publication, recovery, and docs dispatch stay narrowly separated. */
+function releaseWorkflowContract(workflow) {
+  if ((workflow.path.split("/").pop() ?? workflow.path) !== "release.yml") return [];
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  const expected = [
+    ["release-please", { contents: "write", "pull-requests": "write", issues: "write" }],
+    ["recover-candidate", { actions: "write", contents: "read" }],
+    ["publish", { actions: "read", contents: "write", "pull-requests": "read" }],
+    ["dispatch-docs", { actions: "write", contents: "read" }],
+  ];
+  for (const [id, permissions] of expected) {
+    const job = workflow.jobs.find((candidate) => candidate.id === id);
+    if (job === undefined || !isHostedRunner(job, "ubuntu-latest")) {
+      diagnostics.push({
+        path: workflow.path,
+        line: job?.line ?? 1,
+        check: "release-workflow-contract",
+        job: id,
+        message: `release job \`${id}\` must exist on \`ubuntu-latest\``,
+      });
+      continue;
+    }
+    if (!hasExactPermissions(job.permissions, permissions)) {
+      diagnostics.push({
+        path: workflow.path,
+        line: job.permissionsLine,
+        check: "release-workflow-contract",
+        job: id,
+        message: `release job \`${id}\` has drifted from its exact permission set`,
+      });
+    }
+  }
+
+  const releasePlease = workflow.jobs.find((job) => job.id === "release-please");
+  const releaseStep = releasePlease?.steps.find(
+    (step) =>
+      step.uses === "googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7",
+  );
+  if (
+    releasePlease === undefined ||
+    releasePlease.steps.some(
+      (step) => actionName(step.uses ?? "").toLowerCase() === CHECKOUT_ACTION,
+    ) ||
+    releaseStep === undefined ||
+    text(get(releaseStep.with, "config-file")) !== "release-please-config.json" ||
+    text(get(releaseStep.with, "manifest-file")) !== ".release-please-manifest.json"
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: releaseStep?.line ?? releasePlease?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "release-please",
+      message:
+        "Release Please must use the v5.0.0 SHA and manifest configuration without checking out repository code",
+    });
+  }
+
+  const recovery = workflow.jobs.find((job) => job.id === "recover-candidate");
+  const recoverySource = recovery?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    !recoverySource.includes("object.type") ||
+    !recoverySource.includes("gh workflow run swift-ci.yml") ||
+    !recoverySource.includes("recovery_tag=${TAG}") ||
+    !recoverySource.includes("gh run watch")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: recovery?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "recover-candidate",
+      message:
+        "recovery must require an immutable tag, dispatch tag-bound Swift CI, and wait for it",
+    });
+  }
+
+  const publish = workflow.jobs.find((job) => job.id === "publish");
+  const publishSource = publish?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    environmentName(publish) !== "cog-release" ||
+    !publishSource.includes(".github/workflows/swift-ci.yml") ||
+    !publishSource.includes("coglint-candidate-${version}-${pr_head_sha}") ||
+    !publishSource.includes("source_tree == $source_tree") ||
+    !publishSource.includes("workflow == $workflow") ||
+    !publishSource.includes("workflow_run_id == $run_id") ||
+    !publishSource.includes('.build.xcode_build == "17F113"') ||
+    !publishSource.includes('.intel.xcode_build == "17C529"') ||
+    !publishSource.includes("Release was published early") ||
+    !publishSource.includes("Divergent release asset") ||
+    !publishSource.includes('gh release edit "$TAG" --title "Cog ${VERSION}" --draft=false')
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: publish?.environmentLine ?? publish?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "publish",
+      message:
+        "publisher must use `cog-release` and verify workflow identity, PR/tag tree, provenance, checksum, and existing assets before publication",
+    });
+  }
+
+  const docs = workflow.jobs.find((job) => job.id === "dispatch-docs");
+  if (
+    docs === undefined ||
+    text(docs.needs) !== "publish" ||
+    !docs.steps.some((step) => step.run?.trim() === 'gh workflow run docs.yml --ref "$TAG"')
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: docs?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "dispatch-docs",
+      message: "a successful publication must explicitly dispatch `docs.yml` at the release tag",
+    });
+  }
+  return diagnostics;
+}
+
+/** The sibling keeps generation read-only and gates only a no-execution commit job. */
+function cogLintPublicationContract(workflow) {
+  if (
+    (workflow.path.split("/").pop() ?? workflow.path) !== "publish.yml" ||
+    workflow.name !== "Publish CogLintPlugins"
+  ) {
+    return [];
+  }
+  /** @type {Diagnostic[]} */
+  const diagnostics = [];
+  const dispatch = workflow.triggers.find((trigger) => trigger.name === "workflow_dispatch");
+  const version = get(get(dispatch?.configuration, "inputs"), "cog_version");
+  if (dispatch === undefined || text(get(version, "required")) !== "true") {
+    diagnostics.push({
+      path: workflow.path,
+      line: dispatch?.line ?? 1,
+      check: "coglint-publication-contract",
+      message: "sibling publication must require a `cog_version` dispatch input",
+    });
+  }
+
+  const prepare = workflow.jobs.find((job) => job.id === "prepare");
+  const publish = workflow.jobs.find((job) => job.id === "publish");
+  const consume = workflow.jobs.find((job) => job.id === "consume");
+  if (
+    prepare === undefined ||
+    !isHostedRunner(prepare, "macos-15") ||
+    !hasExactContentsRead(prepare.permissions)
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: prepare?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "prepare",
+      message: "sibling preparation must run read-only on hosted macOS",
+    });
+  }
+  const prepareSource = prepare?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    !prepareSource.includes("releases/tags/${VERSION}") ||
+    !prepareSource.includes("source_tree == $tree") ||
+    !prepareSource.includes('.build.xcode_build == "17F113"') ||
+    !prepareSource.includes('.intel.xcode_build == "17C529"') ||
+    !prepareSource.includes("generate-coglint-plugins.mjs") ||
+    !prepareSource.includes("swift build --package-path") ||
+    !prepareSource.includes("sibling_main_sha")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: prepare?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "prepare",
+      message:
+        "preparation must verify the public Cog release/provenance, generate with that tag, smoke-test SwiftPM, and record sibling main",
+    });
+  }
+
+  const publishSource = publish?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    publish === undefined ||
+    !isHostedRunner(publish, "ubuntu-latest") ||
+    !hasExactPermissions(publish.permissions, { contents: "write" }) ||
+    environmentName(publish) !== "coglint-release" ||
+    /\b(node|swift)\b/u.test(publishSource) ||
+    !publishSource.includes("Sibling main moved") ||
+    !publishSource.includes("generated_tree_hash") ||
+    !publishSource.includes("Divergent immutable sibling tag") ||
+    !publishSource.includes("Divergent published sibling tree") ||
+    !publishSource.includes("already_published=true") ||
+    !publishSource.includes('git commit -m "chore(release): publish CogLintPlugins ${VERSION}"') ||
+    !publishSource.includes('git push --atomic origin HEAD:main "refs/tags/${VERSION}"') ||
+    publishSource.includes("--force") ||
+    publishSource.includes("--force-with-lease")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: publish?.environmentLine ?? publish?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "publish",
+      message:
+        "protected sibling publication must only reverify bytes, require unchanged main, fast-forward the conventional commit, and create one immutable tag",
+    });
+  }
+
+  const consumeSource = consume?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    consume === undefined ||
+    !isHostedRunner(consume, "macos-15") ||
+    !hasExactContentsRead(consume.permissions) ||
+    !consumeSource.includes("https://github.com/skeswa/coglint-plugins.git") ||
+    !consumeSource.includes("swift build --package-path")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: consume?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "consume",
+      message: "final read-only verification must build a public exact-tag sibling consumer",
+    });
+  }
   return diagnostics;
 }
 
@@ -898,6 +1304,41 @@ function hasExactContentsRead(permissions) {
   );
 }
 
+/** @param {import("./yaml.mjs").Node | null | undefined} permissions */
+function hasExactPermissions(permissions, expected) {
+  const permissionEntries = entries(permissions);
+  const expectedEntries = Object.entries(expected);
+  return (
+    permissionEntries.length === expectedEntries.length &&
+    expectedEntries.every(([scope, value]) =>
+      permissionEntries.some((entry) => entry.key === scope && text(entry.value) === value),
+    )
+  );
+}
+
+/** @param {import("./model.mjs").Job} job */
+function isHostedRunner(job, label) {
+  return (
+    job.runsOn.shape === "string" &&
+    job.runsOn.labels.length === 1 &&
+    job.runsOn.labels[0].value === label &&
+    !classifyRunner(job.runsOn).selfHosted
+  );
+}
+
+/** @param {import("./model.mjs").Job | undefined} job */
+function environmentName(job) {
+  if (job === undefined) return null;
+  return text(job.environment) ?? text(get(job.environment, "name"));
+}
+
+/** @param {import("./model.mjs").Job} job */
+function findActionStep(job, name) {
+  return job.steps.find(
+    (step) => step.uses !== null && actionName(step.uses).toLowerCase() === name.toLowerCase(),
+  );
+}
+
 /** The ordered registry the CLI runs. */
 export const WORKFLOW_CHECKS = [
   { name: "no-pull-request-target", run: noPullRequestTarget },
@@ -908,6 +1349,9 @@ export const WORKFLOW_CHECKS = [
   { name: "sha-pinned-actions", run: shaPinnedActions },
   { name: "coglint-ci-contract", run: cogLintCiContract },
   { name: "coglint-artifact-ci-contract", run: cogLintArtifactCiContract },
+  { name: "conventional-commits-contract", run: conventionalCommitsContract },
+  { name: "release-workflow-contract", run: releaseWorkflowContract },
+  { name: "coglint-publication-contract", run: cogLintPublicationContract },
 ];
 
 /**

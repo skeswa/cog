@@ -1,6 +1,6 @@
 # Cog CI and runner operations
 
-_August 20, 2026._
+_August 21, 2026._
 
 This maintainer runbook records the CI topology, self-hosted runner security
 boundary, and repository settings that support Cog's public workflows. The
@@ -203,8 +203,9 @@ Recorded risks, to revisit rather than forget:
 This repository is public and its CI is pull-request-driven, so macOS jobs on
 the self-hosted runner are protected by layered settings rather than by
 omitting the `pull_request` trigger. Three repository-level Actions settings
-are part of that hardening. They were applied on 2026-08-10 and are the
-recorded values below; verify them with these exact commands:
+are part of that hardening. The fork and pinning settings were applied on
+2026-08-10; the Release Please permission was enabled on 2026-08-21. These are
+the recorded values; verify them with these exact commands:
 
 ```sh
 # 1. Approval required for workflow runs from all external contributors.
@@ -215,9 +216,9 @@ gh api repos/skeswa/cog/actions/permissions/fork-pr-contributor-approval
 gh api repos/skeswa/cog/actions/permissions --jq '.sha_pinning_required'
 #    => true
 
-# 3. The default GITHUB_TOKEN is read-only and cannot approve pull requests.
+# 3. The default GITHUB_TOKEN is read-only; Actions may create release PRs.
 gh api repos/skeswa/cog/actions/permissions/workflow
-#    => {"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
+#    => {"default_workflow_permissions":"read","can_approve_pull_request_reviews":true}
 ```
 
 These settings are the repository half of the hardening. The workflow half —
@@ -225,17 +226,74 @@ the same-repo guard on every self-hosted job, least-privilege `permissions:`
 blocks, `persist-credentials: false`, and job timeouts — lives in the
 workflows themselves and is enforced by `mise run workflows:check`.
 
-That contract allows exactly one write grant, and it is written down rather
-than waived: the `deploy` job of `docs.yml` holds `pages: write` and
-`id-token: write`, because GitHub Pages cannot be published with a read-only
-token. Two things bound it. The exception names that one file, that one job id,
-and those two scopes in `PERMISSION_EXCEPTIONS`
-(`tools/lib/workflows/checks.mjs`), so a second job cannot inherit it and an
-extra scope on the same job still fails. And it is granted only to a
-GitHub-hosted job, so a write-scoped token never reaches the persistent Mac
-mini — moving that job to `cog-mini` turns the exception off rather than
-carrying it along. Fixtures cover both the granted case and each way of
-overreaching it.
+## Repository release controls
+
+Cog permits rebase merging only: merge commits and squash merging are disabled
+at the repository level. Bare release tags are protected by the active
+`Protect immutable release tags` tag ruleset, whose update and deletion rules
+have no bypass actors. Tag creation remains available to Release Please; after
+creation, neither a person nor a workflow can move or delete that identity.
+The sibling repository has the same tag ruleset and retains read-only default
+workflow permissions.
+
+The `cog-release` and sibling `coglint-release` environments each require
+`skeswa` as a reviewer and permit self-review. Only their narrow hosted
+publisher jobs name those environments or receive `contents: write`.
+
+The existing `Protect main` branch ruleset is migrated only after GitHub has
+registered the new `Conventional Commits` check. Its final state requires a
+pull request, linear history, the rebase merge method, and that exact status
+context. During the one-time migration, PR #400 lands first under the old
+deletion/non-fast-forward rules; the child release-management PR then registers
+the check before the ruleset is tightened. This ordering avoids requiring a
+status that the still-open parent revision cannot produce.
+
+Every write grant is written down rather than waived. `PERMISSION_EXCEPTIONS`
+in `tools/lib/workflows/checks.mjs` names the exact workflow, job, scope, and
+value: Pages deployment has `pages: write` and `id-token: write`; Release Please
+has `contents`, `pull-requests`, and `issues` write; recovery and the docs handoff
+have `actions: write`; and the protected publisher has `contents: write`. The
+sibling fixture permits only its protected publisher's `contents: write`.
+
+Every exception applies only to a GitHub-hosted job, so a write-scoped token
+never reaches the persistent Mac mini. Moving one of those jobs to `cog-mini`
+turns its exception off. The workflow checker also requires the `cog-release`
+and `coglint-release` environments, the Release Please and action SHAs, exact
+candidate identity and provenance checks, tag-bound recovery, explicit docs
+dispatch, unchanged sibling `main`, non-forced tag creation, and final public
+consumption. Fixtures cover the valid topology and drift at each boundary.
+
+## Release and change-management workflows
+
+`conventional-commits.yml` is a required, read-only hosted check with no path
+filters. It checks out the PR head rather than GitHub's synthetic merge commit
+and lints every commit in the PR or push range. The same command reads non-empty
+jj descriptions from `main..@` for developer preflight. Commitlint is locked in
+the documentation dependency tree; `package.json` remains the private docs
+package at 0.0.0 and is not a Cog version source.
+
+`swift-ci.yml` accepts a required Release Please PR number on manual dispatch.
+An ordinary candidate must be dispatched at that PR's exact current head. A
+recovery candidate must be dispatched at an existing tag and must have the same
+tree as the merged release PR. The self-hosted arm64 job builds both native
+CogLint binaries and records versioned JSON provenance; the hosted Intel job
+downloads those bytes, recomputes the checksum, executes the x86_64 member, and
+retains the publication artifact for 90 days. `Release candidate` depends on
+the PR-range Conventional Commit check and the complete host, simulator,
+examples, Storefront UI, lint, documentation, ledger, benchmark, and artifact
+graph. That hosted PR-range job also supplies the required status context for a
+Release Please PR whose repository-token creation did not emit an ordinary
+pull-request workflow event.
+
+`release.yml` has four hosted jobs with separate tokens. Release Please checks
+out no code. Recovery can dispatch and wait for tag-bound Swift CI. Publication
+waits at `cog-release`, verifies the successful workflow identity, PR and tag
+trees, provenance, architectures, toolchains, and checksum, then publishes only
+byte-identical assets. The last job can only dispatch Docs at the published tag.
+The sibling repository mirrors the split with read-only preparation, a
+`coglint-release`-protected contents writer that executes no downloaded Cog
+code, atomically advances `main` with its matching immutable tag, and a final
+read-only public consumer.
 
 ## The documentation site
 
@@ -275,10 +333,11 @@ hits.
 the `pages: write` and `id-token: write` grant and consists of a single action
 invocation with no repository code in it.
 
-`docs.yml` has no `paths:` filter, and should not gain one. GitHub applies path
-filters to tag pushes as well as branch pushes, and a release tag usually points
-at a commit whose diff touches nothing under `docs/`, so the filter would
-silently skip the release publish — the one run that must never be skipped.
+`docs.yml` has no `paths:` filter, and should not gain one. Ordinary pushes can
+still republish prose, while the release pipeline explicitly dispatches Docs at
+the published tag. That dispatch is load-bearing: the repository token creates
+the Release Please tag, and token-created push events do not generally start a
+second workflow.
 
 If the site is ever published without its API reference, `assemble` has failed
 to find the archive; re-running the workflow rebuilds it on the mini. The merge

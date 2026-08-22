@@ -879,56 +879,64 @@ a graph, measured headlessly and again through a real SwiftUI interface.
 
 ## Release process
 
-- Tags: use bare, annotated semver git tags (`0.1.0`) permanently. Bare tags
-  belong to the Swift package. Kotlin releases through Maven coordinates
-  and, if it ever wants tags, uses namespaced ones (`kotlin/1.2.3`), which
-  SwiftPM ignores. The repo is jj-colocated and jj does not author annotated
-  tags, so a tag task runs `git tag -a` in the colocated repo and pushes the
-  tag with `git push origin <tag>`; all other pushes go through
-  `jj git push`.
-- 0.x policy: minor may break; patch is additive or a fix. The README
-  tells consumers to pin
-  `.package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.1.0"))`.
-  `CHANGELOG.md` calls out breaking changes per minor. No `@frozen`, no
-  stability promises before 1.0.
-- Docs: publish DocC to GitHub Pages through the env-gated swift-docc-plugin in
-  `docs.yml` (`upload-pages-artifact` plus `deploy-pages`); URL
-  `https://skeswa.github.io/cog/documentation/cog/`. That workflow merges the
-  archive with the VitePress site built from `docs/` and publishes both as one
-  deployment, always building the archive from the newest release tag so the
-  reference describes released code.
-  M8 rule diagnostics use permanent native article URLs beneath that prefix;
-  the six exact paths are fixed in lint.md §7 and require no redirect layer.
-  Fallback: `xcodebuild docbuild` plus `docc process-archive`, which needs
-  no package dependency.
-- Checklist: before tagging, run `fmt:check` and `test:matrix` locally, then
-  confirm CI, simulator tests, and the Weather build are green. From M5 on,
-  record `mise run bench` with its pinned environment and run `baseline check`
-  once baselines exist. Version 0.1.0 predates the benchmark package and skips
-  those steps. From M8 on, also run `test:lint` and `lint:swift`, build and
-  checksum the release artifact, and exercise its local bundle before the
-  candidate closes. Update the CHANGELOG, tag, and push. Source-only releases
-  then verify the Pages deploy and exact consumption before creating the
-  GitHub Release. A binary-backed release publishes its GitHub Release and
-  attached artifact first, because the exact plugin consumer needs that URL;
-  post-publication gates then verify Pages, download and checksum the asset,
-  and smoke-test the selected channel from a scratch iOS 17 app.
-- Task boundaries: build and exercise release automation first; close a
-  non-mutating release-candidate gate with immutable CI links second; create
-  and push the annotated tag third. A source-only release then verifies Pages
-  and exact consumption before creating the GitHub Release. A binary-backed
-  release separates GitHub Release and asset publication, Pages and asset
-  verification, the Channel B sibling-repository tag, and exact plugin
-  consumption into distinct downstream tasks. The tag task never also owns
-  workflow creation, asset upload, deployment troubleshooting, or
-  post-release smoke testing.
-- Serialization: releases form one dependency-ordered chain. A tag task
-  depends on the previous release's terminal task so publications never
-  interleave, and the ledger checker enforces the chain. A patch release
-  (for example `0.1.1`) inserts a new candidate → tag → verification →
-  GitHub Release link into the chain, reusing the M4 task template. A Channel
-  B sibling tag is part of its owning Cog release chain and is published only
-  after that Cog tag's docs and artifact verify.
+- Authority: release preparation and publication run entirely in GitHub
+  Actions. A maintainer workstation may perform optional developer preflight,
+  but it never supplies release evidence or bytes. Human control is review,
+  workflow dispatch, queued-run approval, and protected-environment approval.
+- History: jj revision descriptions are Conventional Commits and survive
+  rebase-only pull-request merges as the authoritative linear release input.
+  The required `Conventional Commits` check has no path filter and lints every
+  commit in the GitHub PR or push range. `Release-As` is maintainer-only.
+- Versioning: Release Please v17.6.0 uses its manifest-driven `simple` strategy.
+  `version.txt` is the runtime version source; the private Node documentation
+  package remains 0.0.0. Before 1.0, breaking changes and features bump the
+  minor, while fixes and performance changes bump the patch. The one-time
+  manifest begins at 0.0.0 and bootstraps after
+  `16ade4bac358bf1c6f6dbc6e95fad2d467600250`, so the divergent manual 0.4.0 tag
+  is neither treated as an ancestor nor replayed.
+- Proposal: Release Please maintains a draft release PR, `CHANGELOG.md`, the
+  manifest, `version.txt`, and only explicitly marked current-version or
+  consumer-pin statements. Published changelog entries and historical design
+  evidence are immutable inputs. The release PR stays draft until its exact
+  current head passes the complete manual candidate workflow.
+- Candidate: manual `swift-ci.yml` requires the release PR number and rejects a
+  dispatch at any other SHA. Its hosted revision-range job supplies the
+  required `Conventional Commits` context that a repository-token-created
+  Release Please PR cannot trigger for itself. The full Actions graph covers
+  formatting, host and release tests, both arena configurations, simulator and
+  examples, Storefront UI, CogLint integrations, documentation, the ledger,
+  benchmark thresholds, an arm64 native build, and hosted Intel verification
+  of the same downloaded bytes. The final version/PR-head-qualified artifact
+  retains its archive, checksum, and JSON provenance for publication.
+- Cog publication: after the draft release PR rebase-merges, Release Please
+  force-creates the permanent lightweight bare-semver tag and draft GitHub
+  Release. The hosted publisher waits at `cog-release`, then verifies the
+  workflow identity, conclusion, PR head, tag/tree equality, version,
+  provenance, toolchains, architectures, and checksum before uploading assets,
+  titling `Cog <version>`, and publishing. Kotlin remains outside this tag line
+  and uses Maven coordinates.
+- Docs: a narrow hosted job with only `actions: write` dispatches `docs.yml` at
+  the tag after publication, because repository-token-created events do not
+  generally start another workflow. DocC and VitePress still merge into the one
+  Pages deployment at `https://skeswa.github.io/cog/documentation/cog/`.
+- Sibling: after Cog and Docs publish, a human dispatches the
+  `coglint-plugins` repository's workflow with the Cog version. Read-only
+  preparation verifies the public tag, assets, checksum, and provenance; runs
+  the exact tag's generator; and smoke-tests SwiftPM. A `coglint-release`-gated
+  job with only sibling `contents: write` re-hashes without executing downloaded
+  Cog code, requires sibling `main` unchanged, fast-forwards one conventional
+  release commit and creates the matching immutable tag in one atomic,
+  non-forced push. A retry accepts an existing tag only when its commit and
+  regenerated managed tree are identical. Final public consumption is
+  read-only.
+- Recovery: a manual `release.yml` dispatch accepts an existing immutable tag
+  and merged release PR, rebuilds the complete candidate at that tag in
+  Actions, and retries the same protected publisher. Matching partial assets
+  are reused, divergent assets fail, and tags are never moved or replaced.
+- Serialization: the repository-level release concurrency group, draft release
+  PR, immutable tag, and protected publisher admit one Cog publication at a
+  time. The sibling concurrency group and unchanged-main proof serialize the
+  coupled plugin publication behind it.
 
 ## Kotlin headroom
 

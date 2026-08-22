@@ -427,3 +427,8 @@ now the consumer default and the simple implementation is retired. The
 remaining release work is to repeat the scouting measurements and Storefront UI
 qualification on the pinned Xcode, then calibrate thresholds for the new
 shipping configuration.
+
+<!-- x-release-please-start-version -->
+
+The current published Swift release is 0.4.0.
+<!-- x-release-please-end -->

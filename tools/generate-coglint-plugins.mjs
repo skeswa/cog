@@ -3,7 +3,7 @@
 // Generates the version-coupled Channel B distribution package from Cog's
 // checked-in plugin sources and one already-built artifact checksum.
 //
-// Usage: `generate-coglint-plugins.mjs [--version 0.4.0] [--output path]
+// Usage: `generate-coglint-plugins.mjs [--version semver] [--output path]
 //          [--checksum hex] [--artifact-url https://...zip]`
 
 import {
@@ -19,6 +19,7 @@ import {
 import { homedir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentVersion } from "./lib/version.mjs";
 
 /** The Cog repository that owns all distribution inputs. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -35,7 +36,7 @@ main(process.argv.slice(2));
 /** Parses one release identity and writes every managed distribution file. */
 function main(arguments_) {
   const options = parseArguments(arguments_);
-  const version = options.version ?? "0.4.0";
+  const version = options.version ?? currentVersion();
   if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
     fail(`invalid semantic version: ${version}`);
   }
