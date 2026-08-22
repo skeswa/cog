@@ -8,6 +8,7 @@ import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentVersion } from "./lib/version.mjs";
 
 /** The repository root, resolved from this script so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -18,6 +19,7 @@ const BUNDLE_NAME = "CogLintBinary.artifactbundle";
 const BUNDLE_PATH = join(ARTIFACTS_DIRECTORY, BUNDLE_NAME);
 const ARCHIVE_PATH = `${BUNDLE_PATH}.zip`;
 const CHECKSUM_PATH = `${ARCHIVE_PATH}.checksum`;
+const VERSION = currentVersion();
 
 /** Metadata selectors and exact contained paths LINT-19 promises. */
 const VARIANTS = [
@@ -114,7 +116,7 @@ function validateMetadata() {
     artifacts: {
       coglint: {
         type: "executable",
-        version: "0.4.0",
+        version: VERSION,
         variants: VARIANTS.map((variant) => ({
           path: variant.relativePath,
           supportedTriples: [variant.supportedTriple],

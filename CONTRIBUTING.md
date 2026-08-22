@@ -28,6 +28,7 @@ mise run test:compilefail
 mise run lint:swift
 mise run tasks:check
 mise run workflows:check
+mise run changes:check
 ```
 
 Filtered test runs always go through a mise wrapper, for example
@@ -92,9 +93,18 @@ to that snapshot instead of copying milestone state.
 ## Revisions
 
 Use `jj st`, `jj diff`, `jj commit`, `jj bookmark`, and `jj git push`. There is
-no staging area. Keep one logical change per revision and describe it with a
-scoped, imperative summary such as `docs(swift): align plan with task graph`.
-Use annotated Git tags only for releases, as documented in the
+no staging area. Keep one logical change per revision and use a Conventional
+Commit description: `type(optional-scope): imperative summary`. The accepted
+types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+`revert`, `style`, and `test`; use `!` and a `BREAKING CHANGE` footer for
+breaking work. Maintainers alone may add `Release-As`. `mise run changes:check`
+lints the local `main..@` range, and GitHub checks the complete PR or push
+range.
+
+Pull requests use rebase merging so those revision descriptions remain the
+linear release history. Release Please turns that history into versions,
+changelogs, draft release PRs, lightweight bare-semver tags, and draft GitHub
+Releases. Candidate builds and publication run only in GitHub Actions; see the
 [Swift release runbook](./docs/maintainers/releasing.md).
 
 Every change must leave `mise run fmt:check` green and must run the smallest

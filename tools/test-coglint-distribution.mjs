@@ -8,6 +8,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
+import { currentVersion } from "./lib/version.mjs";
 
 /** The repository root and stable ignored LINT-20 scratch space. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -18,6 +19,7 @@ const PACKAGE_NAME = "CogLintPlugins";
 const ASSET_NAME = "CogLintBinary.artifactbundle.zip";
 const SOURCE_DEPENDENCIES = ["swift-syntax", "swift-argument-parser"];
 const DUMMY_CHECKSUM = "0".repeat(64);
+const VERSION = currentVersion();
 
 main();
 
@@ -45,7 +47,7 @@ function generateDistribution() {
     [
       join(REPO_ROOT, "tools", "generate-coglint-plugins.mjs"),
       "--version",
-      "0.4.0",
+      VERSION,
       "--output",
       output,
       "--checksum",
@@ -82,7 +84,7 @@ function validateDistribution(distribution) {
   }
 
   const record = JSON.parse(readFileSync(join(distribution, ".coglint-generation.json"), "utf8"));
-  const expectedURL = `https://github.com/skeswa/cog/releases/download/0.4.0/${ASSET_NAME}`;
+  const expectedURL = `https://github.com/skeswa/cog/releases/download/${VERSION}/${ASSET_NAME}`;
   if (record.artifactURL !== expectedURL || record.checksum !== DUMMY_CHECKSUM) {
     fail("generated release record does not match its version, URL, and checksum inputs");
   }
@@ -200,7 +202,7 @@ function verifyUnusedOptInStillFetches(distribution) {
   const fixtureDistribution = join(TEST_ROOT, "UnreachableCogLintPlugins");
   cpSync(distribution, fixtureDistribution, { recursive: true });
   const manifestPath = join(fixtureDistribution, "Package.swift");
-  const realURL = `https://github.com/skeswa/cog/releases/download/0.4.0/${ASSET_NAME}`;
+  const realURL = `https://github.com/skeswa/cog/releases/download/${VERSION}/${ASSET_NAME}`;
   const unreachableURL = `https://127.0.0.1:1/${ASSET_NAME}`;
   const manifest = readFileSync(manifestPath, "utf8").replace(realURL, unreachableURL);
   if (!manifest.includes(unreachableURL)) {

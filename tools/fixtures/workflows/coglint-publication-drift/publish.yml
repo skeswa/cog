@@ -1,0 +1,33 @@
+name: Publish CogLintPlugins
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  prepare:
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - run: echo incomplete preparation
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - run: git push --force origin HEAD:main
+
+  consume:
+    needs: publish
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - run: echo no public consumer

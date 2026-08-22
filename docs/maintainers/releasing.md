@@ -1,87 +1,141 @@
 # Releasing Cog for Swift
 
-_August 20, 2026._
+_August 21, 2026._
 
-This is the operational checklist for a Swift release. The normative version
-policy and publication ordering remain in
-[`docs/swift/impl/plan.md` § Release process](../swift/impl/plan.md#release-process),
-and the current release task in `docs/swift/impl/tasks.md` owns the exact gate
-for its version. Do not use this runbook to bypass either one.
+Cog releases are produced entirely in GitHub Actions. A maintainer workstation
+does not build candidate bytes, edit a changelog, create a tag, upload an asset,
+deploy documentation, or publish the sibling plugin package. Human control is
+limited to reviewing pull requests, dispatching workflows, approving queued
+runs, and approving protected environments.
 
-## Prepare the candidate
+The normative version policy remains in
+[`docs/swift/impl/plan.md` § Release process](../swift/impl/plan.md#release-process).
+This runbook owns the Actions UI sequence and the evidence a maintainer reviews.
 
-1. Start from an empty Jujutsu working copy whose parent is the exact candidate
-   commit. Confirm the release task's dependencies and immutable CI links.
-2. Update `CHANGELOG.md`, consumer version examples, CogLint artifact metadata,
-   and the sibling `CogLintPlugins` package inputs wherever the release task
-   requires them. One version must identify the source package, documentation,
-   linter, and binary metadata.
-3. Run the release task's complete verification set. For the current package,
-   its local foundation is:
+## How a release is proposed
 
-   ```sh
-   mise run fmt:check
-   mise run workflows:check
-   mise run tasks:check
-   mise run api:check 0.4.0
-   mise run test:matrix
-   mise run test:arena-configurations
-   mise run test:release
-   mise run test:compilefail
-   mise run test:simulator
-   mise run build:weather
-   mise run test:weather
-   mise run test:storefront
-   mise run build:storefront
-   mise run lint:swift
-   mise run test:lint-documentation
-   mise run bench:thresholds:check
-   ```
+`release.yml` runs Release Please after every push to `main`. It checks out no
+repository code and holds only `contents`, `pull-requests`, and `issues` write
+permissions. The manifest-driven `simple` strategy reads Conventional Commit
+revision descriptions, updates `version.txt` and the marked consumer pins,
+generates `CHANGELOG.md`, and maintains one draft release pull request.
+Release Please also owns that file's generated layout, so Oxfmt excludes it;
+the release-configuration gate instead checks its immutable published sections
+and exact bootstrap entries.
 
-   Replace `0.4.0` with the actual preceding release tag. A binary-backed
-   release also runs the artifact, build-tool plugin,
-   command-plugin, and distribution gates named by `mise tasks`. Candidate CI
-   must prove the arm64 artifact built on the pinned mini and the downloaded
-   x86_64 member on the hosted Intel runner.
+Cog is pre-1.0: a breaking change or feature produces a minor release, while a
+fix or performance change produces a patch. `Release-As` is a maintainer-only
+one-time override. The bootstrap migration uses it to propose 0.5.0 without
+replaying the divergent manual 0.4.0 release.
 
-4. Review the public-API diagnostic. An intended 0.x minor break belongs in the
-   changelog and candidate review; do not silence an accidental break with an
-   allowlist. Patch releases remain additive or corrective.
-5. Close the non-mutating candidate gate before creating a tag. Later work may
-   continue only from a child revision and cannot change the candidate commit.
+Review the draft release pull request for all of the following:
 
-## Tag the candidate
+- the proposed version is the intended bare semantic version;
+- `version.txt`, the manifest, and every marked consumer pin agree;
+- the changelog contains only changes since the configured bootstrap or prior
+  Release Please release;
+- breaking notes match the public API changes and no published changelog entry
+  was rewritten; and
+- the pull request remains a draft until its exact current head has passed the
+  candidate workflow.
 
-All ordinary source pushes use Jujutsu. The annotated release tag is the sole
-exception because Jujutsu does not author annotated Git tags:
+GitHub does not recursively trigger ordinary checks for a pull request created
+by the repository token. Approve any queued run in the Actions UI when GitHub
+asks. The exact-head candidate dispatch supplies the required
+`Conventional Commits` check context for this bot-created PR; do not replace
+either Actions result with workstation evidence.
 
-```sh
-jj st
-jj git push
-cog_release=0.5.0
-git tag -a "$cog_release" -m "Cog $cog_release"
-git push origin "$cog_release"
-```
+## Validate the exact release PR head
 
-Resolve the actual version from the release task; the value above is only an
-example. Verify the tag names the approved commit before pushing it. Bare
-semantic-version tags belong to the Swift package and are permanent: never
-move, replace, or force-push a published tag.
+Open **Actions → Swift CI → Run workflow**. Select the Release Please branch,
+enter its pull request number in `release_pr`, and leave `recovery_tag` empty.
+The workflow resolves the PR again and fails unless the dispatched SHA is its
+current head. If Release Please updates the branch, dispatch a new candidate;
+an older successful run no longer authorizes publication.
 
-## Publish and verify
+The `Release candidate` job becomes green only after the complete run succeeds:
+the release PR's Conventional Commit range, formatting, all host isolation
+legs, the public arena configurations, release tests, simulator and example
+tests, Storefront correctness and UI measurement, compile-fail fixtures,
+CogLint dogfood and plugin integrations, documentation, the task ledger,
+benchmark thresholds, the arm64 artifact build, and the hosted Intel proof over
+those exact downloaded bytes.
 
-- A source-only release verifies the tag-triggered DocC deployment and exact
-  scratch-package consumption before creating its GitHub Release.
-- A binary-backed CogLint release publishes the GitHub Release and checksummed
-  artifact first, because the consumer manifest needs that immutable asset URL.
-  Then verify Pages, download and recompute the asset checksum, publish the
-  version-matched sibling manifest tag, and smoke-test plugin consumption from
-  a scratch iOS application.
-- Confirm the GitHub Release notes match `CHANGELOG.md`, the documentation
-  routes resolve, and a consumer can select both `Cog` and `CogTesting` at the
-  exact tag without resolving development-only dependencies.
-- Record the terminal verification links in the release task. The next release
-  chain begins only after this one closes.
+The final Actions artifact is named with both version and PR-head SHA and is
+retained for 90 days. It contains the archive, checksum, and JSON provenance.
+The provenance binds the PR, source SHA and tree, workflow run, Xcode and Swift
+toolchains, both architectures, and both host-selection proofs.
 
-If a defect appears after tagging, fix forward through a new candidate and
-patch version. Do not repair history by retagging the old version.
+After the whole run succeeds, mark the release PR ready and rebase-merge it.
+Cog permits rebase merging only, so every validated jj revision description
+survives on the linear `main` history Release Please reads.
+
+## Publish Cog
+
+The merge starts `release.yml` again. Release Please creates the permanent
+lightweight bare-semver tag immediately and opens a draft GitHub Release. The
+`Publish verified release` job then waits at the protected `cog-release`
+environment.
+
+Before approval, confirm the job names the expected tag, release PR, candidate
+run, and version. Approval lets the hosted publisher receive `contents: write`.
+It independently verifies all of these facts before mutating the release:
+
+- the tag is lightweight, points at the Release Please commit, and agrees with
+  `version.txt`;
+- the rebased tag tree equals the validated release-PR head tree;
+- the candidate is a successful `workflow_dispatch` run of `swift-ci.yml` for
+  that source;
+- the artifact name, workflow run, PR, version, source tree, toolchains,
+  architectures, probes, and SHA-256 checksum agree with JSON provenance; and
+- any already-uploaded asset is byte-identical, so a retry cannot replace a
+  divergent archive.
+
+The publisher uploads the archive, checksum, and provenance, titles the release
+`Cog <version>`, and removes its draft flag. A separate job with only
+`actions: write` then dispatches `docs.yml` at the tag. This explicit dispatch
+is required because events created by the repository token do not generally
+start another workflow.
+
+Wait for Docs to deploy the tag-built DocC archive and the VitePress site. The
+published API reference must resolve at
+`https://skeswa.github.io/cog/documentation/cog/` before publishing the sibling.
+
+## Publish `coglint-plugins`
+
+Open **skeswa/coglint-plugins → Actions → Publish CogLintPlugins**, dispatch
+`main`, and enter the published Cog version. That repository uses only its own
+repository-scoped token.
+
+The read-only preparation job requires the public Cog tag and published
+release, downloads all three assets, verifies their checksum and provenance,
+checks out the exact Cog tag, runs that tag's generator, validates the generated
+manifest, and builds a scratch SwiftPM consumer. It records the current sibling
+`main` SHA and uploads the generated tree as a workflow artifact.
+
+The publish job waits at `coglint-release`. Approve it only after preparation is
+green. Under its sole `contents: write` grant, the job executes no downloaded
+Cog code. It re-hashes the generated artifact, requires sibling `main` to remain
+unchanged, rejects an existing divergent version or tag, fast-forwards one
+`chore(release): publish CogLintPlugins <version>` commit and the matching bare
+lightweight tag in one atomic, non-forced push. An already-published retry is
+accepted only when the tag, commit, and regenerated managed tree are identical.
+A final read-only hosted macOS job resolves that public tag from a scratch
+package and executes its build-tool plugin.
+
+The release is complete only when the Cog release is published, Docs is green,
+and the sibling's final exact-version consumer is green.
+
+## Recover a failed publication
+
+Never move or replace a release tag. For an existing tag whose publication did
+not finish, open **Actions → Release → Run workflow** and enter the tag and its
+merged Release Please PR number. The recovery job proves the tag is lightweight
+and version-matched, dispatches the complete Swift CI workflow at that tag, and
+waits for a new successful candidate. The protected publisher then repeats the
+same provenance and byte checks. Matching assets are reused; divergent assets
+stop the run.
+
+If the released source itself is defective, fix forward through a new
+Conventional Commit and a new patch or minor release. Recovery repairs the
+pipeline around an immutable source release; it never repairs history.

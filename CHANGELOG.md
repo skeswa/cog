@@ -4,40 +4,10 @@ All notable changes to Cog for Swift are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Cog is in 0.x. A **minor** release may break source compatibility and says so
-under a "Breaking" heading; a **patch** release only adds or fixes. Pin
-accordingly:
-
-```swift
-.package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.4.0"))
-```
+under a breaking-change heading; fixes and performance work produce patch
+releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
-
-## [Unreleased]
-
-### Breaking
-
-- Rename the graph mutation primitive from `commit` to `turn`, including the
-  `CogOps`, `Cogs`, and `MechanismController` entry points. The old spellings
-  are removed rather than deprecated.
-- Use “automatic” for non-manual cogs throughout the library and rename the
-  corresponding `CogTesting` lifetime seams. The old “derived” spellings are
-  removed rather than retained as aliases.
-- Remove `Cogs.valueReferenceLayoutName` from `CogTesting`. The losing generic
-  and interned layout experiments and their public testing selector are gone.
-
-### Added
-
-- The `CompactArena` SwiftPM package trait, allowing final applications to
-  trade runtime speed for less generated code by disabling the typed
-  specialization frontier.
-
-### Changed
-
-- Make the specialized arena with shared linked edges and inline
-  `AnyHashable` keys the sole default runtime. The simple core, alternative
-  edge layouts, alternative value-reference layouts, and their comparison
-  selectors are retired.
 
 ## [0.4.0] - 2026-08-18
 

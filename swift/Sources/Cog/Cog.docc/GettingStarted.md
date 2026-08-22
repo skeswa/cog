@@ -15,12 +15,14 @@ Cog resolves with no dependencies of its own. Pin it to a minor version; 0.x
 minors may break, and patches never do.
 
 ```swift
+// x-release-please-start-version
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
     .upToNextMinor(from: "0.4.0")
   )
 ]
+// x-release-please-end
 ```
 
 Add `Cog` to your app target, and `CogTesting` to your test and

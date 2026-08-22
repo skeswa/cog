@@ -1,0 +1,356 @@
+name: Release
+
+# Ordinary pushes let Release Please maintain its draft release PR and, after
+# that PR is rebased into main, create the lightweight tag and draft release.
+# Recovery never moves a tag: it rebuilds an existing tag through Swift CI and
+# feeds those newly verified bytes through the same protected publisher.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable bare-semver tag whose publication should be retried
+        required: true
+        type: string
+      release_pr:
+        description: Merged Release Please pull request that produced the tag
+        required: true
+        type: string
+
+concurrency:
+  group: cog-release
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release-please:
+    name: Release Please
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      # This job intentionally checks out no repository code. The pinned action
+      # reads the manifest through the GitHub API under its bounded write token.
+      - name: Propose or create the release
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0, release-please v17.6.0
+        with:
+          token: ${{ github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  recover-candidate:
+    name: Rebuild recovery candidate
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      run_id: ${{ steps.candidate.outputs.run_id }}
+    steps:
+      - name: Require an existing lightweight tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=Invalid recovery tag::${TAG} is not a bare semantic version"
+            exit 1
+          fi
+          ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}")"
+          if [ "$(jq -r .object.type <<<"$ref")" != commit ]; then
+            echo "::error title=Mutable release identity::${TAG} is not a lightweight commit tag"
+            exit 1
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null
+          encoded="$(gh api "repos/${GITHUB_REPOSITORY}/contents/version.txt?ref=${TAG}" --jq .content | tr -d '\n')"
+          if [ "$(printf '%s' "$encoded" | base64 --decode | tr -d '[:space:]')" != "$TAG" ]; then
+            echo "::error title=Recovery version mismatch::version.txt at ${TAG} does not name the tag"
+            exit 1
+          fi
+
+      - name: Dispatch and wait for a complete tag-bound candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          RELEASE_PR: ${{ inputs.release_pr }}
+        run: |
+          set -euo pipefail
+          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq .object.sha)"
+          before="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&head_sha=${tag_sha}&per_page=100" \
+            --jq '.workflow_runs[].id' > "$before"
+
+          gh workflow run swift-ci.yml --ref "$TAG" \
+            -f "release_pr=${RELEASE_PR}" \
+            -f "recovery_tag=${TAG}"
+
+          run_id=""
+          for _ in $(seq 1 30); do
+            candidates="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&head_sha=${tag_sha}&per_page=20" --jq '.workflow_runs[].id')"
+            while IFS= read -r candidate; do
+              [ -n "$candidate" ] || continue
+              if ! grep -Fxq "$candidate" "$before"; then
+                run_id="$candidate"
+                break
+              fi
+            done <<< "$candidates"
+            [ -z "$run_id" ] || break
+            sleep 10
+          done
+          if [ -z "$run_id" ]; then
+            echo "::error title=Recovery dispatch missing::no new Swift CI run appeared for ${TAG}"
+            exit 1
+          fi
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --exit-status
+
+  publish:
+    name: Publish verified release
+    needs: [release-please, recover-candidate]
+    if: >-
+      always() && ((github.event_name == 'push' && needs.release-please.result ==
+      'success' && needs.release-please.outputs.release_created == 'true') ||
+      (github.event_name == 'workflow_dispatch' &&
+      needs.recover-candidate.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: cog-release
+      url: ${{ steps.publish.outputs.url }}
+    outputs:
+      tag: ${{ steps.verify.outputs.tag }}
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out the exact immutable release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+
+      - name: Find and verify the successful candidate artifact
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+          RELEASE_PR_INPUT: ${{ inputs.release_pr }}
+          RECOVERY_RUN_ID: ${{ needs.recover-candidate.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          version="$(tr -d '[:space:]' < version.txt)"
+          if [ "$version" != "$tag" ]; then
+            echo "::error title=Release version mismatch::version.txt names ${version}, tag names ${tag}"
+            exit 1
+          fi
+
+          ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}")"
+          if [ "$(jq -r .object.type <<<"$ref")" != commit ]; then
+            echo "::error title=Release tag is not lightweight::${tag} must point directly at a commit"
+            exit 1
+          fi
+          tag_sha="$(jq -r .object.sha <<<"$ref")"
+          if [ "$(git rev-parse HEAD)" != "$tag_sha" ]; then
+            echo "::error title=Release checkout mismatch::checkout does not match ${tag}"
+            exit 1
+          fi
+          tag_tree="$(git rev-parse 'HEAD^{tree}')"
+          if [ "$RELEASE_EVENT" != workflow_dispatch ] && [ "$RELEASE_SHA" != "$tag_sha" ]; then
+            echo "::error title=Release Please identity mismatch::action output ${RELEASE_SHA} does not match tag ${tag_sha}"
+            exit 1
+          fi
+
+          if [ "$RELEASE_EVENT" = workflow_dispatch ]; then
+            release_pr="$RELEASE_PR_INPUT"
+          else
+            release_pr="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/commits/${tag_sha}/pulls" \
+              --jq '[.[] | select(.base.ref == "main" and .merged_at != null and (.head.ref | startswith("release-please--branches--main")))][0].number')"
+          fi
+          case "$release_pr" in
+            ''|null|*[!0-9]*) echo "::error title=Release PR missing::could not identify the merged Release Please PR"; exit 1 ;;
+          esac
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${release_pr}")"
+          pr_head_sha="$(jq -r .head.sha <<<"$pr")"
+          pr_head_ref="$(jq -r .head.ref <<<"$pr")"
+          pr_head_repo="$(jq -r .head.repo.full_name <<<"$pr")"
+          pr_head_tree="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${pr_head_sha}" --jq .tree.sha)"
+          if [ "$(jq -r .base.ref <<<"$pr")" != main ] || \
+             [ "$pr_head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error title=Release PR identity mismatch::PR #${release_pr} must target main from this repository"
+            exit 1
+          fi
+          case "$pr_head_ref" in
+            release-please--branches--main*) ;;
+            *) echo "::error title=Release PR identity mismatch::PR #${release_pr} is not a Release Please branch"; exit 1 ;;
+          esac
+          if [ "$(jq -r .merged_at <<<"$pr")" = null ] || [ "$pr_head_tree" != "$tag_tree" ]; then
+            echo "::error title=Release PR tree mismatch::tag ${tag} is not the validated tree from PR #${release_pr}"
+            exit 1
+          fi
+
+          if [ "$RELEASE_EVENT" = workflow_dispatch ]; then
+            run_id="$RECOVERY_RUN_ID"
+            expected_source_sha="$tag_sha"
+            expected_mode=recovery
+            expected_workflow_ref="${GITHUB_REPOSITORY}/.github/workflows/swift-ci.yml@refs/tags/${tag}"
+          else
+            run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&status=success&head_sha=${pr_head_sha}&per_page=100" \
+              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id')"
+            expected_source_sha="$pr_head_sha"
+            expected_mode=candidate
+            expected_workflow_ref="${GITHUB_REPOSITORY}/.github/workflows/swift-ci.yml@refs/heads/${pr_head_ref}"
+          fi
+          case "$run_id" in
+            ''|null|*[!0-9]*) echo "::error title=Candidate run missing::no successful exact-source Swift CI run exists"; exit 1 ;;
+          esac
+
+          run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+          if [ "$(jq -r .path <<<"$run")" != .github/workflows/swift-ci.yml ] || \
+             [ "$(jq -r .event <<<"$run")" != workflow_dispatch ] || \
+             [ "$(jq -r .conclusion <<<"$run")" != success ] || \
+             [ "$(jq -r .head_sha <<<"$run")" != "$expected_source_sha" ]; then
+            echo "::error title=Candidate workflow mismatch::run ${run_id} is not the successful expected Swift CI identity"
+            exit 1
+          fi
+
+          artifact_name="coglint-candidate-${version}-${pr_head_sha}"
+          artifact_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+            --jq ".artifacts[] | select(.name == \"${artifact_name}\" and .expired == false) | .id")"
+          case "$artifact_id" in
+            ''|*[!0-9]*) echo "::error title=Candidate artifact missing::run ${run_id} has no unexpired ${artifact_name}"; exit 1 ;;
+          esac
+
+          candidate="$(mktemp -d)"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${candidate}/candidate.zip"
+          unzip -q "${candidate}/candidate.zip" -d "$candidate"
+          archive="${candidate}/CogLintBinary.artifactbundle.zip"
+          checksum_file="${archive}.checksum"
+          provenance="${archive}.provenance.json"
+          for path in "$archive" "$checksum_file" "$provenance"; do
+            [ -f "$path" ] || { echo "::error title=Candidate file missing::$(basename "$path")"; exit 1; }
+          done
+
+          checksum="$(sha256sum "$archive" | awk '{print $1}')"
+          if [ "$(tr -d '[:space:]' < "$checksum_file")" != "$checksum" ]; then
+            echo "::error title=Candidate checksum mismatch::archive and checksum file disagree"
+            exit 1
+          fi
+          jq -e \
+            --arg version "$version" \
+            --argjson release_pr "$release_pr" \
+            --arg pr_head_sha "$pr_head_sha" \
+            --arg source_sha "$expected_source_sha" \
+            --arg source_tree "$tag_tree" \
+            --arg mode "$expected_mode" \
+            --arg workflow "$expected_workflow_ref" \
+            --argjson run_id "$run_id" \
+            --arg checksum "$checksum" \
+            '.format == "coglint-candidate-v2" and
+             .version == $version and
+             .release_pr == $release_pr and
+             .pr_head_sha == $pr_head_sha and
+             .source_sha == $source_sha and
+             .source_tree == $source_tree and
+             .mode == $mode and
+             .workflow == $workflow and
+             .workflow_run_id == $run_id and
+             .checksum == $checksum and
+             .architectures == ["arm64", "x86_64"] and
+             .build.runner == "self-hosted-cog-mini" and
+             .build.xcode_version == "26.6" and
+             .build.xcode_build == "17F113" and
+             (.build.swift_version | contains("Apple Swift version 6.3.3")) and
+             .build.arm64_probe == "passed" and
+             .intel.runner == "macos-15-intel" and
+             .intel.architecture == "x86_64" and
+             .intel.xcode_version == "26.3" and
+             .intel.xcode_build == "17C529" and
+             (.intel.swift_version | length > 0) and
+             .intel.x86_64_probe == "passed"' "$provenance"
+
+          release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}")"
+          if [ "$(jq -r .target_commitish <<<"$release")" != "$tag_sha" ] || \
+             [ "$(jq -r .prerelease <<<"$release")" != false ]; then
+            echo "::error title=Draft release mismatch::release does not point at the immutable tag commit"
+            exit 1
+          fi
+          if [ "$RELEASE_EVENT" != workflow_dispatch ] && [ "$(jq -r .draft <<<"$release")" != true ]; then
+            echo "::error title=Release was published early::Release Please must leave ${tag} as a draft for the protected publisher"
+            exit 1
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "candidate=${candidate}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload assets and publish the draft
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.verify.outputs.version }}
+          TAG: ${{ steps.verify.outputs.tag }}
+          CANDIDATE: ${{ steps.verify.outputs.candidate }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            CogLintBinary.artifactbundle.zip \
+            CogLintBinary.artifactbundle.zip.checksum \
+            CogLintBinary.artifactbundle.zip.provenance.json; do
+            source="${CANDIDATE}/${name}"
+            if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              existing="$(mktemp -d)"
+              gh release download "$TAG" --pattern "$name" --dir "$existing"
+              if ! cmp -s "$source" "${existing}/${name}"; then
+                echo "::error title=Divergent release asset::${name} already exists with different bytes"
+                exit 1
+              fi
+            else
+              missing+=("$source")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            gh release upload "$TAG" "${missing[@]}"
+          fi
+          gh release edit "$TAG" --title "Cog ${VERSION}" --draft=false
+          url="$(gh release view "$TAG" --json url --jq .url)"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+
+  dispatch-docs:
+    name: Dispatch release documentation
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch Docs at the published tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: gh workflow run docs.yml --ref "$TAG"

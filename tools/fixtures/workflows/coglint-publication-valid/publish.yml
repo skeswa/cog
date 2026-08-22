@@ -1,0 +1,55 @@
+name: Publish CogLintPlugins
+
+on:
+  workflow_dispatch:
+    inputs:
+      cog_version:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  prepare:
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - run: |
+          gh api "repos/skeswa/cog/releases/tags/${VERSION}"
+          jq 'select(.source_tree == $tree)'
+          echo '.build.xcode_build == "17F113"'
+          echo '.intel.xcode_build == "17C529"'
+          node cog/tools/generate-coglint-plugins.mjs
+          swift build --package-path consumer
+          echo sibling_main_sha
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: coglint-release
+    permissions:
+      contents: write
+    steps:
+      - run: |
+          echo 'Sibling main moved'
+          echo generated_tree_hash
+          echo 'Divergent immutable sibling tag'
+          echo 'Divergent published sibling tree'
+          echo 'already_published=true'
+          git commit -m "chore(release): publish CogLintPlugins ${VERSION}"
+          git push --atomic origin HEAD:main "refs/tags/${VERSION}"
+
+  consume:
+    needs: publish
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - run: |
+          echo https://github.com/skeswa/coglint-plugins.git
+          swift build --package-path consumer

@@ -35,6 +35,7 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
 /**
  * @typedef {object} Job
  * @property {string} id
+ * @property {string} name
  * @property {number} line
  * @property {RunsOn} runsOn
  * @property {string | null} condition the job's `if:` expression
@@ -43,6 +44,8 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @property {number} needsLine
  * @property {import("./yaml.mjs").Node | null | undefined} permissions
  * @property {number} permissionsLine
+ * @property {import("./yaml.mjs").Node | null | undefined} environment
+ * @property {number} environmentLine
  * @property {import("./yaml.mjs").Node | null | undefined} timeout
  * @property {number} timeoutLine
  * @property {string | null} reusable a job-level `uses:` (reusable workflow call)
@@ -151,6 +154,7 @@ function readJob(jobEntry) {
   const condition = entryOf(node, "if");
   const needs = entryOf(node, "needs");
   const permissions = entryOf(node, "permissions");
+  const environment = entryOf(node, "environment");
   const timeout = entryOf(node, "timeout-minutes");
   const reusable = entryOf(node, "uses");
 
@@ -175,6 +179,7 @@ function readJob(jobEntry) {
 
   return {
     id: jobEntry.key,
+    name: text(get(node, "name")) ?? jobEntry.key,
     line: jobEntry.line,
     runsOn: readRunsOn(node, jobEntry.line),
     condition: condition === undefined ? null : (text(condition.value) ?? ""),
@@ -183,6 +188,8 @@ function readJob(jobEntry) {
     needsLine: needs?.line ?? jobEntry.line,
     permissions: permissions?.value,
     permissionsLine: permissions?.line ?? jobEntry.line,
+    environment: environment?.value,
+    environmentLine: environment?.line ?? jobEntry.line,
     timeout: timeout?.value,
     timeoutLine: timeout?.line ?? jobEntry.line,
     reusable: reusable === undefined ? null : (text(reusable.value) ?? ""),

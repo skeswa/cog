@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentVersion } from "./lib/version.mjs";
 
 /** The repository root, resolved from this script so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -53,7 +54,7 @@ function main(arguments_) {
     fail("usage: build-coglint-artifact.mjs [version]");
   }
 
-  const version = arguments_[0] ?? "0.4.0";
+  const version = arguments_[0] ?? currentVersion();
   if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
     fail(`invalid semantic version: ${version}`);
   }
