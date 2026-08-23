@@ -42,16 +42,19 @@ private func readColdChain(depth: Int) -> Int {
 @Test func `GRAPH-14 a cold chain within the bound settles normally`() {
   // The bound is not a warning: everything under it must keep working exactly
   // as before, or the guard would be a regression dressed as a diagnostic.
-  #expect(readColdChain(depth: 100) == 100)
+  // Reading at exactly the documented 128-link bound pins its lower edge, so
+  // the limit cannot silently shrink while this stays green.
+  #expect(readColdChain(depth: 128) == 128)
 }
 
 @Test func `GRAPH-14 reading past the cold nesting bound fails with a clear error`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      // Deep enough to trip the bound, but far short of the roughly 2,000
-      // links that actually smash a debug macOS stack — the guard has to fire
-      // long before the crash it exists to prevent.
-      _ = readColdChain(depth: 400)
+      // One link past the documented 128-link bound, pinning its upper edge —
+      // and far short of the roughly 2,000 links that actually smash a debug
+      // macOS stack, since the guard has to fire long before the crash it
+      // exists to prevent.
+      _ = readColdChain(depth: 129)
     }
   }
 

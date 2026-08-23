@@ -101,8 +101,8 @@ My whole app shares one Cog world. Tests get their own little worlds.
   through the installed context sees it — no other setup, no second
   context anywhere.
 - **ONE-02.** Some code tries to install a second app context. Cog stops
-  it right away with a clear error, in debug builds and release builds.
-  (Proof: exit test.)
+  it right away, in debug builds and release builds, with a clear error
+  saying Cog is already assembled. (Proof: exit test.)
 - **ONE-03.** Feature code tries to build a plain `Cogs` with an
   initializer. The compiler says no. (Proof: compile-fail.)
 - **ONE-05.** Tests and previews each ask the testing product for their own
@@ -150,7 +150,7 @@ I declare state at the top of a file and it just works.
 - **DECL-10.** I declare a cog with a `name:`. That name appears when Cog
   talks about the cog (diagnostics and debug history).
 - **DECL-11.** I declare a cog without a name. Cog falls back to the file
-  and line where I declared it.
+  and line where I declared it, rendered as `fileID:line`.
 
 ### 2.4 Selector shape
 
@@ -211,12 +211,17 @@ _Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
 
 - **TURN-05.** A turn inside a turn joins the outer turn. Everything
   flushes once, when the outer body ends, and reactions run once.
-- **TURN-06.** A turn takes its name from the op method that made it, or
-  from a custom name I pass. That name is what history shows.
+- **TURN-06.** A turn takes its name from the op method that made it — the
+  method's `#function` spelling — or from a custom name I pass. That name is
+  what history shows. Joining and queueing treat names the way they treat
+  turns: an inner turn that joins an outer one contributes no name of its
+  own, and a turn queued during a flush keeps the name its call site gave
+  it.
 - **TURN-07.** I sneak the writer out of the turn — stashed in a
   variable or captured into an async task — and use it after the turn
-  ended. Cog stops me with an error, in every kind of build. (Proof: exit
-  test.)
+  ended. Cog stops me with an error, in every kind of build, saying the
+  writer outlived the turn that created it and that the fix is to call
+  `turn` again. (Proof: exit test.)
 - **TURN-08.** Several turns queue up during a flush. They run one at a
   time in the order they arrived, and each queued turn finishes
   completely — settle, notify, react — before the next one starts.
@@ -257,9 +262,10 @@ half-finished picture.
 - **GRAPH-14.** I read the top of a very deep chain whose links have never
   been computed. Cog computes each link the first time it is read, and a
   first read that needs an uncomputed dependency computes it inline, so this
-  one read nests. Past a bound Cog fails with a clear error naming the chain
-  and what to do instead, rather than exhausting the stack. (Proof: exit
-  test.)
+  one read nests. 128 nested cold computations succeed and the 129th fails —
+  rather than exhausting the stack — with a clear error naming the chain's
+  innermost links and the way out: read the chain from its source end first,
+  or make it shorter. (Proof: exit test.)
 - **GRAPH-04.** One source feeds many automatic cogs. Each one I read is
   right, and only the ones I read recompute.
 - **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,
@@ -364,10 +370,12 @@ these stories run inside a small test mechanism's `operate`.
   The turns run one at a time, first-in first-out, and each sees settled
   state.
 - **REACT-17.** Two reactions deliberately wake each other for 65 turns
-  and then stop. In debug, Cog warns after about 64 uninterrupted turns,
-  exposing the warning and its causal chain of turns and reactions through
-  the diagnostic seam, and the context is idle again before the op that
-  started the chain returns — asserted directly, never awaited.
+  and then stop. In debug, Cog warns when an uninterrupted chain passes 64
+  turns — a chain of exactly 64 stays quiet — exposing the warning and its
+  causal chain of turns and reactions through the diagnostic seam. The
+  recorded causal chain holds at most 256 causes and says so when it
+  truncates. The context is idle again before the op that started the chain
+  returns — asserted directly, never awaited.
 - **REACT-19.** Within one flush, every changed UI boundary is notified
   before any reaction runs — flush step 4 before step 5. (Checked through
   history or an internal seam once M2 boundaries exist.)
@@ -479,8 +487,9 @@ test waits wall-clock time.
   gives the starting value again.
 - **LIFE-07.** A registered reaction counts as a watcher: the cogs it
   reads stay alive.
-- **LIFE-08.** Once a view has read a cog, that cog is pinned for the
-  life of the app context. It is never released behind SwiftUI's back.
+- **LIFE-08.** Once a cog has been read through the UI subscript — the read
+  a view's body makes — it is pinned for the life of the app context. It is
+  never released behind SwiftUI's back.
 - **LIFE-09.** Automatic cog B reads automatic cog A, then both lose their last
   external consumer. Their internal graph edge does not keep them alive.
   After the grace period, reading either value reference recreates the needed states
@@ -532,14 +541,20 @@ perf §8._
 
 When I wonder what happened, the debug history can tell me.
 
-- **HIST-01.** Every turn lands in history with its name.
-- **HIST-02.** History records writes and recomputations.
+- **HIST-01.** Every turn lands in history with its name — the custom name
+  its call site passed, or the owning op's `#function` name when it passed
+  none.
+- **HIST-02.** History records writes and recomputations, and it counts the
+  way the graph does: an equal write records its turn but no write entry
+  and no recompute, a keyed state renders as `label[key]`, and one turn
+  through a diamond records one recompute per state that actually ran.
 - **HIST-03.** History is bounded: after many turns, the oldest entries
   fall off and the entry count never passes the cap. (Memory itself is
   benchmark territory, not a unit-test assertion.)
 - **HIST-04.** Release builds pay nothing for history. (Proof: release configuration.)
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
-  history under that name, composed beneath its mechanism's name.
+  history under that name, composed beneath its mechanism's name; a
+  registration without one falls back to the file and line that made it.
 - **HIST-06.** Once M2 boundaries exist, history records each changed UI
   notice with the cog's human-readable label.
 - **HIST-07.** Several turns queue during a flush. History shows each
@@ -695,8 +710,8 @@ renderable, and whether any generation has succeeded.
   main actor, and its result still turns on the MainActor under the
   same generation check.
 - **ASYNC-17.** The internal task that runs an async cog's work carries
-  the descriptor's name and key, so Instruments can show it. (Checked
-  through an internal seam.)
+  the descriptor's name and key, rendered `name[key]`, so Instruments can
+  show it. (Checked through an internal seam.)
 - **ASYNC-18.** Initial work throws. A status watcher and history see pending
   with the resting default and `hasSucceeded == false`, then failure with the
   same pair, as two distinct turns.
@@ -779,7 +794,9 @@ When order matters more than speed, I pick a policy that says so.
   ten — start no new runs. When the run finishes, exactly one catch-up
   run uses the newest state.
 - **POLICY-04.** With `.merged`, runs overlap, and each result publishes as
-  its own turn when it lands.
+  its own turn when it lands — in landing order, not start order, so a
+  slower older run that lands last is what the value shows. Order is what
+  `.queue` is for; `.merged` trades it away.
 - **POLICY-05.** A `.stream` selector cannot use `.queue`,
   `.exhaustLatest`, or `.merged`. The type system says no. (Proof: compile-fail.)
 - **POLICY-06.** Two refreshes queue behind a settled value. The first run
@@ -856,10 +873,12 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
   disappears, the loop ends and the lease is gone — the §6.5 map-camera
   story. (Proof: simulator.)
 - **EXPORT-08.** I link an outside `@Observable` property in with
-  `c.track`. After an observed mutation finishes propagating, my dependent
-  cog returns the newest post-mutation value — never the pre-write value.
-  Repeating this after each propagation boundary keeps returning the newest
-  value; mutations within one boundary may coalesce. (Proof: simulator.)
+  `c.track`. A propagation boundary is one suspension of the main actor
+  after the mutation — the observation machinery fires and re-arms while
+  the mutating code is off the actor. After each boundary my dependent cog
+  returns the newest post-mutation value — never the pre-write value — and
+  mutations made within one boundary may coalesce into a single
+  propagation. (Proof: simulator.)
 - **EXPORT-09.** After consuming the initial value, I pause an `.unbounded`
   reader and publish A, B, then C. It receives every settled value in order.
 - **EXPORT-10.** I track one property of an outside `@Observable` object.
@@ -873,8 +892,9 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
   re-arm window.
 - **EXPORT-12.** On an iOS 26 simulator, the `Observations` path has the
   same post-mutation value correctness and property granularity. Several
-  synchronous mutations may coalesce until the next observation suspension
-  boundary, where the newest value propagates. (Proof: simulator.)
+  synchronous mutations within one observation suspension boundary coalesce
+  into one propagation carrying the newest value: dependents recompute once
+  per boundary, not once per mutation. (Proof: simulator.)
 - **EXPORT-13.** I link outside state in with `c.track`'s closure form
   instead of a key path. It has the same post-mutation value, coalescing,
   and pre-iOS-26 re-arm semantics as the key-path form. (Proof: simulator.)
@@ -922,18 +942,22 @@ These checks live in the benchmark package and test the implementation itself.
 Limits and layout choices stay open until [benchmarks.md](./benchmarks.md)
 records data. Every item in this group uses `benchmark` proof mode.
 
-- **PERF-01.** A steady turn — same graph shape, new values — allocates what
-  impl/benchmarks.md records and no more; the recorded cost only ever ratchets
-  downward. The retained arena reaches the zero-allocation target, so the
-  published `mallocCountTotal == 0` threshold prevents that result from
-  regressing.
-- **PERF-02.** Propagation's retain and release traffic is what impl/benchmarks.md
-  records and no more; the recorded cost only ever ratchets downward. Doing
-  none of it remains the target (perf §5); pinning the retained arena's traffic
-  against drift keeps the remaining runtime work from growing unnoticed.
+- **PERF-01.** A steady turn — same graph shape, new values — allocates
+  nothing. The retained arena reached the zero-allocation target, and the
+  committed `mallocCountTotal == 0` p90 threshold is enforced by
+  `bench:thresholds:check` on the pinned CI host, so the result cannot
+  regress; impl/benchmarks.md records how it was reached.
+- **PERF-02.** Propagation's retain and release traffic is what
+  impl/benchmarks.md records. Doing none of it remains the target (perf §5).
+  The drift check compares against a locally recorded baseline through
+  `bench:baseline:check` — no committed threshold gates this in CI — so the
+  benchmark-record entry, refreshed whenever the benchmark reruns, is the
+  durable claim.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
-  baseline threshold recorded in impl/benchmarks.md. While no baseline exists, this
-  check is red, never skipped.
+  baseline recorded in impl/benchmarks.md. The comparison runs through
+  `bench:baseline:check` against a locally recorded baseline — no committed
+  threshold gates this in CI — so the benchmark-record entry is the durable
+  claim.
 - **PERF-04.** A graph with 1,000 states and 12 UI-read values owns 12
   boundary objects, not 1,000.
 - **PERF-05.** A released state's slot is reused safely: its generation
@@ -941,7 +965,9 @@ records data. Every item in this group uses `benchmark` proof mode.
 - **PERF-06.** Building a value reference with `box[key]` allocates nothing.
 - **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
-  impl/benchmarks.md. While no baseline exists, this check is red, never skipped.
+  impl/benchmarks.md. The comparison runs through `bench:baseline:check`
+  against a locally recorded baseline — no committed threshold gates this
+  in CI — so the benchmark-record entry is the durable claim.
 - **PERF-08.** Keyed diamonds and key churn were measured under inline
   `AnyHashable`, interned-token, and generic-keyed value-reference layouts in
   one pinned environment. The recorded result selects inline `AnyHashable`;
@@ -953,8 +979,9 @@ records data. Every item in this group uses `benchmark` proof mode.
 - **PERF-10.** The specialized arena is measured against compact arena,
   swift-state-graph, and raw `@Observable` in one pinned environment. Historical
   simple-core results remain in impl/benchmarks.md but are not a build
-  configuration. The report records wall-clock results and generous absolute
-  regression thresholds before timing gates enter CI.
+  configuration. The committed one-sided wall-clock ceilings are the
+  thresholds, enforced in CI by `bench:thresholds:check` on the pinned host
+  and proven live by the `bench:thresholds:sentinel` rejection run.
 - **PERF-11.** A pinned keyed state that stops changing costs a turn
   nothing. A turn that writes and reads one key of a family performs the
   same retain and release traffic whether one key or a thousand are pinned
@@ -965,9 +992,10 @@ records data. Every item in this group uses `benchmark` proof mode.
   reuse their storage rather than being rebuilt. The recorded steady-turn
   allocation count falls to what impl/benchmarks.md records and only ever ratchets
   downward.
-- **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md records
-  and no more — allocations, retains, and releases per node — and the
-  recorded cost only ever ratchets downward.
+- **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md
+  records and no more — allocations, retains, and releases per node — and
+  the committed per-node threshold, enforced by `bench:thresholds:check`,
+  keeps that cost from regressing.
 - **PERF-14.** After the shared machinery work, the historical simple core,
   compact arena, and specialized arena were compared on steady, deep, broad,
   and unstable shapes in one environment. impl/benchmarks.md records the
@@ -1006,9 +1034,11 @@ Cog behaves the same no matter how my app is compiled.
   context, escaped writer, cycles, no `CogTesting.seed`, no history cost — prove
   they hold outside debug. (Proof: release configuration.)
 - **LEG-04.** The package builds with its macOS 14 deployment target, and
-  a scratch app plus the Weather example build with an iOS 17 deployment
-  target under Swift 6.2 tools, with no accidental dependency on newer
-  runtime APIs. (Proof: suite.)
+  the Weather example builds with an iOS 17 deployment target under Swift
+  6.2 tools, with no accidental dependency on newer runtime APIs. The
+  scratch-app half of the original proof was M4-04c's recorded one-time
+  run; the Weather build is the leg that keeps re-proving it. (Proof:
+  suite.)
 
 ## 20. ACTOR — MainActor confinement
 
@@ -1101,8 +1131,10 @@ locations in my editor and CI, without making my app compile the linter.
   and argument-parser out of an ordinary Cog consumer's source dependency
   graph and satisfies the recorded unused-artifact-fetch result. (Proof: suite.)
 - **LINT-21.** `mise run lint:swift` first runs the linter's own suite, then
-  lints library and Weather production sources with production rules and test
-  sources with the primitive exemption; the repository is clean. (Proof: suite.)
+  lints the root library, the Storefront workload package, and both example
+  apps' production sources with production rules, and every tracked test
+  target source with the primitive exemption; the repository is clean.
+  (Proof: suite.)
 - **LINT-22.** Every diagnostic's stable URL resolves inside the matching
   version of `Cog.docc`, and each article's examples match the fixture corpus.
   (Proof: suite.)
