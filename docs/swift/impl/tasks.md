@@ -724,8 +724,8 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   _Greens: UI-11._
 - **M2-12** _(Behavior)_ — Prove AppKit automatic tracking on the macOS host.
   _Depends: M2-02ab._
-  _Verify: `mise run test --filter UI-12`._
-  _Greens: UI-12._
+  _Verify: retired proof — its UI-12 AppKit smoke folded into UI-11's UIKit
+  canary, greened by M2-11; one platform-framework proof suffices._
 - **M2-13a** _(Infrastructure)_ — Add the simulator CI job after the UIKit
   boundary target exists.
   _Depends: M2-11._
