@@ -44,4 +44,16 @@ import Testing
 
   #expect(successes == [0, 1, 11])
   #expect(cogs.peek(exhaustedCog) == 11)
+
+  // A trailing input closes the "exactly one catch-up run" promise: exhaust
+  // runs are serial, so a second spurious catch-up from the burst would have
+  // to start before this one, and the next observed start would not be 12.
+  cogs.turn("request twelve") { c in c[inputCog] = 12 }
+  guard await starts.next() == 12 else {
+    work.finishAll()
+    Issue.record("A spurious catch-up run started after the burst settled")
+    return
+  }
+  try await resolveAsyncStatus(in: cogs) { work.succeed(12) }
+  #expect(successes == [0, 1, 11, 12])
 }
