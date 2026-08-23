@@ -1,21 +1,22 @@
 # Contributing to Cog
 
-Cog is one repository with a shipping Swift package and a future Kotlin
-project. The platform designs stay independent. Start with the root README for
-the product and with `docs/swift/README.md` for the current Swift status,
-decisions, and implementation documents.
+Cog has a working Swift package and a planned Kotlin library. Each platform has
+its own design. Read the root README first, then use
+`docs/swift/README.md` for current Swift decisions and work.
 
-## Prerequisites
+## Set up
 
-- Install [mise](https://mise.jdx.dev) and run `mise install` from the root.
-- Use a full Xcode, not Command Line Tools alone. The tested release toolchain
-  and runner topology are recorded in `docs/maintainers/ci.md`.
-- Use Jujutsu for day-to-day version control in this colocated repository.
+- Install [mise](https://mise.jdx.dev), then run `mise install` at the repo root.
+- Use full Xcode. Command Line Tools can build code, but they cannot run this
+  repo's Swift tests. The tested Xcode version is in
+  `docs/maintainers/ci.md`.
+- Use Jujutsu (`jj`) for version control.
 
-`mise.toml` is the authoritative command list. Run `mise tasks` rather than
-copying command spellings from an old issue or review.
+`mise.toml` is the command source. Run `mise tasks` for the current list.
 
-## Common verification
+## Run checks
+
+Common checks are:
 
 ```sh
 mise run fmt:check
@@ -31,80 +32,84 @@ mise run workflows:check
 mise run changes:check
 ```
 
-Filtered test runs always go through a mise wrapper, for example
-`mise run test --filter 'DECL-01|ONE-05'`. Never invoke a filtered
-`swift test` directly: SwiftPM exits successfully when the filter selects
-nothing, while Cog's wrapper verifies selection and the executed count. Root
-package test tasks run serially because the benchmark-sized graph scenarios
-otherwise starve time-bounded actor tests on the MainActor.
+Use a mise wrapper for filtered tests:
 
-Apple-boundary and example verification use `mise run test:simulator`,
-`mise run build:weather`, `mise run test:weather`,
-`mise run build:storefront`, and `mise run test:storefront-ui`. Benchmark and
-CogLint artifact commands are documented in `AGENTS.md` and `CLAUDE.md` and are
-listed by `mise tasks`.
+```sh
+mise run test --filter 'DECL-01|ONE-05'
+```
 
-## Test topology
+Do not run filtered `swift test` commands directly. SwiftPM exits with success
+when a filter finds no tests. Cog's wrapper proves that tests were found and
+run. Root test tasks also run in order so large graph tests do not block tests
+with actor time limits.
 
-- Public behavior proofs live in
-  `swift/Tests/CogTests/Scenarios/<PREFIX>/...ScenarioTests.swift`, import only
-  `Cog` and `CogTesting`, and own scenario IDs.
-- Implementation proofs live under
+Apple and example checks use:
+
+```sh
+mise run test:simulator
+mise run build:weather
+mise run test:weather
+mise run build:storefront
+mise run test:storefront-ui
+```
+
+Run `mise tasks` for benchmark and CogLint artifact commands.
+
+## Put tests in the right place
+
+- Public behavior tests go in
+  `swift/Tests/CogTests/Scenarios/<PREFIX>/...ScenarioTests.swift`. They import
+  only `Cog` and `CogTesting` and own scenario IDs.
+- Internal tests go in
   `swift/Tests/CogTests/Infrastructure/<seam>/...InfrastructureTests.swift`.
-  They may use `@testable import Cog` and own no scenario.
-- Observation and SwiftUI proofs live in `CogBoundaryTests`; shared graph-shape
-  run counts live in `CogScenarioTests`.
-- Expected compiler failures live outside every SwiftPM target in
-  `swift/CompileFail` and run through `mise run test:compilefail`.
-- Performance claims require the guarded benchmark commands and an environment
-  recorded beside every durable number.
+  They may use `@testable import Cog` and do not own scenario IDs.
+- Observation and SwiftUI tests go in `CogBoundaryTests`.
+- Shared graph run-count tests go in `CogScenarioTests`.
+- Expected compiler errors go in `swift/CompileFail` and run with
+  `mise run test:compilefail`.
+- Any lasting performance claim must include a guarded benchmark result and
+  its test environment.
 
-## The documentation site
+## Work on docs
 
-`docs/` is published at [skeswa.github.io/cog](https://skeswa.github.io/cog/)
-by a VitePress site whose configuration lives in `docs/.vitepress/`. Working on
-it needs the repository's only npm dependency tree — the Swift package itself
-still resolves with none:
+The `docs/` site uses the repo's only npm dependency tree. Cog itself still has
+no dependencies.
 
 ```sh
 npm ci
-mise run docs:dev       # hot-reloading local site
-mise run docs:build     # production build; fails on any dead link
-mise run docs           # the whole site, DocC reference included
+mise run docs:dev       # local site with live reload
+mise run docs:build     # production site; fails on broken links
+mise run docs           # full site, including DocC
 ```
 
-`mise run docs:build` treats a broken cross-document link as a build failure, so
-run it after moving or renaming a document. Adding a document means adding it to
-the sidebar in `docs/.vitepress/navigation.mts` as well as to the platform
-README that lists the reading order.
+When you add a page, add it to `docs/.vitepress/navigation.mts` and to the
+platform README that gives its reading order. Run `mise run docs:build` after
+moving or renaming a page.
 
-## Documentation and plans
+Swift design docs define behavior. The implementation docs have separate jobs:
 
-The Swift design documents are normative for behavior. `impl/plan.md` owns
-milestone scope, `impl/scenarios.md` owns promised stories, and `impl/tasks.md`
-owns executable slices and scenario ownership. A change under
-`docs/swift/impl` must leave `mise run tasks:check` green. New commands must be
-documented in both root agent instruction files and, when consumers or new
-contributors need them, here or in the root README.
+- `impl/plan.md` defines milestones.
+- `impl/scenarios.md` defines promised behavior.
+- `impl/tasks.md` defines work items and assigns each scenario.
 
-Keep current project status in the platform README. Other documents should link
-to that snapshot instead of copying milestone state.
+Any change under `docs/swift/impl` must pass `mise run tasks:check`. Keep current
+status in the platform README instead of copying it into other pages. Document
+new commands in both root agent instruction files and, when users need them,
+in this guide or the root README.
 
-## Revisions
+## Write revisions
 
 Use `jj st`, `jj diff`, `jj commit`, `jj bookmark`, and `jj git push`. There is
-no staging area. Keep one logical change per revision and follow the
-[change-management process](./docs/maintainers/changes.md) for Conventional
-Commit syntax, breaking notes, version consequences, and the exact local and
-GitHub ranges. Maintainers alone may add `Release-As`. Run
-`mise run changes:check` before pushing.
+no staging area. Put one logical change in each revision.
 
-Pull requests use rebase merging so those revision descriptions remain the
-linear release history. Release Please turns that history into versions,
-changelogs, draft release PRs, lightweight bare-semver tags, and draft GitHub
-Releases. Candidate builds and publication run only in GitHub Actions; see the
-[Swift release runbook](./docs/maintainers/releasing.md).
+Follow [change management](./docs/maintainers/changes.md) for Conventional
+Commit messages, breaking notes, version effects, and checked ranges. Only the
+maintainer may use `Release-As`. Run `mise run changes:check` before pushing.
 
-Every change must leave `mise run fmt:check` green and must run the smallest
-relevant behavior, release, simulator, or benchmark gates needed to support its
-claims.
+Pull requests use rebase merges so each revision message stays in the final
+history. Release Please uses that history to make versions, changelogs, release
+PRs, tags, and draft GitHub Releases. Candidate builds and publication happen
+only in GitHub Actions. See the [release runbook](./docs/maintainers/releasing.md).
+
+Every change must pass `mise run fmt:check` plus the smallest tests or
+benchmarks needed to prove it works.

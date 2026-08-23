@@ -2,142 +2,139 @@
 
 _August 21, 2026._
 
-Cog releases are produced entirely in GitHub Actions. A maintainer workstation
-does not build candidate bytes, edit a changelog, create a tag, upload an asset,
-deploy documentation, or publish the sibling plugin package. Human control is
-limited to reviewing pull requests, dispatching workflows, approving queued
-runs, and approving protected environments.
+Every release step runs in GitHub Actions. A maintainer computer does not build
+files, edit the changelog, create tags, upload assets, deploy docs, or publish
+plugins. The maintainer reviews pull requests, starts workflows, approves runs,
+and approves protected environments.
 
-The normative version policy remains in
-[`docs/swift/impl/plan.md` § Release process](../swift/impl/plan.md#release-process).
-This runbook owns the Actions UI sequence and the evidence a maintainer reviews.
-The [change-management process](./changes.md) owns Conventional Commit
-authoring and the exact local, pull-request, push, and candidate ranges.
+The [Swift release policy](../swift/impl/plan.md#release-process) defines version
+rules. [Change management](./changes.md) defines commit messages and checked
+ranges. This page gives the Actions UI steps.
 
-## How a release is proposed
+## 1. Review the release PR
 
-`release.yml` runs Release Please after every push to `main`. It checks out no
-repository code and holds only `contents`, `pull-requests`, and `issues` write
-permissions. The manifest-driven `simple` strategy reads Conventional Commit
-revision descriptions, updates `version.txt` and the marked consumer pins,
-generates `CHANGELOG.md`, and maintains one draft release pull request.
-Release Please also owns that file's generated layout, so Oxfmt excludes it;
-the release-configuration gate instead checks its immutable published sections
-and exact bootstrap entries.
+After each push to `main`, `release.yml` runs Release Please. It reads
+Conventional Commit messages and keeps one draft release PR up to date. That PR
+updates:
 
-Cog is pre-1.0: a breaking change or feature produces a minor release, while a
-fix or performance change produces a patch. `Release-As` is a maintainer-only
-one-time override. The bootstrap migration uses it to propose 0.5.0 without
-replaying the divergent manual 0.4.0 release.
+- `version.txt`, the release manifest, and marked version pins;
+- `CHANGELOG.md`; and
+- the next bare semantic version, such as `0.5.0`.
 
-Review the draft release pull request for all of the following:
+Release Please uses a minor release for a feature or breaking change before
+1.0. It uses a patch for a fix or performance change. Only the maintainer may
+use `Release-As` to force a version.
 
-- the proposed version is the intended bare semantic version;
-- `version.txt`, the manifest, and every marked consumer pin agree;
-- the changelog contains only changes since the configured bootstrap or prior
-  Release Please release;
-- breaking notes match the public API changes and no published changelog entry
-  was rewritten; and
-- the pull request remains a draft until its exact current head has passed the
-  candidate workflow.
+`package.json` stays at `0.0.0` because it is only for private docs tools. It is
+not a Cog version source. Release Please owns the changelog layout, so do not
+format or edit generated sections by hand.
 
-GitHub does not recursively trigger ordinary checks for a pull request created
-by the repository token. Approve any queued run in the Actions UI when GitHub
-asks. The exact-head candidate dispatch supplies the required
-`Conventional Commits` check context for this bot-created PR; do not replace
-either Actions result with workstation evidence.
+Check that:
 
-## Validate the exact release PR head
+- the version has no `v` or component prefix;
+- `version.txt`, the manifest, and marked pins agree;
+- the changelog includes only changes since the last configured release;
+- breaking notes match the public API changes;
+- old changelog entries did not change; and
+- the PR stays a draft until its exact head passes the candidate workflow.
 
-Open **Actions → Swift CI → Run workflow**. Select the Release Please branch,
-enter its pull request number in `release_pr`, and leave `recovery_tag` empty.
-The workflow resolves the PR again and fails unless the dispatched SHA is its
-current head. If Release Please updates the branch, dispatch a new candidate;
-an older successful run no longer authorizes publication.
+Release Please checks out no repo code and receives only `contents`,
+`pull-requests`, and `issues` write access. GitHub may ask for approval before a
+bot-created PR check runs. Approve it in Actions. A local result cannot replace
+an Actions result.
 
-The `Release candidate` job becomes green only after the complete run succeeds:
-the release PR's Conventional Commit range, formatting, all host isolation
-legs, the public arena configurations, release tests, simulator and example
-tests, Storefront correctness and UI measurement, compile-fail fixtures,
-CogLint dogfood and plugin integrations, documentation, the task ledger,
-benchmark thresholds, the arm64 artifact build, and the hosted Intel proof over
-those exact downloaded bytes.
+## 2. Test the exact PR head
 
-The final Actions artifact is named with both version and PR-head SHA and is
-retained for 90 days. It contains the archive, checksum, and JSON provenance.
-The provenance binds the PR, source SHA and tree, workflow run, Xcode and Swift
-toolchains, both architectures, and both host-selection proofs.
+Open **Actions → Swift CI → Run workflow**:
 
-After the whole run succeeds, mark the release PR ready and rebase-merge it.
-Cog permits rebase merging only, so every validated jj revision description
-survives on the linear `main` history Release Please reads.
+1. Select the Release Please branch.
+2. Enter its PR number in `release_pr`.
+3. Leave `recovery_tag` empty.
+4. Start the workflow.
 
-## Publish Cog
+The workflow looks up the PR again. It fails if the selected ref is not the
+PR's current head. If Release Please changes the branch, start a new candidate.
+An older run no longer counts.
 
-The merge starts `release.yml` again. Release Please creates the permanent
-lightweight bare-semver tag immediately and opens a draft GitHub Release. The
-`Publish verified release` job then waits at the protected `cog-release`
-environment.
+`Release candidate` turns green only after all commit, format, host, arena,
+release, simulator, example, Storefront, compile-fail, CogLint, docs, task, and
+benchmark checks pass. The mini builds the arm64 and x86_64 CogLint files. A
+hosted Intel Mac then tests the downloaded x86_64 file without rebuilding it.
 
-Before approval, confirm the job names the expected tag, release PR, candidate
-run, and version. Approval lets the hosted publisher receive `contents: write`.
-It independently verifies all of these facts before mutating the release:
+The final artifact name includes the version and PR-head SHA. It is kept for 90
+days and contains the archive, checksum, and JSON record. That record names the
+PR, source commit and tree, workflow run, Xcode and Swift versions, both CPU
+types, and both file-selection checks.
 
-- the tag is lightweight, points at the Release Please commit, and agrees with
+When the whole run passes, mark the PR ready and rebase-merge it. Rebase is the
+only allowed merge type, so the tested revision messages stay in `main`.
+
+## 3. Publish Cog
+
+The merge runs `release.yml`. Release Please creates the permanent lightweight
+tag and a draft GitHub Release. `Publish verified release` then waits for
+approval in the `cog-release` environment.
+
+Before approval, check the shown tag, release PR, candidate run, and version.
+Approval gives the hosted publisher `contents: write`. Before it publishes, the
+job checks that:
+
+- the tag is lightweight, points at the Release Please commit, and matches
   `version.txt`;
-- the rebased tag tree equals the validated release-PR head tree;
-- the candidate is a successful `workflow_dispatch` run of `swift-ci.yml` for
-  that source;
-- the artifact name, workflow run, PR, version, source tree, toolchains,
-  architectures, probes, and SHA-256 checksum agree with JSON provenance; and
-- any already-uploaded asset is byte-identical, so a retry cannot replace a
-  divergent archive.
+- the tag tree equals the tested PR-head tree, even after rebase;
+- the candidate is a successful manual run of `swift-ci.yml` for that source;
+- the artifact name, run, PR, version, tree, tools, CPU types, checks, and
+  SHA-256 checksum match the JSON record; and
+- any asset already present has the same bytes.
 
-The publisher uploads the archive, checksum, and provenance, titles the release
-`Cog <version>`, and removes its draft flag. A separate job with only
-`actions: write` then dispatches `docs.yml` at the tag. This explicit dispatch
-is required because events created by the repository token do not generally
-start another workflow.
+The job uploads the archive, checksum, and record, names the release
+`Cog <version>`, and publishes it. A separate job with only `actions: write`
+starts `docs.yml` at the tag. This direct start is required because events made
+by the repository token do not usually start another workflow.
 
-Wait for Docs to deploy the tag-built DocC archive and the VitePress site. The
-published API reference must resolve at
-`https://skeswa.github.io/cog/documentation/cog/` before publishing the sibling.
+Wait for Docs to finish. Confirm that the
+[published API reference](https://skeswa.github.io/cog/documentation/cog/)
+opens before publishing plugins.
 
-## Publish `coglint-plugins`
+## 4. Publish `coglint-plugins`
 
-Open **skeswa/coglint-plugins → Actions → Publish CogLintPlugins**, dispatch
-`main`, and enter the published Cog version. That repository uses only its own
-repository-scoped token.
+Open **skeswa/coglint-plugins → Actions → Publish CogLintPlugins**. Select
+`main`, enter the published Cog version, and start the workflow. It uses only
+that repo's own token.
 
-The read-only preparation job requires the public Cog tag and published
-release, downloads all three assets, verifies their checksum and provenance,
-checks out the exact Cog tag, runs that tag's generator, validates the generated
-manifest, and builds a scratch SwiftPM consumer. It records the current sibling
-`main` SHA and uploads the generated tree as a workflow artifact.
+The read-only preparation job:
 
-The publish job waits at `coglint-release`. Approve it only after preparation is
-green. Under its sole `contents: write` grant, the job executes no downloaded
-Cog code. It re-hashes the generated artifact, requires sibling `main` to remain
-unchanged, rejects an existing divergent version or tag, fast-forwards one
-`chore(release): publish CogLintPlugins <version>` commit and the matching bare
-lightweight tag in one atomic, non-forced push. An already-published retry is
-accepted only when the tag, commit, and regenerated managed tree are identical.
-A final read-only hosted macOS job resolves that public tag from a scratch
-package and executes its build-tool plugin.
+1. requires the public Cog tag and release;
+2. downloads and checks all three Cog assets;
+3. checks out the exact Cog tag and runs its generator;
+4. checks the generated package and a test SwiftPM app; and
+5. records the sibling `main` SHA and uploads the generated tree.
 
-The release is complete only when the Cog release is published, Docs is green,
-and the sibling's final exact-version consumer is green.
+The publish job then waits at `coglint-release`. Approve it only after
+preparation passes. Its `contents: write` step runs no downloaded Cog code. It
+checks the generated files again, requires `main` to be unchanged, and rejects
+a different existing version or tag. It pushes one
+`chore(release): publish CogLintPlugins <version>` commit and its matching bare
+tag together, without force.
+
+A retry is safe only when the existing tag, commit, and generated files all
+match. A final read-only hosted Mac resolves the public tag in a new Swift
+package and runs its build-tool plugin.
+
+The release is done when the Cog release is public, Docs is green, and the
+sibling's exact-version test is green.
 
 ## Recover a failed publication
 
-Never move or replace a release tag. For an existing tag whose publication did
-not finish, open **Actions → Release → Run workflow** and enter the tag and its
-merged Release Please PR number. The recovery job proves the tag is lightweight
-and version-matched, dispatches the complete Swift CI workflow at that tag, and
-waits for a new successful candidate. The protected publisher then repeats the
-same provenance and byte checks. Matching assets are reused; divergent assets
-stop the run.
+Never move or replace a release tag. To finish an existing tag, open
+**Actions → Release → Run workflow**. Enter the tag and its merged Release
+Please PR number.
 
-If the released source itself is defective, fix forward through a new
-Conventional Commit and a new patch or minor release. Recovery repairs the
-pipeline around an immutable source release; it never repairs history.
+Recovery proves that the tag is lightweight and matches the version. It starts
+the full Swift CI workflow at that tag and waits for a new passing candidate.
+The protected publisher then repeats every source, record, and checksum check.
+It reuses matching assets and stops on different bytes.
+
+If the released code is wrong, make a fix through a new Conventional Commit and
+publish a new patch or minor. Recovery can repair the release process, but it
+cannot change released source or history.

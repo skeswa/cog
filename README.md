@@ -1,63 +1,52 @@
 # Cog
 
-Cog is a fine-grained state-management project for native mobile UI. It is
-planned as two platform-native libraries:
+Cog is fine-grained state management for native mobile apps:
 
-- **iOS:** a Swift library for SwiftUI, using `@Observable` at the UI boundary
-  and one app-wide MainActor-confined dependency graph inside.
-- **Android:** a Kotlin library for Jetpack Compose, built first over the
-  Compose snapshot runtime with one app-wide store plus turn, lifetime, and
-  async rules.
+- **iOS:** a working Swift library for SwiftUI. It uses `@Observable` at the UI
+  edge and one app-wide state graph on the MainActor.
+- **Android:** a planned Kotlin library for Jetpack Compose. It will use one
+  app-wide store over the Compose snapshot system.
 
-The libraries implement one [shared state model](./docs/design.md), while each
-fits its platform instead of forcing one platform's API onto the other.
+Both libraries follow one [shared state model](./docs/design.md), but each uses
+the normal tools and style of its platform.
 
-## Design principles
+## Core rules
 
-1. **Cog should feel simple.** Declaring, reading, and changing state should
-   look natural on each platform. Common code should be easy to read and
-   reason about.
-2. **Every state read should be correct.** A read must use the latest completed
-   source state after settling every dependency it needs. It must not expose a
-   torn update, stale automatic value, or half-finished change.
-3. **Cog should minimize runtime overhead.** Avoid needless recomputation,
-   allocation, synchronization, and UI updates. Use benchmarks to choose
-   implementation details.
-4. **Cog state should be singular.** One running app has one authoritative Cog
-   graph, and each mutable fact represented in Cog has one writable source in
-   it. Screens and features must not create competing graphs or mirror
-   sources. Tests and previews are separate runtimes, each with one graph.
+1. **Keep it simple.** State should be easy to declare, read, and change.
+2. **Make every read correct.** A read must use the last complete change and
+   update all values it depends on first.
+3. **Keep overhead low.** Avoid extra work, memory use, locks, and UI updates.
+   Use benchmarks to choose internal designs.
+4. **Keep one source of truth.** One running app has one Cog graph. Each mutable
+   fact has one writable source in that graph.
 
-Correctness and singular state are not traded for speed. Performance work
-should also keep the common API simple.
+Speed must not weaken correctness or create more sources of truth.
 
 ## Status
 
-The Swift library is real and usable. It includes its SwiftUI boundary,
-mechanisms, declared lifetimes, async policies and streams, value exports, the
-external Observation bridge, first-party CogLint plugins, and the specialized
-arena with shared pool edges. Graph notices are O(changed), steady turns do not
-allocate, and `CompactArena` remains as an application-level binary-size
-opt-out. The Storefront macrobenchmark exercises the retained architecture end
-to end. The Android library has not been started.
+The Swift library is ready to use. It includes SwiftUI support, app-wide side
+effects, lifetimes, async work, streams, value exports, Observation support,
+CogLint plugins, and a fast specialized arena. Normal graph notices scale with
+the number of changed values, and steady turns do not allocate memory. Apps can
+use `CompactArena` to reduce binary size. The Storefront benchmark tests the
+full design. Android work has not started.
 
 <!-- x-release-please-start-version -->
 
-The current published Swift release is 0.4.0.
+The current Swift release is 0.4.0.
 <!-- x-release-please-end -->
 
-The [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
-shows the production-bootstrap and isolated-test call sites, and
-[CHANGELOG.md](./CHANGELOG.md) records what each release contains.
+See the [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
+for production, test, and preview setup. See [CHANGELOG.md](./CHANGELOG.md) for
+release details.
 
-The earlier Dart and Flutter experiment has been removed from the current
-tree. [Design history](./docs/history.md) carries forward its motivation,
-decisions, and source trail; the complete dump remains in repository history.
+The old Dart and Flutter experiment is no longer in the current tree. The
+[design history](./docs/history.md) explains the few ideas needed to understand
+today's model. The full experiment remains in repository history.
 
-## Using Cog in an app
+## Add Cog to a Swift app
 
-Cog for Swift resolves with no dependencies of its own. Add it to a
-`Package.swift`:
+Cog has no runtime dependencies. Add it to `Package.swift`:
 
 ```swift
 // x-release-please-start-version
@@ -70,12 +59,11 @@ dependencies: [
 // x-release-please-end
 ```
 
-or, in Xcode, add the same URL under **File ▸ Add Package Dependencies** with
-the **Up to Next Minor Version** rule.
+In Xcode, add the same URL through **File ▸ Add Package Dependencies** and
+choose **Up to Next Minor Version**.
 
-The default above selects the fastest measured implementation: specialized
-arena with shared pool edges. A final application can opt out of typed
-specialization with the trait-aware dependency overload:
+The default uses the fastest measured design. A final app can trade some speed
+for a smaller binary:
 
 ```swift
 // x-release-please-start-version
@@ -87,71 +75,48 @@ specialization with the trait-aware dependency overload:
 // x-release-please-end
 ```
 
-Package traits are additive across the dependency graph. Enable this trait
-only when the final application owns the binary-size decision; a reusable
-library should not force the compact configuration on every application that
-also resolves Cog. The trait changes no Cog API or behavior and does not
-restore the retired simple core. It keeps the arena and shared edge pool while
-suppressing the client-specializable typed value frontier.
+Package traits affect every package that resolves Cog. Only the final app
+should enable `CompactArena`; a library should not choose it for its users. The
+trait changes no public behavior or API.
 
-Pin to a **minor**, not a major. Cog is in 0.x, where a minor release may break
-source compatibility and says so in the changelog, while a patch release only
-adds or fixes. `.upToNextMajor` would take those breaking minors silently.
+Pin to a **minor**, not a major. Before 1.0, a minor release may include listed
+breaking changes. A patch release only adds or fixes behavior.
 
-Depend on the `Cog` product from an app target, and on `CogTesting` from test
-and preview-support targets. Cog requires iOS 17 or macOS 14. Its manifest uses
-Swift tools 6.2; the repository currently builds and tests releases with Xcode
-26.6 and Swift 6.3.3.
-The documentation lives at
-[skeswa.github.io/cog](https://skeswa.github.io/cog/documentation/cog/), and
-[Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
-takes an app from this pin to a value on screen.
+Use the `Cog` product in app targets. Use `CogTesting` in tests and preview
+support. Cog requires iOS 17 or macOS 14 and Swift tools 6.2. Releases are
+tested with Xcode 26.6 and Swift 6.3.3.
+
+Read [Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
+to put a value on screen. Read
 [Linting your app](https://skeswa.github.io/cog/documentation/cog/lintingyourapp)
-shows how to add the separately distributed, version-matched CogLint plugins
-without adding lint dependencies to an ordinary Cog consumer.
+to add the separate, version-matched CogLint plugins without adding lint tools
+to normal Cog users.
 
-## Working in this repository
+## Work on Cog
 
-[CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, guarded test commands, the
-test topology, documentation obligations, and the Jujutsu workflow. Tooling is
-versioned with [mise](https://mise.jdx.dev), and `mise tasks` prints the
-authoritative command list. The
-[change-management process](./docs/maintainers/changes.md) defines revision
-descriptions and their required check; maintainer-only details live in the
-[CI operations](./docs/maintainers/ci.md) and
-[Swift release](./docs/maintainers/releasing.md) runbooks.
+[CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, tests, docs, and the Jujutsu
+workflow. [mise](https://mise.jdx.dev) manages tools; `mise tasks` lists every
+command.
 
-Releases are produced entirely by GitHub Actions. Release Please derives the
-next Swift version and changelog from Conventional Commit revision descriptions;
-protected workflows build and verify native artifacts, publish Cog and its
-documentation, then publish the matching `coglint-plugins` tag.
+Every release step runs in GitHub Actions. Release Please reads Conventional
+Commit messages to choose the next version and write the changelog. Protected
+workflows test and publish Cog, its docs, and the matching `coglint-plugins`
+tag. Start with [change management](./docs/maintainers/changes.md). Maintainers
+should also read [CI operations](./docs/maintainers/ci.md) and the
+[Swift release runbook](./docs/maintainers/releasing.md).
 
 ## Documentation
 
-Everything below is published as a website at
-**[skeswa.github.io/cog](https://skeswa.github.io/cog/)**, with search and
-navigation, alongside the generated API reference. The same documents are
-readable in this repository.
+The full site is [skeswa.github.io/cog](https://skeswa.github.io/cog/). Key
+pages are also available here:
 
-- **[CHANGELOG.md](./CHANGELOG.md):** what changed in each Swift release, and
-  what a 0.x minor is allowed to break.
-- **[CONTRIBUTING.md](./CONTRIBUTING.md):** local setup, verification, test
-  organization, and revision conventions.
-- **[SECURITY.md](./SECURITY.md):** supported releases and private
-  vulnerability reporting.
-- **[Change management](./docs/maintainers/changes.md):** the authoritative
-  Conventional Commit authoring, validation, and release-input workflow.
-- **[CI and runner operations](./docs/maintainers/ci.md):** the maintainer
-  runbook for the self-hosted boundary, hosted fork lane, and workflow
-  hardening contract.
-- **[Releasing Cog for Swift](./docs/maintainers/releasing.md):** candidate,
-  protected publication, recovery, documentation, and sibling-workflow steps.
-- **[Shared state model](./docs/design.md):** the problem, vocabulary, and
-  behavioral invariants both platform libraries implement.
-- **[Design history](./docs/history.md):** the Dart and Flutter lineage, how the
-  model evolved, what survived, and the original source trail.
-- **[Swift design](./docs/swift/README.md):** the reading order, current
-  decisions, open questions, and implementation plan for SwiftUI.
-- **[Kotlin design](./docs/kotlin/README.md):** the reading order, Compose
-  snapshot architecture, worked example, Flow and effects guidance, and
-  Android benchmark plan.
+- [Changelog](./CHANGELOG.md) — changes in each Swift release
+- [Contributing](./CONTRIBUTING.md) — setup, checks, tests, docs, and revisions
+- [Security](./SECURITY.md) — supported releases and private reports
+- [Change management](./docs/maintainers/changes.md) — commit rules and checks
+- [CI operations](./docs/maintainers/ci.md) — runners, permissions, and controls
+- [Release runbook](./docs/maintainers/releasing.md) — the Actions-only release
+- [Shared state model](./docs/design.md) — rules shared by Swift and Kotlin
+- [Design history](./docs/history.md) — useful background from the old design
+- [Swift docs](./docs/swift/README.md) — current Swift design and work
+- [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
