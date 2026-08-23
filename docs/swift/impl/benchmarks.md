@@ -2,9 +2,8 @@
 
 _August 21, 2026_
 
-This document records benchmark results and the choices they support. It puts
-current results first. Older results appear only when they explain a choice,
-show progress, or record a withdrawn measurement.
+This file records benchmark results and the decisions they support. Current
+results come first. Older results stay only when they explain a choice.
 
 The benchmark design is in [design/perf.md](../design/perf.md). Profiler results
 and optimization details are in [optimization.md](./optimization.md). Commands,
@@ -15,27 +14,30 @@ In the tables below, p50 is the median and p90 is the 90th percentile. Lower
 times, instruction counts, allocations, retains, and releases are better. ARC
 means Swift's automatic reference-counting work.
 
+Each session has a plain name, such as “specialization run” or “three-core
+comparison.” The [environment table](#measurement-environments) gives its date,
+machine, OS, Xcode, Swift, and harness. Short IDs such as
+[E5](#benchmark-environment-e5) remain only as stable record keys.
+
 ## Current core decision
 
-The **specialized arena** is the sole shipping core and default implementation.
-It stores states in shared columns, edges in a shared pool, and exposes a stable
-typed frontier so client compilation can specialize Cog's generic value work.
-The former **simple core** is retired. Applications that prioritize binary size
-can explicitly suppress the typed frontier with the non-default `CompactArena`
-package trait. That public trait is also the supported way to benchmark the
-compact arena configuration.
+The **specialized arena** is the only shipping core and the default. It stores
+states in columns and edges in a shared pool. Its typed frontier lets client
+code specialize generic value work. `CompactArena` turns off that frontier to
+reduce binary size without changing behavior.
 
 Current evidence explains the default and its opt-out:
 
 - The unspecialized arena is 18% faster than simple on a steady turn and 27%
   faster on a 100-node chain.
-- In E5 scouting, the specialized arena extends those wins to 45% and 50%
-  against the earlier E2 simple results; it is 32% faster than the earlier
-  unspecialized-arena result on both shapes. These were separate sessions, not
-  a paired three-way run.
-- In the back-to-back E6 whole-graph run, specialized arena was 64% to 79%
-  faster than simple and 29% to 55% faster than unspecialized arena across the
-  diamond, deep, broad, and unstable shapes.
+- In the [specialization run (E5)](#benchmark-environment-e5), the specialized
+  arena extends those wins to 45% and 50% against the earlier
+  [shared-runtime run (E2)](#benchmark-environment-e2). It is 32% faster than
+  the earlier unspecialized-arena result on both shapes. These were separate
+  sessions, not a paired three-way run.
+- In the [three-core comparison (E6)](#benchmark-environment-e6), specialized
+  arena was 64% to 79% faster than simple and 29% to 55% faster than
+  unspecialized arena across the diamond, deep, broad, and unstable shapes.
 - Unspecialized arena is 12.5× to 66× faster than simple on every graph-backed
   Storefront cut. The specialized Storefront executable has a size result but
   no corrected headless timing yet.
@@ -45,22 +47,19 @@ Current evidence explains the default and its opt-out:
 - Unspecialized arena takes 2.2× as long as simple to build a 1,000-state keyed
   graph. Specialization closes that gap to about 3%.
 
-These results selected specialized arena on runtime evidence; stakeholder
-research changed the product weighting after about 80% of users said they would
-accept its binary-size cost for the speed and overhead gains. The default now
-serves that majority. `CompactArena` preserves an explicit application-level
-escape hatch for the remaining size-sensitive users without restoring the
-simple implementation. Pinned-host Storefront and UI follow-up remains owed for
-release qualification, not for reopening the core choice.
+These results selected specialization. About 80% of surveyed users accepted its
+binary-size cost for the speed and lower overhead. `CompactArena` serves apps
+with a tighter size budget. Pinned-host Storefront and UI runs are still needed
+for release checks, not to reopen the core choice.
 
 ### Warm execution
 
-`M9-23`, environment E2, supplies the historical simple and
-unspecialized-arena columns.
+The [shared-runtime run (E2)](#benchmark-environment-e2) supplies the
+historical simple and unspecialized-arena columns from `M9-23`.
 Work after `M9-17` removed the arena's main exclusivity and metadata costs. The
 specialized-arena column is the median of three independently recorded p50s in
-environment E5. It is scouting across the same host and toolchain, not a
-paired three-way release qualification.
+the [specialization run (E5)](#benchmark-environment-e5). It used the same host
+and toolchain, but it was not a paired three-way release check.
 
 | Shape                 |   simple | arena, unspecialized | arena, specialized | specialized result                      |
 | --------------------- | -------: | -------------------: | -----------------: | --------------------------------------- |
@@ -71,22 +70,18 @@ paired three-way release qualification.
 | pinned-key turn, p50  |  ~2.2 µs |              ~2.6 µs |            ~2.4 µs | near simple; about 8% faster than arena |
 | allocations, all four |        0 |                    0 |                  0 | tie                                     |
 
-The warm gap is a storage cost, not an allocation cost. The simple core keeps
-each state in a class. Its forward edges hold `any CogState` references, and
-its reverse edges are weak-reference objects. A graph walk therefore pays for
-ARC, weak loads, actor checks, and existential access at each step. In the
-`M9-21` profile, ARC was 28.5% of the simple turn against 6.5% of the arena
-turn; actor checks were 8.9% against 2.2%. The arena instead walks integer rows
-and scalar edges, and it updates a matching edge in place.
+The warm gap comes from storage, not allocations. Simple walks class objects,
+weak reverse edges, and erased forward edges. Arena walks integer rows and
+scalar edges. In M9-21, ARC took 28.5% of a simple turn and 6.5% of an arena
+turn; actor checks took 8.9% and 2.2%.
 
 ### Whole-graph propagation
 
-PERF-10, environment E6. Historical simple, unspecialized arena, and specialized
-arena ran back to back in that order on the same host. Each benchmark performs
-its own warmup and gathers samples for up to three seconds. This closes the
-stale `M9-17` comparison and supplies the evidence for retiring simple, but
-remains scouting because Xcode 26.4 is not the repository's pinned Xcode 26.6
-release environment.
+In the [three-core comparison (E6)](#benchmark-environment-e6), PERF-10 ran
+historical simple, unspecialized arena, and specialized arena back to back on
+the same host. Each benchmark warmed up, then gathered samples for up to three
+seconds. This run supports retiring simple, but it is not a release check
+because it used Xcode 26.4 instead of the pinned Xcode 26.6.
 
 | Shape    | simple p50 | arena p50 | specialized p50 | specialized vs. simple | specialized vs. arena | samples, simple / arena / specialized |
 | -------- | ---------: | --------: | --------------: | ---------------------: | --------------------: | ------------------------------------: |
@@ -112,11 +107,12 @@ separate the configurations.
 
 ### Graph construction
 
-`M9-25`, environment E2. Each measured region built and settled a graph with
-500 keyed sources and 500 keyed consumers. Seven paired runs were taken. The
-specialized results are medians from the seven paired baseline/frontier runs in
-E5. The benchmark released the context after `stopMeasurement()`, so teardown
-is not part of these results.
+For `M9-25`, the [shared-runtime run (E2)](#benchmark-environment-e2) built and
+settled 500 keyed sources and 500 keyed consumers. Seven paired samples were
+taken. Specialized results are the medians from seven paired samples in the
+[specialization run (E5)](#benchmark-environment-e5). The benchmark released
+the context after `stopMeasurement()`, so teardown is not part of these
+results.
 
 | Measure                    |    simple | arena, unspecialized | arena, specialized | specialized result                           |
 | -------------------------- | --------: | -------------------: | -----------------: | -------------------------------------------- |
@@ -130,8 +126,8 @@ counted footprint test gives a clearer result.
 
 `M9-26` added a standalone profile of the same graph shape. Its context was
 local, so this profile included teardown even though the benchmark above did
-not. E5 repeated the allocation counter after specialization; that probe did
-not capture retains or releases.
+not. The [specialization run (E5)](#benchmark-environment-e5) repeated the
+allocation counter but did not capture retains or releases.
 
 | Counter     | simple | arena, unspecialized | arena, specialized |
 | ----------- | -----: | -------------------: | -----------------: |
@@ -159,8 +155,9 @@ array code. New rows also grow nine scalar columns and two typed value arrays.
 
 `M9-23` avoids most lookup and metadata work for keyless state by memoizing its
 slot and column. This test is fully keyed, so it always takes the uncached path.
-E5 validates the typed frontier as the fix: it cut the paired median time by
-49.1%, instructions by about 51%, and standalone allocations by 70.2%.
+The specialization run validates the typed frontier as the fix: it cut paired
+median time by 49.1%, instructions by about 51%, and standalone allocations by
+70.2%.
 
 The diagnosis is validated, but the exact share of the original 2.2× gap
 remains approximate because `M9-25` and `M9-26` used different teardown
@@ -168,12 +165,13 @@ boundaries. There is no evidence that arena teardown itself was 2.2× slower.
 
 ### Default arena specialization and compact opt-out
 
-Typed-frontier experiment, environment E5. By default, the arena's public
-generic reads, descriptor-and-key resolution, record-closure formation, and
-typed value-column operations ship as stable `@inlinable` bodies. The
-`CompactArena` trait suppresses those annotations while the scalar graph
-machinery remains opaque in both configurations. Seven paired PERF-03 runs used
-identical build-and-settle boundaries:
+The [specialization run (E5)](#benchmark-environment-e5) tested the typed
+frontier. By default, the arena's public generic reads, descriptor-and-key
+resolution, record-closure formation, and typed value-column operations ship
+as stable `@inlinable` bodies. The `CompactArena` trait suppresses those
+annotations while the scalar graph machinery remains opaque in both
+configurations. Seven paired PERF-03 runs used identical build-and-settle
+boundaries:
 
 | Measure                        | arena baseline | specialized arena | change         |
 | ------------------------------ | -------------: | ----------------: | -------------- |
@@ -196,26 +194,21 @@ arm64 Mach-O `__TEXT` segment and its `__text` machine-code section:
 | Storefront `__TEXT`, vs. historical simple   |        827,392 |                 991,232 |        +163,840 |          +19.8% |
 | Storefront `__text`, vs. historical simple   |        688,821 |                 838,229 |        +149,408 |          +21.7% |
 
-These percentages describe the complete executable segment or section, not a
-standalone Cog library and not the app bundle or compressed download. The
-absolute increase comes from the linked arena implementation and specialized
-copies at Cog's generic value and key call sites. It can grow with the number
-and type diversity of those compile-time call sites, but not with the number of
-runtime state instances and not proportionally with unrelated application
-code. Unrelated machine code enlarges the `__TEXT` denominator, reducing the
-percentage; assets generally live outside `__TEXT`. `CompactArena` exists for
-applications whose size budget outweighs the measured runtime gains.
+These are executable code segments, not the app bundle or download size. The
+increase comes from arena code and specialized copies at generic call sites.
+It can grow with the number of value and key types, but not with runtime state
+count. `CompactArena` exists for apps whose size budget matters more than the
+measured speed.
 
-The experiment ran on E5 rather than the repository's Xcode 26.6 release pin;
-the recorded numbers establish the direction and the product trade, while the
-pinned runner still owns release qualification.
+The specialization run used Xcode 26.4 rather than the repository's pinned
+Xcode 26.6. The results show the direction and product trade, but the pinned
+runner still owns the release check.
 
 ### Evidence needed for the next decision
 
 1. Repeat the corrected Storefront run in the pinned CI environment.
 2. Rerun the Storefront UI suite. Its old results are withdrawn.
-3. Repeat E6's three-way PERF-10 run on the pinned Xcode to qualify the scouting
-   result.
+3. Repeat the three-core comparison on the pinned Xcode to qualify the result.
 4. Qualify both the specialized default and `CompactArena` release archives on
    the pinned Xcode.
 5. Measure build, first settlement, and teardown as separate phases under the
@@ -225,14 +218,14 @@ pinned runner still owns release qualification.
 
 All benchmark runs used release builds.
 
-| ID  | Date       | Environment                                                                                                                                                                                                                            |
-| --- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E1  | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                         |
-| E2  | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                     |
-| E3  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores run back to back on an idle host                                                                                       |
-| E4  | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                           |
-| E5  | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; scouting because the pinned Xcode 26.6 was unavailable |
-| E6  | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 Cog shapes run back to back as simple, unspecialized arena, then specialized arena          |
+| ID                                      | Run name                 | Date       | Environment                                                                                                                                                                                                     |
+| --------------------------------------- | ------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="benchmark-environment-e1"></a>E1 | Initial baseline         | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                  |
+| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run       | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                              |
+| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                |
+| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke      | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                    |
+| <a id="benchmark-environment-e5"></a>E5 | Specialization run       | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check             |
+| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison    | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used
@@ -243,7 +236,7 @@ swift-state-graph 0.28.0 at revision
 
 ### Value references
 
-`M5-09e`, environment E1. The keyed diamond uses 100 keys, five arms, and 500
+In the [initial baseline (E1)](#benchmark-environment-e1), `M5-09e` used 100 keys, five arms, and 500
 turns. The churn test keeps 10 live keys while creating 510 keys. Workload cells
 show instructions and time.
 
@@ -264,7 +257,7 @@ conditional API and storage paths.
 
 ### Arena edges
 
-`M6-05c`, environment E1. Each root reads one stable control and 32 data
+In the [initial baseline (E1)](#benchmark-environment-e1), each `M6-05c` root read one stable control and 32 data
 sources. The static test keeps all edges. The churn test replaces the 32 data
 edges each turn. Workload cells show instructions and time.
 
@@ -287,7 +280,7 @@ three propagation implementations in production source.
 
 ### Pinned keys now cost O(changed keys)
 
-`M9-06`, environment E2. One keyed source changes. All other keyed states stay
+In the [shared-runtime run (E2)](#benchmark-environment-e2), `M9-06` changed one keyed source. All other keyed states stayed
 pinned and untouched.
 
 | Pinned keys | simple retains / releases / p50 | arena retains / releases / p50 |
@@ -301,7 +294,7 @@ operations, or 90 and 110 per turn.
 
 ### A steady turn allocates nothing
 
-`M9-10`, environment E2. This is the simple core's steady turn.
+The [shared-runtime run (E2)](#benchmark-environment-e2) measured the simple core's steady turn for `M9-10`.
 
 | Metric             | before M9 | after M9 |
 | ------------------ | --------: | -------: |
@@ -320,7 +313,7 @@ chain uses much more. Issue #373 tracks that work.
 
 ### Settling a node allocates nothing
 
-`M9-15`, environment E2. This pulls one source through 100 automatic nodes.
+In the [shared-runtime run (E2)](#benchmark-environment-e2), `M9-15` pulled one source through 100 automatic nodes.
 
 | Metric             | before M9 |    now | per node |
 | ------------------ | --------: | -----: | -------: |
@@ -336,7 +329,7 @@ was a dependency list copied before reuse.
 
 ### Observation boundaries stay lazy
 
-`M5-07c`, environment E1. A graph held 1,000 states. Only 12 values were read
+In the [initial baseline (E1)](#benchmark-environment-e1), `M5-07c` held 1,000 states. Only 12 values were read
 through the tracked subscript.
 
 | Metric                  | p0     | p100   | samples |
@@ -349,10 +342,10 @@ The exact gate makes sure Cog creates boundaries only for observed values.
 
 ### Comparison with other runtimes
 
-`M6-11c`, environment E1. These are older than the latest core work, but they
+The [initial baseline (E1)](#benchmark-environment-e1) produced the `M6-11c` results. They are older than the latest core work, but they
 remain the recorded comparison with swift-state-graph and raw Observation.
 The current Cog-only three-way comparison is under “Whole-graph propagation”
-above. The external runtimes were not rerun in E6, so this table preserves the
+above. The external runtimes were not rerun in the three-core comparison, so this table preserves the
 older common-session comparison. Each cell shows instructions and median time.
 
 | Runtime                |      diamond p50 |           deep p50 |        broad p50 |       unstable p50 |
@@ -376,7 +369,7 @@ Process-level peak memory did not separate the runtimes:
 
 ### Absolute CI limits
 
-`M6-11d`, environment E1. CI checks p90 time. The limits are about three times
+The [initial baseline (E1)](#benchmark-environment-e1) produced the `M6-11d` results. CI checks p90 time. The limits are about three times
 the slower recorded p90 in each cell. They catch large regressions without
 choosing a core.
 
@@ -451,7 +444,7 @@ corrected headless results below replace them. The UI suite has not been rerun.
 
 ### Corrected headless results
 
-`M10-05` and `M10-08`, environment E3, standard profile. Both cores ran back to
+The [corrected Storefront run (E3)](#benchmark-environment-e3) covered `M10-05` and `M10-08` with the standard profile. Both cores ran back to
 back. `mise run test:storefront` passed all 14 tests first. These results are
 report-only because they come from one host and one session.
 
@@ -523,12 +516,12 @@ arena's cold generic-storage penalty.
 
 ## Older and withdrawn results
 
-This section keeps earlier measurements in a compact form. Do not use a
-superseded or withdrawn result as current evidence.
+These older measurements explain past choices. Do not use them as current
+evidence.
 
 ### Simple-core baseline before M9
 
-`M5-06` and `M5-07a`, environment E1.
+The [initial baseline (E1)](#benchmark-environment-e1) covered `M5-06` and `M5-07a`.
 
 | Operation                |   mallocs |   objects |  retains |  releases |
 | ------------------------ | --------: | --------: | -------: | --------: |
@@ -566,7 +559,7 @@ this slope on both cores.
 
 ### First core decision
 
-`M6-12a`, environment E1. Both cores passed the same 248 public scenarios.
+In the [initial baseline (E1)](#benchmark-environment-e1), `M6-12a` passed the same 248 public scenarios on both cores.
 
 | Workload        | Core   | mallocs / objects | retains / releases | p50 time |
 | --------------- | ------ | ----------------: | -----------------: | -------: |
@@ -587,7 +580,7 @@ slope. The simple core stayed the default. Arena was kept for research. No
 
 ### Core comparison after shared M9 work
 
-`M9-17`, environment E2. The simple numbers still stand. The arena numbers are
+The [shared-runtime run (E2)](#benchmark-environment-e2) covered `M9-17`. The simple numbers still stand. The arena numbers are
 superseded by `M9-22` and `M9-23`.
 
 | Workload          | Core   | mallocs | retains / releases | p50 time |
@@ -615,100 +608,15 @@ turn and the deep graph. Later arena work reversed the smallest-turn result.
 
 ### Storefront results withdrawn after review
 
-The first headless runs, first cross-core comparison, first footprint reading,
-and first UI run used the flawed harness listed in the correction section.
-Their figures are not current evidence.
+The first M10-05, M10-07, and M10-08 Storefront runs are invalid. Their harness
+included shadow-model work, could finish before graph tasks started, allowed
+no-op samples, gave pricing stages unused dependencies, and used the wrong cart
+control.
 
-`M10-05`, environment E2, standard profile, simple core:
-
-| Cut             | p50 time | instructions | mallocs | objects | retains | releases | samples |
-| --------------- | -------: | -----------: | ------: | ------: | ------: | -------: | ------: |
-| cold            |   555 ms |      7,998 M |       — |       — |       — |        — |      10 |
-| session         | 6,178 ms |         88 G |       — |       — |       — |        — |       2 |
-| interactions    | 1,340 µs |         20 M |      19 |      19 |    29 K |     79 K |   2,181 |
-| async burst     |    80 ms |      1,158 M |       — |       — |       — |        — |      62 |
-| compute control |   604 µs |         13 M |   5,603 |   1,838 |    11 K |     21 K |   4,167 |
-
-`M10-08`, environment E2, standard profile:
-
-| Cut             | simple p50 | arena p50 |
-| --------------- | ---------: | --------: |
-| cold            |     555 ms |     40 ms |
-| session         |   6,178 ms |    195 ms |
-| interactions    |   1,340 µs |     74 µs |
-| async burst     |      80 ms |   6.23 ms |
-| compute control |     604 µs |    657 µs |
-
-| Interaction count | simple | arena |
-| ----------------- | -----: | ----: |
-| mallocs           |     19 |    12 |
-| objects           |     19 |    12 |
-| retains           |   29 K |   903 |
-| releases          |   79 K |   950 |
-
-The withdrawn 2,402-state footprint reading was:
-
-| Measure                   |     simple |     arena |
-| ------------------------- | ---------: | --------: |
-| allocations made          |     21,815 |    10,225 |
-| allocations returned      |      3,761 |    10,150 |
-| allocations that survived |     18,054 |        75 |
-| gross bytes requested     |  2,500,066 | 2,639,596 |
-| bytes that survived       |  1,705,522 | 1,226,863 |
-| object allocations        |     19,333 |       198 |
-| retains                   | 10,200,449 |    60,476 |
-| releases                  | 30,371,379 |    59,387 |
-| instructions              |     7.10 G |     173 M |
-| p50 time                  |     485 ms |   12.6 ms |
-
-The values match the corrected footprint counts because that cut's measured
-region did not contain the shadow checks. The result was still withdrawn with
-the rest of the first run, then confirmed by the corrected run.
-
-The first equal-iteration resident-memory run reported:
-
-| Cut         | simple peak / delta, p50 | arena peak / delta, p50 | iterations |
-| ----------- | -----------------------: | ----------------------: | ---------: |
-| cold        |         22 MB / 1,983 KB |        32 MB / 5,018 KB |         10 |
-| async burst |           21 MB / 820 KB |          28 MB / 508 KB |         50 |
-| session     |         31 MB / 3,410 KB |        53 MB / 5,640 KB |          3 |
-
-The first steady-allocation run reported:
-
-| Measure                   | interactions, simple | interactions, arena | control, simple | control, arena |
-| ------------------------- | -------------------: | ------------------: | --------------: | -------------: |
-| allocations made          |                   19 |                  12 |           5,603 |          5,603 |
-| allocations returned      |                   19 |                  12 |           5,603 |          5,603 |
-| allocations that survived |                    0 |                   0 |               0 |              0 |
-| gross bytes requested     |                3,448 |                 536 |         624,883 |        624,883 |
-| bytes that survived       |                    0 |                   0 |               0 |              0 |
-| object allocations        |                   19 |                  12 |           1,838 |          1,838 |
-| retains                   |               29,064 |                 903 |          11,366 |         11,366 |
-| releases                  |               78,976 |                 950 |          20,670 |         20,664 |
-| instructions              |               19.8 M |              1.46 M |          12.9 M |         12.9 M |
-| p50 time                  |              1.26 ms |             77.9 µs |          643 µs |         587 µs |
-
-`M10-07`, environment E4, smoke profile. Five measured UI iterations followed
-one warm-up. The app relaunched before each measured region.
-
-| Test                             | Metric                |    mean |   RSD |
-| -------------------------------- | --------------------- | ------: | ----: |
-| cold launch                      | first frame           | 1.183 s | 1.32% |
-| settled scrolling                | drag and deceleration | 2.584 s | 0.01% |
-| scrolling during inventory burst | drag and deceleration | 2.567 s | 0.57% |
-| search                           | clock                 | 0.372 s | 1.54% |
-| search                           | app CPU time          | 0.225 s | 3.37% |
-| search                           | app instructions      | 2.38 GI | 1.75% |
-| search                           | app peak memory       | 72.6 MB | 0.12% |
-| search                           | app absolute memory   | 71.4 MB | 0.11% |
-| detail navigation                | navigation transition | 0.517 s | 0.34% |
-| cart and checkout                | clock                 | 2.234 s | 2.23% |
-| cart and checkout                | app instructions      | 3.18 GI | 0.21% |
-
-SwiftUI `List` produced the UIKit scroll timing signpost, but the metric mostly
-measured the fixed swipe and slowdown time. `XCTHitchMetric` returned no data.
-Simulator results can be regression signals, but they cannot support a claim
-about smoothness on a physical device.
+Do not use their headless timing, memory, ARC, allocation, or UI numbers. The
+corrected headless results above replace them. The old footprint counts happened
+to match because that measured region did not run the bad shadow checks; the
+corrected run confirmed them. The UI suite still needs a new run.
 
 ## Measurement rules
 

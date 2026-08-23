@@ -2,109 +2,65 @@
 
 _August 9, 2026_
 
-This is the scenario tree for building Cog test-first. Every behavior the
-library promises is written here as a tiny story. "I" is the library user: an
-engineer writing an app that needs state management they can trust. In the
-LINT group, I am that engineer installing Cog's companion tool. Cog is the
-library.
+This file lists every behavior Cog promises. Each short story becomes a test.
+"I" means an app developer. In the LINT group, it means a developer who uses
+CogLint.
 
 ## How to use this document
 
-- Work red-green. Pick a scenario, write it as a failing test, watch it fail,
-  then write the smallest code that makes it pass. The test suite, not this
-  document, records what is green.
+- Work red-green: write a failing test, see it fail, then make it pass. The
+  test suite is the source of truth for pass status.
 - Scenario IDs are stable. Never renumber or reuse an ID; add new scenarios at
   the end of their group. Tests should carry their scenario ID in their name
   or a comment so the suite and this tree stay linked.
-- API spellings in these stories follow the current design sketch. When core
-  §10 settles a provisional spelling such as tracked `cogs[valueReference]`,
-  update the story and its test call sites without changing the scenario ID;
-  the ID names the behavior, not the spelling.
-- Each group is tagged with the milestone from [plan.md](./plan.md) that turns
-  it green, and points at the design sections it comes from. Every scenario is
-  also covered by exactly one task in [tasks.md](./tasks.md); a task's
-  _Greens:_ line is the coverage ledger. Section numbers
-  resolve per the shared map: §6 lives in
-  [mechanisms.md](../design/mechanisms.md), §5.4 in [rx.md](../design/rx.md), perf
-  §n in [perf.md](../design/perf.md), everything else in
+- If an API name changes, update the story and test but keep the scenario ID.
+  The ID names the behavior, not its spelling.
+- Each group links to its milestone and design section. Exactly one task in
+  [tasks.md](./tasks.md) owns each scenario through its _Greens:_ line. Section
+  §6 is in [mechanisms.md](../design/mechanisms.md), §5.4 is in
+  [rx.md](../design/rx.md), performance sections are in
+  [perf.md](../design/perf.md), and other sections are in
   [exploration.md](../design/exploration.md).
-- Every scenario carries a proof mode naming the check class that greens it:
-  `unit` (the default, left unmarked) runs through `mise run test` for the root
-  package or `mise run test:lint` for the nested linter package. The other
-  modes are `compile-fail`, `exit test`, `release configuration`, `simulator`,
-  `floor runtime`, `suite`, and `benchmark` (the default for every scenario in
-  group 18).
-  Non-unit modes are marked with a trailing `(Proof: ….)` on the scenario.
-  The task-ledger checker matches each mode against the owning task's type
-  and verification commands — exit tests must be proven in debug and
-  release, behavior filters must expand to exactly their unit- and
-  exit-test-mode scenarios, and only suite- and release-configuration-mode
-  scenarios may be greened by a gate.
-- Every test obeys the three testing constraints in the next section: fully
-  optimistic, as fast and cheap as possible, and as implementation agnostic
-  as possible. UI tests live
-  in `CogBoundaryTests`; run-count tests in `CogScenarioTests`; everything else
-  in `CogTests`, run in all four build legs and once more in the
-  release-configuration `test-release` leg (plan M0), which is where every-build
-  guardrail claims are proven outside debug. Scenarios that exercise
-  debug-only surface — `CogTesting.seed`, debug history content, debug
-  warnings —
-  compile out of the `test-release` leg behind `#if DEBUG`; that leg proves
-  their absence instead (SEED-05, HIST-04).
-- A dropped scenario's line is deleted. While no tests exist yet, its group
-  is renumbered to stay gapless; once tests link to IDs, the ID retires
-  instead and a gap is expected.
-- Behavior blocked on a core §10 open question has no scenario yet. The
-  affected group carries a _Pending_ line naming the question; add the
-  scenarios at the end of that group when the decision lands.
-- Scenarios in group 18 are benchmark-gated. Threshold scenarios hold
-  provisional thresholds, and comparison scenarios keep representation choices
-  open, until impl/benchmarks.md records numbers.
+- A scenario's proof mode says how to check it. Unit tests are the default and
+  have no mark. Other modes use `(Proof: ….)`: `compile-fail`, `exit test`,
+  `release configuration`, `simulator`, `floor runtime`, `suite`, or
+  `benchmark`. Group 18 uses `benchmark` by default. The ledger checker makes
+  each task use the right command and exact scenario set. Exit tests must run
+  in debug and release. Only suite and release-configuration scenarios may
+  belong to a gate.
+- UI tests live in `CogBoundaryTests`, run-count tests in `CogScenarioTests`,
+  and other library tests in `CogTests`. Library tests run in all four build
+  legs and in release. Debug-only tests use `#if DEBUG`; the release leg proves
+  those APIs are absent.
+- Before tests use an ID, deleted items may be renumbered. After that, retire
+  the ID and leave a gap. Never reuse it.
+- A blocked behavior gets a _Pending_ note, not a guessed scenario.
+- Group 18 stays open until [benchmarks.md](./benchmarks.md) records its limits
+  or comparison result.
 
 ## Testing constraints
 
-Three constraints govern every test this tree produces. When a scenario and a
-constraint seem to collide, rewrite the test until both hold; no scenario
-justifies a slow, flaky, or core-coupled test.
+Every test follows these rules:
 
-1. **Fully optimistic.** A test drives straight to its conclusion and never
-   hedges against nondeterminism. Every suspension awaits a definite signal
-   the test controls — `CogTesting.TestClock` advancing, a continuation
-   resuming, an exact refresh handle completing, or a deterministic internal
-   acknowledgement — never a sleep, a timeout used as synchronization, a poll
-   loop, a retry, or a flake allowance. Nothing in
-   a test happens "eventually"; if a promised signal might not arrive, that
-   is a library bug for the test to expose, not a reason to wait longer.
-2. **As fast and cheap as possible.** The default home for every test is
-   host-side `swift test`. Simulators appear only where the promise is about
-   a device runtime, and only in `CogBoundaryTests`. Time is always injected — including
-   `whileObserved` grace periods, which elapse on the testing context's
-   injected clock — so no test spends wall-clock time waiting. Graphs are as
-   small as the behavior allows. Compile-fail checks batch into one
-   expected-failure fixture pass, and trap guarantees are Swift Testing exit
-   tests, kept few because each spawns a child process.
-3. **As implementation agnostic as possible.** A test observes the loosest
-   surface that can prove its behavior, in this order: the public `Cog` API,
-   the `CogTesting` product, the debug history surface, and only then a named
-   diagnostic seam. Wherever a scenario says "internal seam," it means such a
-   seam: a narrow behavior contract exposed through the testing product —
-   "the last cycle diagnostic," "deinit cleanup reached the MainActor" —
-   never a peek at state storage, edge layout, or any other representation.
-   COUNT-09 through COUNT-11 are the enforcement: the whole behavior suite
-   must pass unchanged across value-reference layouts and the M6 core swap, so a test
-   that could notice the swap is wrong. Group 18 (PERF) is the one declared
-   exception; it gates the implementation itself and lives in the benchmark
-   package.
-4. **Physically separated by proof kind.** Public behavior proofs in
+1. **Be deterministic.** Wait only for a signal the test controls, such as a
+   test clock, continuation, refresh handle, or internal acknowledgement. Do
+   not sleep, poll, retry, or allow flakes.
+2. **Keep it fast.** Prefer host-side `swift test`. Use a simulator only for
+   device behavior, and only in `CogBoundaryTests`. Inject time, use the
+   smallest useful graph, batch compile-fail fixtures, and limit exit tests.
+3. **Test behavior, not storage.** Prefer the public API, then `CogTesting`,
+   debug history, and finally a narrow diagnostic seam. Do not inspect rows,
+   edges, or other storage details. COUNT-09 through COUNT-11 prove that the
+   same tests work across internal layouts. Group 18 is the only exception.
+4. **Separate proof kinds.** Public behavior proofs in
    `CogTests` live under `Scenarios/<PREFIX>/`, and each
    `<PREFIX><IDs>ScenarioTests.swift` file contains only raw IDs from that
-   scenario family. Scenario fixtures live beside that family without a
-   `Tests` suffix. Proofs that green no scenario live under
+   scenario family. Fixtures live beside that family without a `Tests` suffix.
+   Proofs that green no scenario live under
    `Infrastructure/<seam>/`, use the `...InfrastructureTests.swift` suffix,
-   and never put a raw scenario ID in a test name. Only infrastructure tests
-   may use `@testable import Cog`. Group 21 is the companion-tool exception:
-   its fixture-backed proofs live under `swift/Lint/Tests` and run through
-   `mise run test:lint`, never inside a root-package Cog test target.
+   and use no scenario ID. Only infrastructure tests may use
+   `@testable import Cog`. CogLint proofs live under `swift/Lint/Tests` and run
+   with `mise run test:lint`.
 
 ## The tree
 
@@ -962,12 +918,9 @@ since expected counts derive from the parameters.
 
 _Milestones M5, M6, M9, and M10, in the benchmark package. Design: perf §5–§9._
 
-Benchmark-gated: thresholds stay provisional until impl/benchmarks.md records
-numbers, and any future representation choice remains open until measurements
-select it. This group is the declared exception to implementation agnosticism:
-it gates the implementation itself, lives in the benchmark package, and never
-constrains the behavior suite. Every scenario in this group has proof mode
-`benchmark` by default; no per-scenario marker is needed.
+These checks live in the benchmark package and test the implementation itself.
+Limits and layout choices stay open until [benchmarks.md](./benchmarks.md)
+records data. Every item in this group uses `benchmark` proof mode.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates what
   impl/benchmarks.md records and no more; the recorded cost only ever ratchets
@@ -1020,24 +973,15 @@ constrains the behavior suite. Every scenario in this group has proof mode
   and unstable shapes in one environment. impl/benchmarks.md records the
   comparison; only the specialized default and public `CompactArena` trait
   remain selectable.
-- **PERF-15.** A representative commerce session — a catalog of a thousand-odd
-  products, a sixteen-policy pricing ladder, keyed inventory and offers, and a
-  cart whose totals depend on async quotes — is measured as six named cuts: a
-  cold start, the whole session, settled quiescent interactions, an inventory
-  burst, the exact allocation and heap footprint of building a catalog-wide
-  keyed funnel, and a compute-only control that runs the same algorithms over
-  the same inputs with no graph at all. Every cut proves its own visible identifiers,
-  exact money totals, accepted async generations, invalidation behavior, and
-  output checksum before any number is reported. impl/benchmarks.md records the results
-  with the environment that produced them, the workload's exact shape, and what
-  the workload does not cover.
-- **PERF-16.** That same session, driven through a real SwiftUI application by
-  XCUIAutomation in release configuration, reports launch, scrolling,
-  scrolling-under-load, search, navigation, and cart interaction cost on one
-  pinned simulator configuration. Every measured iteration starts from
-  identical application state. impl/benchmarks.md records the results, and records that a
-  simulator hitch figure is a pinned regression signal rather than a
-  user-experience guarantee.
+- **PERF-15.** Measure six cuts of the Storefront session: cold start, full
+  session, settled actions, an inventory burst, catalog-funnel memory, and the
+  same compute work without Cog. Before reporting time, each cut checks visible
+  IDs, totals, async generations, invalidation, and its checksum.
+  impl/benchmarks.md records the workload, environment, results, and limits.
+- **PERF-16.** Run the same session in the SwiftUI app with XCUIAutomation in
+  release. Measure launch, scroll, scroll under load, search, navigation, and
+  cart actions on one pinned simulator. Reset state before each run. Treat
+  simulator hitch data as a regression signal, not a user promise.
 - **PERF-17.** The representative headless workload runs under the specialized
   default and public `CompactArena` trait, so the supported binary-size trade
   is measured on an application shape rather than only on synthetic graphs.

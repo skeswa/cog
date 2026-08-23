@@ -2,91 +2,47 @@
 
 _August 10, 2026_
 
-This document decomposes the milestones of [plan.md](./plan.md) into
-dependency-aware execution tasks of half an engineering day or less, and
-assigns every scenario in [scenarios.md](./scenarios.md) to exactly one task.
+This file splits [plan.md](./plan.md) into tasks of half a day or less. It also
+assigns every [scenario](./scenarios.md) to one task.
 
 ## Execution rules
 
-- **Plan and tasks are one execution contract.** [plan.md](./plan.md) owns
-  milestone scope, exit criteria, and release boundaries; this ledger owns
-  executable slices, dependencies, commands, and scenario ownership. Use the
-  plan's milestone-to-task table for closure paths. Any change that crosses
-  those ownership boundaries updates both documents in the same change.
-  Live execution bookkeeping — claiming, status, discussion, and closure
-  evidence — happens in the GitHub issue mirror under the plan's "Task
-  bookkeeping" section; a task change here updates that mirror in the same
-  change.
-- **Half a day is the cap.** The estimate includes writing the red tests,
-  implementation, local verification, and the task's required documentation.
-  Known multi-mechanism work is split here rather than deferred until it
-  overruns. If an unknown still makes a task too large, replace it in place
-  with letter-suffixed tasks (`M1-07a`, `M1-07b`). Splitting an already
-  suffixed task appends another letter (`M1-07aa`, `M1-07ab`). The parent ID
-  is then retired as an execution unit and is never reused.
+- **Keep the plan, ledger, and issues in sync.** The plan owns milestone scope,
+  exit rules, and releases. This file owns tasks, dependencies, commands, and
+  scenario coverage. GitHub issues own live status and evidence. Update all
+  affected records in the same change.
+- **Half a day is the cap.** This includes tests, code, checks, and docs. Split
+  larger work with letter suffixes such as `M1-07a` and `M1-07b`. A second
+  split adds another letter. Retire the parent ID and never reuse it.
 - **Task IDs are stable.** Never renumber or reuse an ID. New independent
   tasks go at the end of their milestone; splits inherit the parent's number.
-- **Every task has one type.** A _Decision_ ends in a recorded choice and the
-  scenarios and tasks that choice requires. _Infrastructure_ unblocks later
-  behavior but greens no scenario. _Behavior_ starts with red scenario tests
-  and ends with every clause green. A _Gate_ proves a slice or milestone and
-  never owns the repairs it discovers. A _Release_ performs one externally
-  visible publication step.
-- **Dependencies are normative and minimal.** `_Depends:_` names only the
-  immediate prerequisites; omit a prerequisite already implied by another
-  listed dependency. A prior milestone is not a global barrier unless its gate
-  is named. Tasks may run in parallel when the graph allows, but ready tasks
-  that edit the same primary files must integrate serially. List order is only
-  a readable topological default.
-- **Milestone gates cover every behavior by dependency.** The sole exception
-  is a task with an explicit `_Non-blocking:_` external-availability policy;
-  it remains in the ledger but cannot hold a release hostage to unavailable
-  hosted infrastructure.
-- **Verification is part of the task.** `_Verify:_` names the exact command or
-  review artifact that closes the task. Scenario test names contain their IDs,
-  using Swift 6.2 raw test identifiers that begin with the hyphenated ID, so
-  `mise run test --filter 'A|B'` selects the named slice. All filtered runs go
-  through a mise wrapper that lists tests first and fails when the regular
-  expression matches none; raw `swift test --filter` is forbidden because
-  SwiftPM exits successfully for an empty selection. Compile-fail fixtures use
-  `mise run test:compilefail`; milestone gates use the mise commands from
-  [plan.md](./plan.md). Filter expressions are checked, never trusted: for a
-  behavior task, the scenario filters in `_Verify:_` must expand — against
-  the scenario set in [scenarios.md](./scenarios.md) — to exactly the task's
-  unit- and exit-test-mode `_Greens:_` entries; exit-test scenarios appear in
-  both a `test` and a `test:release` filter; compile-fail scenarios require
-  `mise run test:compilefail`; linter unit scenarios use the guarded nested
-  package wrapper `mise run test:lint`; and simulator, floor, benchmark, and
-  suite scenarios name their runs explicitly. The checker enforces these
-  expansions, so a filter can never silently drift from its coverage claim
-  when a decision task adds scenarios.
-- **_Greens:_ is the coverage ledger.** It means every clause of those
-  scenarios is observable and passing, never merely implemented in part or
-  vacuously true because a consumer does not exist yet. Every scenario ID in
-  [scenarios.md](./scenarios.md) appears in exactly one `_Greens:_` line; the
-  checker derives that census from scenarios.md itself, so no count is
-  maintained by hand. A scenario's proof mode also constrains its owner:
-  only suite- and release-configuration-mode scenarios may be greened by a
-  gate; every other mode belongs to a behavior task. Infrastructure and
-  decisions have no such line.
-- **No task ends red.** Benchmark-gated scenarios record the measurement or
-  provisional threshold they need in `impl/benchmarks.md` within the same task that first
-  turns them green. Later baseline automation does not stand in for that
-  result. If a gate exposes a defect, add or split out the smallest repair
-  task, make the failed gate depend on it, and rerun the gate; do not turn the
-  gate into an unbounded debugging task.
-- **Releases separate preparation from publication.** A non-mutating release
-  candidate gate precedes the tag; tag creation, deployment verification, and
-  GitHub Release creation are separate tasks. Publications are also totally
-  ordered: every _Release_ task depends, directly or transitively, on the
-  previous release's terminal task — including a conditional release's
-  recorded not-applicable closure — so no two release sequences can
-  interleave, and every _Release_ task sits downstream of a _Gate_. A patch
-  release inserts a new candidate → tag → verification → GitHub Release link
-  into the same chain, reusing the M4 template. A binary-backed release may
-  publish its GitHub Release and asset before exact consumption, but asset
-  verification, any conditional sibling tag, and the terminal exact-consumer
-  gate remain separate downstream tasks.
+- **Every task has one type.** A _Decision_ records a choice. _Infrastructure_
+  enables later work but owns no scenario. _Behavior_ makes listed scenarios
+  pass. A _Gate_ checks work but does not fix it. A _Release_ publishes one
+  outside result.
+- **List only direct dependencies.** A prior milestone blocks work only when
+  its gate appears in `_Depends:_`. Independent tasks may run together, but
+  changes to the same files must land in order. List order is only a guide.
+- **Gates cover all milestone behavior.** Only a task with an explicit
+  `_Non-blocking:_` rule may sit outside the gate.
+- **Verification is part of the task.** `_Verify:_` gives the exact command or
+  review record. Test names include scenario IDs. Always use the mise wrappers
+  for filters because they fail when a filter matches no test. The ledger
+  checker makes each filter match the task's exact `_Greens:_` set and proof
+  mode. Exit tests run in debug and release. Compile-fail, lint, simulator,
+  floor, benchmark, and suite proofs use their named commands.
+- **_Greens:_ owns coverage.** Every listed clause must be tested and passing.
+  Each scenario appears on exactly one `_Greens:_` line. Only suite and
+  release-configuration scenarios may belong to gates. Infrastructure and
+  decision tasks have no `_Greens:_` line.
+- **No task ends red.** Record benchmark results or early limits in
+  `impl/benchmarks.md` when the scenario first passes. If a gate finds a bug,
+  add a small repair task, make the gate depend on it, and rerun the gate.
+- **Release steps stay ordered.** A candidate gate comes before the tag.
+  Tagging, deployment checks, and publication are separate tasks. Each release
+  depends on the last release's final task, and every publication follows a
+  gate. Patch releases use the same chain. Binary asset checks and exact
+  consumer checks remain separate steps.
 
 ## M0 tasks
 
@@ -1869,42 +1825,34 @@ _Plan scope and exit: [M9: Shared turn machinery and O(changed) notices](./plan.
 _Every task in this milestone keeps the public API and the recorded M6 core
 disposition unchanged; a task that cannot is a plan change first._
 
-- **M9-01** _(Decision)_ — Profile the steady turn, the settle walk, and the
-  pinned-key flush by call site on both cores, and record in `impl/optimization.md`
-  what the numbers say and which of issue #373's routes M9 schedules against
-  which stay backlog. Keep the harness reproducible beside the other probes,
-  since attribution that cannot be rerun is an anecdote.
+- **M9-01** _(Decision)_ — Profile steady turns, settle walks, and pinned-key
+  flushes on both cores. Record the costs, the chosen work, and the work left
+  in issue #373. Keep a repeatable probe with the other benchmark tools.
   _Depends: M6-12b._
   _Verify: recorded `impl/optimization.md` profile entry with its environment, a
   runnable probe under `swift/Benchmarks/probes/`, and `mise run fmt:check`._
-- **M9-02** _(Infrastructure)_ — Add a pinned-key slope benchmark that measures
-  the same turn beside one pinned key and beside a thousand in one run, so the
-  claim under test is the difference rather than two numbers a reader has to
-  subtract.
+- **M9-02** _(Infrastructure)_ — Add one benchmark that compares the same turn
+  with one pinned key and with 1,000 pinned keys.
   _Depends: M9-01._
   _Verify: `mise run bench --filter perf-11-pinned-key-slope-1 --filter
 perf-11-pinned-key-slope-1000` reports both shapes, whose difference is the
   per-key cost. The harness matches a filter against a whole benchmark name, so
   both names are given._
-- **M9-03** _(Infrastructure)_ — Hoist the arena flush's `changedAt` guard
-  above its boundary-entry copy and descriptor-record fetch, which halves that
-  core's per-key traffic without changing the flush's shape.
+- **M9-03** _(Infrastructure)_ — Check the arena's `changedAt` value before
+  copying a boundary entry or fetching its descriptor record.
   _Depends: M9-02._
   _Verify: `mise run bench --filter perf-11-pinned-key-slope-1 --filter
 perf-11-pinned-key-slope-1000` reports no ARC difference between the two shapes,
   and `mise run test --filter 'UI|SEED|HIST'` stays green._
-- **M9-04** _(Infrastructure)_ — Give the simple core a changed-boundary queue:
-  enqueue where a source is already stamped, dedupe with one flag, and flush
-  that queue instead of sweeping `observationStates`. Preserve boundary-creation
-  notice order by sorting the changed set, and keep a boundary created during a
-  flush joining the next one.
+- **M9-04** _(Infrastructure)_ — Give the simple core a changed-boundary queue.
+  Deduplicate with one flag and keep creation-order notices. A boundary created
+  during a flush joins the next flush.
   _Depends: M9-02._
   _Verify: `mise run test --filter 'UI|SEED|HIST'` and `mise run bench --filter
 perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
-- **M9-05** _(Infrastructure)_ — Give the arena core the same changed-boundary
-  queue over `CogArenaDirtyPropagation.mark(row:atLeast:)`, using a spare
-  `CogArenaStateFlags` bit for the dedupe, so the boundary test stays a scalar
-  read on rows the propagation already visits.
+- **M9-05** _(Infrastructure)_ — Give the arena the same queue. Use a spare
+  `CogArenaStateFlags` bit to remove duplicates while dirty propagation visits
+  each row.
   _Depends: M9-03, M9-04._
   _Verify: `mise run test --filter 'UI|SEED|HIST'` and the arena slope
   benchmarks by exact name._
@@ -1920,24 +1868,18 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   _Depends: M9-01._
   _Verify: `mise run test --filter 'ONE|TURN'` and a steady-turn allocation
   count two lower than the recorded baseline._
-- **M9-08** _(Infrastructure)_ — Replace the per-turn `CogTurnID` and `CogTurn`
-  pair with one reused turn buffer and a monotonically increasing integer
-  token. This removes two allocations and both `isolated deinit`s, whose
-  executor checks the profile found cost more than the allocations did, and a
-  third allocation with them: the touched-source list grows from zero capacity
-  only because its owner is new every turn, so a reused owner retires it too.
+- **M9-08** _(Infrastructure)_ — Replace each turn's `CogTurnID` and `CogTurn`
+  with one reused buffer and an increasing integer token. Reuse the buffer for
+  touched sources too. This removes three allocations and two actor-checked
+  deinits.
   _Depends: M9-07._
   _Verify: `mise run test --filter 'TURN'`, the turn infrastructure suites
   through `mise run test --filter
 'TurnQueueInfrastructure|TurnStateInfrastructure|TurnCompositionInfrastructure'`,
   and `mise run test:release`, which is where a generic-class deinit regression
   would appear._
-- **M9-09** _(Infrastructure)_ — Reuse the capacity of the two arrays a turn
-  rebuilds from a context-lived owner: the invalidation work list, and the
-  dependency list, which reallocates today because `run(in:)` still holds the
-  previous one while clearing it. The touched-source list is the third such
-  array but has no owner to reuse from until the turn object does, so it
-  belongs to `M9-08`.
+- **M9-09** _(Infrastructure)_ — Reuse the invalidation and dependency arrays
+  across turns. M9-08 owns the same fix for the touched-source array.
   _Depends: M9-01._
   _Verify: `mise run test --filter 'GRAPH|TURN'` and a steady-turn allocation
   count two lower than the recorded baseline._
@@ -1954,28 +1896,21 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   _Depends: M9-01._
   _Verify: `mise run test --filter 'GRAPH|CYCLE'` and a deep-chain per-node
   cost below the recorded baseline._
-- **M9-12** _(Infrastructure)_ — Remove the generic metadata instantiation from
-  descriptor-and-key state resolution by caching the resolved state on the
-  declaration's descriptor per context, so a keyless read reaches its state
-  without a dictionary hash or a metadata request. Keep the checked cast: the
-  first attempt replaced it with `unsafeDowncast` and measured 5% of a steady
-  turn, which is not a trade this project makes — the invariant is internal, so
-  a violation is a Cog bug, and an unchecked cast turns a clear release-build
-  error into undefined behavior. Inlining the two lookups alongside it measured
-  within noise and is not the lever either.
+- **M9-12** _(Infrastructure)_ — Cache each keyless descriptor's resolved state
+  per context. This removes a hash and metadata request from each read. Keep a
+  checked cast: `unsafeDowncast` saved about 5% but would turn a Cog bug into
+  undefined behavior.
   _Depends: M9-01._
   _Verify: `mise run test --filter 'DECL|LIFE'`, `mise run test:release`, and a
   recorded steady-turn metadata share below the `M9-10` measurement._
-- **M9-13** _(Infrastructure)_ — Remove the per-turn dynamic actor-isolation
-  checks from dependency re-recording and boundary notification, which the
-  profile measured at an eighth of a steady turn.
+- **M9-13** _(Infrastructure)_ — Remove dynamic actor checks from dependency
+  recording and boundary notices. The profile measured them at one eighth of a
+  steady turn.
   _Depends: M9-01._
   _Verify: `mise run test:matrix` and `mise run test:simulator`, since this
   changes how isolation is established rather than what it is._
-- **M9-14** _(Infrastructure)_ — Fuse the settle walk's enter and exit
-  dependency traversals, resolve each node's descriptor record once, run the
-  cycle check once per node, and short-circuit clean rows at the call sites
-  that settle them.
+- **M9-14** _(Infrastructure)_ — Merge the settle walk's enter and exit edge
+  passes. Resolve each record and check each cycle once. Stop at clean rows.
   _Depends: M9-11._
   _Verify: `mise run test --filter 'GRAPH|CYCLE|COUNT'` and a deep-chain
   per-node cost below the recorded baseline._
@@ -1986,117 +1921,79 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   per-turn allocation and ARC cost, `mise run bench:thresholds:check` holds its
   allocations at exactly zero, and `impl/benchmarks.md` records the per-node figures._
   _Greens: PERF-13._
-- **M9-16** _(Gate)_ — Prove the machinery work changed nothing observable:
-  the complete behavior suite across the isolation matrix, arena
-  configurations, release configuration, and the simulator. The retired core
-  and layout comparisons remain in the selection record.
+- **M9-16** _(Gate)_ — Prove the runtime work changed no public behavior. Run
+  the full isolation matrix, both arena modes, release, and simulator checks.
   _Depends: M9-06, M9-10, M9-15._
   _Verify: `mise run test:matrix`, `mise run test:arena-configurations`,
   `mise run test:release`,
   `mise run test:simulator`, `mise run test:compilefail`, and
   `mise run lint:swift` — which the first pass omitted, and which was the only
   check that had anything to say._
-- **M9-20** _(Infrastructure)_ — Carry positions rather than states on the
-  changed-boundary queue. A boundary's creation order is its index in the
-  registry, so the queue can be integers; the existential queue `M9-04` built
-  retained on every append and again on every comparison its ordering sort
-  made, which `M9-17` measured costing more on a turn where every boundary
-  changed than the O(pinned) walk it replaced.
+- **M9-20** _(Infrastructure)_ — Store boundary positions, not state objects,
+  in the changed queue. Positions keep creation order and avoid retain traffic
+  during append and sort.
   _Depends: M9-16._
   _Verify: `mise run test --filter 'UI|SEED|HIST'`, `mise run test:release`,
   and `mise run bench --filter perf-02-propagation --filter
 perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   with the flat slope intact._
-- **M9-17** _(Behavior)_ — Rerun the pinned runtime comparison of the simple
-  and data-oriented cores on steady, deep, broad, and unstable shapes now that
-  both wear a lighter coat, and record the new comparison in `impl/benchmarks.md`.
+- **M9-17** _(Behavior)_ — Compare the simple and arena cores again on steady,
+  deep, broad, and unstable graphs after the shared runtime changes.
   _Depends: M9-20._
   _Verify: complete pinned comparison result set recorded in `impl/benchmarks.md`, taken
   in one session on the pinned benchmark host._
   _Greens: PERF-14._
-- **M9-21** _(Infrastructure)_ — Stop copying the arena's changed-boundary queue
-  out of its owner, and record where the arena's ordinary turn actually goes.
-  Handing the queue back as a value shared its buffer, so the caller's sort had
-  to reallocate — the copy-on-write mistake `M9-09` fixed in the dependency
-  list, repeated in `M9-05`'s own repair. The flush sorts and reads in place
-  instead.
+- **M9-21** _(Infrastructure)_ — Sort and read the arena's changed-boundary
+  queue in place. Returning it by value shared the buffer and made sorting
+  allocate.
   _Depends: M9-17._
   _Verify: `mise run test --filter 'UI|SEED|HIST'`, `mise run test`, and
   `mise run bench --filter perf-01-steady-turn` at zero allocations._
-- **M9-22** _(Infrastructure)_ — Take dynamic exclusivity enforcement off the
-  arena's scalar columns, which `M9-21` measured at a third of that core's
-  ordinary turn. Trivial element types and MainActor confinement make
-  overlapping access unreachable rather than merely unlikely; the typed value
-  columns keep enforcement because their element type is the user's and
-  releasing one can run arbitrary `deinit` code inside an access.
+- **M9-22** _(Infrastructure)_ — Remove dynamic exclusivity checks from scalar
+  arena columns. MainActor access and trivial values make overlap impossible.
+  Keep checks on user value columns because a value's `deinit` may run code.
   _Depends: M9-21._
   _Verify: `mise run test`, `mise run test:release`, and
   `mise run bench --filter perf-01-steady-turn` below the
   `M9-17` measurement at unchanged allocation counts._
-- **M9-23** _(Infrastructure)_ — Memoize a keyless declaration's resolved arena
-  column and slot on its descriptor, per context, removing the dictionary
-  lookups and the concrete-column downcast that `M9-21` measured instantiating
-  metadata on every read. Identify the context by a monotonic counter rather
-  than an `ObjectIdentifier`, because a recycled address would let a memo serve
-  another context's state, and make the memo self-validating through the slot
-  generation so correctness does not rest on having found every release path.
-  Keyed references keep the existing path.
+- **M9-23** _(Infrastructure)_ — Cache each keyless descriptor's arena column
+  and slot per context. Use an increasing context ID so reused memory addresses
+  cannot match. Check the slot generation so stale cache entries fail safely.
+  Keep the current keyed path.
   _Depends: M9-22._
   _Verify: `mise run test`, `mise run test --filter 'LIFE|SEED'`,
   `mise run test:release`, and `mise run bench --filter perf-01-steady-turn`
   below the `M9-22` measurement at unchanged allocations._
-- **M9-24** _(Infrastructure)_ — Hoist the arena's generation re-validation to
-  one checked entry boundary per operation. `CogArenaStorage.index(of:)`
-  re-validates a slot on nearly every column touch, and the file's own comment
-  anticipates the fix; the shape is row-taking variants on the typed value
-  column with the slot-taking members kept as thin wrappers, so no caller
-  changes. Measured at roughly 8% of an arena turn **before** `M9-22` removed
-  the exclusivity checks around the same accesses, so its remaining value is
-  unknown and has to be re-measured rather than assumed.
+- **M9-24** _(Infrastructure)_ — Validate an arena generation once at each
+  operation boundary instead of on almost every column access. Keep slot-based
+  methods as checked wrappers, and measure again after M9-22.
   _Depends: M9-23._
   _Verify: `mise run test` and `mise run bench --filter perf-01-steady-turn`
   against the `M9-23` measurement, keeping the
   stale-token diagnostic on the side that can still move._
-- **M9-25** _(Decision)_ — Measure what a graph costs to _hold_ and to _build_
-  on both cores, which issue #373's route F asks for and §9.6 has for the
-  simple core only. Run PERF-03's thousand-state shape paired on both
-  selectors, enough times to know whether a difference is real, and record the
-  footprint and the build-settle-teardown wall clock. Resident memory is
-  sampled rather than counted, so a single pair is not a result and the record
-  must say so where it cannot separate them.
+- **M9-25** _(Decision)_ — Measure build time and held memory for a 1,000-state
+  graph on both cores. Use several paired runs because resident memory is
+  sampled. Say when the samples cannot show a clear difference.
   _Depends: M9-24._
   _Verify: recorded `impl/benchmarks.md` entry with its environment, carrying paired
   runs rather than one, and `mise run fmt:check`._
-- **M9-26** _(Decision)_ — Attribute whatever build-cost gap `M9-25` finds to
-  call sites, on the same standing as every other §9.6 claim. Extend the
-  `M9-01` probe with a construction workload rather than reasoning from the
-  source, since a build is the one path whose costs the other workloads
-  deliberately warm away. Counting metrics alone may not explain the gap; where
-  they do not, bucket a sampler's leaves as §9.6 already does and record which
-  bucket moved.
+- **M9-26** _(Decision)_ — Add graph construction to the M9-01 probe and find
+  the call sites behind any build-time gap. Use sampler buckets when counters
+  do not explain it.
   _Depends: M9-25._
   _Verify: recorded `impl/optimization.md` entry naming the buckets that moved, the
   `build` workload runnable from the probe's method document, and
   `mise run fmt:check`._
-- **M9-27** _(Infrastructure)_ — Ship the measured typed frontier as the default
-  arena implementation. Retire the simple-core selector, keep shared pool edges
-  as the sole core's selected layout, delete the class-backed implementation and
-  its representation-private tests, and replace the specialization opt-in with
-  the non-default `CompactArena` package trait as an explicit binary-size
-  opt-out. Use that public trait for compact-arena tests and benchmarks, and
-  make every retired representation selector a hard manifest error so an old
-  command cannot silently measure a different implementation.
+- **M9-27** _(Infrastructure)_ — Make the typed frontier the default. Remove
+  the simple core and its private tests. Keep pool edges. Add the public,
+  non-default `CompactArena` trait for smaller binaries. Make old layout
+  selectors fail in the manifest.
   _Depends: M9-26._
   _Verify: `mise run test:arena-configurations`, `mise run test:matrix`,
   `mise run test:release`, `mise run test:compilefail`, and `mise run api:check`._
-- **M9-18** _(Decision)_ — Record what the remeasurement settled: whether
-  `M6-12a`'s core decision changes, which of issue #373's remaining routes stay
-  open, and whether M9's result warrants a release. Record that the specialized
-  arena wins every whole-graph shape and closes the keyed construction gap,
-  that about 80% of consulted users accept the measured binary-size cost, and
-  that `CompactArena` serves the remaining size-sensitive applications without
-  restoring simple. Add a release link at the end of the serialized chain if a
-  release is warranted.
+- **M9-18** _(Decision)_ — Record the new core choice, the remaining issue #373
+  work, and whether to release. The specialized arena won every full-graph
+  test. `CompactArena` serves apps that favor binary size.
   _Depends: M9-27._
   _Verify: recorded decision in `perf.md`, `impl/benchmarks.md`, and §10; the
   issue #373 disposition; and `mise run tasks:check`._
@@ -2112,110 +2009,74 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
 
 _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
 
-- **M10-01** _(Decision)_ — Settle the representative workload: its scale, its
-  declaration census, which async state sits at which level of the graph, and
-  where the shared workload lives. The scale is a **representative workload v1**
-  rather than a claim about real applications, so it is written down,
-  configurable, and asserted rather than assumed. Record every adjustment from
-  the original targets with its reason — the async census in particular, because
-  the stated levels (two roots, two mid-graph, two deep downstream, plus keyed
-  row and leaf families) do not fit the stated keyless count. Settle the package
-  boundary at the same time: an iOS application target cannot depend on
-  `swift/Benchmarks` without resolving the benchmark harness, the malloc
-  interposer, and swift-state-graph, so the workload is a package of its own
-  that depends on the root by path and on nothing else.
+- **M10-01** _(Decision)_ — Set the Storefront workload's scale, declaration
+  counts, async levels, and package boundary. Keep the scale configurable and
+  tested; it represents one workload, not all apps. Put shared code in its own
+  package so the iOS app does not load benchmark-only dependencies.
   _Verify: recorded `impl/benchmarks.md` entry naming the profile scale, the exact
   declaration census, and every adjustment from the original targets, plus
   `mise run tasks:check`._
-- **M10-02** _(Infrastructure)_ — Build the shared workload: profiles,
-  deterministic fixtures with no `Foundation` import, the four heavy kernels,
-  the sixteen-policy pricing ladder as one recursive keyed declaration, the
-  domain verbs, and the mechanism that installs initial state and registers the
-  durable leases a headless driver needs. Add the shape suite that checks the
-  declaration census mechanically, so a workload that silently grew a
-  declaration fails before it makes two recorded numbers incomparable.
+- **M10-02** _(Infrastructure)_ — Build profiles, deterministic fixtures, four
+  heavy kernels, the 16-step pricing ladder, domain ops, and the bootstrap
+  mechanism. Add shape tests so a declaration-count change fails before it
+  makes benchmark runs hard to compare.
   _Depends: M10-01._
   _Verify: `mise run test:storefront --filter StorefrontShapeTests` asserts the
   census, the profile scale, and the even category spread, and
   `mise run fmt:check`._
-- **M10-03** _(Infrastructure)_ — Add the deterministic scripted service, the
-  eleven-phase interaction trace, and the shadow model its checkpoints compare
-  against. Every request carries a semantic identity, the driver awaits the
-  exact set that has started rather than assuming sibling task order, responses
-  are released by name in a deliberately out-of-order sequence, and a superseded
-  request stays suspended instead of resuming on cancellation — which is what
-  removes the last race with Cog's one-shot async-completion acknowledgement and
-  makes a stale completion something the trace schedules on purpose. Add the
-  guarded `test:storefront` wrapper.
+- **M10-03** _(Infrastructure)_ — Add the scripted service, 11-step trace,
+  shadow model, and guarded test wrapper. Give each request a stable ID, wait
+  for exact start sets, and release responses by name out of order. Keep a
+  replaced request suspended so the trace controls its late completion.
   _Depends: M10-02._
   _Verify: `mise run test:storefront` runs the smoke trace end to end with every
   checkpoint holding and reports a nonzero authoritative executed count, and
   `mise run lint:swift`._
-- **M10-04** _(Infrastructure)_ — Add the six benchmark cuts and register them
-  from the one discovery closure: cold start, whole session, quiescent
-  interactions, inventory burst, footprint, and the compute-only control. Only
-  the quiescent cuts carry malloc and ARC metrics; the rest build or drop a
-  runtime and accept async completions, which is exactly the shape `M5-11` took
-  those counters away from. Register the counting cuts before any non-quiescent
-  benchmark, because counting is process-global. The footprint cut answers what
-  a graph costs to _hold_ with counted bytes rather than sampled resident
-  memory, which means it must never release a context: retain every one it
-  builds, or the frees land in the next iteration's measured region. Pin
-  `maxIterations` on the cuts that report resident memory, so a faster core
-  cannot look larger merely by completing more build-and-drop cycles in the same
-  time budget.
+- **M10-04** _(Infrastructure)_ — Add six cuts: cold start, full session,
+  settled actions, inventory burst, memory footprint, and compute-only control.
+  Count allocations and ARC only in settled cuts. Run those first because the
+  counter is process-wide. Keep footprint contexts alive, and fix the iteration
+  count for resident-memory cuts.
   _Depends: M10-03._
   _Verify: `mise run bench --filter 'perf-15-storefront-.*'` registers and runs
   all six cuts, and `mise run test:lint` still proves the root package resolves
   no dependencies._
-- **M10-05** _(Behavior)_ — Turn the headless macrobenchmark green and record
-  its first measurements. Every cut checks its own visible identifiers, money
-  totals, accepted generations, invalidation behavior, and checksum before
-  reporting.
+- **M10-05** _(Behavior)_ — Run the headless benchmark and record its first
+  valid results. Before timing, each cut checks IDs, totals, accepted async
+  generations, invalidation, and its checksum.
   _Depends: M10-04._
   _Verify: `mise run bench --filter 'perf-15-storefront-.*'` reports every cut,
   and `impl/benchmarks.md` records the measurements, the environment that produced
   them, and what the workload does not cover._
   _Greens: PERF-15._
-- **M10-06** _(Infrastructure)_ — Add the SwiftUI benchmark application: a
-  hand-written objectVersion-77 Xcode project with an app target and a UI-test
-  target, both consuming the shared workload package, and a shared scheme whose
-  test action builds release with the debugger, code coverage, automatic
-  screenshots, and every runtime diagnostic disabled. Every Cog-consuming view
-  resolves the environment itself, reads flatly into domain locals, and calls
-  named domain verbs; benchmark-only controls are gated behind a launch argument
-  so they cannot appear in ordinary app mode.
+- **M10-06** _(Infrastructure)_ — Add the SwiftUI app and UI-test target. Tests
+  build in release with the debugger, coverage, screenshots, and runtime checks
+  off. Views read Cog from the environment and call named ops. A launch flag
+  hides benchmark controls in normal use.
   _Depends: M10-03._
   _Verify: `mise run build:storefront` and `mise run lint:swift`._
-- **M10-07** _(Behavior)_ — Turn the application performance suite green and
-  record its first measurements. Cold launch, settled scrolling, scrolling under
-  a deterministic inventory burst, search, detail navigation, and cart
-  interaction, each resetting application state outside the measured region on
-  one pinned device, orientation, locale, Dynamic Type setting, fixture, and row
-  height.
+- **M10-07** _(Behavior)_ — Measure cold launch, settled scroll, scroll during
+  an inventory burst, search, detail navigation, and cart actions. Reset app
+  state before each sample and pin the device, orientation, locale, text size,
+  fixture, and row height.
   _Depends: M10-06._
   _Verify: `mise run test:storefront-ui` executes the release suite on the
   pinned simulator with a nonzero executed count, and `impl/benchmarks.md` records the
   measured figures, their environment, and why a simulator hitch figure is a
   regression signal rather than a user-experience guarantee._
   _Greens: PERF-16._
-- **M10-08** _(Behavior)_ — Measure the representative workload under the
-  specialized default and compact arena in one session, so the binary-size
-  opt-out's runtime tradeoff is recorded on an application shape rather than a
-  synthetic one. This is the question `M9-25` through `M9-27` answered for a
-  thousand-state fan; an application composes many shapes at once and can
-  answer it differently.
+- **M10-08** _(Behavior)_ — Measure the same Storefront session with the
+  specialized and compact arenas in one session. This shows the compact
+  binary-size tradeoff on an app-shaped graph.
   _Depends: M10-05._
   _Verify: `mise run bench --filter 'perf-15-storefront-.*'` and
   `mise run bench:compact --filter 'perf-15-storefront-.*'` taken in one session
   on the pinned benchmark host,
   with the paired comparison recorded in `impl/benchmarks.md`._
   _Greens: PERF-17._
-- **M10-09** _(Decision)_ — Record what the first measurements settled: which
-  cuts have earned a committed threshold and what the pinned CI runner would
-  have to confirm before one lands, what the cold-start cost is actually spent
-  on, and which questions become scheduled work. Add the scenarios and tasks
-  whichever answer requires.
+- **M10-09** _(Decision)_ — Decide which cuts may get CI limits, what CI must
+  confirm first, where cold-start time goes, and what work comes next. Add any
+  needed scenarios and tasks.
   _Depends: M10-07, M10-08._
   _Verify: recorded decision in `impl/benchmarks.md` and the exploration §10 ledger, naming the
   threshold candidates and the follow-up work, plus `mise run tasks:check`._

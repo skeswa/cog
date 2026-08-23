@@ -2,26 +2,22 @@
 
 _August 6, 2026_
 
-This document turns the semantics in [exploration.md](./exploration.md) into
-an implementation plan. The comparisons in §9.6 selected inline `AnyHashable`
-value references and the shared linked edge pool. M9's later typed-frontier
-measurements selected the specialized arena as the sole shipping core; the
-simple implementation is retired, while the compact unspecialized arena
-remains available through an explicit package trait. Hash-table and
-exclusivity layouts remain benchmark-gated.
+This file defines the Swift runtime layout. Measurements selected inline
+`AnyHashable` value references, a shared linked-edge pool, and the specialized
+arena. `CompactArena` keeps the arena but turns off specialization to reduce
+binary size. Custom hash tables and unchecked exclusivity still need benchmark
+proof.
 
-The [shared state model](../../design.md) owns the cross-platform cost order:
-avoid work before optimizing representation, and never buy speed with torn
-reads or fragmented state. This file owns the Swift representation.
+The [shared state model](../../design.md) gives the cost order: avoid work
+before tuning storage, and never trade correct reads or one source of truth for
+speed.
 
 The core idea: keep graph data in compact arrays owned by one MainActor
 `Cogs`. This avoids locks, per-edge objects, weak references, and repeated
 reference counting in the hot path.
 
-This document serves Cog's third principle, minimizing runtime overhead. The
-other three principles remain constraints: a faster layout does not win if it
-weakens read correctness, fragments state, or pushes internal complexity into
-normal app code.
+A faster layout loses if it weakens correctness, splits state, or makes app
+code harder to use.
 
 ## 1. Cost order
 
@@ -32,10 +28,9 @@ Optimize in this order:
 2. **Make graph bookkeeping cheap.** Dirty flags, edge updates, and version
    checks should touch nearby integers, not scattered objects.
 
-Current Swift systems often pay for locks, weak references, heap objects, or
-`AnyKeyPath` hashing during graph work. Cog's MainActor rule removes the need
-for these costs inside the graph. Appendix A records the source-level
-evidence.
+Many Swift systems pay for locks, weak references, heap objects, or
+`AnyKeyPath` hashing during graph work. Cog needs none of them inside its
+MainActor graph. Appendix A lists the source evidence.
 
 ## 2. Shared lessons from other runtimes
 
@@ -52,16 +47,14 @@ which states to visit; `changedAt` says whether a parent's value changed since
 the last check; a global revision answers “has anything changed since turn N?”
 for exports and debug tools.
 
-Native runtimes add three warnings: common static state kinds may need special
-fast paths; public value references must name data, not expose arena slots; and
-multi-writer snapshots are wasted work in a single-threaded graph. Appendix B
-keeps the detailed prior-art notes and measurements.
+Native runtimes add three rules: give common state kinds fast paths; keep arena
+slots out of public value references; and do not build multi-writer snapshots
+for a single-threaded graph. Appendix B gives the supporting examples.
 
 ## 3. `Cogs` as a table of graph data
 
-An entity-component-system (ECS) stores each kind of data in a separate
-column. Cog uses the same pattern: states are rows, while flags, versions, and
-edges live in parallel arrays — a structure of arrays, or SoA.
+Cog stores states as rows. Flags, versions, and edges use separate parallel
+arrays. This layout is often called a structure of arrays, or SoA.
 
 ### 3.1 State storage
 
@@ -118,10 +111,10 @@ struct Edge {
 }
 ```
 
-One edge belongs to the producer's subscriber list and the consumer's
-dependency list. Indices avoid ARC and weak loads, a free list recycles
-removed edges, and a cursor can reuse edges when a selector reads the same
-dependencies in the same order — zero steady-state allocation and hashing.
+One edge joins the producer's subscriber list and the consumer's dependency
+list. Indices avoid ARC and weak loads. A free list reuses removed edges. A
+cursor reuses an edge when a selector reads the same dependency in the same
+order, so a steady run allocates and hashes nothing.
 
 The M6 comparison measured:
 
@@ -130,12 +123,11 @@ The M6 comparison measured:
 - small inline dependency storage with overflow, based on Incremental's
   common-case layout.
 
-The shared pool won the expected mostly-static shape on instructions. The
-prefix candidate won high churn on instructions, but not wall time, while
-adding per-turn ARC. The inline-plus-overflow candidate won neither shape.
-§9.6 records the complete comparison and selection. Both losing candidates
-were removed after the decision; reproducibility rests on the recorded inputs,
-environment, and results rather than permanent conditional implementations.
+The shared pool used the fewest instructions for mostly stable dependencies.
+Prefix arrays used fewer instructions under high churn, but did not improve
+wall time and added ARC work to each turn. Inline storage won neither case.
+§9.6 links the full measurements. The losing code was removed; the record keeps
+the inputs, environment, and results needed to repeat the test.
 
 ### 3.4 Propagation
 
@@ -157,9 +149,8 @@ A public value reference names a descriptor and key. It never stores a state
 slot. The v1 layout carries the key inline as `AnyHashable?`; the public struct
 remains resilient rather than `@frozen`.
 
-The correctness build uses inline `AnyHashable?`. This is several machine
-words on current 64-bit Swift, so it is not a two-word value reference. Keep the public
-struct resilient and do not mark it `@frozen`.
+`AnyHashable?` takes several machine words on current 64-bit Swift. Keep the
+public value-reference struct resilient and do not mark it `@frozen`.
 
 Even this simple value reference can avoid most hashing:
 
@@ -170,7 +161,7 @@ Even this simple value reference can avoid most hashing:
   hashes the concrete key type rather than `AnyHashable`.
 - A keyless descriptor caches its one slot per runtime context.
 
-The benchmark compares the whole cost of three designs:
+The benchmark compared the full cost of three designs:
 
 1. **Inline `AnyHashable`:** simple and allocation-free to create, but large
    and existential on cursor mismatches.
@@ -179,13 +170,11 @@ The benchmark compares the whole cost of three designs:
 3. **Generic keyed value reference:** fully specialized key storage, but adds the key type
    to the public read surface.
 
-The keyed-diamond and churn comparison in §9.6 selects **inline
-`AnyHashable`**. Interning narrowed a reference and saved about 2% of executed
-instructions, but did not improve both wall-time workloads: churn regressed 4%
-and still paid an unbounded process-wide table plus a lock on every reference
-construction. The generic candidate was 6% slower on the keyed diamond and
-required a permanent keyed overload surface. Neither displaced the simple
-layout that already creates references with zero allocations.
+The keyed-diamond and churn tests selected **inline `AnyHashable`**. Interning
+saved about 2% of instructions, but made churn 4% slower and needed an
+unbounded process-wide table plus a lock for each new reference. The generic
+form was 6% slower on the keyed diamond and added public overloads. The inline
+form already creates references with no allocation.
 
 Hash caching and descriptor-local `Dictionary<Key, Int32>` lookup remain
 possible follow-ups if M6 profiles support them. They can hash the concrete key
@@ -212,9 +201,9 @@ Keep these rules until a benchmark disproves them:
   dependency caches or the first stack entries. `Span` can expose borrowed
   slab views to tests and debug tools without public pointers.
 
-Internal registration handles and mechanism scopes remain final-class
-values. Copies must share one idempotent cancellation resource; none of
-these handles is public API (§6.2–§6.3).
+Internal registration handles and mechanism scopes remain final classes. All
+copies share one cancellation resource that is safe to cancel more than once.
+These handles are not public API (§6.2–§6.3).
 
 ## 6. Create Observation boundaries only when needed
 
@@ -231,8 +220,8 @@ measurement shows that old keyed states or notices are costly.
 
 ## 7. Arena lifetime must not leak into value references
 
-leptos once exposed copyable arena-slot handles. Data could outlive the scope
-that owned its slot, causing leaks and stale handles. Cog avoids that design:
+A copied arena-slot handle can outlive its slot and cause leaks or stale reads.
+Cog avoids that problem:
 
 - A value reference is a stable name: descriptor plus key. If an automatic state is released,
   the same value reference can later create a fresh slot.
@@ -268,19 +257,17 @@ history. Release builds should pay no debug-history cost.
 
 ## 9. Measurement plan
 
-This plan amends §11 of the core document:
+Runtime choices follow this process:
 
-1. **Build the simple version first.** Use class states, edge arrays, and
-   inline `AnyHashable` value references. Its test suite must cover escaped writers, self
-   and multi-state cycles, dynamic cycles, equality-gated UI values, reaction
-   write-back, manual lifetime, async generation safety, slow exports, guarded
-   production-context installation, and scene recreation.
+1. **Prove behavior first.** The shared suite covers escaped writers, cycles,
+   equality gates, reaction writes, lifetime, async generations, slow exports,
+   guarded app setup, and scene recreation.
 2. **Port `js-reactivity-benchmark`.** Include Kairo diamond, deep, broad, and
    unstable cases; dynamicBench sweeps; the Cellx lattice; keyed diamonds; and
    key churn. Keep the expected-run-count checks, since timing alone can hide
    duplicate work. Compare all three value-reference layouts.
-3. **Build the data-oriented core behind the same tests.** Compare it with the
-   simple build, swift-state-graph, and raw `@Observable`.
+3. **Use the same tests for each core.** Compare Cog with the saved simple-core
+   baseline, swift-state-graph, and raw `@Observable`.
 4. **Measure more than time.** Track steady-turn allocations (target zero),
    `box[key]` value-reference creation allocations (target zero), retain and release
    traffic in propagation (target zero), peak memory for 1,000-state graphs,
@@ -288,15 +275,13 @@ This plan amends §11 of the core document:
 5. **Tune only from evidence.** Compare edge layouts, then consider unchecked
    exclusivity or custom hash tables only when a profile points there.
 
-Prepare measured accessors so they can become inlinable without exposing all
-storage. Do not mark value references `@frozen` before the layout result. Reserve reusable
-buffer capacity from known descriptor counts to keep growth noise out of
-benchmarks.
+Keep measured accessors narrow enough to inline without exposing all storage.
+Do not freeze value-reference layout. Reserve reusable buffer capacity from
+known descriptor counts so growth does not distort benchmarks.
 
 ### 9.6 Where the results live
 
-Recorded results are not design, and keeping 1,400 lines of them here buried the
-argument this document exists to make. They now live next door:
+Results live in separate records so this file can stay focused on design:
 
 - [impl/benchmarks.md](../impl/benchmarks.md) — every number the plan above has
   produced, with the environment that produced it, the decision it drove, and
@@ -307,12 +292,8 @@ argument this document exists to make. They now live next door:
 - [`swift/Benchmarks/README.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md) — how to
   run any of it, and how a committed threshold is encoded.
 
-What stays here is the design: the cost order, the representation, the ARC and
-exclusivity rules, and the plan above. The rule those records enforce is
-unchanged and belongs with the plan rather than with the numbers — **a
-measurement means nothing without the machine and toolchain that produced it**,
-so every recorded entry names both, and a threshold with no measurement behind
-it is a guess that fails at the worst moment.
+Every result must name its machine and toolchain. A threshold without a matching
+measurement is only a guess.
 
 ## 10. Deliberate non-goals
 
