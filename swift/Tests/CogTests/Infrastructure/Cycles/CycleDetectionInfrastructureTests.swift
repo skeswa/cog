@@ -33,7 +33,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let closesCycle = ManualCog<Bool>(false)
+      let closesCycle = Cog<Bool>.Manual(false)
       var first: Cog<Int>!
       var second: Cog<Int>!
       first = Cog<Int>(
@@ -54,9 +54,9 @@ import Testing
 @MainActor
 @Test func `CycleDetectionInfrastructure nested settlement preserves outer frames`() {
   let cogs = Cogs.forTesting()
-  let switcher = ManualCog<Bool>(false)
-  let rightSource = ManualCog<Int>(10)
-  let lateSource = ManualCog<Int>(100)
+  let switcher = Cog<Bool>.Manual(false)
+  let rightSource = Cog<Int>.Manual(10)
+  let lateSource = Cog<Int>.Manual(100)
   var leftRuns = 0
   var rightRuns = 0
   var rootRuns = 0

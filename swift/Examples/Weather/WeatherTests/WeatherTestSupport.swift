@@ -26,7 +26,7 @@ nonisolated struct WeatherRequestRun: Equatable, Sendable {
 /// A deterministic weather service whose requests finish only when a test says so.
 ///
 /// The controller intentionally ignores task cancellation. Tests can therefore
-/// finish a replaced request and prove that `AsyncCogBox` rejects its stale
+/// finish a replaced request and prove that `CogBox.Async` rejects its stale
 /// result instead of relying on cooperative cancellation for correctness.
 actor WeatherRequestController {
   /// Buffered notification emitted only after a continuation has been stored.

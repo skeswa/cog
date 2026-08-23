@@ -29,7 +29,7 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
 @Test func `ASYNC-12 box keys fetch and publish status independently`() async {
   let (cogs, m) = probedContext()
   let work = Async12ControlledWork<String>()
-  let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, zip in
+  let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, zip in
     .run { await work.run(for: zip) }
   }
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)

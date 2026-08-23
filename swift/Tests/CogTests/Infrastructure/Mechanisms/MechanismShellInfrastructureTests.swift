@@ -11,7 +11,7 @@ import Testing
 
 @MainActor
 @Test func `MechanismShellInfrastructure registration lands in the context's reaction list`() {
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in

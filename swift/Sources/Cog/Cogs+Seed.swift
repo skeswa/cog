@@ -28,7 +28,7 @@ extension Cogs {
   ///   - value: The candidate value, installed only when the source's equality
   ///     rule considers it changed.
   package func seedForTesting<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     to value: Value
   ) {
     guard case .idle = turnPhase, arenaCore.isSettlementIdle, seedBarrierDepth == 0 else {

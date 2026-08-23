@@ -16,7 +16,7 @@ private nonisolated enum Async38Error: Error {
   // so value consumers never rerun.
   let (cogs, m) = probedContext()
   let work = AsyncStatusControlledWork<Int>()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   var valueRuns = 0
   let projected = Cog<Int> { c in
     valueRuns += 1

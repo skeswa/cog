@@ -9,7 +9,7 @@ import Testing
 @MainActor
 @Test func `ArenaSettlementInfrastructure backdates an equal middle row without class states`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var middleRuns = 0
   var leafRuns = 0
   let middle = Cog<Bool> { c in
@@ -39,9 +39,9 @@ import Testing
 @MainActor
 @Test func `ArenaSettlementInfrastructure recapture keeps candidate storage bounded`() {
   let cogs = Cogs.forTesting()
-  let useFirst = ManualCog<Bool>(true)
-  let first = ManualCog<Int>(1)
-  let second = ManualCog<Int>(2)
+  let useFirst = Cog<Bool>.Manual(true)
+  let first = Cog<Int>.Manual(1)
+  let second = Cog<Int>.Manual(2)
   var runs = 0
   let selected = Cog<Int> { c in
     runs += 1

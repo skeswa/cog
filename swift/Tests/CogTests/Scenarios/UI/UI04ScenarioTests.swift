@@ -7,7 +7,7 @@ import os
 @MainActor
 @Test func `UI-04 an equal automatic recomputation sends no Observation notice`() {
   let cogs = Cogs.forTesting()
-  let count = ManualCog<Int>(1)
+  let count = Cog<Int>.Manual(1)
   var selectorRuns = 0
   let isOdd = Cog<Bool> { c in
     selectorRuns += 1
@@ -34,7 +34,7 @@ import os
 @MainActor
 @Test func `UI-04 an equal manual write sends no Observation notice`() {
   let cogs = Cogs.forTesting()
-  let status = ManualCog<String>("ready")
+  let status = Cog<String>.Manual("ready")
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {

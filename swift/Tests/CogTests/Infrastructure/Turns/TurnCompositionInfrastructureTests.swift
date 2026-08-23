@@ -11,7 +11,7 @@ import Testing
   let cogs = Cogs.forTesting()
   var comparisons = 0
   var flushingTurn: CogTurnID?
-  let source = ManualCog<Int>(
+  let source = Cog<Int>.Manual(
     0,
     equals: { oldValue, newValue in
       comparisons += 1
@@ -73,7 +73,7 @@ import Testing
 @MainActor
 @Test func `TurnCompositionInfrastructure sibling turns are separate turns`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var turnIDs: [CogTurnID] = []
   var turnNames: [String] = []
 

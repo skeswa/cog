@@ -12,7 +12,7 @@ import Testing
   // nothing. Ten missed turns and one catch-up run from the newest value —
   // never one run per missed turn — prove GRAPH-08.
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var inputsSeen: [Int] = []
   let scaled = Cog<Int> { c in
     let input = c[source]

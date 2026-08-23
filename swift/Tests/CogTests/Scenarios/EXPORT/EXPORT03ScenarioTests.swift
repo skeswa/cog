@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-03 default buffering keeps the newest value without blocking turns`() async {
-  let phaseCog = ManualCog<String>("initial")
+  let phaseCog = Cog<String>.Manual("initial")
   let cogs = Cogs.forTesting()
   let values = cogs.values(of: phaseCog)
   var iterator = values.makeAsyncIterator()

@@ -26,7 +26,7 @@ private final class CogComparisonStorage {
 @MainActor
 private enum CogComparisonNode {
   /// A writable Cog source.
-  case source(ManualCog<Int>)
+  case source(Cog<Int>.Manual)
 
   /// A memoized Cog computation.
   case automatic(Cog<Int>)
@@ -50,7 +50,7 @@ final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
   func source(_ initialValue: Int) -> RuntimeComparisonValue {
     let value = RuntimeComparisonValue(index: storage.nodes.count)
     storage.nodes.append(
-      .source(ManualCog<Int>(initialValue, name: "perf.compare.source.\(value.index)"))
+      .source(Cog<Int>.Manual(initialValue, name: "perf.compare.source.\(value.index)"))
     )
     return value
   }

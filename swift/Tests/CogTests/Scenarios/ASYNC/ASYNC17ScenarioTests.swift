@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `ASYNC-17 async task name includes its descriptor and key`() async {
   let (cogs, m) = probedContext()
-  let forecast = AsyncCogBox<String?, Int>(default: nil, name: "forecast") { _, _ in
+  let forecast = CogBox<String?, Int>.Async(default: nil, name: "forecast") { _, _ in
     .run { CogTaskDiagnostic.currentTaskName }
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<String?>.self)

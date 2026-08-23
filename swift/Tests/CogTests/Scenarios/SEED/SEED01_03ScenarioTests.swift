@@ -11,7 +11,7 @@ import Testing
 @MainActor
 @Test func `SEED-01 the next read returns the seeded source value`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
 
   cogs.seed(source, to: 7)
 
@@ -24,7 +24,7 @@ import Testing
   var rootRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(2)
+  let source = Cog<Int>.Manual(2)
   let middle = Cog<Int> { c in
     middleRuns += 1
     return c[source] + 1
@@ -63,7 +63,7 @@ import Testing
 
   var runs = 0
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Reading>(
+  let source = Cog<Reading>.Manual(
     Reading(sample: 1, note: "first"),
     equals: { old, new in old.sample == new.sample }
   )

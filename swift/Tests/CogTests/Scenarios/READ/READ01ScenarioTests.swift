@@ -10,7 +10,7 @@ import Testing
 @MainActor
 @Test func `READ-01 a read after turn sees the written value`() {
   let cogs = Cogs.forTesting()
-  let count = ManualCog<Int>(0)
+  let count = Cog<Int>.Manual(0)
 
   cogs.turn { c in
     c[count] = 1

@@ -10,8 +10,8 @@ import Testing
 @Test func `DECL-07 an automatic cog reads back what its selector computed`() {
   let cogs = Cogs.forTesting()
 
-  let width = ManualCog<Int>(3)
-  let height = ManualCog<Int>(4)
+  let width = Cog<Int>.Manual(3)
+  let height = Cog<Int>.Manual(4)
   let area = Cog<Int> { c in c[width] * c[height] }
 
   #expect(cogs.peek(area) == 12)
@@ -24,7 +24,7 @@ import Testing
   let quiet = Cogs.forTesting()
   let busy = Cogs.forTesting()
 
-  let attempts = ManualCog<Int>(0)
+  let attempts = Cog<Int>.Manual(0)
   let hasRetried = Cog<Bool> { c in c[attempts] > 1 }
 
   busy.turn { c in c[attempts] = 4 }
@@ -40,7 +40,7 @@ import Testing
   // chain.
   let cogs = Cogs.forTesting()
 
-  let celsius = ManualCog<Double>(100)
+  let celsius = Cog<Double>.Manual(100)
   let fahrenheit = Cog<Double> { c in c[celsius] * 9 / 5 + 32 }
   let isBoiling = Cog<Bool> { c in c[fahrenheit] >= 212 }
   let advice = Cog<String> { c in c[isBoiling] ? "wait" : "drink" }
@@ -55,8 +55,8 @@ import Testing
   // Swift, and the dependencies are whatever the run actually read.
   let cogs = Cogs.forTesting()
 
-  let currentZip = ManualCog<String?>(nil)
-  let knownZips = ManualCog<[String]>(["90210"])
+  let currentZip = Cog<String?>.Manual(nil)
+  let knownZips = Cog<[String]>.Manual(["90210"])
 
   let isKnownZip = Cog<Bool> { c in
     guard let zip = c[currentZip] else { return false }
@@ -72,7 +72,7 @@ import Testing
   // is a computed value like any other.
   let cogs = Cogs.forTesting()
 
-  let rawZip = ManualCog<String>("")
+  let rawZip = Cog<String>.Manual("")
   let currentZip = Cog<String?> { c in
     let raw = c[rawZip]
     return raw.isEmpty ? nil : raw
@@ -88,7 +88,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     runs += 1
     return c[source] * 2
@@ -114,7 +114,7 @@ import Testing
   var unreadRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let read = Cog<Int> { c in
     readRuns += 1
     return c[source]
@@ -138,7 +138,7 @@ import Testing
   var outerRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(2)
+  let source = Cog<Int>.Manual(2)
   let inner = Cog<Int> { c in
     innerRuns += 1
     return c[source] * 2
@@ -166,7 +166,7 @@ import Testing
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     runs += 1
     return c[source] * 2

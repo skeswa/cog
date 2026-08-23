@@ -46,7 +46,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The source identity to track.
   /// - Returns: Its current completed-turn value.
-  public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     cogs.arenaCore.requireTracking(reaction.arenaSlot)
 
     guard !reaction.isCancelled else { return cogs.peek(valueReference) }
@@ -85,7 +85,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The async value to track.
   /// - Returns: Its newest settled value in this context.
-  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Async) -> Value {
     self[valueReference.valueCog]
   }
 
@@ -135,7 +135,7 @@ public struct ReactionReader {
     ///
     /// - Parameter valueReference: The async value whose status to track.
     /// - Returns: Its newest settled status in this context.
-    public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
+    public subscript<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
       cogs.arenaCore.requireTracking(reaction.arenaSlot)
 
       guard !reaction.isCancelled else { return cogs.status.peek(valueReference) }
@@ -157,7 +157,7 @@ public struct ReactionReader {
     ///
     /// - Parameter valueReference: The async value whose status to read once.
     /// - Returns: Its newest settled status in this context.
-    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
+    public func peek<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
       cogs.arenaCore.requireTracking(reaction.arenaSlot)
       return cogs.status.peek(valueReference)
     }
@@ -170,7 +170,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The read-only source projection to track.
   /// - Returns: Its source value from the latest completed turn.
-  public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Projection) -> Value {
     self[valueReference.sourceCog]
   }
 
@@ -181,7 +181,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The source identity to read once.
   /// - Returns: Its value from the latest completed turn.
-  public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     cogs.arenaCore.requireTracking(reaction.arenaSlot)
     return cogs.peek(valueReference)
   }
@@ -210,7 +210,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The async value to read once.
   /// - Returns: Its newest settled value in this context.
-  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Async) -> Value {
     cogs.arenaCore.requireTracking(reaction.arenaSlot)
     return cogs.peek(valueReference)
   }
@@ -222,7 +222,7 @@ public struct ReactionReader {
   ///
   /// - Parameter valueReference: The read-only source projection to inspect.
   /// - Returns: Its source value from the latest completed turn.
-  public func peek<Value>(_ valueReference: CogProjection<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Projection) -> Value {
     peek(valueReference.sourceCog)
   }
 }

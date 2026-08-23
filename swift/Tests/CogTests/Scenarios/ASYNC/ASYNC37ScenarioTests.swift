@@ -43,10 +43,10 @@ private final class Async37ControlledWork {
   let clock = TestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async37ControlledWork()
-  let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, key in
+  let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, key in
     .run { await work.run(for: key) }
   }
-  let awayWatcherAlive = ManualCog<Bool>(true)
+  let awayWatcherAlive = Cog<Bool>.Manual(true)
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
   m.whenever(awayWatcherAlive) { s in

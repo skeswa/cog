@@ -7,37 +7,37 @@ import Testing
 
 extension Cogs {
   /// An op whose body nests a second op, which nests a third.
-  fileprivate func transfer(_ amount: Int, from: ManualCog<Int>, to: ManualCog<Int>) {
+  fileprivate func transfer(_ amount: Int, from: Cog<Int>.Manual, to: Cog<Int>.Manual) {
     turn { c in
       c[from] -= amount
       self.credit(amount, to: to)
     }
   }
 
-  fileprivate func credit(_ amount: Int, to: ManualCog<Int>) {
+  fileprivate func credit(_ amount: Int, to: Cog<Int>.Manual) {
     turn("credit") { _ in
       self.recordCredit(amount, to: to)
     }
   }
 
-  fileprivate func recordCredit(_ amount: Int, to: ManualCog<Int>) {
+  fileprivate func recordCredit(_ amount: Int, to: Cog<Int>.Manual) {
     turn("credit.record") { c in c[to] += amount }
   }
 
   /// An op that lets `#function` name its own turn.
-  fileprivate func applyDiscount(_ price: ManualCog<Int>) {
+  fileprivate func applyDiscount(_ price: Cog<Int>.Manual) {
     turn { c in c[price] -= 1 }
   }
 
-  fileprivate func recordFollowup(_ followup: ManualCog<Int>) {
+  fileprivate func recordFollowup(_ followup: Cog<Int>.Manual) {
     turn("followup.record") { c in c[followup] = 1 }
   }
 
-  fileprivate func stepOne(_ counter: ManualCog<Int>) {
+  fileprivate func stepOne(_ counter: Cog<Int>.Manual) {
     turn { c in c[counter] = 1 }
   }
 
-  fileprivate func stepTwo(_ counter: ManualCog<Int>) {
+  fileprivate func stepTwo(_ counter: Cog<Int>.Manual) {
     turn { c in c[counter] = 2 }
   }
 }
@@ -45,8 +45,8 @@ extension Cogs {
 @MainActor
 @Test func `TURN-05 a turn inside a turn flushes once when the outer body ends`() {
   let (cogs, m) = probedContext()
-  let left = ManualCog<Int>(0)
-  let right = ManualCog<Int>(0)
+  let left = Cog<Int>.Manual(0)
+  let right = Cog<Int>.Manual(0)
   var selectorRuns = 0
   let total = Cog<Int> { c in
     selectorRuns += 1
@@ -95,7 +95,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-13 sibling turns each flush and react before the next begins`() {
   let (cogs, m) = probedContext()
-  let counter = ManualCog<Int>(0)
+  let counter = Cog<Int>.Manual(0)
   var events: [String] = []
 
   m.run { c in events.append("react:\(c[counter])") }
@@ -125,8 +125,8 @@ extension Cogs {
 @MainActor
 @Test func `TURN-05 nested turns are one turn in history`() {
   let (cogs, m) = probedContext()
-  let checking = ManualCog<Int>(5)
-  let savings = ManualCog<Int>(0)
+  let checking = Cog<Int>.Manual(5)
+  let savings = Cog<Int>.Manual(0)
 
   cogs.transfer(2, from: checking, to: savings)
 
@@ -151,7 +151,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-06 a turn is named by its op or by the name I pass`() {
   let (cogs, m) = probedContext()
-  let price = ManualCog<Int>(10)
+  let price = Cog<Int>.Manual(10)
 
   cogs.applyDiscount(price)
   cogs.turn("checkout.submit") { c in c[price] = 0 }
@@ -165,9 +165,9 @@ extension Cogs {
 @MainActor
 @Test func `TURN-06 a joined turn contributes no name and a queued one keeps its own`() {
   let (cogs, m) = probedContext()
-  let trigger = ManualCog<Int>(0)
-  let note = ManualCog<Int>(0)
-  let followup = ManualCog<Int>(0)
+  let trigger = Cog<Int>.Manual(0)
+  let note = Cog<Int>.Manual(0)
+  let followup = Cog<Int>.Manual(0)
 
   m.run { c in
     guard c[trigger] == 1 else { return }
@@ -189,7 +189,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-13 sibling turns are two named turns in history`() {
   let (cogs, m) = probedContext()
-  let counter = ManualCog<Int>(0)
+  let counter = Cog<Int>.Manual(0)
 
   cogs.stepOne(counter)
   cogs.stepTwo(counter)

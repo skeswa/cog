@@ -8,8 +8,8 @@ import Testing
 @MainActor
 @Test func `REACT-19 every changed UI boundary is noticed before any reaction runs`() {
   let (cogs, m) = probedContext()
-  let first = ManualCog<Int>(0, name: "pair.first")
-  let second = ManualCog<Int>(0, name: "pair.second")
+  let first = Cog<Int>.Manual(0, name: "pair.first")
+  let second = Cog<Int>.Manual(0, name: "pair.second")
 
   _ = withObservationTracking {
     (cogs[first], cogs[second])
@@ -38,7 +38,7 @@ import Testing
 @MainActor
 @Test func `HIST-06 history names each changed keyed UI notice`() {
   let (cogs, m) = probedContext()
-  let weather = ManualCogBox<String?, String>(nil, name: "weather")
+  let weather = CogBox<String?, String>.Manual(nil, name: "weather")
   let zip = "90210"
 
   _ = withObservationTracking {

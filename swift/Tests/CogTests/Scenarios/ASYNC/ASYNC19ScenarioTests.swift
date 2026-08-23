@@ -34,9 +34,9 @@ private final class Async19ControlledWork {
 @MainActor
 @Test func `ASYNC-19 failures and repeated reloads retain the last success`() async {
   let (cogs, m) = probedContext()
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = Async19ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { try await work.run(for: currentRequest) }
   }

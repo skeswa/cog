@@ -62,7 +62,7 @@ extension Cogs {
     ///
     /// - Parameter valueReference: The async value whose status the UI reads.
     /// - Returns: The newest settled status in this context.
-    public subscript<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
+    public subscript<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
       return cogs.arenaCore.observedAsyncStatus(for: valueReference, in: cogs)
     }
 
@@ -81,7 +81,7 @@ extension Cogs {
     ///   inspect.
     /// - Returns: Its current full status, beginning with pending on first
     ///   demand.
-    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
+    public func peek<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
       let status = cogs.arenaCore.asyncStatus(for: valueReference, in: cogs)
       cogs.arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: cogs)
       return status

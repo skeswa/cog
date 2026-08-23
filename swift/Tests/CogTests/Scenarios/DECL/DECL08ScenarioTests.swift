@@ -13,7 +13,7 @@ private struct Decl08ZipCode: Hashable {
   let there = Decl08ZipCode(digits: "10001")
   var keysComputed: [Decl08ZipCode] = []
 
-  let temperatures = ManualCogBox<Int, Decl08ZipCode> { zip in
+  let temperatures = CogBox<Int, Decl08ZipCode>.Manual { zip in
     zip == here ? 72 : 41
   }
   let summaries = CogBox<String, Decl08ZipCode> { c, zip in

@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `LIFE-08 a first UI read pins an automatic cog for the context lifetime`() async throws {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = ManualCog<Bool>(true)
+  let watcherAlive = Cog<Bool>.Manual(true)
   var selectorRuns = 0
   let automatic = Cog<Int> { _ in
     selectorRuns += 1

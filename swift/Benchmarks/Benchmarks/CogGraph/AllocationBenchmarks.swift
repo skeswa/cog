@@ -13,7 +13,7 @@ import CogTesting
 @MainActor
 enum AllocationHarness {
   /// The source a steady turn writes.
-  static let counterSourceCog = ManualCog<Int>(0, name: "perf.counter")
+  static let counterSourceCog = Cog<Int>.Manual(0, name: "perf.counter")
 
   /// One automatic consumer, so a turn actually propagates.
   static let doubledCog = Cog<Int>(
@@ -22,7 +22,7 @@ enum AllocationHarness {
   )
 
   /// A keyed source, for the `box[key]` value-reference measurement.
-  static let keyedSourceCogs = ManualCogBox<Int, Int>(0, name: "perf.keyed")
+  static let keyedSourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.keyed")
 
   /// The context under measurement, created once per benchmark setup.
   static var cogs: Cogs?

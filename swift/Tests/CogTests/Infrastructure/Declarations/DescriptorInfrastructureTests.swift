@@ -11,8 +11,8 @@ import Testing
 @Test func `DescriptorInfrastructure gives every declaration its own identity`() {
   // Same type, same starting value, same label — and still two different cogs,
   // because identity is the descriptor object and nothing else.
-  let left = ManualCog<Int>(0, name: "twin")
-  let right = ManualCog<Int>(0, name: "twin")
+  let left = Cog<Int>.Manual(0, name: "twin")
+  let right = Cog<Int>.Manual(0, name: "twin")
 
   #expect(left.descriptor.identity != right.descriptor.identity)
   #expect(Set([left.descriptor.identity, right.descriptor.identity]).count == 2)
@@ -20,7 +20,7 @@ import Testing
 
 @MainActor
 @Test func `DescriptorInfrastructure keeps a declaration's identity stable`() {
-  let declared = ManualCog<Int>(0)
+  let declared = Cog<Int>.Manual(0)
   let copied = declared
   let returned = passedThrough(declared)
 
@@ -32,7 +32,7 @@ import Testing
 /// Copies a value reference through a call boundary, so the test above compares identities
 /// the optimizer cannot have folded into one another.
 @MainActor
-private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
+private func passedThrough(_ valueReference: Cog<Int>.Manual) -> Cog<Int>.Manual {
   valueReference
 }
 
@@ -40,7 +40,7 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 
 @MainActor
 @Test func `DescriptorInfrastructure labels a named declaration with its name`() {
-  let named = ManualCog<Int>(0, name: "current zip")
+  let named = Cog<Int>.Manual(0, name: "current zip")
 
   #expect("\(named.descriptor.label)" == "current zip")
 }
@@ -48,7 +48,7 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 @MainActor
 @Test func `DescriptorInfrastructure labels an unnamed declaration with its file and line`() {
   let declarationLine = UInt(#line) + 1
-  let unnamed = ManualCog<Int>(0)
+  let unnamed = Cog<Int>.Manual(0)
 
   #expect("\(unnamed.descriptor.label)" == "\(#fileID):\(declarationLine)")
 }
@@ -58,8 +58,8 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
   // What a cycle diagnostic and the debug history log have to do: hold
   // descriptors of unrelated value types and still name and tell them apart.
   let descriptors: [any CogDescriptor] = [
-    ManualCog<Int>(0, name: "count").descriptor,
-    ManualCog<String>("", name: "greeting").descriptor,
+    Cog<Int>.Manual(0, name: "count").descriptor,
+    Cog<String>.Manual("", name: "greeting").descriptor,
   ]
 
   #expect(descriptors.map { "\($0.label)" } == ["count", "greeting"])
@@ -70,7 +70,7 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 
 @MainActor
 @Test func `DescriptorInfrastructure declares a keyless value reference bound to its descriptor`() {
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
 
   #expect(source.key == nil)
 }
@@ -78,9 +78,9 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 @MainActor
 @Test func `DescriptorInfrastructure builds a keyed value reference without a second descriptor`() {
   // `box[key]` builds a new value reference for the same declaration.
-  let source = ManualCog<Int>(0)
-  let keyed = ManualCog(descriptor: source.descriptor, key: CogKey(5))
-  let sameKeyAgain = ManualCog(descriptor: source.descriptor, key: CogKey(5))
+  let source = Cog<Int>.Manual(0)
+  let keyed = Cog.Manual(descriptor: source.descriptor, key: CogKey(5))
+  let sameKeyAgain = Cog.Manual(descriptor: source.descriptor, key: CogKey(5))
 
   #expect(keyed.descriptor.identity == source.descriptor.identity)
   #expect(keyed.key == CogKey(5))
@@ -92,8 +92,8 @@ private func passedThrough(_ valueReference: ManualCog<Int>) -> ManualCog<Int> {
 
 @MainActor
 @Test func `DescriptorInfrastructure keeps the starting value on the declaration`() {
-  let counter = ManualCog<Int>(7)
-  let optional = ManualCog<String?>(nil)
+  let counter = Cog<Int>.Manual(7)
+  let optional = Cog<String?>.Manual(nil)
 
   #expect(counter.descriptor.startingValue(forKey: nil) == 7)
   #expect(optional.descriptor.startingValue(forKey: nil) == nil)

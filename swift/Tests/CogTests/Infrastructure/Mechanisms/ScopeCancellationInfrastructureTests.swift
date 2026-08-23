@@ -14,7 +14,7 @@ import Testing
 @MainActor
 @Test func `ScopeCancellationInfrastructure cancel unregisters reactions exactly once`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var runs = 0
 
   let scope = MechanismScope()
@@ -39,7 +39,7 @@ import Testing
 @MainActor
 @Test func `ScopeCancellationInfrastructure a late registration is cancelled synchronously`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var runs = 0
 
   let scope = MechanismScope()
@@ -65,7 +65,7 @@ import Testing
 @MainActor
 @Test func `ScopeCancellationInfrastructure a cancelled parent sweeps adopted children`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var childRuns = 0
 
   let parent = MechanismScope()

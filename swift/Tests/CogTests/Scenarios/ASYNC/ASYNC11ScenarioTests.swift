@@ -21,7 +21,7 @@ private final class Async11WorkProbe {
   func run(
     selectorValue: Int,
     cogs: Cogs,
-    workValue: ManualCog<Int>
+    workValue: Cog<Int>.Manual
   ) async -> Int {
     nextRunID += 1
     let runID = nextRunID
@@ -60,12 +60,12 @@ private final class Async11WorkProbe {
 @MainActor
 @Test func `ASYNC-11 only synchronous selector reads become dependencies`() async throws {
   let (cogs, m) = probedContext()
-  let selectorInput = ManualCog<Int>(10)
-  let workInput = ManualCog<Int>(20)
+  let selectorInput = Cog<Int>.Manual(10)
+  let workInput = Cog<Int>.Manual(20)
   let probe = Async11WorkProbe()
   var selectorValues: [Int] = []
 
-  let result = AsyncCog<Int>(default: 0) { c in
+  let result = Cog<Int>.Async(default: 0) { c in
     let selectorValue = c[selectorInput]
     selectorValues.append(selectorValue)
     return .run {

@@ -13,7 +13,7 @@ import Testing
   // state.
   let (cogs, m) = probedContext()
   let work = AsyncStatusControlledWork<Int>()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()

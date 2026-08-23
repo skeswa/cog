@@ -42,7 +42,7 @@ private final class Async26ControlledWork {
 @Test func `ASYNC-26 keyed value reads have stable per-key equality`() async throws {
   let (cogs, m) = probedContext()
   let work = Async26ControlledWork()
-  let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, key in
+  let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, key in
     work.makeWork(for: key)
   }
   let (firstHomeValues, firstHomeContinuation) = AsyncStream.makeStream(of: Int.self)

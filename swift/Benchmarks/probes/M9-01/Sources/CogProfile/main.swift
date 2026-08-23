@@ -55,13 +55,13 @@ func blackHole<Value>(_ value: Value) {
 // MARK: - Graphs
 
 /// The source a steady turn writes.
-let counterSourceCog = ManualCog<Int>(0, name: "prof.counter")
+let counterSourceCog = Cog<Int>.Manual(0, name: "prof.counter")
 
 /// One automatic consumer, so a turn actually propagates.
 let doubledCog = Cog<Int>({ c in c[counterSourceCog] * 2 }, name: "prof.doubled")
 
 /// The keyed source family the pinned-key workload writes one key of.
-let rowSourceCogs = ManualCogBox<Int, Int>(0, name: "prof.pinned.source")
+let rowSourceCogs = CogBox<Int, Int>.Manual(0, name: "prof.pinned.source")
 
 /// One automatic consumer per row, so a write reaches a boundary rather than
 /// stopping at the source.
@@ -71,7 +71,7 @@ let rowCogs = CogBox<Int, Int>(
 )
 
 /// The source at the head of the deep chain.
-let chainSourceCog = ManualCog<Int>(0, name: "prof.chain.source")
+let chainSourceCog = Cog<Int>.Manual(0, name: "prof.chain.source")
 
 /// A chain of automatic nodes, each reading the one below it.
 ///
@@ -89,7 +89,7 @@ let chainCogs = CogBox<Int, Int>(
 ///
 /// PERF-03's shape exactly: one keyed source and one keyed automatic consumer per
 /// entry, which is how a screen actually reaches a thousand states.
-let buildSourceCogs = ManualCogBox<Int, Int>(0, name: "prof.build.source")
+let buildSourceCogs = CogBox<Int, Int>.Manual(0, name: "prof.build.source")
 
 /// One automatic consumer per built entry.
 let buildCogs = CogBox<Int, Int>(

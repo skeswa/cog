@@ -14,7 +14,7 @@ import Testing
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  let count = ManualCog<Int>(0)
+  let count = Cog<Int>.Manual(0)
 
   cogs.turn { c in c[count] = 7 }
   #expect(cogs.peek(count) == 7)
@@ -35,7 +35,7 @@ import Testing
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  let count = ManualCog<Int>(0)
+  let count = Cog<Int>.Manual(0)
   var selectorRuns = 0
   let doubled = Cog<Int> { c in
     selectorRuns += 1
@@ -67,7 +67,7 @@ import Testing
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  let draft = ManualCog<String>("", lifetime: .whileObserved(resetToInitial: true))
+  let draft = Cog<String>.Manual("", lifetime: .whileObserved(resetToInitial: true))
 
   cogs.turn { c in c[draft] = "half a thought" }
   #expect(cogs.peek(draft) == "half a thought")
@@ -90,8 +90,8 @@ import Testing
 @MainActor
 @Test func `LIFE-05 an opted-in source survives while a reaction reads it`() async throws {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = ManualCog<Bool>(true)
-  let draft = ManualCog<String>("", lifetime: .whileObserved(resetToInitial: true))
+  let watcherAlive = Cog<Bool>.Manual(true)
+  let draft = Cog<String>.Manual("", lifetime: .whileObserved(resetToInitial: true))
   var observed: [String] = []
 
   let (cogs, m) = probedContext(

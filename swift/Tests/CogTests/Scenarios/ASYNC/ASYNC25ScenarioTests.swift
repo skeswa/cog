@@ -52,14 +52,14 @@ private final class Async25ControlledWork {
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     selectorRuns += 1
     return work.makeWork()
   }
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let firstWatcherAlive = ManualCog<Bool>(true)
+  let firstWatcherAlive = Cog<Bool>.Manual(true)
   m.whenever(firstWatcherAlive) { s in
     s.run { c in _ = c[forecast] }
   }

@@ -151,9 +151,9 @@ final class DependencyStreamWork {
 @MainActor
 @Test func `STREAM-03 dependency replacement cancels and rejects the old stream`() async throws {
   let (cogs, m) = probedContext()
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = DependencyStreamWork()
-  let readingsCog = AsyncCog<Int>(.latest, default: -1, name: "readings") { c in
+  let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { c in
     let request = c[request]
     return work.makeWork(dependency: request)
   }

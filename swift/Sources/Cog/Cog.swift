@@ -35,7 +35,7 @@
 /// Keep selectors synchronous, cheap, and free of side effects. They may
 /// branch or return early; each run replaces the dependency set. A selector
 /// cannot `throw` in v1. Return `Result` for fallible domain work, or use an
-/// `AsyncCog` when the work must await.
+/// `Cog.Async` when the work must await.
 ///
 /// `Cog` and its selector are MainActor-isolated, so selectors may safely work
 /// with non-`Sendable` values that remain inside the graph.

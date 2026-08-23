@@ -6,9 +6,9 @@ import Testing
 @Test func `STREAM-04 release cancels a live stream and rejects its late element`() async throws {
   let clock = TestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
-  let watcherAlive = ManualCog<Bool>(true)
+  let watcherAlive = Cog<Bool>.Manual(true)
   let work = DependencyStreamWork()
-  let readingsCog = AsyncCog<Int>(.latest, default: -1, name: "readings") { _ in
+  let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork(dependency: 0)
   }
   var observedStatuses: [CogStatus<Int>] = []

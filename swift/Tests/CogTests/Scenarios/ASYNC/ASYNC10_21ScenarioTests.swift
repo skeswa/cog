@@ -32,7 +32,7 @@ private final class Async10ControlledWork {
 @Test func `ASYNC-10 refresh cycles a settled async cog again`() async {
   let (cogs, m) = probedContext()
   let work = Async10ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()
@@ -76,7 +76,7 @@ private final class Async10ControlledWork {
 @Test func `ASYNC-21 refresh replaces in-flight latest work`() async throws {
   let (cogs, m) = probedContext()
   let work = Async10ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }
   var statusIterator = statuses.makeAsyncIterator()

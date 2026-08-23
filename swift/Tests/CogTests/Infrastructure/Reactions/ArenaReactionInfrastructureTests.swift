@@ -9,7 +9,7 @@ import Testing
 @MainActor
 @Test func `ArenaReactionInfrastructure owns an indexed terminal without a class bridge`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var values: [Int] = []
 
   let token = cogs.register(
@@ -39,8 +39,8 @@ import Testing
 @MainActor
 @Test func `ArenaReactionInfrastructure self cancellation retires capture after the body`() throws {
   let cogs = Cogs.forTesting()
-  let trigger = ManualCog<Int>(0)
-  let afterCancellation = ManualCog<Int>(10)
+  let trigger = Cog<Int>.Manual(0)
+  let afterCancellation = Cog<Int>.Manual(10)
   var token: ReactionToken?
   var values: [Int] = []
 

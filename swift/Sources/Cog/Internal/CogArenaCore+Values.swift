@@ -12,7 +12,7 @@ extension CogArenaCore {
   @inlinable
   #endif
   func writerStage<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     value: Value,
     in turn: CogTurn
   ) {
@@ -61,7 +61,7 @@ extension CogArenaCore {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  func writerValue<Value>(for valueReference: ManualCog<Value>) -> Value {
+  func writerValue<Value>(for valueReference: Cog<Value>.Manual) -> Value {
     let location = manualLocation(for: valueReference)
     return location.column.writerValue(at: location.slot)
   }
@@ -70,7 +70,7 @@ extension CogArenaCore {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  func manualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
+  func manualValue<Value>(for valueReference: Cog<Value>.Manual) -> Value {
     let location = manualLocation(for: valueReference)
     return location.column.current(at: location.slot)
   }
@@ -83,7 +83,7 @@ extension CogArenaCore {
   /// and propagation columns, deliberately opening no turn or history event.
   /// An already-installed UI boundary remembers the quiet change so the next
   /// real turn can emit its one deferred notice without seed doing so itself.
-  func publishTestingSeed<Value>(_ value: Value, for valueReference: ManualCog<Value>) {
+  func publishTestingSeed<Value>(_ value: Value, for valueReference: Cog<Value>.Manual) {
     let location = manualLocation(for: valueReference)
     location.column.publishSeed(
       value,
@@ -114,7 +114,7 @@ extension CogArenaCore {
   @inlinable
   #endif
   func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: ManualCog<Value>,
+    for valueReference: Cog<Value>.Manual,
     in cogs: Cogs
   ) {
     let location = manualLocation(for: valueReference)
@@ -135,7 +135,7 @@ extension CogArenaCore {
 
   /// Renews grace after one transient async status demand.
   func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: AsyncCog<Value>,
+    for valueReference: Cog<Value>.Async,
     in cogs: Cogs
   ) {
     let location = asyncLocation(
@@ -152,7 +152,7 @@ extension CogArenaCore {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  func observedManualValue<Value>(for valueReference: ManualCog<Value>) -> Value {
+  func observedManualValue<Value>(for valueReference: Cog<Value>.Manual) -> Value {
     let location = manualLocation(for: valueReference)
     accessObservationBoundary(for: location.slot)
     return location.column.current(at: location.slot)
@@ -174,7 +174,7 @@ extension CogArenaCore {
 
   /// Settles and reads one async status through its field-level UI boundary.
   func observedAsyncStatus<Value>(
-    for valueReference: AsyncCog<Value>,
+    for valueReference: Cog<Value>.Async,
     in cogs: Cogs
   ) -> CogStatus<Value> {
     let location = asyncLocation(
@@ -188,7 +188,7 @@ extension CogArenaCore {
 
   /// Settles and returns one async status without installing a graph consumer.
   func asyncStatus<Value>(
-    for valueReference: AsyncCog<Value>,
+    for valueReference: Cog<Value>.Async,
     in cogs: Cogs
   ) -> CogStatus<Value> {
     asyncStatus(
@@ -210,7 +210,7 @@ extension CogArenaCore {
   }
 
   /// Forces one fresh arena async generation and returns its exact waiter.
-  func refresh<Value>(_ valueReference: AsyncCog<Value>, in cogs: Cogs) -> CogRefresh<Value> {
+  func refresh<Value>(_ valueReference: Cog<Value>.Async, in cogs: Cogs) -> CogRefresh<Value> {
     let location = asyncLocation(
       descriptor: valueReference.descriptor,
       key: valueReference.key
@@ -269,7 +269,7 @@ extension CogArenaCore {
   ///
   /// This internal diagnostic lets infrastructure tests prove that the arena
   /// dispatch record, rather than only the declaration object, carries policy.
-  func lifetimePolicy<Value>(for valueReference: ManualCog<Value>) -> CogStateLifetime {
+  func lifetimePolicy<Value>(for valueReference: Cog<Value>.Manual) -> CogStateLifetime {
     let location = manualLocation(for: valueReference)
     return descriptorRecord(forRow: arena.index(of: location.slot)).lifetime
   }
@@ -281,7 +281,7 @@ extension CogArenaCore {
   }
 
   /// Durable reaction and UI owners of one installed manual arena row.
-  func leaseCount<Value>(for valueReference: ManualCog<Value>) -> UInt32 {
+  func leaseCount<Value>(for valueReference: Cog<Value>.Manual) -> UInt32 {
     let location = manualLocation(for: valueReference)
     return arena.leaseCount[arena.index(of: location.slot)]
   }

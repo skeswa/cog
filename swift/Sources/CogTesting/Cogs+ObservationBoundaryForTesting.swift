@@ -18,7 +18,7 @@ extension Cogs {
   /// Purely a lookup: probing a state never demanded in this context reports
   /// `false` without creating it, so a test can ask about interior or unread
   /// states without disturbing laziness or lifetime.
-  public func hasObservationBoundary<Value>(for valueReference: ManualCog<Value>) -> Bool {
+  public func hasObservationBoundary<Value>(for valueReference: Cog<Value>.Manual) -> Bool {
     hasObservationBoundaryForTesting(for: valueReference)
   }
 

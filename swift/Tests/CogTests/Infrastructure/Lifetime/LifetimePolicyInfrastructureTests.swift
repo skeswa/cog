@@ -8,28 +8,28 @@ private nonisolated struct LifetimeOpaqueValue {
 
 @MainActor
 @Test func `LifetimePolicyInfrastructure manual declarations default to app lifetime`() {
-  let keylessOpaque = ManualCog(LifetimeOpaqueValue(rawValue: 0))
-  let keylessCustom = ManualCog(
+  let keylessOpaque = Cog.Manual(LifetimeOpaqueValue(rawValue: 0))
+  let keylessCustom = Cog.Manual(
     LifetimeOpaqueValue(rawValue: 0),
     equals: { $0.rawValue == $1.rawValue }
   )
-  let keylessEquatable = ManualCog<Int>(0)
-  let constantBox = ManualCogBox<LifetimeOpaqueValue, Int>(
+  let keylessEquatable = Cog<Int>.Manual(0)
+  let constantBox = CogBox<LifetimeOpaqueValue, Int>.Manual(
     LifetimeOpaqueValue(rawValue: 0)
   )
-  let constantCustomBox = ManualCogBox<LifetimeOpaqueValue, Int>(
+  let constantCustomBox = CogBox<LifetimeOpaqueValue, Int>.Manual(
     LifetimeOpaqueValue(rawValue: 0),
     equals: { $0.rawValue == $1.rawValue }
   )
-  let perKeyBox = ManualCogBox<LifetimeOpaqueValue, Int> { key in
+  let perKeyBox = CogBox<LifetimeOpaqueValue, Int>.Manual { key in
     LifetimeOpaqueValue(rawValue: key)
   }
-  let customBox = ManualCogBox<LifetimeOpaqueValue, Int>(
+  let customBox = CogBox<LifetimeOpaqueValue, Int>.Manual(
     { key in LifetimeOpaqueValue(rawValue: key) },
     equals: { $0.rawValue == $1.rawValue }
   )
-  let equatableBox = ManualCogBox<Int, Int>(0)
-  let perKeyEquatableBox = ManualCogBox<Int, Int> { key in key }
+  let equatableBox = CogBox<Int, Int>.Manual(0)
+  let perKeyEquatableBox = CogBox<Int, Int>.Manual { key in key }
 
   let lifetimes = [
     keylessOpaque.descriptor.lifetime,

@@ -6,7 +6,7 @@ import SwiftUI
 //
 // Everything here is main-actor-isolated without saying so. The target builds
 // with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (Config/Shared.xcconfig),
-// which is what makes an unannotated global safe to hold a `ManualCog`, and
+// which is what makes an unannotated global safe to hold a `Cog.Manual`, and
 // what puts these declarations on the same actor as the graph they name.
 
 /// The injectable request boundary selected by every keyed forecast.
@@ -14,12 +14,12 @@ import SwiftUI
 /// Production keeps the live service for the app lifetime. Tests seed a
 /// controlled service before first demand, so they exercise the same async cog
 /// without adding a second request-state mechanism.
-private let weatherServiceSourceCog = ManualCog<WeatherService>(
+private let weatherServiceSourceCog = Cog<WeatherService>.Manual(
   .live,
   name: "weather.service"
 )
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
-private let currentZipSourceCog = ManualCog<ZipCode?>(
+private let currentZipSourceCog = Cog<ZipCode?>.Manual(
   nil,
   name: "weather.currentZip"
 )
@@ -29,7 +29,7 @@ private let currentZipSourceCog = ManualCog<ZipCode?>(
 /// configuration rather than weather, but the cards describe it, and a screen
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
-private let refreshIntervalSourceCog = ManualCog<Duration?>(
+private let refreshIntervalSourceCog = Cog<Duration?>.Manual(
   nil,
   name: "weather.refreshInterval"
 )
@@ -63,7 +63,7 @@ let refreshIntervalCog = refreshIntervalSourceCog.readOnly
 /// in a test invalidates every demanded forecast. The returned work runs away
 /// from the MainActor, while Cog brings its pending, success, and failure
 /// status back to the graph as ordered turns.
-let weatherForecastCogs = AsyncCogBox<WeatherReading?, ZipCode>(
+let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(
   default: nil,
   name: "weather.forecast"
 ) { c, zip in

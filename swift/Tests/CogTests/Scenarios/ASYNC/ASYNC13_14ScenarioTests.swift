@@ -43,8 +43,8 @@ private final class Async13ControlledWork {
   let clock = TestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
-  let watcherAlive = ManualCog<Bool>(true)
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
+  let watcherAlive = Cog<Bool>.Manual(true)
   let refresh = cogs.refresh(forecast)
   m.whenever(watcherAlive) { s in
     s.run { c in _ = c[forecast] }
@@ -84,8 +84,8 @@ private final class Async13ControlledWork {
   let clock = TestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in work.makeWork() }
-  let firstWatcherAlive = ManualCog<Bool>(true)
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
+  let firstWatcherAlive = Cog<Bool>.Manual(true)
   m.whenever(firstWatcherAlive) { s in
     s.run { c in _ = c[forecast] }
   }

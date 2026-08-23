@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-09 unbounded buffering preserves every unseen value`() async {
-  let phaseCog = ManualCog<String>("initial")
+  let phaseCog = Cog<String>.Manual("initial")
   let cogs = Cogs.forTesting()
   let values = cogs.values(of: phaseCog, buffering: .unbounded)
   var iterator = values.makeAsyncIterator()

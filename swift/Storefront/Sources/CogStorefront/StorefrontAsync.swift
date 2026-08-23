@@ -21,7 +21,7 @@ public import Cog
 /// The root of the browse half of the graph: the product index, the search
 /// index, every price ladder, and every row value are downstream of this one
 /// response.
-public let storefrontCatalogCog = AsyncCog<CatalogSnapshot>(
+public let storefrontCatalogCog = Cog<CatalogSnapshot>.Async(
   default: .empty,
   name: "storefront.catalog"
 ) { c in
@@ -38,7 +38,7 @@ public let storefrontCatalogCog = AsyncCog<CatalogSnapshot>(
 /// guest: pricing policies that read a tier must be able to tell "not loaded"
 /// from "guest", and a defaulted guest would silently price the whole catalog
 /// wrong for one turn.
-public let storefrontAccountCog = AsyncCog<Shopper?>(
+public let storefrontAccountCog = Cog<Shopper?>.Async(
   default: nil,
   name: "storefront.account"
 ) { c in
@@ -57,7 +57,7 @@ public let storefrontAccountCog = AsyncCog<Shopper?>(
 /// so accepting a catalog schedules a second wave of work rather than settling
 /// the screen. Building it is the largest single piece of computation in the
 /// workload, which is exactly why it is off the MainActor.
-public let storefrontSearchIndexCog = AsyncCog<StorefrontKernels.SearchIndex>(
+public let storefrontSearchIndexCog = Cog<StorefrontKernels.SearchIndex>.Async(
   default: .empty,
   name: "storefront.searchIndex"
 ) { c in
@@ -75,7 +75,7 @@ public let storefrontSearchIndexCog = AsyncCog<StorefrontKernels.SearchIndex>(
 /// way do not start two requests. Each distinct normalization is a new
 /// generation; the standard trace deliberately completes a stale one to prove
 /// the graph refuses it.
-public let storefrontSuggestionsCog = AsyncCog<[String]>(
+public let storefrontSuggestionsCog = Cog<[String]>.Async(
   default: [],
   name: "storefront.suggestions"
 ) { c in
@@ -96,7 +96,7 @@ public let storefrontSuggestionsCog = AsyncCog<[String]>(
 ///
 /// Depends on both async roots, so it cannot start until each has landed —
 /// which is what makes it the workload's one genuinely three-deep async chain.
-public let storefrontRecommendationsCog = AsyncCog<[ProductID]>(
+public let storefrontRecommendationsCog = Cog<[ProductID]>.Async(
   default: [],
   name: "storefront.recommendations"
 ) { c in
@@ -121,7 +121,7 @@ public let storefrontRecommendationsCog = AsyncCog<[ProductID]>(
 /// this product invalidates exactly this state and no other. A product whose
 /// row is not demanded has no state at all, so a burst covering it costs
 /// nothing — which is the claim the burst checkpoint exists to prove.
-public let storefrontInventoryCogs = AsyncCogBox<InventoryReading, ProductID>(
+public let storefrontInventoryCogs = CogBox<InventoryReading, ProductID>.Async(
   default: .unknown,
   name: "storefront.inventory"
 ) { c, id in
@@ -137,7 +137,7 @@ public let storefrontInventoryCogs = AsyncCogBox<InventoryReading, ProductID>(
 ///
 /// Depends on the shopper, so signing in or out replaces every demanded
 /// offer — a wide, keyed invalidation wave with a narrow trigger.
-public let storefrontOfferCogs = AsyncCogBox<PersonalizedOffer, ProductID>(
+public let storefrontOfferCogs = CogBox<PersonalizedOffer, ProductID>.Async(
   default: .none,
   name: "storefront.offer"
 ) { c, id in
@@ -157,7 +157,7 @@ public let storefrontOfferCogs = AsyncCogBox<PersonalizedOffer, ProductID>(
 /// A leaf: nothing on the browse screen reads it, so it is demanded only while
 /// a detail screen is open and released once the shopper navigates away and its
 /// grace elapses. The lifetime checkpoint measures exactly that.
-public let storefrontDetailCogs = AsyncCogBox<ProductDetail, ProductID>(
+public let storefrontDetailCogs = CogBox<ProductDetail, ProductID>.Async(
   default: .empty,
   name: "storefront.detail"
 ) { c, id in
@@ -179,7 +179,7 @@ public let storefrontDetailCogs = AsyncCogBox<ProductDetail, ProductID>(
 /// depends on every price ladder. A quantity change therefore replaces this
 /// request, and the standard trace changes quantities rapidly on purpose so
 /// that replacement is the behavior under measurement rather than an edge case.
-public let storefrontShippingQuoteCog = AsyncCog<ShippingQuote>(
+public let storefrontShippingQuoteCog = Cog<ShippingQuote>.Async(
   default: .pending,
   name: "storefront.shippingQuote"
 ) { c in
@@ -214,7 +214,7 @@ public let storefrontShippingQuoteCog = AsyncCog<ShippingQuote>(
 /// two start together, complete in whichever order the driver chooses, and both
 /// feed the order total — which is the fan-in shape a checkout screen actually
 /// has.
-public let storefrontTaxQuoteCog = AsyncCog<TaxQuote>(
+public let storefrontTaxQuoteCog = Cog<TaxQuote>.Async(
   default: .pending,
   name: "storefront.taxQuote"
 ) { c in

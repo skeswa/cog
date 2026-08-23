@@ -16,7 +16,7 @@ extension Cogs {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     return arenaCore.observedManualValue(for: valueReference)
   }
 
@@ -53,13 +53,13 @@ extension Cogs {
   ///
   /// This is UI tracking, not a selector or reaction dependency edge. Creating
   /// the boundary pins the projection — and, through its dependency, the async
-  /// state — against `whileObserved` release. Use ``peek(_:)-(AsyncCog<Value>)`` for a one-shot
+  /// state — against `whileObserved` release. Use ``peek(_:)-(Cog<Value>.Async)`` for a one-shot
   /// read that should not invalidate UI and does not keep the async state
   /// durably observed.
   ///
   /// - Parameter valueReference: The async value the UI reads.
   /// - Returns: Its newest settled value in this context.
-  public subscript<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Async) -> Value {
     self[valueReference.valueCog]
   }
 
@@ -70,7 +70,7 @@ extension Cogs {
   ///
   /// - Parameter valueReference: The read-only source projection to observe.
   /// - Returns: Its source value from the latest completed turn.
-  public subscript<Value>(_ valueReference: CogProjection<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Projection) -> Value {
     self[valueReference.sourceCog]
   }
 }

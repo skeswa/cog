@@ -53,7 +53,7 @@ extension CogScenario {
       name: "COUNT-07-KeyedDiamond",
       expectedRuns: (keys + turns) * (width + 1)
     ) { cogs, counter in
-      let sourceCogs = ManualCogBox<Int, Int>(0, name: "keyed.diamond.head")
+      let sourceCogs = CogBox<Int, Int>.Manual(0, name: "keyed.diamond.head")
       // One declaration per arm, each keyed by the whole family. Keying the arm
       // index instead would make one box hold `keys × width` states and turn a
       // per-key claim into a per-composite-key one, which is a different
@@ -143,8 +143,8 @@ extension CogScenario {
       // stayed subscribed would have to recompute. Without it, "dropped keys
       // stop running" would be true of any implementation at all, because
       // nothing would be asking them to run.
-      let epochSourceCog = ManualCog<Int>(0, name: "churn.epoch")
-      let windowStartSourceCog = ManualCog<Int>(0, name: "churn.windowStart")
+      let epochSourceCog = Cog<Int>.Manual(0, name: "churn.epoch")
+      let windowStartSourceCog = Cog<Int>.Manual(0, name: "churn.windowStart")
       let entryCogs = CogBox<Int, Int>(
         { c, key in
           counter.record()

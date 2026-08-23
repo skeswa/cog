@@ -10,7 +10,7 @@ import Testing
   var leafRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let isPositive = Cog<Bool> { c in
     middleRuns += 1
     return c[source] > 0
@@ -42,7 +42,7 @@ import Testing
   var leafRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(11)
+  let source = Cog<Int>.Manual(11)
   let summary = Cog<Summary>(
     { c in
       middleRuns += 1
@@ -72,7 +72,7 @@ import Testing
   var leafRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     middleRuns += 1
     return c[source] * 2
@@ -108,7 +108,7 @@ import Testing
   var leafRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let parity = Cog<Parity> { c in
     middleRuns += 1
     return Parity(isEven: c[source].isMultiple(of: 2))

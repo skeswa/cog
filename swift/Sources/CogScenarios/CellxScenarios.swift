@@ -65,7 +65,7 @@ extension CogScenario {
       // graph settles fine.
       let lattice = CellxLattice()
       lattice.sourceCogs = (0..<CellxLattice.width).map { property in
-        ManualCog<Int>(property + 1, name: "cellx.source.p\(property + 1)")
+        Cog<Int>.Manual(property + 1, name: "cellx.source.p\(property + 1)")
       }
       lattice.layerCogs.reserveCapacity(max(layers, 0))
 
@@ -134,7 +134,7 @@ private final class CellxLattice {
   static let width = 4
 
   /// The four sources, in property order.
-  var sourceCogs: [ManualCog<Int>] = []
+  var sourceCogs: [Cog<Int>.Manual] = []
 
   /// Layers in build order, each four nodes wide.
   var layerCogs: [[Cog<Int>]] = []

@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let hourlyRefreshCountCog = ManualCog<Int>(0)
+@MainActor private let hourlyRefreshCountCog = Cog<Int>.Manual(0)
 
 @MainActor extension CogOps {
   fileprivate func refreshCurrentLocation() {

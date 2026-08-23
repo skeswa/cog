@@ -5,9 +5,9 @@ import Testing
 @MainActor
 @Test func `POLICY-02 queue publishes results in run order and ends newest`() async throws {
   let (cogs, m) = probedContext()
-  let inputCog = ManualCog<Int>(0)
+  let inputCog = Cog<Int>.Manual(0)
   let work = PolicyQueueControlledWork()
-  let queuedCog = AsyncCog<Int>(.queue, default: -1, name: "queued") { c in
+  let queuedCog = Cog<Int>.Async(.queue, default: -1, name: "queued") { c in
     let input = c[inputCog]
     return work.makeRun(for: input)
   }

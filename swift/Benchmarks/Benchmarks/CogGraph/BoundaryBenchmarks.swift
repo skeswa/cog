@@ -24,7 +24,7 @@ enum BoundaryHarness {
   static let onscreenCount = 12
 
   /// The bulk of the graph.
-  static let offscreenSourceCogs = ManualCogBox<Int, Int>(0, name: "perf.boundary.offscreen")
+  static let offscreenSourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.boundary.offscreen")
 
   /// The twelve a view reads.
   static let onscreenCogs = CogBox<Int, Int>(

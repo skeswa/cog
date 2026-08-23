@@ -11,9 +11,9 @@ import Testing
   // resolves as superseded at replacement and never drifts forward to the
   // dependency-started run, whose result alone may turn.
   let (cogs, m) = probedContext()
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = AsyncStatusControlledWork<Int>()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
     _ = c[request]
     return work.makeWork()
   }

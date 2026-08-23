@@ -6,8 +6,8 @@ import Testing
 
 @MainActor
 @Test func `REACT-17 a finite reaction loop warns and returns idle`() throws {
-  let ping = ManualCog<Int>(0)
-  let pong = ManualCog<Int>(0)
+  let ping = Cog<Int>.Manual(0)
+  let pong = Cog<Int>.Manual(0)
   var reactionRuns = 0
   var pingReactionLine: UInt = 0
   var pongReactionLine: UInt = 0
@@ -80,8 +80,8 @@ import Testing
   // Pins the lower edge of "about 64": a chain of exactly 64 uninterrupted
   // turns is quiet, so the warning cannot silently regress toward warning on
   // ordinary short chains.
-  let ping = ManualCog<Int>(0)
-  let pong = ManualCog<Int>(0)
+  let ping = Cog<Int>.Manual(0)
+  let pong = Cog<Int>.Manual(0)
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
@@ -117,8 +117,8 @@ import Testing
   // Enough reactions per turn overflow the bounded causal trace before the
   // turn threshold. The warning still fires once, keeps its bounded prefix,
   // and says that it truncated instead of silently dropping causes.
-  let ping = ManualCog<Int>(0)
-  let pong = ManualCog<Int>(0)
+  let ping = Cog<Int>.Manual(0)
+  let pong = Cog<Int>.Manual(0)
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
@@ -159,7 +159,7 @@ import Testing
 @MainActor
 @Test func `REACT-17 turns separated by idle do not form one turn chain`() {
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
 
   for turn in 1...65 {
     cogs.turn("react17.separate.\(turn)") { c in

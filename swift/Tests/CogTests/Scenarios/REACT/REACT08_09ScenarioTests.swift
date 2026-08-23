@@ -8,7 +8,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-08 a skipping watch is quiet at install and then delivers old and new`() {
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in c[source] * 2 }
   var deliveries: [String] = []
 
@@ -38,7 +38,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-09 a running watch calls the body once at install time`() {
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var deliveries: [String] = []
 
   let cogs = Cogs.forTesting(mechanisms: [

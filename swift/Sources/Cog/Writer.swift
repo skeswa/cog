@@ -4,7 +4,7 @@
 /// values and stages writes until the outer turn body returns. Application
 /// code cannot construct one.
 ///
-/// All access is MainActor-isolated and names only ``ManualCog`` sources;
+/// All access is MainActor-isolated and names only ``Cog.Manual`` sources;
 /// automatic cogs and read-only projections deliberately have no writer
 /// subscript. A normal read sees the latest completed turn, but a writer read
 /// sees this accumulating turn's most recently staged value so read-modify-write
@@ -41,7 +41,7 @@ public struct Writer {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  public subscript<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public subscript<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     get { cogs.writerRead(valueReference, turnID: turnID) }
     nonmutating set { cogs.writerStage(valueReference, value: newValue, turnID: turnID) }
   }
@@ -94,7 +94,7 @@ extension Cogs {
   ///   - value: The value to publish at the turn boundary.
   ///   - name: The turn name recorded for diagnostics and history.
   public func turn<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     to value: Value,
     name: String = #function
   ) {
@@ -128,7 +128,7 @@ extension Cogs {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  internal func writerRead<Value>(_ valueReference: ManualCog<Value>, turnID: CogTurnID) -> Value {
+  internal func writerRead<Value>(_ valueReference: Cog<Value>.Manual, turnID: CogTurnID) -> Value {
     requireWriterTurn(turnID, usage: .reading, target: valueReference)
 
     return arenaCore.writerValue(for: valueReference)
@@ -142,7 +142,7 @@ extension Cogs {
   @inlinable
   #endif
   internal func writerStage<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     value: Value,
     turnID: CogTurnID
   ) {
@@ -168,7 +168,7 @@ extension Cogs {
   internal func requireWriterTurn<Value>(
     _ turnID: CogTurnID,
     usage: WriterUsage,
-    target valueReference: ManualCog<Value>
+    target valueReference: Cog<Value>.Manual
   ) -> CogTurn {
     guard case .accumulating(let turn) = turnPhase, turn.id == turnID else {
       // Composed inside the autoclosure, so a live write pays nothing to build
@@ -202,7 +202,7 @@ internal enum WriterUsage {
 @MainActor
 private func escapedWriterMessage<Value>(
   usage: WriterUsage,
-  target valueReference: ManualCog<Value>
+  target valueReference: Cog<Value>.Manual
 ) -> String {
   """
   This Cog writer outlived the turn that created it, so \(usage.attempt) \
@@ -216,7 +216,7 @@ private func escapedWriterMessage<Value>(
 
 /// The source the escaped writer reached for, as a person would name it.
 @MainActor
-private func escapedWriterTargetName<Value>(_ valueReference: ManualCog<Value>) -> String {
+private func escapedWriterTargetName<Value>(_ valueReference: Cog<Value>.Manual) -> String {
   guard let key = valueReference.key else { return "\(valueReference.descriptor.label)" }
   return "\(valueReference.descriptor.label)[\(key.erased.base)]"
 }

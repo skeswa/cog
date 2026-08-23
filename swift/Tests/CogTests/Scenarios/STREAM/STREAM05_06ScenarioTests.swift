@@ -32,7 +32,7 @@ private final class NaturalStreamWork {
 @Test func `STREAM-05 natural end preserves success until explicit refresh`() async throws {
   let (cogs, m) = probedContext()
   let work = NaturalStreamWork()
-  let readingsCog = AsyncCog<Int>(.latest, default: -1, name: "readings") { _ in
+  let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }
   var statuses: [CogStatus<Int>] = []
@@ -76,7 +76,7 @@ private final class NaturalStreamWork {
 @Test func `STREAM-06 empty natural end stays pending and can refresh`() async throws {
   let (cogs, m) = probedContext()
   let work = NaturalStreamWork()
-  let readingsCog = AsyncCog<Int>(.latest, default: -1, name: "readings") { _ in
+  let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }
   var statuses: [CogStatus<Int>] = []

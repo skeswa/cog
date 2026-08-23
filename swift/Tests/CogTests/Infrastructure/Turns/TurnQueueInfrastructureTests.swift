@@ -9,12 +9,12 @@ import Testing
 @MainActor
 @Test func `TurnQueueInfrastructure defers a turn requested during flush`() {
   let cogs = Cogs.forTesting()
-  let queuedSource = ManualCog<Int>(0)
+  let queuedSource = Cog<Int>.Manual(0)
   var events: [String] = []
   var outerTurn: CogTurnID?
   var queuedTurn: CogTurnID?
 
-  let trigger = ManualCog<Int>(
+  let trigger = Cog<Int>.Manual(
     0,
     equals: { oldValue, newValue in
       guard case .flushing(let turn) = cogs.turnPhase else {
@@ -67,7 +67,7 @@ import Testing
 @MainActor
 @Test func `TurnQueueInfrastructure drains arrivals in FIFO order without reentry`() {
   let cogs = Cogs.forTesting()
-  let value = ManualCog<Int>(0)
+  let value = Cog<Int>.Manual(0)
   var events: [String] = []
   var valuesSeen: [Int] = []
   var turnIDs: [CogTurnID] = []
@@ -82,7 +82,7 @@ import Testing
     turnNames.append(turn.name)
   }
 
-  let firstFlushTrigger = ManualCog<Int>(
+  let firstFlushTrigger = Cog<Int>.Manual(
     0,
     equals: { oldValue, newValue in
       events.append("first flush")
@@ -96,7 +96,7 @@ import Testing
     }
   )
 
-  let outerFlushTrigger = ManualCog<Int>(
+  let outerFlushTrigger = Cog<Int>.Manual(
     0,
     equals: { oldValue, newValue in
       events.append("outer flush")
