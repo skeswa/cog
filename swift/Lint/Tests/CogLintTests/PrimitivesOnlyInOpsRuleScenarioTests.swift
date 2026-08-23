@@ -62,8 +62,8 @@ import Testing
       extension CogOps {
         func update() {
           turn { c in
-            c[countSourceCog] = 1
-            helper { turn(otherSourceCog, to: 2) }
+            c[_countCog] = 1
+            helper { turn(_otherCog, to: 2) }
           }
         }
       }

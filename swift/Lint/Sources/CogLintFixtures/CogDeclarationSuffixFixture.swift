@@ -9,9 +9,9 @@ extension CogLintFixtureRegistry {
       violation:
         "A recognized Cog declaration must end in `Cog` for a keyless reference or `Cogs` for a keyed box.",
       rationale:
-        "The suffix makes reference shape visible at every use and keeps narrower qualifiers such as `Source`, `Async`, or a domain role before the common ending. A reader can therefore distinguish a declaration from an ordinary domain value and know whether it needs a key without chasing its type.",
+        "The suffix makes reference shape visible at every use and keeps narrower qualifiers such as `Async` or a domain role before the common ending. A reader can therefore distinguish a declaration from an ordinary domain value and know whether it needs a key without chasing its type.",
       repair:
-        "Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `CogBox.Manual` named `reportCog` to `reportCogs`."
+        "Rename the declaration so its final word matches its shape. For example, change `_weatherCogDraft` to `_weatherDraftCog`, and change a `CogBox.Manual` named `_reportCog` to `_reportCogs`."
     ),
     triggering: [
       CogLintTriggeringExample(
@@ -22,7 +22,7 @@ extension CogLintFixtureRegistry {
           source:
             """
             let temperature = Cog<Int> { _ in 0 }
-            let weatherCogSource = Cog.Manual(0)
+            let _weatherCogDraft = Cog.Manual(0)
             let forecastCogsAsync = Cog<String>.Async(default: "") { _ in fatalError() }
             """
         ),
@@ -39,8 +39,8 @@ extension CogLintFixtureRegistry {
           source:
             """
             let selectedCogs = Cog<Int> { _ in 0 }
-            let reportCog = CogBox<String, Int>.Manual(0)
-            let avatarCog: CogBox<String, Data> = .init { _ in Data() }
+            let _reportCog = CogBox<String, Int>.Manual(0)
+            let _avatarCog: CogBox<String, Data> = .init { _ in Data() }
             """
         ),
         positions: [
@@ -58,11 +58,11 @@ extension CogLintFixtureRegistry {
         source:
           """
           let temperatureCog = Cog<Int> { _ in 0 }
-          private let weatherServiceSourceCog = Cog.Manual(0)
-          let weatherServiceCog = weatherServiceSourceCog.readOnly
+          private let _weatherServiceCog = Cog.Manual(0)
+          let weatherServiceCog = _weatherServiceCog.readOnly
           let forecastAsyncCog = Cog<String>.Async(default: "") { _ in fatalError() }
-          private let weatherReportSourceCogs = CogBox<String, Int>.Manual(0)
-          let weatherReportCogs = weatherReportSourceCogs.readOnly
+          private let _weatherReportCogs = CogBox<String, Int>.Manual(0)
+          let weatherReportCogs = _weatherReportCogs.readOnly
           let forecastAsyncCogs = CogBox<String, Int>.Async(default: "") { _, _ in fatalError() }
           """
       )

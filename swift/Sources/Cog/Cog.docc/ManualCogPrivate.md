@@ -21,7 +21,7 @@ A bare source declaration is internal and exposes a writer target.
 Expected diagnostic positions: 1:5.
 
 ```swift
-let countSourceCog = Cog.Manual(0)
+let _countCog = Cog.Manual(0)
 ```
 
 ### Explicit wider access
@@ -31,9 +31,9 @@ Internal, package, and public source names all cross the owning file boundary.
 Expected diagnostic positions: 1:14, 2:13, 3:12.
 
 ```swift
-internal let retrySourceCog: Cog.Cog<Int>.Manual = .init(0)
-package let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
-public let sessionSourceCog = Cog.Manual("")
+internal let _retryCog: Cog.Cog<Int>.Manual = .init(0)
+package let _reportCogs = CogBox<String?, Int>.Manual(nil)
+public let _sessionCog = Cog.Manual("")
 ```
 
 ### Setter-only privacy
@@ -43,7 +43,7 @@ public let sessionSourceCog = Cog.Manual("")
 Expected diagnostic positions: 1:25.
 
 ```swift
-public private(set) var sessionSourceCog = Cog.Manual("")
+public private(set) var _sessionCog = Cog.Manual("")
 ```
 
 ## Non-triggering examples
@@ -53,9 +53,9 @@ public private(set) var sessionSourceCog = Cog.Manual("")
 Bare private access owns writer targets, while automatic and read-only names may remain wider.
 
 ```swift
-private let countSourceCog = Cog.Manual(0)
-fileprivate let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
-let countCog = countSourceCog.readOnly
+private let _countCog = Cog.Manual(0)
+fileprivate let _reportCogs = CogBox<String?, Int>.Manual(nil)
+let countCog = _countCog.readOnly
 let doubledCog = Cog<Int> { c in c[countCog] * 2 }
 ```
 
@@ -67,10 +67,10 @@ Factories, typealiases, and the sanctioned seed re-export do not spell a new man
 
 ```swift
 typealias Source = Cog<Int>.Manual
-private let countSourceCog = Cog.Manual(0)
-let factorySourceCog = makeSource()
-let aliasSourceCog = Source(0)
+private let _countCog = Cog.Manual(0)
+let _factoryCog = makeSource()
+let _aliasCog = Source(0)
 #if DEBUG
-let countSeedTargetCog = countSourceCog
+let countSeedTargetCog = _countCog
 #endif
 ```
