@@ -257,13 +257,14 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-06ab** _(Behavior)_ — Settle a linear chain through the explicit stack
   from the newest published source value.
   _Depends: M1-06aa._
-  _Verify: `mise run test --filter GRAPH-01`._
-  _Greens: GRAPH-01._
+  _Verify: retired proof — its GRAPH-01 chain scenario folded into GRAPH-06,
+  greened by M1-07b._
 - **M1-06b** _(Behavior)_ — Add multi-parent checking so multi-source turns
   and diamonds settle once.
   _Depends: M1-06ab._
-  _Verify: `mise run test --filter 'READ-03|GRAPH-02'`._
-  _Greens: READ-03, GRAPH-02._
+  _Verify: `mise run test --filter READ-03`. Its GRAPH-02 balanced diamond
+  folded into GRAPH-13, greened by M4-08._
+  _Greens: READ-03._
 - **M1-06c** _(Behavior)_ — Add broad lazy pull so only read branches compute.
   _Depends: M1-06ab._
   _Verify: `mise run test --filter GRAPH-04`._
@@ -281,8 +282,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-08a** _(Behavior)_ — Keep cold cogs dirty without recomputing and catch
   them up once after any number of turns.
   _Depends: M1-06ab._
-  _Verify: `mise run test --filter 'GRAPH-07|GRAPH-08'`._
-  _Greens: GRAPH-07, GRAPH-08._
+  _Verify: `mise run test --filter GRAPH-08`. Its GRAPH-07 first-missed-turn
+  case folded into GRAPH-08._
+  _Greens: GRAPH-08._
 - **M1-08b** _(Behavior)_ — Add subscription-free one-shot `cogs.peek` that
   still settles.
   _Depends: M1-08a._

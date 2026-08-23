@@ -251,10 +251,6 @@ half-finished picture.
 
 ### 5.1 Shapes
 
-- **GRAPH-01.** A chain: A feeds B feeds C. I change A and read C. C is
-  right.
-- **GRAPH-02.** A diamond: A feeds B and C, which both feed D. I change A
-  once. D recomputes once, using B and C from the same turn.
 - **GRAPH-03.** A chain deep enough to overflow a recursive walk settles
   correctly from top to bottom without exhausting the stack, once its links
   have been computed. Invalidating the source and re-settling the whole chain
@@ -269,23 +265,25 @@ half-finished picture.
 - **GRAPH-04.** One source feeds many automatic cogs. Each one I read is
   right, and only the ones I read recompute.
 - **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,
-  so the two paths differ in length. I change A once. D recomputes once,
-  seeing A and B from the same turn — never new A beside old B.
+  so the two paths differ in length. I change A once. The arm and the join
+  each recompute exactly once, and D sees A and B from the same turn —
+  never new A beside old B. (The balanced diamond, the former GRAPH-02, is
+  the easier case of the same invariant and retired into this one.)
 
 ### 5.2 Equal values stop the wave
 
 - **GRAPH-05.** A middle cog recomputes but lands on the same value as
   before. The cogs below it do not recompute.
 - **GRAPH-06.** A middle cog changes every time. The cogs below it keep
-  following it.
+  following it, each link of the chain recomputing exactly once per changed
+  turn — the chain-propagation story that retired the former GRAPH-01.
 
 ### 5.3 Laziness
 
-- **GRAPH-07.** Nobody is watching an automatic cog. I change its source.
-  Its closure does not run. When I later read it, it runs then.
-- **GRAPH-08.** A cold cog misses ten turns of changes. When I finally
-  read it, it computes once, from the newest values — not once per
-  missed turn.
+- **GRAPH-08.** A cold cog misses ten turns of changes — the first missed
+  turn alone already runs nothing, which was the whole of the former
+  GRAPH-07. When I finally read it, it computes once, from the newest
+  values — not once per missed turn.
 
 ### 5.4 Dependencies follow the code
 

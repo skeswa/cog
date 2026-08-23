@@ -149,7 +149,7 @@ cursor edge. At the first producer mismatch it calls
 removes unread trailing edges.
 
 The smallest proof is `ArenaSettlementInfrastructure recapture keeps candidate
-storage bounded`; public `GRAPH-07`/`GRAPH-08` behavior tests cover dynamic
+storage bounded`; the public `GRAPH-08` behavior test covers dynamic
 replacement without depending on edge layout.
 
 ## Trace equal recomputation

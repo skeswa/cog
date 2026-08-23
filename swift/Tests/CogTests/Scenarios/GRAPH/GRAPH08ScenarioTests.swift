@@ -2,15 +2,14 @@ import Cog
 import CogTesting
 import Testing
 
-// MARK: - GRAPH-07 and GRAPH-08
-
 @MainActor
-@Test func `GRAPH-07 GRAPH-08 a cold cog waits for a read and then catches up once`() {
+@Test func `GRAPH-08 a cold cog waits for a read and then catches up once`() {
   // One shape proves both laziness claims. Establish the internal source edge,
   // then leave the automatic cog without a live UI, reaction, or stream
-  // consumer. The first missed turn proves GRAPH-07: a change alone runs
-  // nothing. Ten missed turns and one catch-up run from the newest value —
-  // never one run per missed turn — prove GRAPH-08.
+  // consumer. The first missed turn already runs nothing — the retired
+  // GRAPH-07's whole claim, still asserted by the loop's first pass. Ten
+  // missed turns and one catch-up run from the newest value — never one run
+  // per missed turn — are GRAPH-08's own.
   let cogs = Cogs.forTesting()
   let source = Cog<Int>.Manual(0)
   var inputsSeen: [Int] = []
