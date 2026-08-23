@@ -346,14 +346,16 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-15c** _(Behavior)_ — Add conditional/keyed cycle reporting and the
   narrow `CogTesting` diagnostic seam.
   _Depends: M1-15b._
-  _Verify: `mise run test --filter 'CYCLE-03|CYCLE-04'`._
-  _Greens: CYCLE-03, CYCLE-04._
+  _Verify: `mise run test --filter CYCLE-04`. Its CYCLE-03 keyed path folded
+  into CYCLE-07, greened by M4-09._
+  _Greens: CYCLE-04._
 - **M1-15d** _(Behavior)_ — Prove self and multi-state cycle failure in debug
   and release with exit tests.
   _Depends: M1-15c._
-  _Verify: `mise run test --filter 'CYCLE-01|CYCLE-02'` and
-  `mise run test:release --filter 'CYCLE-01|CYCLE-02'`._
-  _Greens: CYCLE-01, CYCLE-02._
+  _Verify: `mise run test --filter CYCLE-02` and
+  `mise run test:release --filter CYCLE-02`. Its CYCLE-01 self-loop folded
+  into CYCLE-02._
+  _Greens: CYCLE-02._
 - **M1-15ea** _(Behavior)_ — Reject a turn throughout automatic computation,
   including custom equality, before its body or attempted graph mutation.
   _Depends: M1-07b, M1-15b._
