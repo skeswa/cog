@@ -267,3 +267,58 @@ default. `CompactArena` turns off the typed frontier while keeping arena
 storage, pool edges, debug behavior, generic fallbacks, and public API. SwiftPM
 combines traits across the graph, so the final app—not a library dependency—must
 choose compact mode.
+
+## M11 profiles and changes
+
+Same host family as M9: `mactop`, Apple Silicon arm64, 12 cores, 24 GB,
+macOS 26.4.1, Xcode 26.4 (17E192), Swift 6.3. The M9-01 probe reran unchanged;
+a plain `swift build` in `probes/M9-01` now builds the shipping specialized
+arena.
+
+### M11-01: the steady turn's remaining ARC, attributed
+
+One armed steady turn on the shipping core: 28 retains, 38 releases in the
+probe shape; the `perf-01-steady-turn` benchmark reported exactly 30 and 37 at
+every percentile before the M11-02 cuts. Every event carried a stack. The
+clusters, in retain/release pairs:
+
+| Cluster                                                          | pairs | mechanism                                                       |
+| ---------------------------------------------------------------- | ----: | --------------------------------------------------------------- |
+| Turn machinery (`startTurn`, `turnPhase` payload, epilogue)      |   6–7 | reused `CogTurn` retained into and out of the phase enum        |
+| Location memo and column returns (`memoizedArenaLocation` ×2, …) |   5–6 | owned tuple returns; the same location resolved twice per turn  |
+| `descriptorRecord` → `takeUnretainedValue()`                     |   4–5 | each phase rematerializes the record as a managed reference     |
+| Flush-loop closure contexts and boundary entry copies            |    ~6 | stored `publishSource`/`recompute`/`notifyObservation` contexts |
+| `SerialExecutor.isMainExecutor`                                  |     2 | two executor comparisons per turn                               |
+| Observation registrar `withMutation`                             |    ~3 | outside Cog's control                                           |
+| `Writer`/`Reader` copies of `Cogs`, reaction enum payloads       |   4–5 | struct-field retains per scope                                  |
+
+The same record, column, and closure sites repeat per settled node, about 40
+retains per node on the hundred-node chain, so route C's payoff is on deep
+shapes even though it is cheapest to measure on the steady turn. The probe
+also surfaced one site the cluster table had missed: a sort inside
+`flushObservationBoundaries` whose comparator context retains twice per turn.
+
+### M11-02: slot threading and the payload-free turn phase
+
+Two changes, measured together. `writerStage` returns the slot it resolved so
+`scheduleLifetimeReleaseIfUnobserved` stops re-resolving the same
+descriptor-and-key identity, and `CogTurnPhase` carries no `CogTurn` payload —
+the context owns exactly one reused turn object, so the payload could only
+ever be `reusedTurn`, and storing it retained and released it on every phase
+transition.
+
+| Metric, `perf-01-steady-turn` | before |  after |
+| ----------------------------- | -----: | -----: |
+| retains                       |     30 | **28** |
+| releases                      |     37 | **34** |
+| `mallocCountTotal`            |      0 |      0 |
+| p50 time                      | 756 ns | 744 ns |
+
+Exact at every percentile across 3,908 samples; the zero-malloc gate held.
+The wall-clock movement is within session noise and is not claimed.
+
+A third probe held the memoized column `unowned(unsafe)` and moved no totals:
+the retain lives in the memo's tuple return and the use that follows, not in
+the stored-property load. The change was reverted. That null result is what
+scopes `M11-03`: route C pays only in its full form, scoped borrows or
+parallel hot-field arrays through the whole call chain.

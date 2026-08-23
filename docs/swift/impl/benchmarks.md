@@ -35,12 +35,12 @@ it does today.
 From the [specialization run (E5)](#benchmark-environment-e5). The steady-turn
 figure is the median of three independently recorded p50s.
 
-| Shape           | p50     | notes                            |
-| --------------- | ------- | -------------------------------- |
-| steady turn     | 909 ns  | 31 retains, zero allocations     |
-| 16-consumer fan | 7.6 µs  | zero allocations                 |
-| 100-node chain  | 64 µs   | zero allocations                 |
-| pinned-key turn | ~2.4 µs | flat from 1 to 1,000 pinned keys |
+| Shape           | p50     | notes                                                                                            |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| steady turn     | 909 ns  | zero allocations; 28 retains in the later [turn-machinery run (E10)](#benchmark-environment-e10) |
+| 16-consumer fan | 7.6 µs  | zero allocations                                                                                 |
+| 100-node chain  | 64 µs   | zero allocations                                                                                 |
+| pinned-key turn | ~2.4 µs | flat from 1 to 1,000 pinned keys                                                                 |
 
 For scale against a UI budget: a 120 Hz frame is 8.3 ms, so one frame fits
 about 9,000 steady turns, 1,000 fan updates, or 130 full 100-node chain
@@ -124,8 +124,9 @@ apply these thresholds.
 
 - **A steady turn allocates nothing.** The committed `perf-01-steady-turn`
   threshold requires exactly zero mallocs at p90, not a tolerance around
-  zero. ARC is not zero: a steady turn still retains about 31 times, and
-  issue #373 tracks that work.
+  zero. ARC is not zero: a steady turn still retains exactly 28 times after
+  the M11-02 turn-machinery cuts, and issue #373 and milestone M11 track the
+  rest.
 - **Settling a node allocates nothing.** The committed `perf-13-deep-chain`
   threshold holds the per-node allocation count at zero.
 - **Building a keyed reference allocates nothing.** The committed
@@ -304,17 +305,18 @@ work. The phase-split probe below is the scheduled work that answers this.
 
 All benchmark runs used release builds.
 
-| ID                                      | Run name                                  | Date       | Environment                                                                                                                                                                                                                                                                          |
-| --------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="benchmark-environment-e1"></a>E1 | Initial baseline                          | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                                                                       |
-| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run                        | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                                                                   |
-| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run                  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                                                                                     |
-| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke                       | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                                                                         |
-| <a id="benchmark-environment-e5"></a>E5 | Specialization run                        | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check                                                                                  |
-| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison                     | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back                                                                      |
-| <a id="benchmark-environment-e7"></a>E7 | Paired arena-configuration Storefront run | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; specialized default and `CompactArena` ran back to back on an idle host after `mise run test:storefront` passed; not a release check              |
-| <a id="benchmark-environment-e8"></a>E8 | Corrected Storefront UI run               | 2026-08-23 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, release configuration, smoke profile, five samples per metric through `mise run test:storefront-ui`                                                                                              |
-| <a id="benchmark-environment-e9"></a>E9 | Current runtime comparison                | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; all twelve `perf-10-*` benchmarks in one session on an idle host: shipping core, raw `@Observable`, swift-state-graph 0.28.0; not a release check |
+| ID                                        | Run name                                  | Date       | Environment                                                                                                                                                                                                                                                                          |
+| ----------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="benchmark-environment-e1"></a>E1   | Initial baseline                          | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                                                                       |
+| <a id="benchmark-environment-e2"></a>E2   | Shared-runtime run                        | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                                                                   |
+| <a id="benchmark-environment-e3"></a>E3   | Corrected Storefront run                  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                                                                                     |
+| <a id="benchmark-environment-e4"></a>E4   | Storefront UI smoke                       | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                                                                         |
+| <a id="benchmark-environment-e5"></a>E5   | Specialization run                        | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check                                                                                  |
+| <a id="benchmark-environment-e6"></a>E6   | Three-core comparison                     | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back                                                                      |
+| <a id="benchmark-environment-e7"></a>E7   | Paired arena-configuration Storefront run | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; specialized default and `CompactArena` ran back to back on an idle host after `mise run test:storefront` passed; not a release check              |
+| <a id="benchmark-environment-e8"></a>E8   | Corrected Storefront UI run               | 2026-08-23 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, release configuration, smoke profile, five samples per metric through `mise run test:storefront-ui`                                                                                              |
+| <a id="benchmark-environment-e9"></a>E9   | Current runtime comparison                | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; all twelve `perf-10-*` benchmarks in one session on an idle host: shipping core, raw `@Observable`, swift-state-graph 0.28.0; not a release check |
+| <a id="benchmark-environment-e10"></a>E10 | Turn-machinery ARC run                    | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-02 cuts, 3,908 samples, exact at every percentile; not a release check                                        |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used
