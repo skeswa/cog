@@ -119,10 +119,16 @@ internal enum CogTurnPhase {
   /// No body, publication, Observation flush, or reaction flush is active.
   case idle
   /// An open writer boundary accepting nested writes into the same atomic turn.
-  case accumulating(CogTurn)
+  case accumulating
   /// A closed writer boundary publishing and propagating one completed revision.
-  case flushing(CogTurn)
+  case flushing
 }
+
+// The phase carries no `CogTurn` payload on purpose. The context owns exactly
+// one reused turn object, so a payload could only ever be `reusedTurn`, and
+// storing a class in the enum made every phase transition retain and release
+// it. A scalar phase plus the reused turn's own `id` check says the same
+// thing with no ARC traffic on the steady path.
 
 // Keep these as `fatalError`; `preconditionFailure` drops its message under
 // optimization. See `Cogs.requireWriterTurn` in `Writer.swift`.
@@ -213,8 +219,8 @@ extension Cogs {
     requireOutsideAutomaticComputation(forTurnNamed: name)
 
     switch turnPhase {
-    case .accumulating(let turn):
-      body(turn)
+    case .accumulating:
+      body(reusedTurn)
       return
 
     case .flushing:
@@ -246,8 +252,8 @@ extension Cogs {
   /// rejection message names the op rather than this seam.
   internal func withNonEscapingTurn(_ name: String, _ body: (CogTurn) -> Void) {
     switch turnPhase {
-    case .accumulating(let turn):
-      body(turn)
+    case .accumulating:
+      body(reusedTurn)
       return
 
     case .flushing:
@@ -317,7 +323,7 @@ extension Cogs {
     nextTurnToken += 1
     let turn = reusedTurn
     turn.begin(id: CogTurnID(rawValue: nextTurnToken), name: name)
-    turnPhase = .accumulating(turn)
+    turnPhase = .accumulating
 
     // Record when the turn is created. Nested turns do not reach this point,
     // and the entry precedes the work it caused.
@@ -331,16 +337,16 @@ extension Cogs {
 
   /// Closes the writer boundary and begins publication and propagation.
   internal func startFlushing(_ id: CogTurnID) {
-    guard case .accumulating(let turn) = turnPhase, turn.id == id else {
+    guard case .accumulating = turnPhase, reusedTurn.id == id else {
       fatalError("Only the context's accumulating Cog turn can start its flush.")
     }
 
-    turnPhase = .flushing(turn)
+    turnPhase = .flushing
   }
 
   /// Returns the context to idle only after publication and reactions finish.
   internal func finishTurn(_ id: CogTurnID) {
-    guard case .flushing(let turn) = turnPhase, turn.id == id else {
+    guard case .flushing = turnPhase, reusedTurn.id == id else {
       fatalError("Only the context's flushing Cog turn can finish.")
     }
 

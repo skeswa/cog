@@ -148,8 +148,8 @@ extension Cogs {
   ) {
     let turn = requireWriterTurn(turnID, usage: .writing, target: valueReference)
 
-    arenaCore.writerStage(valueReference, value: value, in: turn)
-    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
+    let slot = arenaCore.writerStage(valueReference, value: value, in: turn)
+    arenaCore.scheduleLifetimeReleaseIfUnobserved(slot, in: self)
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.
@@ -170,12 +170,12 @@ extension Cogs {
     usage: WriterUsage,
     target valueReference: Cog<Value>.Manual
   ) -> CogTurn {
-    guard case .accumulating(let turn) = turnPhase, turn.id == turnID else {
+    guard case .accumulating = turnPhase, reusedTurn.id == turnID else {
       // Composed inside the autoclosure, so a live write pays nothing to build
       // a message it never prints.
       fatalError(escapedWriterMessage(usage: usage, target: valueReference))
     }
-    return turn
+    return reusedTurn
   }
 }
 

@@ -8,17 +8,24 @@
 /// or another call on steady reads and writes.
 extension CogArenaCore {
   /// Stages one typed source and registers its row once with the active turn.
+  ///
+  /// Returns the resolved slot so the caller can hand it straight to the
+  /// lifetime half without resolving the same descriptor-and-key identity a
+  /// second time; each resolution retains the memoized typed column, and a
+  /// steady turn should pay that once.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
+  @discardableResult
   func writerStage<Value>(
     _ valueReference: Cog<Value>.Manual,
     value: Value,
     in turn: CogTurn
-  ) {
+  ) -> CogArenaSlot {
     let location = manualLocation(for: valueReference)
     location.column.stage(value, at: location.slot)
     touchArenaSource(location.slot, in: turn)
+    return location.slot
   }
 
   /// Registers one staged arena source exactly once with its accumulating turn.
