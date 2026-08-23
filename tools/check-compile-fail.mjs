@@ -10,10 +10,9 @@
 // diagnostic back to the fixture that produced it and matches it against that
 // fixture's declared expectations. Fixtures declaring
 // `// configuration: release` form a second batched pass against the
-// release-built modules; that is how `(Proof: release configuration.)`
-// absence claims — API that exists only in debug builds — stay continuously
-// verified rather than resting on the test gates that compile the debug-only
-// suites away.
+// release-built modules; that is how `(Proof: release absence.)` claims —
+// API that exists only in debug builds — stay continuously verified rather
+// than resting on the test gates that compile the debug-only suites away.
 //
 // ## Fixture contract
 //
@@ -48,8 +47,10 @@
 //       Optional, at most once; the default is `debug`. Type-checks this
 //       fixture against the release-built library modules instead of the debug
 //       ones. A release fixture's scenario must be marked
-//       `(Proof: release configuration.)` in scenarios.md, the way a debug
-//       fixture's must be marked `(Proof: compile-fail.)`.
+//       `(Proof: release absence.)` in scenarios.md, the way a debug
+//       fixture's must be marked `(Proof: compile-fail.)`; the task-ledger
+//       checker requires the owning task to name `mise run test:compilefail`
+//       for that mode, since this harness is what actually proves it.
 //
 // Both directions are enforced. A fixture that emits no error at all fails
 // (`no-diagnostic`) — a compile-fail test that quietly starts compiling proves
@@ -422,9 +423,8 @@ function parseFixture(path) {
 /**
  * Maps every scenario ID in scenarios.md to whether it is declared
  * `(Proof: compile-fail.)` and whether it is declared
- * `(Proof: release configuration.)`. Returns null when the ledger is
- * unreadable, which downgrades the cross-check to a no-op rather than a
- * failure.
+ * `(Proof: release absence.)`. Returns null when the ledger is unreadable,
+ * which downgrades the cross-check to a no-op rather than a failure.
  */
 function readScenarioProofModes() {
   if (!existsSync(SCENARIOS)) return null;
@@ -448,7 +448,7 @@ function readScenarioProofModes() {
     const body = source.slice(starts[index].index, end);
     modes.set(starts[index].id, {
       compileFail: /\(Proof:\s*compile-fail\.?\)/.test(body),
-      releaseConfiguration: /\(Proof:\s*release configuration\.?\)/.test(body),
+      releaseAbsence: /\(Proof:\s*release absence\.?\)/.test(body),
     });
   }
   return modes.size === 0 ? null : modes;
@@ -658,8 +658,8 @@ function main() {
         } else {
           const mode = modes.get(id);
           const release = fixture.configuration === "release";
-          if (release ? !mode.releaseConfiguration : !mode.compileFail) {
-            const required = release ? "(Proof: release configuration.)" : "(Proof: compile-fail.)";
+          if (release ? !mode.releaseAbsence : !mode.compileFail) {
+            const required = release ? "(Proof: release absence.)" : "(Proof: compile-fail.)";
             report(
               fixture,
               "wrong-proof-mode",

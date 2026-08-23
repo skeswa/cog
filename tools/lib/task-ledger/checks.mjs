@@ -25,10 +25,11 @@ const GREENLESS_TASK_TYPES = ["Infrastructure", "Decision"];
 
 /**
  * The proof modes a _Gate_ may green. A gate proves a slice whole, so it can
- * own the scenarios that only a whole suite or a whole release-configuration
- * run can demonstrate. Everything narrower is a single behavior's job.
+ * own the scenarios that only a whole suite, a whole release-configuration
+ * run, or the batched release-absence pass can demonstrate. Everything
+ * narrower is a single behavior's job.
  */
-const GATE_PROOF_MODES = ["suite", "release configuration"];
+const GATE_PROOF_MODES = ["suite", "release configuration", "release absence"];
 
 /**
  * The proof modes whose scenarios a filtered host test run can select. These
@@ -993,12 +994,25 @@ function checkExitTestsRunInRelease(context) {
 function checkProofModeCommands(context) {
   const diagnostics = [];
   for (const task of context.tasks) {
-    if (task.type !== "Behavior") continue;
+    const isGate = task.type === "Gate";
+    if (task.type !== "Behavior" && !isGate) continue;
     const commands = context.verifyCommands.get(task) ?? [];
     const verify = verifyText(task);
     const line = task.verifyLine ?? task.line;
 
     for (const scenario of greenedScenarios(context, task)) {
+      // A gate's suite greens need no named command — the whole run is the
+      // proof — but its release-side greens do: `release configuration` is
+      // shown only by the release leg, and `release absence` only by the
+      // batched compile-fail pass against the release modules, so the gate
+      // must name the command that actually demonstrates each.
+      if (
+        isGate &&
+        scenario.mode !== "release configuration" &&
+        scenario.mode !== "release absence"
+      ) {
+        continue;
+      }
       /** @type {string | null} */
       let problem = null;
       switch (scenario.mode) {
@@ -1014,6 +1028,14 @@ function checkProofModeCommands(context) {
             problem =
               "a release-configuration scenario is proven outside debug; " +
               "name `mise run test:release`";
+          }
+          break;
+        case "release absence":
+          if (!runsCommand(commands, "test:compilefail")) {
+            problem =
+              "a release-absence scenario is proven by the batched compile-fail pass against " +
+              "the release-built modules, not by the release test leg — its test sources are " +
+              "`#if DEBUG`-gated there; name `mise run test:compilefail`";
           }
           break;
         case "simulator":

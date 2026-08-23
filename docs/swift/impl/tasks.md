@@ -648,7 +648,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-32** _(Gate)_ — Prove the completed M1 suite and every-build guards in
   release, including absent `CogTesting.seed` and zero-cost history.
   _Depends: M1-33c._
-  _Verify: `mise run test:release` plus release API/build checks._
+  _Verify: `mise run test:release` for the suite, and
+  `mise run test:compilefail` for the release-absence fixtures that prove
+  `seed` and history are gone from the release-built modules._
   _Greens: SEED-05, HIST-04, LEG-03._
 
 ## M2 tasks

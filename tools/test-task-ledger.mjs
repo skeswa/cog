@@ -206,6 +206,17 @@ const CASES = [
     mentions: ["M1-03", "transitively depends on no _(Gate)_ task"],
   },
   {
+    name: "release-side gate greens without their proving commands",
+    ledger: resolve(FIXTURES, "release-absence-command.md"),
+    checks: ["proof-mode-command"],
+    mentions: [
+      "DECL-02",
+      "name `mise run test:compilefail`",
+      "DECL-03",
+      "name `mise run test:release`",
+    ],
+  },
+  {
     name: "filter alternative left behind by a retired scenario",
     ledger: resolve(FIXTURES, "stale-filter-alternative.md"),
     checks: ["stale-filter-alternative"],

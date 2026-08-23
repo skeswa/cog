@@ -1,12 +1,14 @@
 # Fixture: every proof mode, proven the right way
 
-One ledger that uses all eight proof modes correctly, so a proof-mode check
+One ledger that uses all nine proof modes correctly, so a proof-mode check
 that went vacuous — or that grew stricter than the tree promises — fails here
 rather than only on the real ledger. The behavior filters expand to exactly
 their unit- and exit-test greens; the exit test runs in debug and release; the
 compile-fail scenario batches through `test:compilefail`; the simulator, floor,
 and benchmark scenarios name the runs that prove them; and the gate greens only
-the suite- and release-configuration scenarios a whole run can show.
+the suite-, release-configuration-, and release-absence scenarios a whole run
+can show — naming `test:release` for the release leg and `test:compilefail`
+for the release-absence fixture pass.
 
 ## M1 tasks
 
@@ -32,8 +34,9 @@ the suite- and release-configuration scenarios a whole run can show.
   _Depends: M1-02._
   _Verify: benchmark filter for PERF-01 plus the recorded `perf.md` result._
   _Greens: PERF-01._
-- **M1-06** _(Gate)_ — Close the milestone across the matrix and the release
-  configuration.
+- **M1-06** _(Gate)_ — Close the milestone across the matrix, the release
+  configuration, and the release-absence fixture pass.
   _Depends: M1-03, M1-04, M1-05._
-  _Verify: `mise run test:matrix` and `mise run test:release`._
-  _Greens: MODE-06, MODE-07._
+  _Verify: `mise run test:matrix`, `mise run test:release`, and
+  `mise run test:compilefail`._
+  _Greens: MODE-06, MODE-07, MODE-08._

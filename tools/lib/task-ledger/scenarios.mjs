@@ -53,6 +53,7 @@ export const PROOF_MODES = [
   "compile-fail",
   "exit test",
   "release configuration",
+  "release absence",
   "simulator",
   "floor runtime",
   "suite",
