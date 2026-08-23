@@ -265,11 +265,13 @@ half-finished picture.
   or make it shorter. (Proof: exit test.)
 - **GRAPH-04.** One source feeds many automatic cogs. Each one I read is
   right, and only the ones I read recompute.
-- **GRAPH-13.** A shortcut diamond: A feeds D both directly and through B,
-  so the two paths differ in length. I change A once. The arm and the join
-  each recompute exactly once, and D sees A and B from the same turn —
-  never new A beside old B. (The balanced diamond, the former GRAPH-02, is
-  the easier case of the same invariant and retired into this one.)
+- **GRAPH-13.** A shortcut diamond: A feeds D directly and through two
+  independent automatic arms, so the paths to D differ in length and the
+  join has two dirty automatic parents. I change A once. Each arm and the
+  join recompute exactly once, and D sees every input from the same turn —
+  never new A beside a stale arm. (The balanced diamond, the former
+  GRAPH-02, is carried inside this shape by the second arm and its
+  counters.)
 
 ### 5.2 Equal values stop the wave
 
