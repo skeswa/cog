@@ -10,42 +10,14 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
 }
 
 @MainActor
-@Test func `LIFE-02 an unobserved automatic cog is released after injected grace`() async throws {
-  let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = Cog<Bool>.Manual(true)
-  var selectorRuns = 0
-  let automatic = Cog<Int> { _ in
-    selectorRuns += 1
-    return 10
-  }
-
-  let (cogs, m) = probedContext(
-    clock: clock,
-    whileObservedGrace: .seconds(10)
-  )
-  m.whenever(watcherAlive) { s in
-    s.run { c in _ = c[automatic] }
-  }
-  #expect(selectorRuns == 1)
-
-  let released = MainActorCleanupAcknowledgement()
-  cogs.acknowledgeNextAutomaticRelease(with: released)
-  // Lowering the gate tears the watching reaction down: the last watcher
-  // leaves and grace begins.
-  cogs.turn(watcherAlive, to: false)
-  try await clock.waitForScheduledSleep()
-  clock.advance(by: .seconds(10))
-  try await released.wait()
-
-  #expect(released.hasBeenAcknowledged)
-  #expect(cogs.peek(automatic) == 10)
-  #expect(selectorRuns == 2)
-}
-
-@MainActor
 @Test func `LIFE-03 the same value reference recreates from current state after release`()
   async throws
 {
+  // This walk contains the retired LIFE-02 whole: the automatic cog uses the
+  // default `whileObserved` lifetime, its last watcher leaves, injected grace
+  // elapses, and the release acknowledgement fires. LIFE-03's own claim is
+  // the recreation: the same value reference comes back computed fresh —
+  // `c.curr` is nil again — from the state the source has now.
   let clock = AutomaticLifetimeTestClock()
   let watcherAlive = Cog<Bool>.Manual(true)
   let source = Cog<Int>.Manual(1)
