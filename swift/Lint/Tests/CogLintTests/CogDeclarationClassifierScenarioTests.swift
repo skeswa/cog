@@ -9,9 +9,9 @@ import Testing
     """
     let temperatureCog = Cog<Int> { _ in 0 }
     let temperaturesCogs = Cog.CogBox<Int, String> { _ in { _ in 0 } }
-    fileprivate let currentZipSourceCog: Cog.Cog<Int?>.Manual = .init(nil)
-    fileprivate let reportSourceCogs: CogBox<String?, Int>.Manual? = CogBox.Manual(nil)
-    fileprivate let optionalSourceCog: Cog<Int>.Manual? = .init(nil)
+    fileprivate let _currentZipCog: Cog.Cog<Int?>.Manual = .init(nil)
+    fileprivate let _reportCogs: CogBox<String?, Int>.Manual? = CogBox.Manual(nil)
+    fileprivate let _optionalCog: Cog<Int>.Manual? = .init(nil)
     let forecastCog = Cog.Cog<String>.Async(default: "") { _ in fatalError() }
     let forecastsCogs: CogBox<String, Int>.Async = .init(default: "") { _, _ in fatalError() }
     """
@@ -21,9 +21,9 @@ import Testing
     classifications.map(summary) == [
       "temperatureCog:keyless:automatic:direct",
       "temperaturesCogs:box:automatic:direct",
-      "currentZipSourceCog:keyless:writable:direct",
-      "reportSourceCogs:box:writable:direct",
-      "optionalSourceCog:keyless:writable:direct",
+      "_currentZipCog:keyless:writable:direct",
+      "_reportCogs:box:writable:direct",
+      "_optionalCog:keyless:writable:direct",
       "forecastCog:keyless:async:direct",
       "forecastsCogs:box:async:direct",
     ]
@@ -34,24 +34,24 @@ import Testing
 @Test func `LINT-04 classifier carries source facts through read-only projections`() {
   let classifications = classify(
     """
-    fileprivate let currentZipSourceCog = Cog<Int?>.Manual(nil)
-    fileprivate let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
-    let currentZipCog = currentZipSourceCog.readOnly
-    let reportCogs: Cog.CogBox<String?, Int>.Projection = reportSourceCogs.readOnly
+    fileprivate let _currentZipCog = Cog<Int?>.Manual(nil)
+    fileprivate let _reportCogs = CogBox<String?, Int>.Manual(nil)
+    let currentZipCog = _currentZipCog.readOnly
+    let reportCogs: Cog.CogBox<String?, Int>.Projection = _reportCogs.readOnly
     """
   )
 
   #expect(
     classifications.map(summary) == [
-      "currentZipSourceCog:keyless:writable:direct",
-      "reportSourceCogs:box:writable:direct",
+      "_currentZipCog:keyless:writable:direct",
+      "_reportCogs:box:writable:direct",
       "currentZipCog:keyless:writable:projection",
       "reportCogs:box:writable:projection",
     ]
   )
   #expect(
     classifications.filter(\.isWritableSource).map(\.name) == [
-      "currentZipSourceCog", "reportSourceCogs",
+      "_currentZipCog", "_reportCogs",
     ])
 }
 
@@ -60,17 +60,17 @@ import Testing
   let classifications = classify(
     """
     struct WeatherState {
-      fileprivate static let currentZipSourceCog = Cog<Int?>.Manual(nil)
-      static let currentZipCog = currentZipSourceCog.readOnly
+      fileprivate static let _currentZipCog = Cog<Int?>.Manual(nil)
+      static let currentZipCog = _currentZipCog.readOnly
     }
 
     struct UnrelatedState {
-      static let accidentalCog = currentZipSourceCog.readOnly
+      static let accidentalCog = _currentZipCog.readOnly
     }
     """
   )
 
-  #expect(classifications.map(\.name) == ["currentZipSourceCog", "currentZipCog"])
+  #expect(classifications.map(\.name) == ["_currentZipCog", "currentZipCog"])
 }
 
 // MARK: - LINT-05
@@ -80,27 +80,27 @@ import Testing
   let classifications = classify(
     """
     typealias Source = Cog<Int>.Manual
-    fileprivate let currentZipSourceCog = Cog<Int?>.Manual(nil)
+    fileprivate let _currentZipCog = Cog<Int?>.Manual(nil)
     #if DEBUG
-    let currentZipSeedTargetCog = currentZipSourceCog
+    let currentZipSeedTargetCog = _currentZipCog
     #endif
-    let copiedSourceCog = currentZipSourceCog
-    let copiedThenProjectedCog = copiedSourceCog.readOnly
-    let factorySourceCog = makeSource()
-    let typedFactorySourceCog: Cog<Int>.Manual = makeSource()
-    let aliasSourceCog = Source(0)
-    let externalProjectionCog = externalSourceCog.readOnly
-    let forwardProjectionCog = laterSourceCog.readOnly
-    fileprivate let laterSourceCog = Cog.Manual(0)
+    let _copiedCog = _currentZipCog
+    let copiedThenProjectedCog = _copiedCog.readOnly
+    let _factoryCog = makeSource()
+    let _typedFactoryCog: Cog<Int>.Manual = makeSource()
+    let _aliasCog = Source(0)
+    let externalProjectionCog = _externalCog.readOnly
+    let forwardProjectionCog = _laterCog.readOnly
+    fileprivate let _laterCog = Cog.Manual(0)
 
     func localRuntime() {
-      let localSourceCog = Cog.Manual(0)
-      _ = localSourceCog.readOnly
+      let _localCog = Cog.Manual(0)
+      _ = _localCog.readOnly
     }
     """
   )
 
-  #expect(classifications.map(\.name) == ["currentZipSourceCog", "laterSourceCog"])
+  #expect(classifications.map(\.name) == ["_currentZipCog", "_laterCog"])
 }
 
 /// Parses and classifies one source buffer through the production seam.

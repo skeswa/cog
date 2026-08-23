@@ -24,13 +24,13 @@ extension CogLintFixtureRegistry {
             struct CounterCard: View {
               @Environment(\\.cogs) private var cogs
               func increment() {
-                cogs.turn { c in c[countSourceCog] += 1 }
+                cogs.turn { c in c[_countCog] += 1 }
                 self.cogs.refresh(forecastCog)
               }
             }
             func launch() {
               let appGraph = Cogs.assemble()
-              appGraph.turn(countSourceCog, to: 1)
+              appGraph.turn(_countCog, to: 1)
               appGraph.refresh(forecastCog)
             }
             """
@@ -53,10 +53,10 @@ extension CogLintFixtureRegistry {
             func overwrite(_ c: Writer) { c.turn(named: "nested") { _ in } }
             struct Loader: Mechanism {
               func operate(_ m: MechanismController) {
-                m.turn(countSourceCog, to: 1)
+                m.turn(_countCog, to: 1)
                 m.refresh(forecastCog)
                 m.run { c in c.refresh(forecastCog) }
-                m.whenever(enabledCog) { child in child.turn(countSourceCog, to: 2) }
+                m.whenever(enabledCog) { child in child.turn(_countCog, to: 2) }
               }
             }
             """
@@ -79,12 +79,12 @@ extension CogLintFixtureRegistry {
             """
             extension Cogs {
               func resetInline() {
-                turn(countSourceCog, to: 0)
+                turn(_countCog, to: 0)
                 self.refresh(forecastCog)
               }
             }
             extension CogOps {
-              func wronglyQualified() { self.turn(countSourceCog, to: 0) }
+              func wronglyQualified() { self.turn(_countCog, to: 0) }
             }
             """
         ),
@@ -104,10 +104,10 @@ extension CogLintFixtureRegistry {
           """
           extension CogOps {
             func selectCount(_ value: Int) {
-              turn(countSourceCog, to: value)
+              turn(_countCog, to: value)
               turn { c in
-                c[countSourceCog] = value
-                withAnimation { turn(otherSourceCog, to: value) }
+                c[_countCog] = value
+                withAnimation { turn(_otherCog, to: value) }
               }
             }
             func refreshForecast() { refresh(forecastCog) }
@@ -138,7 +138,7 @@ extension CogLintFixtureRegistry {
         source:
           """
           typealias Controller = MechanismController
-          func hidden(_ controller: Controller) { controller.turn(countSourceCog, to: 1) }
+          func hidden(_ controller: Controller) { controller.turn(_countCog, to: 1) }
           func inferred() {
             let graph = makeCogs()
             graph.refresh(forecastCog)
