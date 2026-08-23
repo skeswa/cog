@@ -128,3 +128,39 @@ private actor ContextDropper {
     log.milestones == ["task cancelled", "mechanism released", "connection released"]
   )
 }
+
+@MainActor
+@Test func `MECH-15 a MainActor release tears down in the same order`() async throws {
+  let log = TeardownLog()
+  let (starts, startContinuation) = AsyncStream.makeStream(of: Void.self)
+  let cleanup = MainActorCleanupAcknowledgement()
+
+  weak var mechanism: ConnectedMechanism?
+
+  var cogs: Cogs? = { () -> Cogs in
+    let owned = ConnectedMechanism(log: log, started: startContinuation)
+    mechanism = owned
+    return Cogs.forTesting(mechanisms: [owned])
+  }()
+
+  cogs?.acknowledgeDeinitCleanup(with: cleanup)
+
+  #expect(mechanism != nil)
+  #expect(log.milestones.isEmpty)
+
+  var startIterator = starts.makeAsyncIterator()
+  _ = await startIterator.next()
+
+  // The ledger promises teardown "from the MainActor or a background
+  // executor"; the test above drops from an actor, and this one drops the
+  // last reference right here on the MainActor. The acknowledgement stays in
+  // use so the assertion holds whether that release cleans up synchronously
+  // or after a hop, which may differ by isolation leg.
+  cogs = nil
+  try await cleanup.wait()
+
+  #expect(mechanism == nil)
+  #expect(
+    log.milestones == ["task cancelled", "mechanism released", "connection released"]
+  )
+}
