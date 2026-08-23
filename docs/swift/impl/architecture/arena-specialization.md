@@ -138,7 +138,7 @@ binary-size trade, not a semantic compatibility mode.
 ## Measurement summary
 
 The authoritative numbers and environments live in
-[benchmark results](../benchmarks.md#default-arena-specialization-and-compact-opt-out).
+[benchmark results](../benchmarks.md#compactarena-what-the-size-opt-out-costs).
 The paired keyed build-and-settle run measured the typed frontier at:
 
 | Measure                | Unspecialized arena | Specialized default |     Change |

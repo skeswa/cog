@@ -48,11 +48,13 @@ Read the Swift docs in this order:
    test story.
 10. **[Task graph](./impl/tasks.md)** — small tasks, dependencies, and closing
     checks.
-11. **[Benchmark results](./impl/benchmarks.md)** — measurements, environments,
-    decisions, and withdrawn results.
-12. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
+11. **[Benchmark results](./impl/benchmarks.md)** — the current build's
+    measurements, gates, and environments.
+12. **[Performance history](./impl/perf-history.md)** — the old numbers,
+    retired comparisons, and the decisions they settled.
+13. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
     the result of each speed change.
-13. **[Design history](../history.md)** — optional background from the earlier
+14. **[Design history](../history.md)** — optional background from the earlier
     Dart and Flutter work.
 
 This order also appears in `docs/.vitepress/navigation.mts`. Update both lists

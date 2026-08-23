@@ -936,7 +936,7 @@ The layout-selection proofs that lived here as COUNT-09 through COUNT-11 —
 every behavior scenario passing unchanged across the measured
 value-reference layouts and cores — are frozen selection records now that
 the rejected layouts are manifest hard errors and can never re-run. The
-records live in [benchmarks.md](./benchmarks.md) and
+records live in [perf-history.md](./perf-history.md) and
 [optimization.md](./optimization.md); the living whole-suite proof is
 LEG-01 and LEG-03.
 
@@ -952,7 +952,7 @@ The one-time layout comparisons that lived here as PERF-08, PERF-09, and
 PERF-14 — value-reference layouts, edge layouts, and the post-machinery
 core comparison — are frozen selection records: the rejected
 implementations are manifest hard errors and the comparisons can never
-re-execute. Their results stay in [benchmarks.md](./benchmarks.md) and
+re-execute. Their results stay in [perf-history.md](./perf-history.md) and
 [optimization.md](./optimization.md). PERF-12's shared-machinery zero
 folded into PERF-01 when the committed threshold reached exactly zero.
 

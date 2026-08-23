@@ -111,10 +111,12 @@ keep milestone state there rather than copying it into this instruction file.
   `plan.md` is the implementation plan with milestones, tooling, CI, and
   the release process; `scenarios.md` is the test-scenario tree; `tasks.md`
   is the dependency-aware half-day task graph with explicit verification,
-  covering every scenario exactly once; `benchmarks.md` is the measurement
-  record, every number with the environment that produced it; and
-  `optimization.md` is the profiling record — where the time goes and what each
-  change bought, obtained with a sampler and probes rather than the suite.
+  covering every scenario exactly once; `benchmarks.md` is the current
+  measurement record, every number with the environment that produced it;
+  `perf-history.md` keeps the old numbers, retired comparisons, and the
+  decisions they settled; and `optimization.md` is the profiling record —
+  where the time goes and what each change bought, obtained with a sampler
+  and probes rather than the suite.
 - `docs/kotlin/` — living Kotlin and Jetpack Compose design documents. Start
   with `README.md`. `exploration.md` covers the core architecture and API;
   `example.md` gives a full worked feature; `effects.md` covers effects and

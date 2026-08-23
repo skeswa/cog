@@ -77,6 +77,7 @@ const swiftSidebar: DefaultTheme.SidebarItem[] = [
           { text: "Test scenarios", link: "/swift/impl/scenarios" },
           { text: "Task breakdown", link: "/swift/impl/tasks" },
           { text: "Benchmark results", link: "/swift/impl/benchmarks" },
+          { text: "Performance history", link: "/swift/impl/perf-history" },
           { text: "Profiling and optimization", link: "/swift/impl/optimization" },
         ],
       },
