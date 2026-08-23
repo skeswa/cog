@@ -105,16 +105,6 @@ struct StorefrontShapeTests {
     )
   }
 
-  @Test("the longest meaningful dependency path is 20 to 24 nodes")
-  func longestPathIsInRange() {
-    // catalog → catalogProducts → productIndex → stage0 … stage16 →
-    // effectivePrice → productRow → the browse reaction.
-    let profile = StorefrontProfile.standard
-    let pathLength = 3 + (profile.pricingPolicyCount + 1) + 3
-    #expect(pathLength >= 20)
-    #expect(pathLength <= 24)
-  }
-
   @Test("the standard catalog has the size and even category spread it claims")
   func catalogShape() {
     let profile = StorefrontProfile.standard

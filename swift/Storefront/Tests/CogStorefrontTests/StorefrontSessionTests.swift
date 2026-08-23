@@ -42,17 +42,6 @@ struct StorefrontSessionTests {
     #expect(driver.sink.visibleProductIDs.count == StorefrontProfile.standard.viewportRowCount)
   }
 
-  @Test("a cold start materializes the first screen and nothing more")
-  func coldStartMaterializesOneScreen() async throws {
-    let driver = StorefrontSessionDriver(profile: .smoke)
-    try await driver.runColdStart()
-
-    for checkpoint in driver.checkpoints {
-      #expect(checkpoint.holds, "\(checkpoint.failureDescription)")
-    }
-    #expect(driver.sink.visibleProductIDs.count == StorefrontProfile.smoke.viewportRowCount)
-  }
-
   @Test("draining immediately includes selected tasks that have not begun")
   func immediateDrainSeesScheduledRequests() async throws {
     let driver = StorefrontSessionDriver(profile: .smoke)

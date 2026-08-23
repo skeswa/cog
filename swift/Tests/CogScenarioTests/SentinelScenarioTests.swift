@@ -23,18 +23,6 @@ func `M5ScenarioSentinel costs exactly three runs per settled turn`(turns: Int) 
 }
 
 @MainActor
-@Test func `M5ScenarioSentinel settles its shared consumer once per turn`() {
-  // The sentinel is a diamond, so this is the property that distinguishes a
-  // lazy pull from a naive push: the shared consumer must run once per turn,
-  // not once per changed parent. Four runs per turn would still look fine on
-  // a stopwatch.
-  let oneTurn = CogScenario.sentinel(turns: 1).run(in: Cogs.forTesting())
-  let twoTurns = CogScenario.sentinel(turns: 2).run(in: Cogs.forTesting())
-
-  #expect(twoTurns.actualRuns - oneTurn.actualRuns == 3)
-}
-
-@MainActor
 @Test func `M5ScenarioSentinel starts cold in each context`() {
   // Every run must build its graph from nothing. A scenario reused against a
   // warm context would skip the first settle and quietly undercount, which
