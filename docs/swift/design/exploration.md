@@ -836,7 +836,8 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     deliberately reads like
     `weatherServiceSourceCog = Cog<WeatherService>.Manual(.live)`.
     `ManualCogLifetime` remains top-level because it is value-independent and
-    shared by both shape families.
+    shared by both shape families. The former prefixed shape names are removed,
+    not retained as deprecated typealiases.
 
 ---
 
