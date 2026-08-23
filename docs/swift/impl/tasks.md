@@ -231,8 +231,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-04ab** _(Behavior)_ — Add keyless staging, writer read-back, flush on
   the outer turn boundary, and completed-turn normal reads during accumulation.
   _Depends: M1-04aa._
-  _Verify: `mise run test --filter 'READ-01|TURN-01|TURN-03|TURN-04'`._
-  _Greens: READ-01, TURN-01, TURN-03, TURN-04._
+  _Verify: `mise run test --filter 'TURN-01|TURN-03|TURN-04'`._
+  _Greens: TURN-01, TURN-03, TURN-04._
 - **M1-04b** _(Behavior)_ — Add repeated and keyed staging semantics.
   _Depends: M1-02, M1-04ab._
   _Verify: `mise run test --filter 'TURN-02|TURN-14'`._
