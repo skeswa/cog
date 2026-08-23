@@ -123,6 +123,7 @@ it runs again.
 | M8: First-party lint tooling     | [M8 tasks](./tasks.md#m8-tasks)   | `M8-01a`–`M8-01d` surface pins; `M8-01e` selected Channel B after eager-fetch measurements | `M8-15a` suite → `M8-15b` candidate → `M8-15c` tag → `M8-15d` asset release → `M8-15e` verification → `M8-15f` Channel B publication → `M8-18` identity repair → `M8-15g` exact-consumer gate; `M8-19` is non-blocking |
 | M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks)   | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-25` and `M9-26` build cost, `M9-18` decision, and `M9-19` closeout                                                                                          |
 | M10: Storefront macrobenchmark   | [M10 tasks](./tasks.md#m10-tasks) | `M10-01` workload shape and package boundary; `M10-09` threshold and follow-up decision    | `M10-05` headless results, `M10-07` UI results, `M10-08` core comparison, `M10-09` decision, then `M10-10` closeout                                                                                                    |
+| M11: Steady-turn ARC reduction   | [M11 tasks](./tasks.md#m11-tasks) | `M11-01` route disposition from the August 23 attribution                                  | `M11-02` turn-machinery cuts, then `M11-03` settle-path borrows and `M11-04` small sites, then `M11-05` closeout                                                                                                       |
 
 ## Task bookkeeping
 
@@ -304,6 +305,21 @@ errors. Its results were withdrawn. The corrected headless run is current; the
 UI run still needs to be repeated. M10 reports data but adds no threshold,
 public API, or release.
 
+<a id="plan-m11"></a>
+
+### M11: Steady-turn ARC reduction
+
+Issue #373's August 23 attribution broke the steady turn's remaining ARC
+traffic into named call sites for the first time: turn-machinery enum
+payloads and double resolution, owned returns from the location memos and
+descriptor records, flush-loop closure contexts, two executor checks, the
+turn-name string, and the Observation registrar's own floor. M11 lands the
+measured turn-machinery cuts, takes route C's full scoped-borrow form at the
+settle path where the same sites multiply per node, and cleans up the small
+sites the probe surfaced. Every change is probe-measured before and after,
+with the zero-allocation and threshold gates as hard floors. M11 changes no
+public API.
+
 ## Release process
 
 - Authority: release preparation and publication run entirely in GitHub
@@ -436,6 +452,10 @@ public API, or release.
   and compact arena; the release UI performance suite executing on the pinned
   simulator; linter and formatter clean; `impl/benchmarks.md` carrying the
   measurements, their environment, and the workload's stated limits.
+- M11 (`M11-05`): the probe series in `impl/optimization.md` records each
+  change's retain and release delta; the steady turn's exact zero-malloc gate
+  and the committed thresholds stay green; the complete matrix and release
+  legs pass.
 - Always: formatting and task-ledger checks clean; path-filtered CI green.
 
 ## Open checks

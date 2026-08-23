@@ -2118,3 +2118,46 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   _Verify: `mise run test:storefront`, `mise run test:storefront-ui`,
   `mise run bench --filter 'perf-15-storefront-.*'`, `mise run lint:swift`,
   `mise run fmt:check`, and `mise run tasks:check`._
+
+## M11 tasks
+
+_Plan scope and exit: [M11: Steady-turn ARC reduction](./plan.md#plan-m11)._
+
+- **M11-01** _(Decision)_ — Record the route disposition from the August 23
+  steady-turn ARC attribution on issue #373: land the measured turn-machinery
+  cuts; require route C's full scoped-borrow form (storage-only `unowned`
+  spellings measured as a null result); and schedule the newly surfaced
+  changed-boundary sort, turn-name, and executor-check sites.
+  _Depends: M9-19._
+  _Verify: recorded disposition on issue #373, this M11 section, and
+  `mise run tasks:check`._
+- **M11-02** _(Infrastructure)_ — Land the slot-threading and payload-free
+  turn-phase cuts: `writerStage` returns its resolved slot to the lifetime
+  half, and `CogTurnPhase` carries no `CogTurn` payload.
+  _Depends: M11-01._
+  _Verify: the M9-01 probe's steady run recorded in `impl/optimization.md` at
+  28 retains and 34 releases, `mise run bench --filter perf-01-steady-turn`
+  holding the exact zero-malloc gate, `mise run test`, and
+  `mise run test:release --filter 'TURN|CYCLE|ONE-02'`._
+- **M11-03** _(Infrastructure)_ — Take route C's full-borrow form through the
+  settle path: scoped descriptor-record and typed-column access (or parallel
+  hot-field arrays) through publish, settle, and notify, where the owned
+  returns multiply per settled node.
+  _Depends: M11-02._
+  _Verify: probe deltas for the steady and hundred-node deep runs recorded in
+  `impl/optimization.md`, `mise run test`, and
+  `mise run test:release --filter 'TURN|CYCLE|ONE-02'`._
+- **M11-04** _(Infrastructure)_ — Clean up the small probe-surfaced sites: the
+  changed-boundary sort's closure-context retains, the turn-name string
+  retained through release-build `startTurn`, and the two per-turn
+  executor-check round-trips.
+  _Depends: M11-02._
+  _Verify: the probe's steady run recorded in `impl/optimization.md`, and
+  `mise run test:matrix` for the isolation-sensitive executor change._
+- **M11-05** _(Gate)_ — Close M11 on the recorded evidence: the probe series
+  in `impl/optimization.md`, the benchmark gates green, and the full matrix
+  and release legs passing.
+  _Depends: M11-03, M11-04._
+  _Verify: `mise run test:matrix`, `mise run test:release`,
+  `mise run bench:thresholds:check`, `mise run fmt:check`, and
+  `mise run tasks:check`._
