@@ -7,7 +7,7 @@
 // This is the type-system half of the value-first read model (§5.1). Manual
 // and automatic cogs are always settled values; uncertainty is an async-only
 // concept, and it lives in `CogStatus` behind the lens. Every lens subscript
-// takes an `Cog.Async`, so a manual or automatic reference is a type error at
+// takes a `Cog.Async`, so a manual or automatic reference is a type error at
 // the argument, on every capability that carries the lens.
 //
 // The fixture takes its context and references as parameters. It never builds
