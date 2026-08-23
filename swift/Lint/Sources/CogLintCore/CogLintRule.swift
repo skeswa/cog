@@ -55,6 +55,7 @@ package enum CogLintRuleRegistry {
     PrimitivesOnlyInOpsRule(),
     InitialStateInMechanismRule(),
     ManualCogPrivateRule(),
+    ManualCogUnderscoreRule(),
     NoMultiReadCogsHelperRule(),
   ]
 }

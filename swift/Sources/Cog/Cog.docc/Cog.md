@@ -130,5 +130,6 @@ first-class kind with its own status and policies.
 - <doc:PrimitivesOnlyInOps>
 - <doc:InitialStateInMechanism>
 - <doc:ManualCogPrivate>
+- <doc:ManualCogUnderscore>
 - <doc:NoMultiReadCogsHelper>
 - ``CogWatchStart``

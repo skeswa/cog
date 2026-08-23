@@ -30,6 +30,7 @@ const RULES = [
     "InitialStateInMechanismRule.swift",
   ),
   rule("manual-cog-private", "ManualCogPrivate", "ManualCogPrivateRule.swift"),
+  rule("manual-cog-underscore", "ManualCogUnderscore", "ManualCogUnderscoreRule.swift"),
   rule("no-multi-read-cogs-helper", "NoMultiReadCogsHelper", "NoMultiReadCogsHelperRule.swift"),
 ];
 
@@ -69,7 +70,7 @@ function main() {
     fail("documentation verification left a root Package.resolved behind");
   }
   console.log(
-    "\nPASS LINT-22: all six permanent URLs resolve and every article matches its fixture corpus",
+    "\nPASS LINT-22: all seven permanent URLs resolve and every article matches its fixture corpus",
   );
 }
 
@@ -134,7 +135,7 @@ function verifyGeneratedParity() {
       }
     }
   }
-  console.log("==> Checked-in articles are byte-identical to all six fixture renders");
+  console.log("==> Checked-in articles are byte-identical to all seven fixture renders");
 }
 
 /** Requires each canonical HTML route and matching DocC data payload. */

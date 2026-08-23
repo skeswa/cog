@@ -125,7 +125,7 @@ Each rule owns triggering fixtures with exact positions and non-triggering
 fixtures for valid code and known syntax-only misses. The same fixtures build
 its DocC article. The linter runs its own tests before checking another target.
 
-## 4. The first six rules
+## 4. The rules
 
 A shared classifier finds four kinds of syntax:
 
@@ -147,6 +147,7 @@ The classifier does not follow assignments or infer across files.
 | `primitives-only-in-ops`     | App code calls `turn` and `refresh` only inside `CogOps` |
 | `initial-state-in-mechanism` | App assembly does no graph work                          |
 | `manual-cog-private`         | Writable sources are `private` or `fileprivate`          |
+| `manual-cog-underscore`      | Sources begin with `_`; projections drop the underscore  |
 | `no-multi-read-cogs-helper`  | Reads stay flat instead of hiding in a runtime helper    |
 
 ### 4.1 `cog-declaration-suffix`
@@ -212,6 +213,18 @@ assignments.
 Declare a true computed value as an automatic cog. Otherwise, read each value
 on its own line at the call site.
 
+### 4.7 `manual-cog-underscore`
+
+Each `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` declaration name must
+begin with `_`. A `.readOnly` projection of a recognized source must be named
+exactly its source's name without the leading underscore, so the projection
+owns the clean domain name. An underscored source that is never projected is
+accepted.
+
+The pairing check uses the projected base identifier the shared classifier
+resolved. An annotation-only projection names no source and stays silent, the
+same syntax-only boundary as every other classifier evasion.
+
 ## 5. V1 limits
 
 - No type data. IndexStoreDB is the planned path if cross-file misses become a
@@ -223,9 +236,9 @@ on its own line at the call site.
 
 ## 6. Use and release
 
-The six rules, all reporters, both plugins, the CLI, DocC pages, artifact tests,
-and sibling distribution are implemented. Each rule landed with fixtures and
-the same examples in its docs.
+The seven rules, all reporters, both plugins, the CLI, DocC pages, artifact
+tests, and sibling distribution are implemented. Each rule landed with fixtures
+and the same examples in its docs.
 
 The package uses Swift tools 6.2 and Swift 6 mode. Release builds use Xcode
 26.6 (17F113) and Swift 6.3.3. The exact pins are:
@@ -258,6 +271,7 @@ Users type `coglint`. SwiftPM uses role-specific names:
 | `primitives-only-in-ops`     | `/cog/documentation/cog/primitivesonlyinops`     |
 | `initial-state-in-mechanism` | `/cog/documentation/cog/initialstateinmechanism` |
 | `manual-cog-private`         | `/cog/documentation/cog/manualcogprivate`        |
+| `manual-cog-underscore`      | `/cog/documentation/cog/manualcogunderscore`     |
 | `no-multi-read-cogs-helper`  | `/cog/documentation/cog/nomultireadcogshelper`   |
 
 Each path is under `https://skeswa.github.io`. The docs test checks both the

@@ -209,7 +209,7 @@ directly:
 - `mise run test:lint-distribution` — prove an ordinary Cog consumer resolves
   and builds without lint sources or an artifact fetch, while an unused
   Channel B opt-in retains SwiftPM’s measured eager-fetch behavior.
-- `mise run build:lint-documentation` — regenerate all six checked-in CogLint
+- `mise run build:lint-documentation` — regenerate all seven checked-in CogLint
   DocC articles from their executable fixture corpora.
 - `mise run test:lint-documentation` — regenerate into scratch space, require
   byte-for-byte fixture parity, build the DocC archive, and verify every

@@ -19,7 +19,7 @@ private let _weatherServiceCog = Cog<WeatherService>.Manual(
   name: "weather.service"
 )
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
-private let _currentZipCog = Cog<ZipCode?>.Manual(
+private let _currentZipCodeCog = Cog<ZipCode?>.Manual(
   nil,
   name: "weather.currentZip"
 )
@@ -37,7 +37,7 @@ private let _refreshIntervalCog = Cog<Duration?>.Manual(
 /// Read-only service capability used by the async selector.
 let weatherServiceCog = _weatherServiceCog.readOnly
 /// Read-only selection shared by the picker, hourly loop, and alert reaction.
-let currentZipCodeCog = _currentZipCog.readOnly
+let currentZipCodeCog = _currentZipCodeCog.readOnly
 /// The cadence actually installed by ``WeatherEffects``.
 let refreshIntervalCog = _refreshIntervalCog.readOnly
 
@@ -147,7 +147,7 @@ extension CogOps {
   /// One definition serves both capabilities: views and app code call it on
   /// `cogs`, and the weather mechanism could call it on its controller.
   func selectCurrentLocation(_ zip: ZipCode?) {
-    turn(_currentZipCog, to: zip)
+    turn(_currentZipCodeCog, to: zip)
   }
 
   /// Publishes the cadence owned by the assembly-registered mechanism.
@@ -189,5 +189,5 @@ extension Cogs {
 /// The narrow source capability Weather tests may seed through `CogTesting`.
 let weatherServiceSeedTargetCog = _weatherServiceCog
 /// The narrow selection capability Weather tests may seed through `CogTesting`.
-let currentZipSeedTargetCog = _currentZipCog
+let currentZipSeedTargetCog = _currentZipCodeCog
 #endif

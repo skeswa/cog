@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let niceTemperatureCog = Cog<Int>.Manual(60)
+@MainActor private let _niceTemperatureCog = Cog<Int>.Manual(60)
 
 /// A conventionally named mechanism: the default `name` drops the trailing
 /// "Mechanism", so registrations compose under `Weather`.
@@ -11,7 +11,7 @@ private struct WeatherMechanism: Mechanism {
   let taskNames: AsyncStream<String?>.Continuation
 
   func operate(_ m: MechanismController) {
-    m.watch(niceTemperatureCog, initial: .skip, name: "niceAlert") { _, _ in }
+    m.watch(_niceTemperatureCog, initial: .skip, name: "niceAlert") { _, _ in }
     m.task(name: "hourlyRefresh") {
       taskNames.yield(CogTaskDiagnostic.currentTaskName)
     }
@@ -26,7 +26,7 @@ private struct WeatherMechanism: Mechanism {
     WeatherMechanism(taskNames: taskNameContinuation)
   ])
 
-  cogs.turn("warm up") { c in c[niceTemperatureCog] = 80 }
+  cogs.turn("warm up") { c in c[_niceTemperatureCog] = 80 }
 
   #if DEBUG
   // The watch ran under its composed name: the type name minus "Mechanism",
