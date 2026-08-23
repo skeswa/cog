@@ -395,8 +395,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-16d** _(Behavior)_ — Prove reaction completion before the committing op
   returns.
   _Depends: M1-16c._
-  _Verify: `mise run test --filter REACT-07`._
-  _Greens: REACT-07._
+  _Verify: retired proof — its REACT-07 synchronous-completion claim folded
+  into REACT-02, greened by M1-16b._
 - **M1-16ea** _(Behavior)_ — Queue initial runs for reactions registered during
   a flush without re-entry, after already-scheduled reactions and before queued
   write-back turns.
@@ -435,8 +435,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Greens: REACT-21, REACT-22._
 - **M1-20a** _(Behavior)_ — Queue one op called by a reaction as a new turn.
   _Depends: M1-16d._
-  _Verify: `mise run test --filter REACT-15`._
-  _Greens: REACT-15._
+  _Verify: retired proof — its REACT-15 new-turn claim folded into REACT-16,
+  greened by M1-20b._
 - **M1-20b** _(Behavior)_ — Drain a chain of reaction write-backs one settled
   turn at a time.
   _Depends: M1-20a._

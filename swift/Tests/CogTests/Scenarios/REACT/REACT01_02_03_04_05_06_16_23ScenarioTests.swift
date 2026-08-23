@@ -30,7 +30,7 @@ extension CogOps {
 }
 
 @MainActor
-@Test func `REACT-02 REACT-07 a change wakes the reaction before the turn returns`() {
+@Test func `REACT-02 a change wakes the reaction before the turn returns`() {
   let source = Cog<Int>.Manual(1)
   var seen: [Int] = []
 
@@ -44,9 +44,11 @@ extension CogOps {
 
   cogs.turn { c in c[source] = 2 }
 
-  // One assertion carries both claims: the reaction reran because its
-  // dependency changed (REACT-02), and it had already completed when the line
-  // after the turn ran — no await, polling, or callback (REACT-07).
+  // One assertion carries both halves of the claim: the reaction reran
+  // because its dependency changed, and it had already completed when the
+  // line after the turn ran — no await, polling, or callback. (The second
+  // half retired the former REACT-07: under the no-await constraint no
+  // deterministic proof of one exists without the other.)
   #expect(seen == [1, 2])
 }
 
@@ -255,13 +257,14 @@ extension CogOps {
 }
 
 @MainActor
-@Test func `REACT-15 REACT-16 reaction write-back chains drain settled and FIFO`() {
-  // The first hop is REACT-15: `second` wakes exactly once, after `first`'s
-  // whole body ran, seeing middle already settled — the reaction's op landed
-  // as a brand-new turn after the flush, never a change to the turn being
-  // flushed and never a synchronous nested flush (that would run `third`
-  // before `side`). The rest of the chain is REACT-16: each queued turn runs
-  // first-in first-out, fully settled.
+@Test func `REACT-16 reaction write-back chains drain settled and FIFO`() {
+  // The first hop was the former REACT-15, now REACT-16's opening claim:
+  // `second` wakes exactly once, after `first`'s whole body ran, seeing
+  // middle already settled — the reaction's op landed as a brand-new turn
+  // after the flush, never a change to the turn being flushed and never a
+  // synchronous nested flush (that would run `third` before `side`). The
+  // rest of the chain is the FIFO half: each queued turn runs first-in
+  // first-out, fully settled.
   let trigger = Cog<Int>.Manual(0)
   let middle = Cog<Int>.Manual(0)
   let side = Cog<Int>.Manual(0)

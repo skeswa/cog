@@ -337,7 +337,10 @@ these stories run inside a small test mechanism's `operate`.
 - **REACT-01.** I register a reaction with `m.run`. It runs once right
   away, so Cog learns what it reads.
 - **REACT-02.** A turn changes something my reaction reads. The reaction
-  runs again.
+  runs again, and it has finished before the op that published the turn
+  returns — the very next line of my test can check what it did. (The
+  synchronous-completion half retired the former REACT-07: under the
+  no-await testing constraint, neither half is provable without the other.)
 - **REACT-03.** A turn changes something my reaction does not read. The
   reaction stays quiet.
 - **REACT-04.** When a reaction runs, everything it reads is already
@@ -346,8 +349,6 @@ these stories run inside a small test mechanism's `operate`.
   they run in the order I registered them.
 - **REACT-06.** A reaction's reads change from run to run, like a
   selector's. It is re-tracked every run.
-- **REACT-07.** Reactions run before the op that published the turn
-  returns. The very next line of my test can check what the reaction did.
 - **REACT-23.** While one reaction runs during a flush, it registers several
   more. Their initial tracking runs do not re-enter it: they wait behind every
   reaction already scheduled for that flush, keep registration order, and run
@@ -360,12 +361,12 @@ these stories run inside a small test mechanism's `operate`.
 
 - **REACT-14.** A reaction gets a read-only view of the graph. It cannot
   write directly. (Proof: compile-fail.)
-- **REACT-15.** A reaction calls an op that turns. That write becomes a
+- **REACT-16.** A reaction calls an op that turns. That write becomes a
   brand-new turn after the current flush — never a change to the turn
-  being flushed.
-- **REACT-16.** Reaction A's write wakes reaction B, whose write wakes C.
-  The turns run one at a time, first-in first-out, and each sees settled
-  state.
+  being flushed (the former REACT-15, whose claim the first hop of this
+  chain is) — and when A's write wakes reaction B, whose write wakes C,
+  the queued turns run one at a time, first-in first-out, each seeing
+  settled state.
 - **REACT-17.** Two reactions deliberately wake each other for 65 turns
   and then stop. In debug, Cog warns when an uninterrupted chain passes 64
   turns — a chain of exactly 64 stays quiet — exposing the warning and its
