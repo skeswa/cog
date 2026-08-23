@@ -38,4 +38,15 @@ import Testing
   try await resolveAsyncStatus(in: cogs) { work.succeed(2) }
   #expect(await starts.next() == 3)
   try await resolveAsyncStatus(in: cogs) { work.succeed(3) }
+
+  // A trailing input closes the "exactly three additional runs" promise: the
+  // queue is serial FIFO, so any spurious extra run would have to start before
+  // this one, and the next observed start would not be 4.
+  cogs.turn("request four") { c in c[inputCog] = 4 }
+  guard await starts.next() == 4 else {
+    work.finishAll()
+    Issue.record("A spurious run started after the queued inputs drained")
+    return
+  }
+  try await resolveAsyncStatus(in: cogs) { work.succeed(4) }
 }
