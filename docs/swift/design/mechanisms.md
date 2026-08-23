@@ -2,23 +2,16 @@
 
 _August 14, 2026_
 
-This file is §6 of [exploration.md](./exploration.md). It covers mechanisms —
-the home for every side effect — their bootstrap, gating, testing, and work
-that can outlive the app process. Other section numbers point to the core
-file. The state-versus-effect boundary comes from the
-[shared state model](../../design.md); this file owns its Swift lifecycle and
-API.
+This file is §6 of [core design](./exploration.md). It explains where side
+effects live, how they start and stop, how to test them, and how to handle work
+that outlives the app process.
 
 ## 6. Side effects, worked
 
-A side effect changes something outside the graph: alerts, haptics, logs,
-files, system services. Work that only computes graph state is not a side
-effect. A **mechanism** watches cogs and performs that outside work. It
-bundles the dependencies a family of effects needs — services, clocks,
-notifiers — with the reactions and tasks that use them, and it is the only
-place reactions and tasks exist. Keeping that boundary clear makes application
-behavior easy to find: every imperative consequence of state lives in a named
-mechanism registered at bootstrap.
+A side effect changes something outside the graph, such as an alert, haptic,
+log, file, or system service. A **mechanism** groups that work with the services,
+clocks, reactions, and tasks it needs. All app-wide reactions and tasks live in
+named mechanisms registered at bootstrap.
 
 ### 6.1 Choosing a home for a side effect
 
@@ -54,13 +47,11 @@ public protocol Mechanism {
 }
 ```
 
-Structs and classes both conform; dependencies are ordinary stored properties.
-A struct fits a stateless mechanism, while a class fits one that owns a
-connection or other reference-typed resource. The runtime retains the exact
-mechanism values supplied at bootstrap alongside their registration scopes.
-During runtime teardown, it cancels every scope first and releases the retained
-mechanism values only afterward, so a class-owned resource cannot disappear
-while one of its reactions or tasks is still registered.
+Both structs and classes may conform. Use stored properties for dependencies.
+A class fits a mechanism that owns a connection or other shared resource. The
+runtime retains each mechanism. At teardown it cancels the mechanism's scope
+before releasing the value, so owned resources stay alive while work can use
+them.
 
 ```swift
 // WeatherMechanism.swift
@@ -88,43 +79,30 @@ struct WeatherMechanism: Mechanism {
 }
 ```
 
-The controller `m` is the mechanism's entire relationship with the graph, and
-its pieces have narrow jobs:
+The controller `m` is the mechanism's only link to the graph:
 
 - `m.watch` registers a reaction on one cog and receives its old and new
   values. `.skip` avoids an alert during bootstrap. `m.run` registers a
   reaction over several dependencies; it runs once during registration to
   record them (§3.3).
-- `m.task` starts a normal unstructured Swift task owned by the mechanism's
-  scope.
-  Time-based work injects a `Clock` so tests control it. Task bodies call ops,
-  so writes keep useful names in debug history. A long-running body captures
-  its controller weakly and promotes it around each unit of graph work;
-  this lets scope teardown release the controller even if cancelled work has
-  not cooperatively returned yet.
+- `m.task` starts a Swift task owned by the mechanism's scope. Timed work uses
+  an injected `Clock`. A long task captures `m` weakly and holds it only while
+  touching the graph, so teardown need not wait for cancelled code to return.
 - `m.peek` makes an untracked read (§2.4); an `operate`-time read never
   becomes a dependency, because `operate` is registration, not a reaction.
 - Ops are available on `m` directly, because ops extend `CogOps` and
   the controller conforms (§3.2). `m.turn` and `m.refresh` are the
   primitives beneath them.
-- Every registration is attributed. `watch`, `run`, and `task` names compose
-  under the mechanism's `name` — the task above appears as
-  `Weather.hourlyRefresh` in debug history and Instruments — and a turn an op
-  opens through `m` records which mechanism asked for it.
+- Each registration has a name. Names compose under the mechanism name, so the
+  task above appears as `Weather.hourlyRefresh` in history and Instruments.
 
-There is deliberately no raw `Cogs` on the controller. A mechanism that could
-reach the runtime could also leak it past its own discipline; routing every
-act through `m` is what makes attribution and isolated testing exact.
+The controller does not expose raw `Cogs`. All access goes through `m`, which
+keeps names and isolated tests exact.
 
-`MechanismController` is a final-class lifetime capability retained by its
-scope, so asynchronous and delegate-driven work may capture it weakly. It does
-not own the app runtime. When its scope ends, the runtime cancels the scope's
-registrations and tasks and releases the controller. Work that can outlive that
-scope installs a `[weak m]` callback and returns when promotion fails; storing a
-controller strongly in an external engine is unsupported because it would let
-the engine outlive the lifetime that authorized its graph access. The same
-rule applies to a sub-controller from `whenever`: after the gate falls, an
-external callback weakly holding that sub-controller becomes inert.
+`MechanismController` is a final-class lifetime token owned by its scope, not by
+the app runtime. Work that may outlive the scope captures `[weak m]` and stops
+when that value is gone. An external engine must not retain the controller.
+The same rule applies to a `whenever` sub-controller.
 
 **Gated scopes.** A lifetime shorter than the app is graph state, not a
 registration ceremony. `whenever` runs a nested scope while a Bool cog is
@@ -165,9 +143,8 @@ Its rules:
   `whenever`, and names continue to compose (`Session.heartbeat` above
   becomes `Weather.session.heartbeat` when nested under `session`).
 
-`whenever` replaces every scoped-ownership object the design previously
-needed. There is no public effect group or reaction token: app lifetime comes
-from bootstrap, and every shorter lifetime is a gate expressed in state.
+There is no public effect group or reaction token. Bootstrap owns app-lifetime
+work. A state gate owns shorter work.
 
 ### 6.3 Bootstrap-only registration and lifecycle
 
@@ -192,29 +169,18 @@ struct WeatherApp: App {
 }
 ```
 
-`bootstrapApp(mechanisms:)` constructs the runtime, then calls each
-mechanism's `operate` synchronously in array order, and only then returns.
-The consequences are deliberate:
+`bootstrapApp(mechanisms:)` builds the runtime, calls each `operate` in array
+order, and then returns:
 
-- **When bootstrap returns, every mechanism is live.** There is no window in
-  which the app runs without its effects, no lazy registration that depends
-  on accidental first access, and no late installation API to reopen that
-  window. A mechanism a feature forgets to list simply never runs, which a
-  test catches immediately.
-- **Order is exact.** Cross-mechanism reaction order is array order, because
-  reactions run in registration order (§3.3). Writes made during `operate`
-  `turn` as ordinary named turns and settle before bootstrap returns, so a
-  mechanism may seed demand — `m.refresh(...)` — or configure state, and a
-  later mechanism observes the result.
-- **Names are enforced.** Two mechanisms with the same `name` fail fast with
-  a clear error in debug and release builds, because attribution and
-  history depend on the name being unambiguous.
-- **Reactions have one door.** `run`, `watch`, and task ownership are
-  controller capabilities only; the public `Cogs` surface has no reaction,
-  watch, or effect-group API. Registration handles stay internal: the runtime
-  owns each mechanism's scope, cancellation of a scope is terminal and
-  idempotent, and an isolated test context tears every scope down when it
-  deinitializes.
+- **Every mechanism is live when bootstrap returns.** Registration is not lazy,
+  and no API can add a mechanism later.
+- **Order is exact.** Reactions keep registration order. A write during
+  `operate` is a normal named turn that settles before the next mechanism runs.
+- **Names are unique.** A duplicate mechanism name fails in debug and release
+  builds.
+- **Reactions have one entry point.** Only a controller can register `run`,
+  `watch`, or tasks. Handles stay internal, and scope cancellation is final and
+  safe to repeat.
 
 The `App` creates this runtime once and shares it across every scene. The
 root installs the runtime into SwiftUI once. Every descendant view that
@@ -240,13 +206,10 @@ Reactions may cause writes, but never into the turn they are flushing:
 An old captured writer also fails its turn-ID check, and async writes
 naturally start later turns because they happen after an `await`.
 
-Mechanisms can still form a loop: turn → reaction → turn. A debug guard
-should warn after about 64 turns without reaching idle and print the causal
-chain, naming the mechanisms involved. The queue prevents re-entrant graph
-writes; the trace makes a runaway loop clear. An internal diagnostic seam
-lets tests capture the warning without scraping logs. The guard test uses a
-finite reaction chain that crosses the threshold and then stops, so
-warning-only behavior remains testable without an infinite drain.
+Mechanisms can still form a turn → reaction → turn loop. After about 64 turns
+without reaching idle, a debug guard warns and prints the named cause chain.
+Tests capture this through an internal diagnostic hook and use a finite chain
+that stops after crossing the limit.
 
 Synchronous reaction flush is deliberate: tests can assert effects on the
 line after an op returns, and a short background task knows its reconciler
@@ -279,10 +242,9 @@ When the view disappears, `.task` cancels the sequence and its graph lease.
 buffer may skip intermediate turns for a slow screen, which is right for
 camera state.
 
-The test: if the lifetime is exactly one screen's visibility, use SwiftUI
-lifecycle. App-wide work such as notifications and analytics belongs in a
-mechanism, gated with `whenever` when it should not always run. One effect
-should not use both.
+If work matters only while one screen is visible, let SwiftUI own it. Put
+app-wide notifications and analytics in a mechanism, with `whenever` when they
+need a shorter state-driven lifetime. One effect should not use both owners.
 
 ### 6.6 Testing mechanisms
 
@@ -354,14 +316,10 @@ scheduled sleep before asserting the named turn in history. Advancing before
 the first acknowledgement would race task startup; merely checking state that
 the seeding closure already established would not prove the task ran.
 
-There is no late-start API, even for tests: the factory mirrors production's
-single-call bootstrap exactly, and arrangement slots into the only point
-where it can matter. Testing one mechanism means passing only that mechanism
-with fake dependencies. `CogTesting` publishes `seed` only behind
-`#if DEBUG`; an app importing only `Cog` has no such operation. Seeding that
-precedes `operate` is what `initial: .run` reactions observe; seeding after
-bootstrap remains safe, because a seed marks its dependents dirty and the
-next real turn settles them before reactions run.[^seed]
+Tests have no late-start API. Pass only the mechanism under test and give it
+fake dependencies. `CogTesting` exposes `seed` only in debug builds. Seeds
+before `operate` are visible to `initial: .run`; a later seed marks dependents
+dirty so the next real turn settles them before reactions run.[^seed]
 
 ### 6.7 Background work that outlives the process
 
@@ -433,13 +391,10 @@ final class DownloadsMechanism: Mechanism {
 }
 ```
 
-The class mechanism constructs and retains the engine during `operate`, giving
-it an immutable callback before delegate activity begins. That callback weakly
-captures the mechanism controller rather than raw `Cogs` and hops from the
-delegate queue to the MainActor before calling an op. If the runtime has ended
-before a replayed callback arrives, controller promotion fails and the callback
-does nothing. The engine always stores durable data before asking the op to
-publish graph state.[^engine]
+The class mechanism creates and retains the engine during `operate`. Its fixed
+callback holds the controller weakly, moves from the delegate queue to the
+MainActor, and then calls an op. A callback after teardown does nothing. The
+engine stores durable data before it publishes graph state.[^engine]
 
 A refresh entry point stays small:
 

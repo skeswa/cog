@@ -2,18 +2,16 @@
 
 _August 6, 2026_
 
-This appendix is §5.4 of [exploration.md](./exploration.md). It explains how
-stream operators map to Cog. Other section numbers point to the core file.
+This file is §5.4 of [core design](./exploration.md).
 
 ### 5.4 Where the Rx operators went
 
-Signals hold current state; streams carry events over time. Because these are
-different jobs, Cog does not copy Rx operators into its state graph. Their
-behavior comes from three smaller tools.
+A cog holds current state. A stream carries events. Cog keeps those jobs
+separate instead of copying Rx operators into the graph.
 
-#### 1. Dynamic dependencies switch state
+#### Dynamic reads switch state
 
-An automatic cog depends on what it read during its last run:
+An automatic cog depends on what it reads during each run:
 
 ```swift
 let weatherHereCog = Cog { c in
@@ -23,9 +21,9 @@ let weatherHereCog = Cog { c in
 }
 ```
 
-If the ZIP changes, the next run drops the old weather edge and adds the new
-one — the state half of `switchMap`. The same rule flattens a cog of cogs or
-follows a changing set:
+When the ZIP changes, the next run drops the old weather edge and adds the new
+one. This is the state form of `switchMap`. The same rule follows a changing
+list:
 
 ```swift
 let shouldPackHatCog = Cog { c in
@@ -37,23 +35,20 @@ let shouldPackHatCog = Cog { c in
 }
 ```
 
-This run depends only on the current ZIP list and its current hat cogs. Every
-dependency must be read again on each run, so removed ZIPs lose their edges.
+Removed ZIPs lose their edges because every run must read its dependencies
+again.
 
-#### 2. Async policies switch work
+#### Async policies switch work
 
-When dependencies choose async work, the policy in §5.2 controls old and new
-runs:
+The policy in §5.2 controls old and new work:
 
-- `.latest` cancels old work and starts new work — `switchMap`.
-- `.queue` runs work in order — `concatMap`.
-- `.merged` allows overlap — `flatMap` or `merge`.
-- `.exhaustLatest` finishes the active run, then catches up once with the
-  newest state.
+- `.latest` cancels old work and starts new work: `switchMap`.
+- `.queue` runs work in order: `concatMap`.
+- `.merged` allows overlap: `flatMap` or `merge`.
+- `.exhaustLatest` finishes current work, then runs once with the newest state.
 
-An automatic value cannot forget state changes forever and remain correct, so
-true drop or exhaust behavior belongs to imperative ops, whose inputs are
-events.
+True event dropping belongs in an op. A state value must catch up after a
+dependency changes.
 
 ```swift
 let forecastCog = AsyncCog<Forecast?>(.latest) { c in
@@ -62,12 +57,10 @@ let forecastCog = AsyncCog<Forecast?>(.latest) { c in
 }
 ```
 
-Here the selector follows the new ZIP, while `.latest` cancels the old fetch.
+#### `.stream` follows a real stream
 
-#### 3. `.stream` follows real streams
-
-Some sources really are streams: location updates, websockets, database
-observations.
+Use `.stream` for sources such as location updates, sockets, and database
+observations:
 
 ```swift
 let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
@@ -76,36 +69,30 @@ let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
 }
 ```
 
-Cog publishes each changed sequence element in its own turn; equal `Equatable`
-elements are state no-ops. If `accuracy` changes, Cog cancels the old sequence
-and starts the new one — `flatMapLatest` at a graph state. A stream may use only
-`.latest`; other policies have no safe v1 meaning for work that may never end.
+Each changed element publishes in its own turn. Equal `Equatable` elements do
+nothing. A dependency change cancels the old sequence and starts a new one.
+Streams use `.latest` only because other policies can wait forever for a stream
+to end.
 
 #### Operator dictionary
 
-| Rx operator            | Cog equivalent                                                                                                                                      |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map`, `combineLatest` | An automatic cog. Multiple `c[...]` reads combine current values.                                                                                   |
-| `withLatestFrom`       | `c.peek(...)`: read the current value without tracking it.                                                                                          |
-| `switchMap`            | Dynamic dependencies, `.latest`, or `.stream`, depending on what switches.                                                                          |
-| `concatMap`, `flatMap` | `.queue`, `.merged` (§5.2).                                                                                                                         |
-| `exhaustMap`           | `.exhaustLatest` for state; true exhaust on imperative ops.                                                                                         |
-| `distinctUntilChanged` | Equality checks built into every state (§2.4).                                                                                                      |
-| `scan`                 | `c.curr`, which exposes the cog's prior value.                                                                                                      |
-| `debounce`, `throttle` | Timing options at the edge: a reaction modifier or async-cog option, not graph basics. Not yet designed or scheduled; deferred backlog in core §10. |
+| Rx operator            | Cog form                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `map`, `combineLatest` | An automatic cog with one or more tracked reads                                                   |
+| `withLatestFrom`       | `c.peek(...)`, which reads without adding an edge                                                 |
+| `switchMap`            | Dynamic reads, `.latest`, or `.stream`                                                            |
+| `concatMap`, `flatMap` | `.queue`, `.merged`                                                                               |
+| `exhaustMap`           | `.exhaustLatest` for state; an op for true event dropping                                         |
+| `distinctUntilChanged` | Cog's state equality checks                                                                       |
+| `scan`                 | `c.curr`, the cog's prior value                                                                   |
+| `debounce`, `throttle` | Future timing options at the edge; these are not part of the graph and are still open in core §10 |
 
-Cog does not replace streams of ordered event history. A cog holds the current
-value, not every tap or duplicate event. Keep those pipelines in ops and
-reactions, backed by `AsyncSequence` and tools such as `share()`. This
-boundary keeps a state read unambiguous: it means “the current value,” not
-“the next event.”
+A cog does not store ordered event history. Keep tap and duplicate-event
+pipelines in ops, reactions, and `AsyncSequence`. A cog read always means “the
+current value.”
 
-#### Notes and prior art
+#### Prior art
 
-The 2023 Conveyor drafts marked dynamic links as `temporarily: true`. Per-run
-dependency capture makes that flag needless: every edge must be earned again.
-Cog-of-cog flattening and the old vacation example use the same rule.
-
-`.stream` matches Atoms' `AsyncSequenceAtom` and the `flatMapLatest` work in
-swift-async-algorithms. Timing modifiers also follow Atoms' precedent: they
-are optional edge features, not core state semantics.
+Per-run reads replace the old Conveyor `temporarily: true` edge flag. `.stream`
+matches Atoms' `AsyncSequenceAtom` and the `flatMapLatest` work in
+swift-async-algorithms. Atoms also places timing options at the edge.

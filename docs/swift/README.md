@@ -1,131 +1,85 @@
 # Cog for Swift
 
 Cog is a state library for SwiftUI. It updates only the values and views that
-depend on changed state. At the UI edge it works with Apple's `@Observable`
-system; inside it uses its own MainActor graph.
+depend on changed state. SwiftUI sees normal `@Observable` values. Cog keeps the
+state graph on the MainActor.
 
-This file is the map for the Swift design. The documents share section
-numbers, so a reference such as §6.4 works across files.
+This page is the map for the Swift docs. The design files share section
+numbers, so a link such as §6.4 may point to another file.
 
-## Shared foundation
+## Start here
 
-The [shared state model](../design.md) owns Cog's principles, vocabulary, and
-cross-platform behavior. On Swift, its single runtime is one MainActor-confined
-`Cogs`; correct reads settle through that graph; async uncertainty is explicit
-in `CogStatus`; and Observation exists only at the SwiftUI boundary. This set
-owns those Swift choices rather than projecting them onto Kotlin.
+The [shared state model](../design.md) defines the rules Swift and Kotlin share.
+For Swift, one `Cogs` object owns the app's state. Reads settle through its
+graph, async status uses `CogStatus`, and Observation exists only at the UI
+edge.
 
-## The documents
+Read the Swift docs in this order:
 
-The design lives beside this file in `design/`; the implementation effort
-lives in `impl/`. Read them in this order:
+1. **[Core design](./design/exploration.md)** — graph behavior, public API,
+   writes, async state, SwiftUI, decisions, and open questions.
+2. **[Mechanisms](./design/mechanisms.md)** — side effects, timers, gated work,
+   bootstrap, tests, and background work.
+3. **[Rx map](./design/rx.md)** — how Rx operators map to Cog.
+4. **[Runtime design](./design/perf.md)** — storage, propagation, cost rules,
+   and the measurement plan.
+5. **[Prior-art review](./design/prior-art.md)** — the API review against
+   swift-state-graph.
+6. **[Lint design](./design/lint.md)** — the linter, plugins, rules, and
+   distribution model.
+7. **[Implementation plan](./impl/plan.md)** — package layout, milestones, CI,
+   and releases.
+8. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
+   test story.
+9. **[Task graph](./impl/tasks.md)** — small tasks, dependencies, and closing
+   checks.
+10. **[Benchmark results](./impl/benchmarks.md)** — measurements, environments,
+    decisions, and withdrawn results.
+11. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
+    the result of each speed change.
+12. **[Design history](../history.md)** — optional background from the earlier
+    Dart and Flutter work.
 
-1. **[Shared state model](../design.md): cross-platform foundation.** The
-   motivation, terms, and invariants Swift and Kotlin share.
-2. **[design/exploration.md](./design/exploration.md): core design (§1–§5,
-   §7–§11).** The graph, public API, write rules, async state, SwiftUI
-   boundary, open questions, and spike plan.
-3. **[design/mechanisms.md](./design/mechanisms.md): mechanisms (§6).** The
-   bundled home for every side effect: reactions, timers, gated scopes,
-   bootstrap registration, testing, and work that can outlive the app
-   process.
-4. **[design/rx.md](./design/rx.md): Rx mapping (§5.4).** How common stream
-   operators map to state dependencies, async policies, and real event
-   streams.
-5. **[design/perf.md](./design/perf.md): performance architecture.** The cost
-   order, the data-oriented core, the ARC and exclusivity rules, and the
-   measurement plan that chooses the physical layout. Design only — the numbers
-   it produced live in items 11 and 12.
-6. **[design/prior-art.md](./design/prior-art.md): prior-art review.** The
-   swift-state-graph review that preceded the 0.1.0 public-name freeze: how the
-   two libraries line up, tracked reads versus capture lists, and the
-   name-by-name decisions that came out of it.
-7. **[design/lint.md](./design/lint.md): lint tooling.** The accepted
-   first-party linter that turns the usage conventions into an executable
-   style guide: a SwiftSyntax tool developed in-repo as a nested
-   `swift/Lint` package and shipped behind SwiftPM plugins, the first six
-   rules, their Cog-coupled release, and the rollout.
-8. **[impl/plan.md](./impl/plan.md): implementation plan.** The spike plan
-   turned into milestones, plus the package layout, tooling, CI, and the
-   release process.
-9. **[impl/scenarios.md](./impl/scenarios.md): test scenarios.** The
-   scenario tree that drives red-green implementation: every behavior the
-   library promises, written as small user stories and grouped by milestone.
-10. **[impl/tasks.md](./impl/tasks.md): task graph.** The milestones decomposed
-    into dependency-aware tasks of half an engineering day or less, each with
-    explicit closing verification; every scenario is covered by exactly one
-    task's _Greens:_ line.
-11. **[impl/benchmarks.md](./impl/benchmarks.md): benchmark results.** Every
-    number the measurement plan has produced, with the environment that
-    produced it, the decision it drove, and the withdrawal when a measurement
-    turned out not to be trustworthy. Split out of design/perf.md, which had
-    become four fifths results.
-12. **[impl/optimization.md](./impl/optimization.md): profiling and
-    optimization record.** Where the time actually goes and what each change
-    bought. Separate from item 11 because it is obtained with a sampler and
-    purpose-built probes rather than with the benchmark suite.
-13. **[Design history](../history.md): lineage.** How the Dart and Flutter work
-    became the shared model and then separate native designs. Historical
-    context only; the Swift documents above remain normative for Swift.
+This order also appears in `docs/.vitepress/navigation.mts`. Update both lists
+when adding a document.
 
-This list is the source of truth for reading order, and the sidebar on
-[the published site](https://skeswa.github.io/cog/swift/) mirrors it by hand in
-`docs/.vitepress/navigation.mts`. A document added here belongs there in the
-same revision.
+## Build and test
 
-## Building and testing
-
-Releases are implemented through M8: the original simple core, SwiftUI
-boundary, mechanisms, lifetimes, async policies and streams, exports, external
-Observation tracking, and first-party lint plugins are all present. M9's
-shared-turn performance work, specialized arena, and M10's Storefront
-measurement infrastructure have landed. On `main`, specialized arena with pool
-edges is the sole core and the default implementation. A final application can
-explicitly trade speed for binary size through the non-default `CompactArena`
-SwiftPM package trait. The repository is a SwiftPM package rooted at the git
-root, with every Swift target under `swift/`. Commands are mise tasks; `mise
-tasks` lists them all.
+The git root is the SwiftPM package root. Swift targets live under `swift/`.
+Use mise tasks instead of calling test tools directly:
 
 ```sh
-mise run fmt              # Oxfmt over Markdown/JSON/YAML, swift-format over Swift
-mise run fmt:check        # the same checks, writing nothing
-mise run test             # the default isolation leg
-mise run test:matrix      # all four isolation legs
-mise run test:arena-configurations # behavior through default and compact arena
-mise run test:release     # the default leg in release configuration
-mise run test:compilefail # batched swiftc pass over swift/CompileFail/
-mise run test:storefront  # the macrobenchmark workload's correctness suite
-mise run tasks:check      # validate impl/tasks.md against the plan and scenarios
+mise run fmt                       # format docs, data files, and Swift
+mise run fmt:check                 # check formatting without writing
+mise run test                      # default test setup
+mise run test:matrix               # all four isolation setups
+mise run test:arena-configurations # default and CompactArena behavior
+mise run test:release              # release build tests
+mise run test:compilefail          # expected compiler errors
+mise run test:storefront           # Storefront workload tests
+mise run tasks:check               # check plan, tasks, and scenarios
 ```
 
-Tests run through `tools/swift-test.mjs`, never `swift test` directly: SwiftPM
-exits 0 when `--filter` selects nothing, so a raw filtered run can report a
-green for work it never ran. The wrapper enumerates the built tests before the
-run and checks the executed-test count after it, and gives each leg its own
-scratch path. Arguments pass through, as in
-`mise run test --filter 'DECL-01|ONE-05'`. Root-package runs are serialized so
-the benchmark-sized graph scenarios cannot starve time-bounded actor tests.
+Do not run a filtered `swift test` command. SwiftPM exits successfully when a
+filter finds no tests. Cog's wrapper first checks that the tests exist, then
+checks how many ran:
 
-The four legs are {MainActor-default, nonisolated} ×
-{`NonisolatedNonsendingByDefault` on, off}, selected through
-`COG_TEST_ISOLATION` and `COG_TEST_NNBD`, which `Package.swift` reads. CI runs
-one leg per job using the leg names as wrapper modes (`mainactor-nnbd-on`,
-`mainactor-nnbd-off`, `nonisolated-nnbd-on`, `nonisolated-nnbd-off`). Running
-the tests needs a full Xcode; the Command Line Tools alone fail with
-`no such module 'Testing'`. The maintainer
-[CI runbook](../maintainers/ci.md) records the pinned version and runner
-topology.
+```sh
+mise run test --filter 'DECL-01|ONE-05'
+```
 
-## Production, tests, and previews
+The test matrix combines MainActor or nonisolated defaults with
+`NonisolatedNonsendingByDefault` on or off. A full Xcode is required. The
+Command Line Tools fail to load Swift Testing. See the
+[CI runbook](../maintainers/ci.md) for pinned versions and runners.
 
-Production depends on `Cog` only. Call `Cogs.bootstrapApp(mechanisms:)`
-exactly once, at app launch, listing every mechanism the app runs, and retain
-the context it returns as the app's ownership handle. When bootstrap returns,
-every mechanism is live; there is no later installation step. Use the retained
-object at the composition root to install the SwiftUI environment above every
-scene. A rebuilt scene receives the existing context; it never bootstraps
-another one. Features cannot construct a `Cogs` directly, and there is
-deliberately no ambient `Cogs.app` lookup.
+## Create the app runtime
+
+Production code depends on `Cog`. At launch, call
+`Cogs.bootstrapApp(mechanisms:)` once and keep its result for the life of the
+app. Bootstrap starts every mechanism before it returns.
+
+Install that same object above every SwiftUI scene:
 
 ```swift
 import Cog
@@ -151,23 +105,16 @@ struct WeatherApp: App {
 }
 ```
 
-Every scene receives the same retained object through `.cogEnvironment(cogs)`.
-Every view that interacts with Cog declares
-`@Environment(\.cogs) private var cogs` itself. Views never accept, store, or
-forward `Cogs` in their initializers; intermediate views pass domain values and
-identities only. Tests and previews host their view hierarchy under the same
-modifier with an isolated context.
+Each view that uses Cog reads `@Environment(\.cogs) private var cogs`. A view
+must not accept, store, or pass `Cogs`. Pass normal values and IDs instead.
 
-An ordinary test or preview-support target depends on `CogTesting`. Create one
-fresh context for that test or preview runtime with
-`Cogs.forTesting(seeding:mechanisms:)`; both parameters default to nothing, and
-the seeding closure runs before any mechanism's `operate`, so a test arranges
-state first and then watches mechanisms come alive against it. Use the context
-directly at non-view test boundaries, or install it above a hosted view
-hierarchy with `.cogEnvironment(cogs)`. It starts isolated, never occupies the
-production-install slot, and needs no reset or uninstall. Multiple tests and
-previews may each create a context, but creating a second one partway through
-a single runtime would split the state under test.
+There is no global `Cogs.app`. Features cannot create a production runtime.
+The app owns the one object returned by bootstrap.
+
+## Create test and preview runtimes
+
+Tests and preview-support targets depend on `CogTesting`. Each test or preview
+creates one isolated runtime:
 
 ```swift
 import Cog
@@ -185,13 +132,15 @@ import Testing
 }
 ```
 
-Keep `CogTesting` in test or preview-support targets rather than the shipping
-app target. Timed tests use `TestClock`, inject it wherever scheduling happens,
-and call `advance(by:)` instead of waiting for wall-clock time. Pass that same
-clock as `Cogs.forTesting(clock:)` when Cog-owned lifetime grace is under test.
-Untimed tests use the default continuous clock.
+`Cogs.forTesting(seeding:mechanisms:)` seeds state before it starts mechanisms.
+Use the result directly in non-view tests or install it above a test view with
+`.cogEnvironment(cogs)`. Do not create a second runtime inside the same test or
+preview tree.
 
-Only a test whose subject is the production install uses the scoped fixture:
+Use `TestClock` for timed tests. Pass it to code that schedules work and to
+`Cogs.forTesting(clock:)` when testing Cog's lifetime grace period.
+
+Only tests of production installation should use `withBootstrappedApp`:
 
 ```swift
 @MainActor
@@ -202,231 +151,78 @@ Only a test whose subject is the production install uses the scoped fixture:
 }
 ```
 
-`withBootstrappedApp` calls the real guarded bootstrap and removes its temporary
-registration in `defer`. Its MainActor closure is synchronous, non-reentrant,
-and non-nestable: do not put `await` in it, and do not use it as general test or
-preview setup.
+Its closure is synchronous and cannot nest. Do not use it as normal test setup.
 
-## Where things stand (2026-08-20)
+## Current design
 
-These choices are settled; §10 of the core document has the full record.
+These rules are settled. The linked design files hold the full details.
 
-- `turn` is the only write entry point. Its scalar overload keeps ordinary
-  setters compact; its writer overload makes related writes atomic. Ops are
-  normal methods in `CogOps` extensions, so `Cogs` and a mechanism's
-  controller share every op. `private` or `fileprivate` plus `.readOnly`
-  control which code may name writable state. A turn ID stops an escaped writer from writing later.
-- One outer call to `turn` is one graph turn. The context moves through idle,
-  accumulating, and flushing. Reactions run at the end of the turn; writes
-  from reactions wait in a FIFO queue as new turns. A debug turn-chain guard
-  reports long causal chains through an internal diagnostic seam.
-- A reaction registered during a flush never runs reentrantly. Its initial
-  tracking run joins that flush's reaction tail in registration order, after
-  already-scheduled reactions and before queued write-back turns.
-- Before notifying the UI, Cog settles every changed path that has a live
-  consumer. Unused paths stay lazy.
-- Tracked reads use the active capability's subscript: `c[valueReference]` in
-  selectors and reactions, and `cogs[valueReference]` at the UI boundary. The
-  context owns the tracking operation, while non-tracking reads remain visibly
-  different as `c.peek(valueReference)` or `cogs.peek(valueReference)`.
-  Actions and other escaping closures must use the one-shot spelling. Public
-  Observation cannot tell Cog whether the subscript found an active UI
-  consumer, so Cog does not guess or emit a false-positive missing-consumer
-  warning; that diagnostic is deferred until the framework exposes an exact
-  public query.
-- Value references (`Cog<T>` and `ManualCog<T>`) name state by descriptor and
-  key. A value reference is a value; its identity lives in an internal
-  final-class descriptor plus key. Boxes create keyed value references without
-  allocating new descriptors. Keyed-diamond and churn benchmarks selected
-  inline `AnyHashable?` for v1; the interned-token and generic-keyed candidates
-  were removed after their measurements were recorded.
-- State declaration names expose that shape at the use site: one keyless value
-  reference ends in `Cog` (`currentZipCog`), while a box ends in plural `Cogs`
-  (`weatherForecastCogs`). Qualifiers such as `Source` precede the suffix. The
-  app runtime remains the ordinary local `cogs`; values read from the graph use
-  unsuffixed domain names.
-- Application read sites make that boundary explicit by immediately binding
-  each graph read to its unsuffixed domain local. This applies to selectors and
-  reactions as well as SwiftUI. For example, a status read is
-  `let weatherForecast = cogs.status[weatherForecastCogs[zip]]`. It still uses
-  `weatherForecast`, not `weatherForecastStatus`; its `CogStatus` type carries
-  the distinction. Later field access preserves field-level Observation.
-- Async reads are total and value-first: `c[valueReference]` returns the last
-  accepted success, resting on the declaration's default until one exists, and
-  the request lifecycle reads through the `status` lens (`c.status[...]`,
-  `cogs.status[...]`), which exists only for async references. Every declaration
-  states the resting invariant with `default:`, including `default: nil` for
-  optional values.
-- Async selectors read dependencies synchronously, then return `Work.run` or
-  `Work.stream`. The first read starts work and publicly begins at
-  `kind == .pending`, `value == default`, and `hasSucceeded == false`; there is
-  no observable `initial` kind. `CogStatus.value` is total in every kind, while
-  `hasSucceeded` keeps a successful optional `nil` distinct from the resting
-  default. SwiftUI observes `kind`, `value`, `hasSucceeded`, `error`, and
-  `isLoading` independently, registering only fields a body reads. `.latest`
-  is the default policy.
-  Streams allow only `.latest`. Under `.queue`, a failed run publishes its
-  failure and resolves its exact refresh handle before the next accepted
-  request starts; one request's failure never strands later queued work.
-  A stream's natural end publishes no turn and does not restart: its last
-  success remains current, while an empty stream remains pending on its
-  declared default until dependency change or refresh starts a new generation.
-  An error from the still-current stream publishes failure while retaining
-  that value or default; only cancellation Cog initiated for replacement or
-  release stays silent. Equal `Equatable` stream elements are state no-ops;
-  values without equality conservatively publish every element.
-- `.exhaustLatest` finishes current work, then catches up once. True event
-  dropping belongs to imperative ops.
-- Side effects bundle into first-class `Mechanism` values — a protocol with a
-  defaulted `name` and one `operate(_:)` requirement — specified only at
-  bootstrap and operated synchronously in array order before bootstrap
-  returns. `operate` receives a curated `MechanismController`, never raw
-  `Cogs`: registration (`run`, `watch`, `task`, `whenever`), untracked
-  `peek`, and the shared ops surface. A lifetime shorter than the app is a
-  state-gated `whenever` scope: the gate's fall cancels everything the scope
-  registered, and its next rise re-runs the body fresh. There is no public
-  reaction token or effect group, and no late registration API; view-lifetime
-  work stays with SwiftUI `.task` and `values`. The runtime retains each
-  supplied mechanism value until teardown, when it cancels the mechanism's
-  scope before releasing that value. Delegate work that may arrive later uses
-  a weak controller callback, never raw `Cogs`; the callback becomes inert
-  when its scope ends.
-- Production creates one app-wide `Cogs` and injects it above all scenes.
-  Screens and features share it. Tests and previews create one isolated
-  context for their runtime.
-- Production construction is guarded. `Cogs.bootstrapApp(mechanisms:)`
-  creates the one production context, operates its mechanisms, and fails fast
-  on a second call; the plain initializer is `package`, so feature code cannot
-  name it. The `CogTesting` product adds `Cogs.forTesting(seeding:mechanisms:)`
-  for a test or preview runtime, which seeds before any `operate` and never
-  registers as the production context.
-- The context returned by `bootstrapApp(mechanisms:)` is the app's ownership
-  handle. The app retains it, passes explicit context only at non-view
-  composition boundaries such as isolated test harnesses, and injects it above
-  every scene. Every consuming view resolves it directly through `\.cogs`; no
-  view accepts or forwards it. Ops extend `CogOps`, and there is no
-  ambient `Cogs.app`. Tests of production installation use a synchronous scoped
-  fixture from `CogTesting`, so they cannot leak global install state across
-  the suite.
-- Manual state and states seen by the UI live for the app context by default.
-  Graph-only automatic and async states may be released when unused. Query caches
-  have their own retention rules. A `whileObserved` declaration with no
-  explicit grace uses the context default: 30 seconds in production, with an
-  explicit `CogTesting` override for deterministic timed tests. An ephemeral
-  source opts out of app lifetime with
-  `lifetime: .whileObserved(resetToInitial: true)`, which is the only spelling
-  Cog accepts for a source: releasing one can only start it over, so the
-  contradictory `false` traps at the declaration.
-- Non-tracking peeks (`c.peek` in a selector or reaction, and one-shot
-  `cogs.peek` outside) skip
-  the dependency edge but still settle the value they return; they are never
-  stale. A synchronous automatic or async peek is transient demand: without a
-  durable consumer it renews normal `whileObserved` grace, and expiry releases
-  the state. Peeking or refreshing a never-read async value starts exactly one
-  initial run with `kind == .pending`, `value == default`, and
-  `hasSucceeded == false` without a dependency, subscription, or Observation
-  boundary; expiry also cancels its work and rejects late results. Exported
-  streams (`cogs.values(of:)`) start from the current settled value and never
-  make a turn wait: `.newest(1)` may skip turns for a slow reader,
-  `.oldest(n)` delivers the oldest n in order and drops newer while full, and
-  `.unbounded` delivers everything.
-- External `@Observable` inputs publish the newest post-mutation value at each
-  propagation boundary; several mutations may coalesce. The pre-iOS-26
-  one-shot shim internally acknowledges re-arming for deterministic tests, but
-  its small disarmed race remains a documented platform limitation.
-- Debug-only `CogTesting.seed` stages a value and pushes dirty flags like a
-  write, but records no turn, sends no notices, and runs no reactions. The
-  factory's seeding phase precedes every mechanism's `operate`; seeding after
-  bootstrap remains safe, because the next real turn settles what the seed
-  dirtied. Apps importing only `Cog` cannot seed.
-- Dynamic cycles are programmer errors. Diagnostics show the keyed path.
-  Synchronous selectors do not throw in v1.
-- Automatic computation is read-only through selector execution, dependency
-  reconciliation, custom equality, and result publication. A turn attempted
-  in that region fails immediately in every build, names the cog/key and turn,
-  and tells the caller to invoke the op outside automatic computation, from event
-  handling or a reaction.
-- The shipping runtime is the specialized arena with shared pool edges. M9 made
-  boundary notices O(changed), removed steady-turn allocations from shared
-  machinery, and proved the stable `@inlinable` typed frontier against the
-  simple and unspecialized arena implementations. The frontier removes the
-  erased generic-storage cost that dominated keyed graph construction and wins
-  every measured warm whole-graph shape. The simple core is retired. The
-  `CompactArena` package trait is the explicit binary-size opt-out and disables
-  specialization without changing public behavior. Public value references
-  remain names, never arena slot handles.
-- Tests are fully optimistic, as fast and cheap as possible, and as
-  implementation agnostic as possible: every wait is a definite injected
-  signal (clocks, continuations, acknowledgements), host-side `swift test` is
-  the default home with injected time everywhere, and behavior tests observe
-  the public surface before any diagnostic seam — so the suite must pass
-  unchanged across the planned core swap. The normative statement is the
-  "Testing constraints" section of impl/scenarios.md.
-- Implementation runs from a checked dependency graph of half-day tasks. Each
-  task has one type, explicit prerequisites and closing verification, and ends
-  green; scenario credit requires proving the whole story against real
-  infrastructure. Core swaps integrate by behavior group, and every release
-  separates its candidate gate, tag, and post-release verification. The
-  normative rules are in impl/tasks.md.
-- Public names are frozen for 0.1.0 as they stand. The chartered prior-art
-  review reconsidered thirteen of them against swift-state-graph and renamed
-  none; [design/prior-art.md](./design/prior-art.md) records the matrix, the
-  reasoning, and the one name with a revisit trigger.
-- First-party lint tooling is implemented as a syntax-only `coglint` developed in
-  a nested package and shipped as a prebuilt binary behind SwiftPM plugins. Its
-  six initial rules cover declarations, view/runtime boundaries, primitive
-  ownership, bootstrap-time state, source privacy, and multi-read runtime
-  helpers. Cog, the linter, and their `Cog.docc` rule pages share one release;
-  the root manifest remains artifact-free because SwiftPM and Xcode both
-  eagerly fetched an unused binary target. The selected distribution is the
-  version-coupled sibling manifest repository. The
-  package and products are `CogLint`, `CogLintBinary`,
-  `CogLintBuildToolPlugin`, and `CogLintCommandPlugin`; distribution uses the
-  generated `CogLintPlugins` package in
-  `skeswa/coglint-plugins`. Rule diagnostics link directly to permanent native
-  DocC articles under `/cog/documentation/cog/`, without a redirect facade.
-  Its isolated Swift-tools 6.2 package pins swift-syntax 603.0.2 and
-  swift-argument-parser 1.8.2 exactly; Xcode 26.6 / Swift 6.3.3 builds native
-  arm64 and x86_64 macOS 14 variants.
+### State and writes
 
-Still open: how much `Op` support v1 needs, optional deferred reactions,
-debug-history tools, and persistence helpers. Also open are several
-edge behaviors: debounce/throttle timing modifiers (deferred backlog).
-Custom hash tables also remain open until benchmarks justify them. Inline
-`AnyHashable` value references and the shared linked edge pool are selected by
-the measurements in impl/benchmarks.md.
+- One app has one MainActor `Cogs` graph.
+- `Cog<T>` and `ManualCog<T>` name one value. A `CogBox` makes keyed values
+  from one declaration.
+- Keyless declaration names end in `Cog`; box names end in `Cogs`. Values read
+  from the graph use normal domain names without either suffix.
+- `turn` is the only write primitive. App code wraps `turn` and `refresh` in
+  named methods on `CogOps`.
+- One outer `turn` call is one graph turn. Reaction writes wait in a FIFO queue
+  as later turns.
+- Cog settles each changed path with a live reader before it notifies the UI.
+  Unused paths stay lazy.
+- Tracked reads use subscripts. One-time reads use `peek`; they still settle
+  the value but add no dependency.
+- Dynamic cycles and writes during automatic computation fail with a clear
+  error.
 
-## Prior art
+### Async state
 
-Cog is not the first Swift graph. Before freezing its public names it read
-[swift-state-graph](https://github.com/VergeGroup/swift-state-graph), by
-Hiroshi Kimura (muukii) and the VergeGroup authors, and credits it for arriving
-first at the shape both libraries share: a dependency graph with dirty marking,
-recomputation deferred to the read that needs it, and a library that meets
-SwiftUI at `@Observable` instead of replacing it. Cog's own lineage for the
-graph algorithms — SolidJS, Reactively, and the js-reactivity-benchmark
-scenarios — is credited in [design/perf.md](./design/perf.md).
+- An async declaration has a required default value. A normal read returns the
+  latest accepted value or that default.
+- The `status` lens exposes `kind`, `value`, `hasSucceeded`, `error`, and
+  `isLoading`. SwiftUI tracks only the fields it reads.
+- `.latest` is the default policy. `.queue` runs requests in order.
+  `.exhaustLatest` finishes current work and then catches up once. Streams use
+  `.latest` only.
+- Starting an unread async value creates one pending run. Release cancels work
+  and rejects late results.
+- Exported streams start with the current settled value. Their buffer policy
+  controls what a slow reader may miss.
 
-Cog diverges deliberately in five places: one app-wide `Cogs` owns every state
-instead of state living on the objects that declare it; the reader is a value
-passed to a selector rather than ambient thread-local tracking; lifetime is
-declared per state kind rather than left to ARC; boxes make keyed value
-references from one declaration; and async state, with its status and policies,
-is a first-class state kind. [design/prior-art.md](./design/prior-art.md) is the
-full review.
+### Effects and lifetime
 
-## Next steps
+- A `Mechanism` owns app-wide side effects. Bootstrap starts mechanisms in
+  array order through a limited `MechanismController`.
+- A state-gated `whenever` scope owns shorter work. SwiftUI `.task` and
+  `values` own view-lifetime work.
+- Manual state and UI-observed state live for the app by default. Unused
+  automatic and async state may expire. The default grace period is 30 seconds.
+- An ephemeral source must use
+  `lifetime: .whileObserved(resetToInitial: true)`.
+- Tests may seed state before mechanisms start. Seeding creates no turn,
+  notice, or reaction.
 
-[impl/plan.md](./impl/plan.md) is the execution plan,
-[impl/scenarios.md](./impl/scenarios.md) is its test-scenario tree, and
-[impl/tasks.md](./impl/tasks.md) is its half-day task breakdown. M7 and M8 are
-published as 0.3.0 and 0.4.0. M9's shared-turn, O(changed), and specialization
-work has landed, and M10's Storefront workload, headless cuts, SwiftUI benchmark
-app, and first paired core measurements are present. The specialized arena is
-now the consumer default and the simple implementation is retired. The
-remaining release work is to repeat the scouting measurements and Storefront UI
-qualification on the pinned Xcode, then calibrate thresholds for the new
-shipping configuration.
+### Runtime and tools
+
+- The shipping core is the specialized arena with a shared linked-edge pool.
+  It makes changed-key notices O(changed) and allocates nothing in a steady
+  turn.
+- The `CompactArena` package trait turns off specialization to reduce binary
+  size without changing behavior.
+- Inline `AnyHashable` keys and pool edges won their benchmark decisions.
+  Public value references never expose arena slots.
+- `coglint` checks six Cog usage rules through SwiftPM build-tool and command
+  plugins. The separate `coglint-plugins` package keeps binary artifacts out of
+  Cog's root dependency graph.
+- Behavior tests use public APIs, injected clocks, continuations, and clear
+  signals. They do not depend on timing guesses or a specific core layout.
+
+Open work includes optional `Op` support, deferred reactions, debug history,
+persistence helpers, debounce and throttle timing, and any custom hash table
+that future benchmarks can justify.
+
+The detailed decision record is in [core design §10](./design/exploration.md#10-decision-record).
+Current measurements are in [benchmark results](./impl/benchmarks.md).
 
 <!-- x-release-please-start-version -->
 
