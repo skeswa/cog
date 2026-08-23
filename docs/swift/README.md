@@ -19,7 +19,7 @@ Read the Swift docs in this order:
 1. **[Core design](./design/exploration.md)** — graph behavior, public API,
    writes, async state, SwiftUI, decisions, and open questions.
 2. **[Mechanisms](./design/mechanisms.md)** — side effects, timers, gated work,
-   bootstrap, tests, and background work.
+   assembly, tests, and background work.
 3. **[Rx map](./design/rx.md)** — how Rx operators map to Cog.
 4. **[Runtime design](./design/perf.md)** — storage, propagation, cost rules,
    and the measurement plan.
@@ -91,8 +91,8 @@ Command Line Tools fail to load Swift Testing. See the
 ## Create the app runtime
 
 Production code depends on `Cog`. At launch, call
-`Cogs.bootstrapApp(mechanisms:)` once and keep its result for the life of the
-app. Bootstrap starts every mechanism before it returns.
+`Cogs.assemble(mechanisms:)` once and keep its result for the life of the
+app. Assembly starts every mechanism before it returns.
 
 Install that same object above every SwiftUI scene:
 
@@ -106,7 +106,7 @@ struct WeatherApp: App {
   private let cogs: Cogs
 
   init() {
-    cogs = Cogs.bootstrapApp(mechanisms: [
+    cogs = Cogs.assemble(mechanisms: [
       WeatherMechanism(notifier: .live),
     ])
   }
@@ -124,7 +124,7 @@ Each view that uses Cog reads `@Environment(\.cogs) private var cogs`. A view
 must not accept, store, or pass `Cogs`. Pass normal values and IDs instead.
 
 There is no global `Cogs.app`. Features cannot create a production runtime.
-The app owns the one object returned by bootstrap.
+The app owns the one object returned by assembly.
 
 ## Create test and preview runtimes
 
@@ -155,13 +155,13 @@ preview tree.
 Use `TestClock` for timed tests. Pass it to code that schedules work and to
 `Cogs.forTesting(clock:)` when testing Cog's lifetime grace period.
 
-Only tests of production installation should use `withBootstrappedApp`:
+Only tests of production installation should use `withAssembledCogs`:
 
 ```swift
 @MainActor
-@Test func appBootstrapIsTheSubject() {
-  Cogs.withBootstrappedApp { cogs in
-    #expect(Cogs.isBootstrappedApp(cogs))
+@Test func appAssemblyIsTheSubject() {
+  Cogs.withAssembledCogs { cogs in
+    #expect(Cogs.isAssembledCogs(cogs))
   }
 }
 ```
@@ -208,7 +208,7 @@ These rules are settled. The linked design files hold the full details.
 
 ### Effects and lifetime
 
-- A `Mechanism` owns app-wide side effects. Bootstrap starts mechanisms in
+- A `Mechanism` owns app-wide side effects. Assembly starts mechanisms in
   array order through a limited `MechanismController`.
 - A state-gated `whenever` scope owns shorter work. SwiftUI `.task` and
   `values` own view-lifetime work.

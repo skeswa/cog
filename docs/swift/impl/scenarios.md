@@ -96,7 +96,7 @@ _Milestone M1. Design: §2.3, §6.3, §6.6._
 
 My whole app shares one Cog world. Tests get their own little worlds.
 
-- **ONE-01.** App bootstrap installs the one Cog context at launch. An op
+- **ONE-01.** App assembly installs the one Cog context at launch. An op
   declared in one feature file performs a write, and a read made elsewhere
   through the installed context sees it — no other setup, no second
   context anywhere.
@@ -385,25 +385,25 @@ these stories run inside a small test mechanism's `operate`.
 
 _Milestone M1, except MECH-11 (M4). Design: §6.2, §6.3._
 
-Every side effect lives in a named mechanism specified at bootstrap; a
+Every side effect lives in a named mechanism specified at assembly; a
 shorter lifetime is a `whenever` gate expressed in state. (The GROUP family —
 public effect groups and reaction tokens — retired on 2026-08-14 when
 mechanisms replaced them; REACT-10 through REACT-13 and REACT-18 retired with
 it. Retired IDs stay retired.)
 
-- **MECH-01.** I bootstrap with a list of mechanisms. Each `operate` runs
-  synchronously in list order, and when bootstrap returns every mechanism is
+- **MECH-01.** I assemble with a list of mechanisms. Each `operate` runs
+  synchronously in list order, and when assembly returns every mechanism is
   live: a turn on the very next line wakes their reactions, and reactions
   from two mechanisms run in list order when one turn wakes both.
 - **MECH-02.** A mechanism configures state and seeds demand during
   `operate` through ops on its controller. Those turns settle before
-  bootstrap returns, and a mechanism later in the list observes the earlier
+  assembly returns, and a mechanism later in the list observes the earlier
   mechanism's published values during its own `operate`.
 - **MECH-03.** Declaring a mechanism does nothing by itself. Its reactions
-  and tasks exist only when it is listed at bootstrap; a mechanism left off
+  and tasks exist only when it is listed at assembly; a mechanism left off
   the list never runs.
-- **MECH-04.** Two mechanisms in one bootstrap list share a name. Cog stops
-  bootstrap right away with a clear error, in debug builds and release
+- **MECH-04.** Two mechanisms in one assembly list share a name. Cog stops
+  assembly right away with a clear error, in debug builds and release
   builds. (Proof: exit test.)
 - **MECH-05.** A mechanism without a custom `name` is known by its type name
   with a trailing "Mechanism" dropped, and every registration name composes
@@ -415,7 +415,7 @@ it. Retired IDs stay retired.)
   Before that, it does not run, and the app entry point retains only `Cogs`.
 - **MECH-07.** A `whenever` gate already reads true when its mechanism
   operates. The scope body runs immediately, and its registrations are live
-  when bootstrap returns.
+  when assembly returns.
 - **MECH-08.** A `whenever` gate starts false and a later turn raises it:
   the scope body runs then. Another turn lowers it: the scope's reactions
   never run again and its tasks receive cancellation. A further rise runs
@@ -443,7 +443,7 @@ it. Retired IDs stay retired.)
 - **MECH-14.** I try to register a reaction directly on the runtime, as in
   `cogs.run { ... }`. The compiler says no: reactions register only through
   a mechanism's controller. (Proof: compile-fail.)
-- **MECH-15.** I bootstrap with a class mechanism that owns a resource, then
+- **MECH-15.** I assemble with a class mechanism that owns a resource, then
   drop my own reference to the mechanism. The runtime retains that exact
   mechanism and its resource while the context lives. When the context ends,
   its scope's reactions and tasks are cancelled first, and only then is the
@@ -508,7 +508,7 @@ turn for a loud domain operation.
   after the seed recomputes from the seeded value. A seed obeys the
   source's equality rule the way a write does — seeding an equal value is
   not a change.
-- **SEED-04.** The §6.6 alert story, verbatim: bootstrap a weather
+- **SEED-04.** The §6.6 alert story, verbatim: assemble a weather
   mechanism whose alert reaction watches for nice weather, seeding the zip
   and cloudy weather first (no alert), then stub sunny weather with a real
   turn. The alert fires exactly once, even though the reaction's first
@@ -1061,17 +1061,17 @@ locations in my editor and CI, without making my app compile the linter.
 - **LINT-08.** `primitives-only-in-ops` rejects `turn` and `refresh` on
   classified production graph receivers and rejects bare or
   `self`-qualified primitives inside `extension Cogs`, including environment,
-  bootstrap-local, selector, reaction, and mechanism-controller spellings.
+  assembly-local, selector, reaction, and mechanism-controller spellings.
 - **LINT-09.** `primitives-only-in-ops` allows bare primitives and nested
   writer work lexically inside `extension CogOps`, and explicit test-target
   configuration allows tests to drive graph primitives directly.
 - **LINT-10.** `initial-state-in-mechanism` allows a local bound directly from
-  `Cogs.bootstrapApp` to appear only in its retention assignment inside a
+  `Cogs.assemble` to appear only in its retention assignment inside a
   recognized `App` initializer; named ops, reads, helpers, and primitives
   before or after retention are violations.
-- **LINT-11.** `initial-state-in-mechanism` allows direct bootstrap retention
-  and service or mechanism construction before bootstrap, while documenting
-  factory-hidden bootstrap and cross-file `App` conformance as accepted
+- **LINT-11.** `initial-state-in-mechanism` allows direct assembly retention
+  and service or mechanism construction before assembly, while documenting
+  factory-hidden assembly and cross-file `App` conformance as accepted
   syntax-only misses.
 - **LINT-12.** `manual-cog-private` accepts `private` and `fileprivate` on
   every recognized `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` source and rejects implicit

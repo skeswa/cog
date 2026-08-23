@@ -16,19 +16,19 @@
 /// to pass between arbitrary executors: enter the MainActor before reading,
 /// refreshing, registering reactions, or publishing operations.
 ///
-/// Call ``bootstrapApp(mechanisms:)`` once when an app launches. Tests and previews use
+/// Call ``assemble(mechanisms:)`` once when an app launches. Tests and previews use
 /// `Cogs.forTesting()` from the `CogTesting` product.
 @MainActor
 public final class Cogs {
-  /// The mechanisms this runtime operates, in bootstrap list order.
+  /// The mechanisms this runtime operates, in assembly list order.
   ///
-  /// The runtime retains the exact mechanism values supplied at bootstrap so
+  /// The runtime retains the exact mechanism values supplied at assembly so
   /// a class-owned resource cannot disappear while one of its reactions or
   /// tasks is still registered. Teardown cancels every scope first and
   /// releases these values only afterward.
   private var mechanisms: [any Mechanism] = []
 
-  /// Each bootstrap mechanism's registration scope, parallel to `mechanisms`.
+  /// Each assembly mechanism's registration scope, parallel to `mechanisms`.
   ///
   /// A scope owns its mechanism's reactions, tasks, open `whenever` children,
   /// and controller. Nothing else may register effects: the public `Cogs`
@@ -176,7 +176,7 @@ public final class Cogs {
 
   /// Creates an empty context.
   ///
-  /// Package access limits construction to `bootstrapApp()` and the
+  /// Package access limits construction to `assemble()` and the
   /// `CogTesting` factory. Construction is synchronous and MainActor-isolated;
   /// declarations remain inert until used with this context.
   ///
@@ -301,8 +301,8 @@ public final class Cogs {
 extension Cogs {
   /// Operates the runtime's mechanisms, exactly once, in list order.
   ///
-  /// Only `bootstrapApp(mechanisms:)` and the `CogTesting` factory call this,
-  /// which is what makes registration bootstrap-only: there is no later
+  /// Only `assemble(mechanisms:)` and the `CogTesting` factory call this,
+  /// which is what makes registration assembly-only: there is no later
   /// installation API. Each mechanism receives its own scope and curated
   /// controller; `operate` runs synchronously, so every mechanism is live —
   /// and its operate-time writes settled — before the factory returns.
@@ -318,7 +318,7 @@ extension Cogs {
       fatalError(
         """
         This context already operated its mechanisms. Mechanisms are \
-        specified once, at bootstrap; there is no later installation step.
+        specified once, at assembly; there is no later installation step.
         """
       )
     }
@@ -329,7 +329,7 @@ extension Cogs {
       guard seenNames.insert(name).inserted else {
         fatalError(
           """
-          Two mechanisms in one bootstrap list are both named "\(name)". \
+          Two mechanisms in one assembly list are both named "\(name)". \
           Mechanism names attribute debug history, task names, and \
           diagnostics, so each mechanism needs its own. Give one of them an \
           explicit `name`.

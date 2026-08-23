@@ -2,7 +2,7 @@ public import SwiftUI
 
 /// Optional storage makes a missing composition boundary diagnosable.
 ///
-/// A fabricated default context would split state from the graph bootstrapped
+/// A fabricated default context would split state from the graph assembled
 /// by the app. Keeping the default `nil` lets the public accessor fail with
 /// installation guidance instead.
 private struct CogsEnvironmentKey: EnvironmentKey {
@@ -25,7 +25,7 @@ extension EnvironmentValues {
 extension EnvironmentValues {
   /// The app-wide Cog context installed above this view hierarchy.
   ///
-  /// At app launch, keep the value returned by ``Cogs/bootstrapApp(mechanisms:)`` and
+  /// At app launch, keep the value returned by ``Cogs/assemble(mechanisms:)`` and
   /// install it above every scene:
   ///
   /// ```swift
@@ -58,7 +58,7 @@ extension EnvironmentValues {
       fatalError(
         """
         No Cog context is installed in this view hierarchy. Keep the context \
-        returned by `Cogs.bootstrapApp()` and inject it above every scene with \
+        returned by `Cogs.assemble()` and inject it above every scene with \
         `.cogEnvironment(cogs)`. Tests and previews should inject their \
         isolated `Cogs.forTesting()` context through the same boundary.
         """
@@ -72,7 +72,7 @@ extension View {
   /// Installs the app-wide Cog context above a SwiftUI view hierarchy.
   ///
   /// Call this at the composition root with the single context returned by
-  /// ``Cogs/bootstrapApp(mechanisms:)``. Descendants inherit that exact reference, so
+  /// ``Cogs/assemble(mechanisms:)``. Descendants inherit that exact reference, so
   /// multiple scenes share one authoritative graph. Tests and previews may use
   /// their one isolated testing context instead.
   ///

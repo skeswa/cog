@@ -77,3 +77,9 @@ API breakage: struct CogBoxProjection has been removed
 API breakage: struct CogProjection has been removed
 API breakage: struct ManualCog has been removed
 API breakage: struct ManualCogBox has been removed
+API breakage: func Cogs.bootstrapApp(mechanisms:) has been removed
+API breakage: var Cogs.installedApp has been removed
+API breakage: func Cogs.uninstallApp() has been removed
+API breakage: func Cogs.withBootstrappedApp(mechanisms:_:) has been removed
+API breakage: func Cogs.isBootstrappedApp(_:) has been removed
+API breakage: var Cogs.hasBootstrappedApp has been removed

@@ -144,18 +144,18 @@ new shape automatically, but must not mirror it into a second
 `Cog<Value>.Manual`.
 
 The plain `Cogs` initializer is package-only. Production calls
-`Cogs.bootstrapApp(mechanisms:)` once; a second call fails in every build. Tests
+`Cogs.assemble(mechanisms:)` once; a second call fails in every build. Tests
 and previews use `Cogs.forTesting(seeding:mechanisms:)` for a fresh context.
 It seeds first, then starts mechanisms, and never claims the production slot.
 
-The app retains the value from `bootstrapApp` and injects it above every scene.
+The app retains the value from `assemble` and injects it above every scene.
 Each Cog-using view resolves `\.cogs` itself; no view accepts or forwards the
 runtime. Non-view composition points may receive it directly. Ops extend
 `CogOps`, so both `Cogs` and mechanism controllers use them. There is no global
 `Cogs.app`.
 
 Tests of production setup use a synchronous MainActor `CogTesting` fixture. It
-calls real bootstrap and clears the global slot in `defer`. It cannot suspend,
+calls real assembly and clears the global slot in `defer`. It cannot suspend,
 so parallel tests cannot see the temporary install. Test-only checks may
 compare context identity but cannot inspect graph storage.
 
@@ -685,7 +685,7 @@ graph.
 ## 6. Side effects, worked
 
 See [mechanisms.md](./mechanisms.md) for mechanisms, reactions, gated scopes,
-bootstrap registration, view lifetime, testing, background work, and
+assembly registration, view lifetime, testing, background work, and
 reconciler rules.
 
 ---
@@ -767,9 +767,9 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | Stream end and error | Natural end publishes no turn. A current thrown error publishes failure. Cog-led cancellation is silent. Equal elements are no-ops when equality exists.                                                                                                |
 | Refresh result       | `CogRefresh` reports success, failure, superseded, or released for the exact generation it started.                                                                                                                                                     |
 | Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds.                                                                                                                   |
-| Mechanisms           | Bootstrap owns app-wide effects. `whenever` owns gated work. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.                                                                                                           |
+| Mechanisms           | Assembly owns app-wide effects. `whenever` owns gated work. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.                                                                                                            |
 | UI and exports       | Views resolve `\.cogs` themselves. Bindings use a tracked getter and named-op setter. Exports never block a turn.                                                                                                                                       |
-| Runtime creation     | Production calls `bootstrapApp(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                                                                                                          |
+| Runtime creation     | Production calls `assemble(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                                                                                                              |
 | Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped.                                                                                               |
 | Traps and deinits    | Clear release-build traps use `fatalError`. Every generic class writes `nonisolated deinit` until the Swift optimizer bug is fixed.                                                                                                                     |
 | Public names         | The shape families use `Cog<Value>.Manual` / `.Async` / `.Projection` and the corresponding `CogBox<Value, Key>` members. `ManualCogLifetime` stays top-level. [prior-art.md](./prior-art.md) records the naming review and the `Cogs` revisit trigger. |
@@ -786,8 +786,11 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
    `cogs[...]` at the UI edge, and `peek` for one-time reads.
 2. **First-class `Op` values — open.** Plain `CogOps` methods ship today.
 3. **Deferred reactions — open.** Synchronous ordered reactions ship today.
-4. **App bootstrap — settled.** Production uses `bootstrapApp`; tests and
-   previews use `forTesting`.
+4. **App assembly — settled.** Production uses `assemble`; tests and
+   previews use `forTesting`. `assemble` replaced `bootstrapApp` with no
+   deprecated alias, and API names reference the `Cogs` object rather than
+   the "app" — hence `withAssembledCogs`, `isAssembledCogs`, and
+   `hasAssembledCogs`.
 5. **Debug-history UI — open.** The bounded data exists; its display does not.
 6. **Dart and Flutter feedback — later.** Revisit after the Swift model proves
    useful in shipped apps.
@@ -824,7 +827,7 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
 24. **Read locals — settled.** Bind each read to its plain domain name.
 25. **SwiftUI runtime access — settled.** Each Cog-using view reads `\.cogs`
     from the environment.
-26. **Mechanisms — settled.** Bootstrap lists them; controllers register work;
+26. **Mechanisms — settled.** Assembly lists them; controllers register work;
     state gates own shorter scopes.
 27. **Lint tooling — settled.** The syntax-only linter, six rules, plugins,
     docs, and sibling distribution ship together.

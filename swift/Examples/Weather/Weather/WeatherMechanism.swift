@@ -35,7 +35,7 @@ struct Notifier {
 }
 
 /// Weather's one mechanism: the process-lifetime alert reaction and
-/// scheduling loop, registered at bootstrap.
+/// scheduling loop, registered at assembly.
 ///
 /// The default `Mechanism` name drops the suffix, so registrations compose
 /// under `Weather` in debug history and task names. Forecast request tasks
@@ -50,13 +50,13 @@ struct WeatherMechanism: Mechanism {
   let notifier: Notifier
   /// Injectable clock used only by the periodic scheduling task.
   var clock: any Clock<Duration> = ContinuousClock()
-  /// Keys given one transient initial demand during bootstrap.
+  /// Keys given one transient initial demand during assembly.
   var initialZipCodes = ZipCode.examples
   /// The ZIP selected before anything watches, or `nil` to start unselected.
   ///
   /// Initial app state belongs here rather than in the app entry point:
-  /// `operate` runs inside bootstrap, so this write settles before
-  /// `bootstrapApp` returns and no watcher ever observes the unselected value
+  /// `operate` runs inside assembly, so this write settles before
+  /// `assemble` returns and no watcher ever observes the unselected value
   /// on its way past. It is also how a test arranges the same starting world,
   /// through `Cogs.forTesting(mechanisms:)`.
   var initialLocation: ZipCode? = .newYork

@@ -6,7 +6,7 @@
 //
 // The valid first call proves this fixture resolved the real debug `seed`
 // surface before the second call tests its value-reference restriction. The context and
-// value references are parameters so no bootstrap or construction rule is involved.
+// value references are parameters so no assembly or construction rule is involved.
 //
 // The harness imports CogTesting's debug build, where `seed` exists. This
 // fixture is deliberately not wrapped in `#if DEBUG`: its separate frontend is

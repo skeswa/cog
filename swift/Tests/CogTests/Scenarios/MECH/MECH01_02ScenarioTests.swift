@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func `MECH-01 bootstrap operates mechanisms synchronously in list order`() {
+@Test func `MECH-01 assembly operates mechanisms synchronously in list order`() {
   let source = Cog<Int>.Manual(0)
   var events: [String] = []
 
@@ -36,7 +36,7 @@ import Testing
 }
 
 @MainActor
-@Test func `MECH-02 operate-time writes settle before bootstrap returns`() {
+@Test func `MECH-02 operate-time writes settle before assembly returns`() {
   let configured = Cog<Int>.Manual(0)
   var laterMechanismSaw: Int?
 

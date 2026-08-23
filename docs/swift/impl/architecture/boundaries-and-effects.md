@@ -11,14 +11,14 @@ state ownership out of `Cogs`.
 
 ## Runtime ownership and isolation
 
-The app entry point bootstraps one `Cogs`, retains it, and installs that exact
+The app entry point assembles one `Cogs`, retains it, and installs that exact
 object above every scene. Tests and previews create their own isolated runtime
 through `CogTesting`.
 
 ```swift
 @main @MainActor
 struct WeatherApp: App {
-  private let cogs = Cogs.bootstrapApp(
+  private let cogs = Cogs.assemble(
     mechanisms: [WeatherMechanism(notifier: .live)]
   )
   var body: some Scene {
@@ -137,10 +137,10 @@ compatibility path re-arms one-shot `withObservationTracking` after mutation.
 
 ## Mechanisms own side effects
 
-A `Mechanism` is the bootstrap-registered owner of app-wide effects, timers,
+A `Mechanism` is the assembly-registered owner of app-wide effects, timers,
 tasks, external subscriptions, and initial production state. `operate` receives
 a curated `MechanismController`, not unrestricted installation API. All
-mechanisms are operated synchronously in list order before bootstrap returns.
+mechanisms are operated synchronously in list order before assembly returns.
 
 ```swift
 struct AdviceMechanism: Mechanism {
@@ -155,7 +155,7 @@ struct AdviceMechanism: Mechanism {
 ```
 
 Initial app state belongs in `operate`, through a domain op. Its turn settles
-during bootstrap, before a watcher can observe a transient default. Test setup
+during assembly, before a watcher can observe a transient default. Test setup
 passes the same mechanism to `Cogs.forTesting(mechanisms:)`; `seeding:` remains
 a test-only quiet installation seam.
 
@@ -254,7 +254,7 @@ sequences rather than leaving inert reaction bodies retained.
 - UI boundaries stay lazy and field-specific.
 - Observation adapts completed graph turns; it does not become internal graph
   storage.
-- Mechanisms are the bootstrap-only home for app-wide effects and initial state.
+- Mechanisms are the assembly-only home for app-wide effects and initial state.
 - Reactions read synchronously through a terminal and write later through ops.
 - Every owner has an explicit cancellation or teardown path.
 

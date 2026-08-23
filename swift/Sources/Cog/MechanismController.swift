@@ -10,7 +10,7 @@
 ///
 /// A controller is a final-class lifetime capability retained by its scope, so
 /// asynchronous and delegate-driven work may capture it weakly. It does not
-/// own the app runtime. When its scope ends — runtime teardown for a bootstrap
+/// own the app runtime. When its scope ends — runtime teardown for an assembly
 /// mechanism, a falling gate for a `whenever` sub-controller — the runtime
 /// cancels the scope's registrations and tasks and releases the controller;
 /// a `[weak m]` callback then fails promotion and returns. Storing a
@@ -39,7 +39,7 @@ public final class MechanismController {
 
   /// Creates the capability for one mechanism or `whenever` scope.
   ///
-  /// Only bootstrap and an opening gate construct controllers; the scope
+  /// Only assembly and an opening gate construct controllers; the scope
   /// retains the result for exactly the lifetime it authorizes.
   internal init(cogs: Cogs, namePath: String, scope: MechanismScope) {
     self.cogtext = cogs
@@ -97,7 +97,7 @@ extension MechanismController {
   /// work. `peek` reads remain one-shot and do not become dependencies.
   ///
   /// The runtime owns registrations in call order — across mechanisms, array
-  /// order at bootstrap. A turn marks only reactions reachable from changed
+  /// order at assembly. A turn marks only reactions reachable from changed
   /// state; the flush then runs those reactions after their dependencies
   /// settle and leaves unrelated registrations quiet. Outside a flush the
   /// initial run completes before this method returns. A registration made

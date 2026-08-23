@@ -5,7 +5,7 @@ import CogTesting
 import Testing
 
 @MainActor
-@Test func niceWeatherReactionSkipsBootstrapAndAlertsOnFalseToTrueTransitions() async throws {
+@Test func niceWeatherReactionSkipsAssemblyAndAlertsOnFalseToTrueTransitions() async throws {
   let requests = WeatherRequestController()
   var starts = requests.starts.makeAsyncIterator()
   var alerts: [String] = []
@@ -57,7 +57,7 @@ import Testing
 }
 
 @MainActor
-@Test func bootstrappedMechanismsDoNotRetainAnIsolatedRuntime() async throws {
+@Test func assembledMechanismsDoNotRetainAnIsolatedRuntime() async throws {
   var cogs: Cogs? = Cogs.forTesting(mechanisms: [
     WeatherMechanism(notifier: Notifier { _ in }, initialZipCodes: [])
   ])
@@ -115,7 +115,7 @@ import Testing
 }
 
 @MainActor
-@Test func bootstrappingTheMechanismPublishesTheCadenceTheLoopActuallyKeeps() {
+@Test func assemblingTheMechanismPublishesTheCadenceTheLoopActuallyKeeps() {
   let cogs = Cogs.forTesting(
     seeding: { cogs in
       cogs.seedCurrentZip(.newYork)

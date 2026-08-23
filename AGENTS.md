@@ -100,7 +100,7 @@ keep milestone state there rather than copying it into this instruction file.
   Flutter design, including the ideas retained, revised, or rejected.
 - `docs/swift/` — living Swift documents. Start with `README.md`, the map.
   Design docs live in `docs/swift/design/`: `exploration.md` covers the core
-  architecture and API; `mechanisms.md` covers mechanisms — the bootstrap-registered
+  architecture and API; `mechanisms.md` covers mechanisms — the assembly-registered
   home for every side effect — and background work;
   `rx.md` maps Rx concepts; `perf.md` covers the cost order, the data-oriented
   implementation, and the measurement plan — design only, since its recorded
@@ -433,7 +433,7 @@ that runtime.
   Tests and previews host views under the same environment modifier. Explicit
   `Cogs` parameters remain appropriate at non-view composition boundaries such
   as isolated test harnesses; side effects register as mechanisms in the
-  bootstrap call rather than through any later installation.
+  assembly call rather than through any later installation.
 - **Wrap every primitive in a named op.** `turn` and `refresh` are how the
   graph is asked to do something, not what an app calls the asking. Application
   code — a view action, a button, a mechanism — calls a domain verb from a
@@ -453,9 +453,9 @@ that runtime.
   genuinely automatic rather than merely read together, declare an automatic cog and
   read that flatly too.
 - **Put initial app state in a mechanism's `operate`, not in the app entry
-  point.** `operate` runs inside bootstrap, so its writes settle before
-  `bootstrapApp` returns and no watcher observes the pre-initial value on the
-  way past. The app entry point bootstraps and retains the runtime; it does not
+  point.** `operate` runs inside assembly, so its writes settle before
+  `assemble` returns and no watcher observes the pre-initial value on the
+  way past. The app entry point assembles and retains the runtime; it does not
   write to it. A test arranges the same starting world by passing the same
   mechanism to `Cogs.forTesting(mechanisms:)`. `forTesting`'s `seeding:`
   closure is not the production counterpart of this: it exists to install

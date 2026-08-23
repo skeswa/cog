@@ -61,7 +61,7 @@ Platform names differ where needed:
 | Runtime           | `Cogs`                                       | `CogStore`                                    |
 | Keyed state       | `CogBox` and value references                | `CogBox` and descriptor-plus-key reads        |
 | Operation         | a `CogOps` method                            | a `CogStore` extension                        |
-| Side-effect owner | bootstrap `Mechanism`                        | lifecycle-owned `CogEffects`                  |
+| Side-effect owner | assembly `Mechanism`                         | lifecycle-owned `CogEffects`                  |
 | Async state       | `CogStatus` through the optional status lens | `CogPhase`                                    |
 | UI boundary       | Observation and the SwiftUI environment      | Compose `State` and a composition-local store |
 

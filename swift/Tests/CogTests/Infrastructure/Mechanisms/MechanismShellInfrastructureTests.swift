@@ -42,7 +42,7 @@ import Testing
 @MainActor
 @Test func `MechanismShellInfrastructure operating twice is rejected by the factory seam`() {
   // `operateMechanisms` is the single package entry behind both factories;
-  // its once-only guard is what keeps "bootstrap-only" structural. The public
+  // its once-only guard is what keeps "assembly-only" structural. The public
   // trap is proven by MECH-04's exit test; this only pins that the guard
   // path exists for an empty second list, which is silently ignored.
   let cogs = Cogs.forTesting(mechanisms: [MechanismProbe { _ in }])

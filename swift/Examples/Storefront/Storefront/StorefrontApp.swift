@@ -16,10 +16,10 @@ struct StorefrontApp: App {
   /// The one app-wide graph, retained for the process lifetime.
   @State private var cogs: Cogs
 
-  /// Bootstraps the graph with the workload's mechanism.
+  /// Assembles the graph with the workload's mechanism.
   ///
   /// The mechanism, not this initializer, installs initial state: `operate`
-  /// runs inside `bootstrapApp`, so the request boundary and the starting row
+  /// runs inside `assemble`, so the request boundary and the starting row
   /// window settle before the first `body` observes anything. Nothing else
   /// happens here, and the local exists only to be retained.
   ///
@@ -34,7 +34,7 @@ struct StorefrontApp: App {
   /// offers, and recommendations all read.
   init() {
     let launchOptions = StorefrontLaunchOptions.current
-    let cogs = Cogs.bootstrapApp(mechanisms: [
+    let cogs = Cogs.assemble(mechanisms: [
       StorefrontMechanism(
         service: StorefrontService(profile: launchOptions.profile, mode: .immediate),
         initialWindow: RowWindow(offset: 0, length: launchOptions.profile.viewportRowCount),
