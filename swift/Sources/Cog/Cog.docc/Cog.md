@@ -11,7 +11,7 @@ changes, Cog settles exactly the values that depend on it and notifies exactly
 the views that read them. Nothing else runs.
 
 ```swift
-let temperatureSourceCog = ManualCog<Int>(60)
+let temperatureSourceCog = Cog<Int>.Manual(60)
 let adviceCog = Cog<String> { c in
   c[temperatureSourceCog] > 70 ? "shorts" : "coat"
 }
@@ -32,7 +32,7 @@ nothing and redraws nothing.
 
 Three ideas carry most of the library:
 
-- **A declaration is not state.** ``ManualCog``, ``Cog``, and ``AsyncCog`` are
+- **A declaration is not state.** ``Cog/Manual``, ``Cog``, and ``Cog/Async`` are
   lightweight names. The values behind them live in one ``Cogs``, created
   lazily on first use, so declaring costs nothing and the same declaration can
   name state in a test, a preview, and the app.
@@ -75,21 +75,21 @@ first-class kind with its own status and policies.
 
 ### Declaring state
 
-- ``ManualCog``
+- ``Cog/Manual``
 - ``Cog``
-- ``AsyncCog``
+- ``Cog/Async``
 - ``ManualCogLifetime``
 
 ### Declaring keyed state
 
-- ``ManualCogBox``
+- ``CogBox/Manual``
 - ``CogBox``
-- ``AsyncCogBox``
+- ``CogBox/Async``
 
 ### Sharing state without sharing write access
 
-- ``CogProjection``
-- ``CogBoxProjection``
+- ``Cog/Projection``
+- ``CogBox/Projection``
 
 ### The runtime
 

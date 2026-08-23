@@ -8,7 +8,7 @@
 import Cog
 
 enum ReactionWriteRejected {
-  static func writesThroughReactionController(m: MechanismController, source: ManualCog<Int>) {
+  static func writesThroughReactionController(m: MechanismController, source: Cog<Int>.Manual) {
     m.run { c in
       _ = c[source]
 

@@ -1,7 +1,7 @@
 extension CogBox {
   /// A family of asynchronously automatic values sharing one declaration.
   ///
-  /// A box owns one declaration descriptor and builds lightweight ``Cog.Async``
+  /// A box owns one declaration descriptor and builds lightweight ``Cog/Async``
   /// value references for its keys. Each descriptor-and-key pair has its own
   /// status, dependencies, generation, lifetime state, and work task in a
   /// ``Cogs``:
@@ -18,7 +18,7 @@ extension CogBox {
   /// ```
   ///
   /// The plural final `Cogs` suffix distinguishes this box from the individual
-  /// ``Cog.Async`` value references it produces.
+  /// ``Cog/Async`` value references it produces.
   ///
   /// Value reads of a key are total: `c[fetchedWeatherCogs[zip]]` returns the last
   /// accepted success for that key, resting on the declaration's explicit

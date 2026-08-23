@@ -66,7 +66,7 @@ comes back to it.
 Sources are the facts your app is told. Everything else is computed automatically from them.
 
 ```swift
-private let temperatureSourceCog = ManualCog<Int>(60, name: "temperature")
+private let temperatureSourceCog = Cog<Int>.Manual(60, name: "temperature")
 
 let temperatureCog = temperatureSourceCog.readOnly
 
@@ -80,7 +80,7 @@ Three things are worth noticing:
 
 - Declarations are ordinary `let`s, usually at file scope. They allocate a
   name, not state; no graph exists yet, and `adviceCog`'s closure has not run.
-- `temperatureSourceCog` is `private`, and ``ManualCog/readOnly`` publishes a
+- `temperatureSourceCog` is `private`, and ``Cog/Manual/readOnly`` publishes a
   version of it that cannot be written. That is how Cog controls who may write
   a fact: with Swift's own access control, not a runtime check.
 - `name:` is optional. Give one and diagnostics and debug history use it;

@@ -1,6 +1,6 @@
 /// The descriptor behind a manual source declaration.
 ///
-/// ``Cog.Manual`` and ``CogBox.Manual`` share this descriptor type. It is
+/// ``Cog/Manual`` and ``CogBox/Manual`` share this descriptor type. It is
 /// generic over the value; the reference carries an erased key. A keyed
 /// reference is one descriptor plus its key (§2.3, perf §4).
 /// The immutable descriptor is shared across contexts; each context owns the
@@ -104,7 +104,7 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// Declares a keyed source whose states start at a value computed from the
   /// key.
   ///
-  /// ``CogBox.Manual`` wraps the typed closure before storing it here, so key
+  /// ``CogBox/Manual`` wraps the typed closure before storing it here, so key
   /// erasure never reaches user code.
   init(
     startingValueForKey: @escaping @MainActor (CogKey?) -> Value,

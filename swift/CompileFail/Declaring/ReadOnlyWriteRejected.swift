@@ -6,10 +6,10 @@
 // This is the enforcement half of write ownership. A file keeps its
 // sources `fileprivate` so only it can name them, and publishes `.readOnly`
 // projections for everyone else. That buys nothing unless the projection is
-// genuinely inert: ``Writer``'s subscript takes a `ManualCog`, and a
-// `CogProjection` is a different type, so every spelling of a write below is a
+// genuinely inert: ``Writer``'s subscript takes a `Cog.Manual`, and a
+// `Cog.Projection` is a different type, so every spelling of a write below is a
 // type error at the argument, before any turn exists to reject it. A keyed
-// projection may be a `CogProjection` or a layout-specific box-produced
+// projection may be a `Cog.Projection` or a layout-specific box-produced
 // reference; neither is writable.
 //
 // The fixture takes its context and its value reference as parameters. It never builds
@@ -22,19 +22,19 @@ import Cog
 enum ReadOnlyWriteRejected {
   /// The plain case: stage a value through a published read-only value reference.
   static func stagesThroughAReadOnlyValueReference(
-    cogs: Cogs, currentZipCode: CogProjection<Int>
+    cogs: Cogs, currentZipCode: Cog<Int>.Projection
   ) {
     cogs.turn { c in
-      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: cannot convert value of type 'Cog<Int>.Projection' to expected argument type 'Cog<Int>.Manual'
       c[currentZipCode] = 90210
     }
   }
 
   /// Read-modify-write, which the writer's subscript supports for a real
   /// source (`c[count] += 1`) and must not offer here.
-  static func mutatesThroughAReadOnlyValueReference(cogs: Cogs, retryLimit: CogProjection<Int>) {
+  static func mutatesThroughAReadOnlyValueReference(cogs: Cogs, retryLimit: Cog<Int>.Projection) {
     cogs.turn { c in
-      // expect-error: cannot convert value of type 'CogProjection<Int>' to expected argument type 'ManualCog<Int>'
+      // expect-error: cannot convert value of type 'Cog<Int>.Projection' to expected argument type 'Cog<Int>.Manual'
       c[retryLimit] += 1
     }
   }
@@ -44,10 +44,10 @@ enum ReadOnlyWriteRejected {
   /// error as the keyless one.
   static func stagesThroughAReadOnlyBoxKey(
     cogs: Cogs,
-    weatherReport: CogBoxProjection<Int, String>
+    weatherReport: CogBox<Int, String>.Projection
   ) {
     cogs.turn { c in
-      // expect-error: to expected argument type 'ManualCog<Int>'
+      // expect-error: to expected argument type 'Cog<Int>.Manual'
       c[weatherReport["90210"]] = 72
     }
   }

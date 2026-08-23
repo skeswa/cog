@@ -18,12 +18,12 @@ import CogTesting
 enum AutomaticSeedRejected {
   static func seedsOnlyManualSources(
     cogs: Cogs,
-    source: ManualCog<Int>,
+    source: Cog<Int>.Manual,
     automatic: Cog<Int>
   ) {
     cogs.seed(source, to: 1)
 
-    // expect-error: cannot convert value of type 'Cog<Int>' to expected argument type 'ManualCog<Int>'
+    // expect-error: cannot convert value of type 'Cog<Int>' to expected argument type 'Cog<Int>.Manual'
     cogs.seed(automatic, to: 2)
   }
 }

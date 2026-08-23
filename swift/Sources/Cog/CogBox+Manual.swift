@@ -26,7 +26,7 @@ extension CogBox {
   /// at the read site and unwrap into its domain local, as in
   /// `let weatherReport = c[weatherReportCogs[zip]]`.
   ///
-  /// Each demanded key has app lifetime in its context, like ``Cog.Manual``.
+  /// Each demanded key has app lifetime in its context, like ``Cog/Manual``.
   /// Writes occur through ``Writer`` inside turns and equality is applied only to
   /// the written key's old and final staged values. The box and its starting-value
   /// closure are MainActor-isolated.

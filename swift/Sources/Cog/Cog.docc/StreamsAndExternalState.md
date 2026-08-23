@@ -24,7 +24,7 @@ Return ``Work/stream(_:)`` from a latest-policy async declaration when one
 request produces several values:
 
 ```swift
-let temperatureCog = AsyncCog<Int>(
+let temperatureCog = Cog<Int>.Async(
   default: 0,
   name: "temperature"
 ) { _ in
@@ -44,7 +44,7 @@ replace its active request, select an ``OrderedPolicy`` and return
 ``RunWork/run(_:)``:
 
 ```swift
-let searchCog = AsyncCog<[SearchResult]>(
+let searchCog = Cog<[SearchResult]>.Async(
   .queue,
   default: [],
   name: "search"
@@ -135,7 +135,7 @@ Keep the model and tracked read on the MainActor. The tracked value need not be
 
 ## See Also
 
-- ``AsyncCog``
+- ``Cog/Async``
 - ``Work``
 - ``RunWork``
 - ``OrderedPolicy``

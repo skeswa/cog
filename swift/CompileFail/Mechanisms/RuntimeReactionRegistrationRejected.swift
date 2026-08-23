@@ -8,14 +8,14 @@
 import Cog
 
 enum RuntimeReactionRegistrationRejected {
-  static func registersDirectlyOnTheRuntime(cogs: Cogs, source: ManualCog<Int>) {
+  static func registersDirectlyOnTheRuntime(cogs: Cogs, source: Cog<Int>.Manual) {
     // expect-error: value of type 'Cogs' has no member 'run'
     cogs.run { c in
       _ = c[source]
     }
   }
 
-  static func watchesDirectlyOnTheRuntime(cogs: Cogs, source: ManualCog<Int>) {
+  static func watchesDirectlyOnTheRuntime(cogs: Cogs, source: Cog<Int>.Manual) {
     // expect-error: value of type 'Cogs' has no member 'watch'
     cogs.watch(source, initial: CogWatchStart.skip) { _, _ in }
   }

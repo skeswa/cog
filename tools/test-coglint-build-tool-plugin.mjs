@@ -37,7 +37,7 @@ const PLUGIN_SOURCE = join(
 );
 
 /** One unambiguous production-rule finding shared by both consumers. */
-const VIOLATING_SOURCE = "let countSourceCog = ManualCog(0)\n";
+const VIOLATING_SOURCE = "let countSourceCog = Cog.Manual(0)\n";
 const DIAGNOSTIC_FRAGMENT =
   "Feature.swift:1:5: error: [manual-cog-private] writable Cog sources must be `private` or `fileprivate`; expose `.readOnly` or an automatic cog";
 

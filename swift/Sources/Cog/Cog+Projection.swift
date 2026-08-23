@@ -1,5 +1,5 @@
 extension Cog {
-  /// A read-only value reference for one ``Cog.Manual`` declaration.
+  /// A read-only value reference for one ``Cog/Manual`` declaration.
   ///
   /// Keep a source `fileprivate`, then publish its `.readOnly` projection:
   ///
@@ -15,7 +15,7 @@ extension Cog {
   /// graph read as reading its source.
   ///
   /// The source stays hidden inside Cog, and ``Writer`` only accepts a
-  /// ``Cog.Manual``. Passing a `Cog.Projection` to a writer is a compile-time error.
+  /// ``Cog/Manual``. Passing a `Cog.Projection` to a writer is a compile-time error.
   /// The facade is MainActor-isolated with the graph; keep the source private in
   /// the owning state file because projection itself is an API boundary, not a
   /// replacement for Swift access control.
