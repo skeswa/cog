@@ -15,7 +15,7 @@ mobile UI. Cog consists of:
 The Swift library is implemented.
 <!-- x-release-please-start-version -->
 
-The current published Swift release is 0.4.0.
+The current published Swift release is 0.5.0.
 <!-- x-release-please-end -->
 
 The specialized arena is the shipping default; the Storefront macrobenchmark
