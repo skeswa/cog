@@ -305,12 +305,10 @@ _Milestone M1, except CYCLE-07 (M4). Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
 
-- **CYCLE-01.** A cog reads itself. Cog fails and names the cog. (Proof:
-  exit test.)
 - **CYCLE-02.** Cog A reads cog B, and B reads A. Cog fails and shows the
-  whole path, A to B and back. (Proof: exit test.)
-- **CYCLE-03.** The cycle runs through keyed cogs. The message includes
-  the keys, so I can see which items looped.
+  whole closed path, A to B and back. A cog that reads itself — the former
+  CYCLE-01 — is the one-link case of the same walk and rendering. (Proof:
+  exit test.)
 - **CYCLE-04.** A cycle only exists when a condition is true. Everything
   works until the condition flips; then Cog catches it.
 - **CYCLE-06.** A keyed selector or its custom equality rule calls a named op
@@ -319,10 +317,11 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
   in debug and release. The message names the cog, key, and attempted turn and
   tells me to invoke the op outside automatic computation, from event handling
   or a reaction. (Proof: exit test.)
-- **CYCLE-07.** The keyed cycle from CYCLE-03 reaches the real trap instead
-  of the diagnostic seam. The crash message walks the whole path with each
-  cog's key, in debug and release builds, so the two renderings cannot
-  drift apart. (Proof: exit test.)
+- **CYCLE-07.** A cycle runs through keyed cogs and reaches the real trap.
+  The crash message walks the whole path with each cog's key, in debug and
+  release builds, so I can see which items looped. (Retires the former
+  CYCLE-03, which proved the same keyed path through the diagnostic seam
+  alone.) (Proof: exit test.)
 
 ## 7. REACT — Reactions
 
