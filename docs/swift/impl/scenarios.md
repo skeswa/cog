@@ -23,11 +23,16 @@ CogLint.
   [exploration.md](../design/exploration.md).
 - A scenario's proof mode says how to check it. Unit tests are the default and
   have no mark. Other modes use `(Proof: ….)`: `compile-fail`, `exit test`,
-  `release configuration`, `simulator`, `floor runtime`, `suite`, or
-  `benchmark`. Group 18 uses `benchmark` by default. The ledger checker makes
-  each task use the right command and exact scenario set. Exit tests must run
-  in debug and release. Only suite and release-configuration scenarios may
-  belong to a gate.
+  `release configuration`, `release absence`, `simulator`, `floor runtime`,
+  `suite`, or `benchmark`. Group 18 uses `benchmark` by default. The ledger
+  checker makes each task use the right command and exact scenario set. Exit
+  tests must run in debug and release. A `release absence` scenario promises
+  debug-only API is gone from release builds and is proven by a
+  `// configuration: release` compile-fail fixture, so its owner names
+  `mise run test:compilefail`; a `release configuration` scenario is proven by
+  the release test leg and its owner names `mise run test:release`. Only
+  suite, release-configuration, and release-absence scenarios may belong to a
+  gate.
 - UI tests live in `CogBoundaryTests`, run-count tests in `CogScenarioTests`,
   and other library tests in `CogTests`. Library tests run in all four build
   legs and in release. Debug-only tests use `#if DEBUG`; the release leg proves
@@ -522,7 +527,7 @@ turn for a loud domain operation.
   turn. The alert fires exactly once, even though the reaction's first
   run never read the weather.
 - **SEED-05.** `CogTesting.seed` exists only in debug builds. A release build
-  has no way to seed. (Proof: release configuration.)
+  has no way to seed. (Proof: release absence.)
 - **SEED-06.** I try to seed an automatic cog. The compiler says no: only
   manual sources can be seeded. (Proof: compile-fail.)
 - **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
@@ -550,7 +555,7 @@ When I wonder what happened, the debug history can tell me.
 - **HIST-03.** History is bounded: after many turns, the oldest entries
   fall off and the entry count never passes the cap. (Memory itself is
   benchmark territory, not a unit-test assertion.)
-- **HIST-04.** Release builds pay nothing for history. (Proof: release configuration.)
+- **HIST-04.** Release builds pay nothing for history. (Proof: release absence.)
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
   history under that name, composed beneath its mechanism's name; a
   registration without one falls back to the file and line that made it.

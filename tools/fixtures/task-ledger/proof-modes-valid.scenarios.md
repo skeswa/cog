@@ -16,6 +16,8 @@ from the group heading.
 - **MODE-06.** The whole suite passing unchanged. (Proof: suite.)
 - **MODE-07.** The guardrails holding outside debug.
   (Proof: release configuration.)
+- **MODE-08.** The debug-only API absent from release builds.
+  (Proof: release absence.)
 
 ## 18. PERF — Performance guarantees
 
