@@ -8,15 +8,9 @@ import Testing
 // selector-owned counters. Nothing observes turns, reactions, history, graph
 // storage, or settle flags; those belong to later seed tasks.
 
-@MainActor
-@Test func `SEED-01 the next read returns the seeded source value`() {
-  let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
-
-  cogs.seed(source, to: 7)
-
-  #expect(cogs.peek(source) == 7)
-}
+// The retired SEED-01 — the next read returns the seeded value — is a
+// precondition asserted inside every test here and in SEED-02's, so it needs
+// no test of its own.
 
 @MainActor
 @Test func `SEED-03 seed dirties a transitive automatic chain`() {

@@ -429,11 +429,6 @@ it. Retired IDs stay retired.)
 - **MECH-09.** A `whenever` scope nests inside another. Lowering the outer
   gate cancels the inner scope's reactions and tasks along with the outer
   scope's own.
-- **MECH-10.** An isolated test context's last reference is dropped, from
-  the MainActor or a background executor. I await an internal
-  acknowledgement that deinit cleanup reached the MainActor, then verify
-  every mechanism's reaction registrations are gone and every owned task has
-  received cancellation.
 - **MECH-11.** One turn both changes state a scoped reaction reads and
   lowers that scope's gate. Teardown completes safely at the scope's place
   in the flush: the woken sibling reaction in that scope never runs after
@@ -451,9 +446,12 @@ it. Retired IDs stay retired.)
   a mechanism's controller. (Proof: compile-fail.)
 - **MECH-15.** I assemble with a class mechanism that owns a resource, then
   drop my own reference to the mechanism. The runtime retains that exact
-  mechanism and its resource while the context lives. When the context ends,
-  its scope's reactions and tasks are cancelled first, and only then is the
-  mechanism released.
+  mechanism and its resource while the context lives. When the context's
+  last reference drops — on the MainActor or from a background executor
+  (the former MECH-10's teardown trigger) — an internal acknowledgement
+  reports when deinit cleanup reached the MainActor; the scope's reactions
+  and tasks are cancelled first, and only then is the mechanism released,
+  and the resource after it.
 - **MECH-16.** A retained class mechanism constructs its delegate-owned engine
   with a `[weak m]` callback. A callback from a background executor hops to the
   MainActor, calls an op through the controller, and records the mechanism
@@ -473,11 +471,11 @@ test waits wall-clock time.
 
 - **LIFE-01.** Nobody watches a manual cog for a long time. Its value
   survives anyway, because manual state defaults to app lifetime.
-- **LIFE-02.** An automatic cog defaults to `whileObserved`. After its last
-  watcher leaves and the grace period passes, Cog lets it go. The next
-  read simply computes it fresh.
-- **LIFE-03.** A released automatic cog is read again through the same value reference.
-  It comes back with the correct current value, as if it never left.
+- **LIFE-03.** An automatic cog defaults to `whileObserved`. After its last
+  watcher leaves and the grace period passes, Cog lets it go (the former
+  LIFE-02, whose walk this contains). Read again through the same value
+  reference, it comes back computed fresh — no stale previous value — with
+  the correct current value, as if it never left.
 - **LIFE-04.** A watcher leaves and comes back within the grace period.
   The cog was never released and did not recompute.
 - **LIFE-05.** A manual cog opts into
@@ -508,13 +506,13 @@ _Milestone M1, except SEED-07 (M2) and SEED-08 (M4). Design: §6.6, §4._
 My tests import `CogTesting` to set up state quietly with `seed`, or use a real
 turn for a loud domain operation.
 
-- **SEED-01.** I seed a source. The next read returns the seeded value.
 - **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
   and no reaction runs.
-- **SEED-03.** Seeding still marks dependents dirty: an automatic cog read
-  after the seed recomputes from the seeded value. A seed obeys the
-  source's equality rule the way a write does — seeding an equal value is
-  not a change.
+- **SEED-03.** I seed a source. The next read returns the seeded value (the
+  former SEED-01, a precondition of every assertion here), and seeding
+  marks dependents dirty: an automatic cog read after the seed recomputes
+  from the seeded value. A seed obeys the source's equality rule the way a
+  write does — seeding an equal value is not a change.
 - **SEED-04.** The §6.6 alert story, verbatim: assemble a weather
   mechanism whose alert reaction watches for nice weather, seeding the zip
   and cloudy weather first (no alert), then stub sunny weather with a real

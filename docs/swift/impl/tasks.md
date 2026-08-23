@@ -520,8 +520,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   cleanup and verify mechanism registrations are gone and owned tasks are
   cancelled.
   _Depends: M1-01cb, M1-37f._
-  _Verify: `mise run test --filter MECH-10`._
-  _Greens: MECH-10._
+  _Verify: retired proof — its MECH-10 teardown walk folded into MECH-15,
+  greened by M1-37l._
 - **M1-37i** _(Behavior)_ — Run the `forTesting` seeding closure before any
   `operate`, so `initial: .run` watches observe seeded values on
   registration.
@@ -564,8 +564,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   testing override, then release an unobserved automatic cog after injected
   grace and recreate it correctly.
   _Depends: M1-01ca, M1-27b._
-  _Verify: `mise run test --filter 'LIFE-02|LIFE-03'`._
-  _Greens: LIFE-02, LIFE-03._
+  _Verify: `mise run test --filter LIFE-03`. Its LIFE-02 release walk folded
+  into LIFE-03._
+  _Greens: LIFE-03._
 - **M1-28b** _(Behavior)_ — Cancel pending automatic release and prove reaction
   leases suppress release.
   _Depends: M1-28a._
@@ -607,8 +608,9 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-30a** _(Behavior)_ — Add debug-only manual-source `seed` through
   `CogTesting` and dirty propagation without a turn.
   _Depends: M1-07a, M1-09a._
-  _Verify: `mise run test --filter 'SEED-01|SEED-03'`._
-  _Greens: SEED-01, SEED-03._
+  _Verify: `mise run test --filter SEED-03`. Its SEED-01 read-back folded
+  into SEED-03._
+  _Greens: SEED-03._
 - **M1-30b** _(Behavior)_ — Prove seed is quiet for history and reactions and
   run the §6.6 alert story verbatim.
   _Depends: M1-16c, M1-30a, M1-31a._
