@@ -27,6 +27,10 @@ const FIXTURES = resolve(TOOLS_DIR, "fixtures/task-ledger");
  * @property {string} ledger absolute path
  * @property {string[]} checks expected `error[<check>]` names, empty when clean
  * @property {string[]} [mentions] substrings every diagnostic set must contain
+ * @property {string[]} [forbidden] substrings no diagnostic may contain —
+ *   `reportedChecks` deduplicates check names and `mentions` only proves
+ *   presence, so this is how a case pins that a check did NOT also fire for
+ *   inputs it must leave alone
  */
 
 /** @type {Case[]} */
@@ -206,8 +210,10 @@ const CASES = [
     ledger: resolve(FIXTURES, "integration-hole.md"),
     checks: ["arena-integration-coverage"],
     // DECL-01/02 are filter-covered and DECL-03 is excused by the
-    // `_Arena-coverage exceptions:_` note, so only DECL-04 may fire.
+    // `_Arena-coverage exceptions:_` note, so only DECL-04 may fire — the
+    // forbidden IDs pin that covered and excepted scenarios stay quiet.
     mentions: ["DECL-04", "M1-04", "no M6 arena-integration filter"],
+    forbidden: ["scenario DECL-01", "scenario DECL-02", "scenario DECL-03"],
   },
 ];
 
@@ -248,6 +254,11 @@ function evaluate(testCase) {
   for (const mention of testCase.mentions ?? []) {
     if (!output.includes(mention)) {
       failures.push(`diagnostics never mention \`${mention}\``);
+    }
+  }
+  for (const forbidden of testCase.forbidden ?? []) {
+    if (output.includes(forbidden)) {
+      failures.push(`diagnostics wrongly mention \`${forbidden}\``);
     }
   }
   return { failures, output };
