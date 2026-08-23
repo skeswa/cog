@@ -143,19 +143,19 @@ extension CogScenario {
       // stayed subscribed would have to recompute. Without it, "dropped keys
       // stop running" would be true of any implementation at all, because
       // nothing would be asking them to run.
-      let epochSourceCog = Cog<Int>.Manual(0, name: "churn.epoch")
-      let windowStartSourceCog = Cog<Int>.Manual(0, name: "churn.windowStart")
+      let _epochCog = Cog<Int>.Manual(0, name: "churn.epoch")
+      let _windowStartCog = Cog<Int>.Manual(0, name: "churn.windowStart")
       let entryCogs = CogBox<Int, Int>(
         { c, key in
           counter.record()
-          return c[epochSourceCog] + key
+          return c[_epochCog] + key
         },
         name: "churn.entry"
       )
       let rosterCog = Cog<Int>(
         { c in
           counter.record()
-          let start = c[windowStartSourceCog]
+          let start = c[_windowStartCog]
           var total = 0
           for key in start..<(start + window) { total += c[entryCogs[key]] }
           return total
@@ -166,8 +166,8 @@ extension CogScenario {
       var roster = cogs.peek(rosterCog)
       for turn in 1...max(turns, 1) where turns > 0 {
         cogs.turn("churn.turn") { c in
-          c[epochSourceCog] = turn
-          c[windowStartSourceCog] = turn
+          c[_epochCog] = turn
+          c[_windowStartCog] = turn
         }
         roster = cogs.peek(rosterCog)
       }

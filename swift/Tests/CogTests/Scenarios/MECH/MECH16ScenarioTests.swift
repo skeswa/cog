@@ -3,11 +3,11 @@ import CogTesting
 import Testing
 import os
 
-@MainActor private let readingSourceCog = Cog<Int>.Manual(0, name: "reading")
+@MainActor private let _readingCog = Cog<Int>.Manual(0, name: "reading")
 
 @MainActor extension CogOps {
   fileprivate func recordReading(_ value: Int) {
-    turn { c in c[readingSourceCog] = value }
+    turn { c in c[_readingCog] = value }
   }
 }
 
@@ -78,7 +78,7 @@ private final class SensorMechanism: Mechanism {
   // Live: the callback promotes its controller and the op runs.
   await engine.emit(42)
   #expect(await deliveryIterator.next() == true)
-  #expect(cogs?.peek(readingSourceCog) == 42)
+  #expect(cogs?.peek(_readingCog) == 42)
 
   #if DEBUG
   // The turn is attributed to the mechanism, not to a bare op name, which is

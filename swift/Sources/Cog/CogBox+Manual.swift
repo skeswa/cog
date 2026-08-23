@@ -2,11 +2,10 @@ extension CogBox {
   /// A family of writable sources sharing one declaration, one value per key.
   ///
   /// Use a box when a source has one value per key, such as a zip code or
-  /// document ID. Keep the box `fileprivate` (or `private` inside a type) so only
-  /// its owner can write it:
+  /// document ID. Keep the box `private` so only its owner can write it:
   ///
   /// ```swift
-  /// fileprivate let weatherReportSourceCogs = CogBox<Weather?, ZipCode>.Manual(nil)
+  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual(nil)
   /// ```
   ///
   /// The plural final `Cogs` suffix marks this as a box that can produce many
@@ -45,7 +44,7 @@ extension CogBox {
     /// first use.
     ///
     /// ```swift
-    /// fileprivate let heatAdvisorySourceCogs = CogBox<Bool, ZipCode>.Manual(false)
+    /// private let _heatAdvisoryCogs = CogBox<Bool, ZipCode>.Manual(false)
     /// ```
     ///
     /// One value stands behind every key, so a `Value` that is a reference type
@@ -119,7 +118,7 @@ extension CogBox {
     /// the key.
     ///
     /// ```swift
-    /// fileprivate let cartSourceCogs = CogBox<Cart, UserID>.Manual { user in
+    /// private let _cartCogs = CogBox<Cart, UserID>.Manual { user in
     ///   Cart(owner: user)
     /// }
     /// ```

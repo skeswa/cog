@@ -14,12 +14,12 @@ import SwiftUI
 /// Production keeps the live service for the app lifetime. Tests seed a
 /// controlled service before first demand, so they exercise the same async cog
 /// without adding a second request-state mechanism.
-private let weatherServiceSourceCog = Cog<WeatherService>.Manual(
+private let _weatherServiceCog = Cog<WeatherService>.Manual(
   .live,
   name: "weather.service"
 )
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
-private let currentZipSourceCog = Cog<ZipCode?>.Manual(
+private let _currentZipCog = Cog<ZipCode?>.Manual(
   nil,
   name: "weather.currentZip"
 )
@@ -29,17 +29,17 @@ private let currentZipSourceCog = Cog<ZipCode?>.Manual(
 /// configuration rather than weather, but the cards describe it, and a screen
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
-private let refreshIntervalSourceCog = Cog<Duration?>.Manual(
+private let _refreshIntervalCog = Cog<Duration?>.Manual(
   nil,
   name: "weather.refreshInterval"
 )
 
 /// Read-only service capability used by the async selector.
-let weatherServiceCog = weatherServiceSourceCog.readOnly
+let weatherServiceCog = _weatherServiceCog.readOnly
 /// Read-only selection shared by the picker, hourly loop, and alert reaction.
-let currentZipCodeCog = currentZipSourceCog.readOnly
+let currentZipCodeCog = _currentZipCog.readOnly
 /// The cadence actually installed by ``WeatherEffects``.
-let refreshIntervalCog = refreshIntervalSourceCog.readOnly
+let refreshIntervalCog = _refreshIntervalCog.readOnly
 
 /// The keyed forecast every card reads, resting at `nil` until a ZIP's first
 /// accepted reading.
@@ -147,12 +147,12 @@ extension CogOps {
   /// One definition serves both capabilities: views and app code call it on
   /// `cogs`, and the weather mechanism could call it on its controller.
   func selectCurrentLocation(_ zip: ZipCode?) {
-    turn(currentZipSourceCog, to: zip)
+    turn(_currentZipCog, to: zip)
   }
 
   /// Publishes the cadence owned by the assembly-registered mechanism.
   func setRefreshInterval(_ interval: Duration?) {
-    turn(refreshIntervalSourceCog, to: interval)
+    turn(_refreshIntervalCog, to: interval)
   }
 
   /// Demands a fresh forecast for one ZIP.
@@ -187,7 +187,7 @@ extension Cogs {
 
 #if DEBUG
 /// The narrow source capability Weather tests may seed through `CogTesting`.
-let weatherServiceSeedTargetCog = weatherServiceSourceCog
+let weatherServiceSeedTargetCog = _weatherServiceCog
 /// The narrow selection capability Weather tests may seed through `CogTesting`.
-let currentZipSeedTargetCog = currentZipSourceCog
+let currentZipSeedTargetCog = _currentZipCog
 #endif

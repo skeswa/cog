@@ -16,11 +16,11 @@ enum MemoryHarness {
   static let pairCount = 500
 
   /// The keyed sources.
-  static let entrySourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.memory.source")
+  static let _entryCogs = CogBox<Int, Int>.Manual(0, name: "perf.memory.source")
 
   /// One automatic consumer per key.
   static let entryCogs = CogBox<Int, Int>(
-    { c, key in c[MemoryHarness.entrySourceCogs[key]] &+ key },
+    { c, key in c[MemoryHarness._entryCogs[key]] &+ key },
     name: "perf.memory.entry"
   )
 
@@ -35,7 +35,7 @@ enum MemoryHarness {
   static func buildThousandStates() {
     let context = Cogs.forTesting()
     for key in 0..<pairCount {
-      blackHole(context.peek(entrySourceCogs[key]))
+      blackHole(context.peek(_entryCogs[key]))
       blackHole(context[entryCogs[key]])
     }
     cogs = context

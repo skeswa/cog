@@ -10,7 +10,7 @@
 /// ```swift
 /// extension CogOps {
 ///   func selectCurrentLocation(_ zip: ZipCode) {
-///     turn(currentZipSourceCog, to: zip)
+///     turn(_currentZipCog, to: zip)
 ///   }
 /// }
 /// ```

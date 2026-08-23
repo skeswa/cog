@@ -48,18 +48,18 @@ enum EdgeLayoutHarness {
   static let dependencyWidth = 32
 
   /// Mostly-static sources, declared once so only values move between turns.
-  static let staticSourceCogs: [Cog<Int>.Manual] = (0..<dependencyWidth).map { index in
+  static let _staticCogs: [Cog<Int>.Manual] = (0..<dependencyWidth).map { index in
     Cog<Int>.Manual(index, name: "perf.edge.static.source.\(index)")
   }
 
   /// Stable first dependency, matching the churn graph's control position.
-  static let staticControlSourceCog = Cog<Int>.Manual(0, name: "perf.edge.static.control")
+  static let _staticControlCog = Cog<Int>.Manual(0, name: "perf.edge.static.control")
 
   /// One wide consumer whose dependency order never changes.
   static let staticRootCog = Cog<Int>(
     { c in
-      var total = c[EdgeLayoutHarness.staticControlSourceCog]
-      for sourceCog in EdgeLayoutHarness.staticSourceCogs {
+      var total = c[EdgeLayoutHarness._staticControlCog]
+      for sourceCog in EdgeLayoutHarness._staticCogs {
         total &+= c[sourceCog]
       }
       return total
@@ -83,21 +83,21 @@ enum EdgeLayoutHarness {
   static let churnSourceCount = 128
 
   /// Fixed data values; only the root's selected window changes.
-  static let churnSourceCogs: [Cog<Int>.Manual] = (0..<churnSourceCount).map { index in
+  static let _churnCogs: [Cog<Int>.Manual] = (0..<churnSourceCount).map { index in
     Cog<Int>.Manual(index + 1, name: "perf.edge.churn.source.\(index)")
   }
 
   /// Stable first dependency whose value chooses the 32-entry window.
-  static let churnControlSourceCog = Cog<Int>.Manual(0, name: "perf.edge.churn.control")
+  static let _churnControlCog = Cog<Int>.Manual(0, name: "perf.edge.churn.control")
 
   /// One wide consumer that replaces its complete non-control suffix per turn.
   static let churnRootCog = Cog<Int>(
     { c in
-      let start = c[EdgeLayoutHarness.churnControlSourceCog]
+      let start = c[EdgeLayoutHarness._churnControlCog]
       var total = 0
       for offset in 0..<EdgeLayoutHarness.dependencyWidth {
         let index = (start + offset) % EdgeLayoutHarness.churnSourceCount
-        total &+= c[EdgeLayoutHarness.churnSourceCogs[index]]
+        total &+= c[EdgeLayoutHarness._churnCogs[index]]
       }
       return total
     },
@@ -148,7 +148,7 @@ enum EdgeLayoutHarness {
       staticTurn &+= 1
       let index = staticTurn % dependencyWidth
       cogs.turn("perf.edge.static.turn") { c in
-        c[staticSourceCogs[index]] &+= dependencyWidth
+        c[_staticCogs[index]] &+= dependencyWidth
       }
       staticExpected &+= dependencyWidth
       result = staticSink.value
@@ -182,7 +182,7 @@ enum EdgeLayoutHarness {
     var result = churnExpected[churnTurn % churnSourceCount]
     for _ in 0..<max(count, 1) {
       churnTurn &+= 1
-      cogs.turn(churnControlSourceCog, to: churnTurn, name: "perf.edge.churn.turn")
+      cogs.turn(_churnControlCog, to: churnTurn, name: "perf.edge.churn.turn")
       result = churnSink.value
     }
 

@@ -1,12 +1,13 @@
 extension Cog {
   /// A read-only value reference for one ``Cog/Manual`` declaration.
   ///
-  /// Keep a source `fileprivate`, then publish its `.readOnly` projection:
+  /// Keep a source `private`, then publish its `.readOnly` projection under the
+  /// source's name without the leading underscore:
   ///
   /// ```swift
   /// // WeatherState.swift
-  /// fileprivate let currentZipSourceCog = Cog<ZipCode?>.Manual(nil)
-  /// let currentZipCog = currentZipSourceCog.readOnly
+  /// private let _currentZipCog = Cog<ZipCode?>.Manual(nil)
+  /// let currentZipCog = _currentZipCog.readOnly
   /// ```
   ///
   /// The projection creates no descriptor or state and stores no copy of the
@@ -34,11 +35,12 @@ extension Cog.Manual {
   /// A value reference naming this source's state that cannot be used to write it.
   ///
   /// Publish this next to the source, in the file that owns it, and keep the
-  /// source itself `fileprivate`:
+  /// source itself `private`, named with a leading underscore the projection
+  /// drops:
   ///
   /// ```swift
-  /// fileprivate let weatherServiceSourceCog = Cog<WeatherService>.Manual(.live)
-  /// let weatherServiceCog = weatherServiceSourceCog.readOnly
+  /// private let _weatherServiceCog = Cog<WeatherService>.Manual(.live)
+  /// let weatherServiceCog = _weatherServiceCog.readOnly
   /// ```
   ///
   /// The source and projection name the same state in every context. Accessing

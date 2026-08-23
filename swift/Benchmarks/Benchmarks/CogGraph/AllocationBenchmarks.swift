@@ -13,16 +13,16 @@ import CogTesting
 @MainActor
 enum AllocationHarness {
   /// The source a steady turn writes.
-  static let counterSourceCog = Cog<Int>.Manual(0, name: "perf.counter")
+  static let _counterCog = Cog<Int>.Manual(0, name: "perf.counter")
 
   /// One automatic consumer, so a turn actually propagates.
   static let doubledCog = Cog<Int>(
-    { c in c[AllocationHarness.counterSourceCog] * 2 },
+    { c in c[AllocationHarness._counterCog] * 2 },
     name: "perf.doubled"
   )
 
   /// A keyed source, for the `box[key]` value-reference measurement.
-  static let keyedSourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.keyed")
+  static let _keyedCogs = CogBox<Int, Int>.Manual(0, name: "perf.keyed")
 
   /// The context under measurement, created once per benchmark setup.
   static var cogs: Cogs?
@@ -44,7 +44,7 @@ enum AllocationHarness {
     guard cogs == nil else { return }
     let context = Cogs.forTesting()
     blackHole(context[doubledCog])
-    blackHole(context.peek(keyedSourceCogs[0]))
+    blackHole(context.peek(_keyedCogs[0]))
     cogs = context
   }
 
@@ -58,7 +58,7 @@ enum AllocationHarness {
   static func runSteadyTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.turn(counterSourceCog, to: iteration, name: "perf.turn")
+      cogs.turn(_counterCog, to: iteration, name: "perf.turn")
       blackHole(cogs[doubledCog])
     }
   }
@@ -69,7 +69,7 @@ enum AllocationHarness {
   /// is free, which is why this loop touches no context at all.
   static func makeValueReferences(_ count: Int) {
     for key in 1...max(count, 1) {
-      blackHole(keyedSourceCogs[key & 0x3])
+      blackHole(_keyedCogs[key & 0x3])
     }
   }
 

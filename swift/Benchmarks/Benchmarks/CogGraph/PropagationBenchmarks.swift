@@ -26,12 +26,12 @@ enum PropagationHarness {
   static let fanWidth = 16
 
   /// The source every consumer reads.
-  static let fanSourceCog = Cog<Int>.Manual(0, name: "perf.fan.source")
+  static let _fanCog = Cog<Int>.Manual(0, name: "perf.fan.source")
 
   /// The consumers, declared once so the shape is fixed across iterations.
   static let fanCogs: [Cog<Int>] = (0..<fanWidth).map { index in
     Cog<Int>(
-      { c in c[PropagationHarness.fanSourceCog] &+ index },
+      { c in c[PropagationHarness._fanCog] &+ index },
       name: "perf.fan.\(index)"
     )
   }
@@ -55,7 +55,7 @@ enum PropagationHarness {
   static func runPropagatingTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.turn(fanSourceCog, to: iteration, name: "perf.fan.turn")
+      cogs.turn(_fanCog, to: iteration, name: "perf.fan.turn")
       for fanCog in fanCogs { blackHole(cogs[fanCog]) }
     }
   }
@@ -87,7 +87,7 @@ enum DeepChainHarness {
   static let chainDepth = 100
 
   /// The source at the head of the chain.
-  static let chainSourceCog = Cog<Int>.Manual(0, name: "perf.chain.source")
+  static let _chainCog = Cog<Int>.Manual(0, name: "perf.chain.source")
 
   /// Each node reads the one below it; node zero reads the source.
   ///
@@ -95,7 +95,7 @@ enum DeepChainHarness {
   /// inference cannot close that loop on its own.
   static let chainCogs: CogBox<Int, Int> = CogBox<Int, Int>(
     { c, depth in
-      guard depth > 0 else { return c[DeepChainHarness.chainSourceCog] }
+      guard depth > 0 else { return c[DeepChainHarness._chainCog] }
       return c[DeepChainHarness.chainCogs[depth - 1]] &+ 1
     },
     name: "perf.chain"
@@ -116,7 +116,7 @@ enum DeepChainHarness {
   static func runChainTurns(_ count: Int) {
     guard let cogs else { return }
     for iteration in 1...max(count, 1) {
-      cogs.turn(chainSourceCog, to: iteration, name: "perf.chain.turn")
+      cogs.turn(_chainCog, to: iteration, name: "perf.chain.turn")
       blackHole(cogs[chainCogs[chainDepth]])
     }
   }

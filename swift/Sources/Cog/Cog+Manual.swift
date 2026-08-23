@@ -2,16 +2,16 @@ extension Cog {
   /// A declaration and value reference for one writable source of truth.
   ///
   /// Declare one at the top of the file that owns the state, and keep the
-  /// declaration `fileprivate` (or `private` inside a type) so only that file can
-  /// write it. Expose reads to everyone else, and put the ops that write it in
-  /// the same file:
+  /// declaration `private` so only that file can write it. Expose reads to
+  /// everyone else, and put the ops that write it in the same file:
   ///
   /// ```swift
-  /// fileprivate let currentZipSourceCog = Cog<ZipCode?>.Manual(nil)
+  /// private let _currentZipCog = Cog<ZipCode?>.Manual(nil)
   /// ```
   ///
-  /// The final `Cog` suffix marks this as one keyless value reference; a narrower
-  /// role such as `Source` comes before it.
+  /// The final `Cog` suffix marks this as one keyless value reference, and the
+  /// leading underscore marks the writable source; a `.readOnly` projection
+  /// publishes the same name without the underscore.
   ///
   /// Constructing or copying a `Cog.Manual` does not create graph state. Its
   /// stable descriptor identity names one app-lifetime state inside each

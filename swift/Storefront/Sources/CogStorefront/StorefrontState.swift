@@ -22,25 +22,25 @@ public import Cog
 /// reaching into another's world. Every async declaration reads it
 /// synchronously, so replacing it invalidates every demanded async state — the
 /// same behavior Weather relies on.
-private let storefrontServiceSourceCog = Cog<StorefrontService>.Manual(
+private let _storefrontServiceCog = Cog<StorefrontService>.Manual(
   StorefrontService(profile: .standard),
   name: "storefront.service"
 )
 
 /// The raw text in the search field, exactly as typed.
-private let searchQuerySourceCog = Cog<String>.Manual("", name: "storefront.searchQuery")
+private let _searchQueryCog = Cog<String>.Manual("", name: "storefront.searchQuery")
 
 /// The category chip the shopper selected, or `nil` for all categories.
-private let selectedCategorySourceCog = Cog<CategoryID?>.Manual(
+private let _selectedCategoryCog = Cog<CategoryID?>.Manual(
   nil,
   name: "storefront.selectedCategory"
 )
 
 /// How results are ordered.
-private let sortModeSourceCog = Cog<SortMode>.Manual(.relevance, name: "storefront.sortMode")
+private let _sortModeCog = Cog<SortMode>.Manual(.relevance, name: "storefront.sortMode")
 
 /// Whether out-of-stock products are hidden.
-private let inStockOnlySourceCog = Cog<Bool>.Manual(false, name: "storefront.inStockOnly")
+private let _inStockOnlyCog = Cog<Bool>.Manual(false, name: "storefront.inStockOnly")
 
 /// The signed-in shopper, or `nil` before the account response is accepted.
 ///
@@ -48,31 +48,31 @@ private let inStockOnlySourceCog = Cog<Bool>.Manual(false, name: "storefront.inS
 /// out is a local action that must not wait on a request, and the mechanism
 /// that accepts the account response writes it here. One writable fact, one
 /// writable place.
-private let signedInShopperSourceCog = Cog<Shopper?>.Manual(nil, name: "storefront.shopper")
+private let _signedInShopperCog = Cog<Shopper?>.Manual(nil, name: "storefront.shopper")
 
 /// The coupon the shopper typed, or `nil`.
-private let couponSourceCog = Cog<CouponCode?>.Manual(nil, name: "storefront.coupon")
+private let _couponCog = Cog<CouponCode?>.Manual(nil, name: "storefront.coupon")
 
 /// Where the order ships.
-private let shippingAddressSourceCog = Cog<ShippingAddress>.Manual(
+private let _shippingAddressCog = Cog<ShippingAddress>.Manual(
   StorefrontFixtures.startingAddress,
   name: "storefront.shippingAddress"
 )
 
 /// How the order ships.
-private let shippingMethodSourceCog = Cog<ShippingMethod>.Manual(
+private let _shippingMethodCog = Cog<ShippingMethod>.Manual(
   .standard,
   name: "storefront.shippingMethod"
 )
 
 /// The product whose detail screen is open, or `nil` on the browse screen.
-private let selectedProductSourceCog = Cog<ProductID?>.Manual(
+private let _selectedProductCog = Cog<ProductID?>.Manual(
   nil,
   name: "storefront.selectedProduct"
 )
 
 /// The window of rows the list has materialized.
-private let rowWindowSourceCog = Cog<RowWindow>.Manual(
+private let _rowWindowCog = Cog<RowWindow>.Manual(
   RowWindow(offset: 0, length: 0),
   name: "storefront.rowWindow"
 )
@@ -83,24 +83,24 @@ private let rowWindowSourceCog = Cog<RowWindow>.Manual(
 /// and a keyed box cannot be enumerated. Quantities stay keyed, so changing
 /// one line's quantity does not invalidate the others — which is exactly the
 /// split a real cart wants and the reason both declarations exist.
-private let cartContentsSourceCog = Cog<[ProductID]>.Manual([], name: "storefront.cartContents")
+private let _cartContentsCog = Cog<[ProductID]>.Manual([], name: "storefront.cartContents")
 
 // MARK: - Keyed sources
 
 /// Whether each product is favorited.
-private let favoriteSourceCogs = CogBox<Bool, ProductID>.Manual(
+private let _favoriteCogs = CogBox<Bool, ProductID>.Manual(
   false,
   name: "storefront.favorite"
 )
 
 /// How many of each product are in the cart.
-private let cartQuantitySourceCogs = CogBox<Int, ProductID>.Manual(
+private let _cartQuantityCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.cartQuantity"
 )
 
 /// Which variant of each product is selected.
-private let selectedVariantSourceCogs = CogBox<Int, ProductID>.Manual(
+private let _selectedVariantCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.selectedVariant"
 )
@@ -110,7 +110,7 @@ private let selectedVariantSourceCogs = CogBox<Int, ProductID>.Manual(
 /// A rank rather than a list, so a product row can show a "viewed" badge and
 /// the pricing ladder can nudge a viewed product without any screen having to
 /// enumerate the history.
-private let recentlyViewedRankSourceCogs = CogBox<Int, ProductID>.Manual(
+private let _recentlyViewedRankCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.recentlyViewedRank"
 )
@@ -122,7 +122,7 @@ private let recentlyViewedRankSourceCogs = CogBox<Int, ProductID>.Manual(
 /// touches, in one turn, so a checkpoint can prove that the offscreen half of
 /// the burst invalidated nothing on screen. A keyless epoch would invalidate
 /// every demanded row and make that claim unprovable.
-private let inventoryGenerationSourceCogs = CogBox<Int, ProductID>.Manual(
+private let _inventoryGenerationCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.inventoryGeneration"
 )
@@ -130,39 +130,39 @@ private let inventoryGenerationSourceCogs = CogBox<Int, ProductID>.Manual(
 // MARK: - Readable surface
 
 /// The installed request boundary.
-public let storefrontServiceCog = storefrontServiceSourceCog.readOnly
+public let storefrontServiceCog = _storefrontServiceCog.readOnly
 /// The raw search text.
-public let searchQueryCog = searchQuerySourceCog.readOnly
+public let searchQueryCog = _searchQueryCog.readOnly
 /// The selected category, or `nil` for all.
-public let selectedCategoryCog = selectedCategorySourceCog.readOnly
+public let selectedCategoryCog = _selectedCategoryCog.readOnly
 /// The selected sort mode.
-public let sortModeCog = sortModeSourceCog.readOnly
+public let sortModeCog = _sortModeCog.readOnly
 /// Whether out-of-stock products are hidden.
-public let inStockOnlyCog = inStockOnlySourceCog.readOnly
+public let inStockOnlyCog = _inStockOnlyCog.readOnly
 /// The signed-in shopper, or `nil`.
-public let signedInShopperCog = signedInShopperSourceCog.readOnly
+public let signedInShopperCog = _signedInShopperCog.readOnly
 /// The typed coupon, or `nil`.
-public let couponCog = couponSourceCog.readOnly
+public let couponCog = _couponCog.readOnly
 /// The shipping address.
-public let shippingAddressCog = shippingAddressSourceCog.readOnly
+public let shippingAddressCog = _shippingAddressCog.readOnly
 /// The shipping method.
-public let shippingMethodCog = shippingMethodSourceCog.readOnly
+public let shippingMethodCog = _shippingMethodCog.readOnly
 /// The open product, or `nil`.
-public let selectedProductCog = selectedProductSourceCog.readOnly
+public let selectedProductCog = _selectedProductCog.readOnly
 /// The materialized row window.
-public let rowWindowCog = rowWindowSourceCog.readOnly
+public let rowWindowCog = _rowWindowCog.readOnly
 /// The cart's membership list, in insertion order.
-public let cartContentsCog = cartContentsSourceCog.readOnly
+public let cartContentsCog = _cartContentsCog.readOnly
 /// Per-product favorite flags.
-public let favoriteCogs = favoriteSourceCogs.readOnly
+public let favoriteCogs = _favoriteCogs.readOnly
 /// Per-product cart quantities.
-public let cartQuantityCogs = cartQuantitySourceCogs.readOnly
+public let cartQuantityCogs = _cartQuantityCogs.readOnly
 /// Per-product selected variants.
-public let selectedVariantCogs = selectedVariantSourceCogs.readOnly
+public let selectedVariantCogs = _selectedVariantCogs.readOnly
 /// Per-product recency ranks.
-public let recentlyViewedRankCogs = recentlyViewedRankSourceCogs.readOnly
+public let recentlyViewedRankCogs = _recentlyViewedRankCogs.readOnly
 /// Per-product inventory generations.
-public let inventoryGenerationCogs = inventoryGenerationSourceCogs.readOnly
+public let inventoryGenerationCogs = _inventoryGenerationCogs.readOnly
 
 // MARK: - Domain verbs
 
@@ -175,14 +175,14 @@ extension CogOps {
   ///
   /// - Parameter service: The boundary to install.
   public func installStorefrontService(_ service: StorefrontService) {
-    turn(storefrontServiceSourceCog, to: service)
+    turn(_storefrontServiceCog, to: service)
   }
 
   /// Records the account response the graph accepted.
   ///
   /// - Parameter shopper: The signed-in shopper, or `nil` when signed out.
   public func signIn(as shopper: Shopper?) {
-    turn(signedInShopperSourceCog, to: shopper)
+    turn(_signedInShopperCog, to: shopper)
   }
 
   /// Types one more character into the search field.
@@ -193,7 +193,7 @@ extension CogOps {
   ///
   /// - Parameter text: The field's new contents.
   public func typeSearchQuery(_ text: String) {
-    turn(searchQuerySourceCog, to: text)
+    turn(_searchQueryCog, to: text)
   }
 
   /// Applies the browse screen's filters and window in one turn.
@@ -214,12 +214,12 @@ extension CogOps {
     inStockOnly: Bool
   ) {
     turn { c in
-      c[selectedCategorySourceCog] = category
-      c[sortModeSourceCog] = sortMode
-      c[inStockOnlySourceCog] = inStockOnly
-      c[rowWindowSourceCog] = RowWindow(
+      c[_selectedCategoryCog] = category
+      c[_sortModeCog] = sortMode
+      c[_inStockOnlyCog] = inStockOnly
+      c[_rowWindowCog] = RowWindow(
         offset: 0,
-        length: c[rowWindowSourceCog].length
+        length: c[_rowWindowCog].length
       )
     }
   }
@@ -228,49 +228,49 @@ extension CogOps {
   ///
   /// - Parameter category: The category, or `nil` for all.
   public func selectCategory(_ category: CategoryID?) {
-    turn(selectedCategorySourceCog, to: category)
+    turn(_selectedCategoryCog, to: category)
   }
 
   /// Chooses how results are ordered.
   ///
   /// - Parameter mode: The sort mode.
   public func selectSortMode(_ mode: SortMode) {
-    turn(sortModeSourceCog, to: mode)
+    turn(_sortModeCog, to: mode)
   }
 
   /// Shows or hides out-of-stock products.
   ///
   /// - Parameter isOn: Whether to hide them.
   public func setInStockOnly(_ isOn: Bool) {
-    turn(inStockOnlySourceCog, to: isOn)
+    turn(_inStockOnlyCog, to: isOn)
   }
 
   /// Records the rows the list has materialized.
   ///
   /// - Parameter window: The new window.
   public func scrollRows(to window: RowWindow) {
-    turn(rowWindowSourceCog, to: window)
+    turn(_rowWindowCog, to: window)
   }
 
   /// Applies or clears a coupon.
   ///
   /// - Parameter coupon: The typed coupon, or `nil` to clear it.
   public func applyCoupon(_ coupon: CouponCode?) {
-    turn(couponSourceCog, to: coupon)
+    turn(_couponCog, to: coupon)
   }
 
   /// Chooses where the order ships.
   ///
   /// - Parameter address: The address.
   public func selectShippingAddress(_ address: ShippingAddress) {
-    turn(shippingAddressSourceCog, to: address)
+    turn(_shippingAddressCog, to: address)
   }
 
   /// Chooses how the order ships.
   ///
   /// - Parameter method: The method.
   public func selectShippingMethod(_ method: ShippingMethod) {
-    turn(shippingMethodSourceCog, to: method)
+    turn(_shippingMethodCog, to: method)
   }
 
   /// Toggles one product's favorite flag.
@@ -278,7 +278,7 @@ extension CogOps {
   /// - Parameter id: Which product.
   public func toggleFavorite(_ id: ProductID) {
     turn { c in
-      c[favoriteSourceCogs[id]] = !c[favoriteSourceCogs[id]]
+      c[_favoriteCogs[id]] = !c[_favoriteCogs[id]]
     }
   }
 
@@ -294,14 +294,14 @@ extension CogOps {
   ///   - rank: The recency rank to record; larger is more recent.
   public func openProduct(_ id: ProductID, rank: Int) {
     turn { c in
-      c[selectedProductSourceCog] = id
-      c[recentlyViewedRankSourceCogs[id]] = rank
+      c[_selectedProductCog] = id
+      c[_recentlyViewedRankCogs[id]] = rank
     }
   }
 
   /// Returns to the browse screen.
   public func closeProduct() {
-    turn(selectedProductSourceCog, to: nil)
+    turn(_selectedProductCog, to: nil)
   }
 
   /// Selects a variant of one product.
@@ -310,7 +310,7 @@ extension CogOps {
   ///   - variantIndex: Which variant.
   ///   - id: Which product.
   public func selectVariant(_ variantIndex: Int, for id: ProductID) {
-    turn(selectedVariantSourceCogs[id], to: variantIndex)
+    turn(_selectedVariantCogs[id], to: variantIndex)
   }
 
   /// Adds a product to the cart, or increases its quantity.
@@ -324,10 +324,10 @@ extension CogOps {
   ///   - quantity: How many to add.
   public func addToCart(_ id: ProductID, quantity: Int = 1) {
     turn { c in
-      let existing = c[cartQuantitySourceCogs[id]]
-      c[cartQuantitySourceCogs[id]] = existing + quantity
+      let existing = c[_cartQuantityCogs[id]]
+      c[_cartQuantityCogs[id]] = existing + quantity
       if existing == 0 {
-        c[cartContentsSourceCog] = c[cartContentsSourceCog] + [id]
+        c[_cartContentsCog] = c[_cartContentsCog] + [id]
       }
     }
   }
@@ -339,11 +339,11 @@ extension CogOps {
   ///   - id: Which product.
   public func setCartQuantity(_ quantity: Int, for id: ProductID) {
     turn { c in
-      c[cartQuantitySourceCogs[id]] = max(0, quantity)
+      c[_cartQuantityCogs[id]] = max(0, quantity)
       if quantity <= 0 {
-        c[cartContentsSourceCog] = c[cartContentsSourceCog].filter { $0 != id }
-      } else if !c[cartContentsSourceCog].contains(id) {
-        c[cartContentsSourceCog] = c[cartContentsSourceCog] + [id]
+        c[_cartContentsCog] = c[_cartContentsCog].filter { $0 != id }
+      } else if !c[_cartContentsCog].contains(id) {
+        c[_cartContentsCog] = c[_cartContentsCog] + [id]
       }
     }
   }
@@ -361,7 +361,7 @@ extension CogOps {
   public func publishInventoryBurst(_ ids: [ProductID], generation: Int) {
     turn { c in
       for id in ids {
-        c[inventoryGenerationSourceCogs[id]] = generation
+        c[_inventoryGenerationCogs[id]] = generation
       }
     }
   }
