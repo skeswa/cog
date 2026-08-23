@@ -207,7 +207,7 @@ public struct Reader<Value> {
   /// Reads a source exposed through `.readOnly`, and depends on it.
   ///
   /// This lets a selector read a published projection while the writable
-  /// source stays `fileprivate` in its owning file.
+  /// source stays `private` in its owning file.
   /// The projection and source share one state identity and dependency edge.
   ///
   /// - Parameter valueReference: The read-only projection to read.

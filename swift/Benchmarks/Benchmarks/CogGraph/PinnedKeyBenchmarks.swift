@@ -23,12 +23,12 @@ import CogTesting
 @MainActor
 enum PinnedKeyHarness {
   /// The keyed source a turn writes.
-  static let rowSourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.pinned.source")
+  static let _rowCogs = CogBox<Int, Int>.Manual(0, name: "perf.pinned.source")
 
   /// One automatic consumer per row, so a write actually propagates to a
   /// boundary rather than stopping at the source.
   static let rowCogs = CogBox<Int, Int>(
-    { c, key in c[PinnedKeyHarness.rowSourceCogs[key]] &+ key },
+    { c, key in c[PinnedKeyHarness._rowCogs[key]] &+ key },
     name: "perf.pinned.row"
   )
 
@@ -64,7 +64,7 @@ enum PinnedKeyHarness {
   static func runLiveKeyTurns(_ count: Int, pinnedKeyCount: Int) {
     guard let cogs = contexts[pinnedKeyCount] else { return }
     for iteration in 1...max(count, 1) {
-      cogs.turn(rowSourceCogs[liveKey], to: iteration, name: "perf.pinned.turn")
+      cogs.turn(_rowCogs[liveKey], to: iteration, name: "perf.pinned.turn")
       blackHole(cogs[rowCogs[liveKey]])
     }
   }

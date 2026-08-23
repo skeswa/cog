@@ -1,12 +1,13 @@
 extension CogBox {
   /// A read-only keyed facade over one ``CogBox/Manual`` declaration.
   ///
-  /// Keep a source box `fileprivate`, then publish its `.readOnly` projection:
+  /// Keep a source box `private`, then publish its `.readOnly` projection under
+  /// the source's name without the leading underscore:
   ///
   /// ```swift
   /// // WeatherState.swift
-  /// fileprivate let weatherReportSourceCogs = CogBox<Weather?, ZipCode>.Manual(nil)
-  /// let weatherReportCogs = weatherReportSourceCogs.readOnly
+  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual(nil)
+  /// let weatherReportCogs = _weatherReportCogs.readOnly
   /// ```
   ///
   /// The projection holds the source box's descriptor identity but no keys,
@@ -43,7 +44,7 @@ extension CogBox {
 extension CogBox.Manual {
   /// A keyed declaration naming this box's state whose value references cannot be written.
   ///
-  /// Publish this beside a `fileprivate` source box. Each projected key keeps
+  /// Publish this beside a `private` source box. Each projected key keeps
   /// the source descriptor-and-key identity, equality behavior, starting value,
   /// and context-local state; only write capability is removed.
   public var readOnly: CogBox<Value, Key>.Projection {

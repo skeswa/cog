@@ -6,20 +6,20 @@ import Testing
 @MainActor
 @Test func `ArenaLifetimePolicyInfrastructure rows retain descriptor lifetime policy`() {
   let cogs = Cogs.forTesting()
-  let appSourceCog = Cog<Int>.Manual(0)
-  let ephemeralSourceCog = Cog<Int>.Manual(
+  let _appCog = Cog<Int>.Manual(0)
+  let _ephemeralCog = Cog<Int>.Manual(
     0,
     lifetime: .whileObserved(resetToInitial: true, grace: .seconds(7))
   )
   let automaticCog = Cog<Int> { _ in 1 }
 
-  _ = cogs.peek(appSourceCog)
-  _ = cogs.peek(ephemeralSourceCog)
+  _ = cogs.peek(_appCog)
+  _ = cogs.peek(_ephemeralCog)
   _ = cogs.peek(automaticCog)
 
-  #expect(cogs.arenaCore.lifetimePolicy(for: appSourceCog) == .app)
+  #expect(cogs.arenaCore.lifetimePolicy(for: _appCog) == .app)
   #expect(
-    cogs.arenaCore.lifetimePolicy(for: ephemeralSourceCog)
+    cogs.arenaCore.lifetimePolicy(for: _ephemeralCog)
       == .whileObserved(grace: .seconds(7))
   )
   #expect(cogs.arenaCore.lifetimePolicy(for: automaticCog) == .whileObserved(grace: nil))
@@ -28,32 +28,32 @@ import Testing
 @MainActor
 @Test func `ArenaLeaseInfrastructure reactions lease only direct observed-lifetime roots`() {
   let cogs = Cogs.forTesting()
-  let appSourceCog = Cog<Int>.Manual(1)
-  let ephemeralSourceCog = Cog<Int>.Manual(
+  let _appCog = Cog<Int>.Manual(1)
+  let _ephemeralCog = Cog<Int>.Manual(
     2,
     lifetime: .whileObserved(resetToInitial: true)
   )
-  let innerCog = Cog<Int> { c in c[appSourceCog] + 1 }
+  let innerCog = Cog<Int> { c in c[_appCog] + 1 }
   let rootCog = Cog<Int> { c in c[innerCog] + 1 }
 
   let first = cogs.runForArenaLifetimeTesting { c in
     _ = c[rootCog]
     _ = c[rootCog]
-    _ = c[ephemeralSourceCog]
-    _ = c[appSourceCog]
+    _ = c[_ephemeralCog]
+    _ = c[_appCog]
   }
   let second = cogs.runForArenaLifetimeTesting { c in _ = c[rootCog] }
 
   #expect(cogs.arenaCore.leaseCount(for: rootCog) == 2)
   #expect(cogs.arenaCore.leaseCount(for: innerCog) == 0)
-  #expect(cogs.arenaCore.leaseCount(for: ephemeralSourceCog) == 1)
-  #expect(cogs.arenaCore.leaseCount(for: appSourceCog) == 0)
+  #expect(cogs.arenaCore.leaseCount(for: _ephemeralCog) == 1)
+  #expect(cogs.arenaCore.leaseCount(for: _appCog) == 0)
   #expect(first.reaction.arenaLeasedDependencies.count == 2)
   #expect(second.reaction.arenaLeasedDependencies.count == 1)
 
   first.cancel()
   #expect(cogs.arenaCore.leaseCount(for: rootCog) == 1)
-  #expect(cogs.arenaCore.leaseCount(for: ephemeralSourceCog) == 0)
+  #expect(cogs.arenaCore.leaseCount(for: _ephemeralCog) == 0)
 
   first.cancel()
   #expect(cogs.arenaCore.leaseCount(for: rootCog) == 1)

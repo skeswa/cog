@@ -24,11 +24,11 @@ enum BoundaryHarness {
   static let onscreenCount = 12
 
   /// The bulk of the graph.
-  static let offscreenSourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.boundary.offscreen")
+  static let _offscreenCogs = CogBox<Int, Int>.Manual(0, name: "perf.boundary.offscreen")
 
   /// The twelve a view reads.
   static let onscreenCogs = CogBox<Int, Int>(
-    { c, key in c[BoundaryHarness.offscreenSourceCogs[key]] &+ key },
+    { c, key in c[BoundaryHarness._offscreenCogs[key]] &+ key },
     name: "perf.boundary.onscreen"
   )
 
@@ -43,7 +43,7 @@ enum BoundaryHarness {
   static func countBoundaries() -> Int {
     let cogs = Cogs.forTesting()
     for key in 0..<offscreenCount {
-      blackHole(cogs.peek(offscreenSourceCogs[key]))
+      blackHole(cogs.peek(_offscreenCogs[key]))
     }
     for key in 0..<onscreenCount {
       blackHole(cogs[onscreenCogs[key]])
