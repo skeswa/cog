@@ -1128,6 +1128,73 @@ function checkReleaseAfterGate(context) {
 }
 
 /**
+ * CHECK 24 — M6's arena filters re-prove every filterable M1–M6 scenario.
+ *
+ * M6 rebuilt the runtime under the behavior suite, and its `M6-10*` chain
+ * claims that rebuild was integrated stepwise: each slice re-proves one
+ * family of already-green scenarios through an explicit `--filter`. This
+ * check makes that claim inspectable — the union of every scenario the M6
+ * section's verify filters select must contain every `unit`- and
+ * `exit test`-mode scenario a task in M1 through M6 greens. Unfiltered whole
+ * runs (`mise run test` with no filter) deliberately count for nothing here:
+ * the final gate always runs everything, and if that satisfied the check, a
+ * scenario could reach the end of the integration chain having never been
+ * named by any slice.
+ *
+ * A scenario the arena legitimately cannot re-prove through a host filter is
+ * named by an `_Arena-coverage exceptions: …._` note in the M6 section, which
+ * keeps every hole a recorded decision rather than a silent omission.
+ */
+function checkArenaIntegrationCoverage(context) {
+  const diagnostics = [];
+  const arenaTasks = context.tasks.filter((task) => task.milestone === "M6");
+  if (arenaTasks.length === 0) return diagnostics;
+  const scenarioIds = context.scenarios.ids;
+  if (scenarioIds.length === 0) return diagnostics;
+
+  const covered = new Set();
+  for (const task of arenaTasks) {
+    for (const command of context.verifyCommands.get(task) ?? []) {
+      if (command.negated) continue;
+      if (command.filter === null) continue;
+      if (!SCENARIO_FILTER_COMMANDS.has(command.command)) continue;
+      const { ids } = expandFilter(command.filter, scenarioIds);
+      for (const id of ids) covered.add(id);
+    }
+  }
+
+  const note = context.notes.find(
+    (entry) => entry.milestone === "M6" && entry.label === "Arena-coverage exceptions",
+  );
+  const excepted = new Set(
+    note === undefined ? [] : (note.text.match(/[A-Z][A-Z0-9]*-\d+[a-z]?/g) ?? []),
+  );
+
+  const arenaMilestones = new Set(["M1", "M2", "M3", "M4", "M5", "M6"]);
+  for (const task of context.tasks) {
+    if (!arenaMilestones.has(task.milestone)) continue;
+    for (const scenario of greenedScenarios(context, task)) {
+      if (!FILTERABLE_PROOF_MODES.includes(scenario.mode)) continue;
+      if (covered.has(scenario.id)) continue;
+      if (excepted.has(scenario.id)) continue;
+      diagnostics.push(
+        diagnostic(
+          "arena-integration-coverage",
+          context,
+          task,
+          task.greensLine ?? task.line,
+          `scenario ${scenario.id} (proof mode \`${scenario.mode}\`, greened by ${task.id}) is ` +
+            `selected by no M6 arena-integration filter and is not named by the M6 section's ` +
+            `\`_Arena-coverage exceptions:_\` note; the arena integration re-proves every ` +
+            `filterable M1–M6 scenario by name`,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+/**
  * The ordered check registry. Later ledger-integrity slices — proof modes and
  * graph order — append entries here.
  */
@@ -1155,6 +1222,7 @@ export const LEDGER_CHECKS = [
   { name: "proof-mode-command", run: checkProofModeCommands },
   { name: "release-chain", run: checkReleaseChain },
   { name: "release-after-gate", run: checkReleaseAfterGate },
+  { name: "arena-integration-coverage", run: checkArenaIntegrationCoverage },
 ];
 
 /**

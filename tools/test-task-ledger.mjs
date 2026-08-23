@@ -201,6 +201,14 @@ const CASES = [
     checks: ["release-after-gate"],
     mentions: ["M1-03", "transitively depends on no _(Gate)_ task"],
   },
+  {
+    name: "arena filter that leaves a scenario behind",
+    ledger: resolve(FIXTURES, "integration-hole.md"),
+    checks: ["arena-integration-coverage"],
+    // DECL-01/02 are filter-covered and DECL-03 is excused by the
+    // `_Arena-coverage exceptions:_` note, so only DECL-04 may fire.
+    mentions: ["DECL-04", "M1-04", "no M6 arena-integration filter"],
+  },
 ];
 
 /** @param {string} ledger */
