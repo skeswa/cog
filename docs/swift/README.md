@@ -175,8 +175,9 @@ These rules are settled. The linked design files hold the full details.
 ### State and writes
 
 - One app has one MainActor `Cogs` graph.
-- `Cog<T>` and `ManualCog<T>` name one value. A `CogBox` makes keyed values
-  from one declaration.
+- `Cog<T>` is the automatic shape. Its manual, async, and projection shapes
+  are `Cog<T>.Manual`, `.Async`, and `.Projection`; `CogBox<T, K>` has the
+  matching nested family for keyed values.
 - Keyless declaration names end in `Cog`; box names end in `Cogs`. Values read
   from the graph use normal domain names without either suffix.
 - `turn` is the only write primitive. App code wraps `turn` and `refresh` in

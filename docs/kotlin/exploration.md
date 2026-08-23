@@ -614,6 +614,10 @@ collection. Measure the gain and offer a compatible fallback.
 - exception policy for reaction bodies;
 - exact module and version floors;
 - exact application bootstrap and dependency-injection helpers;
+- whether Kotlin should mirror Swift's settled nested shape families through
+  companion factories; Kotlin permits explicit generic arguments on functions,
+  so its analogous spelling is deferred to implementation rather than copied
+  from Swift;
 - saved-state adapter shape;
 - debug-history size and payload.
 

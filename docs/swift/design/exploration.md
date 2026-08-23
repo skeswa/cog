@@ -753,26 +753,26 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 
 ### Settled choices
 
-| Area                 | Decision                                                                                                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Writes               | Sources are `private` or `fileprivate` and expose `.readOnly`. A `Writer` is valid only for its turn. Named methods on `CogOps` wrap `turn` and `refresh`.                   |
-| State names          | A descriptor plus optional key names state. Keyless declarations end in `Cog`; boxes end in `Cogs`. Read values use plain domain names.                                      |
-| Keyed API            | Boxes make value references. Keys use inline `AnyHashable?`. Public reference types stay resilient.                                                                          |
-| Dependencies         | Actual reads rebuild edges on each run. A shared linked pool stores edges. CLEAN, CHECK, DIRTY, versions, and equality stop unneeded work.                                   |
-| Shipping core        | The specialized arena with pool edges is the default and only shipping core. `CompactArena` turns off the typed frontier to reduce binary size.                              |
-| Correctness          | Reads use lazy pull. Hot roots settle before notices. Cycles and turns during automatic computation fail with a keyed path.                                                  |
-| Async values         | A value read returns the latest success or required default. The `status` lens exposes pending, success, failure, value, error, and flags. There is no public initial state. |
-| Async work           | `.latest` is the default. `.queue`, `.merged`, and `.exhaustLatest` apply to one-shot work. Streams use `.latest` only. Generations reject late results.                     |
-| Stream end and error | Natural end publishes no turn. A current thrown error publishes failure. Cog-led cancellation is silent. Equal elements are no-ops when equality exists.                     |
-| Refresh result       | `CogRefresh` reports success, failure, superseded, or released for the exact generation it started.                                                                          |
-| Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds.                                        |
-| Mechanisms           | Bootstrap owns app-wide effects. `whenever` owns gated work. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.                                |
-| UI and exports       | Views resolve `\.cogs` themselves. Bindings use a tracked getter and named-op setter. Exports never block a turn.                                                            |
-| Runtime creation     | Production calls `bootstrapApp(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                               |
-| Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped.                    |
-| Traps and deinits    | Clear release-build traps use `fatalError`. Every generic class writes `nonisolated deinit` until the Swift optimizer bug is fixed.                                          |
-| Public names         | The 0.1.0 review kept the API names. [prior-art.md](./prior-art.md) records the comparison and the `Cogs` revisit trigger.                                                   |
-| Lint                 | `coglint` enforces the first six usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                   |
+| Area                 | Decision                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Writes               | Sources are `private` or `fileprivate` and expose `.readOnly`. A `Writer` is valid only for its turn. Named methods on `CogOps` wrap `turn` and `refresh`.                                                                                              |
+| State names          | A descriptor plus optional key names state. Keyless declarations end in `Cog`; boxes end in `Cogs`. Read values use plain domain names.                                                                                                                 |
+| Keyed API            | Boxes make value references. Keys use inline `AnyHashable?`. Public reference types stay resilient.                                                                                                                                                     |
+| Dependencies         | Actual reads rebuild edges on each run. A shared linked pool stores edges. CLEAN, CHECK, DIRTY, versions, and equality stop unneeded work.                                                                                                              |
+| Shipping core        | The specialized arena with pool edges is the default and only shipping core. `CompactArena` turns off the typed frontier to reduce binary size.                                                                                                         |
+| Correctness          | Reads use lazy pull. Hot roots settle before notices. Cycles and turns during automatic computation fail with a keyed path.                                                                                                                             |
+| Async values         | A value read returns the latest success or required default. The `status` lens exposes pending, success, failure, value, error, and flags. There is no public initial state.                                                                            |
+| Async work           | `.latest` is the default. `.queue`, `.merged`, and `.exhaustLatest` apply to one-shot work. Streams use `.latest` only. Generations reject late results.                                                                                                |
+| Stream end and error | Natural end publishes no turn. A current thrown error publishes failure. Cog-led cancellation is silent. Equal elements are no-ops when equality exists.                                                                                                |
+| Refresh result       | `CogRefresh` reports success, failure, superseded, or released for the exact generation it started.                                                                                                                                                     |
+| Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds.                                                                                                                   |
+| Mechanisms           | Bootstrap owns app-wide effects. `whenever` owns gated work. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.                                                                                                           |
+| UI and exports       | Views resolve `\.cogs` themselves. Bindings use a tracked getter and named-op setter. Exports never block a turn.                                                                                                                                       |
+| Runtime creation     | Production calls `bootstrapApp(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                                                                                                          |
+| Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped.                                                                                               |
+| Traps and deinits    | Clear release-build traps use `fatalError`. Every generic class writes `nonisolated deinit` until the Swift optimizer bug is fixed.                                                                                                                     |
+| Public names         | The shape families use `Cog<Value>.Manual` / `.Async` / `.Projection` and the corresponding `CogBox<Value, Key>` members. `ManualCogLifetime` stays top-level. [prior-art.md](./prior-art.md) records the naming review and the `Cogs` revisit trigger. |
+| Lint                 | `coglint` enforces the first six usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                                                                                              |
 
 The benchmark record holds the old core and layout comparisons. This table
 states only the current result.
@@ -827,6 +827,15 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     state gates own shorter scopes.
 27. **Lint tooling — settled.** The syntax-only linter, six rules, plugins,
     docs, and sibling distribution ship together.
+28. **Shape-family spelling — settled.** The automatic shape remains
+    `Cog<Value>`; manual, async, and projection shapes are nested as
+    `Cog<Value>.Manual`, `.Async`, and `.Projection`, with the same members on
+    `CogBox<Value, Key>`. `.Manual` preserves the manual/automatic mechanism
+    axis. Declaration variables keep `Source` as a role qualifier, so a source
+    deliberately reads like
+    `weatherServiceSourceCog = Cog<WeatherService>.Manual(.live)`.
+    `ManualCogLifetime` remains top-level because it is value-independent and
+    shared by both shape families.
 
 ---
 
