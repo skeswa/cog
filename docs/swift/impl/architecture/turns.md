@@ -35,7 +35,7 @@ Application code wraps the primitive in domain vocabulary:
 ```swift
 extension CogOps {
   func recordTemperature(_ value: Double) {
-    turn(temperatureSourceCog, to: value)
+    turn(_temperatureCog, to: value)
   }
 }
 ```
@@ -51,10 +51,10 @@ cell, and the row's `touched` bit adds its slot to the turn buffer only once.
 
 ```swift
 cogs.turn(named: "increment twice") { c in
-  c[countSourceCog] += 1
-  c[countSourceCog] += 1
-  #expect(c[countSourceCog] == 2)
-  #expect(cogs.peek(countSourceCog) == 0)
+  c[_countCog] += 1
+  c[_countCog] += 1
+  #expect(c[_countCog] == 2)
+  #expect(cogs.peek(_countCog) == 0)
 }
 ```
 
@@ -71,8 +71,8 @@ UI roots or runs effects. Consumers never observe a half-updated pair.
 
 ```swift
 cogs.turn(named: "move reading") { c in
-  c[temperatureSourceCog] = 86
-  c[humiditySourceCog] = 40
+  c[_temperatureCog] = 86
+  c[_humidityCog] = 40
 }
 ```
 
@@ -135,8 +135,8 @@ A nested operation called while the phase is accumulating receives the same
 
 ```swift
 func recordComfort(_ c: Writer) {
-  c[temperatureSourceCog] = 72
-  c[humiditySourceCog] = 45
+  c[_temperatureCog] = 72
+  c[_humidityCog] = 45
 }
 
 cogs.turn(named: "restore comfort") { c in

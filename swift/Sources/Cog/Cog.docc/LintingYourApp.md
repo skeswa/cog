@@ -84,7 +84,7 @@ rule and a non-empty reason:
 
 ```swift
 // coglint:disable-next-line primitives-only-in-ops -- low-level boundary proof
-c.turn { writer in writer[countSourceCog] += 1 }
+c.turn { writer in writer[_countCog] += 1 }
 ```
 
 A malformed directive suppresses nothing. Prefer the rule's repair whenever

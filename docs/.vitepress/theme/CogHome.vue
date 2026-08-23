@@ -335,9 +335,9 @@ onBeforeUnmount(() => {
       </div>
       <pre
         class="code"
-      ><code><span class="k">let</span> <span class="v">temperatureSourceCog</span> = <span class="t">Cog</span>&lt;<span class="t">Int</span>&gt;.<span class="t">Manual</span>(<span class="n">60</span>)
+      ><code><span class="k">let</span> <span class="v">_temperatureCog</span> = <span class="t">Cog</span>&lt;<span class="t">Int</span>&gt;.<span class="t">Manual</span>(<span class="n">60</span>)
 <span class="k">let</span> <span class="v">adviceCog</span> = <span class="t">Cog</span>&lt;<span class="t">String</span>&gt; { c <span class="k">in</span>
-  c[<span class="v">temperatureSourceCog</span>] &gt; <span class="n">70</span> ? <span class="s">"shorts"</span> : <span class="s">"coat"</span>
+  c[<span class="v">_temperatureCog</span>] &gt; <span class="n">70</span> ? <span class="s">"shorts"</span> : <span class="s">"coat"</span>
 }
 
 <span class="k">struct</span> <span class="t">AdviceLabel</span>: <span class="t">View</span> {

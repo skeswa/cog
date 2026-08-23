@@ -19,9 +19,9 @@ plus a key to name a family of independent states. Internally,
 value projection.
 
 ```swift
-private let temperatureSourceCog = Cog<Double>.Manual(68)
+private let _temperatureCog = Cog<Double>.Manual(68)
 let adviceCog = Cog<String> { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return temperature > 80 ? "Stay inside" : "Go outside"
 }
 let forecastCogs = CogBox<Forecast, ZipCode>.Async(default: .empty) { _, zip in
@@ -29,8 +29,9 @@ let forecastCogs = CogBox<Forecast, ZipCode>.Async(default: .empty) { _, zip in
 }
 ```
 
-Read-only projections preserve ownership. `sourceCog.readOnly` lets another
-file read a source without gaining a writer spelling. A projection shares the
+Read-only projections preserve ownership. `_someCog.readOnly` lets another
+file read a source without gaining a writer spelling; the projection publishes
+the source's name without its leading underscore. A projection shares the
 source state identity; it is not mirrored state.
 
 `Reader`, `ReactionReader`, and `Writer` are short-lived capabilities. A reader
@@ -75,17 +76,17 @@ derive from it; views pass normal values and identities, not copied sources or
 Incorrect—two writable temperatures can disagree:
 
 ```swift
-let appTemperatureSourceCog = Cog<Double>.Manual(68)
-let dashboardTemperatureSourceCog = Cog<Double>.Manual(68)
+let _appTemperatureCog = Cog<Double>.Manual(68)
+let _dashboardTemperatureCog = Cog<Double>.Manual(68)
 ```
 
 Correct—one source and any number of derived views:
 
 ```swift
-private let temperatureSourceCog = Cog<Double>.Manual(68)
-let fahrenheitCog = temperatureSourceCog.readOnly
+private let _temperatureCog = Cog<Double>.Manual(68)
+let temperatureCog = _temperatureCog.readOnly
 let celsiusCog = Cog { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return (temperature - 32) * 5 / 9
 }
 ```
@@ -105,9 +106,9 @@ replaces only the suffix from the first mismatch.
 
 ```swift
 let displayedTemperatureCog = Cog<Double> { c in
-  let showIndoor = c[showIndoorSourceCog]
-  if showIndoor { return c[indoorSourceCog] }
-  return c[outdoorSourceCog]
+  let showIndoor = c[_showIndoorCog]
+  if showIndoor { return c[_indoorCog] }
+  return c[_outdoorCog]
 }
 ```
 
@@ -162,7 +163,7 @@ not depend on temperature:
 
 ```swift
 let adviceCog = Cog<String> { _ in
-  let temperature = cogs.peek(temperatureSourceCog)
+  let temperature = cogs.peek(_temperatureCog)
   return temperature > 80 ? "Stay inside" : "Go outside"
 }
 ```
@@ -171,7 +172,7 @@ Correct—read through `c`:
 
 ```swift
 let adviceCog = Cog<String> { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return temperature > 80 ? "Stay inside" : "Go outside"
 }
 ```
@@ -188,7 +189,7 @@ stateful derivation without inventing another writable source.
 
 ```swift
 let peakCog = Cog<Double> { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return max(c.curr ?? temperature, temperature)
 }
 ```

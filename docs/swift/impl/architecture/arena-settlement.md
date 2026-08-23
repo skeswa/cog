@@ -157,8 +157,8 @@ cannot mutate another selector's edge list.
 
 ```swift
 let selectedCog = Cog { c in
-  let useIndoor = c[showIndoorSourceCog]
-  return useIndoor ? c[indoorSourceCog] : c[outdoorSourceCog]
+  let useIndoor = c[_showIndoorCog]
+  return useIndoor ? c[_indoorCog] : c[_outdoorCog]
 }
 ```
 

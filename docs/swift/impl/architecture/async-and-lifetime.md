@@ -16,7 +16,7 @@ A `Cog<Value>.Async` selector runs on the MainActor with a
 
 ```swift
 let forecastCog = Cog<Forecast>.Async(default: .empty) { c in
-  let zip = c[currentZipSourceCog]
+  let zip = c[_currentZipCog]
   return Work.run { try await service.forecast(for: zip) }
 }
 ```
