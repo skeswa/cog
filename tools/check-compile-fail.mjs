@@ -4,11 +4,16 @@
 //     node tools/check-compile-fail.mjs [options]
 //
 // Every scenario in docs/swift/impl/scenarios.md marked `(Proof: compile-fail.)`
-// is proven by a fixture under `swift/CompileFail/`. All fixtures are
-// type-checked by ONE `swiftc -typecheck` invocation — never one compiler run
-// per fixture — and this tool then attributes each diagnostic back to the
-// fixture that produced it and matches it against that fixture's declared
-// expectations.
+// is proven by a fixture under `swift/CompileFail/`. All fixtures sharing a
+// build configuration are type-checked by ONE `swiftc -typecheck` invocation —
+// never one compiler run per fixture — and this tool then attributes each
+// diagnostic back to the fixture that produced it and matches it against that
+// fixture's declared expectations. Fixtures declaring
+// `// configuration: release` form a second batched pass against the
+// release-built modules; that is how `(Proof: release configuration.)`
+// absence claims — API that exists only in debug builds — stay continuously
+// verified rather than resting on the test gates that compile the debug-only
+// suites away.
 //
 // ## Fixture contract
 //
@@ -38,6 +43,13 @@
 //       Same, but satisfied by a matching error anywhere in the fixture. Use it
 //       only when the compiler attributes the diagnostic to a line the fixture
 //       cannot predict.
+//
+//   // configuration: release
+//       Optional, at most once; the default is `debug`. Type-checks this
+//       fixture against the release-built library modules instead of the debug
+//       ones. A release fixture's scenario must be marked
+//       `(Proof: release configuration.)` in scenarios.md, the way a debug
+//       fixture's must be marked `(Proof: compile-fail.)`.
 //
 // Both directions are enforced. A fixture that emits no error at all fails
 // (`no-diagnostic`) — a compile-fail test that quietly starts compiling proves
@@ -263,7 +275,8 @@ function swiftFilesUnder(directory) {
   return files.sort();
 }
 
-const DIRECTIVE = /^\/\/\s*(scenario|expect-error|expect-error-anywhere)\s*:\s*(.+?)\s*$/;
+const DIRECTIVE =
+  /^\/\/\s*(scenario|expect-error|expect-error-anywhere|configuration)\s*:\s*(.+?)\s*$/;
 const TRAILING_DIRECTIVE = /\S\s{2,}\/\/\s*(expect-error|expect-error-anywhere)\s*:\s*(.+?)\s*$/;
 
 /**
@@ -272,6 +285,7 @@ const TRAILING_DIRECTIVE = /\S\s{2,}\/\/\s*(expect-error|expect-error-anywhere)\
  *   path: string,
  *   relativePath: string,
  *   scenario: string | null,
+ *   configuration: string,
  *   expectations: Array<{ text: string, line: number, anywhere: boolean, directiveLine: number }>,
  *   diagnostics: Array<{ check: string, line: number, message: string }>,
  * }}
@@ -281,6 +295,8 @@ function parseFixture(path) {
   const lines = readFileSync(path, "utf8").split("\n");
   /** @type {string | null} */
   let scenario = null;
+  /** @type {string | null} */
+  let configuration = null;
   /** @type {Array<{ text: string, line: number, anywhere: boolean, directiveLine: number }>} */
   const expectations = [];
   /** @type {Array<{ check: string, line: number, message: string }>} */
@@ -323,6 +339,28 @@ function parseFixture(path) {
           continue;
         }
         scenario = text;
+        continue;
+      }
+      if (kind === "configuration") {
+        if (configuration !== null) {
+          diagnostics.push({
+            check: "duplicate-configuration",
+            line: lineNumber,
+            message:
+              "a fixture declares at most one `// configuration:` directive; " +
+              `already saw \`${configuration}\``,
+          });
+          continue;
+        }
+        if (text !== "debug" && text !== "release") {
+          diagnostics.push({
+            check: "malformed-configuration",
+            line: lineNumber,
+            message: `\`${text}\` is not a fixture configuration (expected \`debug\` or \`release\`)`,
+          });
+          continue;
+        }
+        configuration = text;
         continue;
       }
       const anywhere = kind === "expect-error-anywhere";
@@ -369,15 +407,24 @@ function parseFixture(path) {
     });
   }
 
-  return { path, relativePath, scenario, expectations, diagnostics };
+  return {
+    path,
+    relativePath,
+    scenario,
+    configuration: configuration ?? "debug",
+    expectations,
+    diagnostics,
+  };
 }
 
 // MARK: - scenarios.md cross-check
 
 /**
  * Maps every scenario ID in scenarios.md to whether it is declared
- * `(Proof: compile-fail.)`. Returns null when the ledger is unreadable, which
- * downgrades the cross-check to a no-op rather than a failure.
+ * `(Proof: compile-fail.)` and whether it is declared
+ * `(Proof: release configuration.)`. Returns null when the ledger is
+ * unreadable, which downgrades the cross-check to a no-op rather than a
+ * failure.
  */
 function readScenarioProofModes() {
   if (!existsSync(SCENARIOS)) return null;
@@ -387,7 +434,7 @@ function readScenarioProofModes() {
   } catch {
     return null;
   }
-  /** @type {Map<string, boolean>} */
+  /** @type {Map<string, { compileFail: boolean, releaseConfiguration: boolean }>} */
   const modes = new Map();
   const pattern = /^-\s+\*\*([A-Z][A-Z0-9]*-\d+[a-z]?)\.\*\*/gm;
   /** @type {RegExpExecArray | null} */
@@ -399,7 +446,10 @@ function readScenarioProofModes() {
   for (let index = 0; index < starts.length; index += 1) {
     const end = index + 1 < starts.length ? starts[index + 1].index : source.length;
     const body = source.slice(starts[index].index, end);
-    modes.set(starts[index].id, /\(Proof:\s*compile-fail\.?\)/.test(body));
+    modes.set(starts[index].id, {
+      compileFail: /\(Proof:\s*compile-fail\.?\)/.test(body),
+      releaseConfiguration: /\(Proof:\s*release configuration\.?\)/.test(body),
+    });
   }
   return modes.size === 0 ? null : modes;
 }
@@ -444,26 +494,34 @@ function parseDiagnostics(output) {
 /**
  * @param {string} scratchPath
  * @param {boolean} build
+ * @param {string} configuration
  */
-function ensureModules(scratchPath, build) {
+function ensureModules(scratchPath, build, configuration) {
   if (build) {
-    const result = spawnSync("swift", ["build", "--scratch-path", scratchPath], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      env: shippingManifestEnvironment(process.env),
-      maxBuffer: 64 * 1024 * 1024,
-    });
+    const result = spawnSync(
+      "swift",
+      ["build", "--scratch-path", scratchPath, "--configuration", configuration],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: shippingManifestEnvironment(process.env),
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
     if (result.error) fail(`cannot run \`swift build\`: ${result.error.message}`);
     if (result.status !== 0) {
       process.stderr.write(result.stdout ?? "");
       process.stderr.write(result.stderr ?? "");
-      fail("`swift build` failed; the fixtures cannot be type-checked against the library");
+      fail(
+        `\`swift build -c ${configuration}\` failed; ` +
+          "the fixtures cannot be type-checked against the library",
+      );
     }
   }
-  const modules = join(scratchPath, "debug", "Modules");
+  const modules = join(scratchPath, configuration, "Modules");
   if (!existsSync(modules)) {
     fail(
-      `no module directory at ${repoPath(modules)}; ` +
+      `no ${configuration} module directory at ${repoPath(modules)}; ` +
         "run without `--no-build`, or point `--scratch-path` at a built scratch directory",
     );
   }
@@ -551,7 +609,7 @@ function main() {
   if (options.list) {
     for (const fixture of fixtures) {
       process.stdout.write(
-        `${fixture.scenario ?? "?"}\t${fixture.relativePath}\t` +
+        `${fixture.scenario ?? "?"}\t${fixture.relativePath}\t${fixture.configuration}\t` +
           `${fixture.expectations.length} expectation(s)\n`,
       );
     }
@@ -597,47 +655,63 @@ function main() {
         if (id === null || id.startsWith(HARNESS_PREFIX)) continue;
         if (!modes.has(id)) {
           report(fixture, "unknown-scenario", 1, `${id} is not declared in ${repoPath(SCENARIOS)}`);
-        } else if (!modes.get(id)) {
-          report(
-            fixture,
-            "wrong-proof-mode",
-            1,
-            `${id} is not marked \`(Proof: compile-fail.)\` in ${repoPath(SCENARIOS)}`,
-          );
+        } else {
+          const mode = modes.get(id);
+          const release = fixture.configuration === "release";
+          if (release ? !mode.releaseConfiguration : !mode.compileFail) {
+            const required = release ? "(Proof: release configuration.)" : "(Proof: compile-fail.)";
+            report(
+              fixture,
+              "wrong-proof-mode",
+              1,
+              `${id} is not marked \`${required}\` in ${repoPath(SCENARIOS)}`,
+            );
+          }
         }
       }
     }
   }
 
   const settings = compilerSettingsFromManifest();
-  const modulesPath = ensureModules(options.scratchPath, options.build);
-  const compilation = typecheck(
-    fixtures.map((fixture) => fixture.path),
-    modulesPath,
-    settings,
-  );
-  const diagnostics = parseDiagnostics(compilation.output);
-  const errors = diagnostics.filter((item) => item.severity === "error");
-
   const byPath = new Map(fixtures.map((fixture) => [fixture.path, []]));
-  for (const error of errors) {
-    const bucket = error.path === null ? undefined : byPath.get(error.path);
-    if (bucket === undefined) {
-      problems.push({
-        check: "foreign-diagnostic",
-        path: error.path === null ? "<compiler>" : repoPath(error.path),
-        line: error.line,
-        message: `error outside the fixture set: ${error.message}`,
-        scenario: null,
-      });
-      continue;
-    }
-    bucket.push(error);
-  }
+  const configurations = ["debug", "release"].filter((configuration) =>
+    fixtures.some((fixture) => fixture.configuration === configuration),
+  );
+  let totalErrors = 0;
+  for (const configuration of configurations) {
+    const batch = fixtures.filter((fixture) => fixture.configuration === configuration);
+    const modulesPath = ensureModules(options.scratchPath, options.build, configuration);
+    const compilation = typecheck(
+      batch.map((fixture) => fixture.path),
+      modulesPath,
+      settings,
+    );
+    const diagnostics = parseDiagnostics(compilation.output);
+    const errors = diagnostics.filter((item) => item.severity === "error");
+    totalErrors += errors.length;
 
-  if (errors.length === 0 && compilation.status !== 0) {
-    process.stderr.write(compilation.output);
-    fail(`swiftc exited ${compilation.status} without any parseable diagnostic (output above)`);
+    for (const error of errors) {
+      const bucket = error.path === null ? undefined : byPath.get(error.path);
+      if (bucket === undefined) {
+        problems.push({
+          check: "foreign-diagnostic",
+          path: error.path === null ? "<compiler>" : repoPath(error.path),
+          line: error.line,
+          message: `error outside the fixture set: ${error.message}`,
+          scenario: null,
+        });
+        continue;
+      }
+      bucket.push(error);
+    }
+
+    if (errors.length === 0 && compilation.status !== 0) {
+      process.stderr.write(compilation.output);
+      fail(
+        `swiftc (${configuration}) exited ${compilation.status} ` +
+          "without any parseable diagnostic (output above)",
+      );
+    }
   }
 
   /** @type {Array<{ scenario: string | null, path: string, ok: boolean, expectations: number, errors: number }>} */
@@ -694,6 +768,7 @@ function main() {
     summary.push({
       scenario: fixture.scenario,
       path: fixture.relativePath,
+      configuration: fixture.configuration,
       ok: problems.length === before,
       expectations: fixture.expectations.length,
       errors: fixtureErrors.length,
@@ -752,7 +827,8 @@ function main() {
   const expectations = summary.reduce((total, entry) => total + entry.expectations, 0);
   process.stdout.write(
     `check-compile-fail: OK — ${summary.length} fixture(s), ${expectations} expected ` +
-      `diagnostic(s), ${errors.length} compiler error(s), 1 batched swiftc pass ` +
+      `diagnostic(s), ${totalErrors} compiler error(s), ` +
+      `${configurations.length} batched swiftc pass(es) (${configurations.join(", ")}) ` +
       `[${settings.target}]\n`,
   );
 }

@@ -47,7 +47,10 @@ keep milestone state there rather than copying it into this instruction file.
   separately under `Infrastructure/<seam>/` in
   `...InfrastructureTests.swift` files and green no scenario.
 - `swift/CompileFail/` — expected-failure fixtures, deliberately outside every
-  SwiftPM target, type-checked in one batched pass.
+  SwiftPM target, type-checked in one batched pass per build configuration.
+  Most fixtures check against the debug modules; fixtures declaring
+  `// configuration: release` check against the release modules to prove
+  debug-only API stays absent from release builds.
 - `swift/Benchmarks/` — a **separate** SwiftPM package, depending on the root
   by path so the benchmark harness and its allocator backend can never enter
   the dependency graph a consumer resolves. Run it with
@@ -172,8 +175,10 @@ directly:
 - `mise run test:simulator` — only `CogBoundaryTests` on the latest iOS
   simulator. Set `COG_SIMULATOR_DESTINATION` to override the destination.
 - `mise run test:compilefail` — type-checks every fixture in
-  `swift/CompileFail/` in one batched `swiftc -typecheck` pass, failing both
-  when a fixture misses its expected diagnostic and when it stops failing.
+  `swift/CompileFail/` in one batched `swiftc -typecheck` pass per build
+  configuration (debug, plus release for `// configuration: release`
+  fixtures), failing both when a fixture misses its expected diagnostic and
+  when it stops failing.
 - `mise run test:lint` — run the separate `swift/Lint` package tests. This
   wrapper enumerates tests before every run and requires a nonzero executed
   count from its own xUnit report. Extra arguments pass through, as in
