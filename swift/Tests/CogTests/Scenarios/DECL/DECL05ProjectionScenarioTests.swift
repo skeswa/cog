@@ -95,6 +95,27 @@ private struct ZipCode: Hashable {
   #expect(second.peek(count) == 0)
 }
 
+@MainActor
+@Test func `DECL-05 watching the projection is watching the source`() {
+  // A read-only value reference names the same state its source does, so a
+  // watch registered on it wakes for the source's writes with true old-new
+  // pairs. This is the projection's whole point at the reactive surface: the
+  // owning file writes the source, and a watcher of the published value
+  // reference follows along.
+  let (cogs, m) = probedContext()
+  let countSource = Cog<Int>.Manual(1)
+  let count = countSource.readOnly
+  var deliveries: [String] = []
+
+  m.watch(count, initial: .skip) { old, new in
+    deliveries.append("\(old)->\(new)")
+  }
+
+  cogs.turn { c in c[countSource] = 2 }
+
+  #expect(deliveries == ["1->2"])
+}
+
 // MARK: - DECL-05, keyed
 
 @MainActor

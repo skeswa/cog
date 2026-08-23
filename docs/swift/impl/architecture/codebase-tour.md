@@ -137,8 +137,8 @@ follow:
    queue.
 6. `Cogs.runOuterTurn` → Observation flush, exports, effects, finish, FIFO.
 
-Tests: `TurnCompositionInfrastructureTests`,
-`ArenaDirtyPropagationInfrastructureTests`, and public `TURN-*` scenarios.
+Tests: `ArenaDirtyPropagationInfrastructureTests` and public `TURN-*`
+scenarios.
 
 ## Trace a dependency change
 
@@ -205,9 +205,8 @@ descriptor-less arena terminal. A flush asks `reaction.needsFlush`, then
 current/scratch exact-slot arrays.
 
 Cancellation follows `ReactionToken` → `CogReaction.cancel` → release leases,
-dependency suffix, and terminal row. `ArenaReactionInfrastructureTests` and
-`ReactionLeaseInfrastructureTests` own layout/lease proofs; `REACT-*` scenarios
-own public behavior.
+dependency suffix, and terminal row. `ArenaReactionInfrastructureTests` owns the layout and retirement proofs;
+`REACT-*` and `LIFE-07` scenarios own public behavior.
 
 ## Trace lifetime release
 
@@ -218,8 +217,7 @@ Start at a one-shot read/write/refresh call to
 
 To audit stale safety, check both generations: `CogArenaSlot.generation` rejects
 a former row occupant; `CogArenaLifetimeEntry.generation` rejects an old or
-renewed deadline for the same occupant. `ArenaLifetimeInfrastructureTests`,
-`LifetimePolicyInfrastructureTests`, `LIFE-*`, and `PERF-05` cover the path.
+renewed deadline for the same occupant. `ArenaLifetimeInfrastructureTests`, `LIFE-*`, and `PERF-05` cover the path.
 
 ## Worked graphs
 
