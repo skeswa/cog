@@ -53,7 +53,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(adviceCog) == "coat")
-  cogs.turn(temperatureSourceCog, to: 80)
+  cogs.turn(_temperatureCog, to: 80)
   #expect(cogs.peek(adviceCog) == "shorts")
 }
 ```
@@ -85,7 +85,7 @@ arrange the world a mechanism will wake up into:
 
 ```swift
 let cogs = Cogs.forTesting(
-  seeding: { c in c.seed(weatherServiceSourceCog, to: .stubbed) },
+  seeding: { c in c.seed(_weatherServiceCog, to: .stubbed) },
   mechanisms: [WeatherMechanism(notifier: .capturing)]
 )
 ```

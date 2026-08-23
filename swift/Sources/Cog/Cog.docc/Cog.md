@@ -11,9 +11,9 @@ changes, Cog settles exactly the values that depend on it and notifies exactly
 the views that read them. Nothing else runs.
 
 ```swift
-let temperatureSourceCog = Cog<Int>.Manual(60)
+let _temperatureCog = Cog<Int>.Manual(60)
 let adviceCog = Cog<String> { c in
-  c[temperatureSourceCog] > 70 ? "shorts" : "coat"
+  c[_temperatureCog] > 70 ? "shorts" : "coat"
 }
 
 struct AdviceLabel: View {

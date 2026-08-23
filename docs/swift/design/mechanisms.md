@@ -255,12 +255,12 @@ and any loud domain helpers:
 ```swift
 // WeatherState.swift
 #if DEBUG
-let currentZipSeedTargetCog = currentZipSourceCog
-let weatherSeedTargetsCogs = weatherReportSourceCogs
+let currentZipSeedTargetCog = _currentZipCog
+let weatherSeedTargetsCogs = _weatherReportCogs
 
 extension CogOps {
     func stubWeather(_ report: Weather?, zip: ZipCode) {
-        turn { c in c[weatherReportSourceCogs[zip]] = report }
+        turn { c in c[_weatherReportCogs[zip]] = report }
     }
 }
 #endif

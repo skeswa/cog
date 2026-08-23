@@ -114,8 +114,8 @@ descriptor/key-to-slot resolution.
 
 ```swift
 let comfortCog = Cog { c in
-  let temperature = c[temperatureSourceCog]
-  let humidity = c[humiditySourceCog]
+  let temperature = c[_temperatureCog]
+  let humidity = c[_humidityCog]
   return Comfort(temperature, humidity)
 }
 ```
@@ -128,8 +128,8 @@ or removed.
 
 ```swift
 let shownCog = Cog { c in
-  let indoor = c[showIndoorSourceCog]
-  return indoor ? c[indoorSourceCog] : c[outdoorSourceCog]
+  let indoor = c[_showIndoorCog]
+  return indoor ? c[_indoorCog] : c[_outdoorCog]
 }
 ```
 
@@ -144,7 +144,7 @@ edges because each reader subscript is one capture event:
 
 ```swift
 let doubledCog = Cog { c in
-  c[temperatureSourceCog] + c[temperatureSourceCog]
+  c[_temperatureCog] + c[_temperatureCog]
 }
 ```
 
@@ -155,7 +155,7 @@ local because it states intent and avoids redundant lookup.
 
 ```swift
 let doubledCog = Cog { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return temperature + temperature
 }
 ```
@@ -185,7 +185,7 @@ reuse edge indexes independently of later scalar-slot reuse.
 
 ```swift
 let selectedForecastCog = Cog { c in
-  let zip = c[selectedZipSourceCog]
+  let zip = c[_selectedZipCog]
   return c[forecastCogs[zip]]
 }
 ```

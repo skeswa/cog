@@ -9,15 +9,15 @@ path needs source-level detail.
 The guide uses one small thread throughout:
 
 ```swift
-private let temperatureSourceCog = Cog<Double>.Manual(68)
+private let _temperatureCog = Cog<Double>.Manual(68)
 
 let adviceCog = Cog<String> { c in
-  let temperature = c[temperatureSourceCog]
+  let temperature = c[_temperatureCog]
   return temperature > 80 ? "Stay inside" : "Go outside"
 }
 ```
 
-`temperatureSourceCog` is writable state. `adviceCog` is a cached automatic
+`_temperatureCog` is writable state. `adviceCog` is a cached automatic
 value. `Dashboard` is a UI boundary that may observe the result.
 
 ## The ten-minute model
@@ -26,7 +26,7 @@ One running app owns one MainActor-confined `Cogs`. `Cogs` owns the app's one
 authoritative dependency graph. A test or preview may own a separate `Cogs`,
 because it is a separate runtime rather than another island inside the app.
 
-A declaration such as `temperatureSourceCog` is an immutable name and recipe.
+A declaration such as `_temperatureCog` is an immutable name and recipe.
 It does not contain the temperature. A **state** is the mutable value,
 dependencies, version stamps, and lifetime information that one `Cogs` creates
 for a declaration and optional key. Copied references converge on the same
@@ -81,7 +81,7 @@ completed revision until the outer turn body returns.
 ```swift
 extension CogOps {
   func recordTemperature(_ value: Double) {
-    turn(temperatureSourceCog, to: value)
+    turn(_temperatureCog, to: value)
   }
 }
 ```
