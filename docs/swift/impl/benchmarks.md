@@ -154,8 +154,9 @@ section above; E1's original four-runtime table is in
 | raw `@Observable` | 0.820 / 0.216 / 2.277 / 0.350 ms                | **3 / 1 / 8 / 2 ms**                      |
 | swift-state-graph | 26 / 15 / 37 / 7.696 ms                         | **80 / 50 / 120 / 25 ms**                 |
 
-Storefront has no committed timing limit yet. One local session is not enough
-history for a stable CI limit.
+Storefront has no committed limit yet. The
+[threshold decision](#storefront-threshold-decision) names two candidate
+gates and the pinned-runner session that must confirm them first.
 
 ## Storefront macrobenchmark
 
@@ -258,17 +259,46 @@ Every number here is a pinned-host regression signal, not a user-experience
 guarantee: the simulator runs on the host's CPU and window server, and
 absolute hitch or latency targets belong on a pinned physical device.
 
-## Evidence needed for the next decision
+### Storefront threshold decision
 
-1. Repeat the corrected Storefront run in the pinned CI environment. The
-   [E7](#benchmark-environment-e7) and [E8](#benchmark-environment-e8) reruns
-   recorded the paired configurations and the corrected UI figures, but on
-   `mactop` with Xcode 26.4; the pinned runner still owns the release check.
-2. Repeat the three-core comparison on the pinned Xcode to qualify the result.
-3. Qualify both the specialized default and `CompactArena` release archives on
-   the pinned Xcode.
-4. Measure build, first settlement, and teardown as separate phases under the
-   same profiler boundary.
+`M10-09`, decided August 23, 2026, on the E7, E8, and E9 evidence.
+
+**Two cuts earn CI thresholds; the rest stay report-only.** The named
+candidates are:
+
+- `perf-15-storefront-interactions`: an exact 12-malloc p90 gate, in the
+  style of the steady-turn zero gate, plus a one-sided wall-clock ceiling of
+  600 µs, about three times the recorded p90 of 188 µs.
+- `perf-15-storefront-compute-control`: an exact 5,611-malloc p90 gate plus a
+  one-sided ceiling of 1.7 ms, about three times the recorded p90 of 556 µs.
+  Gating the control pins the harness itself: if the control drifts, the
+  measurement moved, not Cog.
+
+Both cuts run thousands of samples per session, so their percentiles are
+stable. Cold, session, and footprint run 3 to 10 samples and the async
+burst's variance is scheduler-shaped, so none of them gets a ceiling.
+
+**What CI must confirm first.** The thresholds are named here but not
+committed. Committing them requires one paired session on the pinned runner
+that reproduces the E7 cuts, because every current number is from `mactop` on
+Xcode 26.4, and a threshold committed from the wrong host would gate CI
+against a machine it does not run on.
+
+**Where cold-start time goes.** Partly unknown, and recorded as such: of the
+21 ms cold start, the footprint build accounts for roughly 3.6 ms, and the
+rest is unattributed between first settlement, async scheduling, and fixture
+work. The phase-split probe below is the scheduled work that answers this.
+
+**Follow-up work.** None of it blocks closing M10:
+
+1. The pinned-runner paired session, which also commits the two named
+   thresholds and repeats the [E8](#benchmark-environment-e8) UI suite there.
+2. The phase-split probe: build, first settlement, and teardown measured as
+   separate phases under one profiler boundary, to attribute cold start.
+3. A compact Storefront artifact measurement, to complete the size table.
+4. Carried from before this decision: repeat the three-runtime comparison on
+   the pinned Xcode, and qualify the specialized and `CompactArena` release
+   archives there.
 
 ## Measurement environments
 
