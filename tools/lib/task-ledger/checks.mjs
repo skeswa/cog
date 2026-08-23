@@ -18,6 +18,7 @@ import {
   selectsScenario,
 } from "./proof.mjs";
 import { emptyScenarioCensus } from "./scenarios.mjs";
+import { topLevelAlternatives } from "../swift-test-guard.mjs";
 
 /** Task types that may never carry a `_Greens:_` line. */
 const GREENLESS_TASK_TYPES = ["Infrastructure", "Decision"];
@@ -1128,6 +1129,58 @@ function checkReleaseAfterGate(context) {
 }
 
 /**
+ * CHECK 25 — every scenario-shaped filter alternative still selects a scenario.
+ *
+ * The guarded test wrapper refuses a run when any top-level alternative of a
+ * `--filter` selects no tests, so a retired scenario ID left inside a ledger
+ * filter makes that task's verify command fail before testing. The other
+ * filter checks cannot see this: `filter-expansion` compares the union of
+ * what a Behavior task's filters select against its greens, and a dead
+ * alternative contributes nothing to the union, while infrastructure and
+ * gate commands are not expansion-checked at all. This check therefore splits
+ * every scenario-selecting command's filter with the wrapper's own
+ * top-level-alternative rule and requires each scenario-shaped alternative —
+ * one that contains an `ID-` fragment — to match at least one census
+ * scenario. Alternatives naming infrastructure tests carry no such fragment
+ * and are left to the wrapper, which checks them against real test names.
+ */
+function checkStaleFilterAlternatives(context) {
+  const diagnostics = [];
+  const scenarioIds = context.scenarios.ids;
+  if (scenarioIds.length === 0) return diagnostics;
+
+  for (const task of context.tasks) {
+    const greens = new Set(task.greens);
+    for (const command of context.verifyCommands.get(task) ?? []) {
+      if (command.negated) continue;
+      if (command.filter === null) continue;
+      if (!SCENARIO_FILTER_COMMANDS.has(command.command)) continue;
+      for (const alternative of topLevelAlternatives(command.filter)) {
+        if (!/[A-Z][A-Z0-9]*-\d/.test(alternative)) continue;
+        if (expandFilter(alternative, scenarioIds).ids.length > 0) continue;
+        // A green the tree does not define is `unknown-scenario`'s diagnosis;
+        // reporting its filter alternative too would blame the filter for a
+        // census problem.
+        if (greens.has(alternative)) continue;
+        diagnostics.push(
+          diagnostic(
+            "stale-filter-alternative",
+            context,
+            task,
+            task.verifyLine ?? task.line,
+            `task ${task.id} filters on \`${command.filter}\`, whose top-level alternative ` +
+              `\`${alternative}\` selects no scenario in the census; the guarded wrapper refuses ` +
+              `a run with an empty alternative, so a retired ID must leave every filter that ` +
+              `named it`,
+          ),
+        );
+      }
+    }
+  }
+  return diagnostics;
+}
+
+/**
  * CHECK 24 — M6's arena filters re-prove every filterable M1–M6 scenario.
  *
  * M6 rebuilt the runtime under the behavior suite, and its `M6-10*` chain
@@ -1223,6 +1276,7 @@ export const LEDGER_CHECKS = [
   { name: "release-chain", run: checkReleaseChain },
   { name: "release-after-gate", run: checkReleaseAfterGate },
   { name: "arena-integration-coverage", run: checkArenaIntegrationCoverage },
+  { name: "stale-filter-alternative", run: checkStaleFilterAlternatives },
 ];
 
 /**

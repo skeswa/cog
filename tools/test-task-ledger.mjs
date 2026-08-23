@@ -206,6 +206,15 @@ const CASES = [
     mentions: ["M1-03", "transitively depends on no _(Gate)_ task"],
   },
   {
+    name: "filter alternative left behind by a retired scenario",
+    ledger: resolve(FIXTURES, "stale-filter-alternative.md"),
+    checks: ["stale-filter-alternative"],
+    // The dead alternative fires and the surviving one stays quiet; the union
+    // still equals the greens, so filter-expansion must not fire alongside.
+    mentions: ["M1-01", "DECL-99", "selects no scenario in the census"],
+    forbidden: ["error[filter-expansion]"],
+  },
+  {
     name: "arena filter that leaves a scenario behind",
     ledger: resolve(FIXTURES, "integration-hole.md"),
     checks: ["arena-integration-coverage"],

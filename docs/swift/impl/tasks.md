@@ -1249,7 +1249,9 @@ M6-10i's complete-suite run rather than through a named slice filter._
   and the `recompute`/`run`/`tracking` layering raises the `M4-14` bound
   without changing its shape.
   _Depends: M6-07aa._
-  _Verify: `mise run test --filter 'GRAPH-01|GRAPH-02|GRAPH-04|GRAPH-05'`._
+  _Verify: `mise run test --filter 'GRAPH-04|GRAPH-05|GRAPH-06|GRAPH-13'` —
+  GRAPH-06 and GRAPH-13 carry the retired GRAPH-01 chain and GRAPH-02
+  diamond._
 - **M6-07ac** _(Infrastructure)_ — Recapture dynamic dependencies and reuse or
   remove baseline edges as dependency sets change.
   _Depends: M6-07ab._
@@ -1322,7 +1324,8 @@ M6-10i's complete-suite run rather than through a named slice filter._
 - **M6-10cb** _(Infrastructure)_ — Pass reaction write-back, FIFO draining,
   and the turn-chain diagnostic through the arena selector.
   _Depends: M6-10ca._
-  _Verify: `mise run test --filter 'REACT-15|REACT-16|REACT-17'`._
+  _Verify: `mise run test --filter 'REACT-16|REACT-17'` — REACT-16 carries
+  the retired REACT-15 new-turn claim._
 - **M6-10cc** _(Infrastructure)_ — Keep the arena's debug-only quiescence
   probe out of release test compilation without publishing that diagnostic
   seam in production.

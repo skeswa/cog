@@ -53,6 +53,9 @@
 //                             M6's arena filters re-prove every filterable
 //                             M1–M6 scenario, bar the ones the milestone's
 //                             `_Arena-coverage exceptions:_` note names
+//   stale-filter-alternative  every scenario-shaped top-level filter
+//                             alternative selects a census scenario, the way
+//                             the guarded wrapper requires at run time
 //
 // Parse-level problems (`malformed-task-entry`, `malformed-task-id`,
 // `unknown-task-type`, `orphan-task`, `duplicate-field`,
