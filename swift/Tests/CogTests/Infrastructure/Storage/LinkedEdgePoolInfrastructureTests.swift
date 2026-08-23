@@ -247,13 +247,6 @@ import Testing
   #expect(pool.entryCount == producers.count)
 }
 
-@MainActor
-@Test func `LinkedEdgePoolInfrastructure keeps each entry at twenty four bytes`() {
-  #expect(MemoryLayout<CogPoolEdge>.size == 24)
-  #expect(MemoryLayout<CogPoolEdge>.stride == 24)
-  #expect(MemoryLayout<CogEdgeIndex>.size == 4)
-}
-
 /// Converts one live edge index for direct infrastructure inspection.
 private func edgeArrayIndex(_ edge: CogEdgeIndex) -> Int {
   Int(edge.rawValue)

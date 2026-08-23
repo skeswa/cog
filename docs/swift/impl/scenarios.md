@@ -131,7 +131,8 @@ I declare state at the top of a file and it just works.
   at the same state: writing through one shows up when reading the other,
   and `box[6]` does not change.
 - **DECL-05.** I expose a source through `.readOnly`. Reading the
-  read-only value reference always gives the same value as the source.
+  read-only value reference always gives the same value as the source, and
+  watching it is watching the source.
 - **DECL-06.** I try to write through a `.readOnly` value reference. The compiler says
   no. (Proof: compile-fail.)
 

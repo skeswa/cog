@@ -194,7 +194,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
   `ObjectIdentifier` identity, human labels, and `Cog<T>.Manual` value references.
   _Depends: M0-10._
-  _Verify: `mise run test --filter DescriptorInfrastructure`._
+  _Verify: retired proof — descriptor identity, labels, and starting values
+  are pinned publicly by DECL-01 through DECL-04 and DECL-10/DECL-11._
 - **M1-34a** _(Decision)_ — Settle production-install and testing-factory
   helper spellings before either helper or its call sites exist; record the
   choice in §10 and the Swift README snapshot.
@@ -227,7 +228,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   phases, default/custom turn-name capture, unforgeable turn IDs, and
   keyless pending/current storage.
   _Depends: M1-01b._
-  _Verify: `mise run test --filter TurnStateInfrastructure`._
+  _Verify: retired proof — turn phases and naming are pinned publicly by
+  TURN-05, TURN-06, TURN-13, and HIST-01._
 - **M1-04ab** _(Behavior)_ — Add keyless staging, writer read-back, flush on
   the outer turn boundary, and completed-turn normal reads during accumulation.
   _Depends: M1-04aa._
@@ -322,11 +324,13 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   separation, and flush boundaries without yet claiming the reaction/history
   stories.
   _Depends: M1-04b._
-  _Verify: `mise run test --filter TurnCompositionInfrastructure`._
+  _Verify: retired proof — joining, sibling separation, and flush boundaries
+  are pinned publicly by TURN-05, TURN-06, and TURN-13._
 - **M1-13a** _(Infrastructure)_ — Add the non-reentrant FIFO turn queue used
   while flushing.
   _Depends: M1-12a._
-  _Verify: `mise run test --filter TurnQueueInfrastructure`._
+  _Verify: retired proof — the non-reentrant FIFO queue is pinned publicly
+  by TURN-08 and HIST-07._
 - **M1-14** _(Behavior)_ — Reject an escaped writer in debug and release with
   Swift Testing exit tests.
   _Depends: M1-04ab._
@@ -555,11 +559,13 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 - **M1-27a** _(Infrastructure)_ — Add descriptor lifetime policy storage with
   manual `.app` and synchronous automatic `.whileObserved` defaults.
   _Depends: M1-05b, M1-08a._
-  _Verify: `mise run test --filter LifetimePolicyInfrastructure`._
+  _Verify: retired proof — default lifetimes are pinned publicly by LIFE-01,
+  LIFE-03, LIFE-05, and LIFE-10 for every distinguishable shape._
 - **M1-27b** _(Infrastructure)_ — Track registered reactions as external
   lifetime leases, including dependency retracking and cancellation.
   _Depends: M1-16c, M1-27a, M1-35b._
-  _Verify: `mise run test --filter ReactionLeaseInfrastructure`._
+  _Verify: retired proof — lease tracking is pinned publicly by LIFE-07, and
+  non-tracking peeks by READ-06 and REACT-03._
 - **M1-28a** _(Behavior)_ — Store the 30-second context grace default with a
   testing override, then release an unobserved automatic cog after injected
   grace and recreate it correctly.
@@ -1894,11 +1900,9 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   touched sources too. This removes three allocations and two actor-checked
   deinits.
   _Depends: M9-07._
-  _Verify: `mise run test --filter 'TURN'`, the turn infrastructure suites
-  through `mise run test --filter
-'TurnQueueInfrastructure|TurnStateInfrastructure|TurnCompositionInfrastructure'`,
-  and `mise run test:release`, which is where a generic-class deinit regression
-  would appear._
+  _Verify: `mise run test --filter 'TURN'` and `mise run test:release`, which
+  is where a generic-class deinit regression would appear. The retired turn
+  infrastructure suites' claims are pinned publicly by the TURN family._
 - **M9-09** _(Infrastructure)_ — Reuse the invalidation and dependency arrays
   across turns. M9-08 owns the same fix for the touched-source array.
   _Depends: M9-01._

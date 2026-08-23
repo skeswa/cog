@@ -4,29 +4,10 @@ import Testing
 @testable import Cog
 
 // These internal checks cover arena computation paths. Scenario tests use the
-// CogTesting diagnostic and child processes to cover public failures.
-
-@MainActor
-@Test func `CycleDetectionInfrastructure catches every key through the real graph`() async {
-  let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
-    await MainActor.run {
-      let cogs = Cogs.forTesting()
-      let holder = CycleBoxHolder()
-      holder.box = CogBox<Int, String>(
-        { c, key in
-          c[holder.box[key == "home" ? "work" : "home"]]
-        },
-        name: "weather"
-      )
-      _ = cogs.peek(holder.box["home"])
-    }
-  }
-
-  expectCycleMessage(
-    in: result,
-    path: "weather[home] -> weather[work] -> weather[home]"
-  )
-}
+// CogTesting diagnostic and child processes to cover public failures: the
+// cold keyed trap is CYCLE-07's proof, so the only child process here is the
+// warm one — the trap at explicit-stack re-entry, a settlement path no public
+// scenario drives through the real trap.
 
 @MainActor
 @Test func `CycleDetectionInfrastructure catches a warm cycle at explicit stack entry`() async {
@@ -95,11 +76,4 @@ private func expectCycleMessage(in result: ExitTest.Result?, path: String) {
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
   #expect(stderr.contains("Cog dependency cycle"), "stderr was: \(stderr)")
   #expect(stderr.contains(path), "stderr was: \(stderr)")
-}
-
-@MainActor
-private final class CycleBoxHolder {
-  var box: CogBox<Int, String>!
-
-  nonisolated deinit {}
 }
