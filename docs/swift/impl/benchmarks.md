@@ -39,8 +39,11 @@ Current evidence explains the default and its opt-out:
   arena was 64% to 79% faster than simple and 29% to 55% faster than
   unspecialized arena across the diamond, deep, broad, and unstable shapes.
 - Unspecialized arena is 12.5× to 66× faster than simple on every graph-backed
-  Storefront cut. The specialized Storefront executable has a size result but
-  no corrected headless timing yet.
+  Storefront cut. The
+  [paired arena-configuration run (E7)](#benchmark-environment-e7) added the
+  specialized executable's corrected headless timing — faster than the
+  unspecialized arena on every graph-backed cut — and priced `CompactArena` at
+  +7% to +29% on steady cuts and about 2× on cold and footprint builds.
 - Unspecialized arena uses 28% fewer bytes for Storefront's 2,402-state graph.
 - Unspecialized arena loses the pinned-key turn by about 15%; specialization
   reduces the scouting result to about 2.4 µs, near the simple result.
@@ -206,26 +209,30 @@ runner still owns the release check.
 
 ### Evidence needed for the next decision
 
-1. Repeat the corrected Storefront run in the pinned CI environment.
-2. Rerun the Storefront UI suite. Its old results are withdrawn.
-3. Repeat the three-core comparison on the pinned Xcode to qualify the result.
-4. Qualify both the specialized default and `CompactArena` release archives on
+1. Repeat the corrected Storefront run in the pinned CI environment. The
+   [E7](#benchmark-environment-e7) and [E8](#benchmark-environment-e8) reruns
+   recorded the paired configurations and the corrected UI figures, but on
+   `mactop` with Xcode 26.4; the pinned runner still owns the release check.
+2. Repeat the three-core comparison on the pinned Xcode to qualify the result.
+3. Qualify both the specialized default and `CompactArena` release archives on
    the pinned Xcode.
-5. Measure build, first settlement, and teardown as separate phases under the
+4. Measure build, first settlement, and teardown as separate phases under the
    same profiler boundary.
 
 ## Measurement environments
 
 All benchmark runs used release builds.
 
-| ID                                      | Run name                 | Date       | Environment                                                                                                                                                                                                     |
-| --------------------------------------- | ------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a id="benchmark-environment-e1"></a>E1 | Initial baseline         | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                  |
-| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run       | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                              |
-| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                |
-| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke      | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                    |
-| <a id="benchmark-environment-e5"></a>E5 | Specialization run       | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check             |
-| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison    | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back |
+| ID                                      | Run name                                  | Date       | Environment                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ----------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="benchmark-environment-e1"></a>E1 | Initial baseline                          | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                                                          |
+| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run                        | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                                                      |
+| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run                  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                                                                        |
+| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke                       | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                                                            |
+| <a id="benchmark-environment-e5"></a>E5 | Specialization run                        | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check                                                                     |
+| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison                     | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back                                                         |
+| <a id="benchmark-environment-e7"></a>E7 | Paired arena-configuration Storefront run | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; specialized default and `CompactArena` ran back to back on an idle host after `mise run test:storefront` passed; not a release check |
+| <a id="benchmark-environment-e8"></a>E8 | Corrected Storefront UI run               | 2026-08-23 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, release configuration, smoke profile, five samples per metric through `mise run test:storefront-ui`                                                                                 |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used
@@ -440,13 +447,18 @@ On August 20, 2026, a review found five problems in the first harness:
 The fixes moved shadow work outside timing, added a scheduled-work ledger,
 made every sample change state, narrowed pricing dependencies, and fixed the
 control. All earlier Storefront headless and UI results are withdrawn. The
-corrected headless results below replace them. The UI suite has not been rerun.
+corrected headless results below replace them. The
+[corrected UI run (E8)](#benchmark-environment-e8) replaced the withdrawn UI
+results on August 23.
 
 ### Corrected headless results
 
-The [corrected Storefront run (E3)](#benchmark-environment-e3) covered `M10-05` and `M10-08` with the standard profile. Both cores ran back to
+The [corrected Storefront run (E3)](#benchmark-environment-e3) covered `M10-05` with the standard profile. Both cores ran back to
 back. `mise run test:storefront` passed all 14 tests first. These results are
-report-only because they come from one host and one session.
+report-only because they come from one host and one session. (E3 originally
+also claimed `M10-08`, but #400 reshaped that task into the specialized
+default versus `CompactArena` pairing recorded in the next section; the
+simple-versus-arena columns here no longer satisfy it.)
 
 | Cut                                  | simple p50 | arena p50 | arena result     | simple instructions | arena instructions | samples, simple / arena |
 | ------------------------------------ | ---------: | --------: | ---------------- | ------------------: | -----------------: | ----------------------: |
@@ -513,6 +525,74 @@ build. Each source in that test has only one consumer, so the simple core never
 hits its high-fan defect. Storefront has both wide gatherers and shared
 producers with thousands of consumers. That work costs much more than the
 arena's cold generic-storage penalty.
+
+### Specialized default versus CompactArena
+
+The [paired arena-configuration run (E7)](#benchmark-environment-e7) covered
+`M10-08` with the standard profile: `mise run bench` and `mise run bench:compact`
+over every `perf-15-storefront-*` cut, back to back in one session, after
+`mise run test:storefront` passed all 12 tests. This is the binary-size
+opt-out's runtime price on an application-shaped graph, and it also supplies
+the specialized executable's corrected headless timing, which the record
+previously lacked. Report-only: one host, one session, and Xcode 26.4 rather
+than the pinned release toolchain.
+
+| Cut                                  | specialized p50 | compact p50 | compact cost | specialized instructions | compact instructions | samples, spec / compact |
+| ------------------------------------ | --------------: | ----------: | -----------: | -----------------------: | -------------------: | ----------------------: |
+| `perf-15-storefront-cold`            |           21 ms |       33 ms |         +57% |                    457 M |                793 M |                 10 / 10 |
+| `perf-15-storefront-session`         |          131 ms |      169 ms |         +29% |                  2,741 M |              3,756 M |                   3 / 3 |
+| `perf-15-storefront-interactions`    |          178 µs |      197 µs |         +11% |                   4.01 M |               4.52 M |           2,640 / 2,577 |
+| `perf-15-storefront-async-burst`     |         3.74 ms |     3.99 ms |          +7% |                     63 M |                 68 M |                 50 / 50 |
+| `perf-15-storefront-footprint`       |         3.60 ms |     7.43 ms |        +106% |                     81 M |                174 M |                   3 / 3 |
+| `perf-15-storefront-compute-control` |          529 µs |      542 µs |        +2.5% |                     13 M |                 13 M |           5,262 / 5,123 |
+
+The control's +2.5% sits inside its own p25–p75 spread, so the harness held
+still. The trait's costs concentrate exactly where the typed frontier works:
+cold build (+57%), the 2,402-state footprint build (2.1×), and the full
+session (+29%), while a steady interaction (+11%) and the async burst (+7%)
+stay close. Allocation behavior is identical where the interposer counted it —
+12 mallocs per interaction and 5,611 per control run under both
+configurations — except the footprint build, where compact pays about 10,000
+mallocs to the default's 177: suppressing the typed frontier routes cold state
+construction through generic storage, which is the same build-time trade the
+1,000-state keyed benchmark showed.
+
+Against E3's unspecialized-arena columns, the specialized default also
+improves every graph-backed cut (cold 34 → 21 ms, session 178 → 131 ms,
+interactions 201 → 178 µs, async burst 4.09 → 3.74 ms, footprint
+7.29 → 3.60 ms), so the specialization decision's Storefront evidence now
+exists in corrected form rather than by extrapolation.
+
+### Corrected UI results
+
+The [corrected Storefront UI run (E8)](#benchmark-environment-e8) covered
+`M10-07`: the release-configuration `StorefrontUITests` suite on the pinned
+iPhone 17 Pro simulator (iOS 26.4, 23E244), smoke profile, through
+`mise run test:storefront-ui` with its nonzero-executed-count guard — all
+8 tests passed, five samples per metric. These replace the withdrawn UI
+figures. Medians:
+
+| Measure                                          |   median (n = 5) |
+| ------------------------------------------------ | ---------------: |
+| Cold launch to responsive first frame            |          1.194 s |
+| Settled scroll, drag-and-deceleration signpost   |          2.568 s |
+| Scroll during inventory burst, same signpost     |          2.567 s |
+| Detail navigation transition                     |          0.518 s |
+| Search interaction, wall clock                   |          0.382 s |
+| Search interaction, app CPU time / instructions  | 0.212 s / 2.28 G |
+| Search interaction, app peak physical memory     |          73.3 MB |
+| Cart checkout block, wall clock                  |          2.257 s |
+| Cart checkout block, app CPU time / instructions | 0.354 s / 3.17 G |
+
+The two scroll signposts are the load-bearing pair: the gesture-bound
+drag-and-deceleration duration is the same to within 1.5 ms whether the feed
+is settled or a deterministic inventory burst is writing offscreen rows, which
+is the "offscreen updates do no visible work" claim measured at the interface.
+`XCTHitchMetric` contributed no series on the simulator, as
+`StorefrontScrollPerformanceUITests` records, so no hitch figure is reported.
+Every number here is a pinned-host regression signal, not a user-experience
+guarantee: the simulator runs on the host's CPU and window server, and
+absolute hitch or latency targets belong on a pinned physical device.
 
 ## Older and withdrawn results
 
