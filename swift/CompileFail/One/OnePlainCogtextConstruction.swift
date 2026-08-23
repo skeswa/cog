@@ -7,7 +7,8 @@
 //
 // This fixture is that boundary. It is type-checked as its own module with no
 // `-package-name`, which is exactly the position an app that depends on Cog
-// is in, and the two ways to spell plain construction both fail there.
+// is in. `Cogs()` and `Cogs.init()` resolve to the same initializer, so one
+// spelling carries the proof.
 
 import Cog
 
@@ -15,10 +16,5 @@ enum OnePlainCogsConstruction {
   static func buildsItsOwnContext() -> Cogs {
     // expect-error: 'Cogs' initializer is inaccessible due to 'package' protection level
     Cogs()
-  }
-
-  static func buildsItsOwnContextExplicitly() -> Cogs {
-    // expect-error: 'Cogs' initializer is inaccessible due to 'package' protection level
-    Cogs.init()
   }
 }

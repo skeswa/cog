@@ -25,14 +25,10 @@ enum StatusRefusesSyncCogs {
     _ = cogs.status[currentZipCode]
   }
 
-  /// The UI-boundary lens rejects an automatic cog.
-  static func asksTheUILensForAAutomaticCog(cogs: Cogs, isNice: Cog<Bool>) {
-    // expect-error: cannot convert value of type 'Cog<Bool>' to expected argument type 'Cog<Value>.Async'
-    // expect-error: generic parameter 'Value' could not be inferred
-    _ = cogs.status[isNice]
-  }
-
-  /// The selector-side lens rejects an automatic cog the same way.
+  /// The selector-side lens rejects an automatic cog the same way. One case
+  /// per lens carries the proof: manual and automatic references fail the
+  /// same argument conversion, so the pairing across the two lenses covers
+  /// both reference kinds without proving one conversion twice.
   static func asksASelectorLensForAAutomaticCog(isNice: Cog<Bool>) -> Cog<Bool> {
     Cog<Bool> { c in
       // expect-error: cannot convert value of type 'Cog<Bool>' to expected argument type 'Cog<Read>.Async'

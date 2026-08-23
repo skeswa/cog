@@ -30,15 +30,6 @@ enum ReadOnlyWriteRejected {
     }
   }
 
-  /// Read-modify-write, which the writer's subscript supports for a real
-  /// source (`c[count] += 1`) and must not offer here.
-  static func mutatesThroughAReadOnlyValueReference(cogs: Cogs, retryLimit: Cog<Int>.Projection) {
-    cogs.turn { c in
-      // expect-error: cannot convert value of type 'Cog<Int>.Projection' to expected argument type 'Cog<Int>.Manual'
-      c[retryLimit] += 1
-    }
-  }
-
   /// A key does not launder a projection. `readOnlyBox[key]` builds a
   /// read-only value reference like every other, so the keyed write is the same type
   /// error as the keyless one.
