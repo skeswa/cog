@@ -1178,13 +1178,13 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
   under all three value-reference layouts before selecting one.
   _Depends: M5-02b, M5-03a, M5-03b, M5-09b, M5-09c._
   _Verify: `mise run test` plus the three-candidate result recorded in
-  `impl/benchmarks.md`._
-  _Greens: COUNT-09._
+  `impl/benchmarks.md`; its COUNT-09 proof is now that frozen selection
+  record._
 - **M5-09e** _(Behavior)_ — Benchmark keyed diamonds and churn under every
   value-reference layout, record results, and settle the layout in `impl/benchmarks.md` and exploration §10.
   _Depends: M5-09d._
-  _Verify: recorded comparison and selected-layout rationale._
-  _Greens: PERF-08._
+  _Verify: recorded comparison and selected-layout rationale; its PERF-08
+  proof is now that frozen selection record in `impl/benchmarks.md`._
 - **M5-11** _(Infrastructure)_ — Make the benchmark gate deterministic.
   `M5-08a` measured two intermittent failures on the pinned harness: the
   whole-scenario `kairo-diamond` benchmark crashes the runner roughly one run
@@ -1273,8 +1273,8 @@ M6-10i's complete-suite run rather than through a named slice filter._
 - **M6-05c** _(Behavior)_ — Record the edge measurements and settle the
   layout in `impl/benchmarks.md` and exploration §10.
   _Depends: M6-05b._
-  _Verify: recorded decision and selected-candidate rerun._
-  _Greens: PERF-09._
+  _Verify: recorded decision and selected-candidate rerun; its PERF-09 proof
+  is now that frozen selection record in `impl/benchmarks.md`._
 - **M6-08a** _(Infrastructure)_ — Integrate lazy boundary creation with arena
   slots.
   _Depends: M6-05c._
@@ -1375,8 +1375,8 @@ M6-10i's complete-suite run rather than through a named slice filter._
   it does not by itself adopt it.
   _Depends: M6-10bb, M6-10cc, M6-10d, M6-10fb, M6-10fc, M6-10hb._
   _Verify: `mise run test` and `mise run test:compilefail` plus the recorded
-  pre-switch comparison._
-  _Greens: COUNT-10._
+  pre-switch comparison; its COUNT-10 proof is now that frozen selection
+  record._
 - **M6-11a** _(Infrastructure)_ — Add the raw `@Observable` comparison
   adapter and equivalent benchmark workloads.
   _Depends: M6-10i._
@@ -1588,8 +1588,8 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   edge, and core layouts after every M7 track converges.
   _Depends: M7-10c, M7-11a, M7-11b, M7-12, M7-15, M7-17._
   _Verify: complete host, release, simulator, Weather, available floor, and
-  compile-fail suites._
-  _Greens: COUNT-11._
+  compile-fail suites; its COUNT-11 whole-suite claim is what every LEG-01
+  and LEG-03 run keeps proving._
 - **M7-16b** _(Gate)_ — Prepare the non-mutating 0.3.0 release candidate,
   including benchmarks, docs, and changelog.
   _Depends: M7-18._
@@ -1808,8 +1808,9 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
 - **M8-15g** _(Gate)_ — Prove exact 0.4.0 consumption through the selected
   distribution channel in a scratch iOS 17 app.
   _Depends: M8-18._
-  _Verify: exact-consumer plugin build and documentation-link suite for LINT-23._
-  _Greens: LINT-23._
+  _Verify: exact-consumer plugin build and documentation-link suite; its
+  LINT-23 exact-0.4.0 proof is that release's frozen record, re-proven per
+  release by the runbook._
 - **M8-16** _(Infrastructure)_ — Prepare the 0.4.0 release notes and consumer
   lint documentation: changelog, current package pin, status snapshots, and
   a DocC setup guide for the selected Channel B plugins.
@@ -1907,8 +1908,8 @@ perf-11-pinned-key-slope-1 --filter perf-11-pinned-key-slope-1000`._
   and record the new count and its gate in `impl/benchmarks.md`.
   _Depends: M9-08, M9-09._
   _Verify: benchmark filter for the steady turn reports the recorded
-  machinery-free malloc count, plus the recorded `impl/benchmarks.md` result._
-  _Greens: PERF-12._
+  machinery-free malloc count, plus the recorded `impl/benchmarks.md` result;
+  its PERF-12 zero folded into PERF-01's committed threshold._
 - **M9-11** _(Infrastructure)_ — Replace the settle walk's
   `state as? any DerivedCogSettleState` with a stored discriminator on
   `CogState`, so entering and exiting a node costs no conformance lookup, and
@@ -1961,8 +1962,8 @@ perf-11-pinned-key-slope-1000` back at or below the pre-M9 propagation traffic
   deep, broad, and unstable graphs after the shared runtime changes.
   _Depends: M9-20._
   _Verify: complete pinned comparison result set recorded in `impl/benchmarks.md`, taken
-  in one session on the pinned benchmark host._
-  _Greens: PERF-14._
+  in one session on the pinned benchmark host; its PERF-14 proof is now that
+  frozen comparison record._
 - **M9-21** _(Infrastructure)_ — Sort and read the arena's changed-boundary
   queue in place. Returning it by value shared the buffer and made sorting
   allocate.
