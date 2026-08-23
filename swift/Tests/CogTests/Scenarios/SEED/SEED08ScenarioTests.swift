@@ -5,7 +5,7 @@ import CogTesting
 import Testing
 
 // Seed's misuse guard is a debug-only trap: release builds have no seed at all
-// (SEED-05), so both child processes here are debug children.
+// (SEED-05), so every child process here is a debug child.
 
 @MainActor
 @Test func `SEED-08 seeding inside a turn body traps with a clear error`() async {
@@ -35,6 +35,33 @@ import Testing
       }
 
       _ = cogs.peek(sneaky)
+    }
+  }
+
+  expectSeedMisuseMessage(in: result)
+}
+
+@MainActor
+@Test func `SEED-08 seeding from a reaction traps with a clear error`() async {
+  let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+    await MainActor.run {
+      let count = Cog<Int>.Manual(0, name: "count")
+
+      // The reaction stays quiet through its assembly run (count is still 0
+      // and the context reference is still nil) and seeds only when the turn
+      // below wakes it, so the trap fires mid-flush — a different re-entrancy
+      // point than the mid-turn and mid-settle children above.
+      var cogs: Cogs?
+      cogs = Cogs.forTesting(mechanisms: [
+        MechanismProbe { m in
+          m.run { c in
+            guard c[count] == 1, let cogs else { return }
+            cogs.seed(count, to: 7)
+          }
+        }
+      ])
+
+      cogs?.turn("wake") { c in c[count] = 1 }
     }
   }
 
