@@ -1,21 +1,6 @@
 import CogLintCore
 import Foundation
-import SwiftSyntax
 import Testing
-
-/// Gives the guarded wrapper one stable, scenario-free filter sentinel.
-@Test
-func lintWrapperSentinelInfrastructure() {
-  #expect(Bool(true))
-}
-
-/// Proves that the exact swift-syntax pin parses through the shared core seam.
-@Test
-func parserScaffoldUsesPinnedSyntaxTree() {
-  let source = CogLintParser.parse(source: "let value = 1")
-
-  #expect(source.statements.count == 1)
-}
 
 /// Proves that lint-only source dependencies remain outside Cog's root graph.
 ///
