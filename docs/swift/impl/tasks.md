@@ -1204,6 +1204,11 @@ _Plan scope and exit: [M5: Benchmark port](./plan.md#plan-m5)._
 
 _Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
 
+_Arena-coverage exceptions: COUNT-01, COUNT-02, COUNT-03, COUNT-04, COUNT-05,
+COUNT-06, COUNT-07. The cross-cutting run-count sums belong to no single
+integration slice's scenario family; the arena re-proved them through
+M6-10i's complete-suite run rather than through a named slice filter._
+
 - **M6-01a** _(Infrastructure)_ — Add arena slot allocation, reuse,
   generations, and the scalar SoA column skeleton.
   _Depends: M5-10._
