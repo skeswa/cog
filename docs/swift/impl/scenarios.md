@@ -1110,3 +1110,8 @@ locations in my editor and CI, without making my app compile the linter.
   distribution at exactly 0.4.0, applies the build-tool plugin, executes the
   matching released binary, and reaches that release's rule documentation.
   (Proof: suite.)
+- **LINT-24.** `manual-cog-underscore` requires every recognized
+  `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` declaration name to
+  begin with `_`, and requires a `.readOnly` projection of a recognized source
+  to be named exactly its source's name without the leading underscore; an
+  underscored source that is never projected is accepted.

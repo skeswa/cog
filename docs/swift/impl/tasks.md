@@ -1817,6 +1817,14 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Depends: M8-15f._
   _Verify: `mise run test:lint-documentation`, `mise run fmt:check`, and
   `mise run tasks:check`._
+- **M8-19** _(Behavior)_ — Implement `manual-cog-underscore` over the shared
+  declaration classifier, threading the projected base name through it for
+  exact `.readOnly` pairing.
+  _Depends: M8-02d, M8-03a._
+  _Non-blocking: execute when post-0.4.0 work opens; the closed `M8-15g` gate
+  cannot reach it, and the rule ships with the next release._
+  _Verify: `mise run test:lint --filter LINT-24`._
+  _Greens: LINT-24._
 
 ## M9 tasks
 
