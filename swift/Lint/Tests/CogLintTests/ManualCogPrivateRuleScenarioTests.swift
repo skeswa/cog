@@ -18,7 +18,7 @@ import Testing
     .appending(path: "coglint-manual-private-\(UUID().uuidString)", directoryHint: .isDirectory)
   try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: root) }
-  try "let countSourceCog = ManualCog(0)\n".write(
+  try "let countSourceCog = Cog.Manual(0)\n".write(
     to: root.appending(path: "State.swift"),
     atomically: true,
     encoding: .utf8

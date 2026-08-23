@@ -11,7 +11,7 @@ extension CogLintFixtureRegistry {
       rationale:
         "The suffix makes reference shape visible at every use and keeps narrower qualifiers such as `Source`, `Async`, or a domain role before the common ending. A reader can therefore distinguish a declaration from an ordinary domain value and know whether it needs a key without chasing its type.",
       repair:
-        "Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `ManualCogBox` named `reportCog` to `reportCogs`."
+        "Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `CogBox.Manual` named `reportCog` to `reportCogs`."
     ),
     triggering: [
       CogLintTriggeringExample(
@@ -22,8 +22,8 @@ extension CogLintFixtureRegistry {
           source:
             """
             let temperature = Cog<Int> { _ in 0 }
-            let weatherCogSource = ManualCog(0)
-            let forecastCogsAsync = AsyncCog<String> { _ in "" }
+            let weatherCogSource = Cog.Manual(0)
+            let forecastCogsAsync = Cog<String>.Async(default: "") { _ in fatalError() }
             """
         ),
         positions: [
@@ -39,7 +39,7 @@ extension CogLintFixtureRegistry {
           source:
             """
             let selectedCogs = Cog<Int> { _ in 0 }
-            let reportCog = ManualCogBox<String, Int>(0)
+            let reportCog = CogBox<String, Int>.Manual(0)
             let avatarCog: CogBox<String, Data> = .init { _ in Data() }
             """
         ),
@@ -58,12 +58,12 @@ extension CogLintFixtureRegistry {
         source:
           """
           let temperatureCog = Cog<Int> { _ in 0 }
-          private let weatherServiceSourceCog = ManualCog(0)
+          private let weatherServiceSourceCog = Cog.Manual(0)
           let weatherServiceCog = weatherServiceSourceCog.readOnly
-          let forecastAsyncCog = AsyncCog<String> { _ in "" }
-          private let weatherReportSourceCogs = ManualCogBox<String, Int>(0)
+          let forecastAsyncCog = Cog<String>.Async(default: "") { _ in fatalError() }
+          private let weatherReportSourceCogs = CogBox<String, Int>.Manual(0)
           let weatherReportCogs = weatherReportSourceCogs.readOnly
-          let forecastAsyncCogs = AsyncCogBox<String, Int> { _ in 0 }
+          let forecastAsyncCogs = CogBox<String, Int>.Async(default: "") { _, _ in fatalError() }
           """
       )
     ],
@@ -74,7 +74,7 @@ extension CogLintFixtureRegistry {
           "Factories, typealiases, and cross-file identity remain outside the shared syntax-only classifier.",
         source:
           """
-          typealias Source = ManualCog<Int>
+          typealias Source = Cog<Int>.Manual
           let factory = makeSource()
           let alias = Source(0)
           let external = externallyDeclaredReference

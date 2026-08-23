@@ -7,7 +7,7 @@ extension CogLintFixtureRegistry {
     rule: ManualCogPrivateRule(),
     documentation: CogLintRuleDocumentation(
       violation:
-        "A recognized `ManualCog` or `ManualCogBox` source has wider access than `private` or `fileprivate`.",
+        "A recognized `Cog.Manual` or `CogBox.Manual` source has wider access than `private` or `fileprivate`.",
       rationale:
         "Cog state is singular, so each mutable fact has one writable source owned by the file that defines it. Exporting the manual declaration exports a writer target and lets unrelated code bypass the named domain operations that explain who may change that fact.",
       repair:
@@ -18,7 +18,7 @@ extension CogLintFixtureRegistry {
         example: CogLintFixtureExample(
           name: "Implicit internal access",
           explanation: "A bare source declaration is internal and exposes a writer target.",
-          source: "let countSourceCog = ManualCog(0)\n"
+          source: "let countSourceCog = Cog.Manual(0)\n"
         ),
         positions: [CogLintFixturePosition(line: 1, column: 5)]
       ),
@@ -29,9 +29,9 @@ extension CogLintFixtureRegistry {
             "Internal, package, and public source names all cross the owning file boundary.",
           source:
             """
-            internal let retrySourceCog: Cog.ManualCog<Int> = .init(0)
-            package let reportSourceCogs = ManualCogBox<String?, Int>(nil)
-            public let sessionSourceCog = ManualCog("")
+            internal let retrySourceCog: Cog.Cog<Int>.Manual = .init(0)
+            package let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
+            public let sessionSourceCog = Cog.Manual("")
             """
         ),
         positions: [
@@ -44,7 +44,7 @@ extension CogLintFixtureRegistry {
         example: CogLintFixtureExample(
           name: "Setter-only privacy",
           explanation: "`private(set)` leaves the source name visible at its wider read access.",
-          source: "public private(set) var sessionSourceCog = ManualCog(\"\")\n"
+          source: "public private(set) var sessionSourceCog = Cog.Manual(\"\")\n"
         ),
         positions: [CogLintFixturePosition(line: 1, column: 25)]
       ),
@@ -56,8 +56,8 @@ extension CogLintFixtureRegistry {
           "Bare private access owns writer targets, while automatic and read-only names may remain wider.",
         source:
           """
-          private let countSourceCog = ManualCog(0)
-          fileprivate let reportSourceCogs = ManualCogBox<String?, Int>(nil)
+          private let countSourceCog = Cog.Manual(0)
+          fileprivate let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
           let countCog = countSourceCog.readOnly
           let doubledCog = Cog<Int> { c in c[countCog] * 2 }
           """
@@ -70,8 +70,8 @@ extension CogLintFixtureRegistry {
           "Factories, typealiases, and the sanctioned seed re-export do not spell a new manual declaration.",
         source:
           """
-          typealias Source = ManualCog<Int>
-          private let countSourceCog = ManualCog(0)
+          typealias Source = Cog<Int>.Manual
+          private let countSourceCog = Cog.Manual(0)
           let factorySourceCog = makeSource()
           let aliasSourceCog = Source(0)
           #if DEBUG
