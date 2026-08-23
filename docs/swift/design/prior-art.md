@@ -21,7 +21,7 @@ transactions, persistence, SwiftUI environment code, or tests.
 | Invalidation | Dirty flag and lazy recompute | CLEAN, CHECK, and DIRTY with versions and equality  |
 | Identity     | Node objects                  | Descriptor identity plus key                        |
 | Reactions    | Caller-owned cancellable      | Bootstrap-owned mechanisms                          |
-| Async state  | No built-in form              | `AsyncCog`, `CogStatus`, `Work`, and policies       |
+| Async state  | No built-in form              | `Cog<T>.Async`, `CogStatus`, `Work`, and policies   |
 | Lifetime     | ARC                           | A declared app or observed lifetime                 |
 | Keyed state  | No built-in form              | Boxes                                               |
 | UI boundary  | Works with `@Observable`      | One `@Observable` boundary per state read by the UI |

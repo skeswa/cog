@@ -140,7 +140,8 @@ Production code must not create child contexts. Truly view-local state stays
 in SwiftUI `@State`. Cog-backed screen state lives in the app graph, keyed by
 a screen identity when needed, and resets through an explicit op. One mutable
 domain fact gets one manual source; another feature may read it or compute a
-new shape automatically, but must not mirror it into a second `ManualCog`.
+new shape automatically, but must not mirror it into a second
+`Cog<Value>.Manual`.
 
 The plain `Cogs` initializer is package-only. Production calls
 `Cogs.bootstrapApp(mechanisms:)` once; a second call fails in every build. Tests
@@ -215,8 +216,8 @@ Three off-main designs are possible, but none fits the UI boundary:
 | Background graph with snapshots | Snapshots are coherent, but text fields need immediate write-then-read behavior. Local UI state would need a second system. |
 
 Graph bookkeeping is cheap; user code inside a selector is the likely cost.
-Keep small automatic values on main and use `@concurrent` work in an `AsyncCog`
-for expensive computation. Network, database, and sensor producers can work
+Keep small automatic values on main and use `@concurrent` work in a
+`Cog<Value>.Async` for expensive computation. Network, database, and sensor producers can work
 elsewhere and enter through an op. A server-side runtime would still get one
 single-executor context: off-main work is computation, not a second state
 graph, and returns through explicit async results or ops. Appendix C has the
@@ -254,12 +255,12 @@ arguments stay direct because they are references, not read values.
 ```swift
 // WeatherState.swift
 
-fileprivate let weatherServiceSourceCog = ManualCog<WeatherService>(.live)
+fileprivate let weatherServiceSourceCog = Cog<WeatherService>.Manual(.live)
 let weatherServiceCog = weatherServiceSourceCog.readOnly
 
-fileprivate let weatherReportSourceCogs = ManualCogBox<Weather?, ZipCode>(nil)
-fileprivate let heatAdvisorySourceCogs = ManualCogBox<Bool, ZipCode>(false)
-fileprivate let currentZipSourceCog = ManualCog<ZipCode?>(nil)
+fileprivate let weatherReportSourceCogs = CogBox<Weather?, ZipCode>.Manual(nil)
+fileprivate let heatAdvisorySourceCogs = CogBox<Bool, ZipCode>.Manual(false)
+fileprivate let currentZipSourceCog = Cog<ZipCode?>.Manual(nil)
 
 let weatherReportCogs = weatherReportSourceCogs.readOnly
 let heatAdvisoryCogs = heatAdvisorySourceCogs.readOnly
@@ -292,19 +293,19 @@ let isNiceOutsideHereCog = Cog { c in
 
 The public forms are:
 
-| Declare             | Example                                  | Read                                             |
-| ------------------- | ---------------------------------------- | ------------------------------------------------ |
-| One automatic value | `Cog<Bool> { ... }`                      | `c[valueReference]` → `Bool`                     |
-| An automatic box    | `CogBox<Bool, ZipCode> { ... }`          | `c[box[zip]]`                                    |
-| One source          | `ManualCog<ZipCode?>(nil)`               | Read normally; write `c[valueReference] = zip`   |
-| A source box        | `ManualCogBox<Weather?, ZipCode>(nil)`   | `c[box[zip]] = report`                           |
-| One async value     | `AsyncCog<Forecast?> { ... }`            | `c[valueReference]` → `Forecast?`                |
-| An async box        | `AsyncCogBox<Weather?, ZipCode> { ... }` | `c[box[zip]]`; status via `c.status[...]` (§5.1) |
+| Declare             | Example                                   | Read                                             |
+| ------------------- | ----------------------------------------- | ------------------------------------------------ |
+| One automatic value | `Cog<Bool> { ... }`                       | `c[valueReference]` → `Bool`                     |
+| An automatic box    | `CogBox<Bool, ZipCode> { ... }`           | `c[box[zip]]`                                    |
+| One source          | `Cog<ZipCode?>.Manual(nil)`               | Read normally; write `c[valueReference] = zip`   |
+| A source box        | `CogBox<Weather?, ZipCode>.Manual(nil)`   | `c[box[zip]] = report`                           |
+| One async value     | `Cog<Forecast?>.Async { ... }`            | `c[valueReference]` → `Forecast?`                |
+| An async box        | `CogBox<Weather?, ZipCode>.Async { ... }` | `c[box[zip]]`; status via `c.status[...]` (§5.1) |
 
 Four rules keep the API consistent:
 
 1. **Runtime APIs take value references.** `Cog<T>` is readable;
-   `ManualCog<T>` is also writable. Descriptor plus key gives identity.
+   `Cog<T>.Manual` is also writable. Descriptor plus key gives identity.
 2. **Boxes create references.** `box[key]` returns one. A keyless declaration
    is already bound to its only state.
 3. **Production kind does not change the read type.** Manual, automatic, and
@@ -535,7 +536,7 @@ An async selector is synchronous and tracked. It reads dependencies, then
 returns a description of async work:
 
 ```swift
-let fetchedWeatherCogs = AsyncCogBox<Weather?, ZipCode>(
+let fetchedWeatherCogs = CogBox<Weather?, ZipCode>.Async(
     .latest,
     default: nil
 ) { c, zip in

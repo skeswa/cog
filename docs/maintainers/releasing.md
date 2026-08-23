@@ -29,6 +29,15 @@ use `Release-As` to force a version.
 not a Cog version source. Release Please owns the changelog layout, so do not
 format or edit generated sections by hand.
 
+For an intentional public API break, run `mise run api:check` against the newest
+release tag and review every Swift API digester diagnostic. Copy only the
+accepted diagnostics, verbatim, into
+`tools/api-breakage-allowlists/<baseline>.txt`; the filename must match that
+release tag. Migration typealiases do not necessarily suppress signature-change
+diagnostics, so the allowlist records the reviewed compatibility delta rather
+than the availability of a source migration. Rerun the check and require it to
+pass before the release PR. Never add a broad or unreviewed suppression.
+
 Check that:
 
 - the version has no `v` or component prefix;

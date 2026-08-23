@@ -138,7 +138,7 @@ import Testing
 
 @MainActor
 @Test func counterStartsClean() {
-  let countCog = ManualCog<Int>(0)
+  let countCog = Cog<Int>.Manual(0)
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(countCog) == 0)

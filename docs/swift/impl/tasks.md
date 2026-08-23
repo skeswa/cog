@@ -192,7 +192,7 @@ _Plan scope and exit: [M0: Scaffolding](./plan.md#plan-m0)._
 _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
 
 - **M1-01a** _(Infrastructure)_ — Add final-class descriptors, stable
-  `ObjectIdentifier` identity, human labels, and `ManualCog<T>` value references.
+  `ObjectIdentifier` identity, human labels, and `Cog<T>.Manual` value references.
   _Depends: M0-10._
   _Verify: `mise run test --filter DescriptorInfrastructure`._
 - **M1-34a** _(Decision)_ — Settle production-install and testing-factory
@@ -213,7 +213,7 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   acknowledgement primitives to `CogTesting` without exposing graph storage.
   _Depends: M1-01b._
   _Verify: `mise run test --filter CogTestingAcknowledgementInfrastructure`._
-- **M1-02** _(Behavior)_ — Add `ManualCogBox`, constant and closure starting
+- **M1-02** _(Behavior)_ — Add `CogBox<Value, Key>.Manual`, constant and closure starting
   values, allocation-free `box[key]` value references, and per-key state identity.
   _Depends: M1-01b._
   _Verify: `mise run test --filter 'DECL-02|DECL-03|DECL-04'`._
@@ -819,7 +819,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Depends: M3-02._
   _Verify: `mise run test --filter ASYNC-11`._
   _Greens: ASYNC-11._
-- **M3-07** _(Behavior)_ — Fetch and track `AsyncCogBox` status independently by key.
+- **M3-07** _(Behavior)_ — Fetch and track `CogBox<Value, Key>.Async` status independently by key.
   _Depends: M3-05a._
   _Verify: `mise run test --filter ASYNC-12`._
   _Greens: ASYNC-12._
@@ -902,7 +902,7 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   _Verify: `mise run test --filter LIFE-10`._
   _Greens: LIFE-10._
 - **M3-10k** _(Infrastructure)_ — Replace Weather's imperative request sources
-  and async op with one keyed `AsyncCogBox`; render status and total values, and
+  and async op with one keyed `CogBox<Value, Key>.Async`; render status and total values, and
   route initial, retry, and hourly demand through `refresh` with deterministic
   example tests.
   _Depends: M3-04, M3-07, M3-08b, M3-10b._

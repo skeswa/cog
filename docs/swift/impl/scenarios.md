@@ -121,9 +121,9 @@ I declare state at the top of a file and it just works.
 
 ### 2.1 Sources
 
-- **DECL-01.** I declare a `ManualCog` with a starting value. When I read
+- **DECL-01.** I declare a `Cog<Value>.Manual` with a starting value. When I read
   it, I get that starting value.
-- **DECL-02.** I declare a `ManualCogBox` with a starting value. Each key
+- **DECL-02.** I declare a `CogBox<Value, Key>.Manual` with a starting value. Each key
   I look up starts at that value, and each key holds its own value.
 - **DECL-03.** I give a box a starting-value closure instead. Each key
   starts at what the closure returns for that key.
@@ -597,7 +597,7 @@ renderable, and whether any generation has succeeded.
 
 ### 13.1 Status
 
-- **ASYNC-01.** I read an `AsyncCog` for the first time. It starts its
+- **ASYNC-01.** I read a `Cog<Value>.Async` for the first time. It starts its
   work and publishes a pending turn; a `status` read returns
   `kind == .pending`, `value == default`, and `hasSucceeded == false`, while a
   value read returns that same declared resting default. There is no observable
@@ -665,7 +665,7 @@ renderable, and whether any generation has succeeded.
 - **ASYNC-11.** Only what the selector reads with `c[...]` before
   returning counts as a dependency. Values the work closure touches after
   an `await` do not retrigger it.
-- **ASYNC-12.** Two keys of an `AsyncCogBox` fetch independently. One can
+- **ASYNC-12.** Two keys of a `CogBox<Value, Key>.Async` fetch independently. One can
   be loading while the other has succeeded.
 - **ASYNC-35.** A dependency changes while an explicit refresh's work is in
   flight. The handle resolves as `superseded` at replacement — a dependency
@@ -681,7 +681,7 @@ renderable, and whether any generation has succeeded.
   as `released` rather than hanging or following a recreated state.
 - **ASYNC-14.** After a release, reading the value reference again starts fresh work
   and fresh status, unpolluted by anything from before.
-- **ASYNC-37.** One key of an `AsyncCogBox` loses its last consumer while a
+- **ASYNC-37.** One key of a `CogBox<Value, Key>.Async` loses its last consumer while a
   sibling key stays watched. Grace expiry cancels and releases only that
   key's work and state: its late result publishes nothing, the sibling's work
   completes and turns untouched, and reading the released key starts
@@ -1074,7 +1074,7 @@ locations in my editor and CI, without making my app compile the linter.
   factory-hidden bootstrap and cross-file `App` conformance as accepted
   syntax-only misses.
 - **LINT-12.** `manual-cog-private` accepts `private` and `fileprivate` on
-  every recognized `ManualCog` and `ManualCogBox` source and rejects implicit
+  every recognized `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` source and rejects implicit
   internal or any wider access.
 - **LINT-13.** `no-multi-read-cogs-helper` rejects a value-returning member of
   `extension Cogs` or `extension CogOps` whose immediate lexical body contains

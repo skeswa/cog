@@ -407,12 +407,12 @@ the shared package both headlessly and through SwiftUI. It is a
 
 | Declaration kind | Count |
 | ---------------- | ----: |
-| `ManualCog`      |    12 |
-| `ManualCogBox`   |     5 |
+| `Cog.Manual`     |    12 |
+| `CogBox.Manual`  |     5 |
 | `Cog`            |    18 |
 | `CogBox`         |     8 |
-| `AsyncCog`       |     7 |
-| `AsyncCogBox`    |     3 |
+| `Cog.Async`      |     7 |
+| `CogBox.Async`   |     3 |
 
 The original plan named five keyless async cogs, but the required roots,
 middle nodes, and deep quotes need seven. It also named four manual boxes. The

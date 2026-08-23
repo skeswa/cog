@@ -10,20 +10,21 @@ mutable values between those runtimes.
 
 ## Declaration shapes
 
-`ManualCog<Value>` names one writable source. `Cog<Value>` names one cached
-synchronous automatic value. `AsyncCog<Value>` names an async status state and
-an internal equality-gated value projection. A box—`ManualCogBox`, `CogBox`, or
-`AsyncCogBox`—uses one public declaration plus a key to name a family of
-independent states. Internally, `AsyncCogBox` owns two descriptors: one for
-status and one for the value projection.
+`Cog<Value>.Manual` names one writable source. `Cog<Value>` names one cached
+synchronous automatic value. `Cog<Value>.Async` names an async status state and
+an internal equality-gated value projection. A box—`CogBox<Value, Key>.Manual`,
+`CogBox<Value, Key>`, or `CogBox<Value, Key>.Async`—uses one public declaration
+plus a key to name a family of independent states. Internally,
+`CogBox<Value, Key>.Async` owns two descriptors: one for status and one for the
+value projection.
 
 ```swift
-private let temperatureSourceCog = ManualCog<Double>(68)
+private let temperatureSourceCog = Cog<Double>.Manual(68)
 let adviceCog = Cog<String> { c in
   let temperature = c[temperatureSourceCog]
   return temperature > 80 ? "Stay inside" : "Go outside"
 }
-let forecastCogs = AsyncCogBox<Forecast, ZipCode>(default: .empty) { _, zip in
+let forecastCogs = CogBox<Forecast, ZipCode>.Async(default: .empty) { _, zip in
   Work.run { try await service.forecast(for: zip) }
 }
 ```
@@ -74,14 +75,14 @@ derive from it; views pass normal values and identities, not copied sources or
 Incorrect—two writable temperatures can disagree:
 
 ```swift
-let appTemperatureSourceCog = ManualCog<Double>(68)
-let dashboardTemperatureSourceCog = ManualCog<Double>(68)
+let appTemperatureSourceCog = Cog<Double>.Manual(68)
+let dashboardTemperatureSourceCog = Cog<Double>.Manual(68)
 ```
 
 Correct—one source and any number of derived views:
 
 ```swift
-private let temperatureSourceCog = ManualCog<Double>(68)
+private let temperatureSourceCog = Cog<Double>.Manual(68)
 let fahrenheitCog = temperatureSourceCog.readOnly
 let celsiusCog = Cog { c in
   let temperature = c[temperatureSourceCog]
