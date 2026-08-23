@@ -163,8 +163,6 @@ _Milestone M1. Design: §2.2, §2.4._
 
 Every read I make is correct: the latest published state, fully settled.
 
-- **READ-01.** I write a source in a turn. After the turn, every read
-  sees the new value.
 - **READ-02.** I read an automatic cog twice with nothing changing in
   between. Its closure ran only once; the second read used the cache.
 - **READ-03.** I change two sources in one turn. An automatic cog that
@@ -194,7 +192,9 @@ _Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
 ### 4.1 The writer
 
 - **TURN-01.** Inside one turn, `c[countCog] += 1` works: the writer reads
-  back the value it just staged.
+  back the value it just staged, and once the turn ends every normal read
+  sees the published value. (The read-after-turn half retired the former
+  READ-01, whose whole assertion it is.)
 - **TURN-02.** I write the same source twice in one turn. The last
   write wins, and downstream sees exactly one change.
 - **TURN-03.** The writer reads a source I have not written this turn. It
