@@ -99,8 +99,8 @@ extension CogArenaCore {
     in cogs: Cogs
   ) {
     let row = arena.index(of: slot)
-    let record = descriptorRecord(forRow: row)
-    guard case .whileObserved(let declaredGrace) = record.lifetime else { return }
+    let lifetime = withDescriptorRecord(forRow: row) { $0.lifetime }
+    guard case .whileObserved(let declaredGrace) = lifetime else { return }
     guard arena.leaseCount[row] == 0 else { return }
     guard arena.boundary[row] == CogArenaStorage.noIndex else { return }
 
@@ -293,6 +293,11 @@ extension CogArenaCore {
   }
 
   /// Resolves one row's descriptor record without retaining it in the walk.
+  ///
+  /// "Without retaining" holds for the `Unmanaged` load, but the returned
+  /// strong reference still costs the caller one retain/release pair. The
+  /// scoped form below avoids that pair; prefer it on per-turn and per-node
+  /// paths.
   #if !COG_ARENA_COMPACT
   @usableFromInline
   #endif
@@ -302,6 +307,30 @@ extension CogArenaCore {
       fatalError("Cog found a live arena row without descriptor dispatch.")
     }
     return records[Int(descriptorIndex)].takeUnretainedValue()
+  }
+
+  /// Runs `body` with one row's descriptor record borrowed, never retained.
+  ///
+  /// The context's identity table owns every record for as long as the
+  /// context lives, and the publish, settle, notify, and reaction walks that
+  /// call this run synchronously on the MainActor while it does — a release
+  /// cascade runs from a sleeper task or teardown, never from inside one of
+  /// these walks — so the reference is guaranteed for `body`'s whole scope.
+  /// This is issue #373's route C at the record seam: the returning accessor
+  /// above pays one retain/release pair per call, and the walks pay that per
+  /// settled node.
+  #if !COG_ARENA_COMPACT
+  @usableFromInline
+  #endif
+  func withDescriptorRecord<Result>(
+    forRow row: Int,
+    _ body: (CogArenaDescriptorRecord) -> Result
+  ) -> Result {
+    let descriptorIndex = arena.descriptor[row]
+    guard descriptorIndex >= 0, Int(descriptorIndex) < records.count else {
+      fatalError("Cog found a live arena row without descriptor dispatch.")
+    }
+    return records[Int(descriptorIndex)]._withUnsafeGuaranteedRef(body)
   }
 
   #if DEBUG

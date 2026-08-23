@@ -31,8 +31,7 @@ extension CogArenaCore {
       switch frame.phase {
       case .enter:
         guard needsSettlement(row) else { continue }
-        let record = descriptorRecord(forRow: row)
-        guard record.kind != .manual else {
+        guard withDescriptorRecord(forRow: row, { $0.kind }) != .manual else {
           fatalError("Cog found an invalid manual source in the arena pull walk.")
         }
 
@@ -46,14 +45,15 @@ extension CogArenaCore {
 
       case .exit:
         defer { endComputing(row) }
-        let record = descriptorRecord(forRow: row)
         let mustRecompute = arena.flags[row].contains(.dirty) || dependencyChanged(for: frame.row)
         if mustRecompute {
-          guard let recompute = record.recompute else {
-            fatalError("Cog found an automatic arena row without a recompute function.")
+          withDescriptorRecord(forRow: row) { record in
+            guard let recompute = record.recompute else {
+              fatalError("Cog found an automatic arena row without a recompute function.")
+            }
+            let slot = CogArenaSlot(index: frame.row, generation: arena.generation[row])
+            recompute(self, cogs, slot, record.key(at: row))
           }
-          let slot = CogArenaSlot(index: frame.row, generation: arena.generation[row])
-          recompute(self, cogs, slot, record.key(at: row))
         } else {
           arena.checkedAt[row] = revision
           arena.flags[row].remove(.check)

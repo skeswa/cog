@@ -322,3 +322,30 @@ the retain lives in the memo's tuple return and the use that follows, not in
 the stored-property load. The change was reverted. That null result is what
 scopes `M11-03`: route C pays only in its full form, scoped borrows or
 parallel hot-field arrays through the whole call chain.
+
+### M11-03: borrowed descriptor records through the walks
+
+`descriptorRecord(forRow:)` returned a strong reference, so every publish,
+settle, notify, lease, and reaction visit paid one retain/release pair just to
+look at a record the arena already owns. The new scoped
+`withDescriptorRecord(forRow:_:)` runs its body under
+`Unmanaged._withUnsafeGuaranteedRef`, which is sound because the identity
+table owns every record for the context's lifetime and these walks run
+synchronously on the MainActor while it lives — a release cascade comes from a
+sleeper task or teardown, never from inside a walk. The hot sites in
+settlement (enter and exit), source publication, boundary notification,
+reaction lease reconciliation and dependency settlement, `previousValue`, and
+the per-turn lifetime scheduling now borrow.
+
+| Probe run                | before |     after |
+| ------------------------ | -----: | --------: |
+| steady, retains/releases |  26/35 | **21/30** |
+| deep ×100, retains       |    729 |   **524** |
+| deep ×100, releases      |    738 |   **533** |
+
+On the benchmark, `perf-01-steady-turn` reads exactly **22 retains and 28
+releases** at every percentile (4,177 samples, environment E11), the
+zero-malloc gate held, and p50 moved 744 → 676 ns. The deep chain sheds about
+two pairs per settled node; the remaining ~5 pairs per node are the recompute
+closure-context copy, the typed-column value moves, and the `Reader`
+construction, which are `M11-04`-adjacent or accepted per-event costs.

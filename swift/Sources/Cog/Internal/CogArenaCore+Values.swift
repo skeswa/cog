@@ -49,14 +49,14 @@ extension CogArenaCore {
       guard arena.flags[row].contains(.touched) else {
         fatalError("Cog found an arena turn entry whose source was not touched.")
       }
-      let record = descriptorRecord(forRow: row)
-      guard record.kind != .automatic, let publishSource = record.publishSource else {
-        fatalError("Cog tried to flush a non-source arena row as pending state.")
+      let (changed, kind) = withDescriptorRecord(forRow: row) { record in
+        guard record.kind != .automatic, let publishSource = record.publishSource else {
+          fatalError("Cog tried to flush a non-source arena row as pending state.")
+        }
+        return (publishSource(slot, revision, propagation), record.kind)
       }
-
-      let changed = publishSource(slot, revision, propagation)
       #if DEBUG
-      if changed, record.kind == .manual {
+      if changed, kind == .manual {
         recordHistoryState(event: .write, slot: slot)
       }
       #endif
@@ -330,7 +330,7 @@ extension CogArenaCore {
       // Settle before the guard, because settling is what makes `changedAt`
       // current. The flag test comes first so a clean row — every pinned key on
       // an ordinary turn — never resolves its descriptor record at all.
-      if needsSettlement(row), descriptorRecord(forRow: row).kind != .manual {
+      if needsSettlement(row), withDescriptorRecord(forRow: row, { $0.kind }) != .manual {
         settle(slot, in: cogs)
       }
 
@@ -349,7 +349,7 @@ extension CogArenaCore {
       guard changedThisTurn else { continue }
       #endif
       let entry = observationEntries[index]
-      descriptorRecord(forRow: row).notifyObservation(entry.slot, entry.boundary)
+      withDescriptorRecord(forRow: row) { $0.notifyObservation(entry.slot, entry.boundary) }
     }
 
     propagation.dropFlushedBoundaryRows(queuedCount)

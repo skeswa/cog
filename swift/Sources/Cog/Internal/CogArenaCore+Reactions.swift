@@ -53,8 +53,7 @@ extension CogArenaCore {
         fatalError("Cog found another consumer's edge in an arena reaction lease list.")
       }
       let producerRow = liveRow(dependency.dep)
-      let record = descriptorRecord(forRow: producerRow)
-      if case .whileObserved = record.lifetime {
+      if case .whileObserved = withDescriptorRecord(forRow: producerRow, { $0.lifetime }) {
         let producer = CogArenaSlot(
           index: dependency.dep,
           generation: arena.generation[producerRow]
@@ -128,8 +127,7 @@ extension CogArenaCore {
       }
       let producerRow = liveRow(dependency.dep)
       if needsSettlement(producerRow) {
-        let record = descriptorRecord(forRow: producerRow)
-        guard record.kind != .manual else {
+        guard withDescriptorRecord(forRow: producerRow, { $0.kind }) != .manual else {
           fatalError("Cog found an unsettled manual source behind an arena reaction.")
         }
         reactionPullRoots.append(
@@ -232,11 +230,12 @@ extension CogArenaCore {
   func previousValue<Value>(for consumer: CogArenaSlot, as: Value.Type) -> Value? {
     requireTracking(consumer)
     let row = arena.index(of: consumer)
-    let record = descriptorRecord(forRow: row)
-    guard let column = record.column as? CogArenaValueColumn<Value> else {
-      fatalError("Cog restored an arena selector through the wrong typed value column.")
+    return withDescriptorRecord(forRow: row) { record in
+      guard let column = record.column as? CogArenaValueColumn<Value> else {
+        fatalError("Cog restored an arena selector through the wrong typed value column.")
+      }
+      return column.storedValue(at: consumer)
     }
-    return column.storedValue(at: consumer)
   }
 
   /// Requires `consumer` to own the innermost active dependency capture.
