@@ -1,6 +1,6 @@
 /// The immutable declaration behind an async automatic value.
 ///
-/// ``Cog.Async`` and ``CogBox.Async`` are lightweight value references. They
+/// ``Cog/Async`` and ``CogBox/Async`` are lightweight value references. They
 /// retain one descriptor like this and, for a boxed declaration, pair it with
 /// an erased key. A ``Cogs`` uses the descriptor's object identity plus that
 /// key to find or create an arena row. Consequently,
@@ -10,7 +10,7 @@
 /// The descriptor stores only declaration metadata and the synchronous half of
 /// the async selector. It never stores current status or a running `Task`.
 /// Those belong to the arena's context-owned state so one declaration
-/// can be used safely in multiple isolated contexts and, for ``CogBox.Async``,
+/// can be used safely in multiple isolated contexts and, for ``CogBox/Async``,
 /// at multiple keys.
 /// All descriptor access remains MainActor-confined; `Work` is the explicit
 /// boundary that permits the selected operation to choose its own isolation.
@@ -63,7 +63,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// Selects one piece of async work while dependency tracking is active.
   ///
   /// The optional erased key lets keyless and boxed declarations share the
-  /// runtime call path. ``CogBox.Async`` installs the adapter that restores its
+  /// runtime call path. ``CogBox/Async`` installs the adapter that restores its
   /// concrete `Key` before user code runs. Explicit `@MainActor` keeps selector
   /// execution on the graph's actor under every client isolation default.
   private let selector: @MainActor (Reader<CogStatus<Value>>, CogKey?) -> Work<Value>

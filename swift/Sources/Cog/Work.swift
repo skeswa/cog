@@ -1,4 +1,4 @@
-/// Deferred async work selected for one ``Cog.Async`` generation.
+/// Deferred async work selected for one ``Cog/Async`` generation.
 ///
 /// `Work` describes execution; creating it does not start a `Task`. An async
 /// selector returns either a one-shot operation or an async sequence after
@@ -183,7 +183,7 @@ private nonisolated final class WorkStreamIteratorStorage<Iterator: AsyncIterato
 /// How an async state schedules new work while prior work is in flight.
 ///
 /// Policies are part of declaration behavior and apply independently to each
-/// key of an ``CogBox.Async``. The policy is `nonisolated` and `Sendable`;
+/// key of a ``CogBox/Async``. The policy is `nonisolated` and `Sendable`;
 /// choosing one does not access a context or start work. Latest selectors may
 /// return either ``Work/run(_:)`` or ``Work/stream(_:)``.
 public nonisolated enum LatestPolicy: Sendable, Equatable {
@@ -204,7 +204,7 @@ public nonisolated enum LatestPolicy: Sendable, Equatable {
 ///
 /// Ordered selectors return ``RunWork``, which makes stream work unavailable at
 /// compile time. Each policy applies independently to every key of an
-/// ``CogBox.Async``. Selecting a policy is inert; the context starts work only
+/// ``CogBox/Async``. Selecting a policy is inert; the context starts work only
 /// when that value reference is demanded.
 public nonisolated enum OrderedPolicy: Sendable, Equatable {
   /// Run every accepted request one at a time in input order.

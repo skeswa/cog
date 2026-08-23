@@ -17,22 +17,22 @@ enum AsyncCogWithoutDefaultRejected {
   /// A keyless declaration with no default and no conformance is rejected.
   static func declaresKeylessWithoutADefault() {
     // expect-error: missing argument for parameter 'default' in call
-    _ = AsyncCog<Reading> { _ in .run { Reading() } }
+    _ = Cog<Reading>.Async { _ in .run { Reading() } }
   }
 
   /// A keyed declaration is rejected the same way.
   static func declaresKeyedWithoutADefault() {
     // expect-error: missing argument for parameter 'default' in call
-    _ = AsyncCogBox<Reading, Int> { _, _ in .run { Reading() } }
+    _ = CogBox<Reading, Int>.Async { _, _ in .run { Reading() } }
   }
 
   /// Passing `default:` is one legal spelling.
   static func declaresWithAnExplicitDefault() {
-    _ = AsyncCog<Reading>(default: Reading()) { _ in .run { Reading() } }
+    _ = Cog<Reading>.Async(default: Reading()) { _ in .run { Reading() } }
   }
 
   /// An `Optional` states its resting `nil` explicitly too.
   static func declaresAnOptionalRestingAtNil() {
-    _ = AsyncCog<Reading?>(default: nil) { _ in .run { Reading() } }
+    _ = Cog<Reading?>.Async(default: nil) { _ in .run { Reading() } }
   }
 }

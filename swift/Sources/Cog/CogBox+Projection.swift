@@ -1,5 +1,5 @@
 extension CogBox {
-  /// A read-only keyed facade over one ``CogBox.Manual`` declaration.
+  /// A read-only keyed facade over one ``CogBox/Manual`` declaration.
   ///
   /// Keep a source box `fileprivate`, then publish its `.readOnly` projection:
   ///

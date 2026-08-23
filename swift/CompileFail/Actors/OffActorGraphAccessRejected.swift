@@ -8,12 +8,12 @@ import Cog
 
 enum OffActorGraphAccessRejected {
   @MainActor
-  static func readsOnGraphExecutor(cogs: Cogs, source: ManualCog<Int>) -> Int {
+  static func readsOnGraphExecutor(cogs: Cogs, source: Cog<Int>.Manual) -> Int {
     cogs.peek(source)
   }
 
   actor OtherExecutor {
-    func readsWithoutHop(cogs: Cogs, source: ManualCog<Int>) -> Int {
+    func readsWithoutHop(cogs: Cogs, source: Cog<Int>.Manual) -> Int {
       // expect-error: call to main actor-isolated instance method 'peek'
       cogs.peek(source)
     }

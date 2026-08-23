@@ -8,7 +8,7 @@ The suffix makes reference shape visible at every use and keeps narrower qualifi
 
 ## How to fix it
 
-Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `ManualCogBox` named `reportCog` to `reportCogs`.
+Rename the declaration so its final word matches its shape. For example, change `weatherCogSource` to `weatherSourceCog`, and change a `CogBox.Manual` named `reportCog` to `reportCogs`.
 
 <!-- Generated from the cog-declaration-suffix CogLint fixture corpus; do not edit. -->
 
@@ -22,8 +22,8 @@ Expected diagnostic positions: 1:5, 2:5, 3:5.
 
 ```swift
 let temperature = Cog<Int> { _ in 0 }
-let weatherCogSource = ManualCog(0)
-let forecastCogsAsync = AsyncCog<String> { _ in "" }
+let weatherCogSource = Cog.Manual(0)
+let forecastCogsAsync = Cog<String>.Async(default: "") { _ in fatalError() }
 ```
 
 ### Wrong shape plurality
@@ -34,7 +34,7 @@ Expected diagnostic positions: 1:5, 2:5, 3:5.
 
 ```swift
 let selectedCogs = Cog<Int> { _ in 0 }
-let reportCog = ManualCogBox<String, Int>(0)
+let reportCog = CogBox<String, Int>.Manual(0)
 let avatarCog: CogBox<String, Data> = .init { _ in Data() }
 ```
 
@@ -46,12 +46,12 @@ Keyless and boxed declarations end in their singular or plural suffix after role
 
 ```swift
 let temperatureCog = Cog<Int> { _ in 0 }
-private let weatherServiceSourceCog = ManualCog(0)
+private let weatherServiceSourceCog = Cog.Manual(0)
 let weatherServiceCog = weatherServiceSourceCog.readOnly
-let forecastAsyncCog = AsyncCog<String> { _ in "" }
-private let weatherReportSourceCogs = ManualCogBox<String, Int>(0)
+let forecastAsyncCog = Cog<String>.Async(default: "") { _ in fatalError() }
+private let weatherReportSourceCogs = CogBox<String, Int>.Manual(0)
 let weatherReportCogs = weatherReportSourceCogs.readOnly
-let forecastAsyncCogs = AsyncCogBox<String, Int> { _ in 0 }
+let forecastAsyncCogs = CogBox<String, Int>.Async(default: "") { _, _ in fatalError() }
 ```
 
 ## Accepted evasions
@@ -61,7 +61,7 @@ let forecastAsyncCogs = AsyncCogBox<String, Int> { _ in 0 }
 Factories, typealiases, and cross-file identity remain outside the shared syntax-only classifier.
 
 ```swift
-typealias Source = ManualCog<Int>
+typealias Source = Cog<Int>.Manual
 let factory = makeSource()
 let alias = Source(0)
 let external = externallyDeclaredReference

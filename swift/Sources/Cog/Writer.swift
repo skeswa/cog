@@ -4,7 +4,7 @@
 /// values and stages writes until the outer turn body returns. Application
 /// code cannot construct one.
 ///
-/// All access is MainActor-isolated and names only ``Cog.Manual`` sources;
+/// All access is MainActor-isolated and names only ``Cog/Manual`` sources;
 /// automatic cogs and read-only projections deliberately have no writer
 /// subscript. A normal read sees the latest completed turn, but a writer read
 /// sees this accumulating turn's most recently staged value so read-modify-write

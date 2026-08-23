@@ -8,7 +8,7 @@
 /// declared intent rather than a surprise (§5.3).
 ///
 /// The policy is declaration metadata shared by every key of a
-/// ``CogBox.Manual`` and by every context. Each keyed state still owns its own
+/// ``CogBox/Manual`` and by every context. Each keyed state still owns its own
 /// leases and grace deadline.
 public enum ManualCogLifetime: Sendable {
   /// Keep every state of this declaration until its context ends.

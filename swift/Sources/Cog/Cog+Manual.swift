@@ -122,7 +122,7 @@ extension Cog {
 
     /// Builds a reference for an existing descriptor-and-key identity.
     ///
-    /// ``CogBox.Manual`` uses this path so repeated subscripting stays inert and
+    /// ``CogBox/Manual`` uses this path so repeated subscripting stays inert and
     /// lightweight. Context state is still created only when the reference is
     /// first read or written.
     internal init(descriptor: ManualCogDescriptor<Value>, key: CogKey?) {

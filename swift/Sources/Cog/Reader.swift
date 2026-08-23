@@ -17,7 +17,7 @@ public import Observation
 /// replaces the dependency set, so branches and early returns work as expected.
 /// Reads made outside this reader are invisible to Cog.
 ///
-/// An ``Cog.Async`` selector receives a `Reader<CogStatus<Value>>`. Its tracked
+/// A ``Cog/Async`` selector receives a `Reader<CogStatus<Value>>`. Its tracked
 /// reads finish synchronously while the selector builds ``Work``; code in the
 /// work closure runs after dependency capture and cannot add edges through this
 /// reader.
