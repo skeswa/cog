@@ -12,8 +12,12 @@ import Testing
     return work.makeRun(for: input)
   }
   var statusKinds: [CogStatus<Int>.Kind] = []
+  var successes: [Int] = []
   m.status.watch(queuedCog, initial: .run, name: "watch.queued") { _, status in
     statusKinds.append(status.kind)
+    if status.kind == .success {
+      successes.append(status.value)
+    }
   }
   var starts = work.starts.makeAsyncIterator()
 
@@ -49,4 +53,9 @@ import Testing
     return
   }
   try await resolveAsyncStatus(in: cogs) { work.succeed(4) }
+
+  // The retired POLICY-02 rode this same harness: serial FIFO execution means
+  // results publish in run order and the final value matches the newest input.
+  #expect(successes == [0, 1, 2, 3, 4])
+  #expect(cogs.peek(queuedCog) == 4)
 }

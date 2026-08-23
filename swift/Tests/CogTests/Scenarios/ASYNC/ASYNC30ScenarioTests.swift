@@ -2,18 +2,18 @@ import Cog
 import CogTesting
 import Testing
 
-// ASYNC-04 and ASYNC-30 describe the same §5.1 accessor set over the same
-// lifecycle walk, so one controlled-work sequence proves both: every accessor
-// at every visible state (ASYNC-04), and the current-generation semantics of
-// `value` and `error` — a retry's pending clears the failure while the
-// renderable value survives (ASYNC-30).
+// ASYNC-30 owns the whole §5.1 accessor set over one lifecycle walk: every
+// accessor at every visible state — the retired ASYNC-04, which described the
+// same set over the same walk — plus the current-generation semantics of
+// `value` and `error`: a retry's pending clears the failure while the
+// renderable value survives.
 
 private nonisolated enum Async04Error: Error, Equatable {
   case offline
 }
 
 @MainActor
-@Test func `ASYNC-04 ASYNC-30 status accessors describe every request state`() async throws {
+@Test func `ASYNC-30 status accessors describe every request state`() async throws {
   let cogs = Cogs.forTesting()
   let work = AsyncStatusControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0) { _ in work.makeWork() }
@@ -79,7 +79,7 @@ private nonisolated enum Async04Error: Error, Equatable {
 }
 
 @MainActor
-@Test func `ASYNC-04 ASYNC-30 hasSucceeded distinguishes a default nil from a successful nil`()
+@Test func `ASYNC-30 hasSucceeded distinguishes a default nil from a successful nil`()
   async throws
 {
   let cogs = Cogs.forTesting()

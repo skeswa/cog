@@ -778,8 +778,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
   `value`, `hasSucceeded`, and loading semantics, with exhaustive status
   accessor tests.
   _Depends: M2-20._
-  _Verify: `mise run test --filter ASYNC-04`._
-  _Greens: ASYNC-04._
+  _Verify: retired proof — its ASYNC-04 accessor walk folded into ASYNC-30,
+  greened by M4-06._
 - **M3-02** _(Behavior)_ — On first tracked read, start work, publish pending
   as a turn, and expose no initial status case.
   _Depends: M3-01._
@@ -788,8 +788,8 @@ _Plan scope and exit: [M3: First async slice](./plan.md#plan-m3)._
 - **M3-03a** _(Behavior)_ — Publish success and failure as distinct named
   turns observed by watchers.
   _Depends: M3-02._
-  _Verify: `mise run test --filter ASYNC-02`._
-  _Greens: ASYNC-02._
+  _Verify: retired proof — its ASYNC-02 published failure folded into
+  ASYNC-18, greened by M3-03c._
 - **M3-03b** _(Behavior)_ — Preserve a successful optional `nil` through
   `value` plus `hasSucceeded`.
   _Depends: M3-03a._
@@ -1459,8 +1459,8 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
 - **M7-03b** _(Behavior)_ — Publish queued results in run order; the decision
   task owns failure scenarios in its reserved `M7-03c*` branch.
   _Depends: M7-03a._
-  _Verify: `mise run test --filter POLICY-02`._
-  _Greens: POLICY-02._
+  _Verify: retired proof — its POLICY-02 run-order publication folded into
+  POLICY-01, greened by M7-03a._
 - **M7-03c** _(Behavior)_ — Continue a queue after a failed run while keeping
   failure publication and refresh outcomes bound to their exact runs.
   _Depends: M7-03b._
@@ -1481,8 +1481,9 @@ _Plan scope and exit: [M7: Async completion and exports](./plan.md#plan-m7)._
   decision tasks add termination, failure, and equality behavior only in their
   reserved `M7-06b*`, `M7-06c*`, and `M7-06d*` branches.
   _Depends: M7-01b, M7-01c, M7-01d, M7-02._
-  _Verify: `mise run test --filter 'STREAM-01|STREAM-02'`._
-  _Greens: STREAM-01, STREAM-02._
+  _Verify: `mise run test --filter STREAM-01`. Its STREAM-02 starts-pending
+  opening folded into STREAM-01._
+  _Greens: STREAM-01._
 - **M7-06b** _(Behavior)_ — Leave stream state untouched on natural end,
   including the empty-sequence pending state, until dependency change or
   explicit refresh starts a new generation.

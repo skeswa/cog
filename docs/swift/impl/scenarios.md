@@ -613,22 +613,19 @@ renderable, and whether any generation has succeeded.
   `kind == .pending`, `value == default`, and `hasSucceeded == false`, while a
   value read returns that same declared resting default. There is no observable
   `initial` kind.
-- **ASYNC-02.** The work throws. Status becomes failure holding the
-  error, its total renderable value, and whether an earlier success exists.
 - **ASYNC-03.** An async cog whose value is optional succeeded with
   `nil`. When it reloads, `value` remains `nil` and `hasSucceeded` remains
   true — clearly different from the resting `nil` before any success.
-- **ASYNC-04.** `value`, `hasSucceeded`, and `isLoading` are right in every
-  lifecycle state:
-  the default and loading before success; the old value and loading while
-  reloading; the value and not loading on success; the last good value
-  and not loading on failure.
 - **ASYNC-30.** `kind`, `value`, `hasSucceeded`, `error`, and `isLoading` form
-  the accessor set: `kind` carries pending, success, or failure; `value`
-  remains total while `error` reports only the current failure; a reload
-  retrying after a failure has no error and retains its renderable value.
-  Loading and prior success remain orthogonal, and a successful `nil` stays
-  distinct from "never succeeded" through `hasSucceeded`.
+  the accessor set, and every accessor is right in every lifecycle state —
+  the default and loading before success, the old value and loading while
+  reloading, the value and not loading on success, the last good value and
+  not loading on failure (the former ASYNC-04, which described the same
+  walk). `kind` carries pending, success, or failure; `value` remains total
+  while `error` reports only the current failure; a reload retrying after a
+  failure has no error and retains its renderable value. Loading and prior
+  success remain orthogonal, and a successful `nil` stays distinct from
+  "never succeeded" through `hasSucceeded`.
 - **ASYNC-31.** Every async cog rests on a declared default, and value reads
   are total. Every declaration states the resting value with `default:`, and
   an `Optional` spells `default: nil`. In every value spelling — `c[...]`,
@@ -709,8 +706,10 @@ renderable, and whether any generation has succeeded.
   the descriptor's name and key, rendered `name[key]`, so Instruments can
   show it. (Checked through an internal seam.)
 - **ASYNC-18.** Initial work throws. A status watcher and history see pending
-  with the resting default and `hasSucceeded == false`, then failure with the
-  same pair, as two distinct turns.
+  with the resting default and `hasSucceeded == false`, then failure holding
+  the thrown error with the same pair, as two distinct turns. (The former
+  ASYNC-02's published failure is this walk's second half; its
+  refresh-handle outcome lives on in POLICY-06 and STREAM-07.)
 - **ASYNC-19.** Work succeeds, then a dependency change starts a reload
   that fails. A status watcher and history see every visible status — the
   initial pending, success, pending with that success as its value, then
@@ -783,9 +782,8 @@ When order matters more than speed, I pick a policy that says so.
 - **POLICY-01.** After the initial run succeeds, three quick dependency
   changes under `.queue` make exactly three additional runs, one at a time
   and in input order. Each run starts only after the preceding one
-  finishes.
-- **POLICY-02.** With `.queue`, results publish in run order, so the final
-  value always matches the newest input.
+  finishes, results publish in run order, and the final value matches the
+  newest input (the former POLICY-02, which rode the same harness).
 - **POLICY-03.** With `.exhaustLatest`, changes during a run — one or
   ten — start no new runs. When the run finishes, exactly one catch-up
   run uses the newest state.
@@ -808,10 +806,10 @@ _Milestone M7. Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
-- **STREAM-01.** A `.stream` cog publishes each changed element of its sequence
-  as its own turn. Watchers see every published value.
-- **STREAM-02.** Before the first element arrives, the cog reports
-  loading.
+- **STREAM-01.** A `.stream` cog reports loading before its first element
+  arrives (the former STREAM-02, asserted at the top of nearly every STREAM
+  proof), then publishes each changed element of its sequence as its own
+  turn. Watchers see every published value.
 - **STREAM-03.** A dependency changes. The old sequence is cancelled and
   a new one starts; late elements from the old sequence publish nothing.
 - **STREAM-04.** An unwatched `.stream` cog is released while its

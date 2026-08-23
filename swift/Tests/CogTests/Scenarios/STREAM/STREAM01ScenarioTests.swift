@@ -2,8 +2,11 @@ import Cog
 import CogTesting
 import Testing
 
+// The starts-pending opening was the retired STREAM-02; nearly every STREAM
+// test begins by asserting it, so it needs no ID of its own.
+
 @MainActor
-@Test func `STREAM-01 STREAM-02 stream starts pending and publishes every element`() async throws {
+@Test func `STREAM-01 stream starts pending and publishes every element`() async throws {
   let (cogs, m) = probedContext()
   let (sequence, continuation) = AsyncStream.makeStream(of: Int.self)
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
