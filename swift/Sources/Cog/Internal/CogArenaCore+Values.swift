@@ -311,7 +311,13 @@ extension CogArenaCore {
     // its position in that order, so sorting on it restores what the registry
     // walk delivered for free. This sorts the changed set, which is the small
     // one; sorting was never the cost being removed.
-    propagation.sortChangedBoundaryRows { arena.boundary[Int($0)] < arena.boundary[Int($1)] }
+    // The comparator reads through an unsafe buffer so it captures a pointer,
+    // not the storage class: a class capture cost the sort two retain/release
+    // pairs per turn (#373 route C, M11-04). `sortChangedBoundaryRows` mutates
+    // the propagation queue, never `arena.boundary`, so no access overlaps.
+    arena.boundary.withUnsafeBufferPointer { boundary in
+      propagation.sortChangedBoundaryRows { boundary[Int($0)] < boundary[Int($1)] }
+    }
 
     // By index, and dropped afterwards, for the reason this method snapshots
     // its count: a notice can run a synchronous Observation handler that queues

@@ -349,3 +349,36 @@ zero-malloc gate held, and p50 moved 744 → 676 ns. The deep chain sheds about
 two pairs per settled node; the remaining ~5 pairs per node are the recompute
 closure-context copy, the typed-column value moves, and the `Reader`
 construction, which are `M11-04`-adjacent or accepted per-event costs.
+
+### M11-04: the small sites, and two reclassified
+
+Three sites from the M11-01 attribution. Two were real:
+
+- The changed-boundary sort's comparator captured the storage class, which
+  cost two retain/release pairs per turn. It now reads through
+  `withUnsafeBufferPointer`, so it captures a pointer; the sorted queue and
+  the read column never overlap.
+- `CogTurn.name` was write-only in release: history and the turn-chain
+  tracker consume the name from `startTurn`'s parameter, and the trap that
+  names an attempted turn formats its message from the call-site parameter.
+  The stored property is debug-only now, so a release turn stops paying a
+  bridge retain plus a release of the previous name for a string nothing
+  read.
+
+The third was not ours. The two `SerialExecutor.isMainExecutor` round-trips
+attributed to the steady turn turned out to be one dynamic isolation check
+inside Apple's registrar notification, inlined into Cog's `notifyValueChange`
+closure frame, and one inside the probe harness's own `blackHole`. Both are
+reclassified to the measurement floor; no library change exists for either.
+
+| Metric, `perf-01-steady-turn` | before M11 | after M11-04 |
+| ----------------------------- | ---------: | -----------: |
+| retains                       |         30 |       **18** |
+| releases                      |         37 |       **25** |
+| `mallocCountTotal`            |          0 |            0 |
+| p50 time                      |     756 ns |       709 ns |
+
+Exact at every percentile across 4,104 samples (environment E12). The probe's
+hundred-node settle reads 522 retains and 532 releases. Wall clock across the
+M11 series ran 756, 744, 676, and 709 ns; the level shift from the record
+borrows is real, and the rest is session noise around it.

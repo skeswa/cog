@@ -35,12 +35,12 @@ it does today.
 From the [specialization run (E5)](#benchmark-environment-e5). The steady-turn
 figure is the median of three independently recorded p50s.
 
-| Shape           | p50     | notes                                                                                           |
-| --------------- | ------- | ----------------------------------------------------------------------------------------------- |
-| steady turn     | 909 ns  | zero allocations; 22 retains in the later [record-borrow run (E11)](#benchmark-environment-e11) |
-| 16-consumer fan | 7.6 µs  | zero allocations                                                                                |
-| 100-node chain  | 64 µs   | zero allocations                                                                                |
-| pinned-key turn | ~2.4 µs | flat from 1 to 1,000 pinned keys                                                                |
+| Shape           | p50     | notes                                                                                        |
+| --------------- | ------- | -------------------------------------------------------------------------------------------- |
+| steady turn     | 909 ns  | zero allocations; 18 retains in the later [small-site run (E12)](#benchmark-environment-e12) |
+| 16-consumer fan | 7.6 µs  | zero allocations                                                                             |
+| 100-node chain  | 64 µs   | zero allocations                                                                             |
+| pinned-key turn | ~2.4 µs | flat from 1 to 1,000 pinned keys                                                             |
 
 For scale against a UI budget: a 120 Hz frame is 8.3 ms, so one frame fits
 about 9,000 steady turns, 1,000 fan updates, or 130 full 100-node chain
@@ -124,8 +124,8 @@ apply these thresholds.
 
 - **A steady turn allocates nothing.** The committed `perf-01-steady-turn`
   threshold requires exactly zero mallocs at p90, not a tolerance around
-  zero. ARC is not zero: a steady turn retains exactly 22 times after
-  the M11-02 and M11-03 cuts, and issue #373 and milestone M11 track the
+  zero. ARC is not zero: a steady turn retains exactly 18 times after
+  the M11-02 through M11-04 cuts, and issue #373 and milestone M11 track the
   rest.
 - **Settling a node allocates nothing.** The committed `perf-13-deep-chain`
   threshold holds the per-node allocation count at zero.
@@ -318,6 +318,7 @@ All benchmark runs used release builds.
 | <a id="benchmark-environment-e9"></a>E9   | Current runtime comparison                | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; all twelve `perf-10-*` benchmarks in one session on an idle host: shipping core, raw `@Observable`, swift-state-graph 0.28.0; not a release check |
 | <a id="benchmark-environment-e10"></a>E10 | Turn-machinery ARC run                    | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-02 cuts, 3,908 samples, exact at every percentile; not a release check                                        |
 | <a id="benchmark-environment-e11"></a>E11 | Record-borrow run                         | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-03 record borrows, 4,177 samples, exact at every percentile; not a release check                              |
+| <a id="benchmark-environment-e12"></a>E12 | Small-site run                            | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-04 small-site cuts, 4,104 samples, exact at every percentile; not a release check                             |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used

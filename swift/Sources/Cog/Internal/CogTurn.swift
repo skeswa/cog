@@ -52,7 +52,17 @@ internal final class CogTurn {
   private(set) var id = CogTurnID(rawValue: 0)
 
   /// The diagnostic and history name of this outer turn.
+  #if DEBUG
+  /// The turn's diagnostic name.
+  ///
+  /// Debug-only storage: history and the turn-chain tracker consume the name
+  /// from `startTurn`'s parameter, and no release path reads it back off the
+  /// turn object — so a release build storing it paid a bridge retain and a
+  /// release of the previous name on every turn for a string nothing read
+  /// (M11-04). The trap that names an attempted turn (CYCLE-06) formats its
+  /// message from the call-site parameter, not from this property.
   private(set) var name = ""
+  #endif
 
   /// Arena source slots touched once in writer order by this turn.
   private var touchedArenaSources: ContiguousArray<CogArenaSlot> = []
@@ -77,7 +87,9 @@ internal final class CogTurn {
       "A Cog turn began while a previous turn's sources were staged."
     )
     self.id = id
+    #if DEBUG
     self.name = name
+    #endif
   }
 
   /// Registers one arena source whose pending typed cell must be published.
