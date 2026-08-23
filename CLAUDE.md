@@ -412,9 +412,20 @@ that runtime.
   reference `thingCog`, with `Cog` as the final word; this includes manual,
   automatic, async, and read-only projection declarations. Name every box
   `thingCogs`, with plural `Cogs` as the final word. Put narrower qualifiers
-  before the suffix (`weatherServiceSourceCog`, `weatherReportSourceCogs`).
+  before the suffix (`weatherServiceLoaderCog`, `weatherReportDraftCogs`).
   The app runtime remains the ordinary local `cogs`, and ordinary values read
   from the graph receive normal domain names without either suffix.
+- **Underscore every manual cog; its projection takes the clean name.** Every
+  manual declaration begins with a leading underscore
+  (`private let _temperatureCog = Cog<Int>.Manual(0)`), whether or not it is
+  projected. When the state is published, the `.readOnly` projection is named
+  exactly the source's name without the underscore
+  (`let temperatureCog = _temperatureCog.readOnly`), so the clean name is the
+  one the rest of the app reads. The retired `Source` qualifier
+  (`temperatureSourceCog`) must not reappear. Spell file-scope declarations
+  `private`, not `fileprivate` — swift-format rewrites file-scoped
+  `fileprivate` to `private`. CogLint's `manual-cog-underscore` rule enforces
+  both halves.
 - **Unwrap Swift state reads into domain locals.** In application code and
   user-facing examples, bind each value-producing `c[...]`, `cogs[...]`, or
   status/peek read to a local before using it. Name that local by removing the
