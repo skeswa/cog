@@ -9,11 +9,11 @@ import Testing
     """
     let temperatureCog = Cog<Int> { _ in 0 }
     let temperaturesCogs = Cog.CogBox<Int, String> { _ in { _ in 0 } }
-    fileprivate let currentZipSourceCog: Cog.ManualCog<Int?> = .init(nil)
-    fileprivate let reportSourceCogs: ManualCogBox<String?, Int>? = Cog.ManualCogBox(nil)
-    fileprivate let optionalSourceCog: Cog.ManualCog<Int>? = .init(nil)
-    let forecastCog = Cog.AsyncCog<String>(default: "") { _ in fatalError() }
-    let forecastsCogs: AsyncCogBox<String, Int> = .init(default: "") { _ in fatalError() }
+    fileprivate let currentZipSourceCog: Cog.Cog<Int?>.Manual = .init(nil)
+    fileprivate let reportSourceCogs: CogBox<String?, Int>.Manual? = CogBox.Manual(nil)
+    fileprivate let optionalSourceCog: Cog<Int>.Manual? = .init(nil)
+    let forecastCog = Cog.Cog<String>.Async(default: "") { _ in fatalError() }
+    let forecastsCogs: CogBox<String, Int>.Async = .init(default: "") { _, _ in fatalError() }
     """
   )
 
@@ -34,10 +34,10 @@ import Testing
 @Test func `LINT-04 classifier carries source facts through read-only projections`() {
   let classifications = classify(
     """
-    fileprivate let currentZipSourceCog = ManualCog<Int?>(nil)
-    fileprivate let reportSourceCogs = ManualCogBox<String?, Int>(nil)
+    fileprivate let currentZipSourceCog = Cog<Int?>.Manual(nil)
+    fileprivate let reportSourceCogs = CogBox<String?, Int>.Manual(nil)
     let currentZipCog = currentZipSourceCog.readOnly
-    let reportCogs: Cog.CogBoxProjection<String?, Int> = reportSourceCogs.readOnly
+    let reportCogs: Cog.CogBox<String?, Int>.Projection = reportSourceCogs.readOnly
     """
   )
 
@@ -60,7 +60,7 @@ import Testing
   let classifications = classify(
     """
     struct WeatherState {
-      fileprivate static let currentZipSourceCog = ManualCog<Int?>(nil)
+      fileprivate static let currentZipSourceCog = Cog<Int?>.Manual(nil)
       static let currentZipCog = currentZipSourceCog.readOnly
     }
 
@@ -79,22 +79,22 @@ import Testing
 @Test func `LINT-05 classifier accepts its documented syntax-only evasions`() {
   let classifications = classify(
     """
-    typealias Source = ManualCog<Int>
-    fileprivate let currentZipSourceCog = ManualCog<Int?>(nil)
+    typealias Source = Cog<Int>.Manual
+    fileprivate let currentZipSourceCog = Cog<Int?>.Manual(nil)
     #if DEBUG
     let currentZipSeedTargetCog = currentZipSourceCog
     #endif
     let copiedSourceCog = currentZipSourceCog
     let copiedThenProjectedCog = copiedSourceCog.readOnly
     let factorySourceCog = makeSource()
-    let typedFactorySourceCog: ManualCog<Int> = makeSource()
+    let typedFactorySourceCog: Cog<Int>.Manual = makeSource()
     let aliasSourceCog = Source(0)
     let externalProjectionCog = externalSourceCog.readOnly
     let forwardProjectionCog = laterSourceCog.readOnly
-    fileprivate let laterSourceCog = ManualCog(0)
+    fileprivate let laterSourceCog = Cog.Manual(0)
 
     func localRuntime() {
-      let localSourceCog = ManualCog(0)
+      let localSourceCog = Cog.Manual(0)
       _ = localSourceCog.readOnly
     }
     """

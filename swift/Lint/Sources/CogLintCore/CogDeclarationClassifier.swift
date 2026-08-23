@@ -80,8 +80,8 @@ private final class CogDeclarationVisitor: SyntaxVisitor {
     if isDotInit(call.calledExpression) {
       return annotation
     }
-    guard let calledName = nominalName(in: call.calledExpression),
-      let called = CogDeclarationEvidence(nominalName: calledName)
+    guard let spelling = nominalSpelling(in: call.calledExpression),
+      let called = CogDeclarationEvidence(spelling: spelling)
     else {
       return nil
     }
@@ -124,27 +124,42 @@ private struct CogDeclarationEvidence {
   /// Whether the binding directly names the origin or projects it.
   let access: CogDeclarationAccess
 
-  /// Maps only Cog's six declarations and two read-only facade types.
-  init?(nominalName: String) {
-    switch nominalName {
-    case "Cog":
-      self.init(shape: .keyless, origin: .automatic, access: .direct)
-    case "CogBox":
-      self.init(shape: .box, origin: .automatic, access: .direct)
-    case "ManualCog":
+  /// Maps Cog's two family roots, their nested shapes, and migration aliases.
+  init?(spelling: CogNominalSpelling) {
+    switch (spelling.familyName, spelling.memberName) {
+    case ("Cog", "Manual"):
       self.init(shape: .keyless, origin: .writableSource, access: .direct)
-    case "ManualCogBox":
+    case ("CogBox", "Manual"):
       self.init(shape: .box, origin: .writableSource, access: .direct)
-    case "AsyncCog":
+    case ("Cog", "Async"):
       self.init(shape: .keyless, origin: .asynchronous, access: .direct)
-    case "AsyncCogBox":
+    case ("CogBox", "Async"):
       self.init(shape: .box, origin: .asynchronous, access: .direct)
-    case "CogProjection":
+    case ("Cog", "Projection"):
       self.init(shape: .keyless, origin: .writableSource, access: .readOnlyProjection)
-    case "CogBoxProjection":
+    case ("CogBox", "Projection"):
       self.init(shape: .box, origin: .writableSource, access: .readOnlyProjection)
     default:
-      return nil
+      switch spelling.memberName {
+      case "Cog":
+        self.init(shape: .keyless, origin: .automatic, access: .direct)
+      case "CogBox":
+        self.init(shape: .box, origin: .automatic, access: .direct)
+      case "ManualCog":
+        self.init(shape: .keyless, origin: .writableSource, access: .direct)
+      case "ManualCogBox":
+        self.init(shape: .box, origin: .writableSource, access: .direct)
+      case "AsyncCog":
+        self.init(shape: .keyless, origin: .asynchronous, access: .direct)
+      case "AsyncCogBox":
+        self.init(shape: .box, origin: .asynchronous, access: .direct)
+      case "CogProjection":
+        self.init(shape: .keyless, origin: .writableSource, access: .readOnlyProjection)
+      case "CogBoxProjection":
+        self.init(shape: .box, origin: .writableSource, access: .readOnlyProjection)
+      default:
+        return nil
+      }
     }
   }
 
@@ -201,7 +216,9 @@ private func evidence(from type: TypeSyntax) -> CogDeclarationEvidence? {
     {
       return evidence(from: wrapped)
     }
-    return CogDeclarationEvidence(nominalName: identifier.name.text)
+    return CogDeclarationEvidence(
+      spelling: CogNominalSpelling(familyName: nil, memberName: identifier.name.text)
+    )
   }
   if let member = type.as(MemberTypeSyntax.self) {
     if member.name.text == "Optional",
@@ -210,21 +227,57 @@ private func evidence(from type: TypeSyntax) -> CogDeclarationEvidence? {
     {
       return evidence(from: wrapped)
     }
-    return CogDeclarationEvidence(nominalName: member.name.text)
+    return CogDeclarationEvidence(
+      spelling: CogNominalSpelling(
+        familyName: finalNominalName(in: member.baseType),
+        memberName: member.name.text
+      )
+    )
   }
   return nil
 }
 
-/// Extracts the final nominal callee through generic specialization and qualification.
-private func nominalName(in expression: ExprSyntax) -> String? {
+/// The family and final member recovered from a nominal call or type spelling.
+private struct CogNominalSpelling {
+  /// The last nominal component before `memberName`, when one is written.
+  let familyName: String?
+
+  /// The final nominal component naming the called or annotated type.
+  let memberName: String
+}
+
+/// Extracts a final nominal callee without discarding its immediate base type.
+private func nominalSpelling(in expression: ExprSyntax) -> CogNominalSpelling? {
   if let reference = expression.as(DeclReferenceExprSyntax.self) {
-    return reference.baseName.text
+    return CogNominalSpelling(familyName: nil, memberName: reference.baseName.text)
   }
   if let member = expression.as(MemberAccessExprSyntax.self) {
-    return member.declName.baseName.text
+    return CogNominalSpelling(
+      familyName: member.base.flatMap { finalNominalName(in: $0) },
+      memberName: member.declName.baseName.text
+    )
   }
   if let generic = expression.as(GenericSpecializationExprSyntax.self) {
-    return nominalName(in: generic.expression)
+    return nominalSpelling(in: generic.expression)
+  }
+  return nil
+}
+
+/// Extracts the last nominal component from an expression used as a member base.
+private func finalNominalName(in expression: ExprSyntax) -> String? {
+  nominalSpelling(in: expression)?.memberName
+}
+
+/// Extracts the last nominal component from a type used as a nested-type base.
+private func finalNominalName(in type: TypeSyntax) -> String? {
+  if let identifier = type.as(IdentifierTypeSyntax.self) {
+    return identifier.name.text
+  }
+  if let member = type.as(MemberTypeSyntax.self) {
+    return member.name.text
+  }
+  if let attributed = type.as(AttributedTypeSyntax.self) {
+    return finalNominalName(in: attributed.baseType)
   }
   return nil
 }
