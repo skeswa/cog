@@ -47,9 +47,9 @@ flowchart TB
 
 | Start here                                             | Responsibility                                                  |
 | ------------------------------------------------------ | --------------------------------------------------------------- |
-| `ManualCog.swift`, `ManualCogBox.swift`                | Writable keyless and keyed references.                          |
+| `Cog+Manual.swift`, `CogBox+Manual.swift`              | Writable keyless and keyed references.                          |
 | `Cog.swift`, `CogBox.swift`                            | Synchronous automatic references and selectors.                 |
-| `AsyncCog.swift`, `AsyncCogBox.swift`, `Work.swift`    | Async declarations, scheduling-policy types, and selected work. |
+| `Cog+Async.swift`, `CogBox+Async.swift`, `Work.swift`  | Async declarations, scheduling-policy types, and selected work. |
 | `CogStatus.swift`, `CogsStatus.swift`                  | Total async status and value/status read split.                 |
 | `Cogs.swift`, `Cogs+Subscript.swift`                   | Context ownership, one-shot reads, and UI Observation reads.    |
 | `Reader.swift`, `ReactionReader.swift`, `Writer.swift` | Scoped tracking and staging capabilities.                       |

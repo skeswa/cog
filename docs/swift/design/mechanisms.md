@@ -15,15 +15,15 @@ named mechanisms registered at bootstrap.
 
 ### 6.1 Choosing a home for a side effect
 
-| Need                                  | Use                                                 |
-| ------------------------------------- | --------------------------------------------------- |
-| Compute state from other state        | `AsyncCog` (§5.1), or an op that writes manual cogs |
-| Send something outside the graph      | A reaction inside a mechanism                       |
-| Respond to a user action              | Op (§3.2)                                           |
-| Run for the app lifetime              | A mechanism registered at bootstrap                 |
-| Run for a shorter domain lifetime     | A `whenever` scope inside a mechanism (§6.2)        |
-| Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)        |
-| Continue after process death          | Durable state, an engine, and a reconciler (§6.7)   |
+| Need                                  | Use                                                         |
+| ------------------------------------- | ----------------------------------------------------------- |
+| Compute state from other state        | `Cog<Value>.Async` (§5.1), or an op that writes manual cogs |
+| Send something outside the graph      | A reaction inside a mechanism                               |
+| Respond to a user action              | Op (§3.2)                                                   |
+| Run for the app lifetime              | A mechanism registered at bootstrap                         |
+| Run for a shorter domain lifetime     | A `whenever` scope inside a mechanism (§6.2)                |
+| Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)                |
+| Continue after process death          | Durable state, an engine, and a reconciler (§6.7)           |
 
 For example, “check the weather when the ZIP changes” produces state, so it
 belongs in the `fetchedWeatherCogs` async box from §5.1. “Alert me when the
@@ -338,7 +338,7 @@ rules follow:
    task owns its deadline; expiration cancels its op, while a cancellation
    shield can protect the final turn (`withTaskCancellationShield` in Swift
    6.4).
-3. **System-owned work is not an `AsyncCog`.** An async cog models a task
+3. **System-owned work is not a `Cog<Value>.Async`.** An async cog models a task
    owned by the current process. A background `URLSession` transfer can
    outlive that task. Model its status as manual state such as `.queued`,
    `.downloading`, `.downloaded`, or `.failed`, and let an engine own the
@@ -485,6 +485,6 @@ remove duplicate values, but cannot remove the cost of too many turns.
     edge to follow and the alert would never fire.
 
 [^engine]:
-    A process-owned `AsyncCog` can cancel and restart Swift tasks. A
+    A process-owned `Cog<Value>.Async` can cancel and restart Swift tasks. A
     system-owned transfer has no live Swift task after process death, so its
     engine and durable status must carry the lifecycle instead.

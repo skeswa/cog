@@ -47,8 +47,8 @@ on-demand and CI use.
 
 Syntax is enough for the first rules because Cog code has clear written forms:
 
-- declarations name `Cog`, `CogBox`, `ManualCog`, `ManualCogBox`, `AsyncCog`,
-  or `AsyncCogBox`, or use `.readOnly`;
+- declarations name `Cog`, `CogBox`, their nested `Manual`, `Async`, or
+  `Projection` shapes, or use `.readOnly`;
 - graph reads use the usual `cogs` or `c` receiver; and
 - views write `View`, `some View`, and `@Environment(\.cogs)` in source.
 
@@ -151,9 +151,10 @@ The classifier does not follow assignments or infer across files.
 
 ### 4.1 `cog-declaration-suffix`
 
-A keyless `Cog`, `ManualCog`, `AsyncCog`, or projection name must end in
-`Cog`. A `CogBox`, `ManualCogBox`, `AsyncCogBox`, or box projection must end in
-`Cogs`. Put qualifiers before that suffix.
+A keyless `Cog`, `Cog<Value>.Manual`, `Cog<Value>.Async`, or projection name
+must end in `Cog`. A `CogBox`, `CogBox<Value, Key>.Manual`,
+`CogBox<Value, Key>.Async`, or box projection must end in `Cogs`. Put
+qualifiers before that suffix.
 
 The classifier reads both the written type and initializer. It does not follow
 a declaration copied into a debug seed target.
@@ -191,8 +192,9 @@ miss.
 
 ### 4.5 `manual-cog-private`
 
-Each `ManualCog` and `ManualCogBox` declaration must be `private` or
-`fileprivate`. Expose `.readOnly` or an automatic cog instead of the source.
+Each `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` declaration must be
+`private` or `fileprivate`. Expose `.readOnly` or an automatic cog instead of
+the source.
 
 Both access words are valid. At file scope they mean the same thing, and
 `swift format` already chooses its preferred spelling.

@@ -9,7 +9,7 @@ path needs source-level detail.
 The guide uses one small thread throughout:
 
 ```swift
-private let temperatureSourceCog = ManualCog<Double>(68)
+private let temperatureSourceCog = Cog<Double>.Manual(68)
 
 let adviceCog = Cog<String> { c in
   let temperature = c[temperatureSourceCog]
@@ -92,7 +92,8 @@ runs effects, finishes the turn, and then drains turns queued during the flush.
 
 ### Async completion
 
-An `AsyncCog` selector runs synchronously on the MainActor to choose a `Work`.
+A `Cog<Value>.Async` selector runs synchronously on the MainActor to choose a
+`Work`.
 The work may suspend elsewhere. Its completion returns to the context, proves
 that both the slot and work generation are still current, then stages status in
 a named graph-owned turn. Cancellation is advisory; generation and state

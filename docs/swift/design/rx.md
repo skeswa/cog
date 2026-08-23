@@ -51,7 +51,7 @@ True event dropping belongs in an op. A state value must catch up after a
 dependency changes.
 
 ```swift
-let forecastCog = AsyncCog<Forecast?>(.latest) { c in
+let forecastCog = Cog<Forecast?>.Async(.latest) { c in
     let currentZip = c[currentZipCog]
     return .run { try await api.forecast(for: currentZip) }
 }
@@ -63,7 +63,7 @@ Use `.stream` for sources such as location updates, sockets, and database
 observations:
 
 ```swift
-let locationFixCog = AsyncCog<CLLocation?>(.latest) { c in
+let locationFixCog = Cog<CLLocation?>.Async(.latest) { c in
     let desiredAccuracy = c[desiredAccuracyCog]
     return .stream(locationService.updates(accuracy: desiredAccuracy))
 }

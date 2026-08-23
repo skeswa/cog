@@ -194,7 +194,8 @@ runtime. The normal simulator lane remains the compatibility check.
 
 ### M3: First async slice
 
-Ship `CogStatus`, required defaults, `AsyncCog` and `AsyncCogBox`, synchronous
+Ship `CogStatus`, required defaults, `Cog<Value>.Async` and
+`CogBox<Value, Key>.Async`, synchronous
 selectors that return `Work.run`, `.latest`, generation checks, exact
 `CogRefresh` results, and safe observed release. Peek and refresh of cold state
 create transient demand rather than a lasting lease.

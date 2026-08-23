@@ -90,7 +90,7 @@ cannot embed arena slots. Resolution is the only transition:
 
 ```mermaid
 flowchart LR
-  ref["ManualCog / Cog / AsyncCog"]
+  ref["Cog.Manual / Cog / Cog.Async"]
   descriptor[descriptor record]
   identity["CogStateIdentity<br/>descriptor + key"]
   slot["CogArenaSlot<br/>row + generation"]
@@ -119,7 +119,7 @@ For `let advice = cogs[adviceCog]`, the exact handoffs are:
 | 5    | `automaticRecord`                              | Restores or creates `CogArenaValueColumn<String>` and the erased descriptor closures.                            |
 | 6    | `settle`                                       | Pushes an enter frame; a cold DIRTY row reaches descriptor `recompute`.                                          |
 | 7    | `recompute`                                    | Calls `withDependencyCapture`, then `AutomaticCogDescriptor.compute`.                                            |
-| 8    | `Reader.subscript(_ ManualCog)`                | Calls `CogArenaCore.read` for `temperatureSourceCog`.                                                            |
+| 8    | `Reader.subscript(_ Cog<Value>.Manual)`        | Calls `CogArenaCore.read` for `temperatureSourceCog`.                                                            |
 | 9    | `manualLocation` / `resolvedManualLocation`    | Resolves the manual descriptor, slot, and `CogArenaValueColumn<Double>`, inserting 68 on first use.              |
 | 10   | `recordDependency`                             | Reuses the next matching edge or appends an edge from temperature to advice.                                     |
 | 11   | `CogArenaValueColumn.insert`                   | Installs the cold automatic result; `recompute` stamps `changedAt` and `checkedAt`.                              |

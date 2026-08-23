@@ -174,7 +174,7 @@ steady-turn path the memo was measured for, and another memo shape would widen
 release and teardown logic. Their descriptor record uses a no-op
 `forgetMemoizedLocation` closure.
 
-The common value spelling does benefit indirectly. Each `AsyncCog` owns an
+The common value spelling does benefit indirectly. Each `Cog<Value>.Async` owns an
 internal `AutomaticCogDescriptor<Value>` whose selector reads its async status
 and returns `status.value`. A keyless projection follows the automatic location
 memo; a keyed projection uses ordinary descriptor/key resolution. Both use the

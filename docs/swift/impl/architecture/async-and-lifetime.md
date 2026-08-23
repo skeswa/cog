@@ -10,12 +10,12 @@ isolation without holding a reader, capture scope, or turn open.
 
 ## Selection, then operation
 
-An `AsyncCog` selector runs on the MainActor with a
+A `Cog<Value>.Async` selector runs on the MainActor with a
 `Reader<CogStatus<Value>>`. It reads dependencies and returns `Work` or
 `RunWork`. Dependency capture ends before the operation starts.
 
 ```swift
-let forecastCog = AsyncCog<Forecast>(default: .empty) { c in
+let forecastCog = Cog<Forecast>.Async(default: .empty) { c in
   let zip = c[currentZipSourceCog]
   return Work.run { try await service.forecast(for: zip) }
 }
