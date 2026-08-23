@@ -60,7 +60,8 @@ private final class CogDeclarationVisitor: SyntaxVisitor {
           binding: binding,
           shape: evidence.shape,
           origin: evidence.origin,
-          access: evidence.access
+          access: evidence.access,
+          projectedSourceName: evidence.projectedSourceName
         )
       )
       evidenceScopes[evidenceScopes.count - 1][nameToken.text] = evidence
@@ -100,7 +101,8 @@ private final class CogDeclarationVisitor: SyntaxVisitor {
     return CogDeclarationEvidence(
       shape: source.shape,
       origin: source.origin,
-      access: .readOnlyProjection
+      access: .readOnlyProjection,
+      projectedSourceName: base.baseName.text
     )
   }
 
@@ -123,6 +125,12 @@ private struct CogDeclarationEvidence {
 
   /// Whether the binding directly names the origin or projects it.
   let access: CogDeclarationAccess
+
+  /// The classified base identifier a `.readOnly` initializer projected.
+  ///
+  /// Only the initializer channel can supply this; annotation-only projection
+  /// evidence carries `nil` because a written `Projection` type names no source.
+  let projectedSourceName: String?
 
   /// Maps Cog's two family roots and their nested shapes.
   init?(spelling: CogNominalSpelling) {
@@ -155,11 +163,13 @@ private struct CogDeclarationEvidence {
   init(
     shape: CogDeclarationShape,
     origin: CogDeclarationOrigin,
-    access: CogDeclarationAccess
+    access: CogDeclarationAccess,
+    projectedSourceName: String? = nil
   ) {
     self.shape = shape
     self.origin = origin
     self.access = access
+    self.projectedSourceName = projectedSourceName
   }
 
   /// Merges compatible channels while retaining any box, writable, or projection evidence.
@@ -169,7 +179,8 @@ private struct CogDeclarationEvidence {
       origin: mergedOrigin(with: other),
       access:
         access == .readOnlyProjection || other.access == .readOnlyProjection
-        ? .readOnlyProjection : .direct
+        ? .readOnlyProjection : .direct,
+      projectedSourceName: projectedSourceName ?? other.projectedSourceName
     )
   }
 

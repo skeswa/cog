@@ -257,9 +257,11 @@ and a debug-history UI stay open.
 
 ### M8: First-party lint tooling and 0.4.0
 
-Build the isolated `CogLint` package, syntax classifiers, six rules, reporters,
-suppressions, build and command plugins, fixture-built DocC pages, native
-artifact bundle, and repository dogfood task.
+Build the isolated `CogLint` package, syntax classifiers, seven rules,
+reporters, suppressions, build and command plugins, fixture-built DocC pages,
+native artifact bundle, and repository dogfood task. The seventh rule,
+`manual-cog-underscore`, is the non-blocking `M8-19` and ships with the next
+release after the closed 0.4.0 gate.
 
 SwiftPM and Xcode eagerly fetched an unused root binary target, so the root
 manifest stays artifact-free. The generated `skeswa/coglint-plugins` sibling
@@ -422,9 +424,10 @@ public API, or release.
   stream-before-reaction order, and external post-mutation value tests are
   green; the complete behavior suite passes on the selected core before the
   release sequence starts.
-- M8 (`M8-15a` → `M8-15g`): the fixture and integration suites prove all six
-  rules, exact locations, suppression, reporters, plugin caching, host-binary
-  selection, stable rule URLs, and the selected distribution channel. The
+- M8 (`M8-15a` → `M8-15g`): the fixture and integration suites prove the first
+  six rules, exact locations, suppression, reporters, plugin caching,
+  host-binary selection, stable rule URLs, and the selected distribution
+  channel. The
   repository lints clean in production and test target roles; the terminal
   scratch app resolves exactly 0.4.0, runs its matching plugin binary, and
   reaches the matching docs.

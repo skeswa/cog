@@ -779,7 +779,7 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped.                                                                                                |
 | Traps and deinits    | Clear release-build traps use `fatalError`. Every generic class writes `nonisolated deinit` until the Swift optimizer bug is fixed.                                                                                                                      |
 | Public names         | The shape families use `Cog<Value>.Manual` / `.Async` / `.Projection` and the corresponding `CogBox<Value, Key>` members. `ManualCogLifetime` stays top-level. [prior-art.md](./prior-art.md) records the naming review and the `Cogs` revisit trigger.  |
-| Lint                 | `coglint` enforces the first six usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                                                                                               |
+| Lint                 | `coglint` enforces the seven usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                                                                                                   |
 
 The benchmark record holds the old core and layout comparisons. This table
 states only the current result.
@@ -835,7 +835,7 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     from the environment.
 26. **Mechanisms — settled.** Assembly lists them; controllers register work;
     state gates own shorter scopes.
-27. **Lint tooling — settled.** The syntax-only linter, six rules, plugins,
+27. **Lint tooling — settled.** The syntax-only linter, seven rules, plugins,
     docs, and sibling distribution ship together.
 28. **Shape-family spelling — settled.** The automatic shape remains
     `Cog<Value>`; manual, async, and projection shapes are nested as

@@ -54,6 +54,15 @@ package struct CogDeclarationClassification: Sendable {
   /// Whether this name is a direct reference or a read-only projection.
   package let access: CogDeclarationAccess
 
+  /// The classified base identifier this binding's `.readOnly` initializer projected.
+  ///
+  /// Present only for ``CogDeclarationAccess/readOnlyProjection`` evidence that
+  /// came from a written `base.readOnly` initializer whose base the classifier
+  /// had already recognized; annotation-only projection evidence carries `nil`
+  /// because a written `Projection` type names no source. Naming rules use it
+  /// to pair a projection with its underscored source declaration.
+  package let projectedSourceName: String?
+
   /// The source identifier spelling without trivia.
   package var name: String { nameToken.text }
 
@@ -69,7 +78,8 @@ package struct CogDeclarationClassification: Sendable {
     binding: PatternBindingSyntax,
     shape: CogDeclarationShape,
     origin: CogDeclarationOrigin,
-    access: CogDeclarationAccess
+    access: CogDeclarationAccess,
+    projectedSourceName: String? = nil
   ) {
     self.nameToken = nameToken
     self.declaration = declaration
@@ -77,5 +87,6 @@ package struct CogDeclarationClassification: Sendable {
     self.shape = shape
     self.origin = origin
     self.access = access
+    self.projectedSourceName = projectedSourceName
   }
 }

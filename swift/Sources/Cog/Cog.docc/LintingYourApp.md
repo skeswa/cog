@@ -99,4 +99,5 @@ the exception is not itself the point of the code.
 - <doc:PrimitivesOnlyInOps>
 - <doc:InitialStateInMechanism>
 - <doc:ManualCogPrivate>
+- <doc:ManualCogUnderscore>
 - <doc:NoMultiReadCogsHelper>

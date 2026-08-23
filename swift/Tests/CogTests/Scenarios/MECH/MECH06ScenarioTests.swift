@@ -2,12 +2,12 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let hourlyRefreshCountCog = Cog<Int>.Manual(0)
+@MainActor private let _hourlyRefreshCountCog = Cog<Int>.Manual(0)
 
 @MainActor extension CogOps {
   fileprivate func refreshCurrentLocation() {
     turn("location.hourlyRefresh") { c in
-      c[hourlyRefreshCountCog] += 1
+      c[_hourlyRefreshCountCog] += 1
     }
   }
 }
@@ -40,7 +40,7 @@ import Testing
   )
 
   try await clock.waitForScheduledSleep()
-  #expect(cogs.peek(hourlyRefreshCountCog) == 0)
+  #expect(cogs.peek(_hourlyRefreshCountCog) == 0)
 
   clock.advance(by: .seconds(3_600))
   var refreshIterator = refreshEvents.makeAsyncIterator()
@@ -49,7 +49,7 @@ import Testing
     return
   }
 
-  #expect(cogs.peek(hourlyRefreshCountCog) == 1)
+  #expect(cogs.peek(_hourlyRefreshCountCog) == 1)
   #if DEBUG
   let turns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(turns.map(\.name) == ["Location.location.hourlyRefresh"])
@@ -64,7 +64,7 @@ import Testing
     return
   }
 
-  #expect(cogs.peek(hourlyRefreshCountCog) == 2)
+  #expect(cogs.peek(_hourlyRefreshCountCog) == 2)
   #if DEBUG
   let secondTurns = cogs.debugHistory.entries.filter { $0.event == .turn }
   #expect(

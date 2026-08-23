@@ -2,12 +2,12 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let stepCountCog = Cog<Int>.Manual(0)
+@MainActor private let _stepCountCog = Cog<Int>.Manual(0)
 
 // One op definition on the shared protocol serves both capabilities.
 @MainActor extension CogOps {
   fileprivate func advanceStep() {
-    turn { c in c[stepCountCog] += 1 }
+    turn { c in c[_stepCountCog] += 1 }
   }
 }
 
@@ -20,7 +20,7 @@ import Testing
   // definition on its controller. Both write the same source.
   cogs.advanceStep()
   m.advanceStep()
-  #expect(cogs.peek(stepCountCog) == 2)
+  #expect(cogs.peek(_stepCountCog) == 2)
 
   #if DEBUG
   // Both turns carry the op's `#function` name, and the mechanism's call is
