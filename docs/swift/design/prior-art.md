@@ -59,21 +59,21 @@ form, `peek`, so the untracked choice is visible at the read.
 
 ## 4. Public-name decisions
 
-| Cog name                           | Other name considered                | Decision                                                         |
-| ---------------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
-| `Cog<T>`                           | `Computed`, `DerivedCog`             | Keep the short name for the common automatic form.               |
-| `ManualCog<T>`                     | `StoredCog`, `SourceCog`             | Keep the manual, automatic, and async naming set.                |
-| `Cogs`                             | `CogGraph`, `CogRuntime`, `CogStore` | Keep, with the review trigger below.                             |
-| `CogBox` family                    | `CogFamily`, `KeyedCog`              | A box creates value references; it is not a collection.          |
-| `Reader`                           | `Context`, `Scope`                   | It reads only. `Context` is already too broad.                   |
-| `Writer`                           | `Transaction`                        | SwiftUI already uses `Transaction`.                              |
-| `turn`                             | `mutate`, `update`, `write`          | It names Cog's atomic graph boundary.                            |
-| `peek`                             | `untracked`, `read`                  | It is short and matches both reader and runtime APIs.            |
-| `CogStatus`, `Work`, policy types  | —                                    | No matching prior-art API called for a rename.                   |
-| `Mechanism`, `MechanismController` | `Effect`, `Feature`                  | Bootstrap owns registration and lifetime; callers hold no token. |
-| `ManualCogLifetime`                | `CogLifetime`                        | Only manual sources take this option.                            |
-| `.readOnly`, `CogProjection`       | `.readonly`, `AnyCog`                | Keep the clearer existing forms.                                 |
-| `bootstrapApp`, `forTesting`       | —                                    | The names state which runtime each factory creates.              |
+| Cog name                           | Other name considered                     | Decision                                                                                                                                                                                                               |
+| ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Cog<T>`                           | `Computed`, `DerivedCog`                  | Keep the short name for the common automatic form.                                                                                                                                                                     |
+| `Cog<T>.Manual`                    | `ManualCog<T>`, `StoredCog`, `SourceCog`  | Uphold the manual, automatic, and async naming set while moving the shape from a prefix to a nested family member. `.Manual` names the mechanism; a declaration variable may still use `Source` as its role qualifier. |
+| `Cogs`                             | `CogGraph`, `CogRuntime`, `CogStore`      | Keep, with the review trigger below.                                                                                                                                                                                   |
+| `CogBox` family                    | `CogFamily`, `KeyedCog`                   | A box creates value references; it is not a collection. Its manual, async, and projection shapes are nested members matching `Cog`.                                                                                    |
+| `Reader`                           | `Context`, `Scope`                        | It reads only. `Context` is already too broad.                                                                                                                                                                         |
+| `Writer`                           | `Transaction`                             | SwiftUI already uses `Transaction`.                                                                                                                                                                                    |
+| `turn`                             | `mutate`, `update`, `write`               | It names Cog's atomic graph boundary.                                                                                                                                                                                  |
+| `peek`                             | `untracked`, `read`                       | It is short and matches both reader and runtime APIs.                                                                                                                                                                  |
+| `CogStatus`, `Work`, policy types  | —                                         | No matching prior-art API called for a rename.                                                                                                                                                                         |
+| `Mechanism`, `MechanismController` | `Effect`, `Feature`                       | Bootstrap owns registration and lifetime; callers hold no token.                                                                                                                                                       |
+| `ManualCogLifetime`                | `CogLifetime`                             | Keep it top-level: the policy is value-independent and shared by keyless and box families.                                                                                                                             |
+| `.readOnly`, `Cog<T>.Projection`   | `.readonly`, `AnyCog`, `CogProjection<T>` | Keep the property name and move the wrapper into the same nested shape family.                                                                                                                                         |
+| `bootstrapApp`, `forTesting`       | —                                         | The names state which runtime each factory creates.                                                                                                                                                                    |
 
 ### The `Cogs` name
 
@@ -92,6 +92,9 @@ or if Kotlin ships `CogStore` and the split harms shared documentation.
 
 ## 5. Outcome
 
-The review caused no public rename. Cog added the prior-art credit, documented
-the `withoutTracking { }` to `peek` mapping, and made clear that capture lists
-do not create dependencies.
+The 0.1.0 review caused no public rename. The later shape-family decision
+upheld its manual/automatic/async vocabulary while moving the marked shapes
+from prefixes to nested members. The type names the mechanism axis —
+`.Manual` — while declaration variables may name their source role. Cog also
+added the prior-art credit, documented the `withoutTracking { }` to `peek`
+mapping, and made clear that capture lists do not create dependencies.
