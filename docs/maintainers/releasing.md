@@ -33,9 +33,8 @@ For an intentional public API break, run `mise run api:check` against the newest
 release tag and review every Swift API digester diagnostic. Copy only the
 accepted diagnostics, verbatim, into
 `tools/api-breakage-allowlists/<baseline>.txt`; the filename must match that
-release tag. Migration typealiases do not necessarily suppress signature-change
-diagnostics, so the allowlist records the reviewed compatibility delta rather
-than the availability of a source migration. Rerun the check and require it to
+release tag. The allowlist records the reviewed compatibility delta; it is not a
+substitute for a source-migration decision. Rerun the check and require it to
 pass before the release PR. Never add a broad or unreviewed suppression.
 
 Check that:

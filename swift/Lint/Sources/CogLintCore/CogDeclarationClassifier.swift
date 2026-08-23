@@ -124,7 +124,7 @@ private struct CogDeclarationEvidence {
   /// Whether the binding directly names the origin or projects it.
   let access: CogDeclarationAccess
 
-  /// Maps Cog's two family roots, their nested shapes, and migration aliases.
+  /// Maps Cog's two family roots and their nested shapes.
   init?(spelling: CogNominalSpelling) {
     switch (spelling.familyName, spelling.memberName) {
     case ("Cog", "Manual"):
@@ -145,18 +145,6 @@ private struct CogDeclarationEvidence {
         self.init(shape: .keyless, origin: .automatic, access: .direct)
       case "CogBox":
         self.init(shape: .box, origin: .automatic, access: .direct)
-      case "ManualCog":
-        self.init(shape: .keyless, origin: .writableSource, access: .direct)
-      case "ManualCogBox":
-        self.init(shape: .box, origin: .writableSource, access: .direct)
-      case "AsyncCog":
-        self.init(shape: .keyless, origin: .asynchronous, access: .direct)
-      case "AsyncCogBox":
-        self.init(shape: .box, origin: .asynchronous, access: .direct)
-      case "CogProjection":
-        self.init(shape: .keyless, origin: .writableSource, access: .readOnlyProjection)
-      case "CogBoxProjection":
-        self.init(shape: .box, origin: .writableSource, access: .readOnlyProjection)
       default:
         return nil
       }

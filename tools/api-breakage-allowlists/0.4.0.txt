@@ -71,3 +71,9 @@ API breakage: func Reader.peek(_:) has parameter 0 type change from Cog.CogProje
 API breakage: subscript Writer.subscript(_:) has parameter 0 type change from Cog.ManualCog<Value> to Cog.Cog<Value>.Manual
 API breakage: accessor Writer.subscript(_:).Get() has parameter 0 type change from Cog.ManualCog<Value> to Cog.Cog<Value>.Manual
 API breakage: accessor Writer.subscript(_:).Set() has parameter 1 type change from Cog.ManualCog<Value> to Cog.Cog<Value>.Manual
+API breakage: struct AsyncCog has been removed
+API breakage: struct AsyncCogBox has been removed
+API breakage: struct CogBoxProjection has been removed
+API breakage: struct CogProjection has been removed
+API breakage: struct ManualCog has been removed
+API breakage: struct ManualCogBox has been removed
