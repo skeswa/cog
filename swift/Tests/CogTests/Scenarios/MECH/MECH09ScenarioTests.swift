@@ -4,9 +4,9 @@ import Testing
 
 @MainActor
 @Test func `MECH-09 lowering an outer gate cancels the nested scope too`() async {
-  let sessionOpen = ManualCog<Bool>(true)
-  let syncing = ManualCog<Bool>(true)
-  let uploads = ManualCog<Int>(0)
+  let sessionOpen = Cog<Bool>.Manual(true)
+  let syncing = Cog<Bool>.Manual(true)
+  let uploads = Cog<Int>.Manual(0)
   var outerSeen: [Int] = []
   var innerSeen: [Int] = []
   let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)

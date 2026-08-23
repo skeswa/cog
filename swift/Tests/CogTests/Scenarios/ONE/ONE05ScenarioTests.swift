@@ -5,7 +5,7 @@ import Testing
 // Every assertion resolves this one declaration. Different declarations would
 // make isolation vacuous: their values would differ even in one context.
 @MainActor
-private let one05StateCog = ManualCog<Int>(41, name: "one05.state")
+private let one05StateCog = Cog<Int>.Manual(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 test and preview contexts coexist without sharing state`() {

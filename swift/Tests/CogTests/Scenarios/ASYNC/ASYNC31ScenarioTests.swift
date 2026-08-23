@@ -48,7 +48,7 @@ private nonisolated struct Async31Failure: Error {}
 @Test func `ASYNC-31 an explicit default makes every value spelling total`() async throws {
   let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
-  let forecast = AsyncCog<Int>(default: -1, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: -1, name: "forecast") { _ in
     work.makeWork()
   }
   let (values, continuation) = AsyncStream.makeStream(of: Int.self)
@@ -86,7 +86,7 @@ private nonisolated struct Async31Failure: Error {}
 @Test func `ASYNC-31 an Optional value rests at an explicit nil default`() async {
   let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
-  let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { _ in
+  let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { _ in
     .run { try await work.performRun() }
   }
   let (values, continuation) = AsyncStream.makeStream(of: Int?.self)
@@ -115,7 +115,7 @@ private nonisolated struct Async31Failure: Error {}
 @Test func `ASYNC-31 keyed declarations rest every key on the same default`() async {
   let (cogs, m) = probedContext()
   let work = Async31ControlledWork()
-  let forecasts = AsyncCogBox<Int, String>(default: 0, name: "forecast") { _, _ in
+  let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, _ in
     work.makeWork()
   }
   var startIterator = work.starts.makeAsyncIterator()

@@ -2,7 +2,7 @@ import Cog
 
 // The source and write op live in a different feature file from the reader,
 // matching an app's ownership boundary.
-@MainActor private let selectedZipSourceCog = ManualCog<String?>(nil, name: "selectedZip")
+@MainActor private let selectedZipSourceCog = Cog<String?>.Manual(nil, name: "selectedZip")
 
 extension Cogs {
   /// The feature op: an ordinary context method beside the source it owns.

@@ -19,12 +19,12 @@ struct StorefrontShapeTests {
   /// removed, this test fails first and the record is updated deliberately
   /// rather than drifting.
   static let expectedDeclarationCounts: [String: Int] = [
-    "ManualCog": 12,
-    "ManualCogBox": 5,
+    "Cog.Manual": 12,
+    "CogBox.Manual": 5,
     "Cog": 18,
     "CogBox": 8,
-    "AsyncCog": 7,
-    "AsyncCogBox": 3,
+    "Cog.Async": 7,
+    "CogBox.Async": 3,
   ]
 
   /// The directory holding the module's sources, derived from this file's path.
@@ -56,12 +56,12 @@ struct StorefrontShapeTests {
         // indented, and a local Cog is invisible to this census exactly as it
         // is to CogLint's own classifier.
         guard line.first != " ", line.contains("let ") else { continue }
-        for kind in ["ManualCogBox", "ManualCog", "AsyncCogBox", "AsyncCog", "CogBox", "Cog"] {
-          if line.contains("= \(kind)<") {
-            counts[kind, default: 0] += 1
-            break
-          }
-        }
+        guard
+          let family = line.contains("= CogBox<") ? "CogBox" : line.contains("= Cog<") ? "Cog" : nil
+        else { continue }
+        let member =
+          line.contains(">.Manual") ? ".Manual" : line.contains(">.Async") ? ".Async" : ""
+        counts[family + member, default: 0] += 1
       }
     }
     return counts

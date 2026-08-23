@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-14 equal automatic recomputation offers no value`() async {
-  let sourceCog = ManualCog<Int>(0)
+  let sourceCog = Cog<Int>.Manual(0)
   var selectorRuns = 0
   let bucketCog = Cog<Int> { c in
     selectorRuns += 1

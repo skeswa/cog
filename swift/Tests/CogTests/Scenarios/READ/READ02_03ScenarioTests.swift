@@ -11,7 +11,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(5)
+  let source = Cog<Int>.Manual(5)
   let doubled = Cog<Int> { c in
     runs += 1
     return c[source] * 2
@@ -32,7 +32,7 @@ import Testing
   var sharedRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(4)
+  let source = Cog<Int>.Manual(4)
   let shared = Cog<Int> { c in
     sharedRuns += 1
     return c[source] * 2
@@ -54,7 +54,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let rawZip = ManualCog<String>("")
+  let rawZip = Cog<String>.Manual("")
   let currentZip = Cog<String?> { c in
     runs += 1
     let raw = c[rawZip]
@@ -75,7 +75,7 @@ import Testing
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()
-  let source = ManualCog<Int>(6)
+  let source = Cog<Int>.Manual(6)
   let doubled = Cog<Int> { c in
     runs += 1
     return c[source] * 2
@@ -97,8 +97,8 @@ import Testing
   var pairsSeen: [String] = []
 
   let cogs = Cogs.forTesting()
-  let left = ManualCog<Int>(1)
-  let right = ManualCog<Int>(10)
+  let left = Cog<Int>.Manual(1)
+  let right = Cog<Int>.Manual(10)
   let pair = Cog<String> { c in
     let currentLeft = c[left]
     let currentRight = c[right]

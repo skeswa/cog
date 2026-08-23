@@ -146,7 +146,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
   private var read: @MainActor () -> Tracked
 
   /// Hidden source on which dependent Cog selectors record their edge.
-  let sourceCog: ManualCog<Tracked>
+  let sourceCog: Cog<Tracked>.Manual
 
   /// Stable diagnostic name used by every hidden-source publication.
   private let turnName: String
@@ -164,7 +164,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
     turnName: String
   ) {
     self.read = read
-    self.sourceCog = ManualCog(initialValue, name: "c.track")
+    self.sourceCog = Cog.Manual(initialValue, name: "c.track")
     self.turnName = turnName
   }
 
@@ -283,7 +283,7 @@ extension Cogs {
   internal func trackedPropertySource<Root: Observable & AnyObject, Tracked>(
     for root: Root,
     keyPath: KeyPath<Root, Tracked>
-  ) -> ManualCog<Tracked> {
+  ) -> Cog<Tracked>.Manual {
     let identity = CogExternalObservationIdentity.keyPath(
       object: ObjectIdentifier(root),
       keyPath: keyPath
@@ -319,7 +319,7 @@ extension Cogs {
     line: UInt,
     column: UInt,
     read: @escaping @MainActor () -> Tracked
-  ) -> (sourceCog: ManualCog<Tracked>, value: Tracked) {
+  ) -> (sourceCog: Cog<Tracked>.Manual, value: Tracked) {
     let identity = CogExternalObservationIdentity.closure(
       consumer: consumer,
       fileID: fileID,

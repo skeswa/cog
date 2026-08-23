@@ -8,8 +8,8 @@ import Testing
   // grace expiry releases that key alone. The watched sibling never recomputes
   // and keeps answering warm; the released key recreates from current values.
   let clock = AutomaticLifetimeTestClock()
-  let workWatcherAlive = ManualCog<Bool>(true)
-  let sources = ManualCogBox<Int, String>(1)
+  let workWatcherAlive = Cog<Bool>.Manual(true)
+  let sources = CogBox<Int, String>.Manual(1)
   var runsByKey: [String: Int] = [:]
   let automatic = CogBox<Int, String> { c, key in
     runsByKey[key, default: 0] += 1

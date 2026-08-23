@@ -6,8 +6,8 @@ import Testing
 @MainActor
 @Test func `ReactionReaderInfrastructure peek settles without adding a dependency`() {
   let cogs = Cogs.forTesting()
-  let trigger = ManualCog<Int>(0)
-  let source = ManualCog<Int>(1)
+  let trigger = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual(1)
   let projectedSource = source.readOnly
   let doubled = Cog<Int> { c in c[source] * 2 }
   var seen: [(Int, Int)] = []

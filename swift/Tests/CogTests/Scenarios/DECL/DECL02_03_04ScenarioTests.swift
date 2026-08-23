@@ -30,7 +30,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-02 every key of a box starts at the box's starting value`() {
   let cogs = Cogs.forTesting()
 
-  let retryLimit = ManualCogBox<Int, String>(3)
+  let retryLimit = CogBox<Int, String>.Manual(3)
 
   #expect(cogs.peek(retryLimit["upload"]) == 3)
   #expect(cogs.peek(retryLimit["download"]) == 3)
@@ -44,7 +44,7 @@ private struct ZipCode: Hashable {
   // reading one key does not disturb another.
   let cogs = Cogs.forTesting()
 
-  let weatherReport = ManualCogBox<String?, ZipCode>(nil)
+  let weatherReport = CogBox<String?, ZipCode>.Manual(nil)
   let here = ZipCode(digits: "90210")
   let there = ZipCode(digits: "10001")
 
@@ -61,8 +61,8 @@ private struct ZipCode: Hashable {
   // their own values for the same key.
   let cogs = Cogs.forTesting()
 
-  let attempts = ManualCogBox<Int, String>(0)
-  let ceiling = ManualCogBox<Int, String>(5)
+  let attempts = CogBox<Int, String>.Manual(0)
+  let ceiling = CogBox<Int, String>.Manual(5)
 
   #expect(cogs.peek(attempts["upload"]) == 0)
   #expect(cogs.peek(ceiling["upload"]) == 5)
@@ -73,7 +73,7 @@ private struct ZipCode: Hashable {
   // A declaration is a name. Declaring a box for a key space of
   // millions costs one declaration, and a context that is never asked for a
   // key still answers every key correctly when it finally is.
-  let unreadCount = ManualCogBox<Int, Int>(0)
+  let unreadCount = CogBox<Int, Int>.Manual(0)
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()
@@ -88,7 +88,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-03 each key starts at what the closure returns for that key`() {
   let cogs = Cogs.forTesting()
 
-  let doubled = ManualCogBox<Int, Int> { key in key * 2 }
+  let doubled = CogBox<Int, Int>.Manual { key in key * 2 }
 
   #expect(cogs.peek(doubled[5]) == 10)
   #expect(cogs.peek(doubled[6]) == 12)
@@ -101,7 +101,7 @@ private struct ZipCode: Hashable {
   // value can be built out of whatever the key means.
   let cogs = Cogs.forTesting()
 
-  let greeting = ManualCogBox<String, ZipCode> { zip in "hello, \(zip.digits)" }
+  let greeting = CogBox<String, ZipCode>.Manual { zip in "hello, \(zip.digits)" }
 
   #expect(cogs.peek(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
   #expect(cogs.peek(greeting[ZipCode(digits: "10001")]) == "hello, 10001")
@@ -114,7 +114,7 @@ private struct ZipCode: Hashable {
   // while the closure runs per key and each key starts at its own.
   let cogs = Cogs.forTesting()
 
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   #expect(cogs.peek(ledgers[5]) !== cogs.peek(ledgers[6]))
 }
@@ -128,7 +128,7 @@ private struct ZipCode: Hashable {
   let cogs = Cogs.forTesting()
 
   let asked = KeyLog()
-  let doubled = ManualCogBox<Int, Int> { key in
+  let doubled = CogBox<Int, Int>.Manual { key in
     asked.keys.append(key)
     return key * 2
   }
@@ -147,7 +147,7 @@ private struct ZipCode: Hashable {
   // A test or preview runtime is its own world: the same key in a
   // second context is a second piece of state, so it starts fresh from the
   // declaration rather than inheriting anything from the first.
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()
@@ -159,21 +159,21 @@ private struct ZipCode: Hashable {
 
 /// One "place" that builds `box[5]` and changes what it finds there.
 @MainActor
-private func recordAnUpload(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, Int>) {
+private func recordAnUpload(in cogs: Cogs, using ledgers: CogBox<Ledger, Int>.Manual) {
   cogs.peek(ledgers[5]).entries.append("upload")
 }
 
 /// Another "place" that builds `box[5]` for itself, knowing nothing about the
 /// first.
 @MainActor
-private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, Int>) -> [String] {
+private func entriesForFive(in cogs: Cogs, using ledgers: CogBox<Ledger, Int>.Manual) -> [String] {
   cogs.peek(ledgers[5]).entries
 }
 
 @MainActor
 @Test func `DECL-04 value references built in two places name one piece of state`() {
   let cogs = Cogs.forTesting()
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   recordAnUpload(in: cogs, using: ledgers)
 
@@ -194,7 +194,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
 @MainActor
 @Test func `DECL-04 a different key is a different piece of state`() {
   let cogs = Cogs.forTesting()
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   recordAnUpload(in: cogs, using: ledgers)
 
@@ -208,7 +208,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
   // one twice — or a hundred times, from a key computed a different way each
   // time — is not a way to end up with a second piece of state.
   let cogs = Cogs.forTesting()
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   let fromALiteral = cogs.peek(ledgers[5])
   let fromArithmetic = cogs.peek(ledgers[2 + 3])
@@ -224,7 +224,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
   // identical: two separately built `ZipCode` values that compare equal name
   // one state.
   let cogs = Cogs.forTesting()
-  let ledgers = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, ZipCode>.Manual { _ in Ledger() }
 
   let here = ZipCode(digits: "90210")
   let hereAgain = ZipCode(digits: "902" + "10")
@@ -248,7 +248,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
   }
 
   let cogs = Cogs.forTesting()
-  let ledgers = ManualCogBox<Ledger, CollidingKey> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, CollidingKey>.Manual { _ in Ledger() }
 
   cogs.peek(ledgers[CollidingKey(id: 1)]).entries.append("first")
 
@@ -262,7 +262,7 @@ private func entriesForFive(in cogs: Cogs, using ledgers: ManualCogBox<Ledger, I
   // The value reference is the same value reference in both contexts; the
   // state is not the same state.
   // This is the rule that lets tests run in parallel and previews coexist.
-  let ledgers = ManualCogBox<Ledger, Int> { _ in Ledger() }
+  let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()

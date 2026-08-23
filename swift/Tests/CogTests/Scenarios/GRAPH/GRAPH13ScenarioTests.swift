@@ -12,7 +12,7 @@ import Testing
   var reactionPairs: [String] = []
 
   let (cogs, m) = probedContext()
-  let a = ManualCog<Int>(1)
+  let a = Cog<Int>.Manual(1)
   let b = Cog<Int> { c in c[a] * 10 }
   let d = Cog<String> { c in
     let direct = c[a]

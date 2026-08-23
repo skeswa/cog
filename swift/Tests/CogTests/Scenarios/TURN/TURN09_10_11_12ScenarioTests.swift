@@ -9,7 +9,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     runs += 1
     return c[source] * 2
@@ -29,7 +29,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let sources = ManualCogBox<Int, String> { key in key.count }
+  let sources = CogBox<Int, String>.Manual { key in key.count }
   let doubled = Cog<Int> { c in
     runs += 1
     return c[sources["one"]] * 2
@@ -48,7 +48,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(4)
+  let source = Cog<Int>.Manual(4)
   let squared = Cog<Int> { c in
     runs += 1
     let value = c[source]
@@ -80,7 +80,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Reading>(
+  let source = Cog<Reading>.Manual(
     Reading(sample: 7, note: "first"),
     equals: { old, new in old.sample == new.sample }
   )
@@ -117,7 +117,7 @@ import Testing
   var secondRuns = 0
 
   let cogs = Cogs.forTesting()
-  let sources = ManualCogBox<Reading, String>(
+  let sources = CogBox<Reading, String>.Manual(
     { key in Reading(sample: key.count, note: key) },
     equals: { old, new in old.sample == new.sample }
   )
@@ -153,7 +153,7 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Reading>(Reading(value: 3))
+  let source = Cog<Reading>.Manual(Reading(value: 3))
   let value = Cog<Int> { c in
     runs += 1
     return c[source].value
@@ -178,7 +178,7 @@ import Testing
   var workRuns = 0
 
   let cogs = Cogs.forTesting()
-  let readings = ManualCogBox<Reading, String>(Reading(value: 3))
+  let readings = CogBox<Reading, String>.Manual(Reading(value: 3))
   let home = Cog<Int> { c in
     homeRuns += 1
     return c[readings["home"]].value

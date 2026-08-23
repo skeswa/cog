@@ -11,7 +11,7 @@ import Testing
   var inputsSeen: [Int] = []
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     let input = c[source]
     inputsSeen.append(input)
@@ -38,7 +38,7 @@ import Testing
   var inputsSeen: [Int] = []
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let doubled = Cog<Int> { c in
     let input = c[source]
     inputsSeen.append(input)

@@ -8,9 +8,9 @@ import Testing
 @Test func `DECL-01 a declared source reads back its starting value`() {
   let cogs = Cogs.forTesting()
 
-  let retryLimit = ManualCog<Int>(3)
-  let greeting = ManualCog<String>("hello")
-  let currentZip = ManualCog<String?>(nil)
+  let retryLimit = Cog<Int>.Manual(3)
+  let greeting = Cog<String>.Manual("hello")
+  let currentZip = Cog<String?>.Manual(nil)
 
   #expect(cogs.peek(retryLimit) == 3)
   #expect(cogs.peek(greeting) == "hello")
@@ -22,7 +22,7 @@ import Testing
   // Reading is not a one-time unwrapping of the declaration: with nothing
   // written, the tenth read says what the first read said.
   let cogs = Cogs.forTesting()
-  let retryLimit = ManualCog<Int>(3)
+  let retryLimit = Cog<Int>.Manual(3)
 
   for _ in 0..<10 {
     #expect(cogs.peek(retryLimit) == 3)

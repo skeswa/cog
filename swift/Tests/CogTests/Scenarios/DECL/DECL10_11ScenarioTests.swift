@@ -64,7 +64,7 @@ import Testing
 @MainActor
 @Test func `DECL-10 a named cog carries its name into debug history`() {
   let cogs = Cogs.forTesting()
-  let temperature = ManualCog<Int>(60, name: "temperature")
+  let temperature = Cog<Int>.Manual(60, name: "temperature")
   let advice = Cog<String>(
     { c in c[temperature] > 70 ? "shorts" : "coat" },
     name: "advice"
@@ -85,7 +85,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   let beforeSource = UInt(#line)
-  let temperature = ManualCog<Int>(60)
+  let temperature = Cog<Int>.Manual(60)
   let afterSource = UInt(#line)
 
   let beforeAutomatic = UInt(#line)

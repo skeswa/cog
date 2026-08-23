@@ -12,7 +12,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = ManualCog<Int>(0, name: "count")
+      let count = Cog<Int>.Manual(0, name: "count")
 
       cogs.turn { _ in
         cogs.seed(count, to: 7)
@@ -28,7 +28,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = ManualCog<Int>(0, name: "count")
+      let count = Cog<Int>.Manual(0, name: "count")
       let sneaky = Cog<Int> { c in
         cogs.seed(count, to: 7)
         return c[count]

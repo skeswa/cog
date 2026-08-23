@@ -10,9 +10,9 @@ import Testing
   // history entry in execution order, and every write attributes to the turn
   // that made it — entries from different turns never interleave.
   let (cogs, m) = probedContext()
-  let trigger = ManualCog<Int>(0, name: "trigger")
-  let middle = ManualCog<Int>(0, name: "middle")
-  let leaf = ManualCog<Int>(0, name: "leaf")
+  let trigger = Cog<Int>.Manual(0, name: "trigger")
+  let middle = Cog<Int>.Manual(0, name: "middle")
+  let leaf = Cog<Int>.Manual(0, name: "leaf")
 
   m.run { c in
     guard c[trigger] == 1 else { return }

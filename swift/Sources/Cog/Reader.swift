@@ -17,7 +17,7 @@ public import Observation
 /// replaces the dependency set, so branches and early returns work as expected.
 /// Reads made outside this reader are invisible to Cog.
 ///
-/// An ``AsyncCog`` selector receives a `Reader<CogStatus<Value>>`. Its tracked
+/// An ``Cog.Async`` selector receives a `Reader<CogStatus<Value>>`. Its tracked
 /// reads finish synchronously while the selector builds ``Work``; code in the
 /// work closure runs after dependency capture and cannot add edges through this
 /// reader.
@@ -63,7 +63,7 @@ public struct Reader<Value> {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  public subscript<Read>(_ valueReference: ManualCog<Read>) -> Read {
+  public subscript<Read>(_ valueReference: Cog<Read>.Manual) -> Read {
     let consumer = requiredArenaState()
     return cogs.arenaCore.read(valueReference, for: consumer)
   }
@@ -101,7 +101,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The async value to read.
   /// - Returns: Its newest settled value in this context.
-  public subscript<Read>(_ valueReference: AsyncCog<Read>) -> Read {
+  public subscript<Read>(_ valueReference: Cog<Read>.Async) -> Read {
     self[valueReference.valueCog]
   }
 
@@ -151,7 +151,7 @@ public struct Reader<Value> {
     ///
     /// - Parameter valueReference: The async value whose status to read.
     /// - Returns: Its newest settled status in this context.
-    public subscript<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
+    public subscript<Read>(_ valueReference: Cog<Read>.Async) -> CogStatus<Read> {
       return cogs.arenaCore.readAsyncStatus(
         descriptor: valueReference.descriptor,
         key: valueReference.key,
@@ -171,7 +171,7 @@ public struct Reader<Value> {
     /// - Parameter valueReference: The async value whose status to read
     ///   without tracking it.
     /// - Returns: Its newest settled status in this context.
-    public func peek<Read>(_ valueReference: AsyncCog<Read>) -> CogStatus<Read> {
+    public func peek<Read>(_ valueReference: Cog<Read>.Async) -> CogStatus<Read> {
       cogs.arenaCore.requireTracking(arenaState)
       return cogs.status.peek(valueReference)
     }
@@ -212,7 +212,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The read-only projection to read.
   /// - Returns: The value its source holds in the latest completed turn.
-  public subscript<Read>(_ valueReference: CogProjection<Read>) -> Read {
+  public subscript<Read>(_ valueReference: Cog<Read>.Projection) -> Read {
     self[valueReference.sourceCog]
   }
 
@@ -309,7 +309,7 @@ public struct Reader<Value> {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  public func peek<Read>(_ valueReference: ManualCog<Read>) -> Read {
+  public func peek<Read>(_ valueReference: Cog<Read>.Manual) -> Read {
     cogs.arenaCore.requireTracking(requiredArenaState())
     return cogs.peek(valueReference)
   }
@@ -342,7 +342,7 @@ public struct Reader<Value> {
   ///
   /// - Parameter valueReference: The async value to read without tracking it.
   /// - Returns: Its newest settled value in this context.
-  public func peek<Read>(_ valueReference: AsyncCog<Read>) -> Read {
+  public func peek<Read>(_ valueReference: Cog<Read>.Async) -> Read {
     cogs.arenaCore.requireTracking(requiredArenaState())
     return cogs.peek(valueReference)
   }
@@ -355,7 +355,7 @@ public struct Reader<Value> {
   /// - Parameter valueReference: The read-only projection to read without recording an
   ///   edge.
   /// - Returns: The value its source holds in the latest completed turn.
-  public func peek<Read>(_ valueReference: CogProjection<Read>) -> Read {
+  public func peek<Read>(_ valueReference: Cog<Read>.Projection) -> Read {
     peek(valueReference.sourceCog)
   }
 

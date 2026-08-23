@@ -220,7 +220,7 @@ extension Cogs {
   ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
   public func values<Value>(
-    of valueReference: ManualCog<Value>,
+    of valueReference: Cog<Value>.Manual,
     buffering: CogValuesBuffering = .newest(1)
   ) -> CogValues<Value> {
     CogValues(
@@ -265,7 +265,7 @@ extension Cogs {
   ///   - buffering: How this iterator bounds undelivered changed values.
   /// - Returns: A lazy MainActor-isolated asynchronous value sequence.
   public func values<Value>(
-    of valueReference: AsyncCog<Value>,
+    of valueReference: Cog<Value>.Async,
     buffering: CogValuesBuffering = .newest(1)
   ) -> CogValues<Value> {
     CogValues(

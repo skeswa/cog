@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-20 export offers precede every reaction in one flush`() async {
-  let sourceCog = ManualCog<Int>(0)
+  let sourceCog = Cog<Int>.Manual(0)
   var reactionValues: [Int] = []
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in

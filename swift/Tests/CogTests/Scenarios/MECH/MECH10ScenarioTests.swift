@@ -19,7 +19,7 @@ private actor ContextDropper {
 
 @MainActor
 @Test func `MECH-10 background context release tears every mechanism scope down`() async throws {
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)
   let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Void.self)
   let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)

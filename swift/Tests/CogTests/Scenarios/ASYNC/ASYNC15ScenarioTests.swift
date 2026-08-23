@@ -9,9 +9,9 @@ import Testing
     of: Void.self,
     bufferingPolicy: .bufferingNewest(1)
   )
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     .run {
-      MainActor.preconditionIsolated("AsyncCog default work")
+      MainActor.preconditionIsolated("Cog.Async default work")
       startedContinuation.yield()
       return 42
     }

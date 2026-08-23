@@ -35,7 +35,7 @@ private final class Async28ControlledWork {
 {
   let cogs = Cogs.forTesting()
   let work = Async28ControlledWork()
-  let forecast = AsyncCog<Int?>(default: nil, name: "forecast") { _ in
+  let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { _ in
     .run { await work.run() }
   }
   let notices = OSAllocatedUnfairLock(initialState: 0)

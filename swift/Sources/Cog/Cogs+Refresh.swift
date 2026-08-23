@@ -122,7 +122,7 @@ extension Cogs {
   /// - Returns: A handle whose outcome belongs only to the generation this call
   ///   started. Retaining it does not retain the Cog state or add observation.
   @discardableResult
-  public func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value> {
+  public func refresh<Value>(_ valueReference: Cog<Value>.Async) -> CogRefresh<Value> {
     requireOutsideAutomaticComputation(forTurnNamed: #function)
     let refresh = arenaCore.refresh(valueReference, in: self)
     arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)

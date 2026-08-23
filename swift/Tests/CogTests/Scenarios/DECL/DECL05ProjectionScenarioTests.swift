@@ -29,7 +29,7 @@ private struct ZipCode: Hashable {
   // refresh, no second state to keep in step.
   let cogs = Cogs.forTesting()
 
-  let countSource = ManualCog<Int>(0)
+  let countSource = Cog<Int>.Manual(0)
   let count = countSource.readOnly
 
   #expect(cogs.peek(count) == 0)
@@ -53,7 +53,7 @@ private struct ZipCode: Hashable {
   // means one object.
   let cogs = Cogs.forTesting()
 
-  let ledgerSource = ManualCog<Ledger>(Ledger())
+  let ledgerSource = Cog<Ledger>.Manual(Ledger())
   let ledger = ledgerSource.readOnly
 
   cogs.peek(ledger).entries.append("published")
@@ -69,7 +69,7 @@ private struct ZipCode: Hashable {
   // pieces of state.
   let cogs = Cogs.forTesting()
 
-  let ledgerSource = ManualCog<Ledger>(Ledger())
+  let ledgerSource = Cog<Ledger>.Manual(Ledger())
 
   #expect(cogs.peek(ledgerSource.readOnly) === cogs.peek(ledgerSource.readOnly))
   #expect(cogs.peek(ledgerSource.readOnly) === cogs.peek(ledgerSource))
@@ -81,7 +81,7 @@ private struct ZipCode: Hashable {
   // value reference everywhere; the state is per context. A test
   // runtime reading a published value reference reads its own world, not the
   // one next door.
-  let countSource = ManualCog<Int>(0)
+  let countSource = Cog<Int>.Manual(0)
   let count = countSource.readOnly
 
   let first = Cogs.forTesting()
@@ -101,7 +101,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-05 a read-only box key reads what that key of the source reads`() {
   let cogs = Cogs.forTesting()
 
-  let retryLimitSource = ManualCogBox<Int, String>(3)
+  let retryLimitSource = CogBox<Int, String>.Manual(3)
   let retryLimit = retryLimitSource.readOnly
 
   #expect(cogs.peek(retryLimit["upload"]) == cogs.peek(retryLimitSource["upload"]))
@@ -117,7 +117,7 @@ private struct ZipCode: Hashable {
   // source.
   let cogs = Cogs.forTesting()
 
-  let greetingSource = ManualCogBox<String, ZipCode> { zip in "hello, \(zip.digits)" }
+  let greetingSource = CogBox<String, ZipCode>.Manual { zip in "hello, \(zip.digits)" }
   let greeting = greetingSource.readOnly
 
   #expect(cogs.peek(greeting[ZipCode(digits: "90210")]) == "hello, 90210")
@@ -128,7 +128,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-05 a projected key names the same state as that key of the source`() {
   let cogs = Cogs.forTesting()
 
-  let ledgersSource = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
+  let ledgersSource = CogBox<Ledger, ZipCode>.Manual { _ in Ledger() }
   let ledgers = ledgersSource.readOnly
   let here = ZipCode(digits: "90210")
 
@@ -144,7 +144,7 @@ private struct ZipCode: Hashable {
   // its own state, and still the same state as that key of the source.
   let cogs = Cogs.forTesting()
 
-  let ledgersSource = ManualCogBox<Ledger, ZipCode> { _ in Ledger() }
+  let ledgersSource = CogBox<Ledger, ZipCode>.Manual { _ in Ledger() }
   let ledgers = ledgersSource.readOnly
   let here = ZipCode(digits: "90210")
   let there = ZipCode(digits: "10001")

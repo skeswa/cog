@@ -5,9 +5,9 @@ import Testing
 @MainActor
 @Test func `POLICY-03 exhaust coalesces a burst into one newest catch-up`() async throws {
   let (cogs, m) = probedContext()
-  let inputCog = ManualCog<Int>(0)
+  let inputCog = Cog<Int>.Manual(0)
   let work = PolicyQueueControlledWork()
-  let exhaustedCog = AsyncCog<Int>(.exhaustLatest, default: -1, name: "exhausted") { c in
+  let exhaustedCog = Cog<Int>.Async(.exhaustLatest, default: -1, name: "exhausted") { c in
     let input = c[inputCog]
     return work.makeRun(for: input)
   }

@@ -10,7 +10,7 @@ import Testing
   // API-surface coverage rather than a scenario claim: a read-only value reference names
   // the same state its source does, so watching it must be watching the source.
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   let projection = source.readOnly
   var deliveries: [String] = []
 

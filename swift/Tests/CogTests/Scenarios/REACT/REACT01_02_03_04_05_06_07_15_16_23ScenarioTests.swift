@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 extension CogOps {
-  fileprivate func setFromReaction(_ source: ManualCog<Int>, to value: Int) {
+  fileprivate func setFromReaction(_ source: Cog<Int>.Manual, to value: Int) {
     turn("reaction.writeback") { c in c[source] = value }
   }
 }
@@ -15,7 +15,7 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-01 run performs its initial tracking run immediately`() {
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var seen: [Int] = []
 
   _ = Cogs.forTesting(mechanisms: [
@@ -31,7 +31,7 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-02 REACT-07 a change wakes the reaction before the turn returns`() {
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var seen: [Int] = []
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -52,8 +52,8 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-03 an unrelated turn leaves the reaction quiet`() {
-  let observed = ManualCog<Int>(1)
-  let unrelated = ManualCog<Int>(10)
+  let observed = Cog<Int>.Manual(1)
+  let unrelated = Cog<Int>.Manual(10)
   var runs = 0
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -72,7 +72,7 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-04 dependencies settle before the reaction body starts`() {
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var events: [String] = []
   let doubled = Cog<Int> { c in
     let value = c[source] * 2
@@ -97,7 +97,7 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-05 changed reactions run in registration order`() {
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   var order: [Int] = []
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -130,8 +130,8 @@ extension CogOps {
   // registration order. The second reaction lives in a `whenever` scope whose
   // gate starts true, so its registration slot is real; lowering the gate
   // removes it.
-  let secondAlive = ManualCog<Bool>(true)
-  let source = ManualCog<Int>(0)
+  let secondAlive = Cog<Bool>.Manual(true)
+  let source = Cog<Int>.Manual(0)
   var order: [Int] = []
   var m: MechanismController!
 
@@ -169,9 +169,9 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-06 every run replaces the reaction dependency set`() {
-  let useX = ManualCog<Bool>(true)
-  let x = ManualCog<Int>(1)
-  let y = ManualCog<Int>(10)
+  let useX = Cog<Bool>.Manual(true)
+  let x = Cog<Int>.Manual(1)
+  let y = Cog<Int>.Manual(10)
   var seen: [Int] = []
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -197,8 +197,8 @@ extension CogOps {
 
 @MainActor
 @Test func `REACT-23 flush-time registrations join the reaction queue tail`() {
-  let trigger = ManualCog<Int>(0)
-  let writeback = ManualCog<Int>(0)
+  let trigger = Cog<Int>.Manual(0)
+  let writeback = Cog<Int>.Manual(0)
   var events: [String] = []
   var spawned = 0
   var m: MechanismController!
@@ -262,10 +262,10 @@ extension CogOps {
   // flushed and never a synchronous nested flush (that would run `third`
   // before `side`). The rest of the chain is REACT-16: each queued turn runs
   // first-in first-out, fully settled.
-  let trigger = ManualCog<Int>(0)
-  let middle = ManualCog<Int>(0)
-  let side = ManualCog<Int>(0)
-  let leaf = ManualCog<Int>(0)
+  let trigger = Cog<Int>.Manual(0)
+  let middle = Cog<Int>.Manual(0)
+  let side = Cog<Int>.Manual(0)
+  let leaf = Cog<Int>.Manual(0)
   var events: [String] = []
   var reactionDepth = 0
   var maximumDepth = 0
@@ -325,8 +325,8 @@ extension CogOps {
   // The same FIFO chain observed through `watch` instead of `run`: each queued
   // turn is its own delivery, no intermediate value is skipped, and every old
   // half really is the previous turn's value.
-  let trigger = ManualCog<Int>(0)
-  let count = ManualCog<Int>(0)
+  let trigger = Cog<Int>.Manual(0)
+  let count = Cog<Int>.Manual(0)
   var deliveries: [String] = []
 
   let cogs = Cogs.forTesting(mechanisms: [

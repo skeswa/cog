@@ -103,7 +103,7 @@ extension CogScenario {
       // selector that reads it.
       let graph = DynamicSweepGraph()
       graph.sourceCogs = (0..<width).map { index in
-        ManualCog<Int>(index, name: "sweep.source.\(index)")
+        Cog<Int>.Manual(index, name: "sweep.source.\(index)")
       }
       graph.rowCogs.reserveCapacity(rowCount)
 
@@ -155,7 +155,7 @@ extension CogScenario {
 @MainActor
 private final class DynamicSweepGraph {
   /// The source row, in index order.
-  var sourceCogs: [ManualCog<Int>] = []
+  var sourceCogs: [Cog<Int>.Manual] = []
 
   /// Computed rows in build order, each `width` nodes wide.
   var rowCogs: [[Cog<Int>]] = []

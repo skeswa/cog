@@ -16,7 +16,7 @@ enum MemoryHarness {
   static let pairCount = 500
 
   /// The keyed sources.
-  static let entrySourceCogs = ManualCogBox<Int, Int>(0, name: "perf.memory.source")
+  static let entrySourceCogs = CogBox<Int, Int>.Manual(0, name: "perf.memory.source")
 
   /// One automatic consumer per key.
   static let entryCogs = CogBox<Int, Int>(

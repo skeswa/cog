@@ -14,7 +14,7 @@ extension Cogs {
   ///   - valueReference: The exact manual descriptor-and-key state to seed.
   ///   - value: The candidate value, installed only when the source's equality
   ///     rule considers it changed.
-  public func seed<Value>(_ valueReference: ManualCog<Value>, to value: Value) {
+  public func seed<Value>(_ valueReference: Cog<Value>.Manual, to value: Value) {
     seedForTesting(valueReference, to: value)
   }
 }

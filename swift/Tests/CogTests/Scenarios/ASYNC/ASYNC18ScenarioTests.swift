@@ -42,7 +42,7 @@ private final class Async18ControlledWork {
 {
   let (cogs, m) = probedContext()
   let work = Async18ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     .run { try await work.run() }
   }
   let (observations, continuation) = AsyncStream.makeStream(of: Async18Observation.self)

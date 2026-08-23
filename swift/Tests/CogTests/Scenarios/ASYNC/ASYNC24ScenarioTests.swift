@@ -30,13 +30,13 @@ private final class Async24ControlledWork {
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
   let clock = AutomaticLifetimeTestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = Async24ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
     let selectedRequest = c[request]
     return .run { await work.run(for: selectedRequest) }
   }
-  let initialWatcherAlive = ManualCog<Bool>(true)
+  let initialWatcherAlive = Cog<Bool>.Manual(true)
   let (initialStatuses, initialContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.whenever(initialWatcherAlive) { s in
     s.run { c in initialContinuation.yield(c.status[forecast]) }

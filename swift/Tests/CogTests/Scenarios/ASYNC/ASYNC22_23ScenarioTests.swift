@@ -62,7 +62,7 @@ private final class AsyncColdDemandControlledWork {
   let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     selectorRuns += 1
     return work.makeWork()
   }
@@ -148,7 +148,7 @@ private final class AsyncColdDemandControlledWork {
   let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     selectorRuns += 1
     return work.makeWork()
   }

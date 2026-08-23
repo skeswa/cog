@@ -16,7 +16,7 @@ private nonisolated enum Async04Error: Error, Equatable {
 @Test func `ASYNC-04 ASYNC-30 status accessors describe every request state`() async throws {
   let cogs = Cogs.forTesting()
   let work = AsyncStatusControlledWork<Int>()
-  let forecast = AsyncCog<Int>(default: 0) { _ in work.makeWork() }
+  let forecast = Cog<Int>.Async(default: 0) { _ in work.makeWork() }
   var starts = work.starts.makeAsyncIterator()
 
   let initialPending = cogs.status.peek(forecast)
@@ -84,7 +84,7 @@ private nonisolated enum Async04Error: Error, Equatable {
 {
   let cogs = Cogs.forTesting()
   let work = AsyncStatusControlledWork<Int?>()
-  let forecast = AsyncCog<Int?>(default: nil) { _ in work.makeWork() }
+  let forecast = Cog<Int?>.Async(default: nil) { _ in work.makeWork() }
   var starts = work.starts.makeAsyncIterator()
 
   let defaultNil = cogs.status.peek(forecast)

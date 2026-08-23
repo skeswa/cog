@@ -5,9 +5,9 @@ import Testing
 @MainActor
 @Test func `POLICY-04 merged runs overlap and publish in landing order`() async throws {
   let (cogs, m) = probedContext()
-  let inputCog = ManualCog<Int>(0)
+  let inputCog = Cog<Int>.Manual(0)
   let work = PolicyGenerationControlledWork()
-  let mergedCog = AsyncCog<Int>(.merged, default: -1, name: "merged") { c in
+  let mergedCog = Cog<Int>.Async(.merged, default: -1, name: "merged") { c in
     _ = c[inputCog]
     return work.makeRun()
   }

@@ -22,25 +22,25 @@ public import Cog
 /// reaching into another's world. Every async declaration reads it
 /// synchronously, so replacing it invalidates every demanded async state — the
 /// same behavior Weather relies on.
-private let storefrontServiceSourceCog = ManualCog<StorefrontService>(
+private let storefrontServiceSourceCog = Cog<StorefrontService>.Manual(
   StorefrontService(profile: .standard),
   name: "storefront.service"
 )
 
 /// The raw text in the search field, exactly as typed.
-private let searchQuerySourceCog = ManualCog<String>("", name: "storefront.searchQuery")
+private let searchQuerySourceCog = Cog<String>.Manual("", name: "storefront.searchQuery")
 
 /// The category chip the shopper selected, or `nil` for all categories.
-private let selectedCategorySourceCog = ManualCog<CategoryID?>(
+private let selectedCategorySourceCog = Cog<CategoryID?>.Manual(
   nil,
   name: "storefront.selectedCategory"
 )
 
 /// How results are ordered.
-private let sortModeSourceCog = ManualCog<SortMode>(.relevance, name: "storefront.sortMode")
+private let sortModeSourceCog = Cog<SortMode>.Manual(.relevance, name: "storefront.sortMode")
 
 /// Whether out-of-stock products are hidden.
-private let inStockOnlySourceCog = ManualCog<Bool>(false, name: "storefront.inStockOnly")
+private let inStockOnlySourceCog = Cog<Bool>.Manual(false, name: "storefront.inStockOnly")
 
 /// The signed-in shopper, or `nil` before the account response is accepted.
 ///
@@ -48,31 +48,31 @@ private let inStockOnlySourceCog = ManualCog<Bool>(false, name: "storefront.inSt
 /// out is a local action that must not wait on a request, and the mechanism
 /// that accepts the account response writes it here. One writable fact, one
 /// writable place.
-private let signedInShopperSourceCog = ManualCog<Shopper?>(nil, name: "storefront.shopper")
+private let signedInShopperSourceCog = Cog<Shopper?>.Manual(nil, name: "storefront.shopper")
 
 /// The coupon the shopper typed, or `nil`.
-private let couponSourceCog = ManualCog<CouponCode?>(nil, name: "storefront.coupon")
+private let couponSourceCog = Cog<CouponCode?>.Manual(nil, name: "storefront.coupon")
 
 /// Where the order ships.
-private let shippingAddressSourceCog = ManualCog<ShippingAddress>(
+private let shippingAddressSourceCog = Cog<ShippingAddress>.Manual(
   StorefrontFixtures.startingAddress,
   name: "storefront.shippingAddress"
 )
 
 /// How the order ships.
-private let shippingMethodSourceCog = ManualCog<ShippingMethod>(
+private let shippingMethodSourceCog = Cog<ShippingMethod>.Manual(
   .standard,
   name: "storefront.shippingMethod"
 )
 
 /// The product whose detail screen is open, or `nil` on the browse screen.
-private let selectedProductSourceCog = ManualCog<ProductID?>(
+private let selectedProductSourceCog = Cog<ProductID?>.Manual(
   nil,
   name: "storefront.selectedProduct"
 )
 
 /// The window of rows the list has materialized.
-private let rowWindowSourceCog = ManualCog<RowWindow>(
+private let rowWindowSourceCog = Cog<RowWindow>.Manual(
   RowWindow(offset: 0, length: 0),
   name: "storefront.rowWindow"
 )
@@ -83,24 +83,24 @@ private let rowWindowSourceCog = ManualCog<RowWindow>(
 /// and a keyed box cannot be enumerated. Quantities stay keyed, so changing
 /// one line's quantity does not invalidate the others — which is exactly the
 /// split a real cart wants and the reason both declarations exist.
-private let cartContentsSourceCog = ManualCog<[ProductID]>([], name: "storefront.cartContents")
+private let cartContentsSourceCog = Cog<[ProductID]>.Manual([], name: "storefront.cartContents")
 
 // MARK: - Keyed sources
 
 /// Whether each product is favorited.
-private let favoriteSourceCogs = ManualCogBox<Bool, ProductID>(
+private let favoriteSourceCogs = CogBox<Bool, ProductID>.Manual(
   false,
   name: "storefront.favorite"
 )
 
 /// How many of each product are in the cart.
-private let cartQuantitySourceCogs = ManualCogBox<Int, ProductID>(
+private let cartQuantitySourceCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.cartQuantity"
 )
 
 /// Which variant of each product is selected.
-private let selectedVariantSourceCogs = ManualCogBox<Int, ProductID>(
+private let selectedVariantSourceCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.selectedVariant"
 )
@@ -110,7 +110,7 @@ private let selectedVariantSourceCogs = ManualCogBox<Int, ProductID>(
 /// A rank rather than a list, so a product row can show a "viewed" badge and
 /// the pricing ladder can nudge a viewed product without any screen having to
 /// enumerate the history.
-private let recentlyViewedRankSourceCogs = ManualCogBox<Int, ProductID>(
+private let recentlyViewedRankSourceCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.recentlyViewedRank"
 )
@@ -122,7 +122,7 @@ private let recentlyViewedRankSourceCogs = ManualCogBox<Int, ProductID>(
 /// touches, in one turn, so a checkpoint can prove that the offscreen half of
 /// the burst invalidated nothing on screen. A keyless epoch would invalidate
 /// every demanded row and make that claim unprovable.
-private let inventoryGenerationSourceCogs = ManualCogBox<Int, ProductID>(
+private let inventoryGenerationSourceCogs = CogBox<Int, ProductID>.Manual(
   0,
   name: "storefront.inventoryGeneration"
 )

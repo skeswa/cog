@@ -29,7 +29,7 @@ extension CogArenaCore {
   @inlinable
   #endif
   func manualLocation<Value>(
-    for valueReference: ManualCog<Value>
+    for valueReference: Cog<Value>.Manual
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
     if valueReference.key == nil,
       let memo = valueReference.descriptor.memoizedArenaLocation(in: contextIdentity),
@@ -50,7 +50,7 @@ extension CogArenaCore {
   @inlinable
   #endif
   func resolvedManualLocation<Value>(
-    for valueReference: ManualCog<Value>
+    for valueReference: Cog<Value>.Manual
   ) -> (slot: CogArenaSlot, column: CogArenaValueColumn<Value>) {
     let descriptor = valueReference.descriptor
     let setup = manualRecord(for: descriptor)

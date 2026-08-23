@@ -31,7 +31,7 @@ import Testing
 @MainActor
 @Test func `CYCLE-04 a conditional cycle is caught only after its condition flips`() {
   let cogs = Cogs.forTesting()
-  let closesCycle = ManualCog<Bool>(false)
+  let closesCycle = Cog<Bool>.Manual(false)
   var diagnostic: CogCycleDiagnostic?
   var conditional: Cog<Int>!
 

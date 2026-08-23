@@ -51,9 +51,9 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   async throws
 {
   let (cogs, m) = probedContext()
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = Async16ControlledWork()
-  let forecast = AsyncCog<Async16Run>(
+  let forecast = Cog<Async16Run>.Async(
     default: Async16Run(request: -1, ranWithoutActorIsolation: false),
     name: "forecast"
   ) { c in
@@ -73,7 +73,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
   m.run { c in
     let status = c.status[forecast]
     if status.kind == .success {
-      MainActor.preconditionIsolated("AsyncCog concurrent result publication")
+      MainActor.preconditionIsolated("Cog.Async concurrent result publication")
     }
     statusContinuation.yield(status)
   }

@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let niceTemperatureCog = ManualCog<Int>(60)
+@MainActor private let niceTemperatureCog = Cog<Int>.Manual(60)
 
 /// A conventionally named mechanism: the default `name` drops the trailing
 /// "Mechanism", so registrations compose under `Weather`.

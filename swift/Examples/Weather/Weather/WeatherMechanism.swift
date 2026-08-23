@@ -39,7 +39,7 @@ struct Notifier {
 ///
 /// The default `Mechanism` name drops the suffix, so registrations compose
 /// under `Weather` in debug history and task names. Forecast request tasks
-/// are not owned by this mechanism: `AsyncCogBox` owns each generation and
+/// are not owned by this mechanism: `CogBox.Async` owns each generation and
 /// retains it according to graph demand. The mechanism instead owns the
 /// nice-weather reaction and the clock loop that periodically asks the graph
 /// to refresh the selected key; when the runtime tears its scope down, future

@@ -16,7 +16,7 @@ private final class Graph14ChainStorage {
 @MainActor
 private func readColdChain(depth: Int) -> Int {
   let cogs = Cogs.forTesting()
-  let sourceCog = ManualCog<Int>(0, name: "graph14.source")
+  let sourceCog = Cog<Int>.Manual(0, name: "graph14.source")
   let storage = Graph14ChainStorage()
   storage.valueReferences.reserveCapacity(depth)
 
@@ -74,7 +74,7 @@ private func readColdChain(depth: Int) -> Int {
   // limit into a graph-size limit.
   let depth = 5_000
   let cogs = Cogs.forTesting()
-  let sourceCog = ManualCog<Int>(0, name: "graph14.warm.source")
+  let sourceCog = Cog<Int>.Manual(0, name: "graph14.warm.source")
   let storage = Graph14ChainStorage()
   storage.valueReferences.reserveCapacity(depth)
 

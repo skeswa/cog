@@ -184,7 +184,7 @@ extension CogArenaCore {
   @inlinable
   #endif
   func read<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     for consumer: CogArenaSlot
   ) -> Value {
     requireTracking(consumer)

@@ -12,7 +12,7 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
 @MainActor
 @Test func `LIFE-02 an unobserved automatic cog is released after injected grace`() async throws {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = ManualCog<Bool>(true)
+  let watcherAlive = Cog<Bool>.Manual(true)
   var selectorRuns = 0
   let automatic = Cog<Int> { _ in
     selectorRuns += 1
@@ -47,8 +47,8 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
   async throws
 {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = ManualCog<Bool>(true)
-  let source = ManualCog<Int>(1)
+  let watcherAlive = Cog<Bool>.Manual(true)
+  let source = Cog<Int>.Manual(1)
   var previousValues: [Int?] = []
   let automatic = Cog<Int> { c in
     previousValues.append(c.curr)
@@ -85,7 +85,7 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  let source = ManualCog<Int>(1)
+  let source = Cog<Int>.Manual(1)
   var previousValues: [Int?] = []
   let automatic = Cog<Int> { c in
     previousValues.append(c.curr)

@@ -432,7 +432,7 @@ extension Cogs {
   /// Purely a lookup: a state never demanded in this context reports `false`
   /// without being created, so probing cannot disturb laziness or lifetime.
   package func hasObservationBoundaryForTesting<Value>(
-    for valueReference: ManualCog<Value>
+    for valueReference: Cog<Value>.Manual
   ) -> Bool {
     hasObservationBoundary(
       CogStateIdentity(descriptor: valueReference.descriptor.identity, key: valueReference.key))
@@ -508,7 +508,7 @@ extension Cogs {
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     let value = arenaCore.manualValue(for: valueReference)
     arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
     return value
@@ -551,7 +551,7 @@ extension Cogs {
   /// - Parameter valueReference: The async declaration and optional key to inspect.
   /// - Returns: Its current settled value, resting on the default at first
   ///   demand.
-  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Async) -> Value {
     peek(valueReference.valueCog)
   }
 }

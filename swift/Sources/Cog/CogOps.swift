@@ -39,25 +39,25 @@ public protocol CogOps {
 
   /// Reads a source's current value without creating a dependency edge.
   ///
-  /// See ``Cogs/peek(_:)-(ManualCog<Value>)`` for the settlement and lifetime
+  /// See ``Cogs/peek(_:)-(Cog<Value>.Manual)`` for the settlement and lifetime
   /// contract; both conformances share it exactly.
-  func peek<Value>(_ valueReference: ManualCog<Value>) -> Value
+  func peek<Value>(_ valueReference: Cog<Value>.Manual) -> Value
 
   /// Reads an automatic cog's settled value without creating a dependency edge.
   func peek<Value>(_ valueReference: Cog<Value>) -> Value
 
   /// Reads an async cog's current value without creating a dependency edge.
-  func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value
+  func peek<Value>(_ valueReference: Cog<Value>.Async) -> Value
 
   /// Reads a source's read-only projection without creating a dependency
   /// edge.
-  func peek<Value>(_ valueReference: CogProjection<Value>) -> Value
+  func peek<Value>(_ valueReference: Cog<Value>.Projection) -> Value
 
   /// Demands one fresh generation of an async value.
   ///
   /// See ``Cogs/refresh(_:)`` for the demand, grace, and handle contract.
   @discardableResult
-  func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value>
+  func refresh<Value>(_ valueReference: Cog<Value>.Async) -> CogRefresh<Value>
 }
 
 extension CogOps {
@@ -89,7 +89,7 @@ extension CogOps {
   ///   - value: The value to publish at the turn boundary.
   ///   - name: The turn name recorded for diagnostics and history.
   public func turn<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     to value: Value,
     name: String = #function
   ) {

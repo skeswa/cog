@@ -6,7 +6,7 @@ import Testing
 @Test func `STREAM-01 STREAM-02 stream starts pending and publishes every element`() async throws {
   let (cogs, m) = probedContext()
   let (sequence, continuation) = AsyncStream.makeStream(of: Int.self)
-  let readingsCog = AsyncCog<Int>(.latest, default: -1, name: "readings") { _ in
+  let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     .stream(sequence)
   }
   var statuses: [CogStatus<Int>] = []

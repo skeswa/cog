@@ -48,12 +48,12 @@ enum EdgeLayoutHarness {
   static let dependencyWidth = 32
 
   /// Mostly-static sources, declared once so only values move between turns.
-  static let staticSourceCogs: [ManualCog<Int>] = (0..<dependencyWidth).map { index in
-    ManualCog<Int>(index, name: "perf.edge.static.source.\(index)")
+  static let staticSourceCogs: [Cog<Int>.Manual] = (0..<dependencyWidth).map { index in
+    Cog<Int>.Manual(index, name: "perf.edge.static.source.\(index)")
   }
 
   /// Stable first dependency, matching the churn graph's control position.
-  static let staticControlSourceCog = ManualCog<Int>(0, name: "perf.edge.static.control")
+  static let staticControlSourceCog = Cog<Int>.Manual(0, name: "perf.edge.static.control")
 
   /// One wide consumer whose dependency order never changes.
   static let staticRootCog = Cog<Int>(
@@ -83,12 +83,12 @@ enum EdgeLayoutHarness {
   static let churnSourceCount = 128
 
   /// Fixed data values; only the root's selected window changes.
-  static let churnSourceCogs: [ManualCog<Int>] = (0..<churnSourceCount).map { index in
-    ManualCog<Int>(index + 1, name: "perf.edge.churn.source.\(index)")
+  static let churnSourceCogs: [Cog<Int>.Manual] = (0..<churnSourceCount).map { index in
+    Cog<Int>.Manual(index + 1, name: "perf.edge.churn.source.\(index)")
   }
 
   /// Stable first dependency whose value chooses the 32-entry window.
-  static let churnControlSourceCog = ManualCog<Int>(0, name: "perf.edge.churn.control")
+  static let churnControlSourceCog = Cog<Int>.Manual(0, name: "perf.edge.churn.control")
 
   /// One wide consumer that replaces its complete non-control suffix per turn.
   static let churnRootCog = Cog<Int>(

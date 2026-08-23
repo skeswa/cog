@@ -10,8 +10,8 @@ import os
   // each render tracks only what that render read, so a body that stops
   // reading a cog stops being invalidated by it.
   let cogs = Cogs.forTesting()
-  let a = ManualCog<Int>(1)
-  let b = ManualCog<Int>(10)
+  let a = Cog<Int>.Manual(1)
+  let b = Cog<Int>.Manual(10)
   let firstRenderNotices = OSAllocatedUnfairLock(initialState: 0)
   let secondRenderNotices = OSAllocatedUnfairLock(initialState: 0)
 

@@ -10,7 +10,7 @@ import Testing
 @MainActor
 @Test func `TURN-01 the writer reads back the value it staged`() {
   let cogs = Cogs.forTesting()
-  let count = ManualCog<Int>(0)
+  let count = Cog<Int>.Manual(0)
 
   cogs.turn { c in
     c[count] = 4
@@ -28,7 +28,7 @@ import Testing
   var sourceValuesSeen: [Int] = []
 
   let cogs = Cogs.forTesting()
-  let source = ManualCog<Int>(0)
+  let source = Cog<Int>.Manual(0)
   let doubled = Cog<Int> { c in
     let value = c[source]
     sourceValuesSeen.append(value)
@@ -52,9 +52,9 @@ import Testing
 @MainActor
 @Test func `TURN-03 the writer reads current state before staging that source`() {
   let cogs = Cogs.forTesting()
-  let count = ManualCog<Int>(0)
-  let note = ManualCog<String>("old")
-  let retryLimit = ManualCog<Int>(3)
+  let count = Cog<Int>.Manual(0)
+  let note = Cog<String>.Manual("old")
+  let retryLimit = Cog<Int>.Manual(3)
 
   cogs.turn { c in
     c[count] = 3
@@ -73,7 +73,7 @@ import Testing
 @MainActor
 @Test func `TURN-04 normal reads stay published while the writer accumulates`() {
   let cogs = Cogs.forTesting()
-  let count = ManualCog<Int>(0)
+  let count = Cog<Int>.Manual(0)
 
   cogs.turn { c in
     c[count] = 7
@@ -88,7 +88,7 @@ import Testing
 @MainActor
 @Test func `TURN-14 keyed writer read-back changes only the selected key`() {
   let cogs = Cogs.forTesting()
-  let unreadCounts = ManualCogBox<Int, String>(0)
+  let unreadCounts = CogBox<Int, String>.Manual(0)
 
   cogs.turn { c in
     c[unreadCounts["inbox"]] += 1

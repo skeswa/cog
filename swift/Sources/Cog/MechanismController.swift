@@ -3,7 +3,7 @@
 ///
 /// The controller carries registration (``run(fileID:line:_:)``,
 /// `watch`, ``task(name:_:)``, and gated ``whenever(_:name:fileID:line:_:)-(Cog<Bool>,_,_,_,_)`` scopes), untracked
-/// ``peek(_:)-(ManualCog<Value>)`` reads, and the shared ``CogOps`` op surface. There is
+/// ``peek(_:)-(Cog<Value>.Manual)`` reads, and the shared ``CogOps`` op surface. There is
 /// deliberately no raw ``Cogs`` here: a mechanism that could reach the runtime
 /// could also leak it past its own discipline, and routing every act through
 /// the controller is what makes attribution and isolated testing exact (§6.2).
@@ -152,7 +152,7 @@ extension MechanismController {
   ///     and the value after it. The body runs on the MainActor; turns it
   ///     requests during a flush become later FIFO turns.
   public func watch<Value>(
-    _ valueReference: ManualCog<Value>,
+    _ valueReference: Cog<Value>.Manual,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -251,7 +251,7 @@ extension MechanismController {
   ///     and the value after it. The body runs on the MainActor; turns it
   ///     requests during a flush become later FIFO turns.
   public func watch<Value>(
-    _ valueReference: AsyncCog<Value>,
+    _ valueReference: Cog<Value>.Async,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -289,7 +289,7 @@ extension MechanismController {
   ///   - body: Synchronous effect code, given the value before this change
   ///     and the value after it.
   public func watch<Value>(
-    _ valueReference: CogProjection<Value>,
+    _ valueReference: Cog<Value>.Projection,
     initial: CogWatchStart,
     name: String? = nil,
     fileID: StaticString = #fileID,
@@ -396,7 +396,7 @@ extension MechanismController {
   ///
   /// Semantics match the automatic-gate overload exactly.
   public func whenever(
-    _ gate: ManualCog<Bool>,
+    _ gate: Cog<Bool>.Manual,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
@@ -413,7 +413,7 @@ extension MechanismController {
   ///
   /// Semantics match the automatic-gate overload exactly.
   public func whenever(
-    _ gate: CogProjection<Bool>,
+    _ gate: Cog<Bool>.Projection,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
@@ -523,7 +523,7 @@ extension MechanismController {
     ///   - body: Synchronous effect code, given the status before this change
     ///     and the status after it.
     public func watch<Value>(
-      _ valueReference: AsyncCog<Value>,
+      _ valueReference: Cog<Value>.Async,
       initial: CogWatchStart,
       name: String? = nil,
       fileID: StaticString = #fileID,
@@ -551,7 +551,7 @@ extension MechanismController {
     ///   inspect.
     /// - Returns: Its current full status, beginning with pending on first
     ///   demand.
-    public func peek<Value>(_ valueReference: AsyncCog<Value>) -> CogStatus<Value> {
+    public func peek<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
       controller.requiredRuntime.status.peek(valueReference)
     }
   }
@@ -571,11 +571,11 @@ extension MechanismController: CogOps {
     cogtext.turn(named: "\(namePath).\(name)", body)
   }
 
-  /// Reads a source without creating a dependency edge; see ``Cogs/peek(_:)-(ManualCog<Value>)``.
+  /// Reads a source without creating a dependency edge; see ``Cogs/peek(_:)-(Cog<Value>.Manual)``.
   ///
   /// An `operate`-time read never becomes a dependency, because `operate` is
   /// registration, not a reaction.
-  public func peek<Value>(_ valueReference: ManualCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
     requiredRuntime.peek(valueReference)
   }
 
@@ -585,19 +585,19 @@ extension MechanismController: CogOps {
   }
 
   /// Reads an async cog's current value without creating a dependency edge.
-  public func peek<Value>(_ valueReference: AsyncCog<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Async) -> Value {
     requiredRuntime.peek(valueReference)
   }
 
   /// Reads a source's read-only projection without creating a dependency
   /// edge.
-  public func peek<Value>(_ valueReference: CogProjection<Value>) -> Value {
+  public func peek<Value>(_ valueReference: Cog<Value>.Projection) -> Value {
     requiredRuntime.peek(valueReference)
   }
 
   /// Demands one fresh generation of an async value; see ``Cogs/refresh(_:)``.
   @discardableResult
-  public func refresh<Value>(_ valueReference: AsyncCog<Value>) -> CogRefresh<Value> {
+  public func refresh<Value>(_ valueReference: Cog<Value>.Async) -> CogRefresh<Value> {
     requiredRuntime.refresh(valueReference)
   }
 }

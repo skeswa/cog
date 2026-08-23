@@ -34,7 +34,7 @@ private final class Async32ControlledWork {
 @Test func `ASYNC-01 ASYNC-32 the status lens carries tracked reads with value parity`() async {
   let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
@@ -94,7 +94,7 @@ private final class Async32ControlledWork {
   // half and the new status as the new half.
   let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
   let (deliveries, continuation) = AsyncStream.makeStream(
@@ -132,7 +132,7 @@ private final class Async32ControlledWork {
 {
   let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
   let (statusEvents, statusContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
@@ -191,7 +191,7 @@ private final class Async32ControlledWork {
 @Test func `ASYNC-32 SwiftUI observes only the status fields its body reads`() async throws {
   let (cogs, m) = probedContext()
   let work = Async32ControlledWork()
-  let forecastCog = AsyncCog<Int>(default: 0, name: "forecast") { _ in
+  let forecastCog = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
   let kindNotices = OSAllocatedUnfairLock(initialState: 0)

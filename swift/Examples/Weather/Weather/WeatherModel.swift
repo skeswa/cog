@@ -3,7 +3,7 @@ import Foundation
 
 /// A ZIP-code value that also supplies the demo's display metadata.
 ///
-/// The raw string is both external request input and `AsyncCogBox` key. Value
+/// The raw string is both external request input and `CogBox.Async` key. Value
 /// identity therefore follows ZIP equality all the way from `ForEach` through
 /// Cog's keyed state storage and task names.
 nonisolated struct ZipCode: RawRepresentable, Hashable, Identifiable, Sendable {

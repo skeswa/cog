@@ -26,9 +26,9 @@ private final class Async08ControlledWork {
 @MainActor
 @Test func `ASYNC-08 stale cancellation-ignoring result is rejected`() async throws {
   let (cogs, m) = probedContext()
-  let request = ManualCog<Int>(0)
+  let request = Cog<Int>.Manual(0)
   let work = Async08ControlledWork()
-  let forecast = AsyncCog<Int>(default: 0, name: "forecast") { c in
+  let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
     let currentRequest = c[request]
     return .run { await work.run(for: currentRequest) }
   }
