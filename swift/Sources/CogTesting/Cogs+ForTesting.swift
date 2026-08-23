@@ -10,7 +10,7 @@ extension Cogs {
   /// ordinary Swift values: if they contain a shared mutable object, that
   /// object remains shared outside Cog's storage.
   ///
-  /// The factory mirrors production's single-call bootstrap exactly, with one
+  /// The factory mirrors production's single-call assembly exactly, with one
   /// addition: the `seeding` closure runs after the context exists and before
   /// any mechanism's `operate`, so a test arranges state first — quiet seeds
   /// and loud turns both — and then watches mechanisms come alive against
@@ -51,7 +51,7 @@ extension Cogs {
   ///   - seeding: Arrangement run against the new context before any
   ///     mechanism operates. Defaults to none.
   ///   - mechanisms: Every mechanism this isolated runtime runs, operated
-  ///     synchronously in array order exactly as production bootstrap would.
+  ///     synchronously in array order exactly as production assembly would.
   ///     Defaults to none.
   /// - Returns: A new, uninstalled context whose mechanisms are live.
   public static func forTesting(

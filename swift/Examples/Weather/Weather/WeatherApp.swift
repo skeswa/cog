@@ -6,7 +6,7 @@ struct WeatherApp: App {
   @State private var cogs: Cogs
 
   init() {
-    let cogs = Cogs.bootstrapApp(mechanisms: [
+    let cogs = Cogs.assemble(mechanisms: [
       WeatherMechanism(
         notifier: .live,
         hourlyRefreshInterval: .seconds(5)

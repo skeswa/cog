@@ -2,7 +2,7 @@
 ///
 /// A scope owns reaction registrations, named tasks, child scopes, and the
 /// ``MechanismController`` that registered them. The runtime retains one scope
-/// per bootstrap mechanism, and each open `whenever` gate owns one child scope
+/// per assembly mechanism, and each open `whenever` gate owns one child scope
 /// registered with its parent, so cancelling a parent tears its whole family
 /// down as one unit.
 ///
@@ -14,7 +14,7 @@
 /// controllers become inert instead of outliving their lifetime.
 ///
 /// Scopes are MainActor-isolated final classes. None of this surface is
-/// public API: application code expresses lifetime through bootstrap and
+/// public API: application code expresses lifetime through assembly and
 /// `whenever` gates, never through a handle (§6.2–§6.3).
 @MainActor
 internal final class MechanismScope {

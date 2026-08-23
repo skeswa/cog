@@ -5,20 +5,20 @@ import Testing
 
 // MARK: - LINT-10
 
-/// Proves forbidden bootstrap-local work before and after retention.
-@Test func `LINT-10 bootstrap local fixture is the rule specification`() {
+/// Proves forbidden assembly-local work before and after retention.
+@Test func `LINT-10 assembly local fixture is the rule specification`() {
   #expect(
     CogLintFixtureHarness.failures(in: CogLintFixtureRegistry.initialStateInMechanism).isEmpty
   )
 }
 
 /// Proves the production registry diagnoses a correctly wrapped but misplaced domain op.
-@Test func `LINT-10 production registry reports bootstrap-local domain work`() throws {
+@Test func `LINT-10 production registry reports assembly-local domain work`() throws {
   let root = FileManager.default.temporaryDirectory
     .appending(path: "coglint-initial-state-\(UUID().uuidString)", directoryHint: .isDirectory)
   try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: root) }
-  try "struct MainApp: App { init() { let cogs = Cogs.bootstrapApp(); cogs.seedWorld() } }\n".write(
+  try "struct MainApp: App { init() { let cogs = Cogs.assemble(); cogs.seedWorld() } }\n".write(
     to: root.appending(path: "MainApp.swift"),
     atomically: true,
     encoding: .utf8
@@ -34,24 +34,24 @@ import Testing
   #expect(execution.exitCode == 1)
   #expect(
     execution.xcodeOutput
-      == "MainApp.swift:1:64: error: [initial-state-in-mechanism] `cogs` may only retain the result of `Cogs.bootstrapApp`; move initial graph work into a bootstrap mechanism — https://skeswa.github.io/cog/documentation/cog/initialstateinmechanism\n"
+      == "MainApp.swift:1:60: error: [initial-state-in-mechanism] `cogs` may only retain the result of `Cogs.assemble`; move initial graph work into an assembly mechanism — https://skeswa.github.io/cog/documentation/cog/initialstateinmechanism\n"
   )
 }
 
 // MARK: - LINT-11
 
 /// Proves both settled direct-retention spellings remain conforming.
-@Test func `LINT-11 direct bootstrap retention needs no local analysis`() {
+@Test func `LINT-11 direct assembly retention needs no local analysis`() {
   let source = CogLintParser.parse(
     source:
       """
       struct DirectApp: App {
         private let cogs: Cogs
-        init() { cogs = Cogs.bootstrapApp() }
+        init() { cogs = Cogs.assemble() }
       }
       struct WrappedApp: App {
         @State private var cogs: Cogs
-        init() { _cogs = .init(initialValue: Cogs.bootstrapApp()) }
+        init() { _cogs = .init(initialValue: Cogs.assemble()) }
       }
       """
   )

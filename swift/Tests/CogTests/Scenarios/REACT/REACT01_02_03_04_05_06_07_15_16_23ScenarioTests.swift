@@ -9,7 +9,7 @@ extension CogOps {
 }
 
 // Reaction behavior is proved through the public mechanism registration,
-// read, and turn APIs. Each test bootstraps one probe mechanism and registers
+// read, and turn APIs. Each test assembles one probe mechanism and registers
 // through its controller, which the runtime's scope keeps alive for the whole
 // isolated-context lifetime.
 

@@ -30,7 +30,7 @@ import Testing
     }
   ])
 
-  // Both scopes opened at bootstrap: their gates already read true.
+  // Both scopes opened at assembly: their gates already read true.
   #expect(outerSeen == [0])
   #expect(innerSeen == [0])
 

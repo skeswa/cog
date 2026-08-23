@@ -150,7 +150,7 @@ extension CogOps {
     turn(currentZipSourceCog, to: zip)
   }
 
-  /// Publishes the cadence owned by the bootstrap-registered mechanism.
+  /// Publishes the cadence owned by the assembly-registered mechanism.
   func setRefreshInterval(_ interval: Duration?) {
     turn(refreshIntervalSourceCog, to: interval)
   }

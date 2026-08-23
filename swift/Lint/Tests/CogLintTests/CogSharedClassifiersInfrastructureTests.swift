@@ -54,7 +54,7 @@ import Testing
   #expect(apps.map(\.memberBlocks.count) == [1, 2])
 }
 
-/// Proves environment, selector, reaction, writer, mechanism, and bootstrap receiver seams.
+/// Proves environment, selector, reaction, writer, mechanism, and assembly receiver seams.
 @Test func graphReceiverClassifierInfrastructure() {
   let source = CogLintParser.parse(
     source:
@@ -84,7 +84,7 @@ import Testing
 
       struct CounterApp: App {
         init() {
-          let cogs = Cogs.bootstrapApp()
+          let cogs = Cogs.assemble()
           cogs.turn { c in c[countSourceCog] = 1 }
 
           let hiddenCogs = makeCogs()
@@ -108,7 +108,7 @@ import Testing
       "c:writer",
       "s:mechanism",
       "c:reaction",
-      "cogs:bootstrap",
+      "cogs:assembly",
       "c:writer",
     ]
   )
@@ -123,7 +123,7 @@ private func receiverSummary(_ classification: CogGraphReceiverClassification) -
   case .reactionReader: kind = "reaction"
   case .writer: kind = "writer"
   case .mechanismController: kind = "mechanism"
-  case .bootstrapCogs: kind = "bootstrap"
+  case .assembledCogs: kind = "assembly"
   }
   return "\(classification.name):\(kind)"
 }

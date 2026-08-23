@@ -1,7 +1,7 @@
 import Foundation
 import SwiftSyntax
 
-/// Keeps post-bootstrap initial graph work inside bootstrap-registered mechanisms.
+/// Keeps post-assembly initial graph work inside assembly-registered mechanisms.
 package struct InitialStateInMechanismRule: CogLintRule {
   /// The stable identifier printed by every finding and suppression.
   package let slug = "initial-state-in-mechanism"
@@ -14,13 +14,13 @@ package struct InitialStateInMechanismRule: CogLintRule {
   /// Creates the stateless production rule.
   package init() {}
 
-  /// Reports every non-retention use of a directly bootstrapped local in app initializers.
+  /// Reports every non-retention use of a directly assembled local in app initializers.
   package func violations(
     in source: SourceFileSyntax,
     context _: CogLintRuleContext
   ) -> [CogLintViolation] {
-    let bootstrapLocals = CogGraphReceiverClassifier.classify(in: source).filter {
-      $0.kind == .bootstrapCogs
+    let assemblyLocals = CogGraphReceiverClassifier.classify(in: source).filter {
+      $0.kind == .assembledCogs
     }
     return CogAppEntryClassifier.classify(in: source).flatMap { app in
       app.memberBlocks.flatMap { members in
@@ -28,11 +28,11 @@ package struct InitialStateInMechanismRule: CogLintRule {
           guard let initializer = item.decl.as(InitializerDeclSyntax.self),
             let body = initializer.body
           else { return [] }
-          let locals = bootstrapLocals.filter { local in
+          let locals = assemblyLocals.filter { local in
             isDescendant(local.nameToken, of: initializer)
           }
           guard !locals.isEmpty else { return [] }
-          let visitor = BootstrapLocalUseVisitor(locals: locals)
+          let visitor = AssemblyLocalUseVisitor(locals: locals)
           visitor.walk(body)
           return visitor.violations
         }
@@ -41,9 +41,9 @@ package struct InitialStateInMechanismRule: CogLintRule {
   }
 }
 
-/// Finds forbidden references to directly bootstrapped locals in one app initializer.
-private final class BootstrapLocalUseVisitor: SyntaxVisitor {
-  /// Direct bootstrap bindings whose lexical scopes intersect this initializer.
+/// Finds forbidden references to directly assembled locals in one app initializer.
+private final class AssemblyLocalUseVisitor: SyntaxVisitor {
+  /// Direct assembly bindings whose lexical scopes intersect this initializer.
   private let locals: [CogGraphReceiverClassification]
 
   /// Findings retained in source traversal order.
@@ -55,7 +55,7 @@ private final class BootstrapLocalUseVisitor: SyntaxVisitor {
     super.init(viewMode: .sourceAccurate)
   }
 
-  /// Rejects a bootstrap-local reference unless it is the direct retention value.
+  /// Rejects an assembly-local reference unless it is the direct retention value.
   override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
     guard
       let local = locals.reversed().first(where: {
@@ -71,7 +71,7 @@ private final class BootstrapLocalUseVisitor: SyntaxVisitor {
     violations.append(
       CogLintViolation(
         message:
-          "`\(local.name)` may only retain the result of `Cogs.bootstrapApp`; move initial graph work into a bootstrap mechanism",
+          "`\(local.name)` may only retain the result of `Cogs.assemble`; move initial graph work into an assembly mechanism",
         at: node.baseName
       )
     )

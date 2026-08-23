@@ -86,7 +86,7 @@ enum StorefrontUITestIdentifiers {
 ///
 /// Every test resets the app to an identical starting world **outside** its
 /// measured region by launching a fresh process: the graph is app-wide and
-/// bootstrapped once per launch, so a new process is the only reset that is
+/// assembled once per launch, so a new process is the only reset that is
 /// genuinely complete. The measured region then contains nothing but the
 /// interaction under test.
 @MainActor

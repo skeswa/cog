@@ -28,11 +28,11 @@ dependencies: [
 Add `Cog` to your app target, and `CogTesting` to your test and
 preview-support targets. Cog requires iOS 17 or macOS 14 and Swift 6.2.
 
-### Bootstrap once, at launch
+### Assemble once, at launch
 
 An app has exactly one graph. Create it at launch with
-``Cogs/bootstrapApp(mechanisms:)``, retain what it returns, and install it
-above every scene. There is no ambient lookup and no second chance: bootstrap
+``Cogs/assemble(mechanisms:)``, retain what it returns, and install it
+above every scene. There is no ambient lookup and no second chance: assemble
 twice and Cog traps, in debug and release alike, because a second graph would
 mean two answers to the same question.
 
@@ -46,7 +46,7 @@ struct ForecastApp: App {
   private let cogs: Cogs
 
   init() {
-    cogs = Cogs.bootstrapApp(mechanisms: [])
+    cogs = Cogs.assemble(mechanisms: [])
   }
 
   var body: some Scene {
@@ -184,7 +184,7 @@ others, declare an automatic cog for it and read that flatly too.
 ### Run a side effect
 
 Anything that reacts to state — a network request, a timer, a notification —
-is a ``Mechanism``, and every mechanism is registered at bootstrap. There is no
+is a ``Mechanism``, and every mechanism is registered at assembly. There is no
 later installation point, so an app's whole side-effect surface is the array
 you can read at launch.
 
@@ -201,7 +201,7 @@ struct AdviceMechanism: Mechanism {
 Register it in the array from earlier:
 
 ```swift
-cogs = Cogs.bootstrapApp(mechanisms: [AdviceMechanism()])
+cogs = Cogs.assemble(mechanisms: [AdviceMechanism()])
 ```
 
 The controller — never a raw ``Cogs`` — hands a mechanism what it may do:

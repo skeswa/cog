@@ -14,9 +14,9 @@ Move the primitive into a named method on `CogOps`, spell `turn(...)` or `refres
 
 ## Triggering examples
 
-### Environment and bootstrap primitives
+### Environment and assembly primitives
 
-View and bootstrap graph receivers must call domain operations instead of primitives.
+View and assembly graph receivers must call domain operations instead of primitives.
 
 Expected diagnostic positions: 4:10, 5:15, 10:12, 11:12.
 
@@ -29,7 +29,7 @@ struct CounterCard: View {
   }
 }
 func launch() {
-  let appGraph = Cogs.bootstrapApp()
+  let appGraph = Cogs.assemble()
   appGraph.turn(countSourceCog, to: 1)
   appGraph.refresh(forecastCog)
 }

@@ -38,7 +38,7 @@ enum StorefrontHarness {
 
   /// Builds a runtime and materializes the first complete screen.
   ///
-  /// Everything is inside the measured region on purpose: bootstrap, graph
+  /// Everything is inside the measured region on purpose: assembly, graph
   /// construction, the two root responses, the search index, and the first
   /// viewport's inventory and offers. This is the only cut that measures what a
   /// graph costs to *create*, which every other benchmark in this package

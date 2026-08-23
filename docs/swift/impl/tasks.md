@@ -453,8 +453,8 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   _Depends: M1-17, M1-31a._
   _Verify: `mise run test --filter HIST-05`._
   _Greens: HIST-05._
-- **M1-36** _(Decision)_ — Adopt the mechanism redesign: bootstrap-only
-  registration through `Cogs.bootstrapApp(mechanisms:)`, the curated
+- **M1-36** _(Decision)_ — Adopt the mechanism redesign: assembly-only
+  registration through `Cogs.assemble(mechanisms:)`, the curated
   controller with state-gated `whenever` scopes, ops shared through
   `CogOps`, and withdrawal of the public `run`/`watch`/`EffectGroup`/
   `ReactionToken` surface. Update §10, the snapshot, scenarios, and tasks.
@@ -471,20 +471,20 @@ _Plan scope and exit: [M1: Simple correctness core](./plan.md#plan-m1)._
   mechanism's.
   _Depends: M1-35b._
   _Verify: `mise run test --filter MechanismTaskInfrastructure`._
-- **M1-37a** _(Behavior)_ — Operate bootstrap mechanisms synchronously in
+- **M1-37a** _(Behavior)_ — Operate assembly mechanisms synchronously in
   list order, settle operate-time writes before the factory returns, and
   expose an earlier mechanism's published values to a later mechanism's
   `operate`.
   _Depends: M1-16c._
   _Verify: `mise run test --filter 'MECH-01|MECH-02'`._
   _Greens: MECH-01, MECH-02._
-- **M1-37b** _(Behavior)_ — Keep declared mechanisms inert until bootstrap
+- **M1-37b** _(Behavior)_ — Keep declared mechanisms inert until assembly
   lists them; a mechanism left off the list never runs.
   _Depends: M1-16b._
   _Verify: `mise run test --filter MECH-03`._
   _Greens: MECH-03._
 - **M1-37c** _(Behavior)_ — Reject two same-named mechanisms in one
-  bootstrap list with a clear error in debug and release.
+  assembly list with a clear error in debug and release.
   _Depends: M1-35a._
   _Verify: `mise run test --filter MECH-04` and
   `mise run test:release --filter MECH-04`._
@@ -729,7 +729,7 @@ _Plan scope and exit: [M2: SwiftUI boundary and Weather](./plan.md#plan-m2)._
   sources, `fileprivate` access, automatic values, and ops.
   _Depends: M2-05, M2-10._
   _Verify: Weather scheme builds after the state layer change._
-- **M2-14b** _(Infrastructure)_ — Register Weather's mechanism at bootstrap:
+- **M2-14b** _(Infrastructure)_ — Register Weather's mechanism at assembly:
   its nice-weather reaction and injected-clock hourly task, with any shorter
   lifetime expressed as a `whenever` gate.
   _Depends: M2-14a._
@@ -1278,7 +1278,7 @@ _Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
   _Depends: M6-05c._
   _Verify: `mise run test --filter HIST` plus the arena
   release symbol/build check._
-- **M6-10aa** _(Infrastructure)_ — Pass production/testing bootstrap,
+- **M6-10aa** _(Infrastructure)_ — Pass production/testing assembly,
   descriptors, and manual-source behavior through the arena selector.
   _Depends: M6-05c._
   _Verify: `mise run test --filter 'ONE|DECL-0[1-5]'`._
@@ -1312,7 +1312,7 @@ _Plan scope and exit: [M6: Data-oriented core](./plan.md#plan-m6)._
   _Depends: M6-10cb._
   _Verify: `mise run test --filter ArenaQuiescenceInfrastructure` and
   `mise run test:arena-configurations --filter ArenaSpecializationInfrastructure`._
-- **M6-10d** _(Infrastructure)_ — Pass mechanism bootstrap, gated-scope
+- **M6-10d** _(Infrastructure)_ — Pass mechanism assembly, gated-scope
   cancellation, and task behavior through the arena core selector.
   _Depends: M6-10cb._
   _Verify: `mise run test --filter MECH`._
@@ -1668,7 +1668,7 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Verify: `mise run test:lint --filter 'LINT-0[45]'`._
   _Greens: LINT-04, LINT-05._
 - **M8-03b** _(Infrastructure)_ — Implement the shared view, graph-receiver,
-  and app-entry classifiers, including bootstrap locals and documented
+  and app-entry classifiers, including assembly locals and documented
   cross-file misses.
   _Depends: M8-02c._
   _Verify: focused nested-package classifier tests._
@@ -1695,7 +1695,7 @@ _Plan scope and exit: [M8: First-party lint tooling and 0.4.0](./plan.md#plan-m8
   _Verify: `mise run test:lint --filter 'LINT-0[89]'`._
   _Greens: LINT-08, LINT-09._
 - **M8-08** _(Behavior)_ — Implement `initial-state-in-mechanism`, including
-  prohibited bootstrap-local work and the conforming initialization shapes.
+  prohibited assembly-local work and the conforming initialization shapes.
   _Depends: M8-02d, M8-03b._
   _Verify: `mise run test:lint --filter 'LINT-1[01]'`._
   _Greens: LINT-10, LINT-11._
@@ -2017,7 +2017,7 @@ _Plan scope and exit: [M10: Storefront macrobenchmark](./plan.md#plan-m10)._
   declaration census, and every adjustment from the original targets, plus
   `mise run tasks:check`._
 - **M10-02** _(Infrastructure)_ — Build profiles, deterministic fixtures, four
-  heavy kernels, the 16-step pricing ladder, domain ops, and the bootstrap
+  heavy kernels, the 16-step pricing ladder, domain ops, and the assembly
   mechanism. Add shape tests so a declaration-count change fails before it
   makes benchmark runs hard to compare.
   _Depends: M10-01._

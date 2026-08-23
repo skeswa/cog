@@ -2,7 +2,7 @@
 //
 // Reactions have one door: a mechanism's controller. The runtime deliberately
 // has no reaction, watch, or effect-group API, so late registration outside a
-// bootstrap-listed mechanism never compiles. The registrar-shaped members
+// assembly-listed mechanism never compiles. The registrar-shaped members
 // below are exactly the spellings the pre-mechanism design offered.
 
 import Cog

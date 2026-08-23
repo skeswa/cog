@@ -17,8 +17,8 @@ package enum CogGraphReceiverKind: Equatable, Sendable {
   /// A mechanism `operate` parameter or `whenever` child controller.
   case mechanismController
 
-  /// A local bound directly from `Cogs.bootstrapApp(...)`.
-  case bootstrapCogs
+  /// A local bound directly from `Cogs.assemble(...)`.
+  case assembledCogs
 }
 
 /// A lexical syntax boundary in which one receiver binding is visible.
@@ -70,7 +70,7 @@ package struct CogGraphReceiverClassification: Sendable {
 
 /// Recognizes conventional Cog receivers without type checking or data flow.
 package enum CogGraphReceiverClassifier {
-  /// Classifies environment and typed bindings, bootstrap locals, and inferred closures.
+  /// Classifies environment and typed bindings, assembly locals, and inferred closures.
   package static func classify(in source: SourceFileSyntax) -> [CogGraphReceiverClassification] {
     let baseVisitor = CogBaseReceiverVisitor()
     baseVisitor.walk(source)
@@ -127,7 +127,7 @@ private final class CogBaseReceiverVisitor: SyntaxVisitor {
     super.init(viewMode: .sourceAccurate)
   }
 
-  /// Finds `@Environment(\.cogs) ... cogs` and direct bootstrap locals.
+  /// Finds `@Environment(\.cogs) ... cogs` and direct assembly locals.
   override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
     if hasCogsEnvironmentAttribute(node),
       let memberBlock = nearestAncestor(MemberBlockSyntax.self, from: node)
@@ -151,14 +151,14 @@ private final class CogBaseReceiverVisitor: SyntaxVisitor {
     if let codeBlock = nearestAncestor(CodeBlockSyntax.self, from: node) {
       for binding in node.bindings {
         guard let token = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
-          isDirectBootstrap(binding.initializer?.value)
+          isDirectAssembly(binding.initializer?.value)
         else {
           continue
         }
         classifications.append(
           CogGraphReceiverClassification(
             nameToken: token,
-            kind: .bootstrapCogs,
+            kind: .assembledCogs,
             scope: CogLexicalScope(codeBlock)
           )
         )
@@ -212,7 +212,7 @@ private final class CogBaseReceiverVisitor: SyntaxVisitor {
 
 /// Infers conventional closure parameters from calls on already-scoped capabilities.
 private final class CogCallReceiverVisitor: SyntaxVisitor {
-  /// Environment, typed, bootstrap, and selector receivers available for call matching.
+  /// Environment, typed, assembly, and selector receivers available for call matching.
   private var baseReceivers: [CogGraphReceiverClassification]
 
   /// Inferred call-body receivers collected in source order.
@@ -280,11 +280,11 @@ private func hasCogsEnvironmentAttribute(_ declaration: VariableDeclSyntax) -> B
   return false
 }
 
-/// Whether an initializer is a direct `Cogs.bootstrapApp(...)` call.
-private func isDirectBootstrap(_ expression: ExprSyntax?) -> Bool {
+/// Whether an initializer is a direct `Cogs.assemble(...)` call.
+private func isDirectAssembly(_ expression: ExprSyntax?) -> Bool {
   guard let call = expression?.as(FunctionCallExprSyntax.self),
     let access = call.calledExpression.as(MemberAccessExprSyntax.self),
-    access.declName.baseName.text == "bootstrapApp",
+    access.declName.baseName.text == "assemble",
     receiverBaseName(access.base) == "Cogs"
   else {
     return false

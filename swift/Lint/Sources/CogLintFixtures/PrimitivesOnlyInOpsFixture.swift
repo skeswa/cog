@@ -16,9 +16,9 @@ extension CogLintFixtureRegistry {
     triggering: [
       CogLintTriggeringExample(
         example: CogLintFixtureExample(
-          name: "Environment and bootstrap primitives",
+          name: "Environment and assembly primitives",
           explanation:
-            "View and bootstrap graph receivers must call domain operations instead of primitives.",
+            "View and assembly graph receivers must call domain operations instead of primitives.",
           source:
             """
             struct CounterCard: View {
@@ -29,7 +29,7 @@ extension CogLintFixtureRegistry {
               }
             }
             func launch() {
-              let appGraph = Cogs.bootstrapApp()
+              let appGraph = Cogs.assemble()
               appGraph.turn(countSourceCog, to: 1)
               appGraph.refresh(forecastCog)
             }

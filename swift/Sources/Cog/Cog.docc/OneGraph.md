@@ -18,15 +18,15 @@ behaving correctly.
 
 ### The one-context rule
 
-- **Bootstrap once, at launch.** ``Cogs/bootstrapApp(mechanisms:)`` creates the
+- **Assemble once, at launch.** ``Cogs/assemble(mechanisms:)`` creates the
   app's graph, runs every mechanism, and returns the object your app retains.
-- **A second bootstrap traps**, in debug and release alike. It is not a
+- **A second assembly traps**, in debug and release alike. It is not a
   warning: continuing would give the process two graphs.
 - **There is no ambient lookup.** No `Cogs.app`, no shared singleton to reach
   for. The context travels through the SwiftUI environment, installed once at
   the composition root with `.cogEnvironment(cogs)`.
 - **Features cannot construct one.** `Cogs` has no public initializer. The only
-  ways to get one are bootstrap and the testing factory.
+  ways to get one are assembly and the testing factory.
 - **Views resolve it themselves.** Every view that touches Cog declares
   `@Environment(\.cogs) private var cogs`. A view never accepts, stores, or
   forwards a `Cogs` through its initializer; intermediate views pass domain
@@ -60,7 +60,7 @@ import Testing
 
 `Cogs.forTesting(clock:whileObservedGrace:seeding:mechanisms:)` starts empty
 and isolated. It never occupies the production install slot, so a test can
-never collide with an app bootstrap or with another test, and it needs no
+never collide with an app assembly or with another test, and it needs no
 teardown, reset, or `uninstall`. Contexts from two tests share nothing.
 
 What still holds inside one test is the same singularity rule: create one
@@ -117,14 +117,14 @@ sleep, so `advance(by:)` moves past a deadline that exists rather than racing
 one that has not been set yet. No lifetime or scheduling test waits wall-clock
 time, and none polls.
 
-### Testing production bootstrap
+### Testing production assembly
 
 Occasionally the thing under test *is* the app install. `CogTesting` vends a
 synchronous scope for it, so no test leaks a global install into the next one:
 
 ```swift
-CogTesting.withBootstrappedApp(mechanisms: [WeatherMechanism(notifier: .live)]) { cogs in
-  #expect(CogTesting.isBootstrappedApp(cogs))
+CogTesting.withAssembledCogs(mechanisms: [WeatherMechanism(notifier: .live)]) { cogs in
+  #expect(CogTesting.isAssembledCogs(cogs))
 }
 ```
 

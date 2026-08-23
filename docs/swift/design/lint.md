@@ -135,7 +135,7 @@ A shared classifier finds four kinds of syntax:
 - **View:** a type writes `View` conformance or has `body: some View`.
 - **Graph receiver:** `@Environment(\.cogs)`, a selector or turn parameter
   named `c`, a mechanism controller, or a local directly returned by
-  `Cogs.bootstrapApp`.
+  `Cogs.assemble`.
 - **App entry:** a type writes `App` conformance.
 
 The classifier does not follow assignments or infer across files.
@@ -145,7 +145,7 @@ The classifier does not follow assignments or infer across files.
 | `cog-declaration-suffix`     | Keyless names end in `Cog`; box names end in `Cogs`      |
 | `no-cogs-in-view-init`       | Views read `Cogs` from the environment                   |
 | `primitives-only-in-ops`     | App code calls `turn` and `refresh` only inside `CogOps` |
-| `initial-state-in-mechanism` | App bootstrap does no graph work                         |
+| `initial-state-in-mechanism` | App assembly does no graph work                          |
 | `manual-cog-private`         | Writable sources are `private` or `fileprivate`          |
 | `no-multi-read-cogs-helper`  | Reads stay flat instead of hiding in a runtime helper    |
 
@@ -181,13 +181,13 @@ writer turn inside a `CogOps` method remains valid.
 
 ### 4.4 `initial-state-in-mechanism`
 
-An `App` initializer may bind the result of `Cogs.bootstrapApp(...)` and retain
+An `App` initializer may bind the result of `Cogs.assemble(...)` and retain
 it. It must not read from it or call a primitive, op, or helper before
 retention. Put initial state in a supplied mechanism; `operate` settles before
-bootstrap returns.
+assembly returns.
 
-Service and mechanism setup before bootstrap is valid. Direct retention without
-a local is also valid. A factory that hides bootstrap is a known syntax-only
+Service and mechanism setup before assembly is valid. Direct retention without
+a local is also valid. A factory that hides assembly is a known syntax-only
 miss.
 
 ### 4.5 `manual-cog-private`

@@ -11,7 +11,7 @@ that outlives the app process.
 A side effect changes something outside the graph, such as an alert, haptic,
 log, file, or system service. A **mechanism** groups that work with the services,
 clocks, reactions, and tasks it needs. All app-wide reactions and tasks live in
-named mechanisms registered at bootstrap.
+named mechanisms registered at assembly.
 
 ### 6.1 Choosing a home for a side effect
 
@@ -20,7 +20,7 @@ named mechanisms registered at bootstrap.
 | Compute state from other state        | `Cog<Value>.Async` (§5.1), or an op that writes manual cogs |
 | Send something outside the graph      | A reaction inside a mechanism                               |
 | Respond to a user action              | Op (§3.2)                                                   |
-| Run for the app lifetime              | A mechanism registered at bootstrap                         |
+| Run for the app lifetime              | A mechanism registered at assembly                          |
 | Run for a shorter domain lifetime     | A `whenever` scope inside a mechanism (§6.2)                |
 | Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)                |
 | Continue after process death          | Durable state, an engine, and a reconciler (§6.7)           |
@@ -42,7 +42,7 @@ public protocol Mechanism {
     var name: String { get }
 
     /// Registers this mechanism's reactions, tasks, and gated scopes.
-    /// Called exactly once, during bootstrap, in array order.
+    /// Called exactly once, during assembly, in array order.
     func operate(_ m: MechanismController)
 }
 ```
@@ -82,7 +82,7 @@ struct WeatherMechanism: Mechanism {
 The controller `m` is the mechanism's only link to the graph:
 
 - `m.watch` registers a reaction on one cog and receives its old and new
-  values. `.skip` avoids an alert during bootstrap. `m.run` registers a
+  values. `.skip` avoids an alert during assembly. `m.run` registers a
   reaction over several dependencies; it runs once during registration to
   record them (§3.3).
 - `m.task` starts a Swift task owned by the mechanism's scope. Timed work uses
@@ -143,12 +143,12 @@ Its rules:
   `whenever`, and names continue to compose (`Session.heartbeat` above
   becomes `Weather.session.heartbeat` when nested under `session`).
 
-There is no public effect group or reaction token. Bootstrap owns app-lifetime
+There is no public effect group or reaction token. Assembly owns app-lifetime
 work. A state gate owns shorter work.
 
-### 6.3 Bootstrap-only registration and lifecycle
+### 6.3 Assembly-only registration and lifecycle
 
-Mechanisms are specified when the app runtime is bootstrapped, and nowhere
+Mechanisms are specified when the app runtime is assembled, and nowhere
 else:
 
 ```swift
@@ -157,7 +157,7 @@ struct WeatherApp: App {
     @State private var cogs: Cogs
 
     init() {
-        let cogs = Cogs.bootstrapApp(mechanisms: [
+        let cogs = Cogs.assemble(mechanisms: [
             WeatherMechanism(notifier: .live),
         ])
         _cogs = State(initialValue: cogs)
@@ -169,10 +169,10 @@ struct WeatherApp: App {
 }
 ```
 
-`bootstrapApp(mechanisms:)` builds the runtime, calls each `operate` in array
+`assemble(mechanisms:)` builds the runtime, calls each `operate` in array
 order, and then returns:
 
-- **Every mechanism is live when bootstrap returns.** Registration is not lazy,
+- **Every mechanism is live when assembly returns.** Registration is not lazy,
   and no API can add a mechanism later.
 - **Order is exact.** Reactions keep registration order. A write during
   `operate` is a normal named turn that settles before the next mechanism runs.
@@ -332,7 +332,7 @@ rules follow:
    op writes the store first, then its manual cog; a crash between those
    writes loses only the in-memory update. A GRDB `ValueObservation` may
    instead feed the graph as an external input (§8).
-2. **A headless app runtime uses its one normal `Cogs`.** App bootstrap
+2. **A headless app runtime uses its one normal `Cogs`.** App assembly
    creates and configures it once, mechanisms and all, even when no scene
    appears. UI-only work stays safe because it lives in views. A background
    task owns its deadline; expiration cancels its op, while a cancellation
@@ -407,7 +407,7 @@ A refresh entry point stays small:
 
 The full flow:
 
-1. The system launches the app without a scene. The app bootstraps the graph
+1. The system launches the app without a scene. The app assemblys the graph
    from the store with its mechanisms.
 2. Feed refresh turns new episode rows.
 3. The automatic desired-set cog changes. The reconciler hands IDs to the background

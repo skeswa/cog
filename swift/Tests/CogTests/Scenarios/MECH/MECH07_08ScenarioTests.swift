@@ -16,7 +16,7 @@ import Testing
     }
   ])
 
-  // The scope body ran during bootstrap: its registrations were live when
+  // The scope body ran during assembly: its registrations were live when
   // the factory returned, with no rise required.
   #expect(seen == [0])
 

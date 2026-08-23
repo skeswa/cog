@@ -427,7 +427,7 @@ quiescence rule:
 
 | Cut                                  | What it measures                                            | Counting metrics |
 | ------------------------------------ | ----------------------------------------------------------- | ---------------- |
-| `perf-15-storefront-cold`            | bootstrap, graph construction, first complete screen        | no               |
+| `perf-15-storefront-cold`            | assembly, graph construction, first complete screen         | no               |
 | `perf-15-storefront-session`         | the whole eleven-phase interaction trace                    | no               |
 | `perf-15-storefront-interactions`    | settled, quiescent favorite / cart / variant / multi-write  | **yes**          |
 | `perf-15-storefront-async-burst`     | one inventory burst accepted and settled                    | no               |

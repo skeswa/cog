@@ -9,7 +9,7 @@ private final class EdgeLayoutValueSink {
   var value = 0
 }
 
-/// Bootstrap registration that keeps one benchmark root durably observed.
+/// Assembly registration that keeps one benchmark root durably observed.
 ///
 /// The arena vertical slice has not migrated Swift Observation boundaries yet,
 /// so a tracked `cogs[root]` read still belongs to the class core. A mechanism
@@ -18,7 +18,7 @@ private final class EdgeLayoutValueSink {
 /// sleeper inside the measured region.
 @MainActor
 private struct EdgeLayoutObserverMechanism: Mechanism {
-  /// Unique bootstrap attribution within the benchmark context.
+  /// Unique assembly attribution within the benchmark context.
   let name: String
 
   /// Automatic arena value whose completed turns the sink receives.

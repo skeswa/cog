@@ -56,7 +56,7 @@ flowchart TB
 | `CogOps.swift`, `Cogs+Refresh.swift`                   | Application operation primitives and async demand.              |
 | `CogEnvironment.swift`                                 | SwiftUI environment installation and resolution.                |
 | `CogValues.swift`, `Cogs+Watch.swift`                  | Exported async sequences and external watch terminals.          |
-| `Mechanism.swift`, `MechanismController.swift`         | Bootstrap-only effect declarations and controller surface.      |
+| `Mechanism.swift`, `MechanismController.swift`         | Assembly-only effect declarations and controller surface.       |
 | `Internal/MechanismScope.swift`                        | Mechanism, task, reaction-token, and child-scope ownership.     |
 
 ### Descriptors and identity

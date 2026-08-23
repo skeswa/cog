@@ -4,8 +4,8 @@ import CogTesting
 /// A test mechanism whose `operate` is supplied by the test.
 ///
 /// Registration is a controller capability, so scenario proofs that need a
-/// reaction, watch, task, or gated scope bootstrap one of these and register
-/// inside the closure — or capture the controller for use after bootstrap,
+/// reaction, watch, task, or gated scope assemble one of these and register
+/// inside the closure — or capture the controller for use after assembly,
 /// which stays legitimate because the runtime's scope retains the controller
 /// for the app (here: test) lifetime:
 ///
@@ -15,14 +15,14 @@ import CogTesting
 /// m.run { c in ... }
 /// ```
 ///
-/// The default name is `Probe`; tests that bootstrap several probes pass
-/// distinct names because bootstrap enforces uniqueness.
+/// The default name is `Probe`; tests that assemble several probes pass
+/// distinct names because assembly enforces uniqueness.
 @MainActor
 struct MechanismProbe: Mechanism {
-  /// The unique bootstrap name for this probe.
+  /// The unique assembly name for this probe.
   let name: String
 
-  /// The registrations this probe makes, run once at bootstrap.
+  /// The registrations this probe makes, run once at assembly.
   let body: @MainActor (MechanismController) -> Void
 
   init(name: String = "Probe", _ body: @escaping @MainActor (MechanismController) -> Void) {
@@ -35,7 +35,7 @@ struct MechanismProbe: Mechanism {
   }
 }
 
-/// An isolated context bootstrapped with one probe whose controller the test
+/// An isolated context assembled with one probe whose controller the test
 /// keeps.
 ///
 /// Scenario proofs that need a registration mid-story use the returned

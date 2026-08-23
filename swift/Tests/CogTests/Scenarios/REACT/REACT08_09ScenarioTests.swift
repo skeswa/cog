@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 
 // Watch behavior is proved through the public mechanism registration, write,
-// and turn APIs only. Each watch registers during bootstrap, so its install
+// and turn APIs only. Each watch registers during assembly, so its install
 // delivery happens before the factory returns.
 
 @MainActor
@@ -49,7 +49,7 @@ import Testing
     }
   ])
 
-  // Once, and before bootstrap returns — no await and no polling. An install
+  // Once, and before assembly returns — no await and no polling. An install
   // has no transition to report, so the current value is both halves.
   #expect(deliveries == ["1->1"])
 

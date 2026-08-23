@@ -15,7 +15,7 @@
 // The fixture takes its context and its value reference as parameters. It never builds
 // either, because it does not need to: the rejection happens in the type
 // checker, and a fixture that constructed a context would be asserting
-// something about bootstrap instead.
+// something about assembly instead.
 
 import Cog
 

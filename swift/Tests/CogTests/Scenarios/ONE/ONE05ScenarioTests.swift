@@ -50,19 +50,19 @@ private let one05StateCog = Cog<Int>.Manual(41, name: "one05.state")
 
 @MainActor
 @Test func `ONE-05 isolated contexts never occupy or disturb the app install slot`() {
-  #expect(Cogs.hasBootstrappedApp == false)
+  #expect(Cogs.hasAssembledCogs == false)
 
   let beforeInstall = Cogs.forTesting()
   #expect(beforeInstall.peek(one05StateCog) == 41)
-  #expect(Cogs.hasBootstrappedApp == false)
+  #expect(Cogs.hasAssembledCogs == false)
 
-  Cogs.withBootstrappedApp { app in
-    #expect(Cogs.isBootstrappedApp(app))
+  Cogs.withAssembledCogs { app in
+    #expect(Cogs.isAssembledCogs(app))
 
     let duringInstall = Cogs.forTesting()
-    #expect(Cogs.isBootstrappedApp(app))
-    #expect(Cogs.isBootstrappedApp(beforeInstall) == false)
-    #expect(Cogs.isBootstrappedApp(duringInstall) == false)
+    #expect(Cogs.isAssembledCogs(app))
+    #expect(Cogs.isAssembledCogs(beforeInstall) == false)
+    #expect(Cogs.isAssembledCogs(duringInstall) == false)
     #expect(app.peek(one05StateCog) == 41)
     #expect(duringInstall.peek(one05StateCog) == 41)
 
@@ -70,13 +70,13 @@ private let one05StateCog = Cog<Int>.Manual(41, name: "one05.state")
 
     #expect(duringInstall.peek(one05StateCog) == 303)
     #expect(app.peek(one05StateCog) == 41)
-    #expect(Cogs.isBootstrappedApp(app))
+    #expect(Cogs.isAssembledCogs(app))
   }
 
-  #expect(Cogs.hasBootstrappedApp == false)
+  #expect(Cogs.hasAssembledCogs == false)
 
   let afterInstall = Cogs.forTesting()
   #expect(afterInstall !== beforeInstall)
   #expect(afterInstall.peek(one05StateCog) == 41)
-  #expect(Cogs.hasBootstrappedApp == false)
+  #expect(Cogs.hasAssembledCogs == false)
 }

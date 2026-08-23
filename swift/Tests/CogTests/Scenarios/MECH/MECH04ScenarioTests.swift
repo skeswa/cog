@@ -24,6 +24,6 @@ import Testing
   // `preconditionFailure`'s message under `-O`. Reading the child's stderr is
   // what makes this test fail if the guard ever regresses to a silent trap.
   let stderr = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
-  #expect(stderr.contains("Two mechanisms in one bootstrap list are both named \"Twin\""))
+  #expect(stderr.contains("Two mechanisms in one assembly list are both named \"Twin\""))
   #expect(stderr.contains("explicit `name`"))
 }

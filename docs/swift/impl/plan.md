@@ -169,7 +169,7 @@ Build the first complete behavior core:
 - lazy automatic state, dynamic edges, equality gates, cycles, and peeks;
 - reactions, mechanisms, `whenever` scopes, task ownership, and FIFO write-back;
 - app, observed, and ephemeral lifetimes with injected test time;
-- guarded app bootstrap and isolated test or preview contexts;
+- guarded app assembly and isolated test or preview contexts;
 - debug seeding, bounded history, and named diagnostic hooks.
 
 The public behavior suite runs unchanged in all four isolation legs and in a
