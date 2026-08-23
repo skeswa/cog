@@ -2,163 +2,104 @@
 
 _Authored August 21, 2026._
 
-Cog began as an attempt to simplify a Dart and Flutter state system and became
-a pair of platform-native designs for SwiftUI and Jetpack Compose. This
-document preserves that lineage without making an obsolete Dart API the entry
-point to either current library.
+This page keeps only the history needed to explain today's design. It does not
+define current behavior. Use the [shared state model](./design.md),
+[Swift docs](./swift/README.md), and [Kotlin docs](./kotlin/README.md) for that.
 
-The current cross-platform contract is [the shared state model](./design.md).
-The [Swift](./swift/README.md) and [Kotlin](./kotlin/README.md) maps describe
-the live platform decisions. History explains why those decisions were asked
-for; it does not override them.
+## The original problem
 
-## The starting problem
+Cog grew from Ditto Subject/BLoC, a state system for a large Flutter web app.
+It used small writable facts and pure computed values. That made ownership
+clear and let Flutter update only the widgets that read a changed fact.
 
-The predecessor was Ditto Subject/BLoC, built for a large Flutter web app from
-ideas in NgRx and Flutter's BLoC pattern. Small subjects represented writable
-facts and pure derivations. That made ownership and cause visible, and it let
-Flutter rebuild only consumers of a changed fact.
+Three problems led to Cog:
 
-Three failures motivated a replacement:
+1. **Too much setup.** A small feature could need several framework objects and
+   providers. Teams often made a second local state system instead, which gave
+   one fact more than one writable copy.
+2. **Mixed states.** Each stream published on its own. A widget could see a new
+   input with an old computed value while a change moved through the graph.
+3. **Wrong ownership.** Root objects made local facts look global. Nested
+   feature runtimes looked better, but split the app into separate state islands.
 
-1. **The useful path required too much ceremony.** A feature might need a BLoC,
-   an entity-level BLoClet, glue, and a provider before it could declare one
-   fact. Developers reasonably built local state machines instead, splitting
-   authority across the app.
-2. **Stream propagation exposed intermediate values.** A chain updated one
-   subject at a time, so a widget could combine a new upstream value with an
-   old downstream one. The notes called this the “telephone problem.”
-3. **The architecture confused scope with ownership.** Root-owned BLoCs made
-   local facts global, while the “business logic” name discouraged using the
-   graph for UI state. Runtime nesting looked like a solution, but it created
-   state islands rather than a coherent app model.
+The new goal was one app-wide graph with small values, controlled writes,
+complete updates, keyed state, precise UI refreshes, and clear async behavior.
 
-The durable goal was therefore not simply “signals for Flutter.” It was normal
-application code over one explainable state graph, with controlled writes,
-coherent turns, keyed state, precise UI invalidation, and explicit async
-behavior.
+## Names changed; roles stayed
 
-## Names and metaphors
+Early drafts used several names for the same jobs:
 
-The design changed names several times while its jobs stabilized:
+| Current role         | Earlier names                    |
+| -------------------- | -------------------------------- |
+| State descriptor     | Subject, `Cog.simple`, `Cog.man` |
+| Keyed box            | context Cog, scoped Cog          |
+| Named operation      | action, maneuver, lever, `Op`    |
+| Effect               | mechanism, `Cogtext.run`         |
+| Source-code grouping | BLoC, `Machine`                  |
+| App runtime          | Conveyor, Cogtext                |
+| Project              | Conveyor, Machina, ARP           |
 
-| Job                  | Earlier names                    | Current role                                 |
-| -------------------- | -------------------------------- | -------------------------------------------- |
-| One state fact       | Subject, `Cog.simple`, `Cog.man` | a Cog descriptor or value reference          |
-| Keyed family         | context Cog, scoped Cog          | `CogBox`                                     |
-| Named write          | action, maneuver, lever, `Op`    | a domain operation around a turn             |
-| Side effect          | mechanism, `Cogtext.run`         | Swift `Mechanism` or Kotlin effect/reaction  |
-| Feature organization | BLoC, `Machine`                  | an ordinary source file, package, or feature |
-| Runtime              | Conveyor, Cogtext                | Swift `Cogs` or Kotlin `CogStore`            |
-| Project              | Conveyor, Machina, ARP           | Cog                                          |
+Today, a descriptor names one fact, an operation asks for a change, and an
+effect acts outside the graph. Files and packages group feature code. They do
+not create feature runtimes.
 
-The mechanical metaphor was useful: a cog names one fact; an op
-asks for a state change; a mechanism acts outside the graph; and a conveyor
-orders the work. The current APIs keep the distinctions without requiring a
-runtime `Machine` object or sharing the same vocabulary on both platforms.
+## Short timeline
 
-## How the design evolved
+### 2022: small state facts
 
-### 2022: a graph of small facts
+The first notes described app state as a graph with one source for each fact.
+Recoil and Flutter's `InheritedModel` showed the value of small declarations
+and narrow UI updates. The missing part was a graph-owned way to publish a full
+change at once.
 
-The original BLoC notes described application state as a directed graph with
-one source for each fact. Recoil and Flutter's `InheritedModel` reinforced two
-ideas: declarations can be small, and a UI should depend on one aspect rather
-than rebuild for a feature-sized object.
+### 2023: one runtime, dynamic links, and keys
 
-The missing piece was a coherent graph-owned update schedule. Independent
-subjects had the right granularity but the wrong publication model.
+The first Cog drafts split writable state from computed and streaming state.
+Reads recorded their dependencies. Effects watched state. Runtime extensions
+formed the app's write API.
 
-### March 2023: Cog, Conveyor, and dynamic links
+A short-lived `Machine` class grouped each feature's state and lifecycle. It
+was soon removed in favor of normal files and one app runtime. This became a
+core rule: source-code layout must not split runtime state.
 
-The first Cog sketches split writable state from computed or streaming state.
-A controller read dependencies, mechanisms watched state, and extension
-methods formed the app's write API.
+Early per-item state used an unnamed scope. Callers then had to carry that scope
+through unrelated code, and a source could not say which scope it used. Typed
+keys replaced it. One `CogBox` could now define a state shape for many items,
+while each item kept separate tracking.
 
-A short-lived `Machine` class grouped state, methods, and an `operate`
-lifecycle. Within days the declarations moved to ordinary top-level Dart
-libraries and one Conveyor runtime. That change established a lasting rule:
-source organization should not require one runtime object per feature.
+Later 2023 work added named sync and async operations, reactions, controlled
+reads, cache ideas, lints, and migration bridges. It also separated two ideas
+that remain separate today: how old a value is and how long the runtime keeps it.
 
-The same drafts introduced per-entity state, dependencies that could change on
-each run, async overlap policies, a fake runtime, Flutter hooks, and generated
-registration. They first modeled entity identity as an implicit context or
-scope. Feedback showed that a source could not state which scopes it belonged
-to and callers had to carry scope through unrelated layers.
+### 2026: native Swift and Kotlin designs
 
-Typed keys replaced scope. A key could flow within a keyed derivation, while a
-boundary to another entity required an explicit key. This became the `CogBox`
-idea: one declaration, many independently tracked values.
+The last Dart draft reduced the front door to sources, automatic state, keyed
+boxes, controlled reads, and reactions. The team then tested the same model on
+native platforms instead of shipping another Dart API.
 
-### June and July 2023: smaller declarations and named operations
+Swift came first and uses Observation only at the SwiftUI boundary. Kotlin has
+a separate design based on the Compose snapshot system. They share behavior,
+not identical APIs.
 
-Under the Machina name, the surface became manual, automatic, and procedural
-cogs plus first-class sync and async operations. Operations could expose
-in-flight calls and the latest failure. Reactions and local derivations became
-smaller, and reads stayed behind a capability so dependencies could not be
-hidden in a global getter.
+## What remains
 
-The design also explored query-style time-to-live, one-shot UI reads, runtime
-identity from stack traces, and custom lints. The `Machine` class was dropped
-for good. A lint or language access control could restrict writes to the file
-that owns a source while ordinary extension methods supplied domain verbs.
-
-This period also clarified a distinction the current design keeps: freshness
-is not lifetime. An async result may be stale and retained, while an unused
-value may be fresh and releasable.
-
-### September and November 2023: ARP, Cogtext, and migration
-
-The ARP experiment — Algebraic effect, Reactive state, Primitive — tested names
-and `StateNotifier` as storage without changing the graph model.
-
-The later Cogtext sketch returned to Cog vocabulary, used callbacks for fresh
-initial values, made runtime extensions the home for named application
-operations, and proposed bridges to the old Subject system. Those bridges made
-incremental migration possible but did not change the ownership rule: only one
-side should remain writable.
-
-### January 2026: the compact signals surface
-
-The final Dart sketch described Cog plainly as an ergonomic signals design for
-simplicity, correctness, and performance. Its front door was small:
-
-- a manual declaration for one source;
-- an automatic declaration whose reads capture dependencies;
-- a `CogBox` for a keyed family;
-- one controller read operation; and
-- a runtime reaction at the graph's edge.
-
-The sketch asked whether the same model fit Swift. That question led to the
-current repository: Swift first, using Observation only at the UI boundary;
-then a separate Kotlin design that reuses the Compose snapshot runtime.
-
-## What carried forward
-
-The current platform designs retain these ideas:
+The current designs kept:
 
 - small source and automatic declarations;
-- dynamic dependencies captured from reads;
-- keyed families as a first-class shape;
-- named domain operations and atomic turns;
-- settled publication instead of stream-by-stream propagation;
-- side effects outside automatic computation;
-- explicit async overlap and stale-result rules;
-- fine-grained native UI tracking;
-- stable runtime identity, readable labels, and explainable history; and
-- isolated runtimes with deterministic setup for tests and previews.
+- dependencies found from real reads;
+- keyed state families;
+- named operations and complete turns;
+- effects outside automatic state;
+- clear async overlap and stale-result rules;
+- narrow native UI updates;
+- stable identity and useful debug history; and
+- isolated runtimes for tests and previews.
 
-Several older directions were deliberately narrowed or rejected:
+They rejected or limited:
 
-- Production does not create nested Cog runtimes for features or screens. One
-  app has one authoritative graph; truly view-local state stays native.
-- A feature is not a runtime `Machine` object. Files, types, and packages
-  organize declarations and operations.
-- Stack traces and source lines may provide debug labels, not durable state
-  identity.
-- A free global getter does not hide tracked reads. Reads go through a runtime
-  or scoped capability.
-- Async uncertainty does not rely on an ad hoc pair of `.live` and
-  `.latestFailure` values. Each platform defines one coherent status model.
-- Flutter hooks, Dart generators, and Subject bridges are historical vehicles,
-  not cross-platform requirements.
+- nested production runtimes for features or screens;
+- runtime `Machine` objects for source-code grouping;
+- line numbers or stack traces as lasting state identity;
+- global getters that hide tracked reads;
+- separate, loosely linked values for async data and failure; and
+- old Flutter hooks, Dart generators, and Subject bridges as shared rules.

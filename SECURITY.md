@@ -2,21 +2,20 @@
 
 ## Supported versions
 
-Cog is pre-1.0. Security fixes are made on the latest published minor release;
-older minor lines are not maintained unless a release note explicitly says
-otherwise. Consumers should use the latest patch within the minor they have
-selected and review the changelog before taking a newer minor.
+Cog is below 1.0. Security fixes go into the latest minor release. Older minor
+versions are not supported unless their release notes say otherwise. Use the
+latest patch for your chosen minor. Read the changelog before moving to a newer
+minor because it may contain breaking changes.
 
 ## Reporting a vulnerability
 
-Do not disclose a suspected vulnerability in a public issue. Use the
-repository's [private vulnerability report](https://github.com/skeswa/cog/security/advisories/new)
-to describe the affected version, impact, reproduction, and any suggested
-mitigation. If private reporting is unavailable, open a public issue asking for
-a private maintainer contact without including vulnerability details.
+Do not report a possible security flaw in a public issue. Send a
+[private vulnerability report](https://github.com/skeswa/cog/security/advisories/new)
+with the affected version, impact, steps to reproduce it, and any known fix. If
+private reports do not work, open a public issue that asks how to contact the
+maintainer privately. Do not include details about the flaw.
 
-The shipping `Cog` package resolves with no third-party dependencies. Separate
-benchmark and lint-development packages do have pinned dependencies, but they
-are not part of an ordinary consumer's resolved graph. The CI trust boundary,
-self-hosted runner controls, and workflow permission contract are documented in
-`docs/maintainers/ci.md` and checked by `mise run workflows:check`.
+The public `Cog` package has no third-party dependencies. Separate benchmark
+and lint tools have pinned dependencies, but normal Cog apps do not receive
+them. [CI operations](./docs/maintainers/ci.md) explains runner security and
+workflow permissions. `mise run workflows:check` checks those rules.
