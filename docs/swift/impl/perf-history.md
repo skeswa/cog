@@ -243,8 +243,9 @@ Each cell shows instructions and median time.
 
 Raw Observation has no automatic-value cache, so it is a lower bound rather
 than a competitor. It was fastest on all four shapes. swift-state-graph was
-slowest on all four. The external runtimes have not been rerun since; the
-absolute CI limits in benchmarks.md still come from this session.
+slowest on all four. The absolute CI limits in benchmarks.md still come from
+this session; the current three-runtime comparison against the shipping core
+is in benchmarks.md.
 
 ## The Storefront correction
 

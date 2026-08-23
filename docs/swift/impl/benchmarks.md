@@ -42,17 +42,35 @@ figure is the median of three independently recorded p50s.
 | 100-node chain  | 64 µs   | zero allocations                 |
 | pinned-key turn | ~2.4 µs | flat from 1 to 1,000 pinned keys |
 
-### Whole-graph propagation
+For scale against a UI budget: a 120 Hz frame is 8.3 ms, so one frame fits
+about 9,000 steady turns, 1,000 fan updates, or 130 full 100-node chain
+settlements. A whole Storefront interaction, which writes state and settles a
+23-node path through a 16-stage pricing chain, takes about 2% of one frame.
 
-From the [three-core comparison (E6)](#benchmark-environment-e6), which ran
-each benchmark warm for up to three seconds of samples.
+### Whole-graph propagation, in perspective
 
-| Shape    | p50      | instructions |
-| -------- | -------- | -----------: |
-| diamond  | 1.859 ms |         41 M |
-| deep     | 0.907 ms |         21 M |
-| broad    | 4.313 ms |         92 M |
-| unstable | 0.559 ms |         13 M |
+The [current runtime comparison (E9)](#benchmark-environment-e9) ran all
+twelve `perf-10-*` benchmarks in one session: the shipping core, raw
+`@Observable`, and swift-state-graph 0.28.0 on the same four shapes. Raw
+Observation is the floor, not a competitor: it is hand-written invalidation
+with no automatic-value cache, so it shows what the hardware and Observation
+itself cost before any library features. swift-state-graph is the closest
+library. Each cell shows p50 time and p50 instructions.
+
+| Shape    | raw `@Observable` (floor) | Cog             | swift-state-graph | Cog vs. floor | Cog vs. swift-state-graph |
+| -------- | ------------------------- | --------------- | ----------------- | ------------: | ------------------------: |
+| diamond  | 788 µs / 16 M             | 1,530 µs / 37 M | 25 ms / 505 M     |          1.9× |                16× faster |
+| deep     | 202 µs / 4.1 M            | 697 µs / 18 M   | 14 ms / 300 M     |          3.5× |                20× faster |
+| broad    | 2,055 µs / 45 M           | 3,703 µs / 88 M | 36 ms / 721 M     |          1.8× |               9.7× faster |
+| unstable | 324 µs / 7.1 M            | 471 µs / 12 M   | 7,471 µs / 153 M  |          1.5× |                16× faster |
+
+So the caching, glitch-free consistency, and dependency tracking Cog adds on
+top of raw Observation cost 1.5× to 3.5× on these shapes, and the same
+features cost 10× to 20× more in swift-state-graph. The gap to the floor is
+widest on the deep chain, where Cog walks 100 cache nodes the raw version
+does not have. These numbers supersede the E6 whole-graph column as the
+current figures; E6 remains the recorded three-core retirement evidence in
+[perf-history.md](./perf-history.md#retiring-the-simple-core).
 
 ### Building a keyed graph
 
@@ -125,8 +143,9 @@ apply these thresholds.
 The committed `perf-10-*` wall-clock ceilings catch large regressions on the
 diamond, deep, broad, and unstable shapes. Each limit is about three times the
 slower p90 recorded in the [initial baseline (E1)](#benchmark-environment-e1)
-session that compared Cog with swift-state-graph and raw `@Observable`; the
-full four-runtime comparison is in
+session, when Cog's cores were much slower, so the current build clears them
+with a wide margin. The current three-runtime figures are in the comparison
+section above; E1's original four-runtime table is in
 [perf-history.md](./perf-history.md#the-external-runtime-comparison).
 
 | Runtime           | recorded p90: diamond / deep / broad / unstable | limits: diamond / deep / broad / unstable |
@@ -255,16 +274,17 @@ absolute hitch or latency targets belong on a pinned physical device.
 
 All benchmark runs used release builds.
 
-| ID                                      | Run name                                  | Date       | Environment                                                                                                                                                                                                                                                             |
-| --------------------------------------- | ----------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a id="benchmark-environment-e1"></a>E1 | Initial baseline                          | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                                                          |
-| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run                        | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                                                      |
-| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run                  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                                                                        |
-| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke                       | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                                                            |
-| <a id="benchmark-environment-e5"></a>E5 | Specialization run                        | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check                                                                     |
-| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison                     | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back                                                         |
-| <a id="benchmark-environment-e7"></a>E7 | Paired arena-configuration Storefront run | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; specialized default and `CompactArena` ran back to back on an idle host after `mise run test:storefront` passed; not a release check |
-| <a id="benchmark-environment-e8"></a>E8 | Corrected Storefront UI run               | 2026-08-23 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, release configuration, smoke profile, five samples per metric through `mise run test:storefront-ui`                                                                                 |
+| ID                                      | Run name                                  | Date       | Environment                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="benchmark-environment-e1"></a>E1 | Initial baseline                          | 2026-08-17 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Swift 6.3.0, harness 1.36.2                                                                                                                                                       |
+| <a id="benchmark-environment-e2"></a>E2 | Shared-runtime run                        | 2026-08-19 | `mactop`, Apple Silicon arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2                                                                                                                                                   |
+| <a id="benchmark-environment-e3"></a>E3 | Corrected Storefront run                  | 2026-08-20 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; both cores ran back to back on an idle host                                                                                                                                     |
+| <a id="benchmark-environment-e4"></a>E4 | Storefront UI smoke                       | 2026-08-19 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, Storefront smoke profile                                                                                                                                                                         |
+| <a id="benchmark-environment-e5"></a>E5 | Specialization run                        | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; seven paired PERF-03 runs and three specialized warm sweeps; not a release check                                                                                  |
+| <a id="benchmark-environment-e6"></a>E6 | Three-core comparison                     | 2026-08-21 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; PERF-10 ran simple, unspecialized arena, then specialized arena back to back                                                                      |
+| <a id="benchmark-environment-e7"></a>E7 | Paired arena-configuration Storefront run | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; specialized default and `CompactArena` ran back to back on an idle host after `mise run test:storefront` passed; not a release check              |
+| <a id="benchmark-environment-e8"></a>E8 | Corrected Storefront UI run               | 2026-08-23 | `mactop`, Xcode 26.4 (17E192), iPhone 17 Pro simulator on iOS 26.4 (23E244), arm64, release configuration, smoke profile, five samples per metric through `mise run test:storefront-ui`                                                                                              |
+| <a id="benchmark-environment-e9"></a>E9 | Current runtime comparison                | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; all twelve `perf-10-*` benchmarks in one session on an idle host: shipping core, raw `@Observable`, swift-state-graph 0.28.0; not a release check |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used
