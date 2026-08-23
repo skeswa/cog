@@ -587,9 +587,12 @@ wall-clock waits; real rendering is proven once by the Weather example.
 - **UI-09.** A view uses one-shot `cogs.peek` in its body. Later changes
   to that cog do not re-render the view.
 - **UI-11.** UIKit automatic tracking works through the same boundary on
-  an iOS 26 simulator. (Proof: simulator.)
-- **UI-12.** AppKit automatic tracking works through the same boundary on
-  a macOS 26 host.
+  an iOS 26 simulator — the one platform-framework smoke proof, kept
+  because UIKit is the shipping target and `updateProperties` tracking is
+  the platform behavior Cog's UIKit story rests on. (The former UI-12
+  proved the same participation through AppKit's `layout` on the macOS
+  host; one canary suffices, and AppKit is not a shipping target.) (Proof:
+  simulator.)
 - **UI-13.** A view reads two cogs, A and B. One turn changes both. Every
   render sees either the old pair before the turn or the new pair after
   it — never one old value and one new value.
