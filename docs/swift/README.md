@@ -243,5 +243,5 @@ Current measurements are in [benchmark results](./impl/benchmarks.md).
 
 <!-- x-release-please-start-version -->
 
-The current published Swift release is 0.4.0.
+The current published Swift release is 0.5.0.
 <!-- x-release-please-end -->

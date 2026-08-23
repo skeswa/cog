@@ -9,6 +9,43 @@ releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## 0.5.0 (2026-08-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **swift:** `Cogs.bootstrapApp(mechanisms:)` is now `Cogs.assemble(mechanisms:)`, and `withBootstrappedApp`, `isBootstrappedApp`, and `hasBootstrappedApp` are now `withAssembledCogs`, `isAssembledCogs`, and `hasAssembledCogs`.
+* **swift:** ManualCog, AsyncCog, ManualCogBox, AsyncCogBox, CogProjection, and CogBoxProjection are unavailable.
+* **swift:** Manual, async, and projection shape types now live under Cog and CogBox.
+* Rename the graph mutation primitive from commit to turn; the old spellings are removed.
+* Use automatic for non-manual cogs throughout Cog and CogTesting; the old derived spellings are removed.
+* Remove Cogs.valueReferenceLayoutName and the retired generic and interned layout selectors from CogTesting.
+
+### Features
+
+* remove the value-reference layout testing selector ([38b30a8](https://github.com/skeswa/cog/commit/38b30a895006360ba01413ffabb18c900be893be))
+* rename derived cogs to automatic cogs ([38b30a8](https://github.com/skeswa/cog/commit/38b30a895006360ba01413ffabb18c900be893be))
+* rename the graph mutation primitive to turn ([38b30a8](https://github.com/skeswa/cog/commit/38b30a895006360ba01413ffabb18c900be893be))
+* **swift:** add the CompactArena package trait ([38b30a8](https://github.com/skeswa/cog/commit/38b30a895006360ba01413ffabb18c900be893be))
+* **swift:** nest marked shapes in Cog families ([b61c5ec](https://github.com/skeswa/cog/commit/b61c5eca2f79d792384a5d88959f3ec8cf854433))
+* **swift:** remove deprecated shape aliases ([5ce6d70](https://github.com/skeswa/cog/commit/5ce6d70cfb0ef19fb31d024b49b4d891e557caef))
+* **swift:** rename bootstrapApp to assemble ([3c13b47](https://github.com/skeswa/cog/commit/3c13b4772c3a6fc1812ad46dc0d8d1e1d8cf261b))
+
+
+### Bug Fixes
+
+* **lint:** recognize nested Cog shape families ([6ff8ff1](https://github.com/skeswa/cog/commit/6ff8ff1c5b2f4e0a783256bbe3eae3207a737514))
+
+
+### Performance Improvements
+
+* **swift:** make specialized arena the default ([79211f9](https://github.com/skeswa/cog/commit/79211f95b4404087306c3ca4d03aa81b1ba1fd1c))
+
+
+### Continuous Integration
+
+* **release:** adopt Release Please and Conventional Commits ([38b30a8](https://github.com/skeswa/cog/commit/38b30a895006360ba01413ffabb18c900be893be))
+
 ## [0.4.0] - 2026-08-18
 
 Cog conventions are now executable. The first-party `coglint` binary ships
