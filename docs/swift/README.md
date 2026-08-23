@@ -27,17 +27,32 @@ Read the Swift docs in this order:
    swift-state-graph.
 6. **[Lint design](./design/lint.md)** — the linter, plugins, rules, and
    distribution model.
-7. **[Implementation plan](./impl/plan.md)** — package layout, milestones, CI,
+7. **[Architecture guide](./impl/architecture/index.md)** — the implemented
+   runtime from public references through arena rows. Read its chapters in this
+   order:
+   - [State and graph](./impl/architecture/state-and-graph.md)
+   - [Turns](./impl/architecture/turns.md)
+   - [Boundaries and effects](./impl/architecture/boundaries-and-effects.md)
+   - [Async work and lifetime](./impl/architecture/async-and-lifetime.md)
+   - Arena core internals:
+     [core](./impl/architecture/arena-core.md),
+     [identity and caching](./impl/architecture/arena-identity-and-caching.md),
+     [storage](./impl/architecture/arena-storage.md),
+     [edges](./impl/architecture/arena-edges.md),
+     [settlement](./impl/architecture/arena-settlement.md), and
+     [specialization](./impl/architecture/arena-specialization.md)
+   - [Codebase tour](./impl/architecture/codebase-tour.md)
+8. **[Implementation plan](./impl/plan.md)** — package layout, milestones, CI,
    and releases.
-8. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
+9. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
    test story.
-9. **[Task graph](./impl/tasks.md)** — small tasks, dependencies, and closing
-   checks.
-10. **[Benchmark results](./impl/benchmarks.md)** — measurements, environments,
+10. **[Task graph](./impl/tasks.md)** — small tasks, dependencies, and closing
+    checks.
+11. **[Benchmark results](./impl/benchmarks.md)** — measurements, environments,
     decisions, and withdrawn results.
-11. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
+12. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
     the result of each speed change.
-12. **[Design history](../history.md)** — optional background from the earlier
+13. **[Design history](../history.md)** — optional background from the earlier
     Dart and Flutter work.
 
 This order also appears in `docs/.vitepress/navigation.mts`. Update both lists
@@ -221,7 +236,7 @@ Open work includes optional `Op` support, deferred reactions, debug history,
 persistence helpers, debounce and throttle timing, and any custom hash table
 that future benchmarks can justify.
 
-The detailed decision record is in [core design §10](./design/exploration.md#10-decision-record).
+The detailed decision record is in [core design §10](./design/exploration.md#_10-decision-record).
 Current measurements are in [benchmark results](./impl/benchmarks.md).
 
 <!-- x-release-please-start-version -->

@@ -39,6 +39,40 @@ const swiftSidebar: DefaultTheme.SidebarItem[] = [
       {
         text: "Implementation",
         items: [
+          {
+            text: "Architecture",
+            link: "/swift/impl/architecture/",
+            items: [
+              { text: "State and graph", link: "/swift/impl/architecture/state-and-graph" },
+              { text: "Turns", link: "/swift/impl/architecture/turns" },
+              {
+                text: "Boundaries and effects",
+                link: "/swift/impl/architecture/boundaries-and-effects",
+              },
+              {
+                text: "Async work and lifetime",
+                link: "/swift/impl/architecture/async-and-lifetime",
+              },
+              {
+                text: "Arena core internals",
+                items: [
+                  { text: "Core", link: "/swift/impl/architecture/arena-core" },
+                  {
+                    text: "Identity and caching",
+                    link: "/swift/impl/architecture/arena-identity-and-caching",
+                  },
+                  { text: "Storage", link: "/swift/impl/architecture/arena-storage" },
+                  { text: "Edges", link: "/swift/impl/architecture/arena-edges" },
+                  { text: "Settlement", link: "/swift/impl/architecture/arena-settlement" },
+                  {
+                    text: "Specialization",
+                    link: "/swift/impl/architecture/arena-specialization",
+                  },
+                ],
+              },
+              { text: "Codebase tour", link: "/swift/impl/architecture/codebase-tour" },
+            ],
+          },
           { text: "Implementation plan", link: "/swift/impl/plan" },
           { text: "Test scenarios", link: "/swift/impl/scenarios" },
           { text: "Task breakdown", link: "/swift/impl/tasks" },
