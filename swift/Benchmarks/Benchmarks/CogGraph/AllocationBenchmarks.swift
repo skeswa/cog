@@ -161,7 +161,8 @@ let allocationBenchmarks: @Sendable () -> Void = {
     .releaseCount: measuredNotGated,
   ]
 
-  // PERF-01 and PERF-12. A steady turn costs nothing, at every percentile.
+  // PERF-01, which also owns the retired PERF-12's shared-machinery zero.
+  // A steady turn costs nothing, at every percentile.
   //
   // It cost seven mallocs and seven object allocations for most of the
   // project's life, and this benchmark was pinned against drift because zero

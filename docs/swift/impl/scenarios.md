@@ -918,15 +918,16 @@ since expected counts derive from the parameters.
 - **COUNT-06.** Cellx lattice: runs match exactly.
 - **COUNT-07.** Keyed diamonds: runs match exactly.
 - **COUNT-08.** Key churn (keys added and removed over and over): runs
-  match exactly, and dropped keys stop running.
-- **COUNT-09.** The selection record proves every behavior scenario through M5
-  passed unchanged over all three measured value-reference layouts; the suite
-  remains green on the retained inline layout. (Proof: suite.)
-- **COUNT-10.** The selection record proves every behavior scenario through M6
-  passed unchanged when the data-oriented core replaced the simple core; the
-  suite remains green on the retained arena. (Proof: suite.)
-- **COUNT-11.** After M7, the complete behavior suite passes unchanged on
-  the retained inline value-reference layout and arena. (Proof: suite.)
+  match exactly; a turn costs the churn window, never the family size.
+  (Dropped keys going quiet is GRAPH-11's claim.)
+
+The layout-selection proofs that lived here as COUNT-09 through COUNT-11 —
+every behavior scenario passing unchanged across the measured
+value-reference layouts and cores — are frozen selection records now that
+the rejected layouts are manifest hard errors and can never re-run. The
+records live in [benchmarks.md](./benchmarks.md) and
+[optimization.md](./optimization.md); the living whole-suite proof is
+LEG-01 and LEG-03.
 
 ## 18. PERF — Performance guarantees
 
@@ -936,9 +937,20 @@ These checks live in the benchmark package and test the implementation itself.
 Limits and layout choices stay open until [benchmarks.md](./benchmarks.md)
 records data. Every item in this group uses `benchmark` proof mode.
 
+The one-time layout comparisons that lived here as PERF-08, PERF-09, and
+PERF-14 — value-reference layouts, edge layouts, and the post-machinery
+core comparison — are frozen selection records: the rejected
+implementations are manifest hard errors and the comparisons can never
+re-execute. Their results stay in [benchmarks.md](./benchmarks.md) and
+[optimization.md](./optimization.md). PERF-12's shared-machinery zero
+folded into PERF-01 when the committed threshold reached exactly zero.
+
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
-  nothing. The retained arena reached the zero-allocation target, and the
-  committed `mallocCountTotal == 0` p90 threshold is enforced by
+  nothing: neither the graph work nor the shared machinery around it (the
+  turn boundary, the writer it hands out, and the arrays a turn accumulates
+  into all reuse their storage — the former PERF-12, indistinguishable from
+  this scenario once the threshold reached exactly zero). The committed
+  `mallocCountTotal == 0` p90 threshold is enforced by
   `bench:thresholds:check` on the pinned CI host, so the result cannot
   regress; impl/benchmarks.md records how it was reached.
 - **PERF-02.** Propagation's retain and release traffic is what
@@ -962,14 +974,6 @@ records data. Every item in this group uses `benchmark` proof mode.
   impl/benchmarks.md. The comparison runs through `bench:baseline:check`
   against a locally recorded baseline — no committed threshold gates this
   in CI — so the benchmark-record entry is the durable claim.
-- **PERF-08.** Keyed diamonds and key churn were measured under inline
-  `AnyHashable`, interned-token, and generic-keyed value-reference layouts in
-  one pinned environment. The recorded result selects inline `AnyHashable`;
-  the rejected implementations no longer remain as build configurations.
-- **PERF-09.** Mostly static and high-churn graphs were measured under the
-  shared edge pool, per-state prefix arrays, and inline-plus-overflow edge
-  layouts in one pinned environment. The recorded result selects the shared
-  pool; the rejected implementations no longer remain as build configurations.
 - **PERF-10.** The specialized arena is measured against compact arena,
   swift-state-graph, and raw `@Observable` in one pinned environment. Historical
   simple-core results remain in impl/benchmarks.md but are not a build
@@ -981,20 +985,10 @@ records data. Every item in this group uses `benchmark` proof mode.
   same retain and release traffic whether one key or a thousand are pinned
   beside it, and the notices it delivers keep their order. The historical
   simple-versus-arena comparison remains in the benchmark record.
-- **PERF-12.** A steady turn's shared machinery allocates nothing: the turn
-  boundary, the writer it hands out, and the arrays a turn accumulates into
-  reuse their storage rather than being rebuilt. The recorded steady-turn
-  allocation count falls to what impl/benchmarks.md records and only ever ratchets
-  downward.
 - **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md
   records and no more — allocations, retains, and releases per node — and
   the committed per-node threshold, enforced by `bench:thresholds:check`,
   keeps that cost from regressing.
-- **PERF-14.** After the shared machinery work, the historical simple core,
-  compact arena, and specialized arena were compared on steady, deep, broad,
-  and unstable shapes in one environment. impl/benchmarks.md records the
-  comparison; only the specialized default and public `CompactArena` trait
-  remain selectable.
 - **PERF-15.** Measure six cuts of the Storefront session: cold start, full
   session, settled actions, an inventory burst, catalog-funnel memory, and the
   same compute work without Cog. Before reporting time, each cut checks visible
@@ -1054,6 +1048,10 @@ _Milestone M8. Design: [lint.md](../design/lint.md)._
 
 The conventions that make Cog code easy to read fail at the same source
 locations in my editor and CI, without making my app compile the linter.
+
+The exact-0.4.0 consumption proof that lived here as LINT-23 was M8-15g's
+one-shot release gate and is that release's frozen record; each release's
+runbook re-proves consumption for its own version.
 
 - **LINT-01.** I run `coglint` on an explicit mix of files and directories.
   It discovers Swift files in deterministic order, reports each violation at
@@ -1131,10 +1129,6 @@ locations in my editor and CI, without making my app compile the linter.
   (Proof: suite.)
 - **LINT-22.** Every diagnostic's stable URL resolves inside the matching
   version of `Cog.docc`, and each article's examples match the fixture corpus.
-  (Proof: suite.)
-- **LINT-23.** A scratch iOS 17 consumer resolves the selected lint
-  distribution at exactly 0.4.0, applies the build-tool plugin, executes the
-  matching released binary, and reaches that release's rule documentation.
   (Proof: suite.)
 - **LINT-24.** `manual-cog-underscore` requires every recognized
   `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` declaration name to
