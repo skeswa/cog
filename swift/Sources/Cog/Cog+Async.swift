@@ -1,7 +1,7 @@
 extension Cog {
   /// A declaration and value reference for asynchronously automatic state.
   ///
-  /// Constructing or copying an `Cog.Async` does not create graph state or start
+  /// Constructing or copying a `Cog.Async` does not create graph state or start
   /// work. The declaration carries stable descriptor identity; each ``Cogs``
   /// lazily creates its own state for that identity when the value is first
   /// demanded. Copies therefore name the same state in one context and separate
