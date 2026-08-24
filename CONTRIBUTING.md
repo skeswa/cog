@@ -14,6 +14,17 @@ its own design. Read the root README first, then use
 
 `mise.toml` is the command source. Run `mise tasks` for the current list.
 
+The root package targets `.iOS(.v17)` and `.macOS(.v14)` and builds in Swift 6
+language mode with `.defaultIsolation(MainActor.self)` — the SE-0466 manifest
+API is why the tools version is 6.2 — plus `NonisolatedNonsendingByDefault`,
+`ExistentialAny`, `MemberImportVisibility`, and `InternalImportsByDefault`.
+Public declarations still state their isolation explicitly. Most tests run on
+macOS; UIKit and example checks need a simulator. The same tests run under
+{MainActor, nonisolated} × {NNBD on, off}: environment values select a leg and
+test defines prove which leg ran. swift-docc-plugin is gated behind
+`COG_DOCC=1`, set only by the docs workflow, so an ordinary consumer resolves a
+package with no dependencies at all.
+
 ## Run checks
 
 Common checks are:
@@ -27,7 +38,6 @@ mise run test:release
 mise run api:check
 mise run test:compilefail
 mise run lint:swift
-mise run tasks:check
 mise run workflows:check
 mise run changes:check
 ```
@@ -87,15 +97,25 @@ platform README that gives its reading order. Run `mise run docs:build` after
 moving or renaming a page.
 
 Swift design docs define behavior. The implementation docs have separate jobs:
+`impl/scenarios.md` defines promised behavior as test stories, the
+`impl/architecture/` chapters explain the implemented runtime, and
+`impl/perf.md` records what it measures.
 
-- `impl/plan.md` defines milestones.
-- `impl/scenarios.md` defines promised behavior.
-- `impl/tasks.md` defines work items and assigns each scenario.
+Each kind of change has one home:
 
-Any change under `docs/swift/impl` must pass `mise run tasks:check`. Keep current
-status in the platform README instead of copying it into other pages. Document
-new commands in both root agent instruction files and, when users need them,
-in this guide or the root README.
+- Settled decisions go to `docs/swift/design/exploration.md` §10 and the
+  "Where things stand" snapshot in `docs/swift/README.md`.
+- Benchmark results go to `docs/swift/impl/perf.md`, with the environment that
+  produced them. Retired numbers go to `impl/perf-history.md`. A
+  representation choice stays open until it is measured.
+- Build, test, and bench commands go to `CLAUDE.md` and `AGENTS.md`, kept in
+  sync, and to the root README when a newcomer needs them.
+- New documents get mapped in `docs/swift/README.md` or the root `README.md`.
+- New or retired scenarios go to `impl/scenarios.md`, which stays the single
+  census of promised behavior.
+
+Keep current status in the platform README instead of copying it into other
+pages.
 
 ## Write revisions
 

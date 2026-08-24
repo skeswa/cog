@@ -138,7 +138,7 @@ binary-size trade, not a semantic compatibility mode.
 ## Measurement summary
 
 The authoritative numbers and environments live in
-[benchmark results](../benchmarks.md#compactarena-what-the-size-opt-out-costs).
+[performance record](../perf.md#compactarena-what-the-size-opt-out-costs).
 The paired keyed build-and-settle run measured the typed frontier at:
 
 | Measure                | Unspecialized arena | Specialized default |     Change |
@@ -150,8 +150,9 @@ The paired keyed build-and-settle run measured the typed frontier at:
 Retained executable measurements found +163,840 bytes of arm64 `__TEXT` over
 the unspecialized arena (+6.5%) and about +20% for the Storefront executable
 relative to its historical simple build. These are code-segment measurements,
-not app download size. The [optimization record](../optimization.md#typed-frontier-and-shipping-choice)
-explains the profiles that identified generic metadata as the missing cost.
+not app download size. The
+[performance record](../perf.md#typed-frontier-and-shipping-choice) explains the
+profiles that identified generic metadata as the missing cost.
 
 ## Why the app chooses compact mode
 

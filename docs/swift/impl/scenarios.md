@@ -15,8 +15,7 @@ CogLint.
   or a comment so the suite and this tree stay linked.
 - If an API name changes, update the story and test but keep the scenario ID.
   The ID names the behavior, not its spelling.
-- Each group links to its milestone and design section. Exactly one task in
-  [tasks.md](./tasks.md) owns each scenario through its _Greens:_ line. Section
+- Each group links to its design section. Section
   §6 is in [mechanisms.md](../design/mechanisms.md), §5.4 is in
   [rx.md](../design/rx.md), performance sections are in
   [perf.md](../design/perf.md), and other sections are in
@@ -24,15 +23,12 @@ CogLint.
 - A scenario's proof mode says how to check it. Unit tests are the default and
   have no mark. Other modes use `(Proof: ….)`: `compile-fail`, `exit test`,
   `release configuration`, `release absence`, `simulator`, `floor runtime`,
-  `suite`, or `benchmark`. Group 18 uses `benchmark` by default. The ledger
-  checker makes each task use the right command and exact scenario set. Exit
+  `suite`, or `benchmark`. Group 18 uses `benchmark` by default. Exit
   tests must run in debug and release. A `release absence` scenario promises
   debug-only API is gone from release builds and is proven by a
-  `// configuration: release` compile-fail fixture, so its owner names
+  `// configuration: release` compile-fail fixture, so it runs under
   `mise run test:compilefail`; a `release configuration` scenario is proven by
-  the release test leg and its owner names `mise run test:release`. Only
-  suite, release-configuration, and release-absence scenarios may belong to a
-  gate.
+  the release test leg, so it runs under `mise run test:release`.
 - UI tests live in `CogBoundaryTests`, run-count tests in `CogScenarioTests`,
   and other library tests in `CogTests`. Library tests run in all four build
   legs and in release. Debug-only tests use `#if DEBUG`; the release leg proves
@@ -40,7 +36,7 @@ CogLint.
 - Before tests use an ID, deleted items may be renumbered. After that, retire
   the ID and leave a gap. Never reuse it.
 - A blocked behavior gets a _Pending_ note, not a guessed scenario.
-- Group 18 stays open until [benchmarks.md](./benchmarks.md) records its limits
+- Group 18 stays open until [impl/perf.md](./perf.md) records its limits
   or comparison result.
 
 ## Testing constraints
@@ -97,7 +93,7 @@ Every test follows these rules:
 
 ## 1. ONE — One app, one graph
 
-_Milestone M1. Design: §2.3, §6.3, §6.6._
+_Design: §2.3, §6.3, §6.6._
 
 My whole app shares one Cog world. Tests get their own little worlds.
 
@@ -120,7 +116,7 @@ My whole app shares one Cog world. Tests get their own little worlds.
 
 ## 2. DECL — Declaring state
 
-_Milestone M1, except DECL-13 and DECL-14 (M12). Design: §2.3, §3.1, §4._
+_Design: §2.3, §3.1, §4._
 
 I declare state at the top of a file and it just works.
 
@@ -173,7 +169,7 @@ I declare state at the top of a file and it just works.
 
 ## 3. READ — Reading state
 
-_Milestone M1. Design: §2.2, §2.4._
+_Design: §2.2, §2.4._
 
 Every read I make is correct: the latest published state, fully settled.
 
@@ -199,7 +195,7 @@ Every read I make is correct: the latest published state, fully settled.
 
 ## 4. TURN — Writing state and turns
 
-_Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
+_Design: §3.2, §2.2._
 
 `turn` is the only door for writes, and every outer call creates one named graph turn.
 
@@ -258,7 +254,7 @@ _Milestone M1, except TURN-15 (M4). Design: §3.2, §2.2._
 
 ## 5. GRAPH — Automatic values stay right and lazy
 
-_Milestone M1, except GRAPH-13 (M4). Design: §2.2, §2.4, §5.4._
+_Design: §2.2, §2.4, §5.4._
 
 Cog recomputes only what is needed, only when it is needed, and never shows a
 half-finished picture.
@@ -317,7 +313,7 @@ half-finished picture.
 
 ## 6. CYCLE — Cycles and mistakes
 
-_Milestone M1, except CYCLE-07 (M4). Design: §2.4, perf §3.4._
+_Design: §2.4, perf §3.4._
 
 If I accidentally make state depend on itself, Cog tells me exactly where.
 
@@ -341,8 +337,7 @@ If I accidentally make state depend on itself, Cog tells me exactly where.
 
 ## 7. REACT — Reactions
 
-_Milestone M1, except REACT-19 (M2) and REACT-20 (M7). Design: §3.3, §6.2,
-§6.4._
+_Design: §3.3, §6.2, §6.4._
 
 A reaction watches state and does something outside the graph when it
 changes. Reactions register only through a mechanism's controller (§6.2);
@@ -392,11 +387,10 @@ these stories run inside a small test mechanism's `operate`.
   returns — asserted directly, never awaited.
 - **REACT-19.** Within one flush, every changed UI boundary is notified
   before any reaction runs — flush step 4 before step 5. (Checked through
-  history or an internal seam once M2 boundaries exist.)
+  history or an internal seam.)
 - **REACT-20.** Within one flush, every changed export value is offered to
   its subscriber buffers before any reaction runs — flush step 4 before
-  step 5. (Checked through history or an internal seam once M7 exports
-  exist.)
+  step 5. (Checked through history or an internal seam.)
 - **REACT-21.** A reaction watches an automatic cog. A turn changes that
   cog's source, but the recompute lands on an equal value. The reaction
   does not run: only changed reactions run in flush step 5.
@@ -405,7 +399,7 @@ these stories run inside a small test mechanism's `operate`.
 
 ## 8. MECH — Mechanisms and timers
 
-_Milestone M1, except MECH-11 (M4). Design: §6.2, §6.3._
+_Design: §6.2, §6.3._
 
 Every side effect lives in a named mechanism specified at assembly; a
 shorter lifetime is a `whenever` gate expressed in state. (The GROUP family —
@@ -477,8 +471,7 @@ it. Retired IDs stay retired.)
 
 ## 9. LIFE — How long state lives
 
-_Milestone M1 (UI pinning lands with M2; async release with M3; LIFE-11 with
-M4; LIFE-12 with M12). Design: §5.3, perf §7._
+_Design: §5.3, perf §7._
 
 State lives as long as its kind says, and coming back is always safe. Grace
 periods default to 30 seconds in production. Tests override that context
@@ -521,12 +514,12 @@ test waits wall-clock time.
 
 ## 10. SEED — Test helpers: seed and stub
 
-_Milestone M1, except SEED-07 (M2) and SEED-08 (M4). Design: §6.6, §4._
+_Design: §6.6, §4._
 
 My tests import `CogTesting` to set up state quietly with `seed`, or use a real
 turn for a loud domain operation.
 
-- **SEED-02.** Seeding is quiet in the M1 runtime: no turn lands in history
+- **SEED-02.** Seeding is quiet: no turn lands in history
   and no reaction runs.
 - **SEED-03.** I seed a source. The next read returns the seeded value (the
   former SEED-01, a precondition of every assertion here), and seeding
@@ -542,7 +535,7 @@ turn for a loud domain operation.
   has no way to seed. (Proof: release absence.)
 - **SEED-06.** I try to seed an automatic cog. The compiler says no: only
   manual sources can be seeded. (Proof: compile-fail.)
-- **SEED-07.** Once M2 UI boundaries exist, I seed a source that a view has
+- **SEED-07.** I seed a source that a view has
   read. Seeding sends no UI notice; the next real turn still settles and
   notices the value dirtied by the seed.
 - **SEED-08.** I call `seed` at the wrong time — inside a turn body, or
@@ -552,8 +545,7 @@ turn for a loud domain operation.
 
 ## 11. HIST — Debug history
 
-_Milestone M1, except HIST-06 (M2) and HIST-07 (M4). Design: §2.3, §6.2,
-perf §8._
+_Design: §2.3, §6.2, perf §8._
 
 When I wonder what happened, the debug history can tell me.
 
@@ -571,8 +563,8 @@ When I wonder what happened, the debug history can tell me.
 - **HIST-05.** A watch registered with a `name:` runs. Its run lands in
   history under that name, composed beneath its mechanism's name; a
   registration without one falls back to the file and line that made it.
-- **HIST-06.** Once M2 boundaries exist, history records each changed UI
-  notice with the cog's human-readable label.
+- **HIST-06.** History records each changed UI notice with the cog's
+  human-readable label.
 - **HIST-07.** Several turns queue during a flush. History shows each
   queued turn as its own entry, in execution order, and attributes every
   write to the turn that made it; entries from different turns never
@@ -580,8 +572,8 @@ When I wonder what happened, the debug history can tell me.
 
 ## 12. UI — SwiftUI and UIKit boundary
 
-_Milestone M2, except UI-16 (M4), in `CogBoundaryTests` and the Weather
-example. Design: §3.4, §7, §9, perf §6._
+_In `CogBoundaryTests` and the Weather example. Design: §3.4, §7, §9,
+perf §6._
 
 My views update when — and only when — the values they read change. Boundary
 tests assert Observation notices and re-render counters, never pixels or
@@ -623,8 +615,7 @@ wall-clock waits; real rendering is proven once by the Weather example.
 
 ## 13. ASYNC — Async values, first slice
 
-_Milestone M3, except ASYNC-30 through ASYNC-39 (M4) and ASYNC-40 (M12).
-Design: §5.1, §5.2 (`.latest` only), §5.3._
+_Design: §5.1, §5.2 (`.latest` only), §5.3._
 
 Async state is honest: it always says whether it is loading, what value is
 renderable, and whether any generation has succeeded.
@@ -805,7 +796,7 @@ renderable, and whether any generation has succeeded.
 
 ## 14. POLICY — Ordered async policies
 
-_Milestone M7. Design: §5.2, §5.4._
+_Design: §5.2, §5.4._
 
 When order matters more than speed, I pick a policy that says so.
 
@@ -832,7 +823,7 @@ When order matters more than speed, I pick a policy that says so.
 
 ## 15. STREAM — Streams
 
-_Milestone M7. Design: §5.1, §5.2, §5.4._
+_Design: §5.1, §5.2, §5.4._
 
 Some state really is a stream — locations, sockets, database watches.
 
@@ -874,7 +865,7 @@ Some state really is a stream — locations, sockets, database watches.
 
 ## 16. EXPORT — Exports and interop
 
-_Milestone M7. Design: §8, §6.5._
+_Design: §8, §6.5._
 
 Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 
@@ -931,7 +922,7 @@ Cog state can flow out as an `AsyncSequence`, and outside state can flow in.
 
 ## 17. COUNT — Run counts
 
-_Milestones M5, M6, and M7, in `CogScenarioTests`. Design: perf §9, plan M5._
+_In `CogScenarioTests`. Design: perf §9._
 
 Cog never does the same work twice. These scenarios count actual selector
 runs and compare them with the expected number — as plain tests, so duplicate
@@ -956,15 +947,15 @@ every behavior scenario passing unchanged across the measured
 value-reference layouts and cores — are frozen selection records now that
 the rejected layouts are manifest hard errors and can never re-run. The
 records live in [perf-history.md](./perf-history.md) and
-[optimization.md](./optimization.md); the living whole-suite proof is
+[impl/perf.md](./perf.md); the living whole-suite proof is
 LEG-01 and LEG-03.
 
 ## 18. PERF — Performance guarantees
 
-_Milestones M5, M6, M9, and M10, in the benchmark package. Design: perf §5–§9._
+_In the benchmark package. Design: perf §5–§9._
 
 These checks live in the benchmark package and test the implementation itself.
-Limits and layout choices stay open until [benchmarks.md](./benchmarks.md)
+Limits and layout choices stay open until [impl/perf.md](./perf.md)
 records data. Every item in this group uses `benchmark` proof mode.
 
 The one-time layout comparisons that lived here as PERF-08, PERF-09, and
@@ -972,7 +963,7 @@ PERF-14 — value-reference layouts, edge layouts, and the post-machinery
 core comparison — are frozen selection records: the rejected
 implementations are manifest hard errors and the comparisons can never
 re-execute. Their results stay in [perf-history.md](./perf-history.md) and
-[optimization.md](./optimization.md). PERF-12's shared-machinery zero
+[impl/perf.md](./perf.md). PERF-12's shared-machinery zero
 folded into PERF-01 when the committed threshold reached exactly zero.
 
 - **PERF-01.** A steady turn — same graph shape, new values — allocates
@@ -982,15 +973,15 @@ folded into PERF-01 when the committed threshold reached exactly zero.
   this scenario once the threshold reached exactly zero). The committed
   `mallocCountTotal == 0` p90 threshold is enforced by
   `bench:thresholds:check` on the pinned CI host, so the result cannot
-  regress; impl/benchmarks.md records how it was reached.
+  regress; impl/perf.md records how it was reached.
 - **PERF-02.** Propagation's retain and release traffic is what
-  impl/benchmarks.md records. Doing none of it remains the target (perf §5).
+  impl/perf.md records. Doing none of it remains the target (perf §5).
   The drift check compares against a locally recorded baseline through
   `bench:baseline:check` — no committed threshold gates this in CI — so the
   benchmark-record entry, refreshed whenever the benchmark reruns, is the
   durable claim.
 - **PERF-03.** Peak memory for a 1,000-state graph stays within the
-  baseline recorded in impl/benchmarks.md. The comparison runs through
+  baseline recorded in impl/perf.md. The comparison runs through
   `bench:baseline:check` against a locally recorded baseline — no committed
   threshold gates this in CI — so the benchmark-record entry is the durable
   claim.
@@ -1001,12 +992,12 @@ folded into PERF-01 when the committed threshold reached exactly zero.
 - **PERF-06.** Building a value reference with `box[key]` allocates nothing.
 - **PERF-07.** Notice traffic for pinned keyed states — old keys the UI
   once read but no longer shows — stays within the baseline recorded in
-  impl/benchmarks.md. The comparison runs through `bench:baseline:check`
+  impl/perf.md. The comparison runs through `bench:baseline:check`
   against a locally recorded baseline — no committed threshold gates this
   in CI — so the benchmark-record entry is the durable claim.
 - **PERF-10.** The specialized arena is measured against compact arena,
   swift-state-graph, and raw `@Observable` in one pinned environment. Historical
-  simple-core results remain in impl/benchmarks.md but are not a build
+  simple-core results remain in impl/perf.md but are not a build
   configuration. The committed one-sided wall-clock ceilings are the
   thresholds, enforced in CI by `bench:thresholds:check` on the pinned host
   and proven live by the `bench:thresholds:sentinel` rejection run.
@@ -1015,7 +1006,7 @@ folded into PERF-01 when the committed threshold reached exactly zero.
   same retain and release traffic whether one key or a thousand are pinned
   beside it, and the notices it delivers keep their order. The historical
   simple-versus-arena comparison remains in the benchmark record.
-- **PERF-13.** Settling one node of a deep chain costs what impl/benchmarks.md
+- **PERF-13.** Settling one node of a deep chain costs what impl/perf.md
   records and no more — allocations, retains, and releases per node — and
   the committed per-node threshold, enforced by `bench:thresholds:check`,
   keeps that cost from regressing.
@@ -1023,7 +1014,7 @@ folded into PERF-01 when the committed threshold reached exactly zero.
   session, settled actions, an inventory burst, catalog-funnel memory, and the
   same compute work without Cog. Before reporting time, each cut checks visible
   IDs, totals, async generations, invalidation, and its checksum.
-  impl/benchmarks.md records the workload, environment, results, and limits.
+  impl/perf.md records the workload, environment, results, and limits.
 - **PERF-16.** Run the same session in the SwiftUI app with XCUIAutomation in
   release. Measure launch, scroll, scroll under load, search, navigation, and
   cart actions on one pinned simulator. Reset state before each run. Treat
@@ -1031,13 +1022,20 @@ folded into PERF-01 when the committed threshold reached exactly zero.
 - **PERF-17.** The representative headless workload runs under the specialized
   default and public `CompactArena` trait, so the supported binary-size trade
   is measured on an application shape rather than only on synthetic graphs.
-  impl/benchmarks.md preserves the earlier simple-core comparison alongside
+  impl/perf.md preserves the earlier simple-core comparison alongside
   the current paired measurement.
+- **PERF-18.** The same eleven-phase Storefront session runs under four state
+  runtimes — Cog, raw Swift Observation, hand-memoized Observation, and
+  swift-state-graph — from one shared runtime-neutral workload and one
+  identical script. Every runtime passes the shadow model's checkpoints, the
+  settled-output digest, and the zero-outstanding-request check before any of
+  its numbers is reported. impl/perf.md records the cross-runtime cuts,
+  each runtime's declared semantics, and what each non-Cog port had to
+  hand-write.
 
 ## 19. LEG — Build-settings matrix
 
-_Milestones M0 and M1, except LEG-04 (M4). Design: §7, §9, plan Manifest
-choices._
+_Design: §7, §9, and the package manifest facts in `CONTRIBUTING.md`._
 
 Cog behaves the same no matter how my app is compiled.
 
@@ -1054,13 +1052,12 @@ Cog behaves the same no matter how my app is compiled.
 - **LEG-04.** The package builds with its macOS 14 deployment target, and
   the Weather example builds with an iOS 17 deployment target under Swift
   6.2 tools, with no accidental dependency on newer runtime APIs. The
-  scratch-app half of the original proof was M4-04c's recorded one-time
-  run; the Weather build is the leg that keeps re-proving it. (Proof:
-  suite.)
+  scratch-app half of the original proof was a recorded one-time run; the
+  Weather build is the leg that keeps re-proving it. (Proof: suite.)
 
 ## 20. ACTOR — MainActor confinement
 
-_Milestone M1. Design: §1.2, §2.5, §7._
+_Design: §1.2, §2.5, §7._
 
 The graph has one execution lane regardless of my target's default isolation
 settings.
@@ -1074,14 +1071,14 @@ settings.
 
 ## 21. LINT — First-party lint tooling
 
-_Milestone M8. Design: [lint.md](../design/lint.md)._
+_Design: [lint.md](../design/lint.md)._
 
 The conventions that make Cog code easy to read fail at the same source
 locations in my editor and CI, without making my app compile the linter.
 
-The exact-0.4.0 consumption proof that lived here as LINT-23 was M8-15g's
-one-shot release gate and is that release's frozen record; each release's
-runbook re-proves consumption for its own version.
+The exact-0.4.0 consumption proof that lived here as LINT-23 was that
+release's one-shot gate and is its frozen record; each release's runbook
+re-proves consumption for its own version.
 
 - **LINT-01.** I run `coglint` on an explicit mix of files and directories.
   It discovers Swift files in deterministic order, reports each violation at
@@ -1153,9 +1150,10 @@ runbook re-proves consumption for its own version.
   and argument-parser out of an ordinary Cog consumer's source dependency
   graph and satisfies the recorded unused-artifact-fetch result. (Proof: suite.)
 - **LINT-21.** `mise run lint:swift` first runs the linter's own suite, then
-  lints the root library, the Storefront workload package, and both example
-  apps' production sources with production rules, and every tracked test
-  target source with the primitive exemption; the repository is clean.
+  lints the root library, the Storefront workload and comparison-runtime
+  packages, and the Weather example and Storefront benchmark apps' production
+  sources with production rules, and every tracked test target source with the
+  primitive exemption; the repository is clean.
   (Proof: suite.)
 - **LINT-22.** Every diagnostic's stable URL resolves inside the matching
   version of `Cog.docc`, and each article's examples match the fixture corpus.

@@ -48,9 +48,8 @@
 //       fixture against the release-built library modules instead of the debug
 //       ones. A release fixture's scenario must be marked
 //       `(Proof: release absence.)` in scenarios.md, the way a debug
-//       fixture's must be marked `(Proof: compile-fail.)`; the task-ledger
-//       checker requires the owning task to name `mise run test:compilefail`
-//       for that mode, since this harness is what actually proves it.
+//       fixture's must be marked `(Proof: compile-fail.)`, because this
+//       harness is what actually proves either mode.
 //
 // Both directions are enforced. A fixture that emits no error at all fails
 // (`no-diagnostic`) — a compile-fail test that quietly starts compiling proves
@@ -423,7 +422,7 @@ function parseFixture(path) {
 /**
  * Maps every scenario ID in scenarios.md to whether it is declared
  * `(Proof: compile-fail.)` and whether it is declared
- * `(Proof: release absence.)`. Returns null when the ledger is unreadable,
+ * `(Proof: release absence.)`. Returns null when scenarios.md is unreadable,
  * which downgrades the cross-check to a no-op rather than a failure.
  */
 function readScenarioProofModes() {

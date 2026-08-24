@@ -7,9 +7,71 @@ files, edit the changelog, create tags, upload assets, deploy docs, or publish
 plugins. The maintainer reviews pull requests, starts workflows, approves runs,
 and approves protected environments.
 
-The [Swift release policy](../swift/impl/plan.md#release-process) defines version
-rules. [Change management](./changes.md) defines commit messages and checked
-ranges. This page gives the Actions UI steps.
+[Change management](./changes.md) defines commit messages and checked ranges.
+The policy below defines what a release is and who may produce one; the
+numbered sections after it give the Actions UI steps.
+
+## Release policy
+
+- **Authority.** Release preparation and publication run entirely in GitHub
+  Actions. A maintainer workstation may perform optional developer preflight,
+  but it never supplies release evidence or bytes. Human control is review,
+  workflow dispatch, queued-run approval, and protected-environment approval.
+- **History.** jj revision descriptions are Conventional Commits and survive
+  rebase-only pull-request merges as the authoritative linear release input.
+  The required `Conventional Commits` check has no path filter and lints every
+  commit in the GitHub PR or push range. `Release-As` is maintainer-only.
+- **Versioning.** Release Please v17.6.0 uses its manifest-driven `simple`
+  strategy. `version.txt` is the runtime version source; the private Node
+  documentation package remains 0.0.0. Before 1.0, breaking changes and
+  features bump the minor, while fixes and performance changes bump the patch.
+  The one-time manifest begins at 0.0.0 and bootstraps after
+  `16ade4bac358bf1c6f6dbc6e95fad2d467600250`, so the divergent manual 0.4.0 tag
+  is neither treated as an ancestor nor replayed.
+- **Proposal.** Release Please maintains a draft release PR, `CHANGELOG.md`,
+  the manifest, `version.txt`, and only explicitly marked current-version or
+  consumer-pin statements. Published changelog entries and historical design
+  evidence are immutable inputs. The release PR stays draft until its exact
+  current head passes the complete manual candidate workflow.
+- **Candidate.** Manual `swift-ci.yml` requires the release PR number and
+  rejects a dispatch at any other SHA. Its hosted revision-range job supplies
+  the required `Conventional Commits` context that a repository-token-created
+  Release Please PR cannot trigger for itself. The full Actions graph covers
+  formatting, host and release tests, both arena configurations, simulator and
+  examples, Storefront UI, CogLint integrations, documentation, benchmark
+  thresholds, an arm64 native build, and hosted Intel verification of the same
+  downloaded bytes. The final version/PR-head-qualified artifact retains its
+  archive, checksum, and JSON provenance for publication.
+- **Cog publication.** After the draft release PR rebase-merges, Release Please
+  force-creates the permanent lightweight bare-semver tag and draft GitHub
+  Release. The hosted publisher waits at `cog-release`, then verifies the
+  workflow identity, conclusion, PR head, tag/tree equality, version,
+  provenance, toolchains, architectures, and checksum before uploading assets,
+  titling `Cog <version>`, and publishing. Kotlin remains outside this tag line
+  and uses Maven coordinates.
+- **Docs.** A narrow hosted job with only `actions: write` dispatches
+  `docs.yml` at the tag after publication, because repository-token-created
+  events do not generally start another workflow. DocC and VitePress still
+  merge into the one Pages deployment at
+  `https://skeswa.github.io/cog/documentation/cog/`.
+- **Sibling.** After Cog and Docs publish, a human dispatches the
+  `coglint-plugins` repository's workflow with the Cog version. Read-only
+  preparation verifies the public tag, assets, checksum, and provenance; runs
+  the exact tag's generator; and smoke-tests SwiftPM. A `coglint-release`-gated
+  job with only sibling `contents: write` re-hashes without executing
+  downloaded Cog code, requires sibling `main` unchanged, fast-forwards one
+  conventional release commit and creates the matching immutable tag in one
+  atomic, non-forced push. A retry accepts an existing tag only when its commit
+  and regenerated managed tree are identical. Final public consumption is
+  read-only.
+- **Recovery.** A manual `release.yml` dispatch accepts an existing immutable
+  tag and merged release PR, rebuilds the complete candidate at that tag in
+  Actions, and retries the same protected publisher. Matching partial assets
+  are reused, divergent assets fail, and tags are never moved or replaced.
+- **Serialization.** The repository-level release concurrency group, draft
+  release PR, immutable tag, and protected publisher admit one Cog publication
+  at a time. The sibling concurrency group and unchanged-main proof serialize
+  the coupled plugin publication behind it.
 
 ## 1. Review the release PR
 

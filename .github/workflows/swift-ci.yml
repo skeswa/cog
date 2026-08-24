@@ -16,7 +16,7 @@ name: Swift CI
 #
 # The two `if:` guards below are exhaustive and mutually exclusive, so exactly
 # one lane runs per event. They are copied verbatim from the "macOS runner
-# topology" section of `docs/maintainers/ci.md` (`M0-05a`), which is the normative
+# topology" section of `docs/maintainers/ci.md`, which is the normative
 # record; do not paraphrase them here. In particular the
 # `github.event_name != 'pull_request' ||` clause is load-bearing: on `push`
 # there is no `github.event.pull_request`, so a bare comparison would evaluate
@@ -45,12 +45,10 @@ name: Swift CI
 # least-privilege `permissions:`, `persist-credentials: false`, a timeout on
 # every job, no `pull_request_target`, and full-SHA action pins.
 #
-# Jobs land here as the milestones that need them land: `M0-05c` adds the
-# release-configuration and compile-fail jobs, `M0-09b` adds the task-ledger
-# check and widens the path filters below, M2 adds `test-simulator` and the
-# Weather build, `M5-08b` adds the benchmark package gate, `M8-13c` adds
-# CogLint dogfood to both macOS runner lanes, and `M8-17` adds the manually
-# dispatched, exact-source release-artifact job.
+# The job list grew alongside the library: the release-configuration and
+# compile-fail jobs, then `test-simulator` and the Weather build, then the
+# benchmark package gate, then CogLint dogfood on both macOS runner lanes, and
+# finally the manually dispatched, exact-source release-artifact job.
 
 # The two path lists are deliberately duplicated rather than shared through a
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
@@ -75,8 +73,6 @@ on:
       - ".swift-format"
       - "mise.toml"
       - "tools/**"
-      - "docs/swift/impl/plan.md"
-      - "docs/swift/impl/tasks.md"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
   push:
@@ -89,8 +85,6 @@ on:
       - ".swift-format"
       - "mise.toml"
       - "tools/**"
-      - "docs/swift/impl/plan.md"
-      - "docs/swift/impl/tasks.md"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
 
@@ -714,7 +708,7 @@ jobs:
         run: mise run test:simulator
 
   build-weather:
-    name: Example apps and macrobenchmark workload (self-hosted)
+    name: Example app and macrobenchmark workload (self-hosted)
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
@@ -751,8 +745,13 @@ jobs:
       # report-only, it is slow, and a timing test on a shared machine teaches
       # people to rerun rather than to look; it runs from
       # `mise run test:storefront-ui` when a number is wanted.
-      - name: Run the Storefront workload tests
-        run: mise run test:storefront
+      # `test:storefront-all` rather than `test:storefront`: the workload suite,
+      # both comparison-runtime packages, and the cross-runtime agreement suite.
+      # A comparison is only meaningful when every runtime in it is green in the
+      # same revision, and the agreement suite is what proves the four computed
+      # the same answers — without it a fast number might just be a wrong one.
+      - name: Run the Storefront workload and comparison-runtime tests
+        run: mise run test:storefront-all
 
       - name: Build the Storefront benchmark app
         run: mise run build:storefront
@@ -831,41 +830,6 @@ jobs:
         run: mise run test:compilefail
 
   # ---------------------------------------------------------------------------
-  # Document lane: the plan-to-task contract, on GitHub-hosted ubuntu.
-  #
-  # The checker is platform-neutral Node, so it needs neither macOS nor the
-  # mini, and running it on a hosted runner keeps the mini's single runner free
-  # for the work that genuinely needs it. It lives in this workflow rather than
-  # `markdown.yml` because the ledger is a Swift-implementation input, and the
-  # path filters above are extended to match: a change to the plan, either
-  # ledger, or the checker itself now triggers this workflow, so an
-  # alignment-only change can never skip its validator.
-  #
-  # No fork guard: this is a GitHub-hosted runner, so fork pull requests are
-  # welcome here and are approval-gated by the repository policy.
-  # ---------------------------------------------------------------------------
-
-  ledger:
-    name: Task ledger
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up mise and the tools pinned in mise.toml
-        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
-        with:
-          version: ${{ env.COG_MISE_VERSION }}
-
-      - name: Validate the task ledger against the plan and scenarios
-        run: mise run tasks:check
-
-  # ---------------------------------------------------------------------------
   # Fork lane: pull requests from forks, on GitHub-hosted macOS.
   #
   # These jobs are the fork's entire macOS signal, so they mirror the
@@ -876,7 +840,7 @@ jobs:
   #
   # These jobs need no same-repo guard because they carry its complement, and
   # they are approval-gated by the repository's `all_external_contributors`
-  # fork-PR policy (`M0-14`), not by anything in this file.
+  # fork-PR policy, not by anything in this file.
   # ---------------------------------------------------------------------------
 
   fork-format:
@@ -1015,7 +979,7 @@ jobs:
         run: mise run test:simulator
 
   fork-build-weather:
-    name: Example apps and macrobenchmark workload (fork, GitHub-hosted)
+    name: Example app and macrobenchmark workload (fork, GitHub-hosted)
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -1051,8 +1015,13 @@ jobs:
       # report-only, it is slow, and a timing test on a shared machine teaches
       # people to rerun rather than to look; it runs from
       # `mise run test:storefront-ui` when a number is wanted.
-      - name: Run the Storefront workload tests
-        run: mise run test:storefront
+      # `test:storefront-all` rather than `test:storefront`: the workload suite,
+      # both comparison-runtime packages, and the cross-runtime agreement suite.
+      # A comparison is only meaningful when every runtime in it is green in the
+      # same revision, and the agreement suite is what proves the four computed
+      # the same answers — without it a fast number might just be a wrong one.
+      - name: Run the Storefront workload and comparison-runtime tests
+        run: mise run test:storefront-all
 
       - name: Build the Storefront benchmark app
         run: mise run build:storefront
@@ -1117,7 +1086,6 @@ jobs:
       - build-weather
       - test-release
       - compile-fail
-      - ledger
       - bench-build
     runs-on: ubuntu-latest
     timeout-minutes: 5

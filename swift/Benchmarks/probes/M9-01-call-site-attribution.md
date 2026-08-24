@@ -6,8 +6,8 @@ code reading and a ranking that no measurement stands behind is a guess with a
 tablecloth on.
 
 The results this probe produced, and the conclusions drawn from them, are in
-[optimization.md](../../../docs/swift/impl/optimization.md) under **Post-M6 call-site
-profile**. This document is the method.
+[impl/perf.md](../../../docs/swift/impl/perf.md) under **What the profiler
+last said, and how stale it is**. This document is the method.
 
 ## Environment
 

@@ -5,9 +5,9 @@
  */
 
 :root {
-  /* Several documents carry wide tables — `docs/swift/impl/plan.md` has rows
-     well past 300 columns — and the stock 688px content column forces those
-     into a cramped horizontal scroll. */
+  /* Several documents carry wide tables — the measurement-environment table in
+     `docs/swift/impl/perf.md` has rows well past 300 columns — and the stock
+     688px content column forces those into a cramped horizontal scroll. */
   --vp-layout-max-width: 1520px;
   --content-width: 900px;
 

@@ -234,3 +234,15 @@ Do not add a path filter to `docs.yml`. The release workflow must dispatch it
 at the tag because events made by a repository token do not usually start
 another workflow. If the API reference is missing, rerun Docs; the merge step
 will fail instead of publishing broken `/documentation/cog/` links.
+
+## Open questions
+
+These are unresolved operational choices, not defects. Each is written down so
+a future change reconsiders it deliberately.
+
+- If the mini ever moves from bare metal to a virtual machine, measure
+  benchmark noise again before trusting a gated threshold from the new host.
+- Recheck the benchmark tool pins in `swift/Benchmarks/README.md` whenever
+  Swift or Xcode changes.
+- Move simulator checks out of pull requests if they become too slow, and run
+  them on `main` and release candidates only.

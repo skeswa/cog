@@ -1,9 +1,89 @@
 import Benchmark
 internal import Cog
 import CogStorefront
+import StorefrontWorkload
 
-/// The Storefront macrobenchmark's five cuts, and the MainActor owner they run
-/// behind.
+/// The inputs every Storefront cut shares, whichever runtime performs them.
+///
+/// Static and non-generic on purpose. The profile decides the catalog, the
+/// pricing ladder, and every expectation derived from them, so four runtimes
+/// that built their own would be four different sessions rather than one
+/// session performed four ways. One profile and one prepared world, built once
+/// and handed to every harness, is what makes the comparison a comparison.
+@MainActor
+enum StorefrontWorkloadInputs {
+  /// The profile every reported cut runs.
+  ///
+  /// `standard`, always. The smoke profile is for correctness and the stress
+  /// profile is for local exploration; a reported number that could have come
+  /// from either would mean nothing.
+  static let profile = StorefrontProfile.standard
+
+  /// Fixture-derived verifier storage prepared outside every measured region.
+  ///
+  /// A value type, so each driver receives a copy and mutates only its own.
+  /// Sharing the *construction* across runtimes is the point; sharing the
+  /// storage would let one runtime's session move another's shadow.
+  static let preparedWorld = StorefrontWorld(profile: profile)
+
+  /// The catalog the compute-only control scores, built once.
+  ///
+  /// Fixture construction is not part of what the control measures — it is the
+  /// *input* — so it happens here rather than inside the measured region.
+  static let controlCatalog = preparedWorld.catalog
+
+  /// Runs every heavy kernel over the same inputs with no graph at all.
+  ///
+  /// Reported *beside* the application cuts and never subtracted from them.
+  /// Differencing two noisy measurements produces a third, noisier number that
+  /// looks authoritative and is not; printing both and letting a reader see the
+  /// ratio is honest and just as useful.
+  ///
+  /// Deliberately not a method on ``StorefrontHarness``: it holds no graph at
+  /// all, so it has no runtime to be generic over, and repeating it once per
+  /// runtime would measure the same call four times under four names.
+  static func runComputeControl(
+    catalog: CatalogSnapshot
+  ) -> StorefrontKernels.ComputeControlResult {
+    let result = StorefrontKernels.computeControl(for: profile, catalog: catalog)
+    blackHole(result.checksum)
+    return result
+  }
+
+  /// Validates the compute-only result after its timer has stopped.
+  static func validateComputeControl(_ result: StorefrontKernels.ComputeControlResult) {
+    guard result.indexedTokens > 0, result.candidateCount > 0 else {
+      fatalError("The Storefront compute control produced an empty index or no candidates.")
+    }
+  }
+}
+
+/// A measured range of steady interactions whose operations can be replayed
+/// after timing.
+///
+/// Top-level and non-generic so it can carry a measured batch back out to a
+/// nonisolated `Benchmark` body whichever runtime produced it. It holds
+/// ordinals, never runtime state.
+struct StorefrontInteractionBatch: Sendable {
+  /// First global interaction ordinal in the batch.
+  let range: Range<Int>
+}
+
+/// The inputs one inventory burst is measured over.
+///
+/// Top-level and non-generic for the same reason as
+/// ``StorefrontInteractionBatch``: it crosses back out to the benchmark body,
+/// and everything in it is plain data.
+struct StorefrontBurstInput: Sendable {
+  /// Rows the held browse observer currently demands.
+  let touched: [ProductID]
+
+  /// Inventory generation published by this burst.
+  let generation: Int
+}
+
+/// The Storefront macrobenchmark's cuts, and the MainActor owner they run
+/// behind — generic over the state-management runtime that performs them.
 ///
 /// This is the one workload in the suite that is an *application* rather than a
 /// graph shape. Everything else here measures a structure — a diamond, a fan, a
@@ -15,26 +95,51 @@ import CogStorefront
 /// It complements the synthetic benchmarks rather than replacing them. A
 /// regression here says *something* got slower; the synthetic ones say what.
 ///
+/// ## Why it is generic
+///
+/// `perf-16` measures four runtimes — Cog, raw Swift Observation, hand-memoized
+/// Observation, and swift-state-graph — over the identical eleven-phase
+/// session. Four similar-but-separate harnesses would compare the harnesses:
+/// one that settled its runtime a little differently, or validated a little
+/// less, would produce a number that looks like a property of the runtime and
+/// is a property of the apparatus. One generic harness makes the measured code
+/// path literally the same source for all four, and `perf-15`'s Cog-only cuts
+/// run through this same class at `Runtime == CogStorefrontRuntime`, so their
+/// agreement with `perf-16-storefront-cog-*` is a free self-check on it.
+///
+/// ## Identity and ownership
+///
+/// One instance per runtime, created once and retained for the whole process by
+/// ``StorefrontComparisonHarness``. A class rather than the `enum` this used to
+/// be because Swift has no static stored properties in a generic type, and the
+/// settled interaction runtime, the settled burst runtime, and the retained
+/// footprint contexts have to outlive individual samples — that persistence is
+/// what `M5-11` requires of a region carrying process-global counters.
+///
 /// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``.
 @MainActor
-enum StorefrontHarness {
-  /// The profile every reported cut runs.
+final class StorefrontHarness<Runtime: StorefrontRuntime> {
+  /// The profile every cut this harness runs uses.
+  var profile: StorefrontProfile { StorefrontWorkloadInputs.profile }
+
+  /// The fixture-derived world every driver this harness builds starts from.
+  var preparedWorld: StorefrontWorld { StorefrontWorkloadInputs.preparedWorld }
+
+  /// Creates the one harness for this runtime.
+  init() {}
+
+  // MARK: - Cold start and whole session
+
+  /// The driver the last measured cold start or session produced.
   ///
-  /// `standard`, always. The smoke profile is for correctness and the stress
-  /// profile is for local exploration; a reported number that could have come
-  /// from either would mean nothing.
-  static let profile = StorefrontProfile.standard
-
-  /// Fixture-derived verifier storage prepared outside every measured region.
-  static let preparedWorld = StorefrontWorld(profile: profile)
-
-  /// The catalog the compute-only control scores, built once.
+  /// Held rather than returned because a `StorefrontSessionDriver` is not
+  /// `Sendable` and a benchmark body is nonisolated: handing one back out is
+  /// exactly the error the isolated-harness shape exists to avoid.
   ///
-  /// Fixture construction is not part of what the control measures — it is the
-  /// *input* — so it happens here rather than inside the measured region.
-  static let controlCatalog = preparedWorld.catalog
-
-  // MARK: - Cold start
+  /// ``validateMeasuredDriver()`` clears it, so the release of a measured
+  /// driver still lands *after* `stopMeasurement()` rather than inside the next
+  /// sample's timed region.
+  private var lastMeasuredDriver: StorefrontSessionDriver<Runtime>?
 
   /// Builds a runtime and materializes the first complete screen.
   ///
@@ -43,10 +148,8 @@ enum StorefrontHarness {
   /// viewport's inventory and offers. This is the only cut that measures what a
   /// graph costs to *create*, which every other benchmark in this package
   /// deliberately warms away.
-  static func runColdStart(preparedWorld: StorefrontWorld) async throws
-    -> StorefrontSessionDriver
-  {
-    let driver = StorefrontSessionDriver(
+  func runColdStart() async throws {
+    let driver = StorefrontSessionDriver<Runtime>(
       profile: profile,
       holds: .all,
       preparedWorld: preparedWorld,
@@ -54,14 +157,12 @@ enum StorefrontHarness {
     )
     try await driver.runColdStart()
     blackHole(driver.sink.visibleChecksum)
-    return driver
+    lastMeasuredDriver = driver
   }
 
-  // MARK: - Whole session
-
   /// Runs the complete standard interaction trace.
-  static func runSession(preparedWorld: StorefrontWorld) async throws -> StorefrontSessionDriver {
-    let driver = StorefrontSessionDriver(
+  func runSession() async throws {
+    let driver = StorefrontSessionDriver<Runtime>(
       profile: profile,
       holds: .all,
       preparedWorld: preparedWorld,
@@ -69,51 +170,50 @@ enum StorefrontHarness {
     )
     try await driver.runStandardTrace()
     blackHole(driver.sink.visibleChecksum)
-    return driver
+    lastMeasuredDriver = driver
   }
 
-  /// Validates one measured driver only after its timer has stopped.
+  /// Validates the last measured driver only after its timer has stopped.
   ///
-  /// The phase-by-phase verifier is the Storefront package's correctness gate.
-  /// A reported sample instead proves its final independent shadow digest and
+  /// The phase-by-phase verifier is the workload package's correctness gate. A
+  /// reported sample instead proves its final independent shadow digest and
   /// exact request quiescence here, keeping verifier kernels out of the timing.
-  static func validateMeasuredDriver(
-    _ driver: StorefrontSessionDriver,
-    against world: StorefrontWorld? = nil
-  ) async {
-    await driver.requireSettledOutput(against: world)
+  /// Every claim it makes is runtime-invariant — the visible identifiers, the
+  /// rendered checksum, the suggestions, the order total, and that nothing is
+  /// still outstanding — so a runtime that computed a different session fails
+  /// here rather than reporting a fast wrong answer.
+  func validateMeasuredDriver() async {
+    guard let driver = lastMeasuredDriver else {
+      fatalError("A Storefront sample was validated without having been measured.")
+    }
+    lastMeasuredDriver = nil
+    await driver.requireSettledOutput()
   }
 
   // MARK: - Quiescent interactions
 
   /// The settled runtime the interaction cut drives, held across every sample.
-  static var interactionDriver: StorefrontSessionDriver?
+  private var interactionDriver: StorefrontSessionDriver<Runtime>?
 
   /// Products the interaction loop touches, all of them on screen.
-  static var interactionProducts: [ProductID] = []
+  private var interactionProducts: [ProductID] = []
 
   /// Shadow state replayed only after each measured interaction batch.
-  static var interactionWorld: StorefrontWorld?
+  private var interactionWorld: StorefrontWorld?
 
   /// Monotonic interaction ordinal across warmups and reported samples.
-  static var interactionIteration = 0
-
-  /// A measured range whose operations can be replayed after timing.
-  struct InteractionBatch: Sendable {
-    /// First global interaction ordinal in the batch.
-    let range: Range<Int>
-  }
+  private var interactionIteration = 0
 
   /// Builds and settles the interaction runtime exactly once.
   ///
   /// Once, not once per iteration, and that is what makes the measured region
   /// quiescent enough to carry process-global allocation and ARC counters
-  /// (`M5-11`). The context is never dropped, the mechanism's reactions hold
-  /// durable leases so no `whileObserved` grace sleeper is scheduled, and the
-  /// scripted service is left with nothing outstanding.
-  static func settleInteractions() async throws {
+  /// (`M5-11`). The context is never dropped, the held observers keep their
+  /// demand so no grace sleeper is scheduled, and the scripted service is left
+  /// with nothing outstanding.
+  func settleInteractions() async throws {
     guard interactionDriver == nil else { return }
-    let driver = StorefrontSessionDriver(
+    let driver = StorefrontSessionDriver<Runtime>(
       profile: profile,
       holds: .quiescentBrowse,
       preparedWorld: preparedWorld
@@ -146,11 +246,17 @@ enum StorefrontHarness {
   /// session cut instead, on wall clock alone.
   ///
   /// - Parameter count: How many iterations to drive.
-  static func runInteractions(_ count: Int) -> InteractionBatch {
+  func runInteractions(_ count: Int) -> StorefrontInteractionBatch {
     guard let driver = interactionDriver else {
       fatalError("The Storefront interaction cut was driven before it was settled.")
     }
-    let cogs = driver.cogs
+    // The **runtime**, deliberately, and never the generic driver. Reading it
+    // out once binds `Runtime` to this harness's concrete type for the whole
+    // loop, so the specializer can devirtualize all four verbs; going back
+    // through the driver on every iteration would put protocol-witness
+    // dispatches inside the measured region and quietly make this cut report
+    // the cost of the apparatus that makes four runtimes comparable.
+    let runtime = driver.runtime
     let products = interactionProducts
     let start = interactionIteration
     let end = start + count
@@ -164,14 +270,14 @@ enum StorefrontHarness {
       else {
         fatalError("The Storefront interaction cut has no settled products.")
       }
-      cogs.toggleFavorite(interaction.productID)
-      cogs.setCartQuantity(interaction.quantity, for: interaction.productID)
-      cogs.selectVariant(interaction.variantIndex, for: interaction.productID)
-      cogs.openProduct(interaction.productID, rank: interaction.viewRank)
+      runtime.toggleFavorite(interaction.productID)
+      runtime.setCartQuantity(interaction.quantity, for: interaction.productID)
+      runtime.selectVariant(interaction.variantIndex, for: interaction.productID)
+      runtime.openProduct(interaction.productID, rank: interaction.viewRank)
     }
     interactionIteration = end
     blackHole(driver.sink.visibleChecksum)
-    return InteractionBatch(range: start..<end)
+    return StorefrontInteractionBatch(range: start..<end)
   }
 
   /// Replays a measured batch into the plain shadow and validates its output.
@@ -180,7 +286,7 @@ enum StorefrontHarness {
   /// and two on successive laps, variants advance on every lap, favorites
   /// always toggle, and ranks are globally monotonic; no persistent sample can
   /// degrade into repeatedly writing the values it already holds.
-  static func validateInteractions(_ batch: InteractionBatch) async {
+  func validateInteractions(_ batch: StorefrontInteractionBatch) async {
     guard let driver = interactionDriver, var world = interactionWorld else {
       fatalError("The Storefront interaction batch was validated before it was settled.")
     }
@@ -207,7 +313,7 @@ enum StorefrontHarness {
       world.viewRanks[id] = interaction.viewRank
     }
     interactionWorld = world
-    await validateMeasuredDriver(driver, against: world)
+    await driver.requireSettledOutput(against: world)
   }
 
   // MARK: - Footprint
@@ -215,7 +321,7 @@ enum StorefrontHarness {
   /// Contexts the footprint cut has already measured, retained forever.
   ///
   /// Retained, not released, and that is the whole reason this cut can carry
-  /// allocation counters at all. Releasing a `Cogs` between iterations would
+  /// allocation counters at all. Releasing a runtime between iterations would
   /// drop thousands of states and cancel their grace sleepers, and the frees
   /// would land inside the *next* iteration's measured region — the exact
   /// process-global attribution error `M5-11` recorded, with the null
@@ -224,10 +330,10 @@ enum StorefrontHarness {
   ///
   /// The cost is real and bounded: `maxIterations` is small precisely because
   /// each retained context is a whole standard-profile graph.
-  static var footprintContexts: [StorefrontSessionDriver] = []
+  private var footprintContexts: [StorefrontSessionDriver<Runtime>] = []
 
   /// The context built for the next measured materialization.
-  static var pendingFootprintContext: StorefrontSessionDriver?
+  private var pendingFootprintContext: StorefrontSessionDriver<Runtime>?
 
   /// Builds a context and settles its async roots, materializing no keyed state.
   ///
@@ -238,21 +344,25 @@ enum StorefrontHarness {
   /// are resolved first and the measured region contains only synchronous
   /// graph construction.
   ///
-  /// The read that demands the roots is deliberately the *candidate list* — the
-  /// last node upstream of the keyed funnel. It pulls the catalog and the search
-  /// index and produces a list of ordinals, and it creates not one per-product
-  /// state, which is what leaves the whole funnel for the measured region.
-  static func prepareFootprint() async throws {
-    let driver = StorefrontSessionDriver(
+  /// The root demand is supplied by the caller rather than performed here, and
+  /// it is the one step of this cut that is *not* runtime-neutral. What has to
+  /// happen is precise: start the catalog and the search index without
+  /// materializing the funnel those two feed, because the funnel is the thing
+  /// the measured region exists to build. ``StorefrontRuntime`` has no verb for
+  /// that — ``StorefrontRuntime/demandRankedProductIDs()`` deliberately
+  /// materializes the funnel — so the demand is written per runtime, at a call
+  /// site where `Runtime` is concrete, and is documented there.
+  ///
+  /// - Parameter demandRoots: Starts the catalog and search-index requests
+  ///   while creating none of the per-product funnel this cut weighs.
+  func prepareFootprint(demandingRoots demandRoots: (Runtime) -> Void) async throws {
+    let driver = StorefrontSessionDriver<Runtime>(
       profile: profile,
       holds: [.account],
       preparedWorld: preparedWorld
     )
 
-    // Demand the roots. Tracked, never `peek`: a one-shot peek renews a
-    // `whileObserved` grace sleeper, which is a task and an allocation, and
-    // this cut exists to count allocations.
-    blackHole(driver.cogs[storefrontSearchCandidateIDsCog].count)
+    demandRoots(driver.runtime)
 
     await driver.awaitStarted([.catalog, .account, .searchIndex])
     // The account first, so no later state is built against a signed-out
@@ -286,18 +396,21 @@ enum StorefrontHarness {
   /// quiescent.
   ///
   /// - Returns: How many products the funnel ranked.
-  static func materializeFootprint() -> Int {
+  func materializeFootprint() -> Int {
     guard let driver = pendingFootprintContext else {
       fatalError("The Storefront footprint cut was measured before it was prepared.")
     }
-    let rankedProducts = driver.cogs[storefrontRankedProductIDsCog]
+    // Through the runtime verb rather than through a subscript, so every
+    // runtime measures this cut with the same one call. It is a tracked read:
+    // the funnel has to stay materialized to be weighed.
+    let rankedProducts = driver.runtime.demandRankedProductIDs()
     return rankedProducts.count
   }
 
   /// Checks the materialization and retains the context so nothing is released.
   ///
   /// - Parameter rankedCount: What ``materializeFootprint()`` returned.
-  static func retainFootprint(rankedCount: Int) {
+  func retainFootprint(rankedCount: Int) {
     guard rankedCount == profile.productCount else {
       fatalError(
         """
@@ -320,32 +433,23 @@ enum StorefrontHarness {
   /// state per product, plus the eligible list and the ranked list. Reported as
   /// a custom metric so a reader can divide the allocation columns by it
   /// without doing arithmetic from a paragraph.
-  static var footprintStateCount: Int { profile.productCount * 2 + 2 }
+  var footprintStateCount: Int { profile.productCount * 2 + 2 }
 
   // MARK: - Async burst
 
   /// The settled runtime the burst cut drives, held across every sample.
-  static var burstDriver: StorefrontSessionDriver?
+  private var burstDriver: StorefrontSessionDriver<Runtime>?
 
   /// Which generation the next burst publishes.
-  static var burstGeneration = 0
+  private var burstGeneration = 0
 
   /// Shadow state advanced only after each measured burst.
-  static var burstWorld: StorefrontWorld?
-
-  /// Inputs selected before one burst timer starts.
-  struct BurstInput: Sendable {
-    /// Rows the held browse reaction currently demands.
-    let touched: [ProductID]
-
-    /// Inventory generation published by this burst.
-    let generation: Int
-  }
+  private var burstWorld: StorefrontWorld?
 
   /// Builds and settles the burst runtime exactly once.
-  static func settleBurst() async throws {
+  func settleBurst() async throws {
     guard burstDriver == nil else { return }
-    let driver = StorefrontSessionDriver(
+    let driver = StorefrontSessionDriver<Runtime>(
       profile: profile,
       holds: .quiescentBrowse,
       preparedWorld: preparedWorld
@@ -357,12 +461,15 @@ enum StorefrontHarness {
   }
 
   /// Snapshots one burst's inputs outside the measured region.
-  static func prepareBurst() -> BurstInput {
+  func prepareBurst() -> StorefrontBurstInput {
     guard let driver = burstDriver else {
       fatalError("The Storefront burst cut was prepared before it was settled.")
     }
     burstGeneration += 1
-    return BurstInput(touched: driver.sink.demandedProductIDs, generation: burstGeneration)
+    return StorefrontBurstInput(
+      touched: driver.sink.demandedProductIDs,
+      generation: burstGeneration
+    )
   }
 
   /// Publishes one inventory burst, accepts every response, and settles.
@@ -371,7 +478,7 @@ enum StorefrontHarness {
   /// one multi-key turn, the requests the demanded rows start, the
   /// acceptance of each response, the graph settlement each acceptance causes,
   /// and the observation work that re-renders the affected rows.
-  static func runBurst(_ input: BurstInput) async throws {
+  func runBurst(_ input: StorefrontBurstInput) async throws {
     guard let driver = burstDriver else {
       fatalError("The Storefront burst cut was driven before it was settled.")
     }
@@ -380,7 +487,7 @@ enum StorefrontHarness {
   }
 
   /// Validates a measured inventory burst after its timer has stopped.
-  static func validateBurst(_ input: BurstInput) async {
+  func validateBurst(_ input: StorefrontBurstInput) async {
     guard let driver = burstDriver, var world = burstWorld else {
       fatalError("The Storefront burst cut was validated before it was settled.")
     }
@@ -389,42 +496,21 @@ enum StorefrontHarness {
     }
     guard input.touched == driver.sink.demandedProductIDs else {
       fatalError(
-        "The Storefront burst touched \(input.touched.count) rows but the browse reaction demanded \(driver.sink.demandedProductIDs.count)."
+        "The Storefront burst touched \(input.touched.count) rows but the browse observer demanded \(driver.sink.demandedProductIDs.count)."
       )
     }
     for id in input.touched { world.inventoryGenerations[id] = input.generation }
     burstWorld = world
-    await validateMeasuredDriver(driver, against: world)
+    await driver.requireSettledOutput(against: world)
   }
 
-  // MARK: - Compute-only control
-
-  /// Runs every heavy kernel over the same inputs with no graph at all.
-  ///
-  /// Reported *beside* the application cuts and never subtracted from them.
-  /// Differencing two noisy measurements produces a third, noisier number that
-  /// looks authoritative and is not; printing both and letting a reader see the
-  /// ratio is honest and just as useful.
-  static func runComputeControl(
-    catalog: CatalogSnapshot
-  ) -> StorefrontKernels.ComputeControlResult {
-    let result = StorefrontKernels.computeControl(for: profile, catalog: catalog)
-    blackHole(result.checksum)
-    return result
-  }
-
-  /// Validates the compute-only result after its timer has stopped.
-  static func validateComputeControl(_ result: StorefrontKernels.ComputeControlResult) {
-    guard result.indexedTokens > 0, result.candidateCount > 0 else {
-      fatalError("The Storefront compute control produced an empty index or no candidates.")
-    }
-  }
+  nonisolated deinit {}
 }
 
 /// The Storefront cuts whose measured region is quiescent.
 ///
 /// Registered with the other counting benchmarks and **before** any benchmark
-/// that drops a `Cogs` or leaves work on another thread, because counting is
+/// that drops a runtime or leaves work on another thread, because counting is
 /// process-global: teardown from a non-quiescent benchmark lands in whichever
 /// benchmark measures next (`M5-11`).
 let storefrontCountingBenchmarks: @Sendable () -> Void = {
@@ -443,14 +529,10 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
   // - `mallocBytesCount` — gross bytes requested;
   // - `memoryLeakedBytes` — bytes that survived the region, which is the
   //   closest thing to "heap held" that can be counted rather than sampled.
-  let countingMetrics: [BenchmarkMetric] = [
-    .mallocCountTotal, .freeCountTotal, .mallocFreeDelta, .mallocBytesCount,
-    .memoryLeakedBytes, .objectAllocCount, .retainCount, .releaseCount, .wallClock,
-    .instructions,
-  ]
+  let countingMetrics = storefrontCountingMetrics
   // Reported, never gated. This workload has no pinned-CI history yet, and a
   // threshold with no repeated measurement behind it is a guess that fails at
-  // the worst moment. `impl/benchmarks.md` records the first measurements and names
+  // the worst moment. `impl/perf.md` records the first measurements and names
   // what promotion would require.
   let reported = BenchmarkThresholds()
   let reportedOnly = Dictionary(
@@ -466,12 +548,12 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
-    try await StorefrontHarness.settleInteractions()
+    try await StorefrontComparisonHarness.settleInteractions(.cog)
     let count = benchmark.scaledIterations.count
     benchmark.startMeasurement()
-    let batch = await StorefrontHarness.runInteractions(count)
+    let batch = await StorefrontComparisonHarness.runInteractions(.cog, count)
     benchmark.stopMeasurement()
-    await StorefrontHarness.validateInteractions(batch)
+    await StorefrontComparisonHarness.validateInteractions(.cog, batch)
   }
 
   Benchmark(
@@ -483,11 +565,11 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
-    let catalog = await StorefrontHarness.controlCatalog
+    let catalog = await StorefrontWorkloadInputs.controlCatalog
     benchmark.startMeasurement()
-    let result = await StorefrontHarness.runComputeControl(catalog: catalog)
+    let result = await StorefrontWorkloadInputs.runComputeControl(catalog: catalog)
     benchmark.stopMeasurement()
-    await StorefrontHarness.validateComputeControl(result)
+    await StorefrontWorkloadInputs.validateComputeControl(result)
   }
 
   // What a catalog-wide keyed funnel costs to *build and hold*.
@@ -498,26 +580,57 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
   // Three is enough: these are exact interposer counts rather than a sampled
   // distribution, so agreement from p0 to p100 is the result, and disagreement
   // would itself be the finding.
+  //
+  // Cog-only, and it has no `perf-16` twin: its preparation has to start the
+  // catalog and search-index requests while creating none of the funnel, and
+  // the neutral protocol has no verb that does that. See
+  // `StorefrontComparisonHarness.prepareCogFootprint()`.
   Benchmark(
     "perf-15-storefront-footprint",
     configuration: .init(
-      metrics: countingMetrics + [footprintStateMetric],
+      metrics: countingMetrics + [storefrontFootprintStateMetric],
       warmupIterations: 0,
       maxDuration: .seconds(120),
       maxIterations: 3,
-      thresholds: reportedOnly.merging([footprintStateMetric: BenchmarkThresholds()]) {
+      thresholds: reportedOnly.merging([storefrontFootprintStateMetric: BenchmarkThresholds()]) {
         current, _ in current
       }
     )
   ) { benchmark in
-    try await StorefrontHarness.prepareFootprint()
+    try await StorefrontComparisonHarness.prepareCogFootprint()
     benchmark.startMeasurement()
-    let rankedCount = await StorefrontHarness.materializeFootprint()
+    let rankedCount = await StorefrontComparisonHarness.materializeFootprint(.cog)
     benchmark.stopMeasurement()
-    await StorefrontHarness.retainFootprint(rankedCount: rankedCount)
-    benchmark.measurement(footprintStateMetric, await StorefrontHarness.footprintStateCount)
+    await StorefrontComparisonHarness.retainFootprint(.cog, rankedCount: rankedCount)
+    benchmark.measurement(
+      storefrontFootprintStateMetric,
+      await StorefrontComparisonHarness.footprintStateCount(.cog)
+    )
   }
 }
+
+/// The metrics every quiescent Storefront cut reports.
+///
+/// Shared with the `perf-16` counting cuts rather than repeated there: two
+/// families that reported different columns for the same measured region would
+/// be describing the same run two ways.
+let storefrontCountingMetrics: [BenchmarkMetric] = [
+  .mallocCountTotal, .freeCountTotal, .mallocFreeDelta, .mallocBytesCount,
+  .memoryLeakedBytes, .objectAllocCount, .retainCount, .releaseCount, .wallClock,
+  .instructions,
+]
+
+/// The metrics every non-quiescent Storefront cut reports.
+///
+/// Wall clock, instructions, and resident memory only. Each cut that uses them
+/// builds or drives a runtime that starts tasks, accepts async completions, or
+/// is dropped at the end of a sample, and `M5-11`'s rule is explicit that such a
+/// region must stay off the ARC and malloc counters — the harness tears its ARC
+/// hooks down between iterations, and a task finishing on another thread then
+/// calls through a null `swift_release_hook`.
+let storefrontTimingMetrics: [BenchmarkMetric] = [
+  .wallClock, .cpuTotal, .instructions, .peakMemoryResidentDelta, .peakMemoryResident,
+]
 
 /// States one footprint iteration materializes.
 ///
@@ -525,24 +638,15 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
 /// metric expresses, and because carrying it beside the allocation columns is
 /// what lets a reader divide one by the other. Unscaled: the count is the
 /// count, not a count per thousand iterations.
-private let footprintStateMetric = BenchmarkMetric.custom(
+let storefrontFootprintStateMetric = BenchmarkMetric.custom(
   "storefrontStates",
   polarity: .prefersSmaller,
   useScalingFactor: false
 )
 
 /// The Storefront cuts whose measured region is not quiescent.
-///
-/// Wall clock, instructions, and resident memory only. Each of these builds or
-/// drives a runtime that starts tasks, accepts async completions, or is dropped
-/// at the end of a sample, and `M5-11`'s rule is explicit that such a region
-/// must stay off the ARC and malloc counters — the harness tears its ARC hooks
-/// down between iterations, and a task finishing on another thread then calls
-/// through a null `swift_release_hook`.
 let storefrontTimingBenchmarks: @Sendable () -> Void = {
-  let timingMetrics: [BenchmarkMetric] = [
-    .wallClock, .cpuTotal, .instructions, .peakMemoryResidentDelta, .peakMemoryResident,
-  ]
+  let timingMetrics = storefrontTimingMetrics
   // Every cut below pins `maxIterations`, and the reason is the memory columns
   // rather than the timing ones. `peakMemoryResident` is a process-wide
   // high-water mark that never comes down, and `peakMemoryResidentDelta` only
@@ -566,11 +670,10 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
-    let preparedWorld = await StorefrontHarness.preparedWorld
     benchmark.startMeasurement()
-    let driver = try await StorefrontHarness.runColdStart(preparedWorld: preparedWorld)
+    try await StorefrontComparisonHarness.runColdStart(.cog)
     benchmark.stopMeasurement()
-    await StorefrontHarness.validateMeasuredDriver(driver)
+    await StorefrontComparisonHarness.validateMeasuredDriver(.cog)
   }
 
   Benchmark(
@@ -583,12 +686,12 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
-    try await StorefrontHarness.settleBurst()
-    let input = await StorefrontHarness.prepareBurst()
+    try await StorefrontComparisonHarness.settleBurst(.cog)
+    let input = await StorefrontComparisonHarness.prepareBurst(.cog)
     benchmark.startMeasurement()
-    try await StorefrontHarness.runBurst(input)
+    try await StorefrontComparisonHarness.runBurst(.cog, input)
     benchmark.stopMeasurement()
-    await StorefrontHarness.validateBurst(input)
+    await StorefrontComparisonHarness.validateBurst(.cog, input)
   }
 
   Benchmark(
@@ -601,10 +704,9 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
       thresholds: reportedOnly
     )
   ) { benchmark in
-    let preparedWorld = await StorefrontHarness.preparedWorld
     benchmark.startMeasurement()
-    let driver = try await StorefrontHarness.runSession(preparedWorld: preparedWorld)
+    try await StorefrontComparisonHarness.runSession(.cog)
     benchmark.stopMeasurement()
-    await StorefrontHarness.validateMeasuredDriver(driver)
+    await StorefrontComparisonHarness.validateMeasuredDriver(.cog)
   }
 }

@@ -4,8 +4,8 @@ _August 22, 2026_
 
 [Back to the architecture overview.](./index.md)
 
-This chapter maps architecture concepts to source files, tests, examples, and
-verification commands. Use it to trace a behavior before changing it.
+This chapter maps architecture concepts to source files, tests, the example app,
+the macrobenchmark, and verification commands. Use it to trace a behavior before changing it.
 
 ## Products and packages
 
@@ -20,11 +20,13 @@ flowchart TB
   testing["CogTesting target<br/>isolated factories + seams"]
   scenarios["CogScenarios target<br/>shared benchmark graphs"]
   tests["root tests"]
-  benches["swift/Benchmarks<br/>separate package"]
-  storefront["swift/Storefront<br/>separate workload package"]
+  benches["cog-benchmarks<br/>swift/Benchmarks<br/>separate package"]
+  storefront["cog-storefront<br/>Macro/Storefront/Workload<br/>separate package"]
+  runtimes["cog-storefront-runtimes<br/>Macro/Storefront/Runtimes<br/>separate package"]
+  stategraph["cog-storefront-state-graph<br/>Macro/Storefront/StateGraph<br/>separate package"]
   lint["swift/Lint<br/>separate development package"]
-  weather["Weather<br/>Xcode app"]
-  storefrontApp["Storefront<br/>Xcode app"]
+  weather["Weather<br/>Xcode example app"]
+  storefrontApp["Storefront<br/>Xcode benchmark driver app<br/>Macro/Storefront/Apps/Cog"]
   root --> cog
   root --> testing --> cog
   root --> scenarios --> cog
@@ -34,12 +36,22 @@ flowchart TB
   benches --> root
   benches --> scenarios
   benches --> storefront
+  benches --> runtimes
+  benches --> stategraph
   storefront --> root
+  runtimes --> storefront
+  stategraph --> storefront
   weather --> root
   storefrontApp --> root
   storefrontApp --> storefront
   lintNote["no root-package dependency"] -.-> lint
 ```
+
+The three `Macro/Storefront/` packages sit inside the `cog-benchmarks` package
+_directory_ and are still separate packages. That nesting is a filesystem fact,
+not a dependency fact: merging them into `cog-benchmarks` would make every
+Storefront app resolve the benchmark harness, the malloc interposer, and
+swift-state-graph, so it must not be done.
 
 ## Source map
 
@@ -227,11 +239,22 @@ is the best feature-sized map. Start with
 then read `WeatherDashboard`, `WeatherCard`, and `WeatherMechanism` for UI and
 effect boundaries.
 
-The [Storefront workload](https://github.com/skeswa/cog/tree/main/swift/Storefront/Sources/CogStorefront)
-is the large-graph map. `StorefrontState.swift` owns sources,
+The [Storefront Cog port](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Macro/Storefront/Workload/Sources/CogStorefront)
+is the large-graph map. It is the Cog runtime of the
+[Storefront macrobenchmark](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/README.md),
+not an example app: three other runtimes run the same session beside it, which
+is why its declarations sit in a package that no benchmark harness can drag into
+an application. `StorefrontState.swift` owns sources,
 `StorefrontAutomatic.swift` contains long automatic chains and keyed selectors,
-`StorefrontAsync.swift` contains async policies, and `StorefrontMechanism.swift`
-owns effects. Its headless trace and SwiftUI app drive the same declarations.
+`StorefrontAsync.swift` contains async policies,
+`CogStorefrontMechanism.swift` owns effects, and `CogStorefrontRuntime.swift` is
+the `StorefrontRuntime` adapter the headless trace and the SwiftUI app both
+drive, so both exercise the same declarations. The runtime-neutral half — the
+domain model, fixtures, kernels, pricing ladder, scripted service, shadow model,
+the `StorefrontRuntime` protocol, and the generic session driver and its
+eleven-phase trace — sits beside it in the dependency-free
+[`StorefrontWorkload`](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Macro/Storefront/Workload/Sources/StorefrontWorkload)
+target, which imports nothing at all.
 
 ## Test organization
 
@@ -245,10 +268,16 @@ owns effects. Its headless trace and SwiftUI app drive the same declarations.
   invalidation, and retracking behavior.
 - `swift/Tests/CogScenarioTests/`: run-count proofs over shared benchmark-sized
   scenario graphs from `CogScenarios`.
-- `swift/Storefront/Tests/`: declaration census, profile shape, and the shared
-  eleven-phase workload trace.
+- `swift/Benchmarks/Macro/Storefront/Workload/Tests/`: declaration census,
+  profile shape, and the shared eleven-phase workload trace.
+- `swift/Benchmarks/Macro/Storefront/Runtimes/Tests/` and
+  `.../StateGraph/Tests/`: the three comparison runtimes against that same
+  trace.
+- `swift/Benchmarks/Tests/StorefrontAgreementTests/`: the cross-runtime
+  agreement gate — the only place all four runtimes coexist, and the gate every
+  reported Storefront number rests on.
 - `swift/Benchmarks/`: separate package for measured graph shapes and Storefront
-  cuts; benchmark numbers belong in `docs/swift/impl/benchmarks.md`.
+  cuts; benchmark numbers belong in `docs/swift/impl/perf.md`.
 
 Never turn an infrastructure detail into a scenario assertion. Behavior must
 remain valid for both specialized default and `CompactArena`.
@@ -311,7 +340,6 @@ Use the repository wrappers:
 
 ```sh
 mise run fmt:check
-mise run tasks:check
 mise run docs:build
 mise run test:arena-configurations
 mise run changes:check

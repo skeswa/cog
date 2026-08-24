@@ -28,8 +28,13 @@ The Swift library is ready to use. It includes SwiftUI support, app-wide side
 effects, lifetimes, async work, streams, value exports, Observation support,
 CogLint plugins, and a fast specialized arena. Normal graph notices scale with
 the number of changed values, and steady turns do not allocate memory. Apps can
-use `CompactArena` to reduce binary size. The Storefront benchmark tests the
-full design. Android work has not started.
+use `CompactArena` to reduce binary size. The Storefront macrobenchmark tests
+the full design against three alternatives — plain `@Observable` with no
+caching, hand-written caching, and swift-state-graph — by running all four
+through one identical shopping session, and every runtime has to compute the
+same answers before any timing is reported. The measured
+[cross-runtime results](./docs/swift/impl/perf.md#cross-runtime-results)
+say what Cog's machinery costs and what it buys. Android work has not started.
 
 <!-- x-release-please-start-version -->
 
@@ -120,3 +125,5 @@ pages are also available here:
 - [Design history](./docs/history.md) — useful background from the old design
 - [Swift docs](./docs/swift/README.md) — current Swift design and work
 - [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
+- [Storefront macrobenchmark](./swift/Benchmarks/Macro/Storefront/README.md) —
+  the four-runtime comparison and how to run it

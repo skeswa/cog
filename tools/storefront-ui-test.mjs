@@ -26,7 +26,7 @@ import { rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
-const PROJECT = "swift/Examples/Storefront/Storefront.xcodeproj";
+const PROJECT = "swift/Benchmarks/Macro/Storefront/Apps/Cog/Storefront.xcodeproj";
 const SCHEME = "StorefrontBench";
 const BUNDLE_NAME = "StorefrontUITests";
 const RESULT_BUNDLE = ".build/storefront-uitest-results.xcresult";

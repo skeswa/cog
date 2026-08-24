@@ -42,19 +42,13 @@ Read the Swift docs in this order:
      [settlement](./impl/architecture/arena-settlement.md), and
      [specialization](./impl/architecture/arena-specialization.md)
    - [Codebase tour](./impl/architecture/codebase-tour.md)
-8. **[Implementation plan](./impl/plan.md)** — package layout, milestones, CI,
-   and releases.
-9. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
+8. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
    test story.
-10. **[Task graph](./impl/tasks.md)** — small tasks, dependencies, and closing
-    checks.
-11. **[Benchmark results](./impl/benchmarks.md)** — the current build's
-    measurements, gates, and environments.
-12. **[Performance history](./impl/perf-history.md)** — the old numbers,
+9. **[Performance record](./impl/perf.md)** — what the current build measures,
+   where the gaps are, the trade-offs taken, and what could come next.
+10. **[Performance history](./impl/perf-history.md)** — the old numbers,
     retired comparisons, and the decisions they settled.
-13. **[Optimization record](./impl/optimization.md)** — profiles, probes, and
-    the result of each speed change.
-14. **[Design history](../history.md)** — optional background from the earlier
+11. **[Design history](../history.md)** — optional background from the earlier
     Dart and Flutter work.
 
 This order also appears in `docs/.vitepress/navigation.mts`. Update both lists
@@ -73,9 +67,24 @@ mise run test:matrix               # all four isolation setups
 mise run test:arena-configurations # default and CompactArena behavior
 mise run test:release              # release build tests
 mise run test:compilefail          # expected compiler errors
-mise run test:storefront           # Storefront workload tests
-mise run tasks:check               # check plan, tasks, and scenarios
+mise run test:storefront-all       # every Storefront macrobenchmark suite
 ```
+
+The Storefront is a macrobenchmark, not an example app. It runs one identical
+eleven-phase shopping session through four state-management runtimes — Cog,
+plain `@Observable` with no caching, hand-written caching, and
+swift-state-graph — and compares their answers before any timing number is
+reported. It lives in `swift/Benchmarks/Macro/Storefront/`, and its
+[README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/README.md)
+explains the runtimes, the shared workload, the agreement gate, and each suite.
+Each package under it documents its own half: the
+[shared workload](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/Workload/README.md),
+the [two plain-Swift ports](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/Runtimes/README.md),
+and the [swift-state-graph port](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/StateGraph/README.md),
+each with the fairness rules and disclosed judgement calls its numbers rest on.
+The measured results are in the
+[performance record](./impl/perf.md#cross-runtime-results). The worked
+_example_ app is `swift/Examples/Weather/`.
 
 Do not run a filtered `swift test` command. SwiftPM exits successfully when a
 filter finds no tests. Cog's wrapper first checks that the tests exist, then
@@ -241,13 +250,18 @@ These rules are settled. The linked design files hold the full details.
   Cog's root dependency graph.
 - Behavior tests use public APIs, injected clocks, continuations, and clear
   signals. They do not depend on timing guesses or a specific core layout.
+- The Storefront macrobenchmark runs one identical commerce session under four
+  state runtimes, gated on all four agreeing. On the measured steady
+  interaction Cog is faster than swift-state-graph and slower than careful
+  hand-written memoization, which reproduces Cog's declared behavior at the
+  cost of 89 lines of hand-maintained invalidation.
 
 Open work includes optional `Op` support, deferred reactions, debug history,
 persistence helpers, debounce and throttle timing, and any custom hash table
 that future benchmarks can justify.
 
 The detailed decision record is in [core design §10](./design/exploration.md#_10-decision-record).
-Current measurements are in [benchmark results](./impl/benchmarks.md).
+Current measurements are in the [performance record](./impl/perf.md).
 
 <!-- x-release-please-start-version -->
 

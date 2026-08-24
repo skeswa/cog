@@ -10,7 +10,7 @@ import { entries, get, items, text } from "./yaml.mjs";
 // POLICY CONSTANTS — the knobs this checker enforces. Edit here, nowhere else.
 // ---------------------------------------------------------------------------
 
-/** The repository the same-repo guard must name (plan.md, "CI runners"). */
+/** The repository the same-repo guard must name (see maintainers/ci.md). */
 const REPOSITORY = "skeswa/cog";
 
 /**
@@ -985,7 +985,6 @@ function cogLintArtifactCiContract(workflow) {
     "build-weather",
     "test-release",
     "compile-fail",
-    "ledger",
     "bench-build",
   ];
   if (

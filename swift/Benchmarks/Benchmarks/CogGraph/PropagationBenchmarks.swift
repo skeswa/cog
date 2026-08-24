@@ -131,7 +131,7 @@ let propagationBenchmarks: @Sendable () -> Void = {
   // is: propagation over class states with edge arrays does ARC work by
   // construction (perf §9.1), and §5's no-ARC rule is what the data-oriented
   // core adopts in M6. The recorded numbers, and the per-node figure derived
-  // from them, are in `impl/benchmarks.md`.
+  // from them, are in `impl/perf.md`.
   let gate = BenchmarkThresholds(
     absolute: [
       .p0: 100, .p25: 100, .p50: 100, .p75: 100, .p90: 100, .p99: 100, .p100: 100,
@@ -163,7 +163,7 @@ let propagationBenchmarks: @Sendable () -> Void = {
   }
 
   // PERF-13. What one node of a settle walk costs, which is the figure the
-  // deep-shape work in M9 is aimed at. Reported per turn; `impl/benchmarks.md` divides by
+  // deep-shape work in M9 is aimed at. Reported per turn; `impl/perf.md` divides by
   // the depth and records the per-node result, because a per-node ceiling in a
   // threshold file would silently change meaning if the depth ever moved.
   //

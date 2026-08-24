@@ -1,44 +1,48 @@
 # Cog for Swift: performance history
 
-_August 23, 2026_
+_August 25, 2026_
 
 This file tells the story of how Cog got fast. It keeps the old numbers, the
 retired comparisons, and the decisions they settled, so that
-[benchmarks.md](./benchmarks.md) can stay focused on the current build.
+[impl/perf.md](./perf.md) can stay focused on the current build.
 
 Nothing here is current evidence. If a number in this file disagrees with one
-in benchmarks.md, benchmarks.md wins. Environment IDs such as
-[E1](./benchmarks.md#benchmark-environment-e1) point at the environment table
-in benchmarks.md.
+in impl/perf.md, the record wins. Environment IDs such as
+[E1](./perf.md#benchmark-environment-e1) point at the environment table in
+impl/perf.md.
 
 ## The short version
 
 Cog's first runtime was a class-based core we called **simple**. Each piece of
 state was an object with pointers to its neighbors. It was easy to verify, and
-M5 gave it a full benchmark baseline.
+it got a full benchmark baseline.
 
-M6 built a second runtime, the **arena**, which stores state in columns and
+A second runtime followed: the **arena**, which stores state in columns and
 edges in a shared pool. The first face-off was a split decision: the arena won
 wide graphs but lost the smallest turn and had a worse pinned-key slope. So the
 simple core stayed the default, and the planned 0.2.0 release did not happen.
 
-M9 changed the picture in three steps. First, shared machinery that both cores
-paid for was fixed: a steady turn stopped allocating, and boundary notices
-stopped costing time per pinned key. Second, profiling found why the arena
-still lost on cold construction: its generic storage boundary made every keyed
-access run unspecialized generic code. Third, the fix for that, a typed
-frontier of `@inlinable` entry points, made the **specialized arena** faster
-than everything else on every shape measured. It shipped as the only core in
-0.5.0. `CompactArena` remains as an opt-out that turns the typed frontier off
-to keep the binary smaller.
+Three later changes settled it. First, shared machinery that both cores paid
+for was fixed: a steady turn stopped allocating, and boundary notices stopped
+costing time per pinned key. Second, profiling found why the arena still lost
+on cold construction: its generic storage boundary made every keyed access run
+unspecialized generic code. Third, the fix for that, a typed frontier of
+`@inlinable` entry points, made the **specialized arena** faster than
+everything else on every shape measured. It shipped as the only core in 0.5.0.
+`CompactArena` remains as an opt-out that turns the typed frontier off to keep
+the binary smaller.
 
 Along the way, a review found five bugs in the first Storefront harness. All of
 its early results were thrown out and remeasured.
 
+The Storefront trace was later lifted onto a runtime-neutral protocol so four
+state runtimes could perform the same session, which retired the pre-lift
+Storefront absolutes recorded here.
+
 ## The simple core's baselines
 
-The [initial baseline (E1)](./benchmarks.md#benchmark-environment-e1) covered
-`M5-06` and `M5-07a` on the simple core.
+The [initial baseline (E1)](./perf.md#benchmark-environment-e1) covered the
+steady turn and keyed reference creation on the simple core.
 
 | Operation                |   mallocs |   objects |  retains |  releases |
 | ------------------------ | --------: | --------: | -------: | --------: |
@@ -47,9 +51,9 @@ The [initial baseline (E1)](./benchmarks.md#benchmark-environment-e1) covered
 | 16-consumer fan          |        26 |        26 |    1,116 |     2,032 |
 | added cost per consumer  | about 1.3 | about 1.3 | about 70 | about 129 |
 
-`M5-07b` measured 1,000 simple states at about 1.4 KB each, sampled in whole
-pages. `M5-07d` measured the old pinned-key slope, which grew with every
-pinned key even when nothing changed:
+A memory cut measured 1,000 simple states at about 1.4 KB each, sampled in
+whole pages. A boundary cut measured the old pinned-key slope, which grew with
+every pinned key even when nothing changed:
 
 | Pinned keys | retains | releases | p50 time |
 | ----------: | ------: | -------: | -------: |
@@ -57,20 +61,20 @@ pinned key even when nothing changed:
 |         100 |     167 |      194 |   4.8 µs |
 |         500 |     567 |      594 |    14 µs |
 
-`M9-06` later removed this slope on both cores. The current flat cost and its
-gate are in benchmarks.md.
+That slope was later removed on both cores. The current flat cost and its gate
+are in impl/perf.md.
 
 ## Storage layout selections
 
 Two representation choices were measured in
-[E1](./benchmarks.md#benchmark-environment-e1) and then settled. The rejected
+[E1](./perf.md#benchmark-environment-e1) and then settled. The rejected
 layouts were deleted from the codebase. Their numbers stay here so the choices
 can be audited without keeping three implementations alive.
 
 ### Value references
 
-`M5-09e` used 100 keys, five arms, and 500 turns. The churn test keeps 10 live
-keys while creating 510.
+The value-reference cut used 100 keys, five arms, and 500 turns. The churn test
+keeps 10 live keys while creating 510.
 
 | Layout               | reference size | keyed diamond p50 |   key churn p50 | peak memory, diamond / churn |
 | -------------------- | -------------: | ----------------: | --------------: | ---------------------------: |
@@ -85,8 +89,8 @@ overloads and ran about 6% slower on the diamond.
 
 ### Arena edges
 
-For `M6-05c`, each root read one stable control and 32 data sources. The churn
-test replaces the 32 data edges each turn.
+In the edge-layout cut, each root read one stable control and 32 data sources.
+The churn test replaces the 32 data edges each turn.
 
 | Layout               | mostly static, p50 | high churn, p50 | mallocs / objects | static retains / releases | churn retains / releases |
 | -------------------- | -----------------: | --------------: | ----------------: | ------------------------: | -----------------------: |
@@ -100,8 +104,8 @@ the forced-churn instruction count and added ARC work.
 
 ## The first core decision
 
-In [E1](./benchmarks.md#benchmark-environment-e1), `M6-12a` ran the same 248
-public scenarios on both cores and compared them.
+In [E1](./perf.md#benchmark-environment-e1), the core comparison ran the same
+248 public scenarios on both cores.
 
 | Workload        | Core   | mallocs / objects | retains / releases | p50 time |
 | --------------- | ------ | ----------------: | -----------------: | -------: |
@@ -114,28 +118,28 @@ The arena cut wide-graph work in half but still allocated, lost the smallest
 turn, and had a worse pinned-key slope past 100 keys. The simple core stayed
 the default. The arena was kept for research, and no 0.2.0 release was made.
 
-## Shared runtime work in M9
+## Shared runtime work
 
-The [shared-runtime run (E2)](./benchmarks.md#benchmark-environment-e2)
+The [shared-runtime run (E2)](./perf.md#benchmark-environment-e2)
 measured fixes that helped both cores.
 
-`M9-10` made the steady turn allocate nothing:
+One cut made the steady turn allocate nothing:
 
-| Metric             | before M9 | after M9 |
-| ------------------ | --------: | -------: |
-| `mallocCountTotal` |         7 |    **0** |
-| retains            |        66 |       63 |
-| p50 time           |  2.202 µs | 1.676 µs |
+| Metric             |   before |    after |
+| ------------------ | -------: | -------: |
+| `mallocCountTotal` |        7 |    **0** |
+| retains            |       66 |       63 |
+| p50 time           | 2.202 µs | 1.676 µs |
 
-Zero held at every percentile across 1,751 samples. `M9-15` did the same for
-settling a node: pulling one source through 100 automatic nodes went from 107
+Zero held at every percentile across 1,751 samples. A companion cut did the
+same for settling a node: pulling one source through 100 automatic nodes went from 107
 allocations to zero. The problem was a dependency list copied before reuse.
 
-`M9-06` made boundary notices cost O(changed keys) instead of O(pinned keys).
+A third made boundary notices cost O(changed keys) instead of O(pinned keys).
 One changed key cost the same with 1 pinned neighbor as with 1,000: on the
 simple core, 71 retains and about 2.4 µs either way.
 
-`M9-17` then compared the cores again. The arena won broad and unstable graphs
+The cores were then compared again. The arena won broad and unstable graphs
 but still lost the smallest turn and the deep chain:
 
 | Workload | simple p50 | arena p50 | simple instructions | arena instructions |
@@ -148,8 +152,8 @@ but still lost the smallest turn and the deep chain:
 ## The construction gap and the typed frontier
 
 The arena took 2.2× as long as simple to build a 1,000-state keyed graph.
-`M9-25` and `M9-26` chased that gap with paired counters and a CPU profile.
-Allocation counts could not explain it. The profile could:
+Paired counters and a CPU profile chased that gap. Allocation counts could not
+explain it. The profile could:
 
 | CPU bucket                        | simple share | arena share | arena cost vs simple |
 | --------------------------------- | -----------: | ----------: | -------------------: |
@@ -166,7 +170,7 @@ generic code.
 The fix was a typed frontier: the arena's public generic reads,
 descriptor-and-key resolution, and typed value-column operations ship as
 stable `@inlinable` bodies, so client builds specialize them. The
-[specialization run (E5)](./benchmarks.md#benchmark-environment-e5) measured
+[specialization run (E5)](./perf.md#benchmark-environment-e5) measured
 the result on the 500-source, 500-consumer build:
 
 | Measure                        | arena without frontier | specialized arena | change |
@@ -182,12 +186,12 @@ An earlier rule had rejected specialization because it grew the binary more
 than 5%. After these results, about 80% of surveyed users said they would take
 the size cost for the speed, so the frontier became the default and the
 `CompactArena` trait became the opt-out. The measured size cost and the
-current compact-versus-default numbers are in benchmarks.md.
+current compact-versus-default numbers are in impl/perf.md.
 
 ## Retiring the simple core
 
 Two runs closed the case. The
-[three-core comparison (E6)](./benchmarks.md#benchmark-environment-e6) ran
+[three-core comparison (E6)](./perf.md#benchmark-environment-e6) ran
 simple, the arena without the frontier, and the specialized arena back to
 back:
 
@@ -198,7 +202,7 @@ back:
 | broad    |      13 ms |  7.909 ms |        4.313 ms |             67% faster |
 | unstable |   2.693 ms |  0.787 ms |        0.559 ms |             79% faster |
 
-The [corrected Storefront run (E3)](./benchmarks.md#benchmark-environment-e3)
+The [corrected Storefront run (E3)](./perf.md#benchmark-environment-e3)
 showed the same thing on an application-shaped graph. The arena (without the
 frontier) beat simple by 12.5× to 66× on every graph-backed cut:
 
@@ -223,15 +227,15 @@ as many retains and 145× as many releases on simple as on the arena. The
 2,402-state footprint kept 18,054 surviving allocations on simple against 75
 on the arena, while holding 28% more bytes.
 
-After the specialized arena also won the warm and whole-graph shapes, `M9-18`
-recorded the decision: the specialized arena is the only shipping core, and
+After the specialized arena also won the warm and whole-graph shapes, the
+decision was recorded: the specialized arena is the only shipping core, and
 the simple core was deleted. The retired selectors are manifest errors now, so
 none of these comparisons can be rerun.
 
 ## The external runtime comparison
 
-In [E1](./benchmarks.md#benchmark-environment-e1), `M6-11c` compared the two
-Cog cores of that time with swift-state-graph 0.28.0 and raw `@Observable`.
+In [E1](./perf.md#benchmark-environment-e1), the two Cog cores of that time
+were compared with swift-state-graph 0.28.0 and raw `@Observable`.
 Each cell shows instructions and median time.
 
 | Runtime                |      diamond p50 |           deep p50 |        broad p50 |       unstable p50 |
@@ -243,9 +247,9 @@ Each cell shows instructions and median time.
 
 Raw Observation has no automatic-value cache, so it is a lower bound rather
 than a competitor. It was fastest on all four shapes. swift-state-graph was
-slowest on all four. The absolute CI limits in benchmarks.md still come from
+slowest on all four. The absolute CI limits in impl/perf.md still come from
 this session; the current three-runtime comparison against the shipping core
-is in benchmarks.md.
+is in impl/perf.md.
 
 ## The Storefront correction
 
@@ -259,8 +263,28 @@ On August 20, 2026, a review found five bugs in the first Storefront harness:
 
 Every early Storefront result, headless and UI, was withdrawn. The corrected
 headless run (E3, above) replaced the headless numbers, the
-[paired arena-configuration run (E7)](./benchmarks.md#benchmark-environment-e7)
+[paired arena-configuration run (E7)](./perf.md#benchmark-environment-e7)
 measured the shipping default against `CompactArena`, and the
-[corrected UI run (E8)](./benchmarks.md#benchmark-environment-e8) replaced the
+[corrected UI run (E8)](./perf.md#benchmark-environment-e8) replaced the
 UI numbers. The old footprint counts happened to match the corrected ones
 because that region never ran the bad shadow checks.
+
+## Storefront before the runtime lift
+
+Before the runtime lift the Storefront trace was Cog-specific:
+`StorefrontSessionDriver` drove Cog directly rather than a `StorefrontRuntime`
+conformance. The
+[paired arena-configuration run (E7)](./perf.md#benchmark-environment-e7)
+was measured through that pre-lift driver, and it also retired the pre-frontier
+arena's headless figures from the
+[corrected Storefront run](#retiring-the-simple-core): the specialized
+executable beat them on every graph-backed cut, cold 34 → 21 ms, session
+178 → 131 ms, interactions 201 → 178 µs, async burst 4.09 → 3.74 ms, and
+footprint 7.29 → 3.60 ms.
+
+Those absolutes are retired twice over. The driver became generic, and the
+[four-runtime comparison (E14)](./perf.md#benchmark-environment-e14)
+re-measured all six `perf-15` cuts on a different host and toolchain, so no
+figure here may be differenced against one there. E7's paired _ratio_ between
+the specialized default and `CompactArena` is not retired and stays in
+impl/perf.md; only its absolute column is superseded.
