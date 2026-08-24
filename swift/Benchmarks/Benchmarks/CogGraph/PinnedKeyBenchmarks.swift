@@ -126,6 +126,34 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
   // table are 71,000 here, and a ceiling written as 90 would gate nothing while
   // looking like it gated everything. `M9-06` found this the way `M5-11` found
   // it for baselines: by watching a deliberately impossible ceiling pass.
+  // The one-key shape is also the **keyed steady turn**: the graph PERF-01
+  // measures — a manual source, one automatic consumer reading it, one tracked
+  // read — with every reference keyed. The pair is therefore the only
+  // measurement of what keying itself costs, and nothing gated it until a
+  // 2026-08-24 comparison priced it at 2.18x the keyless turn ([E13], with the
+  // call-site attribution beside it in `impl/benchmarks.md`). These ceilings
+  // hold that price. Allocations are exactly zero at the gated percentile,
+  // because a keyed turn allocates nothing for the same reason a keyless one
+  // does and a claim of nothing is checkable exactly. ARC sits just above the
+  // measured 27 retains and 34 releases per turn: tight enough that restoring
+  // a per-turn record or slot lookup fails it — each costs two pairs — and
+  // loose enough to survive the couple of pairs an inlining change can move
+  // when the Xcode pin advances.
+  //
+  // Raw sums, like the slope ceilings below.
+  let keyedTurnAllocation = BenchmarkThresholds(
+    absolute: [
+      .p0: 100, .p25: 100, .p50: 100, .p75: 100, .p90: 0, .p99: 100, .p100: 100,
+    ]
+  )
+  let keyedTurnThresholds: [BenchmarkMetric: BenchmarkThresholds] = [
+    .retainCount: BenchmarkThresholds(absolute: [.p90: 30_000]),
+    .releaseCount: BenchmarkThresholds(absolute: [.p90: 38_000]),
+    .objectAllocCount: keyedTurnAllocation,
+    .mallocCountTotal: keyedTurnAllocation,
+    .wallClock: BenchmarkThresholds(),
+  ]
+
   let slopeThresholds: [BenchmarkMetric: BenchmarkThresholds] = [
     .retainCount: BenchmarkThresholds(absolute: [.p90: 90_000]),
     .releaseCount: BenchmarkThresholds(absolute: [.p90: 110_000]),
@@ -142,7 +170,7 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
         warmupIterations: 2,
         scalingFactor: .kilo,
         maxDuration: .seconds(3),
-        thresholds: pinnedKeyCount == 1 ? thresholds : slopeThresholds
+        thresholds: pinnedKeyCount == 1 ? keyedTurnThresholds : slopeThresholds
       )
     ) { benchmark in
       await PinnedKeyHarness.settle(pinnedKeyCount: pinnedKeyCount)

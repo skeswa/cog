@@ -138,6 +138,41 @@ apply these thresholds.
 - **Observation boundaries stay lazy.** With 1,000 states and 12 tracked
   reads, exactly 12 boundary objects exist. The exact count is asserted, not
   bounded.
+- **A keyed steady turn allocates nothing, and its ARC traffic holds.** The
+  committed `perf-11-pinned-key-slope-1` threshold requires exactly zero
+  mallocs at p90 and caps the turn at 30 retains and 38 releases, just above
+  the 27 and 34 the [keyed-turn comparison (E13)](#benchmark-environment-e13)
+  measured. Restoring a per-turn record or slot lookup costs two pairs and
+  fails it.
+
+### What keying costs
+
+`perf-01-steady-turn` and `perf-11-pinned-key-slope-1` run the same graph — a
+manual source, one automatic consumer that reads it, one tracked read — and
+differ only in that every reference in the second is keyed. The difference
+between them is therefore the price of keying itself, which nothing had
+measured since the typed frontier shipped. From the
+[keyed-turn comparison (E13)](#benchmark-environment-e13):
+
+| Measure            | keyless |       keyed | keyed cost |
+| ------------------ | ------: | ----------: | ---------: |
+| p50 wall clock     |  582 ns | **1267 ns** |  **2.18x** |
+| retains / releases | 18 / 25 | **27 / 34** |    +9 / +9 |
+| mallocs            |       0 |           0 |          — |
+
+The M9-01 probe reproduces the ARC delta exactly — 19/29 against 28/38 on its
+own shape — from a different counting mechanism, and attributes the nine extra
+pairs to `manualRecord` (+4), `automaticRecord` (+2), `existingSlot` (+3), and
+three `box[key]` reference formations, less the three the keyless memo saves.
+
+Time does not follow ARC here. Sampling both shapes puts only about 32 ns of
+the 685 ns gap in ARC. The gap is `AnyHashable` and the generic machinery
+around it: metadata and witness work grows 63 → 248 ns, hashing 5 → 115 ns, and
+value copies 37 → 108 ns, with `_dyld_find_protocol_conformance` — the uncached
+conformance path — appearing in a steady-state loop. `perf-06-value-reference`
+prices one `box[key]` at 65 ns, and a keyed turn forms three, so roughly 195 ns
+of the gap is the inline-`AnyHashable` public representation rather than
+lookup, and no cache can reach it.
 
 ### Absolute CI limits
 
@@ -319,6 +354,8 @@ All benchmark runs used release builds.
 | <a id="benchmark-environment-e10"></a>E10 | Turn-machinery ARC run                    | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-02 cuts, 3,908 samples, exact at every percentile; not a release check                                        |
 | <a id="benchmark-environment-e11"></a>E11 | Record-borrow run                         | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-03 record borrows, 4,177 samples, exact at every percentile; not a release check                              |
 | <a id="benchmark-environment-e12"></a>E12 | Small-site run                            | 2026-08-23 | `mactop`, Apple M4 Pro arm64, 12 cores, 24 GB, macOS 26.4.1 / Darwin 25.4.0, Xcode 26.4 (17E192), Apple Swift 6.3, harness 1.36.2; `perf-01-steady-turn` after the M11-04 small-site cuts, 4,104 samples, exact at every percentile; not a release check                             |
+
+| <a id="benchmark-environment-e13"></a>E13 | Keyed-turn comparison | 2026-08-24 | `koomac`, Apple M5 Pro arm64, 15 cores, 48 GB, macOS 26.5.1 / Darwin 25.5.0, Xcode 26.6 (17F113), Apple Swift 6.3.3, harness 1.36.2, interposer 1.4.0; `perf-01-steady-turn` and `perf-11-pinned-key-slope-1` in one session on an idle host, with M9-01 probe ARC attribution and 6-second `sample` runs of both shapes; the toolchain is the CI pin, the host is not the runner; not a release check |
 
 Runs with malloc and ARC counters used the malloc interposer. The edge-layout
 run used interposer 1.4.0. The external runtime comparison used

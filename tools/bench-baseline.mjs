@@ -64,6 +64,7 @@ const WITNESS_BENCHMARK = "perf-witness-allocating";
 const THRESHOLDED_BENCHMARKS = [
   "perf-01-steady-turn",
   "perf-06-value-reference",
+  "perf-11-pinned-key-slope-1",
   "perf-11-pinned-key-slope-1000",
   "perf-13-deep-chain",
   "perf-10-cog-diamond",
@@ -83,14 +84,22 @@ const THRESHOLDED_BENCHMARKS = [
 /**
  * Which metrics each gated benchmark commits a reference for.
  *
- * Most of the gate is wall clock. Four are not: PERF-01, PERF-06 and PERF-13
+ * Most of the gate is wall clock. Five are not: PERF-01, PERF-06 and PERF-13
  * promise an allocation-free steady turn, value reference, and settle walk, and
- * PERF-11 promises that a thousand pinned keys cost a turn what one does, which
- * is a claim about ARC rather than about time.
+ * PERF-11 promises both that a thousand pinned keys cost a turn what one does
+ * and that the one-key turn — the keyed twin of PERF-01's shape — allocates
+ * nothing and holds its measured ARC traffic. Both are claims about
+ * allocation and ARC rather than about time.
  */
 const STATIC_THRESHOLD_METRICS = {
   "perf-01-steady-turn": ["mallocCountTotal", "objectAllocCount"],
   "perf-06-value-reference": ["mallocCountTotal", "objectAllocCount"],
+  "perf-11-pinned-key-slope-1": [
+    "mallocCountTotal",
+    "objectAllocCount",
+    "releaseCount",
+    "retainCount",
+  ],
   "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
   "perf-13-deep-chain": ["mallocCountTotal", "objectAllocCount"],
 };
