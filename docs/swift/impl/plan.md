@@ -302,8 +302,11 @@ totals, lifetime release, and an eleven-step session. A shadow model checks ever
 result before timing is accepted.
 
 The first harness mixed control work into timing and had async and dependency
-errors. Its results were withdrawn. The corrected headless run is current; the
-UI run still needs to be repeated. M10 reports data but adds no threshold,
+errors. Its results were withdrawn. The corrected headless run and the
+corrected release-configuration UI run are both current, and both come from
+`mactop`; repeating them on the pinned runner, which is also what would commit
+the two named thresholds, stays open as follow-up work in
+[benchmarks.md](./benchmarks.md). M10 reports data but adds no threshold,
 public API, or release.
 
 <a id="plan-m11"></a>
