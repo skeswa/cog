@@ -9,8 +9,8 @@ import os
 @MainActor
 @Test func `SEED-07 seed stays quiet until the next real turn`() {
   let cogs = Cogs.forTesting()
-  let seeded = Cog<Int>.Manual(0, name: "seeded")
-  let unrelated = Cog<Bool>.Manual(false, name: "unrelated")
+  let seeded = Cog<Int>.Manual({ 0 }, name: "seeded")
+  let unrelated = Cog<Bool>.Manual({ false }, name: "unrelated")
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {

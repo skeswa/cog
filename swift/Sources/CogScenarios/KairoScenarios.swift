@@ -49,7 +49,7 @@ extension CogScenario {
       name: "COUNT-01-KairoDiamond",
       expectedRuns: (width + 1) * (1 + turns)
     ) { cogs, counter in
-      let sourceCog = Cog<Int>.Manual(0, name: "kairo.diamond.head")
+      let sourceCog = Cog<Int>.Manual({ 0 }, name: "kairo.diamond.head")
       let armCogs = (0..<width).map { arm in
         Cog<Int>(
           { c in
@@ -102,7 +102,7 @@ extension CogScenario {
       name: "COUNT-02-KairoDeep",
       expectedRuns: depth * (1 + turns)
     ) { cogs, counter in
-      let sourceCog = Cog<Int>.Manual(0, name: "kairo.deep.head")
+      let sourceCog = Cog<Int>.Manual({ 0 }, name: "kairo.deep.head")
       // Flat ownership, for the reason GRAPH-03 gives: if each link's selector
       // captured the link below it by value, the descriptors would form a
       // chain that ARC releases recursively, and the scenario would crash on
@@ -175,7 +175,7 @@ extension CogScenario {
       name: "COUNT-03-KairoBroad",
       expectedRuns: 2 * width * (1 + turns)
     ) { cogs, counter in
-      let sourceCog = Cog<Int>.Manual(0, name: "kairo.broad.head")
+      let sourceCog = Cog<Int>.Manual({ 0 }, name: "kairo.broad.head")
       // Two links per arm, and the leaf captures only its own offset, so the
       // arms stay independent of each other. No flat storage is needed here
       // the way `kairoDeep` needs it: an arm is two links deep, not fifty, so
@@ -256,7 +256,7 @@ extension CogScenario {
       name: "COUNT-04-KairoUnstable",
       expectedRuns: 2 + 3 * turns
     ) { cogs, counter in
-      let sourceCog = Cog<Int>.Manual(0, name: "kairo.unstable.head")
+      let sourceCog = Cog<Int>.Manual({ 0 }, name: "kairo.unstable.head")
       let doubleCog = Cog<Int>(
         { c in
           counter.record()

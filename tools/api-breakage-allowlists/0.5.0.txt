@@ -1,0 +1,6 @@
+API breakage: constructor Cog.Manual.init(_:lifetime:name:fileID:line:) has parameter 0 type change from Value to () -> Value
+API breakage: constructor Cog.Manual.init(_:equals:lifetime:name:fileID:line:) has parameter 0 type change from Value to () -> Value
+API breakage: constructor CogBox.Manual.init(_:lifetime:name:fileID:line:) has parameter 0 type change from Value to () -> Value
+API breakage: constructor CogBox.Manual.init(_:equals:lifetime:name:fileID:line:) has parameter 0 type change from Value to () -> Value
+API breakage: constructor Cog.Async.init(_:default:name:fileID:line:_:) has parameter 1 type change from Value to () -> Value
+API breakage: constructor CogBox.Async.init(_:default:name:fileID:line:_:) has parameter 1 type change from Value to () -> Value

@@ -46,7 +46,7 @@ private final class Async37ControlledWork {
   let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, key in
     .run { await work.run(for: key) }
   }
-  let awayWatcherAlive = Cog<Bool>.Manual(true)
+  let awayWatcherAlive = Cog<Bool>.Manual { true }
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
   m.whenever(awayWatcherAlive) { s in

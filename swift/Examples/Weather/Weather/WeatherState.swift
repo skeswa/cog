@@ -15,12 +15,12 @@ import SwiftUI
 /// controlled service before first demand, so they exercise the same async cog
 /// without adding a second request-state mechanism.
 private let _weatherServiceCog = Cog<WeatherService>.Manual(
-  .live,
+  { .live },
   name: "weather.service"
 )
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
 private let _currentZipCodeCog = Cog<ZipCode?>.Manual(
-  nil,
+  { nil },
   name: "weather.currentZip"
 )
 /// How often background refresh runs, or `nil` while none is installed.
@@ -30,7 +30,7 @@ private let _currentZipCodeCog = Cog<ZipCode?>.Manual(
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
 private let _refreshIntervalCog = Cog<Duration?>.Manual(
-  nil,
+  { nil },
   name: "weather.refreshInterval"
 )
 

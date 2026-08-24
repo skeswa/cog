@@ -89,7 +89,7 @@ extension Cog {
     ///     operation for each generation.
     public init(
       _ policy: LatestPolicy = .latest,
-      default defaultValue: Value,
+      default defaultValue: @autoclosure @escaping @MainActor () -> Value,
       name: String? = nil,
       fileID: StaticString = #fileID,
       line: UInt = #line,
@@ -127,13 +127,14 @@ extension Cog {
     /// - Parameters:
     ///   - policy: Queue, exhaust-latest, or merged scheduling for one-shot runs.
     ///   - defaultValue: The honest resting value before any run succeeds.
+    ///     Evaluated once per state, not once per declaration.
     ///   - name: A stable label for turns, diagnostics, and task tools.
     ///   - fileID: The declaration's file. Leave this at its default.
     ///   - line: The declaration's line. Leave this at its default.
     ///   - selector: MainActor dependency selection that returns one run.
     public init(
       _ policy: OrderedPolicy,
-      default defaultValue: Value,
+      default defaultValue: @autoclosure @escaping @MainActor () -> Value,
       name: String? = nil,
       fileID: StaticString = #fileID,
       line: UInt = #line,
@@ -230,7 +231,8 @@ extension Cog.Async where Value: Equatable {
   /// - Parameters:
   ///   - policy: Latest-generation replacement for one-shot or stream work.
   ///     Ordered policies use the separate ``RunWork`` initializer.
-  ///   - defaultValue: The honest resting value returned before the first success.
+  ///   - defaultValue: The honest resting value returned before the first
+  ///     success. Evaluated once per state, not once per declaration.
   ///   - name: A stable label for turns, diagnostics, and task tools.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
@@ -238,7 +240,7 @@ extension Cog.Async where Value: Equatable {
   ///     operation per generation.
   public init(
     _ policy: LatestPolicy = .latest,
-    default defaultValue: Value,
+    default defaultValue: @autoclosure @escaping @MainActor () -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
@@ -274,13 +276,14 @@ extension Cog.Async where Value: Equatable {
   /// - Parameters:
   ///   - policy: Queue, exhaust-latest, or merged scheduling for one-shot runs.
   ///   - defaultValue: The honest resting value before any run succeeds.
+  ///     Evaluated once per state, not once per declaration.
   ///   - name: A stable label for turns, diagnostics, and task tools.
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   ///   - selector: MainActor dependency selection that returns one run.
   public init(
     _ policy: OrderedPolicy,
-    default defaultValue: Value,
+    default defaultValue: @autoclosure @escaping @MainActor () -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,

@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-21 an equal recomputation leaves a watching reaction quiet`() {
-  let count = Cog<Int>.Manual(2)
+  let count = Cog<Int>.Manual { 2 }
   var parityRuns = 0
   let isEven = Cog<Bool> { c in
     parityRuns += 1
@@ -48,7 +48,7 @@ import Testing
 
 @MainActor
 @Test func `REACT-22 an equal write leaves a reading reaction quiet`() {
-  let source = Cog<Int>.Manual(7)
+  let source = Cog<Int>.Manual { 7 }
   var reactionRuns = 0
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -76,7 +76,7 @@ import Testing
 @Test func `REACT-22 an equal write leaves a watch quiet`() {
   // The same promise through the watch spelling, whose delivery of an old and
   // a new value would be meaningless if an equal write could reach it.
-  let source = Cog<Int>.Manual(7)
+  let source = Cog<Int>.Manual { 7 }
   var deliveries: [String] = []
 
   let cogs = Cogs.forTesting(mechanisms: [

@@ -45,8 +45,8 @@ extension Cogs {
 @MainActor
 @Test func `TURN-05 a turn inside a turn flushes once when the outer body ends`() {
   let (cogs, m) = probedContext()
-  let left = Cog<Int>.Manual(0)
-  let right = Cog<Int>.Manual(0)
+  let left = Cog<Int>.Manual { 0 }
+  let right = Cog<Int>.Manual { 0 }
   var selectorRuns = 0
   let total = Cog<Int> { c in
     selectorRuns += 1
@@ -95,7 +95,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-13 sibling turns each flush and react before the next begins`() {
   let (cogs, m) = probedContext()
-  let counter = Cog<Int>.Manual(0)
+  let counter = Cog<Int>.Manual { 0 }
   var events: [String] = []
 
   m.run { c in events.append("react:\(c[counter])") }
@@ -125,8 +125,8 @@ extension Cogs {
 @MainActor
 @Test func `TURN-05 nested turns are one turn in history`() {
   let (cogs, m) = probedContext()
-  let checking = Cog<Int>.Manual(5)
-  let savings = Cog<Int>.Manual(0)
+  let checking = Cog<Int>.Manual { 5 }
+  let savings = Cog<Int>.Manual { 0 }
 
   cogs.transfer(2, from: checking, to: savings)
 
@@ -151,7 +151,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-06 a turn is named by its op or by the name I pass`() {
   let (cogs, m) = probedContext()
-  let price = Cog<Int>.Manual(10)
+  let price = Cog<Int>.Manual { 10 }
 
   cogs.applyDiscount(price)
   cogs.turn("checkout.submit") { c in c[price] = 0 }
@@ -165,9 +165,9 @@ extension Cogs {
 @MainActor
 @Test func `TURN-06 a joined turn contributes no name and a queued one keeps its own`() {
   let (cogs, m) = probedContext()
-  let trigger = Cog<Int>.Manual(0)
-  let note = Cog<Int>.Manual(0)
-  let followup = Cog<Int>.Manual(0)
+  let trigger = Cog<Int>.Manual { 0 }
+  let note = Cog<Int>.Manual { 0 }
+  let followup = Cog<Int>.Manual { 0 }
 
   m.run { c in
     guard c[trigger] == 1 else { return }
@@ -189,7 +189,7 @@ extension Cogs {
 @MainActor
 @Test func `TURN-13 sibling turns are two named turns in history`() {
   let (cogs, m) = probedContext()
-  let counter = Cog<Int>.Manual(0)
+  let counter = Cog<Int>.Manual { 0 }
 
   cogs.stepOne(counter)
   cogs.stepTwo(counter)

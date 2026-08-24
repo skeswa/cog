@@ -6,7 +6,7 @@ extension Cog {
   /// everyone else, and put the ops that write it in the same file:
   ///
   /// ```swift
-  /// private let _currentZipCog = Cog<ZipCode?>.Manual(nil)
+  /// private let _currentZipCog = Cog<ZipCode?>.Manual { nil }
   /// ```
   ///
   /// The final `Cog` suffix marks this as one keyless value reference, and the
@@ -44,16 +44,30 @@ extension Cog {
     #endif
     internal let key: CogKey?
 
-    /// Declares a source of state that starts at `startingValue`.
+    /// Declares a source of state that starts at what `startingValue` returns.
     ///
     /// This allocates one descriptor but no graph state. Each context creates its
     /// own state lazily and retains it until that context ends. Without an
     /// equality rule, every turn that writes the source counts as a change even
     /// if the old and final values happen to be equal.
     ///
+    /// The starting value is a closure rather than a value because one
+    /// descriptor names every state this declaration ever has. A stored value
+    /// would be handed to the app's context and to each test's context alike,
+    /// so a `Value` that is or contains a reference type would give all of them
+    /// one object to mutate. Cog runs the closure once per state instead, which
+    /// is the only place a per-state value can be made.
+    ///
+    /// Keep it cheap and free of side effects: the app decides when a state
+    /// first appears, and — under
+    /// ``ManualCogLifetime/whileObserved(resetToInitial:grace:)`` — how often.
+    /// It is an ordinary MainActor closure, receives no ``Reader``, and creates
+    /// no dependencies.
+    ///
     /// - Parameters:
-    ///   - startingValue: The value a context's first read sees and retains until
-    ///     a completed turn writes another value.
+    ///   - startingValue: Produces the value a state's first read sees and
+    ///     retains until a completed turn writes another. Called once per
+    ///     state.
     ///   - lifetime: How long each of this declaration's states lives. Sources
     ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
     ///     release and reset with
@@ -63,7 +77,7 @@ extension Cog {
     ///   - fileID: The declaration's file. Leave this at its default.
     ///   - line: The declaration's line. Leave this at its default.
     public init(
-      _ startingValue: Value,
+      _ startingValue: @escaping @MainActor () -> Value,
       lifetime: ManualCogLifetime = .app,
       name: String? = nil,
       fileID: StaticString = #fileID,
@@ -90,7 +104,8 @@ extension Cog {
     /// The comparison runs on the MainActor at the turn boundary.
     ///
     /// - Parameters:
-    ///   - startingValue: The value reads see until something writes.
+    ///   - startingValue: Produces the value reads see until something writes.
+    ///     Called once per state, for the reason the plain initializer gives.
     ///   - equals: Comparison of the latest completed value and the turn's final
     ///     staged value. Return `true` to keep the old value and stop propagation.
     ///   - lifetime: How long each of this declaration's states lives. Sources
@@ -102,7 +117,7 @@ extension Cog {
     ///   - fileID: The declaration's file. Leave this at its default.
     ///   - line: The declaration's line. Leave this at its default.
     public init(
-      _ startingValue: Value,
+      _ startingValue: @escaping @MainActor () -> Value,
       equals: @escaping @MainActor (Value, Value) -> Bool,
       lifetime: ManualCogLifetime = .app,
       name: String? = nil,
@@ -142,7 +157,8 @@ extension Cog.Manual where Value: Equatable {
   /// downstream work.
   ///
   /// - Parameters:
-  ///   - startingValue: The initial app-lifetime value in each context.
+  ///   - startingValue: Produces each context's initial app-lifetime value.
+  ///     Called once per state, for the reason the plain initializer gives.
   ///   - lifetime: How long each of this declaration's states lives. Sources
   ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
   ///     release and reset with
@@ -151,7 +167,7 @@ extension Cog.Manual where Value: Equatable {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    _ startingValue: Value,
+    _ startingValue: @escaping @MainActor () -> Value,
     lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,

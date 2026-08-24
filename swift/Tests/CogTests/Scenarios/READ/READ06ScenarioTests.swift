@@ -5,8 +5,8 @@ import Testing
 @MainActor
 @Test func `READ-06 a trigger rerun peeks at the newest settled value`() {
   let cogs = Cogs.forTesting()
-  let trigger = Cog<Int>.Manual(0)
-  let xSource = Cog<Int>.Manual(1)
+  let trigger = Cog<Int>.Manual { 0 }
+  let xSource = Cog<Int>.Manual { 1 }
   var xRuns = 0
   var selectorRuns = 0
 
@@ -38,7 +38,7 @@ import Testing
   // selector that both tracks and peeks one cog keeps the dependency, in
   // either order.
   let cogs = Cogs.forTesting()
-  let xSource = Cog<Int>.Manual(1)
+  let xSource = Cog<Int>.Manual { 1 }
   var peekFirstRuns = 0
   var peekSecondRuns = 0
 
@@ -66,9 +66,9 @@ import Testing
 @MainActor
 @Test func `READ-06 manual and read-only peeks also skip edges`() {
   let cogs = Cogs.forTesting()
-  let trigger = Cog<Int>.Manual(0)
-  let manual = Cog<Int>.Manual(1)
-  let owned = Cog<Int>.Manual(10)
+  let trigger = Cog<Int>.Manual { 0 }
+  let manual = Cog<Int>.Manual { 1 }
+  let owned = Cog<Int>.Manual { 10 }
   let exposed = owned.readOnly
   var snapshots: [String] = []
 

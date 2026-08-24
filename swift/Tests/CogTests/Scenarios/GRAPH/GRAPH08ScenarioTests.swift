@@ -11,7 +11,7 @@ import Testing
   // missed turns and one catch-up run from the newest value — never one run
   // per missed turn — are GRAPH-08's own.
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   var inputsSeen: [Int] = []
   let scaled = Cog<Int> { c in
     let input = c[source]

@@ -59,7 +59,7 @@ private final class Async25ControlledWork {
   var startIterator = work.starts.makeAsyncIterator()
   var cancellationIterator = work.cancellations.makeAsyncIterator()
 
-  let firstWatcherAlive = Cog<Bool>.Manual(true)
+  let firstWatcherAlive = Cog<Bool>.Manual { true }
   m.whenever(firstWatcherAlive) { s in
     s.run { c in _ = c[forecast] }
   }

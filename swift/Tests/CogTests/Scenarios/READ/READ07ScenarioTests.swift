@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Test func `READ-07 peek settles without subscribing`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   var inputsSeen: [Int] = []
   let doubled = Cog<Int> { c in
     let input = c[source]
@@ -34,8 +34,8 @@ import Testing
 @MainActor
 @Test func `READ-07 peek creates no dependency on its ambient selector`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
-  let trigger = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 1 }
+  let trigger = Cog<Int>.Manual { 0 }
   var innerInputs: [Int] = []
   var outerRuns = 0
 

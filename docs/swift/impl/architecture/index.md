@@ -9,7 +9,7 @@ path needs source-level detail.
 The guide uses one small thread throughout:
 
 ```swift
-private let _temperatureCog = Cog<Double>.Manual(68)
+private let _temperatureCog = Cog<Double>.Manual { 68 }
 
 let adviceCog = Cog<String> { c in
   let temperature = c[_temperatureCog]

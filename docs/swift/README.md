@@ -140,7 +140,7 @@ import Testing
 
 @MainActor
 @Test func counterStartsClean() {
-  let countCog = Cog<Int>.Manual(0)
+  let countCog = Cog<Int>.Manual { 0 }
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(countCog) == 0)
@@ -183,6 +183,9 @@ These rules are settled. The linked design files hold the full details.
   unavailable.
 - Keyless declaration names end in `Cog`; box names end in `Cogs`. Values read
   from the graph use normal domain names without either suffix.
+- A manual starting value is a closure, not a bare value: `Cog<Int>.Manual { 0 }`.
+  Cog calls it once per state, so two runtimes, two keys of a box, and a
+  `whileObserved` state recreated after release never share one object.
 - `turn` is the only write primitive. App code wraps `turn` and `refresh` in
   named methods on `CogOps`.
 - One outer `turn` call is one graph turn. Reaction writes wait in a FIFO queue
@@ -196,8 +199,11 @@ These rules are settled. The linked design files hold the full details.
 
 ### Async state
 
-- An async declaration has a required default value. A normal read returns the
-  latest accepted value or that default.
+- An async declaration has a required `default:`. A normal read returns the
+  latest accepted value or that default. It is an autoclosure, so the call site
+  keeps writing `default: .empty` while Cog still produces one value per state —
+  every pending and failure status before a first success carries that same
+  value, and a released state comes back on a fresh one.
 - The `status` lens exposes `kind`, `value`, `hasSucceeded`, `error`, and
   `isLoading`. SwiftUI tracks only the fields it reads.
 - `.latest` is the default policy. `.queue` runs requests in order.

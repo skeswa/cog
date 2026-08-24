@@ -11,8 +11,8 @@ import Testing
 @MainActor
 @Test func `LIFE-09 an internal edge does not keep an upstream cog alive`() async throws {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = Cog<Bool>.Manual(true)
-  let source = Cog<Int>.Manual(1)
+  let watcherAlive = Cog<Bool>.Manual { true }
+  let source = Cog<Int>.Manual { 1 }
   var upstreamRuns = 0
   var downstreamRuns = 0
   let upstream = Cog<Int> { c in
@@ -62,8 +62,8 @@ import Testing
 @MainActor
 @Test func `LIFE-09 reading one released cog recreates only what it needs`() async throws {
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = Cog<Bool>.Manual(true)
-  let source = Cog<Int>.Manual(1)
+  let watcherAlive = Cog<Bool>.Manual { true }
+  let source = Cog<Int>.Manual { 1 }
   var upstreamRuns = 0
   var downstreamRuns = 0
   let upstream = Cog<Int> { c in

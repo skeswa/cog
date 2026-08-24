@@ -258,12 +258,12 @@ arguments stay direct because they are references, not read values.
 ```swift
 // WeatherState.swift
 
-private let _weatherServiceCog = Cog<WeatherService>.Manual(.live)
+private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
 let weatherServiceCog = _weatherServiceCog.readOnly
 
-private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual(nil)
-private let _heatAdvisoryCogs = CogBox<Bool, ZipCode>.Manual(false)
-private let _currentZipCog = Cog<ZipCode?>.Manual(nil)
+private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual { nil }
+private let _heatAdvisoryCogs = CogBox<Bool, ZipCode>.Manual { false }
+private let _currentZipCog = Cog<ZipCode?>.Manual { nil }
 
 let weatherReportCogs = _weatherReportCogs.readOnly
 let heatAdvisoryCogs = _heatAdvisoryCogs.readOnly
@@ -296,14 +296,14 @@ let isNiceOutsideHereCog = Cog { c in
 
 The public forms are:
 
-| Declare             | Example                                   | Read                                             |
-| ------------------- | ----------------------------------------- | ------------------------------------------------ |
-| One automatic value | `Cog<Bool> { ... }`                       | `c[valueReference]` → `Bool`                     |
-| An automatic box    | `CogBox<Bool, ZipCode> { ... }`           | `c[box[zip]]`                                    |
-| One source          | `Cog<ZipCode?>.Manual(nil)`               | Read normally; write `c[valueReference] = zip`   |
-| A source box        | `CogBox<Weather?, ZipCode>.Manual(nil)`   | `c[box[zip]] = report`                           |
-| One async value     | `Cog<Forecast?>.Async { ... }`            | `c[valueReference]` → `Forecast?`                |
-| An async box        | `CogBox<Weather?, ZipCode>.Async { ... }` | `c[box[zip]]`; status via `c.status[...]` (§5.1) |
+| Declare             | Example                                    | Read                                             |
+| ------------------- | ------------------------------------------ | ------------------------------------------------ |
+| One automatic value | `Cog<Bool> { ... }`                        | `c[valueReference]` → `Bool`                     |
+| An automatic box    | `CogBox<Bool, ZipCode> { ... }`            | `c[box[zip]]`                                    |
+| One source          | `Cog<ZipCode?>.Manual { nil }`             | Read normally; write `c[valueReference] = zip`   |
+| A source box        | `CogBox<Weather?, ZipCode>.Manual { nil }` | `c[box[zip]] = report`                           |
+| One async value     | `Cog<Forecast?>.Async { ... }`             | `c[valueReference]` → `Forecast?`                |
+| An async box        | `CogBox<Weather?, ZipCode>.Async { ... }`  | `c[box[zip]]`; status via `c.status[...]` (§5.1) |
 
 Four rules keep the API consistent:
 
@@ -323,7 +323,19 @@ See perf §4 and §9.6.
 
 Keys pass through normal lexical capture, as `zip` does above — there is no
 hidden key flow. States appear lazily per descriptor and key. A manual box's
-initial value may also be a key-based closure.
+starting value may also be a key-based closure.
+
+Every starting value and async default is written as a closure, never as a bare
+value. A declaration is one immutable descriptor shared by every state it ever
+names — across contexts, across a box's keys, and across a `whileObserved`
+state released and recreated. A bare value would be captured once and handed to
+all of them, so a `Value` that is or contains a reference type would give an
+app, each of its tests, and every key of a box the same object to mutate. The
+closure moves the value's construction to the moment a state is created, which
+is the only place it can be per-state. Cog calls it once per state and never
+again, so it must be cheap and free of side effects; it receives no `Reader`
+and creates no dependencies. A manual box's closure may take the key, and
+`{ 0 }` costs nothing extra when `Value` has value semantics anyway.
 
 ### 3.2 Ops and turns
 
@@ -523,6 +535,20 @@ There is no public `initial` kind. The first read creates the state, starts
 work, and publishes `pending`, the default value, and `hasSucceeded == false`
 as one turn. A status read returns those fields together. A value read returns
 the same default.
+
+`default:` is produced per state for the reason §3.1 gives, and async state
+needs that more than manual state does: it defaults to `whileObserved`, so
+release and recreation is its ordinary path rather than an opt-in. Cog produces
+the default once when it creates a state and keeps that value for as long as the
+state lives, so every pending and failure status before the first success
+carries one default rather than a fresh one each time it is published.
+
+Unlike a manual starting value, `default:` is an `@autoclosure`, so the call
+site still writes `default: .empty`. The shapes differ because the call sites
+do: a manual starting value is the declaration's only closure and reads well as
+one, while an async declaration already ends in its selector closure — a second
+one there would put two closures in a single call, which is both harder to read
+and rejected by the formatter's `OnlyOneTrailingClosureArgument` rule.
 
 Peek and refresh follow the same rule on a never-read async state: create it,
 run the synchronous selector, and start one pending generation. Peek adds no
@@ -764,6 +790,7 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Writes               | Sources are `private` or `fileprivate` and expose `.readOnly`. A `Writer` is valid only for its turn. Named methods on `CogOps` wrap `turn` and `refresh`.                                                                                                                                      |
 | State names          | A descriptor plus optional key names state. Keyless declarations end in `Cog`; boxes end in `Cogs`. A manual declaration begins with `_`, and its `.readOnly` projection takes the same name without the underscore. Read values use plain domain names.                                        |
+| Starting values      | Every manual starting value and async `default:` is produced once per state, never stored on the shared descriptor. Manual takes an explicit `@MainActor` closure; async takes an `@autoclosure` and materializes it at state creation.                                                         |
 | Keyed API            | Boxes make value references. Keys use inline `AnyHashable?`. Public reference types stay resilient.                                                                                                                                                                                             |
 | Dependencies         | Actual reads rebuild edges on each run. A shared linked pool stores edges. CLEAN, CHECK, DIRTY, versions, and equality stop unneeded work.                                                                                                                                                      |
 | Shipping core        | The specialized arena with pool edges is the default and only shipping core. `CompactArena` turns off the typed frontier to reduce binary size.                                                                                                                                                 |
@@ -849,10 +876,23 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     leading underscore, whether or not it is projected, and its `.readOnly`
     projection takes exactly the same name without the underscore, so a source
     and its published reference read like
-    `private let _weatherServiceCog = Cog<WeatherService>.Manual(.live)` and
+    `private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }` and
     `let weatherServiceCog = _weatherServiceCog.readOnly`. This replaces the
     former `Source` role qualifier, which is retired. The
     `manual-cog-underscore` lint rule enforces both halves.
+30. **Starting values are per state — settled.** A manual starting value and an
+    async `default:` are produced once per state rather than stored on the
+    shared descriptor, so a reference-type value cannot be shared by two
+    contexts, by two keys of one box, or by a `whileObserved` state across a
+    release. Manual takes an explicit `@MainActor` closure —
+    `Cog<Int>.Manual { 0 }` — and its bare-value initializers were replaced
+    outright rather than joined by an overload, because leaving the hazardous
+    spelling as the shorter one defeats the change. Async takes an
+    `@autoclosure` instead, keeping `default: .empty` at the call site: an async
+    declaration already ends in its selector closure, and a second closure there
+    reads worse and trips the formatter's `OnlyOneTrailingClosureArgument` rule.
+    The two shapes are spelled differently because their call sites are shaped
+    differently, not because their semantics differ.
 
 ---
 

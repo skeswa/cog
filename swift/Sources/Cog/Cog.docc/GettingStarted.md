@@ -66,7 +66,7 @@ comes back to it.
 Sources are the facts your app is told. Everything else is computed automatically from them.
 
 ```swift
-private let _temperatureCog = Cog<Int>.Manual(60, name: "temperature")
+private let _temperatureCog = Cog<Int>.Manual({ 60 }, name: "temperature")
 
 let temperatureCog = _temperatureCog.readOnly
 

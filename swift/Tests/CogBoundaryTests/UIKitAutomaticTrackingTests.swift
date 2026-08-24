@@ -33,7 +33,7 @@ private final class CogTrackingView: UIView {
 @MainActor
 @Test func `UI-11 UIKit automatically retracks a Cog boundary`() {
   let cogs = Cogs.forTesting()
-  let count = Cog<Int>.Manual(0)
+  let count = Cog<Int>.Manual { 0 }
   let view = CogTrackingView(cogs: cogs, count: count)
 
   view.setNeedsUpdateProperties()

@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `EXPORT-06 cancelling a reader releases its graph lease`() async throws {
   let clock = TestClock()
-  let sourceCog = Cog<Int>.Manual(1)
+  let sourceCog = Cog<Int>.Manual { 1 }
   var selectorRuns = 0
   let doubledCog = Cog<Int> { c in
     selectorRuns += 1

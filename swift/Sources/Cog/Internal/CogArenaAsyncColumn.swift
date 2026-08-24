@@ -71,6 +71,20 @@ internal final class CogArenaAsyncColumn<Value> {
   /// Latest accepted success retained through later pending and failure turns.
   private var successes: ContiguousArray<CogArenaAsyncSuccess<Value>> = []
 
+  /// This row's own resting default, produced once when the row was installed.
+  ///
+  /// The declaration supplies a closure rather than a value, so the default has
+  /// to be materialized somewhere per state; here is that place. Holding it per
+  /// row — rather than calling the closure at each publication — is what makes
+  /// the pending, failure, and retry-pending statuses a state publishes before
+  /// its first success carry one value instead of a new one each time. A
+  /// released row clears the cell, so the next install produces a fresh
+  /// default, which is exactly the `whileObserved` reset async state expects.
+  ///
+  /// `nil` means the row is not installed; an installed row always holds a
+  /// value.
+  private var defaults: ContiguousArray<Value?> = []
+
   /// Exact-generation explicit refresh cells, cold and normally empty.
   private var refreshWaiters: ContiguousArray<[UInt64: CogRefreshWaiter<Value>]> = []
 
@@ -103,8 +117,27 @@ internal final class CogArenaAsyncColumn<Value> {
     exhaustCatchUps[row] = nil
     generations[row] = 0
     successes[row] = .absent
+    defaults[row] = descriptor.makeDefaultValue()
     refreshWaiters[row].removeAll(keepingCapacity: false)
     observationChanges[row] = []
+  }
+
+  /// This row's resting default, produced when the row was installed.
+  ///
+  /// Traps rather than re-producing a default for an uninstalled row: every
+  /// caller reaches this after ``installedRow(for:)`` has already proven the row
+  /// is live, so a missing cell is storage corruption, not a cold path.
+  private func defaultValue(at row: Int) -> Value {
+    guard let value = defaults[row] else {
+      fatalError(
+        """
+        Cog asked \(descriptor.label) for the resting default of an async state \
+        that is not installed. An installed row always holds the default it \
+        produced at installation, so this context's async storage is corrupt.
+        """
+      )
+    }
+    return value
   }
 
   /// Whether first demand has installed this row's pending status baseline.
@@ -271,7 +304,7 @@ internal final class CogArenaAsyncColumn<Value> {
         let failure: CogStatus<Value> =
           switch self.successes[row] {
           case .absent:
-            .failure(error, value: self.descriptor.defaultValue, hasSucceeded: false)
+            .failure(error, value: self.defaultValue(at: row), hasSucceeded: false)
           case .value(let value):
             .failure(error, value: value, hasSucceeded: true)
           }
@@ -312,7 +345,7 @@ internal final class CogArenaAsyncColumn<Value> {
     let pending: CogStatus<Value> =
       switch successes[row] {
       case .absent:
-        .pending(value: descriptor.defaultValue, hasSucceeded: false)
+        .pending(value: defaultValue(at: row), hasSucceeded: false)
       case .value(let value):
         .pending(value: value, hasSucceeded: true)
       }
@@ -436,7 +469,7 @@ internal final class CogArenaAsyncColumn<Value> {
         let failure: CogStatus<Value> =
           switch self.successes[row] {
           case .absent:
-            .failure(error, value: self.descriptor.defaultValue, hasSucceeded: false)
+            .failure(error, value: self.defaultValue(at: row), hasSucceeded: false)
           case .value(let value):
             .failure(error, value: value, hasSucceeded: true)
           }
@@ -531,6 +564,7 @@ internal final class CogArenaAsyncColumn<Value> {
     }
     installed[row] = false
     successes[row] = .absent
+    defaults[row] = nil
     observationChanges[row] = []
   }
 
@@ -686,6 +720,7 @@ internal final class CogArenaAsyncColumn<Value> {
     exhaustCatchUps.append(contentsOf: repeatElement(nil, count: missing))
     generations.append(contentsOf: repeatElement(0, count: missing))
     successes.append(contentsOf: repeatElement(.absent, count: missing))
+    defaults.append(contentsOf: repeatElement(nil, count: missing))
     refreshWaiters.append(contentsOf: repeatElement([:], count: missing))
     observationChanges.append(contentsOf: repeatElement([], count: missing))
   }

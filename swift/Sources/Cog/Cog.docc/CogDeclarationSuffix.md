@@ -22,7 +22,7 @@ Expected diagnostic positions: 1:5, 2:5, 3:5.
 
 ```swift
 let temperature = Cog<Int> { _ in 0 }
-let _weatherCogDraft = Cog.Manual(0)
+let _weatherCogDraft = Cog.Manual { 0 }
 let forecastCogsAsync = Cog<String>.Async(default: "") { _ in fatalError() }
 ```
 
@@ -34,7 +34,7 @@ Expected diagnostic positions: 1:5, 2:5, 3:5.
 
 ```swift
 let selectedCogs = Cog<Int> { _ in 0 }
-let _reportCog = CogBox<String, Int>.Manual(0)
+let _reportCog = CogBox<String, Int>.Manual { 0 }
 let _avatarCog: CogBox<String, Data> = .init { _ in Data() }
 ```
 
@@ -46,10 +46,10 @@ Keyless and boxed declarations end in their singular or plural suffix after role
 
 ```swift
 let temperatureCog = Cog<Int> { _ in 0 }
-private let _weatherServiceCog = Cog.Manual(0)
+private let _weatherServiceCog = Cog.Manual { 0 }
 let weatherServiceCog = _weatherServiceCog.readOnly
 let forecastAsyncCog = Cog<String>.Async(default: "") { _ in fatalError() }
-private let _weatherReportCogs = CogBox<String, Int>.Manual(0)
+private let _weatherReportCogs = CogBox<String, Int>.Manual { 0 }
 let weatherReportCogs = _weatherReportCogs.readOnly
 let forecastAsyncCogs = CogBox<String, Int>.Async(default: "") { _, _ in fatalError() }
 ```
@@ -63,6 +63,6 @@ Factories, typealiases, and cross-file identity remain outside the shared syntax
 ```swift
 typealias Source = Cog<Int>.Manual
 let factory = makeSource()
-let alias = Source(0)
+let alias = Source { 0 }
 let external = externallyDeclaredReference
 ```

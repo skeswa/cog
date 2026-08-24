@@ -27,7 +27,7 @@ private final class Async03ControlledWork {
 @MainActor
 @Test func `ASYNC-03 reload preserves an explicit previous nil`() async {
   let (cogs, m) = probedContext()
-  let request = Cog<Int>.Manual(0)
+  let request = Cog<Int>.Manual { 0 }
   let work = Async03ControlledWork()
   let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { c in
     let currentRequest = c[request]

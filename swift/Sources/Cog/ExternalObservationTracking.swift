@@ -164,7 +164,10 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
     turnName: String
   ) {
     self.read = read
-    self.sourceCog = Cog.Manual(initialValue, name: "c.track")
+    // The descriptor is per-bridge and reaches exactly one context, so
+    // capturing the already-armed value is the intended per-state semantics
+    // rather than the shared-object hazard the closure form exists to prevent.
+    self.sourceCog = Cog.Manual({ initialValue }, name: "c.track")
     self.turnName = turnName
   }
 

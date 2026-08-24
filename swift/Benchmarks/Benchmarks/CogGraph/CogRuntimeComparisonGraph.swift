@@ -50,7 +50,7 @@ final class CogRuntimeComparisonGraph: RuntimeComparisonGraph {
   func source(_ initialValue: Int) -> RuntimeComparisonValue {
     let value = RuntimeComparisonValue(index: storage.nodes.count)
     storage.nodes.append(
-      .source(Cog<Int>.Manual(initialValue, name: "perf.compare.source.\(value.index)"))
+      .source(Cog<Int>.Manual({ initialValue }, name: "perf.compare.source.\(value.index)"))
     )
     return value
   }

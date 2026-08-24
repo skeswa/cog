@@ -16,7 +16,7 @@ private final class Graph03ChainStorage {
   let depth = 20_000
   var cogs: Cogs? = Cogs.forTesting()
   weak let releasedContext = cogs
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   let storage = Graph03ChainStorage()
   storage.valueReferences.reserveCapacity(depth)
   storage.settlementOrder.reserveCapacity(depth)

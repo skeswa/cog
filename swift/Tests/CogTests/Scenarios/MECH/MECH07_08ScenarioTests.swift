@@ -4,8 +4,8 @@ import Testing
 
 @MainActor
 @Test func `MECH-07 a gate already true at operate opens its scope immediately`() {
-  let loggedIn = Cog<Bool>.Manual(true)
-  let uploads = Cog<Int>.Manual(0)
+  let loggedIn = Cog<Bool>.Manual { true }
+  let uploads = Cog<Int>.Manual { 0 }
   var seen: [Int] = []
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -26,8 +26,8 @@ import Testing
 
 @MainActor
 @Test func `MECH-08 a gate cycle tears the scope down and reopens it fresh`() async {
-  let loggedIn = Cog<Bool>.Manual(false)
-  let uploads = Cog<Int>.Manual(0)
+  let loggedIn = Cog<Bool>.Manual { false }
+  let uploads = Cog<Int>.Manual { 0 }
   var bodyRuns = 0
   var seen: [Int] = []
   let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)

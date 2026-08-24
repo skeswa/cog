@@ -6,7 +6,7 @@ extension CogBox {
   ///
   /// ```swift
   /// // WeatherState.swift
-  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual(nil)
+  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual { nil }
   /// let weatherReportCogs = _weatherReportCogs.readOnly
   /// ```
   ///

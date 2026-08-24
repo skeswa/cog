@@ -424,7 +424,7 @@ that runtime.
   from the graph receive normal domain names without either suffix.
 - **Underscore every manual cog; its projection takes the clean name.** Every
   manual declaration begins with a leading underscore
-  (`private let _temperatureCog = Cog<Int>.Manual(0)`), whether or not it is
+  (`private let _temperatureCog = Cog<Int>.Manual { 0 }`), whether or not it is
   projected. When the state is published, the `.readOnly` projection is named
   exactly the source's name without the underscore
   (`let temperatureCog = _temperatureCog.readOnly`), so the clean name is the

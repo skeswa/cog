@@ -88,16 +88,19 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   #endif
   internal let equals: (@MainActor (Value, Value) -> Bool)?
 
-  /// Declares a source whose states all start at the same value.
+  /// Declares a source whose states each start at a freshly produced value.
+  ///
+  /// `startingValue` runs once per state rather than once per declaration, so
+  /// two contexts and two keys of one box never share the object it returns.
   init(
-    startingValue: Value,
+    startingValue: @escaping @MainActor () -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     lifetime: CogStateLifetime = .app,
     label: CogLabel
   ) {
     self.label = label
     self.lifetime = lifetime
-    self.start = .constant(startingValue)
+    self.start = .shared(startingValue)
     self.equals = equals
   }
 
@@ -121,8 +124,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// The value the state for `key` holds before anything writes to it.
   ///
   /// The context invokes this once when it lazily creates that exact state.
-  /// Repeated reads and writes use the resident value and never rerun a per-key
-  /// initializer unless a future releasable-manual policy recreates the state.
+  /// Repeated reads and writes use the resident value and never rerun the
+  /// closure; a `whileObserved(resetToInitial:)` state that has been released
+  /// runs it again on the read that recreates it, which is what makes that
+  /// reset produce a fresh value rather than the released one.
   ///
   /// - Parameter key: The state's key, or `nil` for a keyless declaration.
   #if !COG_ARENA_COMPACT
@@ -130,8 +135,8 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   #endif
   func startingValue(forKey key: CogKey?) -> Value {
     switch start {
-    case .constant(let value):
-      return value
+    case .shared(let makeStartingValue):
+      return makeStartingValue()
     case .perKey(let makeStartingValue):
       return makeStartingValue(key)
     }
@@ -209,16 +214,22 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 
 /// The two forms a manual declaration's starting value can take.
 ///
-/// The constant case avoids a closure allocation and call. Public initializers
-/// select the case from `(0)` or `{ key in ... }`. The per-key closure is
-/// MainActor-isolated because lazy state creation is graph work; the erased key
-/// adapter restores the public key type before user code observes it.
+/// Both are closures, never a stored value: a descriptor outlives every state
+/// it names, so a value captured here once would be handed to every context,
+/// every key of a box, and every `whileObserved` state recreated after a
+/// release — sharing one object among all of them whenever `Value` is or
+/// contains a reference type (§3.1). Public initializers select the case from
+/// `{ 0 }` or `{ key in ... }`.
+///
+/// Both are MainActor-isolated because lazy state creation is graph work; the
+/// erased key adapter restores the public key type before user code observes
+/// it.
 #if !COG_ARENA_COMPACT
 @usableFromInline
 #endif
 internal enum ManualCogStartingValue<Value> {
-  /// Every state of the declaration starts at this value.
-  case constant(Value)
+  /// Each state starts at what this returns, ignoring any key.
+  case shared(@MainActor () -> Value)
 
   /// Each state starts at what this returns for its own key.
   case perKey(@MainActor (CogKey?) -> Value)

@@ -46,12 +46,23 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// of the declaration and consistent across all contexts and keys.
   let policy: AsyncSchedulingPolicy
 
-  /// The total value exposed before this declaration accepts a success.
+  /// Produces the total value exposed before a state accepts a success.
   ///
-  /// Status carries this value through initial loading and initial failure.
-  /// Keeping it on the async descriptor gives every context and key the same
-  /// declaration-level resting contract without consulting the value projection.
-  let defaultValue: Value
+  /// Status carries that value through initial loading and initial failure.
+  /// Keeping the closure on the async descriptor gives every context and key
+  /// the same declaration-level resting contract without consulting the value
+  /// projection.
+  ///
+  /// It is a closure, not a stored value, because one descriptor outlives every
+  /// state it names, and async state defaults to `whileObserved` — so a stored
+  /// value would be shared by every context, every key, and every state
+  /// recreated after a release (§5.1). The public initializers take it as an
+  /// `@autoclosure`, so a call site still writes `default: .empty` and never
+  /// sees this shape. ``CogArenaAsyncColumn`` calls it once when it installs a
+  /// state and keeps that result for the state's life, so repeated pending and
+  /// failure publications before a first success all carry one value rather
+  /// than a fresh one each time.
+  let makeDefaultValue: @MainActor () -> Value
 
   /// Whether two total values should produce the same value-field observation.
   ///
@@ -74,7 +85,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// lazy in each context and key, preserving independent status and task life.
   init(
     policy: AsyncSchedulingPolicy,
-    default defaultValue: Value,
+    default makeDefaultValue: @escaping @MainActor () -> Value,
     equals: (@MainActor (Value, Value) -> Bool)?,
     selector: @escaping @MainActor (Reader<CogStatus<Value>>, CogKey?) -> Work<Value>,
     lifetime: CogStateLifetime = .whileObserved(grace: nil),
@@ -83,7 +94,7 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
     self.label = label
     self.lifetime = lifetime
     self.policy = policy
-    self.defaultValue = defaultValue
+    self.makeDefaultValue = makeDefaultValue
     self.equals = equals
     self.selector = selector
   }

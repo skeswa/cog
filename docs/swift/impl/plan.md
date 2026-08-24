@@ -124,6 +124,7 @@ it runs again.
 | M9: Shared turn machinery        | [M9 tasks](./tasks.md#m9-tasks)   | `M9-01` profile and route ranking; `M9-18` core, backlog, and release decision             | `M9-16` machinery suite gate, then `M9-17` comparison, `M9-25` and `M9-26` build cost, `M9-18` decision, and `M9-19` closeout                                                                                          |
 | M10: Storefront macrobenchmark   | [M10 tasks](./tasks.md#m10-tasks) | `M10-01` workload shape and package boundary; `M10-09` threshold and follow-up decision    | `M10-05` headless results, `M10-07` UI results, `M10-08` core comparison, `M10-09` decision, then `M10-10` closeout                                                                                                    |
 | M11: Steady-turn ARC reduction   | [M11 tasks](./tasks.md#m11-tasks) | `M11-01` route disposition from the August 23 attribution                                  | `M11-02` turn-machinery cuts, then `M11-03` settle-path borrows and `M11-04` small sites, then `M11-05` closeout                                                                                                       |
+| M12: Per-state starting values   | [M12 tasks](./tasks.md#m12-tasks) | `M12-01` per-shape spelling and the no-deprecation break                                   | `M12-02` manual surface, `M12-03` async surface and per-state default, then `M12-04` migration and `M12-05` closeout                                                                                                   |
 
 ## Task bookkeeping
 
@@ -319,6 +320,26 @@ settle path where the same sites multiply per node, and cleans up the small
 sites the probe surfaced. Every change is probe-measured before and after,
 with the zero-allocation and threshold gates as hard floors. M11 changes no
 public API.
+
+### M12: Per-state starting values
+
+Issue #266 observed that a manual starting value is stored once on the shared
+descriptor and handed to every state that declaration ever names. For a `Value`
+that is or contains a reference type, one app context, each of its tests, and
+every key of a box mutate the same object; a `whileObserved(resetToInitial:)`
+state comes back as the object it was released holding, contradicting the
+parameter that names the reset. The async `default:` has the identical defect
+and defaults to `whileObserved`, so recreation is its ordinary path.
+
+M12 makes every manual starting value and async default per state. Manual takes
+an explicit `@MainActor` closure, replacing its bare-value initializers; async
+takes an `@autoclosure`, so `default: .empty` still compiles unchanged — an
+async declaration already ends in its selector closure, and a second closure
+there trips the formatter's `OnlyOneTrailingClosureArgument` rule. Async
+materializes its default at state creation so repeated pending and failure
+publications before a first success share one value. The manual half is a
+breaking public API change with no deprecated overload, and it is the release
+input for the next minor.
 
 ## Release process
 

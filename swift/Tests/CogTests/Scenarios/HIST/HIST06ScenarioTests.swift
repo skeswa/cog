@@ -8,7 +8,7 @@ import Testing
 @MainActor
 @Test func `HIST-06 history names each changed keyed UI notice`() {
   let (cogs, m) = probedContext()
-  let weather = CogBox<String?, String>.Manual(nil, name: "weather")
+  let weather = CogBox<String?, String>.Manual({ nil }, name: "weather")
   let zip = "90210"
 
   _ = withObservationTracking {

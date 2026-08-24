@@ -8,8 +8,8 @@ import Testing
   // the gate watch registered first, so it runs first, and the woken sibling
   // reaction inside the scope never runs after teardown even though the same
   // turn changed its dependency.
-  let scopeOpen = Cog<Bool>.Manual(true)
-  let dependency = Cog<Int>.Manual(0)
+  let scopeOpen = Cog<Bool>.Manual { true }
+  let dependency = Cog<Int>.Manual { 0 }
   var scopedSeen: [Int] = []
   let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)
   let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Void.self)

@@ -18,7 +18,7 @@ extension CogLintFixtureRegistry {
         example: CogLintFixtureExample(
           name: "Implicit internal access",
           explanation: "A bare source declaration is internal and exposes a writer target.",
-          source: "let _countCog = Cog.Manual(0)\n"
+          source: "let _countCog = Cog.Manual { 0 }\n"
         ),
         positions: [CogLintFixturePosition(line: 1, column: 5)]
       ),
@@ -29,9 +29,9 @@ extension CogLintFixtureRegistry {
             "Internal, package, and public source names all cross the owning file boundary.",
           source:
             """
-            internal let _retryCog: Cog.Cog<Int>.Manual = .init(0)
-            package let _reportCogs = CogBox<String?, Int>.Manual(nil)
-            public let _sessionCog = Cog.Manual("")
+            internal let _retryCog: Cog.Cog<Int>.Manual = .init { 0 }
+            package let _reportCogs = CogBox<String?, Int>.Manual { nil }
+            public let _sessionCog = Cog.Manual { "" }
             """
         ),
         positions: [
@@ -44,7 +44,7 @@ extension CogLintFixtureRegistry {
         example: CogLintFixtureExample(
           name: "Setter-only privacy",
           explanation: "`private(set)` leaves the source name visible at its wider read access.",
-          source: "public private(set) var _sessionCog = Cog.Manual(\"\")\n"
+          source: "public private(set) var _sessionCog = Cog.Manual { \"\" }\n"
         ),
         positions: [CogLintFixturePosition(line: 1, column: 25)]
       ),
@@ -56,8 +56,8 @@ extension CogLintFixtureRegistry {
           "Bare private access owns writer targets, while automatic and read-only names may remain wider.",
         source:
           """
-          private let _countCog = Cog.Manual(0)
-          fileprivate let _reportCogs = CogBox<String?, Int>.Manual(nil)
+          private let _countCog = Cog.Manual { 0 }
+          fileprivate let _reportCogs = CogBox<String?, Int>.Manual { nil }
           let countCog = _countCog.readOnly
           let doubledCog = Cog<Int> { c in c[countCog] * 2 }
           """
@@ -71,9 +71,9 @@ extension CogLintFixtureRegistry {
         source:
           """
           typealias Source = Cog<Int>.Manual
-          private let _countCog = Cog.Manual(0)
+          private let _countCog = Cog.Manual { 0 }
           let _factoryCog = makeSource()
-          let _aliasCog = Source(0)
+          let _aliasCog = Source { 0 }
           #if DEBUG
           let countSeedTargetCog = _countCog
           #endif

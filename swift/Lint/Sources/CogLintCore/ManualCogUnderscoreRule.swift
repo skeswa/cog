@@ -5,7 +5,7 @@ import SwiftSyntax
 ///
 /// The convention gives the published projection the clean domain name and
 /// marks the file-owned writable source with a leading underscore, so the two
-/// halves of one fact read as a pair: `private let _countCog = Cog.Manual(0)`
+/// halves of one fact read as a pair: `private let _countCog = Cog.Manual { 0 }`
 /// beside `let countCog = _countCog.readOnly`. An underscored source that is
 /// never projected is accepted; not every source needs publication.
 package struct ManualCogUnderscoreRule: CogLintRule {

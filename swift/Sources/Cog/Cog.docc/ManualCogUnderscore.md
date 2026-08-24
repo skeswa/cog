@@ -8,7 +8,7 @@ The published projection is the name the rest of the app reads, so it owns the c
 
 ## How to fix it
 
-Prefix the manual declaration with `_` and name its `.readOnly` projection the same identifier without the underscore: `private let _countCog = Cog.Manual(0)` published as `let countCog = _countCog.readOnly`.
+Prefix the manual declaration with `_` and name its `.readOnly` projection the same identifier without the underscore: `private let _countCog = Cog.Manual { 0 }` published as `let countCog = _countCog.readOnly`.
 
 <!-- Generated from the manual-cog-underscore CogLint fixture corpus; do not edit. -->
 
@@ -21,8 +21,8 @@ Keyless and boxed manual declarations must both begin with `_`.
 Expected diagnostic positions: 1:13, 2:13.
 
 ```swift
-private let countCog = Cog.Manual(0)
-private let reportCogs = CogBox<String?, Int>.Manual(nil)
+private let countCog = Cog.Manual { 0 }
+private let reportCogs = CogBox<String?, Int>.Manual { nil }
 ```
 
 ### Retired Source qualifier pair
@@ -32,7 +32,7 @@ The former `Source` spelling violates both halves: the source lacks its undersco
 Expected diagnostic positions: 1:13, 2:5.
 
 ```swift
-private let countSourceCog = Cog.Manual(0)
+private let countSourceCog = Cog.Manual { 0 }
 let countCog = countSourceCog.readOnly
 ```
 
@@ -43,7 +43,7 @@ A projection may not publish a different domain name than its source states.
 Expected diagnostic positions: 2:5.
 
 ```swift
-private let _countCog = Cog.Manual(0)
+private let _countCog = Cog.Manual { 0 }
 let totalCog = _countCog.readOnly
 ```
 
@@ -54,11 +54,11 @@ let totalCog = _countCog.readOnly
 Each projection drops exactly the underscore, and an unprojected underscored source is accepted.
 
 ```swift
-private let _countCog = Cog.Manual(0)
+private let _countCog = Cog.Manual { 0 }
 let countCog = _countCog.readOnly
-private let _reportCogs = CogBox<String?, Int>.Manual(nil)
+private let _reportCogs = CogBox<String?, Int>.Manual { nil }
 let reportCogs = _reportCogs.readOnly
-private let _draftCog = Cog.Manual("")
+private let _draftCog = Cog.Manual { "" }
 ```
 
 ## Accepted evasions
@@ -69,9 +69,9 @@ Aliases, factories, and copies stay outside the syntax-only classifier, so a pro
 
 ```swift
 typealias Source = Cog<Int>.Manual
-let aliasCog = Source(0)
+let aliasCog = Source { 0 }
 let factoryCog = makeSource()
-private let _countCog = Cog.Manual(0)
+private let _countCog = Cog.Manual { 0 }
 let copiedCog = _countCog
 let renamedCog = copiedCog.readOnly
 ```

@@ -6,7 +6,7 @@ extension Cog {
   ///
   /// ```swift
   /// // WeatherState.swift
-  /// private let _currentZipCog = Cog<ZipCode?>.Manual(nil)
+  /// private let _currentZipCog = Cog<ZipCode?>.Manual { nil }
   /// let currentZipCog = _currentZipCog.readOnly
   /// ```
   ///
@@ -39,7 +39,7 @@ extension Cog.Manual {
   /// drops:
   ///
   /// ```swift
-  /// private let _weatherServiceCog = Cog<WeatherService>.Manual(.live)
+  /// private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
   /// let weatherServiceCog = _weatherServiceCog.readOnly
   /// ```
   ///

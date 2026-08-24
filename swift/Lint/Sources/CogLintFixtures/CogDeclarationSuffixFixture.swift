@@ -22,7 +22,7 @@ extension CogLintFixtureRegistry {
           source:
             """
             let temperature = Cog<Int> { _ in 0 }
-            let _weatherCogDraft = Cog.Manual(0)
+            let _weatherCogDraft = Cog.Manual { 0 }
             let forecastCogsAsync = Cog<String>.Async(default: "") { _ in fatalError() }
             """
         ),
@@ -39,7 +39,7 @@ extension CogLintFixtureRegistry {
           source:
             """
             let selectedCogs = Cog<Int> { _ in 0 }
-            let _reportCog = CogBox<String, Int>.Manual(0)
+            let _reportCog = CogBox<String, Int>.Manual { 0 }
             let _avatarCog: CogBox<String, Data> = .init { _ in Data() }
             """
         ),
@@ -58,10 +58,10 @@ extension CogLintFixtureRegistry {
         source:
           """
           let temperatureCog = Cog<Int> { _ in 0 }
-          private let _weatherServiceCog = Cog.Manual(0)
+          private let _weatherServiceCog = Cog.Manual { 0 }
           let weatherServiceCog = _weatherServiceCog.readOnly
           let forecastAsyncCog = Cog<String>.Async(default: "") { _ in fatalError() }
-          private let _weatherReportCogs = CogBox<String, Int>.Manual(0)
+          private let _weatherReportCogs = CogBox<String, Int>.Manual { 0 }
           let weatherReportCogs = _weatherReportCogs.readOnly
           let forecastAsyncCogs = CogBox<String, Int>.Async(default: "") { _, _ in fatalError() }
           """
@@ -76,7 +76,7 @@ extension CogLintFixtureRegistry {
           """
           typealias Source = Cog<Int>.Manual
           let factory = makeSource()
-          let alias = Source(0)
+          let alias = Source { 0 }
           let external = externallyDeclaredReference
           """
       )

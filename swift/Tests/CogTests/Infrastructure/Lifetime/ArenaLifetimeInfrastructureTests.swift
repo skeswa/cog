@@ -6,9 +6,9 @@ import Testing
 @MainActor
 @Test func `ArenaLifetimePolicyInfrastructure rows retain descriptor lifetime policy`() {
   let cogs = Cogs.forTesting()
-  let _appCog = Cog<Int>.Manual(0)
+  let _appCog = Cog<Int>.Manual { 0 }
   let _ephemeralCog = Cog<Int>.Manual(
-    0,
+    { 0 },
     lifetime: .whileObserved(resetToInitial: true, grace: .seconds(7))
   )
   let automaticCog = Cog<Int> { _ in 1 }
@@ -28,9 +28,9 @@ import Testing
 @MainActor
 @Test func `ArenaLeaseInfrastructure reactions lease only direct observed-lifetime roots`() {
   let cogs = Cogs.forTesting()
-  let _appCog = Cog<Int>.Manual(1)
+  let _appCog = Cog<Int>.Manual { 1 }
   let _ephemeralCog = Cog<Int>.Manual(
-    2,
+    { 2 },
     lifetime: .whileObserved(resetToInitial: true)
   )
   let innerCog = Cog<Int> { c in c[_appCog] + 1 }
@@ -65,7 +65,7 @@ import Testing
 @MainActor
 @Test func `ArenaLeaseInfrastructure retracking moves leases and retains shared roots`() {
   let cogs = Cogs.forTesting()
-  let chooseLeftCog = Cog<Bool>.Manual(true)
+  let chooseLeftCog = Cog<Bool>.Manual { true }
   let leftCog = Cog<Int> { _ in 1 }
   let rightCog = Cog<Int> { _ in 2 }
   let anchorCog = Cog<Int> { _ in 3 }
@@ -116,7 +116,7 @@ import Testing
 @MainActor
 @Test func `ArenaLeaseInfrastructure self cancellation cannot reacquire a lease`() {
   let cogs = Cogs.forTesting()
-  let triggerCog = Cog<Int>.Manual(0)
+  let triggerCog = Cog<Int>.Manual { 0 }
   let beforeCancellationCog = Cog<Int> { _ in 1 }
   let afterCancellationCog = Cog<Int> { _ in 2 }
   var token: ReactionToken?

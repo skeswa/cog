@@ -2,7 +2,7 @@ import Cog
 import CogTesting
 import Testing
 
-@MainActor private let _stepCountCog = Cog<Int>.Manual(0)
+@MainActor private let _stepCountCog = Cog<Int>.Manual { 0 }
 
 // One op definition on the shared protocol serves both capabilities.
 @MainActor extension CogOps {
