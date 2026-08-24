@@ -283,12 +283,14 @@ known descriptor counts so growth does not distort benchmarks.
 
 Results live in separate records so this file can stay focused on design:
 
-- [impl/benchmarks.md](../impl/benchmarks.md) — every number the plan above has
-  produced, with the environment that produced it, the decision it drove, and
-  the withdrawal when a measurement turned out not to be trustworthy.
-- [impl/optimization.md](../impl/optimization.md) — profiler attribution: where
-  the time actually goes, and what each change bought. A different instrument
-  from the suite, so a different document.
+- [impl/perf.md](../impl/perf.md) — the performance record: every number the
+  plan above has produced, with the environment that produced it and the
+  decision it drove; where the remaining gaps are, including the profiler
+  attribution that says where the time actually goes; the trade-offs taken; and
+  the withdrawal when a measurement turned out not to be trustworthy. This
+  design file states the plan; that record states the results.
+- [impl/perf-history.md](../impl/perf-history.md) — the old numbers, the retired
+  comparisons, and the decisions they settled.
 - [`swift/Benchmarks/README.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md) — how to
   run any of it, and how a committed threshold is encoded.
 

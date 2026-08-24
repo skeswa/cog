@@ -912,8 +912,7 @@ The original spikes are complete:
 6. Async runs, policies, streams, exports, lifetime, and safe late-result
    rejection are implemented.
 
-The [implementation plan](../impl/plan.md) owns milestone status. The
-[benchmark record](../impl/benchmarks.md) owns measurements.
+The [performance record](../impl/perf.md) owns measurements.
 
 ---
 

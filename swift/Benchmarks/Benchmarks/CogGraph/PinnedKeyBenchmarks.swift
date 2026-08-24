@@ -131,7 +131,7 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
   // read — with every reference keyed. The pair is therefore the only
   // measurement of what keying itself costs, and nothing gated it until a
   // 2026-08-24 comparison priced it at 2.18x the keyless turn ([E13], with the
-  // call-site attribution beside it in `impl/benchmarks.md`). These ceilings
+  // call-site attribution beside it in `impl/perf.md`). These ceilings
   // hold that price. Allocations are exactly zero at the gated percentile,
   // because a keyed turn allocates nothing for the same reason a keyless one
   // does and a claim of nothing is checkable exactly. ARC sits just above the

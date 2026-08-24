@@ -151,7 +151,8 @@ They are. `probe-c-whole-scenario` reports 278 object allocs, 3,639 retains and
 empty body — a floor, not silence.
 
 So PERF-02 can be measured by the harness. The manual `xcrun xctrace` workflow
-stays what perf.md says it is: _per-callsite attribution_, for when a count has
+stays what `design/perf.md` says it is: _per-callsite attribution_, for when a
+count has
 moved and the question becomes which line moved it.
 
 ## Finding 4 — the malloc backend, and a silent zero worth guarding

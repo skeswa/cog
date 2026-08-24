@@ -27,6 +27,18 @@ The dependency is a **path**, never a version. Benchmarks measure the working
 tree, so resolving Cog from a tag would make every measurement a statement about
 a commit that is not the one being changed.
 
+This package also reaches the Storefront macrobenchmark's three workload
+packages by path — `Macro/Storefront/Workload` (`cog-storefront`),
+`Macro/Storefront/Runtimes` (`cog-storefront-runtimes`), and
+`Macro/Storefront/StateGraph` (`cog-storefront-state-graph`) — and the arrow
+runs the same one way. Those three sit in a subdirectory of this package's
+directory, which is a filesystem fact and not a dependency fact: no target here
+is given a `path:` into `Macro/`, and none of the three may be collapsed into
+this package, because the iOS applications that drive them cannot resolve the
+harness, the malloc interposer, or swift-state-graph.
+[`Macro/Storefront/README.md`](./Macro/Storefront/README.md) is the entry point
+for all of it.
+
 ## Running it
 
 From this directory:
@@ -46,9 +58,14 @@ another job.
 
 ## What is here today
 
-One target, `CogGraph`, carries the allocation, graph-shape, layout,
+Two targets. `CogGraph` carries the allocation, graph-shape, layout,
 four-runtime comparison, and Storefront macrobenchmark workloads described
-below. Baseline tolerances pin
+below. `StorefrontAgreementTests` carries the cross-runtime agreement suite —
+the correctness gate every Storefront comparison number rests on, described
+under "Cross-runtime agreement" below. It is a test target rather than a
+benchmark cut because it asserts rather than measures, and it depends on nothing
+from `CogGraph`: a correctness proof has no business importing a benchmark
+runner. Baseline tolerances pin
 counting metrics against drift. Committed static files add the portable CI
 gate: PERF-06's exact zero-allocation p90 plus PERF-10's generous wall-clock
 ceilings.
@@ -92,7 +109,7 @@ explicitly documented as not comparable across backends. A recorded baseline is
 therefore a statement about one harness version, and a floating pin would let a
 resolve quietly invalidate every threshold in the repository. Upgrading is a
 deliberate, reviewed event that comes with re-baselining — which is exactly the
-rule perf.md already states for the allocator path.
+rule `design/perf.md` already states for the allocator path.
 
 ### Layout constraint
 
@@ -133,7 +150,8 @@ two are not comparable across the backend boundary even within one project.
 The absolute-threshold gate this project needs — `mallocCountTotal == 0` and
 generous absolute wall-clock ceilings — is `thresholds check` at 1.36.2.
 `baseline check --check-absolute` still works but upstream marks the flag
-deprecated in favour of the `thresholds` verb. perf.md §9 anticipated exactly
+deprecated in favour of the `thresholds` verb. `design/perf.md` §9 anticipated
+exactly
 this by saying baselines use "the CLI spelling proven by the compatibility
 probe"; this is that spelling.
 
@@ -223,7 +241,7 @@ lives in `tools/bench-baseline.mjs`.
 Baselines live in the git-ignored `.benchmarkBaselines/`. Upstream calls the
 stored format unstable, and a baseline is a statement about one machine;
 numbers meant to outlive a session belong in
-[`benchmarks.md`](../../docs/swift/impl/benchmarks.md) with their environment
+[`impl/perf.md`](../../docs/swift/impl/perf.md) with their environment
 written beside them.
 
 ## Committed CI thresholds
@@ -357,7 +375,7 @@ object-allocation, retain, and release counters.
 M6-05c's same-session comparison selected the shared pool: it won the expected
 mostly-static instruction count, all candidates tied on p50 wall time and
 allocations, prefix arrays added ARC under churn, and inline-plus-overflow won
-neither shape. `impl/benchmarks.md` records the raw comparison and rationale.
+neither shape. `impl/perf.md` records the raw comparison and rationale.
 The rejected implementations and their selectors were removed once the
 direction was settled; the measurements remain the reproducible decision
 record.
@@ -415,12 +433,12 @@ two sibling async quotes, and an inventory feed that touches rows nobody is
 looking at.
 
 Its declarations, fixtures, kernels, scripted service, and interaction trace
-live in **`swift/Storefront`**, a package of its own, because the SwiftUI
-benchmark application in `swift/Examples/Storefront` drives the same workload
+live in **`swift/Benchmarks/Macro/Storefront/Workload`**, a package of its own, because the SwiftUI
+benchmark application in `swift/Benchmarks/Macro/Storefront/Apps/Cog` drives the same workload
 and an iOS application target cannot depend on _this_ package without resolving
 the harness, the interposer, and swift-state-graph. That package depends on the
 root by path and on nothing else. Read
-[`swift/Storefront/README.md`](../Storefront/README.md) first.
+[`swift/Benchmarks/Macro/Storefront/Workload/README.md`](./Macro/Storefront/Workload/README.md) first.
 
 Six cuts, and which metrics each may carry is decided entirely by `M5-11`'s
 quiescence rule:
@@ -529,13 +547,118 @@ package correctness suite runs the detailed phase-by-phase checks.
 ```console
 mise run bench --filter 'perf-15-storefront-.*'
 mise run bench:compact --filter 'perf-15-storefront-.*'
-mise run test:storefront        # the correctness gate the numbers rest on
+mise run test:storefront            # the correctness gate the numbers rest on
+mise run test:storefront-agreement  # and the cross-runtime one, below
 ```
+
+## The four-runtime Storefront comparison
+
+`perf-15` is the Cog-only cut family. `perf-16` runs the _same_ workload under
+four state-management runtimes, named
+`perf-16-storefront-<runtime>-<cut>`, where `<runtime>` is the slug the port
+itself declares — `cog`, `observation-raw`, `observation-memo`, or
+`state-graph` — and `<cut>` is `cold`, `session`, `async-burst`, or
+`interactions`. Every cut's preparation asserts that its backend's raw value
+equals the port's own `descriptor.slug`, so a transposed case cannot silently
+file a number under the wrong runtime.
+
+**Sixteen cuts, not twenty.** There is no `perf-16` footprint twin. That cut's
+preparation must start the catalog and the search index while materializing
+none of the funnel, and `StorefrontRuntime` has no neutral verb that does that;
+the only verbs that start those requests also warm the search pipeline, so the
+measured region would time a cache hit, and the alternative would start a
+service request inside a region carrying process-global malloc counters, which
+`M5-11` forbids. Closing that needs a new protocol verb in all four ports, so
+`perf-15-storefront-footprint` stays Cog-only with its Cog-specific root
+demand. The reasoning is recorded beside the registrations in
+`Benchmarks/CogGraph/StorefrontRuntimeBenchmarks.swift`.
+
+**Registration order matters.** The runtime cuts register ahead of every cut
+that drops a runtime, for the same `M5-11` reason the `perf-15` cuts do: a
+region that tears a runtime down may not carry process-wide counters, and the
+harness's ordering is what keeps a counting cut from inheriting another cut's
+teardown. `storefrontRuntimeCountingBenchmarks()` is registered immediately
+after `storefrontCountingBenchmarks()`, and `storefrontRuntimeTimingBenchmarks()`
+last.
+
+**Nothing in `perf-16` is thresholded**, and `tools/bench-baseline.mjs` names
+none of it. Three of the four runtimes are programs this repository does not
+own the tuning of; a committed ceiling on one of them would turn an outside
+library's change, or a fair-port revision of our own, into a Cog CI failure.
+The comparison is a recorded result, not a gate.
+
+**One shared limitation belongs beside every `perf-16` number.** All three
+non-Cog ports render explicitly at the close of a transaction, because none of
+their observation schedulers is synchronous:
+`withObservationTracking`'s `onChange` fires before the mutation that triggered
+it has completed, and `withGraphTracking` re-applies tracking on the next
+runloop turn, while the shared trace reads the sink on the line after a verb
+returns. Both `@Observable` ports keep an empty tracking scope anyway so the
+registrar's registration and notification costs stay inside the sample. Only
+Cog's reactions are the library's own scheduler. That is a scheduling mismatch
+rather than a defect, and each port's README states its version of it.
+
+```console
+mise run bench --filter 'perf-16-storefront-.*'            # all sixteen
+mise run bench --filter 'perf-1[56]-storefront-.*'         # with the Cog-only six
+mise run test:storefront-all                               # required first
+```
+
+Running the `perf-15` and `perf-16-cog` families in one session buys a free
+self-check: they are the same workload reached through two registrations, so
+they must agree. `impl/perf.md` records what they reported.
+
+## Cross-runtime agreement
+
+The strongest gate the macrobenchmark has, and the one that makes a timing
+comparison between four runtimes mean anything at all. It lives here, in
+`Tests/StorefrontAgreementTests`, run by `mise run test:storefront-agreement`.
+
+It lives here because nowhere else can hold it. Each runtime's own package
+proves that runtime agrees with the shared shadow model, which is a _transitive_
+argument that the four agree with one another. This suite makes the argument
+directly: it links all four — the Cog port, the raw `@Observable` floor, the
+hand-memoized `@Observable` port, and the swift-state-graph port — drives each
+through the identical eleven-phase trace on the `smoke` profile, and compares
+their answers value for value. `cog-storefront` cannot see the ports;
+`cog-storefront-runtimes` and `cog-storefront-state-graph` cannot see each other,
+deliberately, since target separation is what makes it a compile error for one
+port to reach into another's cache. This package already depends on all four, so
+it is the one place the four coexist without weakening that separation.
+
+What it requires:
+
+- every checkpoint holds for every runtime, and the only skipped checkpoints are
+  the ones that runtime's declared semantics predict — a skip records as
+  holding, so an unexamined skip is how a claim stops being checked;
+- the four agree exactly, at all ten branch-free phase boundaries and at the
+  end, on the visible product identifiers, the rendered checksum, the settled
+  suggestions, and the order total, and each agrees with the shadow it derived
+  independently from the same profile and the same events;
+- every session ends with **zero** outstanding service requests, which is what
+  separates "computed the same answer" from "computed the same answer for the
+  same reasons": a runtime that had quietly stopped asking for something would
+  end with fewer requests and identical rendered output;
+- the `StorefrontRuntimeSemantics` fields that admit no variation really are
+  invariant across the four, while the ones that legitimately differ are printed
+  as a table rather than asserted — that difference is the result the comparison
+  exists to surface.
+
+The eleventh boundary is compared in two pieces on purpose. The teardown phase
+branches on `releasesUnobservedValues`: a runtime with a lifetime model scrolls
+back to re-materialize a released row and prove it asks the service again, so it
+ends with rows on screen, while a runtime that caches nothing skips that proof —
+correctly, since it would pass for the wrong reason — and ends with the empty
+window the phase navigated to. That is a difference in the script those runtimes
+ran, not in the answers they computed, so the browse screen is compared within
+each branch group and each runtime is separately held to its own shadow, while
+the suggestions and the cart's money, which the branch does not touch, are
+compared across all four.
 
 Nothing here is gated. There are no committed threshold files for `perf-15`,
 and `tools/bench-baseline.mjs` names none, because these are first measurements
 on one host and a threshold with no repeated pinned-CI history behind it is a
-guess. `impl/benchmarks.md` records the numbers, the environment, the workload's exact
+guess. `impl/perf.md` records the numbers, the environment, the workload's exact
 shape, and what it does not cover.
 
 ## What is coming

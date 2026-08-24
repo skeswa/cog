@@ -181,11 +181,12 @@ function selectionCount(pattern, specifiers, fail) {
 /**
  * Splits a pattern on top-level `|`, ignoring escapes, classes, and groups.
  *
- * Exported because the task-ledger checker validates ledger filters with the
- * same splitting rule this guard enforces at run time, so the two can never
- * disagree about what "one alternative" means.
+ * A filter naming one alternative selects one test; a filter with several
+ * selects several. The guard counts alternatives to tell a caller which of the
+ * two it asked for, so the split must ignore escapes, character classes, and
+ * groups rather than splitting on every `|`.
  */
-export function topLevelAlternatives(pattern) {
+function topLevelAlternatives(pattern) {
   const branches = [];
   let branch = "";
   let depth = 0;

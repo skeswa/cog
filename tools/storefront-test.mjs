@@ -35,7 +35,26 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /** The separate package whose build graph and tests this wrapper owns. */
-const STOREFRONT_PACKAGE = join(REPO_ROOT, "swift", "Storefront");
+const STOREFRONT_PACKAGE = join(
+  REPO_ROOT,
+  "swift",
+  "Benchmarks",
+  "Macro",
+  "Storefront",
+  "Workload",
+);
+
+/**
+ * What the guards call the thing they are guarding.
+ *
+ * The package name, not a target name: `cog-storefront` builds two test
+ * targets — `StorefrontWorkloadTests` for the runtime-neutral half and
+ * `CogStorefrontTests` for the Cog half — and the guards count executed tests
+ * across every xUnit file in the report directory, so they speak for both. A
+ * literal one-target name here would name half the run in a message about all
+ * of it, which is exactly the kind of misdirection a guard exists to avoid.
+ */
+const SUBJECT = "cog-storefront";
 
 /**
  * A scratch path of its own, under the repository's ignored `.build`.
@@ -57,7 +76,7 @@ function main(passthrough) {
   const filters = extractFilters(passthrough, fail);
   const common = ["-c", "debug", "--scratch-path", SCRATCH_PATH];
 
-  console.log("\n==> swift test [CogStorefront] [debug]");
+  console.log(`\n==> swift test [${SUBJECT}] [debug]`);
 
   const listed = spawnSync("swift", ["test", "list", ...common], {
     cwd: STOREFRONT_PACKAGE,
@@ -68,9 +87,9 @@ function main(passthrough) {
 
   const specifiers = parseSpecifiers(listed.stdout);
   if (specifiers.length === 0) {
-    fail("CogStorefront lists zero tests, so the test run was refused");
+    fail(`${SUBJECT} lists zero tests, so the test run was refused`);
   }
-  assertFiltersSelectTests(filters, specifiers, "CogStorefront", fail);
+  assertFiltersSelectTests(filters, specifiers, SUBJECT, fail);
 
   const reportDirectory = mkdtempSync(join(tmpdir(), "cog-storefront-test-"));
   process.on("exit", () => rmSync(reportDirectory, { force: true, recursive: true }));
@@ -86,10 +105,10 @@ function main(passthrough) {
   );
   exitOnFailure(tested, "swift test");
 
-  const executed = assertRunSelectedTests(filters, reportDirectory, "CogStorefront", fail, {
+  const executed = assertRunSelectedTests(filters, reportDirectory, SUBJECT, fail, {
     requireReport: true,
   });
-  console.log(`==> CogStorefront authoritative executed-test count: ${executed}`);
+  console.log(`==> ${SUBJECT} authoritative executed-test count: ${executed}`);
 }
 
 /** Propagates a child process failure, including death by signal. */
@@ -101,7 +120,7 @@ function exitOnFailure(result, what) {
     fail(`\`${what}\` was killed by ${result.signal}`);
   }
   if (result.status !== 0) {
-    console.error(`error: \`${what}\` failed for CogStorefront`);
+    console.error(`error: \`${what}\` failed for ${SUBJECT}`);
     process.exit(result.status);
   }
 }

@@ -182,7 +182,7 @@ flowchart TB
   [settlement](./arena-settlement.md).
 - Measuring code size or speed: finish with
   [specialization](./arena-specialization.md) and the authoritative
-  [benchmark record](../benchmarks.md).
+  [performance record](../perf.md).
 
 ## Glossary
 
@@ -213,5 +213,5 @@ The public contracts remain in [core design](../../design/exploration.md),
 [mechanisms](../../design/mechanisms.md), and the
 [scenario ledger](../scenarios.md). Arena claims here follow the files under
 `swift/Sources/Cog/Internal/` and their infrastructure tests. Historical or
-rejected layouts remain in [optimization.md](../optimization.md) and
-[benchmarks.md](../benchmarks.md).
+rejected layouts remain in [impl/perf.md](../perf.md) and
+[impl/perf-history.md](../perf-history.md).

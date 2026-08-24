@@ -35,7 +35,8 @@ name: Docs
 #
 # DocC is always built from the newest release tag, never from `main`, so the
 # API reference keeps describing released code even though the site around it
-# republishes on every push. That was `M4-05c`'s guarantee and it survives here.
+# republishes on every push. That guarantee dates to the first tagged release
+# and survives here.
 #
 # There is deliberately no `paths:` filter. GitHub applies path filters to tag
 # pushes as well as branch pushes, and a release tag usually points at a commit

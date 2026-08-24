@@ -1,0 +1,33 @@
+{
+  "originHash" : "a655e68479009d20e9944fc0864ef2b4e406a972554babc0efd28ff1005407d8",
+  "pins" : [
+    {
+      "identity" : "swift-state-graph",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/VergeGroup/swift-state-graph",
+      "state" : {
+        "revision" : "e602fcdb19342a38c135543e7228b3fd60753dc7",
+        "version" : "0.28.0"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
+        "version" : "603.0.2"
+      }
+    },
+    {
+      "identity" : "swift-typed-identifier",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/VergeGroup/swift-typed-identifier.git",
+      "state" : {
+        "revision" : "ea7afa2ce943c6bf3ef87d385c8a6e9f67fea4f3",
+        "version" : "2.0.4"
+      }
+    }
+  ],
+  "version" : 3
+}
