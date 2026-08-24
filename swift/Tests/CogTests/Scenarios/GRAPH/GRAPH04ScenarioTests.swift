@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Test func `GRAPH-04 a broad pull recomputes only the branches it reads`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   let breadth = 64
   var runs = Array(repeating: 0, count: breadth)
 

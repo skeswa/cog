@@ -79,7 +79,7 @@ extension CogBox {
     ///     fresh async operation for that key's next generation.
     public init(
       _ policy: LatestPolicy = .latest,
-      default defaultValue: Value,
+      default defaultValue: @autoclosure @escaping @MainActor () -> Value,
       name: String? = nil,
       fileID: StaticString = #fileID,
       line: UInt = #line,
@@ -120,7 +120,7 @@ extension CogBox {
     ///   - selector: MainActor dependency selection returning one run for a key.
     public init(
       _ policy: OrderedPolicy,
-      default defaultValue: Value,
+      default defaultValue: @autoclosure @escaping @MainActor () -> Value,
       name: String? = nil,
       fileID: StaticString = #fileID,
       line: UInt = #line,
@@ -172,7 +172,7 @@ extension CogBox {
     /// would run the selector against an impossible identity.
     internal static func makeDescriptor(
       policy: AsyncSchedulingPolicy,
-      default defaultValue: Value,
+      default defaultValue: @escaping @MainActor () -> Value,
       equals: (@MainActor (Value, Value) -> Bool)?,
       lifetime: CogStateLifetime,
       label: CogLabel,
@@ -224,7 +224,7 @@ extension CogBox.Async where Value: Equatable {
   ///     the requested key and generation.
   public init(
     _ policy: LatestPolicy = .latest,
-    default defaultValue: Value,
+    default defaultValue: @autoclosure @escaping @MainActor () -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,
@@ -264,7 +264,7 @@ extension CogBox.Async where Value: Equatable {
   ///   - selector: MainActor dependency selection returning one run for a key.
   public init(
     _ policy: OrderedPolicy,
-    default defaultValue: Value,
+    default defaultValue: @autoclosure @escaping @MainActor () -> Value,
     name: String? = nil,
     fileID: StaticString = #fileID,
     line: UInt = #line,

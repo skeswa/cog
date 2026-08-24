@@ -2161,3 +2161,48 @@ _Plan scope and exit: [M11: Steady-turn ARC reduction](./plan.md#plan-m11)._
   _Verify: `mise run test:matrix`, `mise run test:release`,
   `mise run bench:thresholds:check`, `mise run fmt:check`, and
   `mise run tasks:check`._
+
+## M12 tasks
+
+_Plan scope and exit: [M12: Per-state starting values](./plan.md#plan-m12)._
+
+- **M12-01** _(Decision)_ — Record the starting-value spelling on issue #266:
+  every manual starting value and async `default:` is produced once per state;
+  manual takes an explicit `@MainActor` closure and loses its bare-value
+  initializers outright rather than keeping them beside it; async takes an
+  `@autoclosure` so `default:` stays unchanged at call sites, because a second
+  closure beside its selector trips `OnlyOneTrailingClosureArgument`.
+  _Depends: M11-05._
+  _Verify: recorded disposition on issue #266, §10 issue ID 30, this M12
+  section, and `mise run tasks:check`._
+- **M12-02** _(Behavior)_ — Replace the bare starting value on `Cog.Manual` and
+  the key-ignoring `CogBox.Manual` overloads with a `@MainActor` closure, and
+  fold it into `ManualCogStartingValue` so state creation runs it once per
+  state.
+  _Depends: M12-01._
+  _Verify: `mise run test --filter 'DECL-13|DECL-14|LIFE-12'`._
+  _Greens: DECL-13, DECL-14, LIFE-12._
+- **M12-03** _(Behavior)_ — Make `default:` on `Cog.Async` and `CogBox.Async` an
+  `@autoclosure`, and materialize it once per state in `CogArenaAsyncColumn` so
+  repeated pending and failure publications before a first success carry one
+  value.
+  _Depends: M12-01._
+  _Verify: `mise run test --filter ASYNC-40`._
+  _Greens: ASYNC-40._
+- **M12-04** _(Infrastructure)_ — Migrate every call site and example to the
+  closure spelling: library, `CogScenarios`, `CogTesting`, the test targets,
+  `swift/Benchmarks`, `swift/Storefront`, both example apps, the CogLint
+  fixture corpora, and the regenerated lint DocC articles.
+  _Depends: M12-02, M12-03._
+  _Verify: `mise run lint:swift`, `mise run test:lint-documentation`,
+  `mise run build:weather`, `mise run build:storefront`, and
+  `mise run test:storefront`._
+- **M12-05** _(Gate)_ — Close M12 on the full suite: the isolation matrix, the
+  release leg, both arena configurations, compile-fail, the simulator boundary,
+  and the benchmark thresholds re-run because state creation moved to a
+  closure.
+  _Depends: M12-04._
+  _Verify: `mise run test:matrix`, `mise run test:release`,
+  `mise run test:arena-configurations`, `mise run test:compilefail`,
+  `mise run test:simulator`, `mise run bench:thresholds:check`,
+  `mise run api:check`, `mise run fmt:check`, and `mise run tasks:check`._

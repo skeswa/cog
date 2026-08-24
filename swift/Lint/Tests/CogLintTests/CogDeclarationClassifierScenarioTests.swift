@@ -9,9 +9,9 @@ import Testing
     """
     let temperatureCog = Cog<Int> { _ in 0 }
     let temperaturesCogs = Cog.CogBox<Int, String> { _ in { _ in 0 } }
-    fileprivate let _currentZipCog: Cog.Cog<Int?>.Manual = .init(nil)
-    fileprivate let _reportCogs: CogBox<String?, Int>.Manual? = CogBox.Manual(nil)
-    fileprivate let _optionalCog: Cog<Int>.Manual? = .init(nil)
+    fileprivate let _currentZipCog: Cog.Cog<Int?>.Manual = .init { nil }
+    fileprivate let _reportCogs: CogBox<String?, Int>.Manual? = CogBox.Manual { nil }
+    fileprivate let _optionalCog: Cog<Int>.Manual? = .init { nil }
     let forecastCog = Cog.Cog<String>.Async(default: "") { _ in fatalError() }
     let forecastsCogs: CogBox<String, Int>.Async = .init(default: "") { _, _ in fatalError() }
     """
@@ -34,8 +34,8 @@ import Testing
 @Test func `LINT-04 classifier carries source facts through read-only projections`() {
   let classifications = classify(
     """
-    fileprivate let _currentZipCog = Cog<Int?>.Manual(nil)
-    fileprivate let _reportCogs = CogBox<String?, Int>.Manual(nil)
+    fileprivate let _currentZipCog = Cog<Int?>.Manual { nil }
+    fileprivate let _reportCogs = CogBox<String?, Int>.Manual { nil }
     let currentZipCog = _currentZipCog.readOnly
     let reportCogs: Cog.CogBox<String?, Int>.Projection = _reportCogs.readOnly
     """
@@ -60,7 +60,7 @@ import Testing
   let classifications = classify(
     """
     struct WeatherState {
-      fileprivate static let _currentZipCog = Cog<Int?>.Manual(nil)
+      fileprivate static let _currentZipCog = Cog<Int?>.Manual { nil }
       static let currentZipCog = _currentZipCog.readOnly
     }
 
@@ -80,7 +80,7 @@ import Testing
   let classifications = classify(
     """
     typealias Source = Cog<Int>.Manual
-    fileprivate let _currentZipCog = Cog<Int?>.Manual(nil)
+    fileprivate let _currentZipCog = Cog<Int?>.Manual { nil }
     #if DEBUG
     let currentZipSeedTargetCog = _currentZipCog
     #endif
@@ -88,13 +88,13 @@ import Testing
     let copiedThenProjectedCog = _copiedCog.readOnly
     let _factoryCog = makeSource()
     let _typedFactoryCog: Cog<Int>.Manual = makeSource()
-    let _aliasCog = Source(0)
+    let _aliasCog = Source { 0 }
     let externalProjectionCog = _externalCog.readOnly
     let forwardProjectionCog = _laterCog.readOnly
-    fileprivate let _laterCog = Cog.Manual(0)
+    fileprivate let _laterCog = Cog.Manual { 0 }
 
     func localRuntime() {
-      let _localCog = Cog.Manual(0)
+      let _localCog = Cog.Manual { 0 }
       _ = _localCog.readOnly
     }
     """

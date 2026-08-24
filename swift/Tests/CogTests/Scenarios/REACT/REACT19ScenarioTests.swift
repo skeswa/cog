@@ -8,8 +8,8 @@ import Testing
 @MainActor
 @Test func `REACT-19 every changed UI boundary is noticed before any reaction runs`() {
   let (cogs, m) = probedContext()
-  let first = Cog<Int>.Manual(0, name: "pair.first")
-  let second = Cog<Int>.Manual(0, name: "pair.second")
+  let first = Cog<Int>.Manual({ 0 }, name: "pair.first")
+  let second = Cog<Int>.Manual({ 0 }, name: "pair.second")
 
   _ = withObservationTracking {
     (cogs[first], cogs[second])

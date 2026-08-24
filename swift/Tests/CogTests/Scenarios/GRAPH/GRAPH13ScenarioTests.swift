@@ -19,7 +19,7 @@ import Testing
   var reactionTriples: [String] = []
 
   let (cogs, m) = probedContext()
-  let a = Cog<Int>.Manual(1)
+  let a = Cog<Int>.Manual { 1 }
   let b = Cog<Int> { c in
     bRuns += 1
     return c[a] * 10

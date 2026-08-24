@@ -18,7 +18,7 @@ import Testing
   var rootRuns = 0
 
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(2)
+  let source = Cog<Int>.Manual { 2 }
   let middle = Cog<Int> { c in
     middleRuns += 1
     return c[source] + 1
@@ -58,7 +58,7 @@ import Testing
   var runs = 0
   let cogs = Cogs.forTesting()
   let source = Cog<Reading>.Manual(
-    Reading(sample: 1, note: "first"),
+    { Reading(sample: 1, note: "first") },
     equals: { old, new in old.sample == new.sample }
   )
   let note = Cog<String> { c in

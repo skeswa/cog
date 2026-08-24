@@ -12,8 +12,8 @@ private nonisolated struct ObservedPair: Equatable, Sendable {
 @MainActor
 @Test func `UI-13 one turn never exposes a torn pair to an observed consumer`() {
   let cogs = Cogs.forTesting()
-  let first = Cog<Int>.Manual(0)
-  let second = Cog<Int>.Manual(0)
+  let first = Cog<Int>.Manual { 0 }
+  let second = Cog<Int>.Manual { 0 }
   let renderedPairs = OSAllocatedUnfairLock(initialState: [ObservedPair]())
 
   let initial = withObservationTracking {

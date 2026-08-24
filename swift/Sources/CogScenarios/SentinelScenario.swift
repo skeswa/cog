@@ -31,7 +31,7 @@ extension CogScenario {
       name: "M5ScenarioSentinel",
       expectedRuns: 3 * (1 + turns)
     ) { cogs, counter in
-      let sourceCog = Cog<Int>.Manual(0, name: "sentinel.source")
+      let sourceCog = Cog<Int>.Manual({ 0 }, name: "sentinel.source")
       let leftCog = Cog<Int>(
         { c in
           counter.record()

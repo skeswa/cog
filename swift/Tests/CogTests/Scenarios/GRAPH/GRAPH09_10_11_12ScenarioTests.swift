@@ -10,9 +10,9 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let useX = Cog<Bool>.Manual(true)
-  let x = Cog<Int>.Manual(1)
-  let y = Cog<Int>.Manual(10)
+  let useX = Cog<Bool>.Manual { true }
+  let x = Cog<Int>.Manual { 1 }
+  let y = Cog<Int>.Manual { 10 }
   let selected = Cog<Int> { c in
     runs += 1
     return c[useX] ? c[x] : c[y]
@@ -47,8 +47,8 @@ import Testing
   var runs = 0
 
   let cogs = Cogs.forTesting()
-  let includeZ = Cog<Bool>.Manual(false)
-  let z = Cog<Int>.Manual(1)
+  let includeZ = Cog<Bool>.Manual { false }
+  let z = Cog<Int>.Manual { 1 }
   let selected = Cog<Int> { c in
     runs += 1
     guard c[includeZ] else { return -1 }
@@ -74,7 +74,7 @@ import Testing
 @MainActor
 @Test func `GRAPH-11 removing a list item drops its keyed dependency`() {
   let cogs = Cogs.forTesting()
-  let members = CogBox<[Int], String>.Manual([1, 2, 3])
+  let members = CogBox<[Int], String>.Manual { [1, 2, 3] }
   let scores = CogBox<Int, Int>.Manual { item in item * 10 }
   var runs = 0
 
@@ -108,7 +108,7 @@ func
   `GRAPH-12 a selector follows the new keyed value reference and drops the old one`()
 {
   let cogs = Cogs.forTesting()
-  let currentZip = Cog<String>.Manual("90210")
+  let currentZip = Cog<String>.Manual { "90210" }
   let weather = CogBox<Int, String>.Manual { zip in
     zip == "90210" ? 72 : 41
   }

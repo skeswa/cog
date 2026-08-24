@@ -19,7 +19,7 @@ plus a key to name a family of independent states. Internally,
 value projection.
 
 ```swift
-private let _temperatureCog = Cog<Double>.Manual(68)
+private let _temperatureCog = Cog<Double>.Manual { 68 }
 let adviceCog = Cog<String> { c in
   let temperature = c[_temperatureCog]
   return temperature > 80 ? "Stay inside" : "Go outside"
@@ -76,14 +76,14 @@ derive from it; views pass normal values and identities, not copied sources or
 Incorrect—two writable temperatures can disagree:
 
 ```swift
-let _appTemperatureCog = Cog<Double>.Manual(68)
-let _dashboardTemperatureCog = Cog<Double>.Manual(68)
+let _appTemperatureCog = Cog<Double>.Manual { 68 }
+let _dashboardTemperatureCog = Cog<Double>.Manual { 68 }
 ```
 
 Correct—one source and any number of derived views:
 
 ```swift
-private let _temperatureCog = Cog<Double>.Manual(68)
+private let _temperatureCog = Cog<Double>.Manual { 68 }
 let temperatureCog = _temperatureCog.readOnly
 let celsiusCog = Cog { c in
   let temperature = c[_temperatureCog]

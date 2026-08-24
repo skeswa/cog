@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-01 EXPORT-02 values settle cold state then offer changes`() async {
-  let sourceCog = Cog<Int>.Manual(2)
+  let sourceCog = Cog<Int>.Manual { 2 }
   var selectorRuns = 0
   let doubledCog = Cog<Int>(
     { c in

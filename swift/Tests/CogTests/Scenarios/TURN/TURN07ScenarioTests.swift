@@ -12,7 +12,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
 
       var escaped: Writer?
       cogs.turn { c in
@@ -31,7 +31,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
 
       var escaped: Writer?
       cogs.turn { c in
@@ -57,7 +57,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     let lateWrite = await MainActor.run { () -> Task<Void, Never> in
       let cogs = Cogs.forTesting()
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
 
       var escaped: Task<Void, Never>?
       cogs.turn { c in

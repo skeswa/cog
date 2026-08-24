@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `MECH-01 assembly operates mechanisms synchronously in list order`() {
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   var events: [String] = []
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -37,7 +37,7 @@ import Testing
 
 @MainActor
 @Test func `MECH-02 operate-time writes settle before assembly returns`() {
-  let configured = Cog<Int>.Manual(0)
+  let configured = Cog<Int>.Manual { 0 }
   var laterMechanismSaw: Int?
 
   let cogs = Cogs.forTesting(mechanisms: [

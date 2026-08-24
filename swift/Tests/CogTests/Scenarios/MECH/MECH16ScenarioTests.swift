@@ -3,7 +3,7 @@ import CogTesting
 import Testing
 import os
 
-@MainActor private let _readingCog = Cog<Int>.Manual(0, name: "reading")
+@MainActor private let _readingCog = Cog<Int>.Manual({ 0 }, name: "reading")
 
 @MainActor extension CogOps {
   fileprivate func recordReading(_ value: Int) {

@@ -7,7 +7,7 @@ import os
 @MainActor
 @Test func `UI-03 writing one keyed value does not invalidate another keyed reader`() {
   let cogs = Cogs.forTesting()
-  let weather = CogBox<String?, String>.Manual(nil)
+  let weather = CogBox<String?, String>.Manual { nil }
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
   let initial = withObservationTracking {

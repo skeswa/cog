@@ -5,7 +5,7 @@ extension CogBox {
   /// document ID. Keep the box `private` so only its owner can write it:
   ///
   /// ```swift
-  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual(nil)
+  /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual { nil }
   /// ```
   ///
   /// The plural final `Cogs` suffix marks this as a box that can produce many
@@ -38,25 +38,27 @@ extension CogBox {
     /// Stable declaration identity and behavior shared by every key and box copy.
     internal let descriptor: ManualCogDescriptor<Value>
 
-    /// Declares a keyed source whose every key starts at `startingValue`.
+    /// Declares a keyed source whose every key starts the same way.
     ///
     /// This allocates one descriptor. A context creates each key's state on
-    /// first use.
+    /// first use and runs `startingValue` once for it.
     ///
     /// ```swift
-    /// private let _heatAdvisoryCogs = CogBox<Bool, ZipCode>.Manual(false)
+    /// private let _heatAdvisoryCogs = CogBox<Bool, ZipCode>.Manual { false }
     /// ```
     ///
-    /// One value stands behind every key, so a `Value` that is a reference type
-    /// hands every key the same object. Use the closure form below when each key
-    /// should start at its own value.
+    /// The closure runs per key rather than per declaration, so a `Value` that
+    /// is or contains a reference type gives each key its own object instead of
+    /// handing one object to all of them. Use the key-taking form below when a
+    /// key's starting value depends on the key itself.
     ///
     /// Without an equality rule, a written key always propagates at the turn
     /// boundary. The `Equatable` overload or explicit comparison can make equal
     /// writes no-ops.
     ///
     /// - Parameters:
-    ///   - startingValue: The value a key's reads see until something writes it.
+    ///   - startingValue: Produces the value a key's reads see until something
+    ///     writes it. Called once per key and context.
     ///   - lifetime: How long each of this declaration's states lives. Sources
     ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
     ///     release and reset with
@@ -66,7 +68,7 @@ extension CogBox {
     ///   - fileID: The declaration's file. Leave this at its default.
     ///   - line: The declaration's line. Leave this at its default.
     public init(
-      _ startingValue: Value,
+      _ startingValue: @escaping @MainActor () -> Value,
       lifetime: ManualCogLifetime = .app,
       name: String? = nil,
       fileID: StaticString = #fileID,
@@ -80,15 +82,16 @@ extension CogBox {
       )
     }
 
-    /// Declares a keyed source with one starting value and an explicit equality
-    /// rule shared by every key.
+    /// Declares a keyed source with one starting-value closure and an explicit
+    /// equality rule, both shared by every key.
     ///
     /// Cog compares each written key's latest completed value with that turn's
     /// final staged value. Returning `true` suppresses downstream work for that
     /// key and does not affect any sibling key.
     ///
     /// - Parameters:
-    ///   - startingValue: The shared initial value installed lazily for every key.
+    ///   - startingValue: Produces the initial value installed lazily for each
+    ///     key. Called once per key and context.
     ///   - equals: MainActor comparison for the old and final staged value of a
     ///     written key. Return `true` to keep the old value.
     ///   - lifetime: How long each of this declaration's states lives. Sources
@@ -99,7 +102,7 @@ extension CogBox {
     ///   - fileID: The declaration's file. Leave this at its default.
     ///   - line: The declaration's line. Leave this at its default.
     public init(
-      _ startingValue: Value,
+      _ startingValue: @escaping @MainActor () -> Value,
       equals: @escaping @MainActor (Value, Value) -> Bool,
       lifetime: ManualCogLifetime = .app,
       name: String? = nil,
@@ -130,8 +133,10 @@ extension CogBox {
     /// each key first appears. Reads inside this closure are ordinary Swift reads;
     /// it receives no ``Reader`` and creates no dependencies.
     ///
-    /// If `Value` is a function from `Key`, disambiguate the constant form with
-    /// its type: `CogBox<(UserID) ->.Manual Cart, UserID>(makeCart)`.
+    /// If `Value` is itself a function from `Key`, the two closure arities still
+    /// separate the forms: `{ key in ... }` selects this one, and the
+    /// key-ignoring form takes the extra brace,
+    /// `CogBox<(UserID) -> Cart, UserID>.Manual { makeCart }`.
     ///
     /// - Parameters:
     ///   - startingValue: What a key's reads see until something writes that
@@ -247,11 +252,11 @@ extension CogBox.Manual where Value: Equatable {
   /// Declares an `Equatable` keyed source with one starting value.
   ///
   /// This overload is selected automatically and makes equal final writes
-  /// no-ops independently for each key. A reference-type starting value is
-  /// still shared across keys; use the closure overload for distinct objects.
+  /// no-ops independently for each key.
   ///
   /// - Parameters:
-  ///   - startingValue: The initial value shared by all lazily created keys.
+  ///   - startingValue: Produces the initial value for each lazily created key.
+  ///     Called once per key and context.
   ///   - lifetime: How long each of this declaration's states lives. Sources
   ///     default to ``ManualCogLifetime/app``; an ephemeral source opts into
   ///     release and reset with
@@ -260,7 +265,7 @@ extension CogBox.Manual where Value: Equatable {
   ///   - fileID: The declaration's file. Leave this at its default.
   ///   - line: The declaration's line. Leave this at its default.
   public init(
-    _ startingValue: Value,
+    _ startingValue: @escaping @MainActor () -> Value,
     lifetime: ManualCogLifetime = .app,
     name: String? = nil,
     fileID: StaticString = #fileID,

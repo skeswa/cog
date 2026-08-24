@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `EXPORT-15 a live subscription holds state across every grace period`() async {
   let clock = AutomaticLifetimeTestClock()
-  let sourceCog = Cog<Int>.Manual(0)
+  let sourceCog = Cog<Int>.Manual { 0 }
   var selectorRuns = 0
   let doubledCog = Cog<Int> { c in
     selectorRuns += 1

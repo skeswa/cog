@@ -30,7 +30,7 @@ private struct ZipCode: Hashable {
 @Test func `DECL-02 every key of a box starts at the box's starting value`() {
   let cogs = Cogs.forTesting()
 
-  let retryLimit = CogBox<Int, String>.Manual(3)
+  let retryLimit = CogBox<Int, String>.Manual { 3 }
 
   #expect(cogs.peek(retryLimit["upload"]) == 3)
   #expect(cogs.peek(retryLimit["download"]) == 3)
@@ -44,7 +44,7 @@ private struct ZipCode: Hashable {
   // reading one key does not disturb another.
   let cogs = Cogs.forTesting()
 
-  let weatherReport = CogBox<String?, ZipCode>.Manual(nil)
+  let weatherReport = CogBox<String?, ZipCode>.Manual { nil }
   let here = ZipCode(digits: "90210")
   let there = ZipCode(digits: "10001")
 
@@ -61,8 +61,8 @@ private struct ZipCode: Hashable {
   // their own values for the same key.
   let cogs = Cogs.forTesting()
 
-  let attempts = CogBox<Int, String>.Manual(0)
-  let ceiling = CogBox<Int, String>.Manual(5)
+  let attempts = CogBox<Int, String>.Manual { 0 }
+  let ceiling = CogBox<Int, String>.Manual { 5 }
 
   #expect(cogs.peek(attempts["upload"]) == 0)
   #expect(cogs.peek(ceiling["upload"]) == 5)
@@ -73,7 +73,7 @@ private struct ZipCode: Hashable {
   // A declaration is a name. Declaring a box for a key space of
   // millions costs one declaration, and a context that is never asked for a
   // key still answers every key correctly when it finally is.
-  let unreadCount = CogBox<Int, Int>.Manual(0)
+  let unreadCount = CogBox<Int, Int>.Manual { 0 }
 
   let first = Cogs.forTesting()
   let second = Cogs.forTesting()

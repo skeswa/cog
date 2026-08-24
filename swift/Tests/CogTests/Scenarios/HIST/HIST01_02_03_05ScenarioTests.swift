@@ -16,7 +16,7 @@ extension Cogs {
 @MainActor
 @Test func `HIST-01 every turn lands in history under the name it was given`() {
   let cogs = Cogs.forTesting()
-  let count = Cog<Int>.Manual(0)
+  let count = Cog<Int>.Manual { 0 }
 
   #expect(cogs.debugHistory.count == 0)
 
@@ -32,7 +32,7 @@ extension Cogs {
 @MainActor
 @Test func `HIST-01 an unnamed turn lands under the op that published it`() {
   let cogs = Cogs.forTesting()
-  let count = Cog<Int>.Manual(0)
+  let count = Cog<Int>.Manual { 0 }
 
   cogs.bumpTheCounter(count)
 
@@ -47,7 +47,7 @@ extension Cogs {
 @MainActor
 @Test func `HIST-02 history records writes and recomputations`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   let doubled = Cog<Int> { c in c[source] * 2 }
 
   #expect(cogs.peek(doubled) == 2)
@@ -82,7 +82,7 @@ extension Cogs {
   // which item of a box wrote or ran — the same rendering turns and task
   // names use.
   let cogs = Cogs.forTesting()
-  let temperatures = CogBox<Int, String>.Manual(60, name: "temperature")
+  let temperatures = CogBox<Int, String>.Manual({ 60 }, name: "temperature")
   let weather = CogBox<String, String>(
     { c, key in "temp: \(c[temperatures[key]])" },
     name: "weather"
@@ -103,7 +103,7 @@ extension Cogs {
 @MainActor
 @Test func `HIST-02 a diamond records one recomputation for each state that ran`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   let left = Cog<Int> { c in c[source] + 1 }
   let right = Cog<Int> { c in c[source] + 2 }
   let sum = Cog<Int> { c in c[left] + c[right] }
@@ -123,7 +123,7 @@ extension Cogs {
 
 @MainActor
 @Test func `HIST-05 a named watch's run lands in history under its effect name`() {
-  let temperature = Cog<Int>.Manual(60)
+  let temperature = Cog<Int>.Manual { 60 }
   var alerts = 0
 
   let cogs = Cogs.forTesting(mechanisms: [
@@ -149,7 +149,7 @@ extension Cogs {
 
 @MainActor
 @Test func `HIST-05 an unnamed registration lands under its file and line`() {
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in

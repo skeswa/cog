@@ -23,7 +23,7 @@ import CogTesting
 @MainActor
 enum PinnedKeyHarness {
   /// The keyed source a turn writes.
-  static let _rowCogs = CogBox<Int, Int>.Manual(0, name: "perf.pinned.source")
+  static let _rowCogs = CogBox<Int, Int>.Manual({ 0 }, name: "perf.pinned.source")
 
   /// One automatic consumer per row, so a write actually propagates to a
   /// boundary rather than stopping at the source.

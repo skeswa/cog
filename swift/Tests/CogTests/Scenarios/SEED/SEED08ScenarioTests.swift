@@ -12,7 +12,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
 
       cogs.turn { _ in
         cogs.seed(count, to: 7)
@@ -28,7 +28,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
       let sneaky = Cog<Int> { c in
         cogs.seed(count, to: 7)
         return c[count]
@@ -45,7 +45,7 @@ import Testing
 @Test func `SEED-08 seeding from a reaction traps with a clear error`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      let count = Cog<Int>.Manual(0, name: "count")
+      let count = Cog<Int>.Manual({ 0 }, name: "count")
 
       // The reaction stays quiet through its assembly run (count is still 0
       // and the context reference is still nil) and seeds only when the turn

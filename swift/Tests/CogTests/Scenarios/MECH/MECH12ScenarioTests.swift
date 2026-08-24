@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Test func `MECH-12 the seeding closure runs before any operate`() {
-  let currentZip = Cog<String?>.Manual(nil)
+  let currentZip = Cog<String?>.Manual { nil }
   var deliveries: [String] = []
 
   _ = Cogs.forTesting(

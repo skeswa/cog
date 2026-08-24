@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Test func `ACTOR-01 automatic selectors execute on the MainActor`() {
   let (cogs, m) = probedContext()
-  let source = Cog<Int>.Manual(21)
+  let source = Cog<Int>.Manual { 21 }
   var selectorRuns = 0
   let doubled = Cog<Int> { c in
     MainActor.preconditionIsolated("Cog selector")
@@ -20,7 +20,7 @@ import Testing
 @MainActor
 @Test func `ACTOR-01 turn bodies execute on the MainActor`() {
   let (cogs, m) = probedContext()
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   var bodyRuns = 0
 
   cogs.turn { c in
@@ -36,7 +36,7 @@ import Testing
 @MainActor
 @Test func `ACTOR-01 watch handlers execute on the MainActor`() {
   let (cogs, m) = probedContext()
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   var deliveries: [String] = []
 
   m.watch(source, initial: .run) { old, new in
@@ -52,7 +52,7 @@ import Testing
 @MainActor
 @Test func `ACTOR-01 reactions execute on the MainActor`() {
   let (cogs, m) = probedContext()
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   var seen: [Int] = []
 
   m.run { c in

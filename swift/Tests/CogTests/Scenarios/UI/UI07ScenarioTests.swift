@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Test func `UI-07 a binding reads current state and writes through its named turn`() {
   let cogs = Cogs.forTesting()
-  let source = Cog<String>.Manual("old", name: "binding.value")
+  let source = Cog<String>.Manual({ "old" }, name: "binding.value")
   let value = source.readOnly
   let binding = Binding(
     get: { cogs[value] },

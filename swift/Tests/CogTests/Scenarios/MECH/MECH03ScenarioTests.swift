@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `MECH-03 a mechanism left off the assembly list never runs`() {
-  let source = Cog<Int>.Manual(0)
+  let source = Cog<Int>.Manual { 0 }
   var listedRuns = 0
   var unlistedRuns = 0
 

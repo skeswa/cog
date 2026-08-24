@@ -120,18 +120,26 @@ My whole app shares one Cog world. Tests get their own little worlds.
 
 ## 2. DECL — Declaring state
 
-_Milestone M1. Design: §2.3, §3.1, §4._
+_Milestone M1, except DECL-13 and DECL-14 (M12). Design: §2.3, §3.1, §4._
 
 I declare state at the top of a file and it just works.
 
 ### 2.1 Sources
 
-- **DECL-01.** I declare a `Cog<Value>.Manual` with a starting value. When I read
-  it, I get that starting value.
-- **DECL-02.** I declare a `CogBox<Value, Key>.Manual` with a starting value. Each key
-  I look up starts at that value, and each key holds its own value.
-- **DECL-03.** I give a box a starting-value closure instead. Each key
+- **DECL-01.** I declare a `Cog<Value>.Manual` with a starting-value closure.
+  When I read it, I get what that closure returned.
+- **DECL-02.** I declare a `CogBox<Value, Key>.Manual` with a starting-value
+  closure that ignores the key. Each key I look up starts at what that closure
+  returns, and each key holds its own value.
+- **DECL-03.** I give a box a key-taking starting-value closure instead. Each key
   starts at what the closure returns for that key.
+- **DECL-13.** My starting value is a mutable reference type. Two `Cogs`
+  contexts built from the same declaration each get their own object: mutating
+  the value read from one context leaves the other context's value untouched.
+  Each context ran the closure once.
+- **DECL-14.** My box's key-ignoring starting-value closure produces a mutable
+  reference type. Two keys of the same box get two objects, not one shared
+  object, and the closure ran once per key.
 - **DECL-04.** I build `box[5]` in two different places. Both value references point
   at the same state: writing through one shows up when reading the other,
   and `box[6]` does not change.
@@ -470,7 +478,7 @@ it. Retired IDs stay retired.)
 ## 9. LIFE — How long state lives
 
 _Milestone M1 (UI pinning lands with M2; async release with M3; LIFE-11 with
-M4). Design: §5.3, perf §7._
+M4; LIFE-12 with M12). Design: §5.3, perf §7._
 
 State lives as long as its kind says, and coming back is always safe. Grace
 periods default to 30 seconds in production. Tests override that context
@@ -489,6 +497,10 @@ test waits wall-clock time.
 - **LIFE-05.** A manual cog opts into
   `whileObserved(resetToInitial: true)`. After release, the next read
   gives the starting value again.
+- **LIFE-12.** That reset cog's starting value is a mutable reference type. I
+  mutate the value I read, let the state be released, and read again. I get a
+  freshly produced object at its declared starting value, not the object I
+  mutated — the starting-value closure ran a second time.
 - **LIFE-07.** A registered reaction counts as a watcher: the cogs it
   reads stay alive.
 - **LIFE-08.** Once a cog has been read through the UI subscript — the read
@@ -611,8 +623,8 @@ wall-clock waits; real rendering is proven once by the Weather example.
 
 ## 13. ASYNC — Async values, first slice
 
-_Milestone M3, except ASYNC-30 through ASYNC-39 (M4). Design: §5.1, §5.2
-(`.latest` only), §5.3._
+_Milestone M3, except ASYNC-30 through ASYNC-39 (M4) and ASYNC-40 (M12).
+Design: §5.1, §5.2 (`.latest` only), §5.3._
 
 Async state is honest: it always says whether it is loading, what value is
 renderable, and whether any generation has succeeded.
@@ -668,6 +680,13 @@ renderable, and whether any generation has succeeded.
   is an ordinary failure holding the error, never a silent forever-pending
   state; only Cog's own replacement or release cancellation publishes
   nothing (ASYNC-09, ASYNC-13).
+- **ASYNC-40.** My async declaration's `default:` closure produces a mutable
+  reference type. Two contexts, and two keys of one box, each rest on their own
+  object rather than sharing one. Within a single state the default is
+  materialized once: a pending turn, a failure, and a retry's pending turn
+  before any success all carry the identical object, and the closure ran once.
+  After that state is released and recreated, the closure runs again and the
+  new state rests on a fresh object.
 
 ### 13.2 Latest wins
 

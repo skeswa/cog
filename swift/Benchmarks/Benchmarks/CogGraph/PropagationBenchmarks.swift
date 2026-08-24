@@ -26,7 +26,7 @@ enum PropagationHarness {
   static let fanWidth = 16
 
   /// The source every consumer reads.
-  static let _fanCog = Cog<Int>.Manual(0, name: "perf.fan.source")
+  static let _fanCog = Cog<Int>.Manual({ 0 }, name: "perf.fan.source")
 
   /// The consumers, declared once so the shape is fixed across iterations.
   static let fanCogs: [Cog<Int>] = (0..<fanWidth).map { index in
@@ -87,7 +87,7 @@ enum DeepChainHarness {
   static let chainDepth = 100
 
   /// The source at the head of the chain.
-  static let _chainCog = Cog<Int>.Manual(0, name: "perf.chain.source")
+  static let _chainCog = Cog<Int>.Manual({ 0 }, name: "perf.chain.source")
 
   /// Each node reads the one below it; node zero reads the source.
   ///

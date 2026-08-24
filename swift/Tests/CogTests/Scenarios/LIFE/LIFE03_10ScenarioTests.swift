@@ -19,8 +19,8 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
   // the recreation: the same value reference comes back computed fresh —
   // `c.curr` is nil again — from the state the source has now.
   let clock = AutomaticLifetimeTestClock()
-  let watcherAlive = Cog<Bool>.Manual(true)
-  let source = Cog<Int>.Manual(1)
+  let watcherAlive = Cog<Bool>.Manual { true }
+  let source = Cog<Int>.Manual { 1 }
   var previousValues: [Int?] = []
   let automatic = Cog<Int> { c in
     previousValues.append(c.curr)
@@ -57,7 +57,7 @@ private nonisolated enum AutomaticLifetimeSleepOutcome {
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  let source = Cog<Int>.Manual(1)
+  let source = Cog<Int>.Manual { 1 }
   var previousValues: [Int?] = []
   let automatic = Cog<Int> { c in
     previousValues.append(c.curr)

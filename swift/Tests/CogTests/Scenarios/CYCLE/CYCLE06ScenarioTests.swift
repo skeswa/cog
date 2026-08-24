@@ -34,7 +34,7 @@ import Testing
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       let cogs = Cogs.forTesting()
-      let source = Cog<Int>.Manual(0)
+      let source = Cog<Int>.Manual { 0 }
       let weather = CogBox<Int, String>(
         { c, _ in c[source] },
         equals: { _, _ in
