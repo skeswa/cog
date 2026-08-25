@@ -450,16 +450,19 @@ context with the same modifier.
 SwiftUI does not report when it stops watching a registrar. A state that
 reaches the UI boundary therefore stays pinned to the app context (§5.3).
 
-Sources are `private`, so views cannot name writable references. The state
+Sources are `private`, so views cannot name writable references. A bindings
 file may export an ordinary SwiftUI adapter when a control requires `Binding`:
 
 ```swift
 // WeatherState+Cogs.swift
-extension Cogs {
+extension CogOps {
     func selectCurrentLocation(_ zip: ZipCode?) {
         turn(_currentZipCog, to: zip)
     }
+}
 
+// WeatherState+Bindings.swift
+extension Cogs {
     var currentZipBinding: Binding<ZipCode?> {
         Binding(
             get: { self[currentZipCog] },

@@ -24,6 +24,8 @@ mise run build:todomvc
   equality-gated independently from the rows.
 - Every mutation is a domain operation on `CogOps`. Multi-value actions such as
   adding a row and clearing the composer settle in one turn.
+- `TodoState+Bindings.swift` keeps SwiftUI adapters separate from graph
+  declarations and domain operations.
 - `TodoState+Mechanisms.swift` restores persisted JSON during assembly and
   owns the one persistence reaction. `UserDefaults` is durable storage, not a
   second live source of truth.
