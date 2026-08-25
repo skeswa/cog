@@ -33,28 +33,33 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /** The separate package whose build graph and tests this wrapper owns. */
-const RUNTIMES_PACKAGE = join(REPO_ROOT, "swift", "Benchmarks", "Macro", "Storefront", "Runtimes");
+const RUNTIMES_PACKAGE = join(
+  REPO_ROOT,
+  "swift",
+  "Benchmarks",
+  "Storefront",
+  "Runtimes",
+  "Observation",
+);
 
 /**
  * What the guards call the thing they are guarding.
  *
- * The package name rather than a target name: `cog-storefront-runtimes` builds
+ * The package name rather than a target name: `cog-storefront-observation` builds
  * one test target today but two library targets — `StorefrontObservationRaw` and
  * `StorefrontObservationMemo` — and the guards count executed tests across every
  * xUnit file in the report directory, so they speak for the whole package. A
  * literal one-target name here would name part of the run in a message about all
  * of it, which is exactly the kind of misdirection a guard exists to avoid.
  */
-const SUBJECT = "cog-storefront-runtimes";
+const SUBJECT = "cog-storefront-observation";
 
 /**
  * A scratch path of its own, under the repository's ignored `.build`.
  *
- * Shared with nothing. This package resolves `cog-storefront` by path, which
- * resolves the root Cog package by path in turn, so it compiles both itself.
- * Letting that share a scratch directory with either package's own test builds
- * would make each invalidate the other, and the state-graph port's scratch path
- * is separate again for the same reason.
+ * Shared with nothing. This package resolves only the neutral workload, and a
+ * scratch directory of its own keeps runtime builds from invalidating one
+ * another even though they consume the same workload product.
  */
 const SCRATCH_PATH = join(REPO_ROOT, ".build", "storefront-runtimes");
 

@@ -38,8 +38,8 @@ const STATE_GRAPH_PACKAGE = join(
   REPO_ROOT,
   "swift",
   "Benchmarks",
-  "Macro",
   "Storefront",
+  "Runtimes",
   "StateGraph",
 );
 
@@ -57,8 +57,8 @@ const SUBJECT = "cog-storefront-state-graph";
  * A scratch path of its own, under the repository's ignored `.build`.
  *
  * Shared with nothing, and here that matters twice over: this package resolves
- * `cog-storefront` and the root Cog package by path, *and* it resolves
- * swift-state-graph and its macro toolchain from the network. Sharing a scratch
+ * the neutral workload by path and swift-state-graph plus its macro toolchain
+ * from the network. Sharing a scratch
  * directory with any other package's test builds would make each invalidate the
  * other and would drag a macro toolchain rebuild into unrelated runs.
  */

@@ -39,11 +39,11 @@
 // ## Where things live
 //
 // Baselines and their metadata live under
-// `swift/Benchmarks/.benchmarkBaselines/`, which is git-ignored on purpose:
+// `swift/Benchmarks/Runner/.benchmarkBaselines/`, which is git-ignored on purpose:
 // the format is upstream-unstable, and a baseline is a statement about one
 // machine. Numbers that outlive a session belong in docs/swift/impl/perf.md, written by
 // hand, with their environment beside them. Portable zero references live in
-// `swift/Benchmarks/Thresholds/`; their one-sided tolerances live in benchmark
+// `swift/Benchmarks/Runner/Thresholds/`; their one-sided tolerances live in benchmark
 // source so a code review sees the effective ceilings.
 
 import { execFileSync } from "node:child_process";
@@ -53,7 +53,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const benchmarkPackage = join(repositoryRoot, "swift", "Benchmarks");
+const benchmarkPackage = join(repositoryRoot, "swift", "Benchmarks", "Runner");
 const baselineDirectory = join(benchmarkPackage, ".benchmarkBaselines");
 const thresholdDirectory = join(benchmarkPackage, "Thresholds");
 
@@ -103,6 +103,11 @@ const STATIC_THRESHOLD_METRICS = {
   "perf-11-pinned-key-slope-1000": ["releaseCount", "retainCount"],
   "perf-13-deep-chain": ["mallocCountTotal", "objectAllocCount"],
 };
+
+/** Returns the executable target that owns one committed threshold. */
+function thresholdTarget(benchmark) {
+  return benchmark.startsWith("perf-10-") ? "RuntimeComparison" : "CogCore";
+}
 
 /** One exact regular expression, so CI measures no ungated workload by accident. */
 const THRESHOLD_FILTER = `^(${THRESHOLDED_BENCHMARKS.join("|")})$`;
@@ -294,7 +299,7 @@ function assertWitnessMeasured() {
  * Checks that every promised static reference exists and remains exactly zero.
  *
  * The harness only fails when it finds no files at all; one surviving file can
- * otherwise hide twelve missing gates. Zero is intentional: benchmark source
+ * otherwise hide missing gates. Zero is intentional: benchmark source
  * carries each one-sided absolute tolerance, making that tolerance the actual
  * ceiling and preventing a faster result from exiting as an "improvement".
  *
@@ -302,7 +307,7 @@ function assertWitnessMeasured() {
  */
 function assertStaticThresholdsComplete(directory) {
   for (const benchmark of THRESHOLDED_BENCHMARKS) {
-    const path = join(directory, `CogGraph.${benchmark}.p90.json`);
+    const path = join(directory, `${thresholdTarget(benchmark)}.${benchmark}.p90.json`);
     if (!existsSync(path)) fail(`missing static threshold file: ${path}`);
 
     const thresholds = JSON.parse(readFileSync(path, "utf8"));
@@ -377,7 +382,10 @@ function checkStaticThresholds() {
 function checkThresholdSentinel() {
   const benchmark = "perf-10-observation-deep";
   const sentinelDirectory = mkdtempSync(join(tmpdir(), "cog-benchmark-thresholds-"));
-  const sentinelPath = join(sentinelDirectory, `CogGraph.${benchmark}.p90.json`);
+  const sentinelPath = join(
+    sentinelDirectory,
+    `${thresholdTarget(benchmark)}.${benchmark}.p90.json`,
+  );
   writeFileSync(sentinelPath, `${JSON.stringify({ wallClock: -1_000_000_000 }, null, 2)}\n`);
 
   let regression;

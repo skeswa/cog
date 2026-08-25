@@ -745,8 +745,8 @@ jobs:
       # report-only, it is slow, and a timing test on a shared machine teaches
       # people to rerun rather than to look; it runs from
       # `mise run test:storefront-ui` when a number is wanted.
-      # `test:storefront-all` rather than `test:storefront`: the workload suite,
-      # both comparison-runtime packages, and the cross-runtime agreement suite.
+      # `test:storefront-all` rather than `test:storefront`: the workload, Cog,
+      # both comparison-runtime packages, and cross-runtime agreement suites.
       # A comparison is only meaningful when every runtime in it is green in the
       # same revision, and the agreement suite is what proves the four computed
       # the same answers — without it a fast number might just be a wrong one.
@@ -1015,8 +1015,8 @@ jobs:
       # report-only, it is slow, and a timing test on a shared machine teaches
       # people to rerun rather than to look; it runs from
       # `mise run test:storefront-ui` when a number is wanted.
-      # `test:storefront-all` rather than `test:storefront`: the workload suite,
-      # both comparison-runtime packages, and the cross-runtime agreement suite.
+      # `test:storefront-all` rather than `test:storefront`: the workload, Cog,
+      # both comparison-runtime packages, and cross-runtime agreement suites.
       # A comparison is only meaningful when every runtime in it is green in the
       # same revision, and the agreement suite is what proves the four computed
       # the same answers — without it a fast number might just be a wrong one.
@@ -1065,8 +1065,8 @@ jobs:
       - name: Restore the benchmark build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: swift/Benchmarks/.build
-          key: swift-bench-${{ runner.arch }}-${{ hashFiles('swift/Benchmarks/Package.swift', 'swift/Benchmarks/Package.resolved') }}
+          path: swift/Benchmarks/Runner/.build
+          key: swift-bench-${{ runner.arch }}-${{ hashFiles('swift/Benchmarks/Runner/Package.swift', 'swift/Benchmarks/Runner/Package.resolved') }}
           restore-keys: |
             swift-bench-${{ runner.arch }}-
 

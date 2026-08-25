@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Runs the separate Storefront workload package's tests with the guards
+// Runs the dependency-free Storefront workload package's tests with the guards
 // SwiftPM does not provide itself.
 //
 // The reasoning is the same one `swift-lint-test.mjs` records for the CogLint
@@ -35,33 +35,22 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /** The separate package whose build graph and tests this wrapper owns. */
-const STOREFRONT_PACKAGE = join(
-  REPO_ROOT,
-  "swift",
-  "Benchmarks",
-  "Macro",
-  "Storefront",
-  "Workload",
-);
+const STOREFRONT_PACKAGE = join(REPO_ROOT, "swift", "Benchmarks", "Storefront", "Workload");
 
 /**
  * What the guards call the thing they are guarding.
  *
- * The package name, not a target name: `cog-storefront` builds two test
- * targets — `StorefrontWorkloadTests` for the runtime-neutral half and
- * `CogStorefrontTests` for the Cog half — and the guards count executed tests
- * across every xUnit file in the report directory, so they speak for both. A
- * literal one-target name here would name half the run in a message about all
- * of it, which is exactly the kind of misdirection a guard exists to avoid.
+ * The package name rather than the test target name, matching the other
+ * Storefront wrappers and leaving room for the neutral package to grow more
+ * than one test target without making diagnostics misleading.
  */
-const SUBJECT = "cog-storefront";
+const SUBJECT = "cog-storefront-workload";
 
 /**
  * A scratch path of its own, under the repository's ignored `.build`.
  *
- * Shared with nothing: this package resolves the root Cog package by path, so
- * it compiles Cog itself, and letting that share a scratch directory with the
- * root package's own test builds would make each invalidate the other.
+ * Shared with nothing so the neutral workload's compilation state cannot be
+ * invalidated by a runtime package that consumes it under different products.
  */
 const SCRATCH_PATH = join(REPO_ROOT, ".build", "storefront");
 

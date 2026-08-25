@@ -175,7 +175,7 @@ let package = Package(
   products: [
     .library(name: "Cog", targets: ["Cog"]),
     .library(name: "CogTesting", targets: ["CogTesting"]),
-    // Not API. Exists so the separate `swift/Benchmarks` package can share the
+    // Not API. Exists so the separate `swift/Benchmarks/Runner` package can share the
     // scenario graphs with `CogScenarioTests`.
     .library(name: "_CogScenarios", targets: ["CogScenarios"]),
   ],

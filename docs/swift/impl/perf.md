@@ -12,7 +12,7 @@ This document answers four questions:
 It records the current build. Older results and retired designs live in
 [perf-history.md](./perf-history.md). The benchmark design lives in
 [design/perf.md](../design/perf.md). Commands and tool versions live in the
-[`swift/Benchmarks` README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md).
+[`swift/Benchmarks/Runner` README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Runner/README.md).
 If a number here conflicts with `perf-history.md`, use this one.
 
 ## The short answer
@@ -472,7 +472,7 @@ above. It is useful history, not a current list of percentages.
 
 That profile led to targeted scalar exclusivity changes, a checked location
 cache, and then the typed frontier. Those changes make its shares stale. The
-[repeatable call-site attribution probe](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/probes/M9-01-call-site-attribution.md)
+[repeatable call-site attribution probe](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Runner/Probes/M9-01-call-site-attribution.md)
 contains the full method and call-site record. Re-profile before optimizing
 one of those old hot sites again.
 

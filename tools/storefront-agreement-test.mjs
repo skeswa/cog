@@ -9,12 +9,9 @@
 // they computed the *same answers* before any timing between them is allowed to
 // mean anything. Without it a fast number might simply be a wrong number.
 //
-// The suite lives in `swift/Benchmarks` because there is nowhere else it could.
-// `cog-storefront` cannot see the ports; the two port packages cannot see each
-// other, deliberately, since target separation is what makes it a compile error
-// for one port to reach into another's cache. The benchmark package already
-// depends on all four, so it is the one place the four coexist without weakening
-// that separation.
+// The suite lives in Storefront's dedicated Verification package. That package
+// is the intentional integration point where all four runtimes coexist;
+// individual runtime packages still cannot see one another.
 //
 // The guards matter more here than anywhere: SwiftPM exits 0 when a filter
 // selects nothing, so an empty run would report agreement that was never
@@ -40,28 +37,22 @@ import {
 /** The repository root, resolved from this file so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-/** The separate benchmark package that hosts the agreement suite. */
-const BENCHMARKS_PACKAGE = join(REPO_ROOT, "swift", "Benchmarks");
+/** The separate verification package that hosts the agreement suite. */
+const VERIFICATION_PACKAGE = join(REPO_ROOT, "swift", "Benchmarks", "Storefront", "Verification");
 
 /**
  * What the guards call the thing they are guarding.
  *
- * The package name plus the suite, because `cog-benchmarks` also holds the
- * benchmark executable and `swift package benchmark` is a different command
- * entirely. A message that named only the package would leave a reader guessing
- * which of the two failed.
+ * The package name names the one responsibility this package has.
  */
-const SUBJECT = "cog-benchmarks (cross-runtime agreement)";
+const SUBJECT = "cog-storefront-verification";
 
 /**
  * A scratch path of its own, under the repository's ignored `.build`.
  *
- * Shared with nothing, and in particular not with `swift/Benchmarks/.build`,
- * which `mise run bench` uses. A measured run and a test run compile the same
- * package under different configurations and different traits; letting them
- * share a scratch directory would make each invalidate the other, and a
- * benchmark that had to rebuild the world before every sample is a benchmark
- * nobody runs.
+ * Shared with nothing, and in particular not with the headless runner. The
+ * verification and measurement packages compile the same runtimes for
+ * different purposes, so sharing would make each invalidate the other.
  */
 const SCRATCH_PATH = join(REPO_ROOT, ".build", "storefront-agreement");
 
@@ -79,7 +70,7 @@ function main(passthrough) {
   console.log(`\n==> swift test [${SUBJECT}] [debug]`);
 
   const listed = spawnSync("swift", ["test", "list", ...common], {
-    cwd: BENCHMARKS_PACKAGE,
+    cwd: VERIFICATION_PACKAGE,
     encoding: "utf8",
     stdio: ["inherit", "pipe", "inherit"],
   });
@@ -99,7 +90,7 @@ function main(passthrough) {
     "swift",
     ["test", ...common, "--xunit-output", reportPath, ...passthrough],
     {
-      cwd: BENCHMARKS_PACKAGE,
+      cwd: VERIFICATION_PACKAGE,
       stdio: "inherit",
     },
   );

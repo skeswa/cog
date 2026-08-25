@@ -2,8 +2,8 @@
 # wrappers use, such as the `M9-01` probe's `--scratch-path .build-arena`.
 # The probe's interposer is built by the clang line in its method document
 # rather than by SwiftPM, so its products are ignored by name.
-swift/Benchmarks/probes/**/libcogprof.dylib
-swift/Benchmarks/probes/**/libcogprof.dylib.dSYM/
+swift/Benchmarks/Runner/Probes/**/libcogprof.dylib
+swift/Benchmarks/Runner/Probes/**/libcogprof.dylib.dSYM/
 .build-mechanisms/
 .build/
 .build-*/
@@ -12,12 +12,12 @@ Package.resolved.bak
 
 # Benchmark baselines. Upstream calls the stored format unstable, and a
 # baseline is a statement about one machine — numbers meant to outlive a
-# session belong in docs/swift/design/perf.md with their environment beside
-# them. `swift/Benchmarks/Package.resolved` is deliberately NOT ignored.
+# session belong in docs/swift/impl/perf.md with their environment beside
+# them. `swift/Benchmarks/Runner/Package.resolved` is deliberately NOT ignored.
 .benchmarkBaselines/
 Thresholds/
-!swift/Benchmarks/Thresholds/
-!swift/Benchmarks/Thresholds/*.p90.json
+!swift/Benchmarks/Runner/Thresholds/
+!swift/Benchmarks/Runner/Thresholds/*.p90.json
 
 # CogLint artifact-bundle products. The source, exact pins, and reproducible
 # build/selection pipeline are committed; release binaries are not.
