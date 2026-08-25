@@ -125,5 +125,5 @@ pages are also available here:
 - [Design history](./docs/history.md) — useful background from the old design
 - [Swift docs](./docs/swift/README.md) — current Swift design and work
 - [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
-- [Storefront macrobenchmark](./swift/Benchmarks/Macro/Storefront/README.md) —
+- [Storefront macrobenchmark](./swift/Benchmarks/Storefront/README.md) —
   the four-runtime comparison and how to run it

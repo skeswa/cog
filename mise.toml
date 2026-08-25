@@ -79,9 +79,9 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weat
 description = "Run the Weather example's tests on an iOS simulator"
 run = "node {{config_root}}/tools/weather-test.mjs"
 
-# The Storefront macrobenchmark's shared workload is a package of its own under
-# `swift/Benchmarks/Macro/Storefront/Workload`, so its correctness suite needs
-# a wrapper of its own. The guards are the ones every other Swift test command
+# The Storefront macrobenchmark's neutral workload and Cog implementation are
+# separate packages, so each correctness suite has a guarded wrapper. The
+# guards are the ones every other Swift test command
 # has: enumerate first, require every filter alternative to match, and read an
 # authoritative executed count back out of an xUnit report the wrapper owns.
 # This suite is the gate the Storefront benchmark numbers rest on, so a silently
@@ -91,14 +91,14 @@ run = "node {{config_root}}/tools/weather-test.mjs"
 description = "Run the guarded Storefront workload package tests"
 run = "node {{config_root}}/tools/storefront-test.mjs"
 
-# The three comparison runtimes live in two further packages of their own, and
-# each package therefore needs a wrapper of its own with the same guards. They
-# are separate packages rather than extra targets in the workload package because
-# SwiftPM hands a package's dependencies to everyone who resolves it: an
-# `@Observable` comparison app must not resolve swift-state-graph, and a target
-# containing no Cog must not be linted under the Cog application ruleset. Each
-# wrapper owns a scratch path of its own, because each package compiles Cog — and
-# in the state-graph case a macro toolchain — for itself.
+[tasks."test:storefront-cog"]
+description = "Run the guarded Cog Storefront runtime tests"
+run = "node {{config_root}}/tools/storefront-cog-test.mjs"
+
+# The comparison runtimes live in two further packages. Package separation
+# keeps Observation free of both Cog and swift-state-graph, while the state-
+# graph port alone resolves its macro toolchain. Every wrapper owns a scratch
+# path of its own so builds for one runtime cannot invalidate another.
 
 [tasks."test:storefront-runtimes"]
 description = "Run the guarded plain-Swift Storefront comparison runtime tests"
@@ -108,13 +108,10 @@ run = "node {{config_root}}/tools/storefront-runtimes-test.mjs"
 description = "Run the guarded swift-state-graph Storefront runtime tests"
 run = "node {{config_root}}/tools/storefront-state-graph-test.mjs"
 
-# The cross-runtime agreement suite lives in `swift/Benchmarks` because that is
-# the only package that can see all four runtimes at once: `cog-storefront`
-# cannot see the ports, and the two port packages cannot see each other — which
-# is deliberate, since target separation is what makes it a compile error for one
-# port to reach into another's cache. Its scratch path is separate from
-# `swift/Benchmarks/.build` so a correctness run and `mise run bench` do not
-# invalidate each other's builds.
+# The cross-runtime agreement suite lives in Storefront's Verification package,
+# the sole integration point that can see all four runtimes. Individual runtime
+# packages still cannot see one another. Its scratch path is separate from the
+# runner so correctness and measurement builds cannot invalidate each other.
 
 [tasks."test:storefront-agreement"]
 description = "Run the guarded cross-runtime Storefront agreement suite"
@@ -124,6 +121,7 @@ run = "node {{config_root}}/tools/storefront-agreement-test.mjs"
 description = "Run every Storefront workload, comparison-runtime, and agreement suite"
 depends = [
   "test:storefront",
+  "test:storefront-cog",
   "test:storefront-runtimes",
   "test:storefront-state-graph",
   "test:storefront-agreement",
@@ -131,7 +129,7 @@ depends = [
 run = "echo '==> every Storefront suite passed'"
 
 # The Storefront benchmark application is an Xcode project of its own under
-# `swift/Benchmarks/Macro/Storefront/Apps/Cog`. It is not an example —
+# `swift/Benchmarks/Storefront/Apps/Cog`. It is not an example —
 # `swift/Examples/` holds exactly one app, Weather, the worked feature example —
 # but it needs the same build/test split for the same reason: xcodebuild's
 # `build` action builds only the scheme's build-action entries, and the
@@ -144,7 +142,7 @@ run = "echo '==> every Storefront suite passed'"
 
 [tasks."build:storefront"]
 description = "Build the Storefront benchmark app for the iOS simulator"
-run = """xcodebuild -quiet -project "{{config_root}}/swift/Benchmarks/Macro/Storefront/Apps/Cog/Storefront.xcodeproj" -scheme StorefrontBench -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/storefront-derived-data" CODE_SIGNING_ALLOWED=NO build"""
+run = """xcodebuild -quiet -project "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/Storefront.xcodeproj" -scheme StorefrontBench -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/storefront-derived-data" CODE_SIGNING_ALLOWED=NO build"""
 
 [tasks."test:storefront-ui"]
 description = "Run the Storefront UI performance tests on a pinned iOS simulator"
@@ -164,17 +162,16 @@ run = "node {{config_root}}/tools/check-compile-fail.mjs"
 # before every run, validates every filter alternative, and owns the xUnit
 # report used to reject an authoritative executed count of zero.
 #
-# The state-graph port's `Probe/` sources are a lint input even though the probe
+# The state-graph port's API-behavior probe sources are a lint input even though the probe
 # is a throwaway measurement executable in a nested package outside every target.
 # A directory no linter inspects is how a convention violation stays unnoticed,
 # and that is exactly how the probe reached `main` with a class declaring no
 # `nonisolated deinit`. It contains no Cog symbol, so no rule fires; the point is
 # that the directory is covered rather than assumed clean.
 #
-# `swift/Benchmarks/Tests` is a test-role input on the same argument: it holds
-# the cross-runtime agreement suite, which is source a maintainer reads and
-# edits. The rest of `swift/Benchmarks` stays out, because the harness sources
-# are measurement apparatus rather than a worked example of how to write Cog.
+# Storefront Verification is a test-role input on the same argument. Runner
+# sources stay out because they are measurement apparatus rather than a worked
+# example of how to write Cog.
 
 [tasks."test:lint"]
 description = "Run the guarded CogLint package tests"
@@ -189,22 +186,24 @@ echo "==> Cog, example app, workload, and comparison-runtime production targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role production \
   "{{config_root}}/swift/Sources" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Workload/Sources" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Runtimes/Sources" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/StateGraph/Sources" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/StateGraph/Probe/Sources" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Workload/Sources" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/Observation/Sources" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Sources" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Probes/APIBehavior/Sources" \
   "{{config_root}}/swift/Examples/Weather/Weather" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Apps/Cog/Storefront"
+  "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/Storefront"
 echo "==> Cog, example app, workload, and comparison-runtime test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role test \
   "{{config_root}}/swift/Tests" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Workload/Tests" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Runtimes/Tests" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/StateGraph/Tests" \
-  "{{config_root}}/swift/Benchmarks/Tests" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Workload/Tests" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Tests" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/Observation/Tests" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Tests" \
+  "{{config_root}}/swift/Benchmarks/Storefront/Verification/Tests" \
   "{{config_root}}/swift/Examples/Weather/WeatherTests" \
-  "{{config_root}}/swift/Benchmarks/Macro/Storefront/Apps/Cog/StorefrontUITests"
+  "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/StorefrontUITests"
 """
 
 # CogLint ships as a checksummed SwiftPM artifact bundle with one native
@@ -277,7 +276,7 @@ node {{config_root}}/tools/test-changes.mjs
 node {{config_root}}/tools/test-release-configuration.mjs
 """
 
-# Benchmarks live in their own SwiftPM package under `swift/Benchmarks`, so
+# Benchmarks live in their own SwiftPM package under `swift/Benchmarks/Runner`, so
 # every benchmark command runs there rather than at the repository root. The
 # plugin always builds release; a debug measurement of a graph library measures
 # the optimizer's absence. Extra arguments pass straight through, as in
@@ -285,12 +284,12 @@ node {{config_root}}/tools/test-release-configuration.mjs
 
 [tasks.bench]
 description = "Run the Cog benchmarks in release"
-dir = "{{config_root}}/swift/Benchmarks"
+dir = "{{config_root}}/swift/Benchmarks/Runner"
 run = "swift package benchmark"
 
 [tasks."bench:compact"]
 description = "Run the Cog benchmarks with the CompactArena trait"
-dir = "{{config_root}}/swift/Benchmarks"
+dir = "{{config_root}}/swift/Benchmarks/Runner"
 run = "swift package --traits CompactArena benchmark"
 
 # Benchmark baselines, through `tools/bench-baseline.mjs`. The benchmark
@@ -302,7 +301,7 @@ run = "swift package --traits CompactArena benchmark"
 # count, because a suite whose every threshold is zero passes just as happily
 # when nothing is being measured at all (`M5-05bb`).
 #
-# Baselines live in the git-ignored `swift/Benchmarks/.benchmarkBaselines/`:
+# Baselines live in the git-ignored `swift/Benchmarks/Runner/.benchmarkBaselines/`:
 # upstream calls that format unstable, and numbers meant to outlive a session
 # belong in docs/swift/impl/perf.md with their environment beside them.
 

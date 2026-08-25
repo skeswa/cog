@@ -291,7 +291,7 @@ Results live in separate records so this file can stay focused on design:
   design file states the plan; that record states the results.
 - [impl/perf-history.md](../impl/perf-history.md) — the old numbers, the retired
   comparisons, and the decisions they settled.
-- [`swift/Benchmarks/README.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/README.md) — how to
+- [`swift/Benchmarks/Runner/README.md`](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Runner/README.md) — how to
   run any of it, and how a committed threshold is encoded.
 
 Every result must name its machine and toolchain. A threshold without a matching

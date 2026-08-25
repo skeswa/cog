@@ -242,7 +242,7 @@ a future change reconsiders it deliberately.
 
 - If the mini ever moves from bare metal to a virtual machine, measure
   benchmark noise again before trusting a gated threshold from the new host.
-- Recheck the benchmark tool pins in `swift/Benchmarks/README.md` whenever
+- Recheck the benchmark tool pins in `swift/Benchmarks/Runner/README.md` whenever
   Swift or Xcode changes.
 - Move simulator checks out of pull requests if they become too slow, and run
   them on `main` and release candidates only.

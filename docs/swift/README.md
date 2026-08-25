@@ -74,13 +74,15 @@ The Storefront is a macrobenchmark, not an example app. It runs one identical
 eleven-phase shopping session through four state-management runtimes — Cog,
 plain `@Observable` with no caching, hand-written caching, and
 swift-state-graph — and compares their answers before any timing number is
-reported. It lives in `swift/Benchmarks/Macro/Storefront/`, and its
-[README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/README.md)
+reported. It lives in `swift/Benchmarks/Storefront/`, and its
+[README](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/README.md)
 explains the runtimes, the shared workload, the agreement gate, and each suite.
-Each package under it documents its own half: the
-[shared workload](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/Workload/README.md),
-the [two plain-Swift ports](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/Runtimes/README.md),
-and the [swift-state-graph port](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Macro/Storefront/StateGraph/README.md),
+Each package under it documents its own boundary: the
+[shared workload](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Workload/README.md),
+[Cog runtime](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Runtimes/CogRuntime/README.md),
+the [two plain-Swift ports](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Runtimes/Observation/README.md),
+the [swift-state-graph port](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Runtimes/StateGraph/README.md),
+and the [verification gate](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Verification/README.md),
 each with the fairness rules and disclosed judgement calls its numbers rest on.
 The measured results are in the
 [performance record](./impl/perf.md#cross-runtime-results). The worked

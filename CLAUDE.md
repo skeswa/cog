@@ -51,68 +51,57 @@ keep status there rather than copying it into this instruction file.
   Most fixtures check against the debug modules; fixtures declaring
   `// configuration: release` check against the release modules to prove
   debug-only API stays absent from release builds.
-- `swift/Benchmarks/` — a **separate** SwiftPM package, depending on the root
-  by path so the benchmark harness and its allocator backend can never enter
-  the dependency graph a consumer resolves. Run it with
-  `swift package benchmark` from that directory. Its `README.md` records the
-  pinned tool matrix and the MainActor isolation shim; `probes/` holds the
-  measurements those pins rest on. Unlike the root package, its
-  `Package.resolved` is committed. Two directories under it are asymmetric on
-  purpose. `Benchmarks/CogGraph/` holds the micro cuts, and the doubled name is
-  upstream's hard discovery rule rather than a choice: the pinned harness tests
-  a benchmark target's **immediate parent** directory for the literal name
-  `Benchmarks`, so a target moved to a bare `Micro/` would silently not be
-  discovered at all. `Macro/Storefront/` holds the Storefront macrobenchmark,
-  whose four subdirectories are separate SwiftPM packages and an Xcode project
-  rather than benchmark targets, so that rule does not reach them.
-- `swift/Benchmarks/Macro/Storefront/` — the Storefront macrobenchmark: not an
+- `swift/Benchmarks/` — the benchmark workspace container, not a SwiftPM
+  package. Its `README.md` is the short map to the independently resolvable
+  runner, workload, runtimes, verification suite, and application driver.
+- `swift/Benchmarks/Runner/` — the **separate** `cog-benchmarks` SwiftPM
+  package, depending on the root and Storefront packages by path so its
+  benchmark harness and allocator backend can never enter the dependency graph
+  a consumer or benchmark application resolves. Run `swift package benchmark`
+  from this directory. Its `README.md` records the pinned tool matrix and the
+  MainActor isolation shim; `Probes/` holds the measurements those pins rest
+  on; `Thresholds/` holds committed gates. Unlike the root package, its
+  `Package.resolved` is committed. `Benchmarks/CogCore/`,
+  `Benchmarks/RuntimeComparison/`, and `Benchmarks/Storefront/` are three
+  executable targets. Their immediate parent must keep the literal name
+  `Benchmarks`: that doubled name is the pinned harness's hard discovery rule.
+- `swift/Benchmarks/Storefront/` — the Storefront macrobenchmark: not an
   example app but the suite's one _application-shaped_ measurement, in which
   four state-management runtimes run one identical eleven-phase commerce
-  session. `Workload/`, `Runtimes/`, and `StateGraph/` are three **separate
-  SwiftPM packages** that merely live under another package's directory, and
-  `Apps/` holds their SwiftUI driver applications. That nesting is a filesystem
-  fact, not a dependency fact, and it must never be read as an invitation to
-  merge them into `cog-benchmarks`: those applications cannot resolve that
-  package without also resolving the benchmark harness, the malloc interposer,
-  and swift-state-graph, so merging would break them. `cog-benchmarks` reaches
-  each of the three by path **dependency**, and no `cog-benchmarks` target is
-  given a `path:` into `Macro/`. Its `README.md` is the entry point: the four
-  runtimes and what each is for, the shared-workload design, the cross-runtime
-  agreement gate every reported number rests on, and how to run each suite.
-- `swift/Benchmarks/Macro/Storefront/Workload/` — the **separate** `cog-storefront` SwiftPM package
-  holding the Storefront macrobenchmark's shared workload: its state
-  declarations, deterministic fixtures, heavy kernels, sixteen-policy pricing
-  ladder, domain operations, scripted async service, eleven-phase interaction
-  trace, and the shadow model its checkpoints compare against. It depends on the
-  root by path and on **nothing else**, which is the whole reason it is a
-  package of its own rather than a target of `cog-benchmarks`: an iOS
-  application target cannot depend on that package without also resolving the
-  benchmark harness, the malloc interposer, and swift-state-graph — which its
-  nesting under `swift/Benchmarks/` does not change. Both the headless benchmark
-  cuts and the SwiftUI benchmark app drive exactly this workload. Its `README.md` explains the boundary and the
-  three profiles. Its runtime-neutral `StorefrontWorkload` target depends on
-  **nothing at all**, not even Cog, which is what lets a state-management
-  runtime with no Cog in it run the identical session.
-- `swift/Benchmarks/Macro/Storefront/Runtimes/` — the **separate** `cog-storefront-runtimes`
-  SwiftPM package holding the two plain-Swift comparison runtimes for that
+  session. Its `README.md` is the entry point for the four runtimes, shared
+  workload, agreement gate, and run commands.
+- `swift/Benchmarks/Storefront/Workload/` — the **separate**
+  `cog-storefront-workload` SwiftPM package holding the runtime-neutral domain
+  model, deterministic fixtures, heavy kernels, sixteen-policy pricing ladder,
+  scripted async service, eleven-phase trace, and independent shadow model. It
+  has no package dependencies and its sole library target depends on nothing at
+  all, not even Cog. Every runtime and both the headless and SwiftUI drivers use
+  this exact workload.
+- `swift/Benchmarks/Storefront/Runtimes/CogRuntime/` — the **separate**
+  `cog-storefront` SwiftPM package holding the 53 Cog declarations, domain
+  operations, assembly mechanism, and `CogStorefrontRuntime` adapter. It
+  depends only on the root and the neutral workload. The directory avoids the
+  bare name `Cog`, which would collide with the root package's SwiftPM identity.
+- `swift/Benchmarks/Storefront/Runtimes/Observation/` — the **separate**
+  `cog-storefront-observation` SwiftPM package holding the two plain-Swift
+  comparison runtimes for that
   workload: `StorefrontObservationRaw`, the recompute-on-every-read floor, and
   `StorefrontObservationMemo`, honest hand-written memoization. It depends on
-  `swift/Benchmarks/Macro/Storefront/Workload` by path and on nothing else. It is a package of its own
-  because CogLint applies the Cog application ruleset to
-  `swift/Benchmarks/Macro/Storefront/Workload/Sources` and a target whose whole point is to contain no Cog
-  must not be linted as Cog application code, and because `cog-storefront` is the
-  worked large-app Cog example rather than a shelf of alternatives to it. The two
-  ports are separate targets so that it is a compile error for the raw port to
-  reach the memo port's cache.
-- `swift/Benchmarks/Macro/Storefront/StateGraph/` — the **separate** `cog-storefront-state-graph`
+  the workload by path and on nothing else. The two ports are separate targets
+  so it is a compile error for the raw port to reach the memo port's cache.
+- `swift/Benchmarks/Storefront/Runtimes/StateGraph/` — the **separate** `cog-storefront-state-graph`
   SwiftPM package holding the swift-state-graph port of the same workload,
   pinned `exact: "0.28.0"`, with its committed `Package.resolved`, its
   `API-NOTES.md` recording every measured library behavior the port rests on,
-  and the throwaway `Probe/` package that measured them. It is a package of its
+  and the throwaway `Probes/APIBehavior/` package that measured them. It is a package of its
   own because SwiftPM hands a package's dependencies to everyone who resolves it:
   an `@Observable` comparison app must not resolve swift-state-graph and its
   macro toolchain.
-- `swift/Benchmarks/Macro/Storefront/Apps/Cog/` — the SwiftUI benchmark
+- `swift/Benchmarks/Storefront/Verification/` — the **separate**, test-only
+  `cog-storefront-verification` SwiftPM package. It is the only package that
+  resolves all four runtimes, so it owns the cross-runtime agreement and build-
+  shape gates without weakening isolation among the runtime packages.
+- `swift/Benchmarks/Storefront/Apps/Cog/` — the SwiftUI benchmark
   application driving the Cog port of that workload, whose `StorefrontUITests`
   target measures launch, scrolling, search, navigation, and cart interaction
   in release through XCUIAutomation. A hand-written objectVersion-77 Xcode
@@ -238,23 +227,23 @@ directly:
   count from its own xUnit report. Extra arguments pass through, as in
   `mise run test:lint --filter LINT-02`.
 - `mise run lint:swift` — first run the guarded CogLint suite, then lint the
-  root library, the Storefront workload package, the two comparison-runtime
-  packages, and the Weather example and Storefront benchmark apps' production
-  sources with production rules, and
+  root library, the Storefront workload and Cog runtime packages, the two
+  comparison-runtime packages, and the Weather example and Storefront benchmark
+  apps' production sources with production rules, and
   every tracked test target source with the explicit test-role primitive
-  exemption. The Storefront workload is linted like application code on purpose:
+  exemption. The Storefront Cog runtime is linted like application code on purpose:
   it is the worked example of what a large Cog app looks like, and a benchmark
   that broke the conventions it exists to measure would be measuring the wrong
   thing. The comparison-runtime packages are linted too even though they contain
   no Cog, so that a Cog symbol appearing in a port that is supposed to be free of
   one is caught rather than assumed absent; every CogLint rule keys on an actual
   Cog declaration, so Cog-free source produces no diagnostics. The state-graph
-  port's `Probe/` package is a named input for the same reason even though it is
+  port's `Probes/APIBehavior/` package is a named input for the same reason even though it is
   a throwaway measurement executable outside every target: a directory no linter
   inspects is how a convention violation stays unnoticed, and that is exactly how
   the probe reached `main` with a class that declared no `nonisolated deinit`.
-  `swift/Benchmarks/Tests`, which holds the cross-runtime agreement suite, is a
-  test-role input on that same argument; the rest of `swift/Benchmarks` is not,
+  `swift/Benchmarks/Storefront/Verification/Tests`, which holds the cross-runtime
+  agreement suite, is a test-role input on that same argument; Runner is not,
   because the harness sources are measurement apparatus rather than a worked
   example. Empty Xcode-created target directories are not command inputs; CogLint
   continues to reject any named input that does not exist.
@@ -286,20 +275,20 @@ directly:
   byte-for-byte fixture parity, build the DocC archive, and verify every
   permanent diagnostic URL has both its static HTML route and data payload.
 
-- `mise run bench` — run the Cog benchmarks from `swift/Benchmarks` in release.
+- `mise run bench` — run the Cog benchmarks from `swift/Benchmarks/Runner` in release.
   Extra arguments pass through, as in `mise run bench --filter perf-01-steady-turn`.
 - `mise run bench:compact` — run the same benchmark package with its
   `CompactArena` trait, forwarding that public trait to Cog. Extra arguments
   pass through, so Storefront's five compact cuts are
   `mise run bench:compact --filter 'perf-15-storefront-.*'`.
 - `mise run bench:baseline:update [name]` — record a benchmark baseline in
-  `swift/Benchmarks` together with the environment that produced it (Xcode,
+  `swift/Benchmarks/Runner` together with the environment that produced it (Xcode,
   Swift, harness and interposer versions, architecture, host, allocator
   backend). Defaults to `local`.
 - `mise run bench:baseline:check [name]` — refuse to compare across
   environments, assert the allocation witness still reports a non-zero malloc
   count, then check the run against that baseline. Baselines live in the
-  git-ignored `swift/Benchmarks/.benchmarkBaselines/`; numbers meant to
+  git-ignored `swift/Benchmarks/Runner/.benchmarkBaselines/`; numbers meant to
   outlive a session go in `docs/swift/impl/perf.md`.
 - `mise run bench:thresholds:check` — assert the allocation witness is live,
   require every gated benchmark and its committed static threshold, then
@@ -320,7 +309,7 @@ Xcode as the library:
   never compiles a target the Weather scheme lists only under its test
   action.
 - `mise run build:storefront` — build the Storefront benchmark app, whose
-  Xcode project lives at `swift/Benchmarks/Macro/Storefront/Apps/Cog/`, for a
+  Xcode project lives at `swift/Benchmarks/Storefront/Apps/Cog/`, for a
   generic iOS Simulator destination without launching one. The same
   build-action split applies as for Weather.
 - `mise run test:storefront-ui` — run `StorefrontUITests` in **release** on a
@@ -331,23 +320,21 @@ Xcode as the library:
   the scheme carries those settings. Set `COG_STOREFRONT_DESTINATION` to
   override the destination, which local exploration may want and CI must not.
 
-The Storefront macrobenchmark's shared workload is a package of its own, so its
-correctness suite has a wrapper of its own:
+Each Storefront package has a guarded wrapper with its own scratch path:
 
-- `mise run test:storefront` — run the guarded `swift/Benchmarks/Macro/Storefront/Workload` package
-  tests: the declaration-census and profile shape assertions, and the
-  eleven-phase interaction trace end to end. This suite is the gate every
-  Storefront benchmark number rests on.
-
-The three comparison runtimes that share that workload live in two further
-packages, so each has a guarded wrapper of its own with the same three guards
-and a scratch path of its own:
+- `mise run test:storefront` — run the guarded
+  `swift/Benchmarks/Storefront/Workload` package tests: the neutral workload's
+  profile shape and eleven-phase shadow trace.
+- `mise run test:storefront-cog` — run the guarded
+  `swift/Benchmarks/Storefront/Runtimes/CogRuntime` package tests: the Cog
+  declaration census and runtime against the shared shadow model.
 
 - `mise run test:storefront-runtimes` — run the guarded
-  `swift/Benchmarks/Macro/Storefront/Runtimes` package tests: the two plain-Swift `@Observable`
-  ports against the shared shadow model and against each other.
+  `swift/Benchmarks/Storefront/Runtimes/Observation` package tests: the two
+  plain-Swift `@Observable` ports against the shared shadow model and each
+  other.
 - `mise run test:storefront-state-graph` — run the guarded
-  `swift/Benchmarks/Macro/Storefront/StateGraph` package tests: the swift-state-graph port against
+  `swift/Benchmarks/Storefront/Runtimes/StateGraph` package tests: the swift-state-graph port against
   the same shadow model.
 - `mise run test:storefront-agreement` — run the guarded cross-runtime agreement
   suite, the strongest gate the macrobenchmark has. It drives all four runtimes
@@ -357,13 +344,12 @@ and a scratch path of its own:
   request count — then asserts that the declared semantics admitting no
   variation really are invariant and prints the ones that legitimately differ.
   Without it a fast number might just be a wrong number. The suite lives in
-  `swift/Benchmarks/Tests/StorefrontAgreementTests` because that is the only
-  package that can see all four runtimes: `cog-storefront` cannot see the ports,
-  and the two port packages cannot see each other, which is the separation that
-  stops one port reaching into another's cache. Its scratch path is separate
-  from the one `mise run bench` uses so a correctness run and a measured run do
-  not invalidate each other.
-- `mise run test:storefront-all` — run all four Storefront suites together. Use
+  `swift/Benchmarks/Storefront/Verification/Tests/StorefrontAgreementTests`
+  because that is the only package that can see all four runtimes. It also owns
+  the manifest build-shape assertions. Its scratch path is separate from the one
+  `mise run bench` uses so correctness and measurement runs do not invalidate
+  each other.
+- `mise run test:storefront-all` — run all five Storefront suites together. Use
   it before recording any cross-runtime number: a comparison is only meaningful
   when every runtime in it is green in the same revision.
 
