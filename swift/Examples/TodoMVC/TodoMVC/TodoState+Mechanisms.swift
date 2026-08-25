@@ -53,7 +53,7 @@ struct TodoStore {
   }
 }
 
-/// Installs first-run or persisted state and owns the persistence reaction.
+/// TodoMVC's mechanism installs starting state and owns persistence.
 struct TodoMechanism: Mechanism {
   /// Storage capability retained for the mechanism scope's lifetime.
   let store: TodoStore

@@ -120,7 +120,7 @@ keep status there rather than copying it into this instruction file.
   mechanism example, and `TodoMVC/`, the classic fine-grained keyed-state and
   persistence example.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
-  `swift-simulator-test.mjs`, `weather-test.mjs`, `todomvc-test.mjs`, `storefront-test.mjs`,
+  `swift-simulator-test.mjs`, `storefront-test.mjs`,
   `storefront-runtimes-test.mjs`, `storefront-state-graph-test.mjs`,
   `storefront-agreement-test.mjs`, `storefront-ui-test.mjs`,
   `check-compile-fail.mjs`, `check-changes.mjs`, and `check-workflows.mjs`,
@@ -304,20 +304,11 @@ same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS
   Simulator destination without launching one.
-- `mise run test:weather` — run `WeatherTests` on an iOS simulator. Set
-  `COG_WEATHER_DESTINATION` to override the destination. This is a separate
-  command because `build:weather` uses xcodebuild's `build` action, which
-  never compiles a target the Weather scheme lists only under its test
-  action.
 - `mise run build:todomvc` — build the TodoMVC app for a generic iOS Simulator
   destination without launching one.
-- `mise run test:todomvc` — run `TodoMVCTests` on an iOS simulator. Set
-  `COG_TODOMVC_DESTINATION` to override the destination. Its wrapper enforces
-  the same nonzero executed-test count as Weather's.
 - `mise run build:storefront` — build the Storefront benchmark app, whose
   Xcode project lives at `swift/Benchmarks/Storefront/Apps/Cog/`, for a
-  generic iOS Simulator destination without launching one. The same
-  build-action split applies as for Weather.
+  generic iOS Simulator destination without launching one.
 - `mise run test:storefront-ui` — run `StorefrontUITests` in **release** on a
   pinned iOS simulator, and read the result bundle back to require a nonzero
   executed count. Release rather than debug because Apple's performance-test

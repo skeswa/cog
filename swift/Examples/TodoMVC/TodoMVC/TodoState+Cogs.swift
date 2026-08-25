@@ -114,8 +114,8 @@ extension CogOps {
 
   /// Commits the composer as a new row and clears it in one settled turn.
   ///
-  /// Blank normalized titles do nothing, matching TodoMVC. Supplying identity
-  /// lets tests be deterministic; UI callers use a fresh default UUID.
+  /// Blank normalized titles do nothing, matching TodoMVC. UI callers use the
+  /// default fresh UUID, while other callers may supply an identity.
   ///
   /// - Parameter id: Identity for the row being created.
   func addTodo(id: TodoID = TodoID()) {
@@ -236,16 +236,3 @@ extension Cogs {
     )
   }
 }
-
-#if DEBUG
-/// Narrow membership source exposed only to isolated example tests.
-let todoIDsSeedTargetCog = _todoIDsCog
-/// Narrow composer source exposed only to isolated example tests.
-let newTodoTitleSeedTargetCog = _newTodoTitleCog
-/// Narrow filter source exposed only to isolated example tests.
-let todoFilterSeedTargetCog = _todoFilterCog
-/// Narrow title box exposed only to isolated example tests.
-let todoTitleSeedTargetCogs = _todoTitleCogs
-/// Narrow completion box exposed only to isolated example tests.
-let todoIsCompletedSeedTargetCogs = _todoIsCompletedCogs
-#endif

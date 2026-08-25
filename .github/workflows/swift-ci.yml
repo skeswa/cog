@@ -734,14 +734,8 @@ jobs:
       - name: Build the Weather example
         run: mise run build:weather
 
-      - name: Run the Weather example tests
-        run: mise run test:weather
-
       - name: Build the TodoMVC example
         run: mise run build:todomvc
-
-      - name: Run the TodoMVC example tests
-        run: mise run test:todomvc
 
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate
@@ -1010,14 +1004,8 @@ jobs:
       - name: Build the Weather example
         run: mise run build:weather
 
-      - name: Run the Weather example tests
-        run: mise run test:weather
-
       - name: Build the TodoMVC example
         run: mise run build:todomvc
-
-      - name: Run the TodoMVC example tests
-        run: mise run test:todomvc
 
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate

@@ -68,28 +68,9 @@ run = "node {{config_root}}/tools/swift-simulator-test.mjs"
 description = "Build the Weather example for the iOS simulator"
 run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weather.xcodeproj" -scheme Weather -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/weather-derived-data" CODE_SIGNING_ALLOWED=NO build"""
 
-# `build:weather` uses xcodebuild's `build` action, which builds only the
-# scheme's build-action entries — and the Weather scheme lists just
-# `Weather.app` there. It therefore never compiles `WeatherTests`, so the
-# example's behaviour proofs need their own command. Like the Swift test
-# wrappers, `tools/weather-test.mjs` checks the executed-test count afterwards
-# rather than trusting the exit status.
-
-[tasks."test:weather"]
-description = "Run the Weather example's tests on an iOS simulator"
-run = "node {{config_root}}/tools/weather-test.mjs"
-
 [tasks."build:todomvc"]
 description = "Build the TodoMVC example for the iOS simulator"
 run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/TodoMVC/TodoMVC.xcodeproj" -scheme TodoMVC -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/todomvc-derived-data" CODE_SIGNING_ALLOWED=NO build"""
-
-# TodoMVC has the same build/test split as Weather. The app is the scheme's
-# only build-action entry; the guarded test wrapper runs `TodoMVCTests` on a
-# simulator and requires a nonzero authoritative executed count.
-
-[tasks."test:todomvc"]
-description = "Run the TodoMVC example's tests on an iOS simulator"
-run = "node {{config_root}}/tools/todomvc-test.mjs"
 
 # The Storefront macrobenchmark's neutral workload and Cog implementation are
 # separate packages, so each correctness suite has a guarded wrapper. The
@@ -143,12 +124,12 @@ run = "echo '==> every Storefront suite passed'"
 # The Storefront benchmark application is an Xcode project of its own under
 # `swift/Benchmarks/Storefront/Apps/Cog`. It is not an example —
 # `swift/Examples/` holds the Weather and TodoMVC worked examples —
-# but it needs the same build/test split for the same reason: xcodebuild's
+# but its UI performance suite needs a separate test action because xcodebuild's
 # `build` action builds only the scheme's build-action entries, and the
 # StorefrontBench scheme lists just `Storefront.app` there.
 #
-# Its tests run in **release**, unlike the example apps'. Apple's performance-test
-# guidance is explicit that a measured run builds for testing with the Release
+# Its tests run in **release**. Apple's performance-test guidance is explicit
+# that a measured run builds for testing with the Release
 # configuration and the debugger, code coverage, and runtime diagnostics off;
 # the scheme carries those settings and the wrapper carries the configuration.
 
@@ -206,7 +187,7 @@ swift run --package-path "{{config_root}}/swift/Lint" coglint \
   "{{config_root}}/swift/Examples/Weather/Weather" \
   "{{config_root}}/swift/Examples/TodoMVC/TodoMVC" \
   "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/Storefront"
-echo "==> Cog, example apps, workload, and comparison-runtime test targets"
+echo "==> Cog, workload, and benchmark test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role test \
   "{{config_root}}/swift/Tests" \
@@ -215,8 +196,6 @@ swift run --package-path "{{config_root}}/swift/Lint" coglint \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/Observation/Tests" \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Tests" \
   "{{config_root}}/swift/Benchmarks/Storefront/Verification/Tests" \
-  "{{config_root}}/swift/Examples/Weather/WeatherTests" \
-  "{{config_root}}/swift/Examples/TodoMVC/TodoMVCTests" \
   "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/StorefrontUITests"
 """
 

@@ -5,7 +5,7 @@ extension CogBox {
   /// the source's name without the leading underscore:
   ///
   /// ```swift
-  /// // WeatherState.swift
+  /// // WeatherState+Cogs.swift
   /// private let _weatherReportCogs = CogBox<Weather?, ZipCode>.Manual { nil }
   /// let weatherReportCogs = _weatherReportCogs.readOnly
   /// ```

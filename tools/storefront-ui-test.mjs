@@ -10,13 +10,10 @@
 // measurement of a SwiftUI app measures the optimizer's absence, exactly as a
 // debug benchmark of the graph would.
 //
-// Like `tools/weather-test.mjs`, this wrapper does not trust the exit status
-// alone — it reads the result bundle back and requires a non-zero executed
-// count from the one bundle it expects. It differs from that wrapper in one
-// load-bearing place: a **UI** test bundle reports `nodeType` as
-// `"UI test bundle"`, not `"Unit test bundle"`, so a wrapper copied verbatim
-// from Weather would report "found no test bundle" on a run where every test
-// passed.
+// This wrapper does not trust the exit status alone — it reads the result
+// bundle back and requires a non-zero executed count from the one bundle it
+// expects. A **UI** test bundle reports `nodeType` as `"UI test bundle"`, not
+// `"Unit test bundle"`, so the result parser must distinguish the two.
 //
 // Usage: `storefront-ui-test.mjs [extra xcodebuild arguments...]`
 // Set `COG_STOREFRONT_DESTINATION` to override the simulator destination.

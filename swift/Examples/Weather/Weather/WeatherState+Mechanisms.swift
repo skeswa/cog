@@ -3,9 +3,9 @@ import os
 
 /// A MainActor notification boundary used by the nice-weather reaction.
 ///
-/// Production writes to unified logging; tests inject an array-appending
-/// closure. Keeping this side effect outside Cog state lets the reaction own
-/// transition detection without mirroring whether an alert was sent.
+/// Production writes to unified logging. Keeping this side effect outside Cog
+/// state lets the reaction own transition detection without mirroring whether
+/// an alert was sent.
 struct Notifier {
   /// The production log destination shared by copies of ``live``.
   private static let logger = Logger(
@@ -57,8 +57,7 @@ struct WeatherMechanism: Mechanism {
   /// Initial app state belongs here rather than in the app entry point:
   /// `operate` runs inside assembly, so this write settles before
   /// `assemble` returns and no watcher ever observes the unselected value
-  /// on its way past. It is also how a test arranges the same starting world,
-  /// through `Cogs.forTesting(mechanisms:)`.
+  /// on its way past.
   var initialLocation: ZipCode? = .newYork
   /// Distance between periodic refresh deadlines.
   var hourlyRefreshInterval: Duration = .seconds(3_600)

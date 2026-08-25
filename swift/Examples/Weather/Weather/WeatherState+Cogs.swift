@@ -9,17 +9,13 @@ import SwiftUI
 // which is what makes an unannotated global safe to hold a `Cog.Manual`, and
 // what puts these declarations on the same actor as the graph they name.
 
-/// The injectable request boundary selected by every keyed forecast.
-///
-/// Production keeps the live service for the app lifetime. Tests seed a
-/// controlled service before first demand, so they exercise the same async cog
-/// without adding a second request-state mechanism.
+/// The request boundary selected by every keyed forecast.
 private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
 private let _currentZipCodeCog = Cog<ZipCode?>.Manual { nil }
 /// How often background refresh runs, or `nil` while none is installed.
 ///
-/// `WeatherEffects.install` publishes its own interval here. The cadence is
+/// `WeatherMechanism.operate` publishes its own interval here. The cadence is
 /// configuration rather than weather, but the cards describe it, and a screen
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
@@ -29,7 +25,7 @@ private let _refreshIntervalCog = Cog<Duration?>.Manual { nil }
 let weatherServiceCog = _weatherServiceCog.readOnly
 /// Read-only selection shared by the picker, hourly loop, and alert reaction.
 let currentZipCodeCog = _currentZipCodeCog.readOnly
-/// The cadence actually installed by ``WeatherEffects``.
+/// The cadence actually installed by ``WeatherMechanism``.
 let refreshIntervalCog = _refreshIntervalCog.readOnly
 
 /// The keyed forecast every card reads, resting at `nil` until a ZIP's first
@@ -49,11 +45,9 @@ let refreshIntervalCog = _refreshIntervalCog.readOnly
 /// let weatherForecast = cogs.status[weatherForecastCogs[zip]]
 /// ```
 ///
-/// The selector synchronously
-/// captures the current service as a Cog dependency; replacing that service
-/// in a test invalidates every demanded forecast. The returned work runs away
-/// from the MainActor, while Cog brings its pending, success, and failure
-/// status back to the graph as ordered turns.
+/// The selector synchronously captures the current service as a Cog dependency.
+/// The returned work runs away from the MainActor, while Cog brings its pending,
+/// success, and failure status back to the graph as ordered turns.
 let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(default: nil) { c, zip in
   let weatherService = c[weatherServiceCog]
   return .run { @concurrent in
@@ -157,10 +151,3 @@ extension Cogs {
     )
   }
 }
-
-#if DEBUG
-/// The narrow source capability Weather tests may seed through `CogTesting`.
-let weatherServiceSeedTargetCog = _weatherServiceCog
-/// The narrow selection capability Weather tests may seed through `CogTesting`.
-let currentZipSeedTargetCog = _currentZipCodeCog
-#endif

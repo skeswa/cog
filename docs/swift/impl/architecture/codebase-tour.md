@@ -246,16 +246,15 @@ renewed deadline for the same occupant. `ArenaLifetimeInfrastructureTests`, `LIF
 
 The [Weather example](https://github.com/skeswa/cog/tree/main/swift/Examples/Weather/Weather)
 is the best feature-sized map. Start with
-[`WeatherState.swift`](https://github.com/skeswa/cog/blob/main/swift/Examples/Weather/Weather/WeatherState.swift),
-then read `WeatherDashboard`, `WeatherCard`, and `WeatherMechanism` for UI and
-effect boundaries.
+[`WeatherState+Cogs.swift`](https://github.com/skeswa/cog/blob/main/swift/Examples/Weather/Weather/WeatherState%2BCogs.swift),
+then read `WeatherDashboard`, `WeatherCard`, and `WeatherState+Mechanisms.swift`
+for UI and effect boundaries.
 
 The [TodoMVC example](https://github.com/skeswa/cog/tree/main/swift/Examples/TodoMVC/TodoMVC)
-is the smallest complete application map. `TodoState.swift` shows ordered
+is the smallest complete application map. `TodoState+Cogs.swift` shows ordered
 membership beside keyed row cells, dynamic filter dependencies, automatic
-counts, and multi-source operations; `TodoMechanism.swift` shows assembly-time
-restore and a persistence reaction; the row and integration tests prove that
-one todo does not invalidate its siblings.
+counts, and multi-source operations; `TodoState+Mechanisms.swift` shows
+assembly-time restore and a persistence reaction.
 
 The [Storefront Cog port](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources/CogStorefront)
 is the large-graph map. It is the Cog runtime of the

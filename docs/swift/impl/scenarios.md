@@ -572,12 +572,12 @@ When I wonder what happened, the debug history can tell me.
 
 ## 12. UI — SwiftUI and UIKit boundary
 
-_In `CogBoundaryTests` and the Weather example. Design: §3.4, §7, §9,
-perf §6._
+_In `CogTests` and `CogBoundaryTests`. The Weather example is the build-checked
+worked application. Design: §3.4, §7, §9, perf §6._
 
 My views update when — and only when — the values they read change. Boundary
-tests assert Observation notices and re-render counters, never pixels or
-wall-clock waits; real rendering is proven once by the Weather example.
+tests assert Observation notices and re-render counters; UI-06 and EXPORT-07
+exercise real SwiftUI rendering without making an example app own a test target.
 
 - **UI-01.** A view reads a cog with `cogs[valueReference]`. When that cog
   changes, the view re-renders.

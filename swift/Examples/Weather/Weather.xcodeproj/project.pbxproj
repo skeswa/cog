@@ -8,38 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		C0A000000000000000000005 /* Cog in Frameworks */ = {isa = PBXBuildFile; productRef = C0A000000000000000000002 /* Cog */; };
-		C0A000000000000000000006 /* Cog in Frameworks */ = {isa = PBXBuildFile; productRef = C0A000000000000000000003 /* Cog */; };
-		C0A000000000000000000007 /* CogTesting in Frameworks */ = {isa = PBXBuildFile; productRef = C0A000000000000000000004 /* CogTesting */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		8B41F6452DEDD0D5001A66F9 /* Weather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Weather.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		8B41F65C2DEDD0D6001A66F9 /* WeatherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeatherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		C0A000000000000000000008 /* Exceptions for "Weather" folder in "WeatherTests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Assets.xcassets,
-				WeatherApp.swift,
-			);
-			target = 8B41F65B2DEDD0D6001A66F9 /* WeatherTests */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8B41F6472DEDD0D5001A66F9 /* Weather */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				C0A000000000000000000008 /* Exceptions for "Weather" folder in "WeatherTests" target */,
-			);
 			path = Weather;
-			sourceTree = "<group>";
-		};
-		8B41F65F2DEDD0D6001A66F9 /* WeatherTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WeatherTests;
 			sourceTree = "<group>";
 		};
 		8BD71C052DEE41D800CEDD92 /* Config */ = {
@@ -58,15 +36,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8B41F6592DEDD0D6001A66F9 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				C0A000000000000000000006 /* Cog in Frameworks */,
-				C0A000000000000000000007 /* CogTesting in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -75,7 +44,6 @@
 			children = (
 				8BD71C052DEE41D800CEDD92 /* Config */,
 				8B41F6472DEDD0D5001A66F9 /* Weather */,
-				8B41F65F2DEDD0D6001A66F9 /* WeatherTests */,
 				8B41F6462DEDD0D5001A66F9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -84,7 +52,6 @@
 			isa = PBXGroup;
 			children = (
 				8B41F6452DEDD0D5001A66F9 /* Weather.app */,
-				8B41F65C2DEDD0D6001A66F9 /* WeatherTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -115,31 +82,6 @@
 			productReference = 8B41F6452DEDD0D5001A66F9 /* Weather.app */;
 			productType = "com.apple.product-type.application";
 		};
-		8B41F65B2DEDD0D6001A66F9 /* WeatherTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 8B41F66C2DEDD0D6001A66F9 /* Build configuration list for PBXNativeTarget "WeatherTests" */;
-			buildPhases = (
-				8B41F6582DEDD0D6001A66F9 /* Sources */,
-				8B41F6592DEDD0D6001A66F9 /* Frameworks */,
-				8B41F65A2DEDD0D6001A66F9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				8B41F6472DEDD0D5001A66F9 /* Weather */,
-				8B41F65F2DEDD0D6001A66F9 /* WeatherTests */,
-			);
-			name = WeatherTests;
-			packageProductDependencies = (
-				C0A000000000000000000003 /* Cog */,
-				C0A000000000000000000004 /* CogTesting */,
-			);
-			productName = WeatherTests;
-			productReference = 8B41F65C2DEDD0D6001A66F9 /* WeatherTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -152,10 +94,6 @@
 				TargetAttributes = {
 					8B41F6442DEDD0D5001A66F9 = {
 						CreatedOnToolsVersion = 26.6;
-					};
-					8B41F65B2DEDD0D6001A66F9 = {
-						CreatedOnToolsVersion = 26.6;
-						TestTargetID = 8B41F6442DEDD0D5001A66F9;
 					};
 				};
 			};
@@ -177,7 +115,6 @@
 			projectRoot = "";
 			targets = (
 				8B41F6442DEDD0D5001A66F9 /* Weather */,
-				8B41F65B2DEDD0D6001A66F9 /* WeatherTests */,
 			);
 		};
 /* End PBXProject section */
@@ -190,24 +127,10 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8B41F65A2DEDD0D6001A66F9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8B41F6412DEDD0D5001A66F9 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		8B41F6582DEDD0D6001A66F9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -294,40 +217,6 @@
 			};
 			name = Release;
 		};
-		8B41F66D2DEDD0D6001A66F9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 8BD71C052DEE41D800CEDD92 /* Config */;
-			baseConfigurationReferenceRelativePath = Tests.xcconfig;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_NAME = WeatherTests;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-			};
-			name = Debug;
-		};
-		8B41F66E2DEDD0D6001A66F9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 8BD71C052DEE41D800CEDD92 /* Config */;
-			baseConfigurationReferenceRelativePath = Tests.xcconfig;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_NAME = WeatherTests;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -349,15 +238,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8B41F66C2DEDD0D6001A66F9 /* Build configuration list for PBXNativeTarget "WeatherTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				8B41F66D2DEDD0D6001A66F9 /* Debug */,
-				8B41F66E2DEDD0D6001A66F9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -372,16 +252,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C0A000000000000000000001 /* XCLocalSwiftPackageReference "../../.." */;
 			productName = Cog;
-		};
-		C0A000000000000000000003 /* Cog */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C0A000000000000000000001 /* XCLocalSwiftPackageReference "../../.." */;
-			productName = Cog;
-		};
-		C0A000000000000000000004 /* CogTesting */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C0A000000000000000000001 /* XCLocalSwiftPackageReference "../../.." */;
-			productName = CogTesting;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

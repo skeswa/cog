@@ -256,7 +256,7 @@ the status tracks no field until code reads one. Writer targets and `refresh`
 arguments stay direct because they are references, not read values.
 
 ```swift
-// WeatherState.swift
+// WeatherState+Cogs.swift
 
 private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
 let weatherServiceCog = _weatherServiceCog.readOnly
@@ -454,7 +454,7 @@ Sources are `private`, so views cannot name writable references. The state
 file may export an ordinary SwiftUI adapter when a control requires `Binding`:
 
 ```swift
-// WeatherState.swift
+// WeatherState+Cogs.swift
 extension Cogs {
     func selectCurrentLocation(_ zip: ZipCode?) {
         turn(_currentZipCog, to: zip)

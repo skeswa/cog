@@ -2,7 +2,7 @@ import Foundation
 
 /// Display copy for the background-refresh cadence.
 ///
-/// The app shortens `WeatherEffects.hourlyRefreshInterval` to a few seconds so
+/// The app shortens `WeatherMechanism.hourlyRefreshInterval` to a few seconds so
 /// the demo is watchable, and the screens describe that cadence in three
 /// places. Formatting all three from the one installed interval keeps them
 /// from disagreeing with the loop or with each other.
