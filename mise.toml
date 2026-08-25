@@ -79,6 +79,18 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weat
 description = "Run the Weather example's tests on an iOS simulator"
 run = "node {{config_root}}/tools/weather-test.mjs"
 
+[tasks."build:todomvc"]
+description = "Build the TodoMVC example for the iOS simulator"
+run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/TodoMVC/TodoMVC.xcodeproj" -scheme TodoMVC -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/todomvc-derived-data" CODE_SIGNING_ALLOWED=NO build"""
+
+# TodoMVC has the same build/test split as Weather. The app is the scheme's
+# only build-action entry; the guarded test wrapper runs `TodoMVCTests` on a
+# simulator and requires a nonzero authoritative executed count.
+
+[tasks."test:todomvc"]
+description = "Run the TodoMVC example's tests on an iOS simulator"
+run = "node {{config_root}}/tools/todomvc-test.mjs"
+
 # The Storefront macrobenchmark's neutral workload and Cog implementation are
 # separate packages, so each correctness suite has a guarded wrapper. The
 # guards are the ones every other Swift test command
@@ -130,12 +142,12 @@ run = "echo '==> every Storefront suite passed'"
 
 # The Storefront benchmark application is an Xcode project of its own under
 # `swift/Benchmarks/Storefront/Apps/Cog`. It is not an example —
-# `swift/Examples/` holds exactly one app, Weather, the worked feature example —
+# `swift/Examples/` holds the Weather and TodoMVC worked examples —
 # but it needs the same build/test split for the same reason: xcodebuild's
 # `build` action builds only the scheme's build-action entries, and the
 # StorefrontBench scheme lists just `Storefront.app` there.
 #
-# Its tests run in **release**, unlike Weather's. Apple's performance-test
+# Its tests run in **release**, unlike the example apps'. Apple's performance-test
 # guidance is explicit that a measured run builds for testing with the Release
 # configuration and the debugger, code coverage, and runtime diagnostics off;
 # the scheme carries those settings and the wrapper carries the configuration.
@@ -178,11 +190,11 @@ description = "Run the guarded CogLint package tests"
 run = "node {{config_root}}/tools/swift-lint-test.mjs"
 
 [tasks."lint:swift"]
-description = "Test CogLint, then check library, example, workload, and runtime sources"
+description = "Test CogLint, then check library, examples, workload, and runtime sources"
 depends = ["test:lint"]
 run = """
 set -euo pipefail
-echo "==> Cog, example app, workload, and comparison-runtime production targets"
+echo "==> Cog, example apps, workload, and comparison-runtime production targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role production \
   "{{config_root}}/swift/Sources" \
@@ -192,8 +204,9 @@ swift run --package-path "{{config_root}}/swift/Lint" coglint \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Sources" \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Probes/APIBehavior/Sources" \
   "{{config_root}}/swift/Examples/Weather/Weather" \
+  "{{config_root}}/swift/Examples/TodoMVC/TodoMVC" \
   "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/Storefront"
-echo "==> Cog, example app, workload, and comparison-runtime test targets"
+echo "==> Cog, example apps, workload, and comparison-runtime test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \
   --target-role test \
   "{{config_root}}/swift/Tests" \
@@ -203,6 +216,7 @@ swift run --package-path "{{config_root}}/swift/Lint" coglint \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Tests" \
   "{{config_root}}/swift/Benchmarks/Storefront/Verification/Tests" \
   "{{config_root}}/swift/Examples/Weather/WeatherTests" \
+  "{{config_root}}/swift/Examples/TodoMVC/TodoMVCTests" \
   "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/StorefrontUITests"
 """
 

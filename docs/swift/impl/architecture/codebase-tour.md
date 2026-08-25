@@ -4,7 +4,7 @@ _August 22, 2026_
 
 [Back to the architecture overview.](./index.md)
 
-This chapter maps architecture concepts to source files, tests, the example app,
+This chapter maps architecture concepts to source files, tests, the example apps,
 the macrobenchmark, and verification commands. Use it to trace a behavior before changing it.
 
 ## Products and packages
@@ -28,6 +28,7 @@ flowchart TB
   verification["cog-storefront-verification<br/>Storefront/Verification<br/>test only"]
   lint["swift/Lint<br/>separate development package"]
   weather["Weather<br/>Xcode example app"]
+  todomvc["TodoMVC<br/>Xcode example app"]
   storefrontApp["Storefront<br/>Xcode benchmark driver app<br/>Storefront/Apps/Cog"]
   root --> cog
   root --> testing --> cog
@@ -50,6 +51,7 @@ flowchart TB
   verification --> stategraph
   verification --> workload
   weather --> root
+  todomvc --> root
   storefrontApp --> root
   storefrontApp --> storefront
   storefrontApp --> workload
@@ -247,6 +249,13 @@ is the best feature-sized map. Start with
 [`WeatherState.swift`](https://github.com/skeswa/cog/blob/main/swift/Examples/Weather/Weather/WeatherState.swift),
 then read `WeatherDashboard`, `WeatherCard`, and `WeatherMechanism` for UI and
 effect boundaries.
+
+The [TodoMVC example](https://github.com/skeswa/cog/tree/main/swift/Examples/TodoMVC/TodoMVC)
+is the smallest complete application map. `TodoState.swift` shows ordered
+membership beside keyed row cells, dynamic filter dependencies, automatic
+counts, and multi-source operations; `TodoMechanism.swift` shows assembly-time
+restore and a persistence reaction; the row and integration tests prove that
+one todo does not invalidate its siblings.
 
 The [Storefront Cog port](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources/CogStorefront)
 is the large-graph map. It is the Cog runtime of the

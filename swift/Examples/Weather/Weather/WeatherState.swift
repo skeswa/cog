@@ -14,25 +14,16 @@ import SwiftUI
 /// Production keeps the live service for the app lifetime. Tests seed a
 /// controlled service before first demand, so they exercise the same async cog
 /// without adding a second request-state mechanism.
-private let _weatherServiceCog = Cog<WeatherService>.Manual(
-  { .live },
-  name: "weather.service"
-)
+private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
 /// The optional ZIP whose card receives periodic refreshes and nice-weather alerts.
-private let _currentZipCodeCog = Cog<ZipCode?>.Manual(
-  { nil },
-  name: "weather.currentZip"
-)
+private let _currentZipCodeCog = Cog<ZipCode?>.Manual { nil }
 /// How often background refresh runs, or `nil` while none is installed.
 ///
 /// `WeatherEffects.install` publishes its own interval here. The cadence is
 /// configuration rather than weather, but the cards describe it, and a screen
 /// that repeats the literal instead is a second source of the same fact — one
 /// that goes quietly wrong the moment the interval changes.
-private let _refreshIntervalCog = Cog<Duration?>.Manual(
-  { nil },
-  name: "weather.refreshInterval"
-)
+private let _refreshIntervalCog = Cog<Duration?>.Manual { nil }
 
 /// Read-only service capability used by the async selector.
 let weatherServiceCog = _weatherServiceCog.readOnly
@@ -63,10 +54,7 @@ let refreshIntervalCog = _refreshIntervalCog.readOnly
 /// in a test invalidates every demanded forecast. The returned work runs away
 /// from the MainActor, while Cog brings its pending, success, and failure
 /// status back to the graph as ordered turns.
-let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(
-  default: nil,
-  name: "weather.forecast"
-) { c, zip in
+let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(default: nil) { c, zip in
   let weatherService = c[weatherServiceCog]
   return .run { @concurrent in
     try await weatherService.forecast(for: zip)
@@ -77,55 +65,43 @@ let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(
 ///
 /// The plain value read keeps this automatic value stable across reload pending
 /// and failure status; it changes only when the accepted reading does.
-let isSunnyCogs = CogBox<Bool, ZipCode>(
-  { c, zip in
-    let weatherForecast = c[weatherForecastCogs[zip]]
-    return switch weatherForecast?.weather.kind {
-    case .clear, .partlyCloudy: true
-    default: false
-    }
-  },
-  name: "weather.isSunny"
-)
+let isSunnyCogs = CogBox<Bool, ZipCode> { c, zip in
+  let weatherForecast = c[weatherForecastCogs[zip]]
+  return switch weatherForecast?.weather.kind {
+  case .clear, .partlyCloudy: true
+  default: false
+  }
+}
 
 /// Whether the latest accepted weather and advisories are suitable for being outside.
 ///
 /// This keyed automatic value is shared by cards and the location-specific reaction,
 /// so the app has one definition of "nice" and equality gates both consumers.
-let isNiceOutsideCogs = CogBox<Bool, ZipCode>(
-  { c, zip in
-    guard let weatherForecast = c[weatherForecastCogs[zip]] else { return false }
-    let isSunny = c[isSunnyCogs[zip]]
-    guard isSunny else { return false }
-    return weatherForecast.weather.temperatureF > 60
-      && weatherForecast.weather.temperatureF < 90
-      && !weatherForecast.advisories.contains(.heat)
-  },
-  name: "weather.isNice"
-)
+let isNiceOutsideCogs = CogBox<Bool, ZipCode> { c, zip in
+  guard let weatherForecast = c[weatherForecastCogs[zip]] else { return false }
+  let isSunny = c[isSunnyCogs[zip]]
+  guard isSunny else { return false }
+  return weatherForecast.weather.temperatureF > 60
+    && weatherForecast.weather.temperatureF < 90
+    && !weatherForecast.advisories.contains(.heat)
+}
 
 /// The nice-weather value for the currently selected location.
 ///
 /// Changing the selection replaces the keyed dependency captured by this cog;
 /// `nil` deliberately makes the reaction inactive without demanding a forecast.
-let isNiceOutsideHereCog = Cog<Bool>(
-  { c in
-    guard let currentZipCode = c[currentZipCodeCog] else { return false }
-    let isNiceOutside = c[isNiceOutsideCogs[currentZipCode]]
-    return isNiceOutside
-  },
-  name: "weather.isNiceHere"
-)
+let isNiceOutsideHereCog = Cog<Bool> { c in
+  guard let currentZipCode = c[currentZipCodeCog] else { return false }
+  let isNiceOutside = c[isNiceOutsideCogs[currentZipCode]]
+  return isNiceOutside
+}
 
 /// Whether one card is the currently selected target of an installed refresh loop.
-let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
-  { c, zip in
-    let refreshInterval = c[refreshIntervalCog]
-    let currentZipCode = c[currentZipCodeCog]
-    return refreshInterval != nil && currentZipCode == zip
-  },
-  name: "weather.receivesHourlyUpdates"
-)
+let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode> { c, zip in
+  let refreshInterval = c[refreshIntervalCog]
+  let currentZipCode = c[currentZipCodeCog]
+  return refreshInterval != nil && currentZipCode == zip
+}
 
 /// The automatic map destination for the currently selected refresh location.
 ///
@@ -133,13 +109,10 @@ let receivesHourlyUpdatesCogs = CogBox<Bool, ZipCode>(
 /// selection to the coordinates a platform camera needs. A visible map leases
 /// it through `values(of:)`; when that view disappears, normal observed
 /// lifetime can release the otherwise unused projection.
-let weatherMapLocationCog = Cog<WeatherMapLocation?>(
-  { c in
-    guard let currentZipCode = c[currentZipCodeCog] else { return nil }
-    return WeatherMapLocation(zip: currentZipCode)
-  },
-  name: "weather.mapLocation"
-)
+let weatherMapLocationCog = Cog<WeatherMapLocation?> { c in
+  guard let currentZipCode = c[currentZipCodeCog] else { return nil }
+  return WeatherMapLocation(zip: currentZipCode)
+}
 
 extension CogOps {
   /// Selects the ZIP used by the alert reaction and periodic refresh loop.

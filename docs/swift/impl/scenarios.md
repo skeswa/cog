@@ -1151,7 +1151,7 @@ re-proves consumption for its own version.
   graph and satisfies the recorded unused-artifact-fetch result. (Proof: suite.)
 - **LINT-21.** `mise run lint:swift` first runs the linter's own suite, then
   lints the root library, the Storefront workload and comparison-runtime
-  packages, and the Weather example and Storefront benchmark apps' production
+  packages, both example apps, and the Storefront benchmark app's production
   sources with production rules, and every tracked test target source with the
   primitive exemption; the repository is clean.
   (Proof: suite.)

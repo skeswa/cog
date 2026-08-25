@@ -108,8 +108,8 @@ import Testing
   let turnNames = cogs.debugHistory.entries
     .filter { $0.event == .turn }
     .map(\.name)
-  #expect(turnNames.contains("weather.forecast[10001] pending"))
-  #expect(turnNames.last == "weather.forecast[10001] success")
+  #expect(turnNames.contains { $0.hasSuffix("[10001] pending") })
+  #expect(turnNames.last?.hasSuffix("[10001] success") == true)
 
   clock.finish()
 }

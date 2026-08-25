@@ -55,7 +55,7 @@ nonisolated struct ZipCode: RawRepresentable, Hashable, Identifiable, Sendable {
 }
 
 extension ZipCode: CustomStringConvertible {
-  /// The raw ZIP used in keyed Cog labels such as `weather.forecast[10001]`.
+  /// The raw ZIP appended to keyed Cog labels, as in a `[10001]` suffix.
   var description: String { rawValue }
 }
 

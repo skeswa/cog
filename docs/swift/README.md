@@ -85,8 +85,10 @@ the [swift-state-graph port](https://github.com/skeswa/cog/blob/main/swift/Bench
 and the [verification gate](https://github.com/skeswa/cog/blob/main/swift/Benchmarks/Storefront/Verification/README.md),
 each with the fairness rules and disclosed judgement calls its numbers rest on.
 The measured results are in the
-[performance record](./impl/perf.md#cross-runtime-results). The worked
-_example_ app is `swift/Examples/Weather/`.
+[performance record](./impl/perf.md#cross-runtime-results). The worked example
+apps are `swift/Examples/Weather/`, for async state, mechanisms, and exported
+values, and `swift/Examples/TodoMVC/`, for keyed row state, dynamic filters,
+atomic list actions, and persistence.
 
 Do not run a filtered `swift test` command. SwiftPM exits successfully when a
 filter finds no tests. Cog's wrapper first checks that the tests exist, then

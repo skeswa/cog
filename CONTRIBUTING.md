@@ -59,6 +59,8 @@ Apple and example checks use:
 mise run test:simulator
 mise run build:weather
 mise run test:weather
+mise run build:todomvc
+mise run test:todomvc
 mise run build:storefront
 mise run test:storefront-ui
 ```

@@ -46,7 +46,7 @@ name: Swift CI
 # every job, no `pull_request_target`, and full-SHA action pins.
 #
 # The job list grew alongside the library: the release-configuration and
-# compile-fail jobs, then `test-simulator` and the Weather build, then the
+# compile-fail jobs, then `test-simulator` and the example-app builds, then the
 # benchmark package gate, then CogLint dogfood on both macOS runner lanes, and
 # finally the manually dispatched, exact-source release-artifact job.
 
@@ -220,7 +220,7 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
 
-      - name: Lint Cog and Weather with CogLint
+      - name: Lint Cog and example apps with CogLint
         run: mise run lint:swift
 
   # Release-candidate bytes are deliberately manual. A dispatch still runs the
@@ -708,7 +708,7 @@ jobs:
         run: mise run test:simulator
 
   build-weather:
-    name: Example app and macrobenchmark workload (self-hosted)
+    name: Example apps and macrobenchmark workload (self-hosted)
     runs-on: [self-hosted, macOS, ARM64, cog-mini]
     timeout-minutes: 30
     permissions:
@@ -736,6 +736,12 @@ jobs:
 
       - name: Run the Weather example tests
         run: mise run test:weather
+
+      - name: Build the TodoMVC example
+        run: mise run build:todomvc
+
+      - name: Run the TodoMVC example tests
+        run: mise run test:todomvc
 
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate
@@ -892,7 +898,7 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
 
-      - name: Lint Cog and Weather with CogLint
+      - name: Lint Cog and example apps with CogLint
         run: mise run lint:swift
 
   fork-test-host:
@@ -979,7 +985,7 @@ jobs:
         run: mise run test:simulator
 
   fork-build-weather:
-    name: Example app and macrobenchmark workload (fork, GitHub-hosted)
+    name: Example apps and macrobenchmark workload (fork, GitHub-hosted)
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -1006,6 +1012,12 @@ jobs:
 
       - name: Run the Weather example tests
         run: mise run test:weather
+
+      - name: Build the TodoMVC example
+        run: mise run build:todomvc
+
+      - name: Run the TodoMVC example tests
+        run: mise run test:todomvc
 
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate

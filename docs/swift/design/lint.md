@@ -78,7 +78,8 @@ The CLI supports Xcode, GitHub, and SARIF reporters. The build plugin uses its
 work directory as a cache so unchanged files are cheap to check.
 
 In this repo, `mise run lint:swift` lints library, Storefront, example, and test
-sources with the correct target role. The Weather app is the main dogfood app.
+sources with the correct target role. Weather and TodoMVC are the feature-sized
+dogfood apps.
 
 ### 3.2 Distribution and releases
 

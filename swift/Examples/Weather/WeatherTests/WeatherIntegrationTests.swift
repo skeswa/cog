@@ -198,9 +198,10 @@ private final class TrackedWeatherCard {
 
   #expect(alerts == ["It is nice outside!"])
   let equalEntries = entriesInLatestTurn(cogs)
-  let noticeNames = equalEntries.filter { $0.event == .notice }.map(\.name)
-  #expect(noticeNames.contains("weather.forecast[10001]"))
-  #expect(!noticeNames.contains("weather.isNice[10001]"))
+  let keyedNotices = equalEntries.filter {
+    $0.event == .notice && $0.name.hasSuffix("[10001]")
+  }
+  #expect(keyedNotices.count == 1)
   withExtendedLifetime(card) {}
 }
 
