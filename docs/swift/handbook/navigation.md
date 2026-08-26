@@ -9,9 +9,10 @@ Instead, each navigation container is driven by its own source. Deep
 linking, restoration, analytics, and navigation-gated effects then fall out
 of machinery the graph already has.
 
-The worked proof is the
+The sketches below use a generic app with tabs, an item catalog, and one
+modal sheet. The
 [Trails](https://github.com/skeswa/cog/tree/main/swift/Examples/Trails)
-example. This chapter names its patterns.
+example implements every pattern in this chapter as a working app.
 
 ## One source per container
 
@@ -20,11 +21,11 @@ cluster, so the UI updates precisely:
 
 ```swift
 /// The selected tab.
-private let _selectedTabCog = Cog<TrailTab>.Manual { .explore }
+private let _selectedTabCog = Cog<AppTab>.Manual { .home }
 /// Each tab's navigation stack, keyed so tabs invalidate independently.
-private let _tabPathCogs = CogBox<[TrailRoute], TrailTab>.Manual { [] }
+private let _tabPathCogs = CogBox<[Route], AppTab>.Manual { [] }
 /// The single presented modal layer, or `nil` when nothing is presented.
-private let _presentedSheetCog = Cog<TrailSheet?>.Manual { nil }
+private let _presentedSheetCog = Cog<Sheet?>.Manual { nil }
 ```
 
 - **Tab selection** is a plain enum cog.
@@ -36,24 +37,24 @@ private let _presentedSheetCog = Cog<TrailSheet?>.Manual { nil }
   touches no path at all.
 
 Routes are small `Codable` values that carry identities, never loaded
-models: `.trail(TrailID)`, not `.trail(Trail)`. Screens look the content up
+models: `.detail(ItemID)`, not `.detail(Item)`. Screens look the content up
 at render time. That is what makes a route buildable from a URL, storable in
 a snapshot, and honest when the content changes underneath it.
 
 ## Both roads converge on named ops
 
-App code navigates by calling domain ops (`show`, `present`,
-`showTrailInExplore`). The system navigates — back buttons, pop gestures,
-tab taps, swipe-to-dismiss — by writing through the binding adapters, whose
-setters call those same ops ([SwiftUI integration](./swiftui.md)). Both
-roads land on the same sources, so there is nothing to keep in sync.
+App code navigates by calling domain ops (`show`, `present`, and friends).
+The system navigates — back buttons, pop gestures, tab taps,
+swipe-to-dismiss — by writing through the binding adapters, whose setters
+call those same ops ([SwiftUI integration](./swiftui.md)). Both roads land
+on the same sources, so there is nothing to keep in sync.
 
 Standard platform behaviors become one-liners in the ops. Reselecting the
 current tab pops it to its root, because the tab binding's setter lands in
 `selectTab`, and popping is just writing an empty path:
 
 ```swift
-func selectTab(_ tab: TrailTab) {
+func selectTab(_ tab: AppTab) {
   turn { c in
     if c[_selectedTabCog] == tab {
       c[_tabPathCogs[tab]] = []
@@ -67,27 +68,27 @@ func selectTab(_ tab: TrailTab) {
 ## A deep link is a value; opening one is one turn
 
 Model the URL grammar as a value type whose parser and printer are exact
-inverses — `TrailDeepLink(url:)` and `.url`. Both are testable without a
-graph. The parser checks shape only. Whether an identity still exists is
-decided later, at resolution, so a stale link fails softly instead of
-failing at parse time.
+inverses — `DeepLink(url:)` and `.url`. Both are testable without a graph.
+The parser checks shape only. Whether an identity still exists is decided
+later, at resolution, so a stale link fails softly instead of failing at
+parse time.
 
 Resolution is a named op that writes the _entire_ destination — tab, full
 stack, sheet — in one atomic turn:
 
 ```swift
-case .trail(let trailID):
-  guard let trail = TrailCatalog.trail(trailID) else { return }
+case .detail(let itemID):
+  guard let item = catalog.item(itemID) else { return }
   turn { c in
-    c[_selectedTabCog] = .explore
-    c[_tabPathCogs[TrailTab.explore]] = [.region(trail.regionID), .trail(trailID)]
+    c[_selectedTabCog] = .home
+    c[_tabPathCogs[AppTab.home]] = [.collection(item.collectionID), .detail(itemID)]
     c[_presentedSheetCog] = nil
   }
 ```
 
 No observer sees a halfway state — no wrong tab flashing past, no sheet
-hanging over a changed stack. Resolution consults the catalog to build the
-stack _beneath_ the destination, so a deep-linked screen arrives with a
+hanging over a changed stack. Resolution consults the app's content to build
+the stack _beneath_ the destination, so a deep-linked screen arrives with a
 working back button. The entry point is one modifier:
 `.onOpenURL { cogs.open(url: $0) }`.
 
@@ -100,12 +101,12 @@ sources. Two kinds of behavior attach to it:
 
 - **Analytics without instrumentation.** One mechanism watches
   `currentScreenCog` and sees every transition — tap, gesture, URL, or
-  restoration — with no per-screen tracking calls. Trails' journal is this
-  pattern with the analytics service replaced by a visible log.
-- **Navigation-gated work.** A derived Bool over navigation state
-  (`isLoggingHikeCog`) gates a `whenever` scope, so an effect lives exactly
-  while a screen is presented, however it was presented
-  ([Side effects](./side-effects.md)).
+  restoration — with no per-screen tracking calls. Trails demonstrates this
+  with the analytics service replaced by a visible journal.
+- **Navigation-gated work.** A derived Bool over navigation state — "is
+  this sheet up?", "is this screen showing?" — gates a `whenever` scope, so
+  an effect lives exactly while a screen is presented, however it was
+  presented ([Side effects](./side-effects.md)).
 
 ## Restoration is the same code path
 
@@ -118,7 +119,7 @@ restored screen.
 Cold-launch deep links, warm in-app navigation, and relaunch restoration
 become one code path. All three are turns writing the same sources, and the
 screens resolve whatever identities those sources carry. Keep genuinely
-session-scoped facts — a half-typed search, the visit journal — out of the
+session-scoped facts — a half-typed search, a transient log — out of the
 snapshot on purpose: restore where the user was, not what they were
 mid-doing.
 
