@@ -2,20 +2,18 @@
 
 _August 26, 2026_
 
-This is the working handbook for building an app on Cog: the conventions the
-project has settled on, distilled from the design documents and proven in the
-three worked example apps. Each chapter states its rules first, then shows the
-rule in real code.
+This handbook shows you how to build an app on Cog. It collects the
+conventions the project has settled on. Each chapter states its rules first,
+then shows the rules in real code.
 
-The handbook is operational, not normative. The
-[core design](../design/exploration.md) and
-[mechanisms](../design/mechanisms.md) documents define what Cog _is_ and
-record why each decision went the way it did; this guide tells you what to
-_write_. Where the two ever disagree, the design documents win — and the
-disagreement is a bug in this guide.
+The handbook tells you what to write. It does not explain why Cog works the
+way it does — the [core design](../design/exploration.md) and
+[mechanisms](../design/mechanisms.md) documents do that, and they also record
+why each decision went the way it did. If this guide ever disagrees with
+them, the design documents win, and the disagreement is a bug in this guide.
 
-Every convention here is exercised by at least one of the example apps, which
-are the handbook's companion code:
+Every convention here is used by at least one of the example apps. They are
+the handbook's companion code:
 
 - [Weather](https://github.com/skeswa/cog/tree/main/swift/Examples/Weather) —
   async state, mechanisms, and exported values.
@@ -26,30 +24,29 @@ are the handbook's companion code:
 
 ## The chapters
 
-1. **[Structuring an app](./app-structure.md)** — one app-wide runtime, how it
-   reaches SwiftUI, and the `…State+Aspect.swift` file families that organize
-   a state layer.
-2. **[Declaring state](./declaring-state.md)** — naming by shape, the
-   underscore-and-projection pattern, and choosing among manual, automatic,
-   async, and keyed declarations.
-3. **[Reading state](./reading-state.md)** — unwrapping reads into domain
-   locals, reading flatly, and the status lens.
+1. **[Structuring an app](./app-structure.md)** — one app-wide runtime, how
+   views reach it, and the `…State+Aspect.swift` files that organize a state
+   layer.
+2. **[Declaring state](./declaring-state.md)** — how to name state, the
+   underscore-and-projection pattern, and how to choose among manual,
+   automatic, async, and keyed declarations.
+3. **[Reading state](./reading-state.md)** — how to unwrap reads into plain
+   locals, why reads stay flat, and how to read async status.
 4. **[Writing state](./writing-state.md)** — named operations, atomic turns,
-   and composing cross-file writes through nested turns.
-5. **[SwiftUI integration](./swiftui.md)** — environment resolution, binding
-   adapters, and what stays view-local.
+   and how writes in different files combine into one turn.
+5. **[SwiftUI integration](./swiftui.md)** — how views find the runtime, how
+   bindings work, and what stays in the view.
 6. **[Side effects](./side-effects.md)** — mechanisms, initial state, gated
    scopes, and the persistence pattern.
 7. **[Navigation and deep linking](./navigation.md)** — driving tabs, stacks,
    sheets, URLs, and restoration from ordinary graph state.
 8. **[Testing](./testing.md)** — isolated runtimes, seeding, injected clocks,
-   and proving behavior headlessly.
+   and proving behavior without a UI.
 
 ## The four rules behind every convention
 
-Each convention in this handbook exists to preserve the project's four
-principles, so when a situation the handbook does not cover comes up, decide
-by them:
+Every convention in this handbook exists to protect the project's four
+principles. When you hit a case the handbook does not cover, decide by them:
 
 1. Cog should feel simple to use, read, and reason about.
 2. Every state read should be correct.
@@ -58,6 +55,6 @@ by them:
    each mutable fact has one writable source in it, and screens or features do
    not create state islands or mirror sources.
 
-Several of the conventions are enforced mechanically by
-[`coglint`](../design/lint.md); the handbook notes where a rule has a linter
+Some of the conventions are checked by a linter,
+[`coglint`](../design/lint.md). The handbook notes where a rule has a linter
 behind it.

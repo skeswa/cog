@@ -2,15 +2,15 @@
 
 _August 26, 2026_
 
-A declaration is an immutable name and recipe; the runtime creates the mutable
-state behind it on first use. This chapter covers how to name declarations,
-which shape to pick, and the underscore-and-projection pattern that controls
-who can write.
+A declaration is a fixed name and recipe. The runtime creates the mutable
+state behind it the first time something uses it. This chapter covers how to
+name declarations, which shape to pick, and the underscore-and-projection
+pattern that controls who can write.
 
 ## Name by shape
 
-Every keyless value reference ends in `Cog`; every keyed box ends in plural
-`Cogs`. This includes manual, automatic, async, and read-only projection
+Every keyless value reference ends in `Cog`. Every keyed box ends in plural
+`Cogs`. This is true for manual, automatic, async, and read-only projection
 declarations alike — the suffix says "this is a graph reference," not which
 shape it is. Narrower qualifiers go before the suffix:
 
@@ -20,17 +20,17 @@ let weatherForecastCogs: CogBox<WeatherReading?, ZipCode>  // keyed box
 let weatherServiceLoaderCog: …                     // qualifier before suffix
 ```
 
-The app runtime itself stays the ordinary local `cogs`, and values read from
-the graph get normal domain names without either suffix
-([Reading state](./reading-state.md)). The result is that a name tells you
-which side of the graph boundary it lives on at a glance.
+The app runtime itself stays the ordinary local `cogs`. Values read from the
+graph get normal domain names with no suffix at all
+([Reading state](./reading-state.md)). The payoff: a name tells you at a
+glance which side of the graph boundary it lives on.
 
 ## Underscore the source; project the clean name
 
-Every manual declaration begins with a leading underscore, whether or not it
-is published. When the state is published, the `.readOnly` projection takes
-exactly the source's name without the underscore, so the clean name is the one
-the rest of the app reads:
+Every manual declaration starts with an underscore, whether or not it is
+published. When the state is published, the `.readOnly` projection takes the
+source's exact name without the underscore. The clean name is the one the
+rest of the app reads:
 
 ```swift
 /// The selected tab.
@@ -42,30 +42,32 @@ let selectedTabCog = _selectedTabCog.readOnly
 
 Why this shape:
 
-- Only code in the declaring file can write `_selectedTabCog`, so the file
-  boundary is the write boundary. Everything else — views, other clusters,
-  mechanisms — reads the projection and mutates through the file's named
-  operations ([Writing state](./writing-state.md)).
-- The underscore makes a write site visually distinct: a `turn` body touching
+- Only code in the declaring file can write `_selectedTabCog`. Everything
+  else — views, other clusters, mechanisms — reads the projection and
+  mutates through the file's named operations
+  ([Writing state](./writing-state.md)).
+- The underscore makes a write site easy to spot: a `turn` body touching
   `_something` is touching a source.
 
-Spell file-scope declarations `private`, not `fileprivate` — swift-format
-rewrites file-scoped `fileprivate` to `private`. The retired `Source`
-qualifier (`temperatureSourceCog`) must not reappear. `coglint`'s
-`manual-cog-underscore` rule enforces both halves of this pattern.
+Two spelling rules. Write file-scope declarations as `private`, not
+`fileprivate`, because swift-format rewrites file-scoped `fileprivate` to
+`private`. And do not bring back the retired `Source` qualifier
+(`temperatureSourceCog`). `coglint`'s `manual-cog-underscore` rule enforces
+both halves of this pattern.
 
 ## Initial values are closures
 
 A manual starting value is a closure, not a bare value:
-`Cog<Int>.Manual { 0 }`. Cog calls it once per state, so two runtimes, two
-keys of a box, and a `whileObserved` state recreated after release never share
-one object. This matters most for reference types and is free for value types,
-so it is uniform.
+`Cog<Int>.Manual { 0 }`. Cog calls the closure once per state. That way two
+runtimes, two keys of a box, and a `whileObserved` state recreated after
+release never share one object. This matters most for reference types and
+costs nothing for value types, so the rule is uniform.
 
 ## Choosing a shape
 
-**Manual** (`Cog<T>.Manual`, `CogBox<T, K>.Manual`) — a fact something outside
-the graph decides: a user choice, a navigation position, a received record.
+**Manual** (`Cog<T>.Manual`, `CogBox<T, K>.Manual`) — a fact that something
+outside the graph decides: a user choice, a navigation position, a received
+record.
 
 **Automatic** (`Cog<T> { c in … }`, `CogBox<T, K> { c, key in … }`) — a fact
 fully determined by other graph state. It is cached, recomputes only when a
@@ -79,17 +81,17 @@ let savedTrailCountCog = Cog<Int> { c in
 }
 ```
 
-Prefer a _keyed_ automatic box when consumers care about one slice each: every
-Trails row reads `isTrailSavedCogs[trailID]`, so toggling one bookmark
-invalidates one row, not the list.
+Prefer a _keyed_ automatic box when each consumer cares about one slice.
+Every Trails row reads `isTrailSavedCogs[trailID]`, so toggling one bookmark
+updates one row, not the whole list.
 
-If a value is genuinely derived, declare it automatic — never compute it
-inline in several views, and never bundle several reads into a struct to
+If a value is genuinely derived, declare it automatic. Do not compute it
+inline in several views, and do not bundle several reads into a struct to
 imitate one ([Reading state](./reading-state.md)).
 
 **Async** (`Cog<T>.Async`, `CogBox<T, K>.Async`) — a fact that arrives from
-outside the process. The declaration has a required `default:`, selects its
-dependencies synchronously, and returns work that runs away from the
+outside the process. The declaration has a required `default:`. It selects
+its dependencies synchronously, then returns work that runs away from the
 MainActor:
 
 ```swift
@@ -101,27 +103,28 @@ let weatherForecastCogs = CogBox<WeatherReading?, ZipCode>.Async(default: nil) {
 }
 ```
 
-A normal read of an async value is total: it returns the last accepted success
-or the default. Uncertainty stays explicit in `CogStatus`, read through the
-opt-in `status` lens. `.latest` is the default concurrency policy; `.queue`
-runs requests in order; `.exhaustLatest` finishes current work and catches up
-once. The full model is [core design §4](../design/exploration.md).
+A normal read of an async value always returns something: the last accepted
+success, or the default before one exists. Loading and failure stay explicit
+in `CogStatus`, read through the opt-in `status` lens. `.latest` is the
+default concurrency policy; `.queue` runs requests in order;
+`.exhaustLatest` finishes current work and then catches up once. The full
+model is [core design §4](../design/exploration.md).
 
 **Projection** (`.readOnly`) — the published face of a manual source, as
 above.
 
 ## Lifetime
 
-Manual state and UI-observed state live for the app by default; unused
+Manual state and UI-observed state live for the whole app by default. Unused
 automatic and async state may expire after a grace period. A source that must
-reset when nothing observes it opts in explicitly with
+reset when nothing observes it opts in with
 `lifetime: .whileObserved(resetToInitial: true)`. Reach for that only when
-"nobody is looking" genuinely means "the fact is gone" — a draft, a live
-connection — and rely on the defaults otherwise.
+"nobody is looking" really means "the fact is gone" — a draft, a live
+connection. Otherwise rely on the defaults.
 
 ## Where declarations live
 
 Declarations are file-scope `let`s in the cluster's `+Cogs.swift` file
-([Structuring an app](./app-structure.md)), main-actor-isolated by the
-target's MainActor default isolation. The value types they manage live in the
-cluster's `+Model.swift`.
+([Structuring an app](./app-structure.md)). The target's MainActor default
+isolation puts them on the same actor as the graph. The value types they
+manage live in the cluster's `+Model.swift`.
