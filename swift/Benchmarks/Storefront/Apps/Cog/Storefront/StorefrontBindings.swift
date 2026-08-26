@@ -63,6 +63,23 @@ extension Cogs {
     )
   }
 
+  /// A tracked binding to one product's selected variant.
+  ///
+  /// Keyed rather than keyless because the picker belongs to a detail screen,
+  /// and the fact it edits is per-product: the getter reads exactly that
+  /// product's row, so opening a second product invalidates neither picker.
+  ///
+  /// - Parameter id: Product whose variant the picker selects.
+  func selectedVariantBinding(for id: ProductID) -> Binding<Int> {
+    Binding(
+      get: {
+        let selectedVariant = self[selectedVariantCogs[id]]
+        return selectedVariant
+      },
+      set: { self.selectVariant($0, for: id) }
+    )
+  }
+
   /// A tracked binding to the out-of-stock filter switch.
   var inStockOnlyBinding: Binding<Bool> {
     Binding(

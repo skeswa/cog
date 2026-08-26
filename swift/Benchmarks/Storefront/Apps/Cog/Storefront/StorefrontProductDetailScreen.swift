@@ -45,7 +45,6 @@ struct StorefrontProductDetailScreen: View {
     // nothing else in the status participates in this body's invalidation.
     let storefrontDetail = cogs.status[storefrontDetailCogs[productID]]
     let storefrontProductRow = cogs[storefrontProductRowCogs[productID]]
-    let selectedVariant = cogs[selectedVariantCogs[productID]]
     let storefrontService = cogs[storefrontServiceCog]
     let variantCount = storefrontService.profile.variantCount
 
@@ -81,10 +80,7 @@ struct StorefrontProductDetailScreen: View {
 
         Picker(
           "Variant",
-          selection: Binding(
-            get: { selectedVariant },
-            set: { cogs.selectVariant($0, for: productID) }
-          )
+          selection: cogs.selectedVariantBinding(for: productID)
         ) {
           ForEach(0..<variantCount, id: \.self) { index in
             Text("Variant \(index + 1)").tag(index)
