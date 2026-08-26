@@ -32,7 +32,12 @@ through the same code path.
 
 ## What it demonstrates
 
-- `TrailNavigation+Cogs.swift` keeps the selected tab, each tab's route stack
+- State is organized as two `…State+` file families: `NavigationState+Model`,
+  `+Cogs`, `+Bindings`, and `+Mechanisms` own navigation, and `TrailState+…`
+  owns the domain. The immutable content catalog stays outside both in
+  `TrailCatalog.swift`, so the layout itself records what is state and what is
+  content.
+- `NavigationState+Cogs.swift` keeps the selected tab, each tab's route stack
   (a `CogBox` keyed by tab), and the presented sheet as separate manual
   sources. Pushing on one tab invalidates only that tab's path; presenting the
   sheet invalidates no path at all.
@@ -48,8 +53,9 @@ through the same code path.
 - `HikeTimerMechanism` hangs a `whenever` scope on the derived
   `isLoggingHikeCog`, so the elapsed-time ticker exists exactly while the
   logger sheet is up, however it was presented, and cancels on any dismissal.
-- `TrailState+Bindings.swift` adapts graph state to `TabView`,
-  `NavigationStack(path:)`, `sheet(item:)`, and `.searchable`. System-driven
+- `NavigationState+Bindings.swift` and `TrailState+Bindings.swift` adapt graph
+  state to `TabView`, `NavigationStack(path:)`, `sheet(item:)`, and
+  `.searchable`. System-driven
   navigation — back gestures, interactive dismissal, `NavigationLink(value:)`
   pushes — writes back through the same named operations, and equal writes
   are discarded by the turn itself. Re-tapping the selected tab pops it to

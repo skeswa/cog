@@ -1,49 +1,9 @@
 import Foundation
 
-/// Stable identity for one region across Cog keys, routes, and deep links.
-nonisolated struct RegionID: RawRepresentable, Codable, Hashable, Identifiable, Sendable {
-  /// The persisted slug backing this identity; it appears verbatim in URLs.
-  let rawValue: String
-
-  /// SwiftUI list identity equal to the Cog box key.
-  var id: Self { self }
-
-  /// Wraps a catalog or deep-link slug without validating it.
-  ///
-  /// Unknown slugs stay representable so a stale deep link can fail softly at
-  /// resolution instead of crashing at parse time.
-  ///
-  /// - Parameter rawValue: The slug to preserve across URL round trips.
-  init(rawValue: String) {
-    self.rawValue = rawValue
-  }
-}
-
-extension RegionID: CustomStringConvertible {
-  /// Compact text used in keyed debug-history names.
-  var description: String { rawValue }
-}
-
-/// Stable identity for one trail across Cog keys, routes, and deep links.
-nonisolated struct TrailID: RawRepresentable, Codable, Hashable, Identifiable, Sendable {
-  /// The persisted slug backing this identity; it appears verbatim in URLs.
-  let rawValue: String
-
-  /// SwiftUI list identity equal to the Cog box key.
-  var id: Self { self }
-
-  /// Wraps a catalog or deep-link slug without validating it.
-  ///
-  /// - Parameter rawValue: The slug to preserve across URL round trips.
-  init(rawValue: String) {
-    self.rawValue = rawValue
-  }
-}
-
-extension TrailID: CustomStringConvertible {
-  /// Compact text used in keyed debug-history names.
-  var description: String { rawValue }
-}
+// The immutable content model: what a region or trail *is*. Nothing here is
+// app state — the graph manages identities and user facts through the
+// `TrailState+Model.swift` types, and screens resolve those identities to
+// content through this catalog.
 
 /// Effort rating shown on trail rows and detail screens.
 nonisolated enum TrailDifficulty: String, CaseIterable, Codable, Sendable {
@@ -99,36 +59,6 @@ nonisolated struct Trail: Codable, Equatable, Identifiable, Sendable {
   let difficulty: TrailDifficulty
   /// Short description shown on the detail screen.
   let blurb: String
-}
-
-/// Stable identity for one logged hike across persistence round trips.
-nonisolated struct HikeEntryID: RawRepresentable, Codable, Hashable, Identifiable, Sendable {
-  /// The persisted UUID backing this identity.
-  let rawValue: UUID
-
-  /// SwiftUI list identity for journal rows.
-  var id: Self { self }
-
-  /// Creates a fresh identity unless a deterministic UUID is supplied by a test.
-  ///
-  /// - Parameter rawValue: The UUID to preserve across persistence round trips.
-  init(rawValue: UUID = UUID()) {
-    self.rawValue = rawValue
-  }
-}
-
-/// One hike recorded through the logger sheet.
-nonisolated struct HikeEntry: Codable, Equatable, Identifiable, Sendable {
-  /// Stable row identity.
-  let id: HikeEntryID
-  /// The trail this hike was logged against.
-  let trailID: TrailID
-  /// Normalized user note; may be empty.
-  let note: String
-  /// Whole seconds the logger sheet stayed open, from the gated timer.
-  let loggedSeconds: Int
-  /// Wall-clock moment the entry was committed.
-  let loggedAt: Date
 }
 
 /// The immutable content catalog behind every screen.

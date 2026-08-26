@@ -492,6 +492,17 @@ that runtime.
 
 ## Conventions
 
+- **Organize app state files as `…State+Aspect.swift` families.** Application
+  state lives in file families named for the state cluster they hold —
+  `WeatherState`, `TodoState`, or Trails' paired `TrailState` and
+  `NavigationState`. The aspects are `+Model.swift` for the value types the
+  cluster's cogs, operations, and mechanisms manage and exchange (identities,
+  records, snapshot documents, service capabilities); `+Cogs.swift` for
+  sources, projections, derived declarations, and `CogOps` operations;
+  `+Bindings.swift` for SwiftUI binding adapters; and `+Mechanisms.swift` for
+  the cluster's mechanisms. Immutable content fixtures that never enter the
+  graph (`TrailCatalog.swift`) stay outside the family, so the layout itself
+  records what is state and what is content.
 - **Suffix Swift state declarations by shape.** Name every keyless value
   reference `thingCog`, with `Cog` as the final word; this includes manual,
   automatic, async, and read-only projection declarations. Name every box

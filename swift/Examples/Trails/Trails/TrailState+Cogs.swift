@@ -2,7 +2,7 @@ import Cog
 import Foundation
 
 // Domain state for saved trails, search, and hike logging. Navigation state
-// lives in `TrailNavigation+Cogs.swift`; the two files stay separate to show
+// lives in `NavigationState+Cogs.swift`; the two files stay separate to show
 // that per-file source privacy survives cross-feature operations — a turn
 // body may call the other file's operation, and the nested turn joins.
 

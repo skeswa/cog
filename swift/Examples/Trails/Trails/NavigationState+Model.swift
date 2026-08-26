@@ -1,4 +1,7 @@
-import Foundation
+// The value types the navigation state's cogs, operations, and mechanisms
+// manage: the tab, route, sheet, and derived-screen vocabulary, plus the
+// journal's visit record. Routes carry identities from
+// `TrailState+Model.swift` and never loaded content.
 
 /// The four top-level destinations in the tab bar.
 ///
@@ -121,23 +124,4 @@ nonisolated struct TrailScreenVisit: Equatable, Identifiable, Sendable {
   let id: Int
   /// The screen that became topmost.
   let screen: TrailScreen
-}
-
-/// The durable navigation-and-domain document written by the persistence
-/// mechanism.
-///
-/// The search query and journal are deliberately absent: both are
-/// session-scoped by design, so a relaunch restores where the user was, not
-/// what they were mid-typing.
-nonisolated struct TrailSnapshot: Codable, Equatable, Sendable {
-  /// The selected tab.
-  let tab: TrailTab
-  /// Every tab's navigation stack, including tabs not currently selected.
-  let paths: [TrailTab: [TrailRoute]]
-  /// The presented sheet, restored so a relaunch mid-log resumes the logger.
-  let sheet: TrailSheet?
-  /// Bookmarked trails in the order they were saved.
-  let savedTrailIDs: [TrailID]
-  /// Logged hikes, most recent first.
-  let hikeEntries: [HikeEntry]
 }
