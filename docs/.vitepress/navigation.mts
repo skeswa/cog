@@ -37,6 +37,20 @@ const swiftSidebar: DefaultTheme.SidebarItem[] = [
         ],
       },
       {
+        text: "Handbook",
+        link: "/swift/guide/",
+        items: [
+          { text: "Structuring an app", link: "/swift/guide/app-structure" },
+          { text: "Declaring state", link: "/swift/guide/declaring-state" },
+          { text: "Reading state", link: "/swift/guide/reading-state" },
+          { text: "Writing state", link: "/swift/guide/writing-state" },
+          { text: "SwiftUI integration", link: "/swift/guide/swiftui" },
+          { text: "Side effects", link: "/swift/guide/side-effects" },
+          { text: "Navigation and deep linking", link: "/swift/guide/navigation" },
+          { text: "Testing", link: "/swift/guide/testing" },
+        ],
+      },
+      {
         text: "Implementation",
         items: [
           {

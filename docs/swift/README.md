@@ -27,7 +27,17 @@ Read the Swift docs in this order:
    swift-state-graph.
 6. **[Lint design](./design/lint.md)** — the linter, plugins, rules, and
    distribution model.
-7. **[Architecture guide](./impl/architecture/index.md)** — the implemented
+7. **[Handbook](./guide/index.md)** — the working conventions for building an
+   app on Cog, each proven in the example apps:
+   - [Structuring an app](./guide/app-structure.md)
+   - [Declaring state](./guide/declaring-state.md)
+   - [Reading state](./guide/reading-state.md)
+   - [Writing state](./guide/writing-state.md)
+   - [SwiftUI integration](./guide/swiftui.md)
+   - [Side effects](./guide/side-effects.md)
+   - [Navigation and deep linking](./guide/navigation.md)
+   - [Testing](./guide/testing.md)
+8. **[Architecture guide](./impl/architecture/index.md)** — the implemented
    runtime from public references through arena rows. Read its chapters in this
    order:
    - [State and graph](./impl/architecture/state-and-graph.md)
@@ -42,13 +52,14 @@ Read the Swift docs in this order:
      [settlement](./impl/architecture/arena-settlement.md), and
      [specialization](./impl/architecture/arena-specialization.md)
    - [Codebase tour](./impl/architecture/codebase-tour.md)
-8. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
+9. **[Test scenarios](./impl/scenarios.md)** — every promised behavior as a
    test story.
-9. **[Performance record](./impl/perf.md)** — what the current build measures,
-   where the gaps are, the trade-offs taken, and what could come next.
-10. **[Performance history](./impl/perf-history.md)** — the old numbers,
+10. **[Performance record](./impl/perf.md)** — what the current build
+    measures, where the gaps are, the trade-offs taken, and what could come
+    next.
+11. **[Performance history](./impl/perf-history.md)** — the old numbers,
     retired comparisons, and the decisions they settled.
-11. **[Design history](../history.md)** — optional background from the earlier
+12. **[Design history](../history.md)** — optional background from the earlier
     Dart and Flutter work.
 
 This order also appears in `docs/.vitepress/navigation.mts`. Update both lists
