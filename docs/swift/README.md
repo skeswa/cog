@@ -27,16 +27,16 @@ Read the Swift docs in this order:
    swift-state-graph.
 6. **[Lint design](./design/lint.md)** — the linter, plugins, rules, and
    distribution model.
-7. **[Handbook](./guide/index.md)** — the working conventions for building an
+7. **[Handbook](./handbook/index.md)** — the working conventions for building an
    app on Cog, each proven in the example apps:
-   - [Structuring an app](./guide/app-structure.md)
-   - [Declaring state](./guide/declaring-state.md)
-   - [Reading state](./guide/reading-state.md)
-   - [Writing state](./guide/writing-state.md)
-   - [SwiftUI integration](./guide/swiftui.md)
-   - [Side effects](./guide/side-effects.md)
-   - [Navigation and deep linking](./guide/navigation.md)
-   - [Testing](./guide/testing.md)
+   - [Structuring an app](./handbook/app-structure.md)
+   - [Declaring state](./handbook/declaring-state.md)
+   - [Reading state](./handbook/reading-state.md)
+   - [Writing state](./handbook/writing-state.md)
+   - [SwiftUI integration](./handbook/swiftui.md)
+   - [Side effects](./handbook/side-effects.md)
+   - [Navigation and deep linking](./handbook/navigation.md)
+   - [Testing](./handbook/testing.md)
 8. **[Architecture guide](./impl/architecture/index.md)** — the implemented
    runtime from public references through arena rows. Read its chapters in this
    order:

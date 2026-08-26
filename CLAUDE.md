@@ -148,7 +148,7 @@ keep status there rather than copying it into this instruction file.
   `rx.md` maps Rx concepts; `design/perf.md` covers the cost order, the
   data-oriented implementation, and the measurement plan — design only, since
   the recorded results live under `impl/`. The app-author handbook lives in
-  `docs/swift/guide/`: `index.md` is its map, and its chapters distill the
+  `docs/swift/handbook/`: `index.md` is its map, and its chapters distill the
   working conventions — app structure, declaring, reading, and writing state,
   SwiftUI integration, side effects, navigation and deep linking, and testing
   — each proven in the example apps. Implementation docs live in

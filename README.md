@@ -124,7 +124,7 @@ pages are also available here:
 - [Shared state model](./docs/design.md) — rules shared by Swift and Kotlin
 - [Design history](./docs/history.md) — useful background from the old design
 - [Swift docs](./docs/swift/README.md) — current Swift design and work
-- [Swift handbook](./docs/swift/guide/index.md) — the working conventions for
+- [Swift handbook](./docs/swift/handbook/index.md) — the working conventions for
   building an app on Cog, with chapters from file layout to testing
 - [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
 - [TodoMVC example](./swift/Examples/TodoMVC/README.md) — a complete native

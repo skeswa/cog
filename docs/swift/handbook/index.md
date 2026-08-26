@@ -9,8 +9,9 @@ then shows the rules in real code.
 The handbook tells you what to write. It does not explain why Cog works the
 way it does — the [core design](../design/exploration.md) and
 [mechanisms](../design/mechanisms.md) documents do that, and they also record
-why each decision went the way it did. If this guide ever disagrees with
-them, the design documents win, and the disagreement is a bug in this guide.
+why each decision went the way it did. If this handbook ever disagrees with
+them, the design documents win, and the disagreement is a bug in the
+handbook.
 
 Every convention here is used by at least one of the example apps. They are
 the handbook's companion code:
