@@ -132,4 +132,5 @@ first-class kind with its own status and policies.
 - <doc:ManualCogPrivate>
 - <doc:ManualCogUnderscore>
 - <doc:NoMultiReadCogsHelper>
+- <doc:TrackedBindingAdapters>
 - ``CogWatchStart``

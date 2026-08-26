@@ -54,7 +54,9 @@ SwiftUI's container APIs — `TabView`, `NavigationStack(path:)`,
 on purpose (decision record, [core design §10](../design/exploration.md)).
 Each app writes its own thin adapters in the cluster's `+Bindings.swift`
 file, and every adapter has the same shape: a tracked getter, and a setter
-that calls a named operation.
+that calls a named operation. `coglint`'s `tracked-binding-adapters` rule
+enforces that shape, so the library ships the convention even though it ships
+no helper.
 
 ```swift
 extension Cogs {
@@ -93,6 +95,12 @@ set: { sheet in
   }
 }
 ```
+
+Two mistakes are worth naming because neither is a compile error. A getter
+written with `peek` reads without registering, so the control renders once and
+then quietly stops following its own value. And a binding assembled inline in a
+view puts a writable surface outside the one file that is supposed to list
+them. The lint rule rejects both.
 
 ## What stays view-local
 

@@ -1087,7 +1087,9 @@ re-proves consumption for its own version.
 - **LINT-02.** Each rule fixture distinguishes triggering and non-triggering
   examples and exact diagnostic positions. The harness fails if any of those
   expectations drift, and emits the canonical DocC examples from that same
-  corpus instead of maintaining a second copy.
+  corpus instead of maintaining a second copy. The enabled rule set and the
+  fixture inventory are compared by slug, so a rule cannot reach consumers
+  without an executable specification or a generated article.
 - **LINT-03.** An exact next-line suppression written as
   `// coglint:disable-next-line <rule> -- <non-empty reason>` suppresses exactly
   that rule on exactly the following physical line; it neither leaks farther
@@ -1156,10 +1158,20 @@ re-proves consumption for its own version.
   primitive exemption; the repository is clean.
   (Proof: suite.)
 - **LINT-22.** Every diagnostic's stable URL resolves inside the matching
-  version of `Cog.docc`, and each article's examples match the fixture corpus.
-  (Proof: suite.)
+  version of `Cog.docc`, each article's examples match the fixture corpus, and
+  both DocC topic lists link every rule article so no published rule reference
+  is unreachable. (Proof: suite.)
 - **LINT-24.** `manual-cog-underscore` requires every recognized
   `Cog<Value>.Manual` and `CogBox<Value, Key>.Manual` declaration name to
   begin with `_`, and requires a `.readOnly` projection of a recognized source
   to be named exactly its source's name without the leading underscore; an
   underscored source that is never projected is accepted.
+- **LINT-25.** `tracked-binding-adapters` rejects an explicit `Binding`
+  construction inside a recognized view whose closures mention a classified
+  graph receiver, and stays silent for a view binding over local state and for
+  an adapter the view merely calls.
+- **LINT-26.** `tracked-binding-adapters` rejects a `peek` inside the `get:`
+  closure of a binding constructed outside a view, in its bare, `self`,
+  status-lens, and receiver-qualified spellings; a setter peek, a factory-built
+  binding, and a view whose conformance is written in another file stay
+  outside the rule.

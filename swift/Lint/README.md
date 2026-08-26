@@ -74,7 +74,7 @@ The rule-reference articles are generated with
 `mise run build:lint-documentation`. Their violation, rationale, repair, and
 code examples all come from `CogLintFixtures`; the checked-in Markdown is a
 release input, not another editable copy. `mise run test:lint-documentation`
-regenerates the seven articles in scratch space, requires byte identity, builds
+regenerates the eight articles in scratch space, requires byte identity, builds
 the statically hosted DocC archive, and checks each diagnostic URL’s HTML route,
 data payload, and rendered code listings.
 

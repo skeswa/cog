@@ -14,6 +14,7 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const LINT_PACKAGE = join(REPO_ROOT, "swift", "Lint");
 const DOCC_CATALOG = join(REPO_ROOT, "swift", "Sources", "Cog", "Cog.docc");
 const SETUP_GUIDE = join(DOCC_CATALOG, "LintingYourApp.md");
+const MODULE_PAGE = join(DOCC_CATALOG, "Cog.md");
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-documentation-test");
 const GENERATED = join(TEST_ROOT, "generated");
 const ARCHIVE = join(REPO_ROOT, ".build", "docs", "Cog.doccarchive");
@@ -32,6 +33,7 @@ const RULES = [
   rule("manual-cog-private", "ManualCogPrivate", "ManualCogPrivateRule.swift"),
   rule("manual-cog-underscore", "ManualCogUnderscore", "ManualCogUnderscoreRule.swift"),
   rule("no-multi-read-cogs-helper", "NoMultiReadCogsHelper", "NoMultiReadCogsHelperRule.swift"),
+  rule("tracked-binding-adapters", "TrackedBindingAdapters", "TrackedBindingAdaptersRule.swift"),
 ];
 
 main();
@@ -57,6 +59,7 @@ function main() {
     { stdio: "inherit" },
   );
   verifyGeneratedParity();
+  verifyRuleReference();
   verifySetupGuide();
 
   console.log("\n==> Build the statically hosted Cog.docc archive");
@@ -70,8 +73,25 @@ function main() {
     fail("documentation verification left a root Package.resolved behind");
   }
   console.log(
-    "\nPASS LINT-22: all seven permanent URLs resolve and every article matches its fixture corpus",
+    "\nPASS LINT-22: all eight permanent URLs resolve and every article matches its fixture corpus",
   );
+}
+
+/** Requires every rule article to be reachable from both DocC topic lists. */
+function verifyRuleReference() {
+  // An article DocC never links is published but unreachable: the diagnostic
+  // URL still resolves, while a reader browsing the rule reference cannot find
+  // the rule at all. Both pages carry the list, so both are checked.
+  for (const page of [MODULE_PAGE, SETUP_GUIDE]) {
+    const contents = readFileSync(page, "utf8");
+    const referenced = [...contents.matchAll(/<doc:([A-Za-z]+)>/g)].map((match) => match[1]);
+    for (const entry of RULES) {
+      if (!referenced.includes(entry.articleStem)) {
+        fail(`${page} does not list <doc:${entry.articleStem}> in its rule reference`);
+      }
+    }
+  }
+  console.log("==> Both DocC topic lists reach all eight rule articles");
 }
 
 /** Requires the documented product reference to equal the URL-derived package identity. */
@@ -135,7 +155,7 @@ function verifyGeneratedParity() {
       }
     }
   }
-  console.log("==> Checked-in articles are byte-identical to all seven fixture renders");
+  console.log("==> Checked-in articles are byte-identical to all eight fixture renders");
 }
 
 /** Requires each canonical HTML route and matching DocC data payload. */

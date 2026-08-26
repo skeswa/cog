@@ -9,5 +9,6 @@ package enum CogLintFixtureRegistry {
     manualCogPrivate,
     manualCogUnderscore,
     noMultiReadCogsHelper,
+    trackedBindingAdapters,
   ]
 }

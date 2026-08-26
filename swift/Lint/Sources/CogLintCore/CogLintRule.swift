@@ -57,6 +57,7 @@ package enum CogLintRuleRegistry {
     ManualCogPrivateRule(),
     ManualCogUnderscoreRule(),
     NoMultiReadCogsHelperRule(),
+    TrackedBindingAdaptersRule(),
   ]
 }
 

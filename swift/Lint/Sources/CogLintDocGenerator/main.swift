@@ -4,7 +4,7 @@ import Foundation
 /// Generates CogLint rule articles from the package's executable fixture registry.
 @main
 struct CogLintDocGenerator {
-  /// Validates every corpus and writes the seven deterministic Markdown articles.
+  /// Validates every corpus and writes the eight deterministic Markdown articles.
   static func main() throws {
     let outputDirectory = try outputDirectory(from: Array(CommandLine.arguments.dropFirst()))
     try FileManager.default.createDirectory(

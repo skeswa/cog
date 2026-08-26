@@ -124,7 +124,10 @@ A bad directive suppresses nothing. There are no global severity settings.
 
 Each rule owns triggering fixtures with exact positions and non-triggering
 fixtures for valid code and known syntax-only misses. The same fixtures build
-its DocC article. The linter runs its own tests before checking another target.
+its DocC article. The enabled rule set and the fixture inventory are compared
+by slug, and the documentation suite requires both DocC topic lists to link
+every article, so an enabled rule cannot ship unspecified or unreachable. The
+linter runs its own tests before checking another target.
 
 ## 4. The rules
 
@@ -150,6 +153,7 @@ The classifier does not follow assignments or infer across files.
 | `manual-cog-private`         | Writable sources are `private` or `fileprivate`          |
 | `manual-cog-underscore`      | Sources begin with `_`; projections drop the underscore  |
 | `no-multi-read-cogs-helper`  | Reads stay flat instead of hiding in a runtime helper    |
+| `tracked-binding-adapters`   | Graph bindings are tracked adapters on `Cogs`            |
 
 ### 4.1 `cog-declaration-suffix`
 
@@ -226,6 +230,26 @@ The pairing check uses the projected base identifier the shared classifier
 resolved. An annotation-only projection names no source and stays silent, the
 same syntax-only boundary as every other classifier evasion.
 
+### 4.8 `tracked-binding-adapters`
+
+An explicit `Binding(get:set:)` construction is checked by where it sits. A
+construction inside a recognized view fails when any of its closures mentions a
+classified graph receiver: a binding that reaches the runtime is a writable
+surface, and those belong in the cluster's `+Bindings.swift` adapters. Every
+other construction fails when its `get:` closure reads through `peek`, which
+registers no dependency and leaves the control showing a value it has stopped
+following.
+
+The two checks divide by placement, so one construction never reports both. A
+view binding is a placement finding; fixing it moves the construction where the
+tracking check applies.
+
+Setter peeks are outside the rule, because only the getter must register. So is
+the setter's write: `primitives-only-in-ops` already rejects a `turn` or
+`refresh` inside an adapter, so this rule does not repeat that check. A
+`Binding` returned by a factory, or built in a type whose `View` conformance is
+written in another file, names no evidence this pass can trust.
+
 ## 5. V1 limits
 
 - No type data. IndexStoreDB is the planned path if cross-file misses become a
@@ -237,7 +261,7 @@ same syntax-only boundary as every other classifier evasion.
 
 ## 6. Use and release
 
-The seven rules, all reporters, both plugins, the CLI, DocC pages, artifact
+The eight rules, all reporters, both plugins, the CLI, DocC pages, artifact
 tests, and sibling distribution are implemented. Each rule landed with fixtures
 and the same examples in its docs.
 
@@ -274,6 +298,7 @@ Users type `coglint`. SwiftPM uses role-specific names:
 | `manual-cog-private`         | `/cog/documentation/cog/manualcogprivate`        |
 | `manual-cog-underscore`      | `/cog/documentation/cog/manualcogunderscore`     |
 | `no-multi-read-cogs-helper`  | `/cog/documentation/cog/nomultireadcogshelper`   |
+| `tracked-binding-adapters`   | `/cog/documentation/cog/trackedbindingadapters`  |
 
 Each path is under `https://skeswa.github.io`. The docs test checks both the
 HTML route and data file. GitHub Pages cannot use DocC redirect metadata as an

@@ -809,7 +809,7 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped.                                                                                                                                       |
 | Traps and deinits    | Clear release-build traps use `fatalError`. Every generic class writes `nonisolated deinit` until the Swift optimizer bug is fixed.                                                                                                                                                             |
 | Public names         | The shape families use `Cog<Value>.Manual` / `.Async` / `.Projection` and the corresponding `CogBox<Value, Key>` members. `ManualCogLifetime` stays top-level. [prior-art.md](./prior-art.md) records the naming review and the `Cogs` revisit trigger.                                         |
-| Lint                 | `coglint` enforces the seven usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                                                                                                                                          |
+| Lint                 | `coglint` enforces the eight usage rules. [lint.md](./lint.md) defines its package, plugins, errors, and release pins.                                                                                                                                                                          |
 | Storefront gates     | Two cuts earn CI thresholds: interactions (exact 12 mallocs, 600 µs ceiling) and the compute control (exact 5,611 mallocs, 1.7 ms ceiling). They commit only after a pinned-runner session reproduces them. The other cuts stay report-only; the phase-split probe owns cold-start attribution. |
 
 The benchmark record holds the old core and layout comparisons. This table
@@ -855,7 +855,8 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     whether a tracked UI consumer exists.
 18. **Async lifecycle API — settled.** `status` is the only lifecycle lens.
 19. **Runtime name and ownership — settled.** `Cogs` is the app-owned runtime.
-20. **SwiftUI bindings — settled.** Cog ships no binding helper.
+20. **SwiftUI bindings — settled.** Cog ships no binding helper; the
+    `tracked-binding-adapters` lint rule enforces the adapter shape instead.
 21. **Refresh completion — settled.** The handle follows one generation.
 22. **Test time — settled.** `CogTesting.TestClock` controls app scheduling and
     Cog grace periods.
@@ -866,7 +867,7 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     from the environment.
 26. **Mechanisms — settled.** Assembly lists them; controllers register work;
     state gates own shorter scopes.
-27. **Lint tooling — settled.** The syntax-only linter, seven rules, plugins,
+27. **Lint tooling — settled.** The syntax-only linter, eight rules, plugins,
     docs, and sibling distribution ship together.
 28. **Shape-family spelling — settled.** The automatic shape remains
     `Cog<Value>`; manual, async, and projection shapes are nested as

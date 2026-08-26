@@ -275,7 +275,7 @@ directly:
 - `mise run test:lint-distribution` — prove an ordinary Cog consumer resolves
   and builds without lint sources or an artifact fetch, while an unused
   Channel B opt-in retains SwiftPM’s measured eager-fetch behavior.
-- `mise run build:lint-documentation` — regenerate all seven checked-in CogLint
+- `mise run build:lint-documentation` — regenerate all eight checked-in CogLint
   DocC articles from their executable fixture corpora.
 - `mise run test:lint-documentation` — regenerate into scratch space, require
   byte-for-byte fixture parity, build the DocC archive, and verify every
@@ -552,6 +552,14 @@ that runtime.
   with the rest of it, and it applies to `refresh` for the same reason it
   applies to `turn`: both are demands on the graph, and neither is domain
   vocabulary.
+- **Adapt SwiftUI bindings on `Cogs`, never in a view.** A control that speaks
+  `Binding` gets a thin adapter in the state cluster's `+Bindings.swift` file,
+  written as a member of `extension Cogs` with exactly one shape: a getter that
+  reads with the tracked subscript, and a setter that calls a named `CogOps`
+  operation. A getter spelled with `peek` registers nothing, so the control
+  stops following its value; a binding assembled inline in a view puts a
+  writable surface outside the one file that lists them. CogLint's
+  `tracked-binding-adapters` rule rejects both.
 - **Read flatly; never repackage reads into a projection type.** A view that
   needs several values reads each one on its own line and binds it to a domain
   local, however many there are. Do not gather them into a struct — not one

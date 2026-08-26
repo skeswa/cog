@@ -101,3 +101,4 @@ the exception is not itself the point of the code.
 - <doc:ManualCogPrivate>
 - <doc:ManualCogUnderscore>
 - <doc:NoMultiReadCogsHelper>
+- <doc:TrackedBindingAdapters>
