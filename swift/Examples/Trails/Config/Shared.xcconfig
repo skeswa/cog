@@ -1,0 +1,39 @@
+// Shared.xcconfig
+// Shared app and test settings.
+
+// ==========================================
+// Project Identity
+// ==========================================
+PRODUCT_NAME = Trails
+PRODUCT_DISPLAY_NAME = Cog Trails
+PRODUCT_BUNDLE_IDENTIFIER = com.skeswa.cog.trails
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1
+
+// ==========================================
+// Platform Configuration
+// ==========================================
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 6.0
+SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT = YES
+SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY = YES
+SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES
+SWIFT_UPCOMING_FEATURE_INTERNAL_IMPORTS_BY_DEFAULT = YES
+
+TARGETED_DEVICE_FAMILY = 1,2
+
+// ==========================================
+// Info PLIST
+// ==========================================
+// The generated Info.plist is merged with Config/Info.plist, which carries
+// only the CFBundleURLTypes entry registering the cog-trails:// scheme.
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE = Config/Info.plist
+INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
+INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+
+// ==========================================
+// Entitlements
+// ==========================================
+CODE_SIGN_ENTITLEMENTS = Config/Trails.entitlements

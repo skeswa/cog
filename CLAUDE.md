@@ -115,10 +115,11 @@ keep status there rather than copying it into this instruction file.
   swift-syntax and swift-argument-parser pins without exposing them to a Cog
   consumer. Its committed `Package.resolved` fixes those revisions, and its
   scaffold test asks SwiftPM to prove the root dependency graph remains empty.
-- `swift/Examples/` — two hand-written objectVersion-77 Xcode example apps that
-  reference the root package by relative path: `Weather/`, the worked async and
-  mechanism example, and `TodoMVC/`, the classic fine-grained keyed-state and
-  persistence example.
+- `swift/Examples/` — three hand-written objectVersion-77 Xcode example apps
+  that reference the root package by relative path: `Weather/`, the worked
+  async and mechanism example; `TodoMVC/`, the classic fine-grained keyed-state
+  and persistence example; and `Trails/`, the state-driven navigation,
+  deep-linking, and restoration example.
 - `tools/` — pinned Node tooling: `swift-test.mjs`, `swift-lint-test.mjs`,
   `swift-simulator-test.mjs`, `storefront-test.mjs`,
   `storefront-runtimes-test.mjs`, `storefront-state-graph-test.mjs`,
@@ -229,8 +230,8 @@ directly:
   `mise run test:lint --filter LINT-02`.
 - `mise run lint:swift` — first run the guarded CogLint suite, then lint the
   root library, the Storefront workload and Cog runtime packages, the two
-  comparison-runtime packages, both example apps, and the Storefront benchmark
-  app's production sources with production rules, and
+  comparison-runtime packages, the three example apps, and the Storefront
+  benchmark app's production sources with production rules, and
   every tracked test target source with the explicit test-role primitive
   exemption. The Storefront Cog runtime is linted like application code on purpose:
   it is the worked example of what a large Cog app looks like, and a benchmark
@@ -299,12 +300,14 @@ directly:
   temporary impossible threshold and pass only when the gate rejects it as a
   regression.
 
-The Weather and TodoMVC example apps and the Storefront benchmark app use the
-same pinned Xcode as the library:
+The Weather, TodoMVC, and Trails example apps and the Storefront benchmark
+app use the same pinned Xcode as the library:
 
 - `mise run build:weather` — build the Weather app for a generic iOS
   Simulator destination without launching one.
 - `mise run build:todomvc` — build the TodoMVC app for a generic iOS Simulator
+  destination without launching one.
+- `mise run build:trails` — build the Trails app for a generic iOS Simulator
   destination without launching one.
 - `mise run build:storefront` — build the Storefront benchmark app, whose
   Xcode project lives at `swift/Benchmarks/Storefront/Apps/Cog/`, for a

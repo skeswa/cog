@@ -1,0 +1,7 @@
+// Debug.xcconfig
+// Debug configuration for iOS projects - minimal overrides only
+
+#include "Shared.xcconfig"
+
+// No additional debug-specific overrides needed
+// All debug settings use Xcode project defaults

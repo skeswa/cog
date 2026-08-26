@@ -127,5 +127,7 @@ pages are also available here:
 - [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
 - [TodoMVC example](./swift/Examples/TodoMVC/README.md) — a complete native
   SwiftUI app demonstrating keyed state, derived filters, atomic actions, and persistence
+- [Trails example](./swift/Examples/Trails/README.md) — a tabbed SwiftUI app
+  whose navigation, deep linking, and restoration are all driven by graph state
 - [Storefront macrobenchmark](./swift/Benchmarks/Storefront/README.md) —
   the four-runtime comparison and how to run it

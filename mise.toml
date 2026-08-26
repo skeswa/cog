@@ -72,6 +72,10 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Weather/Weat
 description = "Build the TodoMVC example for the iOS simulator"
 run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/TodoMVC/TodoMVC.xcodeproj" -scheme TodoMVC -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/todomvc-derived-data" CODE_SIGNING_ALLOWED=NO build"""
 
+[tasks."build:trails"]
+description = "Build the Trails example for the iOS simulator"
+run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Trails/Trails.xcodeproj" -scheme Trails -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/trails-derived-data" CODE_SIGNING_ALLOWED=NO build"""
+
 # The Storefront macrobenchmark's neutral workload and Cog implementation are
 # separate packages, so each correctness suite has a guarded wrapper. The
 # guards are the ones every other Swift test command
@@ -123,7 +127,7 @@ run = "echo '==> every Storefront suite passed'"
 
 # The Storefront benchmark application is an Xcode project of its own under
 # `swift/Benchmarks/Storefront/Apps/Cog`. It is not an example —
-# `swift/Examples/` holds the Weather and TodoMVC worked examples —
+# `swift/Examples/` holds the Weather, TodoMVC, and Trails worked examples —
 # but its UI performance suite needs a separate test action because xcodebuild's
 # `build` action builds only the scheme's build-action entries, and the
 # StorefrontBench scheme lists just `Storefront.app` there.
@@ -186,6 +190,7 @@ swift run --package-path "{{config_root}}/swift/Lint" coglint \
   "{{config_root}}/swift/Benchmarks/Storefront/Runtimes/StateGraph/Probes/APIBehavior/Sources" \
   "{{config_root}}/swift/Examples/Weather/Weather" \
   "{{config_root}}/swift/Examples/TodoMVC/TodoMVC" \
+  "{{config_root}}/swift/Examples/Trails/Trails" \
   "{{config_root}}/swift/Benchmarks/Storefront/Apps/Cog/Storefront"
 echo "==> Cog, workload, and benchmark test targets"
 swift run --package-path "{{config_root}}/swift/Lint" coglint \

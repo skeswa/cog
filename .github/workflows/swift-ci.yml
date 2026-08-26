@@ -737,6 +737,9 @@ jobs:
       - name: Build the TodoMVC example
         run: mise run build:todomvc
 
+      - name: Build the Trails example
+        run: mise run build:trails
+
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate
       # every recorded Storefront number rests on, so it runs on every change.
@@ -1006,6 +1009,9 @@ jobs:
 
       - name: Build the TodoMVC example
         run: mise run build:todomvc
+
+      - name: Build the Trails example
+        run: mise run build:trails
 
       # The Storefront macrobenchmark's shared workload and its SwiftUI
       # benchmark application. The workload's correctness suite is the gate
