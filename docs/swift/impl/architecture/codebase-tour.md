@@ -346,6 +346,30 @@ remain valid for both specialized default and `CompactArena`.
   publication.
 - Resolve refresh waiters on success, failure, supersession, and release.
 
+### Traps and deinitializers
+
+- Spell a fail-fast trap `fatalError`, never `preconditionFailure`. Under `-O`
+  the standard library drops `preconditionFailure`'s message: the process still
+  traps, but with no explanation, so a scenario promising a clear release-build
+  error would be unprovable. Measured — under `-Onone` both print, under `-O`
+  only `fatalError` does. An exit test should assert on the child's
+  `standardErrorContent`, not merely its exit status.
+- Give every class an explicit `nonisolated deinit`. Under
+  `.defaultIsolation(MainActor.self)` a synthesized `deinit` is
+  MainActor-isolated, which is wrong twice: on a generic class it crashes the
+  optimizer in release configuration on Swift 6.3.0 and 6.3.3, and on any class
+  it compiles to `swift_task_deinitOnExecutor`, which `M9-01` measured at about
+  an eighth of a steady turn. Debug builds are clean, so `mise run test:matrix`
+  will not catch the crash — only `mise run test:release` will.
+- A `deinit` that must touch the graph is spelled `isolated deinit`, and its
+  class must not be generic. A written `deinit` is nonisolated unless it says
+  otherwise, so it cannot call a MainActor-isolated method at all — the
+  compiler rejects it outright, which is the opposite failure from the
+  synthesized case and is caught at build time rather than in release.
+  `ReactionToken` is the worked example ([boundaries and
+  effects](./boundaries-and-effects.md)). The two spellings solve opposite
+  problems; do not rewrite one into the other.
+
 ### Lifetime ownership
 
 - Name the durable owner and exact cancellation path.

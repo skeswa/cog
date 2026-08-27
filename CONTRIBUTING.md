@@ -20,8 +20,11 @@ API is why the tools version is 6.2 — plus `NonisolatedNonsendingByDefault`,
 `ExistentialAny`, `MemberImportVisibility`, and `InternalImportsByDefault`.
 Public declarations still state their isolation explicitly. Most tests run on
 macOS; UIKit and example checks need a simulator. The same tests run under
-{MainActor, nonisolated} × {NNBD on, off}: environment values select a leg and
-test defines prove which leg ran. swift-docc-plugin is gated behind
+{MainActor, nonisolated} × {NNBD on, off}: `COG_TEST_ISOLATION` and
+`COG_TEST_NNBD` select a leg and test defines prove which leg ran. The four leg
+names — `mainactor-nnbd-on`, `mainactor-nnbd-off`, `nonisolated-nnbd-on`,
+`nonisolated-nnbd-off` — are also wrapper modes, which CI uses to run one leg
+per job. swift-docc-plugin is gated behind
 `COG_DOCC=1`, set only by the docs workflow, so an ordinary consumer resolves a
 package with no dependencies at all.
 
@@ -96,6 +99,25 @@ When you add a page, add it to `docs/.vitepress/navigation.mts` and to the
 platform README that gives its reading order. Run `mise run docs:build` after
 moving or renaming a page.
 
+Three conventions govern the pages themselves:
+
+- Dated files are frozen; undated files are living. A living design doc uses a
+  short lowercase name and carries an authorship date below its title.
+- Swift and Kotlin documents own their own platform APIs, runtime mechanics,
+  and framework integration. Cross-platform invariants and vocabulary live in
+  `docs/design.md`, and a platform choice is never copied across without a
+  decision recorded for the receiving platform.
+- The companion docs were split out of `exploration.md` and keep its numbering:
+  Swift `mechanisms.md` is §6 and `rx.md` is §5.4, and Kotlin `effects.md` and
+  `flows.md` mirror them. A reference such as "§6.4" resolves inside the
+  companion. Do not renumber these sections.
+
+`.oxfmtrc.json` excludes every `swift/Sources/**/*.docc/**` catalog file,
+because Oxfmt rewrites DocC's double-backtick symbol links into code spans and
+silently turns each documentation link into plain text. It also excludes
+`CHANGELOG.md`, whose layout belongs to the pinned Release Please changelog
+writer.
+
 Swift design docs define behavior. The implementation docs have separate jobs:
 `impl/scenarios.md` defines promised behavior as test stories, the
 `impl/architecture/` chapters explain the implemented runtime, and
@@ -108,8 +130,10 @@ Each kind of change has one home:
 - Benchmark results go to `docs/swift/impl/perf.md`, with the environment that
   produced them. Retired numbers go to `impl/perf-history.md`. A
   representation choice stays open until it is measured.
-- Build, test, and bench commands go to `CLAUDE.md` and `AGENTS.md`, kept in
-  sync, and to the root README when a newcomer needs them.
+- Build, test, and bench commands are defined in `mise.toml`, which is their
+  only inventory. Explain a new one where it is used: here when a contributor
+  needs it, the root README when a newcomer does, and a `docs/maintainers/`
+  runbook when only a release or CI does.
 - New documents get mapped in `docs/swift/README.md` or the root `README.md`.
 - New or retired scenarios go to `impl/scenarios.md`, which stays the single
   census of promised behavior.
