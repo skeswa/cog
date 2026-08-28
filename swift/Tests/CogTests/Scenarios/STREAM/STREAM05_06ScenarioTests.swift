@@ -3,35 +3,9 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class NaturalStreamWork {
-  /// The live continuation for each stream generation selected so far.
-  private var continuations: [AsyncStream<Int>.Continuation] = []
-
-  /// How many independent stream generations the selector has created.
-  var generationCount: Int { continuations.count }
-
-  /// Creates one inert stream generation for the async selector.
-  func makeWork() -> Work<Int> {
-    let (sequence, continuation) = AsyncStream.makeStream(of: Int.self)
-    continuations.append(continuation)
-    return .stream(sequence)
-  }
-
-  /// Offers one element to the requested generation.
-  func yield(_ value: Int, to generation: Int) {
-    continuations[generation].yield(value)
-  }
-
-  /// Ends the requested generation normally.
-  func finish(_ generation: Int) {
-    continuations[generation].finish()
-  }
-}
-
-@MainActor
 @Test func `STREAM-05 natural end preserves success until explicit refresh`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = NaturalStreamWork()
+  let work = ControlledStream<Int>()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }
@@ -75,7 +49,7 @@ private final class NaturalStreamWork {
 @MainActor
 @Test func `STREAM-06 empty natural end stays pending and can refresh`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = NaturalStreamWork()
+  let work = ControlledStream<Int>()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }

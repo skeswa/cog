@@ -34,6 +34,17 @@ public final class ControlledStream<Value: Sendable> {
   /// The generation IDs whose streams Cog has begun consuming, in order.
   public let starts: AsyncStream<Int>
 
+  /// How many generations ``makeWork()`` has created so far.
+  ///
+  /// This is the count of selector runs, not of consumptions, and it is the
+  /// upper-bound probe ``starts`` cannot be: awaiting `starts` proves at least
+  /// N generations went live, while asserting this count proves the selector
+  /// ran no *more* than N times — the shape of "a natural end starts no new
+  /// work" claims.
+  public var generationCount: Int {
+    continuations.count
+  }
+
   /// Publishes each generation when its consumption begins.
   private let startContinuation: AsyncStream<Int>.Continuation
 
