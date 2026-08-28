@@ -14,21 +14,9 @@ import Testing
 
 /// Proves the registered rule emits the settled diagnostic and permanent help URL.
 @Test func `LINT-06 production registry reports the shape-specific suffix`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-declaration-suffix-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "private let _reportCog = CogBox<String, Int>.Manual { 0 }\n".write(
-    to: root.appending(path: "State.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["State.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "private let _reportCog = CogBox<String, Int>.Manual { 0 }\n",
+    named: "State.swift"
   )
 
   #expect(execution.exitCode == 1)

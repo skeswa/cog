@@ -29,7 +29,7 @@ package struct InitialStateInMechanismRule: CogLintRule {
             let body = initializer.body
           else { return [] }
           let locals = assemblyLocals.filter { local in
-            isDescendant(local.nameToken, of: initializer)
+            CogLexicalScope(initializer).contains(local.nameToken)
           }
           guard !locals.isEmpty else { return [] }
           let visitor = AssemblyLocalUseVisitor(locals: locals)
@@ -102,7 +102,7 @@ private func isRetentionReference(
     return true
   }
   guard target == "_cogs", let call = right.as(FunctionCallExprSyntax.self),
-    let calledName = finalCalledName(in: call.calledExpression),
+    let calledName = finalNominalName(in: call.calledExpression),
     calledName == "State" || calledName == "init"
   else {
     return false
@@ -116,16 +116,9 @@ private func isRetentionReference(
 private func nearestAssignmentSequence(
   from node: some SyntaxProtocol
 ) -> SequenceExprSyntax? {
-  var cursor = Syntax(node).parent
-  while let current = cursor {
-    if let sequence = current.as(SequenceExprSyntax.self),
-      sequence.elements.contains(where: { $0.is(AssignmentExprSyntax.self) })
-    {
-      return sequence
-    }
-    cursor = current.parent
+  nearestAncestor(SequenceExprSyntax.self, from: node) { sequence in
+    sequence.elements.contains { $0.is(AssignmentExprSyntax.self) }
   }
-  return nil
 }
 
 /// Extracts a bare or `self`-qualified assignment destination name.
@@ -155,32 +148,4 @@ private func isDirectReference(
   to reference: DeclReferenceExprSyntax
 ) -> Bool {
   expression.as(DeclReferenceExprSyntax.self)?.id == reference.id
-}
-
-/// Extracts the final called name through qualification and generic specialization.
-private func finalCalledName(in expression: ExprSyntax) -> String? {
-  if let reference = expression.as(DeclReferenceExprSyntax.self) {
-    return reference.baseName.text
-  }
-  if let member = expression.as(MemberAccessExprSyntax.self) {
-    return member.declName.baseName.text
-  }
-  if let generic = expression.as(GenericSpecializationExprSyntax.self) {
-    return finalCalledName(in: generic.expression)
-  }
-  return nil
-}
-
-/// Whether one syntax node is lexically nested under another.
-private func isDescendant(
-  _ node: some SyntaxProtocol,
-  of ancestor: some SyntaxProtocol
-) -> Bool {
-  var cursor: Syntax? = Syntax(node)
-  let ancestorID = Syntax(ancestor).id
-  while let current = cursor {
-    if current.id == ancestorID { return true }
-    cursor = current.parent
-  }
-  return false
 }

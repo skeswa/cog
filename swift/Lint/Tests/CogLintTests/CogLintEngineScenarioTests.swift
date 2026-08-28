@@ -87,23 +87,3 @@ private struct EngineSentinelRule: CogLintRule {
     }
   }
 }
-
-/// Runs one filesystem scenario under an isolated, automatically removed directory.
-private func withTemporaryLintDirectory(
-  _ body: (URL) throws -> Void
-) throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try body(root)
-}
-
-/// Writes a fixture after creating every parent directory required by its path.
-private func write(_ contents: String, to file: URL) throws {
-  try FileManager.default.createDirectory(
-    at: file.deletingLastPathComponent(),
-    withIntermediateDirectories: true
-  )
-  try contents.write(to: file, atomically: true, encoding: .utf8)
-}

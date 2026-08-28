@@ -69,25 +69,6 @@ import Testing
 }
 
 /// Runs the complete production registry over one scratch source buffer.
-///
-/// The engine rather than the rule alone is exercised so the settled slug,
-/// message, help URL, and process status are proven together, and so a rule
-/// that never reached ``CogLintRuleRegistry`` cannot pass its own suite.
 private func lintTrackedBindingSource(_ source: String) throws -> CogLintExecution {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-tracked-binding-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try (source + "\n").write(
-    to: root.appending(path: "Bindings.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  return try CogLintEngine.lint(
-    paths: ["Bindings.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
-  )
+  try lintScratchSource(source + "\n", named: "Bindings.swift")
 }

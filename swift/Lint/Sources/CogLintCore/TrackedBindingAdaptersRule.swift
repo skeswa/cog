@@ -99,14 +99,8 @@ private final class BindingConstructionVisitor: SyntaxVisitor {
   /// The nearest block rather than any ancestor block keeps a helper type
   /// nested inside a view from inheriting that view's placement policy.
   private func isInsideRecognizedView(_ node: some SyntaxProtocol) -> Bool {
-    var cursor = Syntax(node).parent
-    while let current = cursor {
-      if let members = current.as(MemberBlockSyntax.self) {
-        return viewMemberBlockIDs.contains(members.id)
-      }
-      cursor = current.parent
-    }
-    return false
+    guard let members = nearestAncestor(MemberBlockSyntax.self, from: node) else { return false }
+    return viewMemberBlockIDs.contains(members.id)
   }
 
   /// Whether any argument mentions a graph receiver visible at that mention.
@@ -173,46 +167,15 @@ private final class UntrackedReadVisitor: SyntaxVisitor {
 
   /// Recognizes bare, `self`-qualified, status-lens, and receiver-qualified peeks.
   override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
-    if let reference = node.calledExpression.as(DeclReferenceExprSyntax.self),
-      reference.baseName.text == "peek"
-    {
-      tokens.append(reference.baseName)
-      return .visitChildren
+    let token = directPeekToken(in: node.calledExpression) { expression in
+      isGraphReceiverExpression(expression) { reference in
+        isClassifiedReceiver(named: reference.baseName.text, at: reference, among: receivers)
+      }
     }
-    if let member = node.calledExpression.as(MemberAccessExprSyntax.self),
-      member.declName.baseName.text == "peek",
-      let base = member.base,
-      isGraphBase(base)
-    {
-      tokens.append(member.declName.baseName)
+    if let token {
+      tokens.append(token)
     }
     return .visitChildren
-  }
-
-  /// Whether a peek's base is `self`, a status lens, or a classified receiver.
-  private func isGraphBase(_ expression: ExprSyntax) -> Bool {
-    if let reference = expression.as(DeclReferenceExprSyntax.self) {
-      if reference.baseName.text == "self" || reference.baseName.text == "status" { return true }
-      return isClassifiedReceiver(named: reference.baseName.text, at: reference, among: receivers)
-    }
-    guard let member = expression.as(MemberAccessExprSyntax.self),
-      member.declName.baseName.text == "status",
-      let base = member.base
-    else {
-      return false
-    }
-    return isGraphBase(base)
-  }
-}
-
-/// Whether one written identifier resolves to a receiver in scope at that use.
-private func isClassifiedReceiver(
-  named name: String,
-  at node: some SyntaxProtocol,
-  among receivers: [CogGraphReceiverClassification]
-) -> Bool {
-  receivers.contains { receiver in
-    receiver.name == name && receiver.scope.contains(node)
   }
 }
 

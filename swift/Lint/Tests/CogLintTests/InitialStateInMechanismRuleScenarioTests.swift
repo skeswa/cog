@@ -14,21 +14,9 @@ import Testing
 
 /// Proves the production registry diagnoses a correctly wrapped but misplaced domain op.
 @Test func `LINT-10 production registry reports assembly-local domain work`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-initial-state-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "struct MainApp: App { init() { let cogs = Cogs.assemble(); cogs.seedWorld() } }\n".write(
-    to: root.appending(path: "MainApp.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["MainApp.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "struct MainApp: App { init() { let cogs = Cogs.assemble(); cogs.seedWorld() } }\n",
+    named: "MainApp.swift"
   )
 
   #expect(execution.exitCode == 1)

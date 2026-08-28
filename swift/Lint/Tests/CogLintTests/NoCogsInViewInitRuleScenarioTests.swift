@@ -12,21 +12,9 @@ import Testing
 
 /// Proves the registered rule emits its environment-focused repair guidance.
 @Test func `LINT-07 production registry reports a view initializer parameter`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-view-init-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "struct Panel: View { init(cogs: Cogs) {} }\n".write(
-    to: root.appending(path: "Panel.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["Panel.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "struct Panel: View { init(cogs: Cogs) {} }\n",
+    named: "Panel.swift"
   )
 
   #expect(execution.exitCode == 1)

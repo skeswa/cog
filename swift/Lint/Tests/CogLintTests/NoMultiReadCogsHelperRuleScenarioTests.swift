@@ -14,21 +14,9 @@ import Testing
 
 /// Proves the production registry reports the helper rather than each constituent read.
 @Test func `LINT-13 production registry reports one member diagnostic`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-multi-read-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "extension Cogs { func pair() -> Pair { Pair(self[firstCog], self[secondCog]) } }\n".write(
-    to: root.appending(path: "Projection.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["Projection.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "extension Cogs { func pair() -> Pair { Pair(self[firstCog], self[secondCog]) } }\n",
+    named: "Projection.swift"
   )
 
   #expect(execution.exitCode == 1)

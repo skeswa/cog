@@ -15,6 +15,7 @@ const LINT_PACKAGE = join(REPO_ROOT, "swift", "Lint");
 const DOCC_CATALOG = join(REPO_ROOT, "swift", "Sources", "Cog", "Cog.docc");
 const SETUP_GUIDE = join(DOCC_CATALOG, "LintingYourApp.md");
 const MODULE_PAGE = join(DOCC_CATALOG, "Cog.md");
+const DESIGN_DOC = join(REPO_ROOT, "docs", "swift", "design", "lint.md");
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-documentation-test");
 const GENERATED = join(TEST_ROOT, "generated");
 const ARCHIVE = join(REPO_ROOT, ".build", "docs", "Cog.doccarchive");
@@ -60,6 +61,7 @@ function main() {
   );
   verifyGeneratedParity();
   verifyRuleReference();
+  verifyDesignDocTables();
   verifySetupGuide();
 
   console.log("\n==> Build the statically hosted Cog.docc archive");
@@ -73,7 +75,7 @@ function main() {
     fail("documentation verification left a root Package.resolved behind");
   }
   console.log(
-    "\nPASS LINT-22: all eight permanent URLs resolve and every article matches its fixture corpus",
+    `\nPASS LINT-22: all ${RULES.length} permanent URLs resolve and every article matches its fixture corpus`,
   );
 }
 
@@ -91,7 +93,28 @@ function verifyRuleReference() {
       }
     }
   }
-  console.log("==> Both DocC topic lists reach all eight rule articles");
+  console.log(`==> Both DocC topic lists reach all ${RULES.length} rule articles`);
+}
+
+/** Requires the design doc's rule and URL tables to carry every enabled rule. */
+function verifyDesignDocTables() {
+  // The fixture registry, DocC topic lists, and generated articles are all
+  // slug-checked elsewhere; the design doc's two tables were the one roster
+  // nothing enforced, so a ninth rule could silently miss the human-readable
+  // index. Each slug must open a row in both the required-form table and the
+  // permanent-URL table.
+  const design = readFileSync(DESIGN_DOC, "utf8");
+  const lines = design.split("\n");
+  for (const entry of RULES) {
+    const rows = lines.filter((line) => line.startsWith(`| \`${entry.slug}\``)).length;
+    if (rows < 2) {
+      fail(`${entry.slug} is missing a rule-table or URL-table row in ${DESIGN_DOC}`);
+    }
+    if (!design.includes(`/cog/documentation/cog/${entry.route}`)) {
+      fail(`${entry.slug} is missing its permanent URL in ${DESIGN_DOC}`);
+    }
+  }
+  console.log(`==> The design doc's tables carry all ${RULES.length} rules`);
 }
 
 /** Requires the documented product reference to equal the URL-derived package identity. */
@@ -155,7 +178,7 @@ function verifyGeneratedParity() {
       }
     }
   }
-  console.log("==> Checked-in articles are byte-identical to all eight fixture renders");
+  console.log(`==> Checked-in articles are byte-identical to all ${RULES.length} fixture renders`);
 }
 
 /** Requires each canonical HTML route and matching DocC data payload. */

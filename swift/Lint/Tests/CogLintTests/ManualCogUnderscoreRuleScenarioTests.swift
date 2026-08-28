@@ -14,21 +14,9 @@ import Testing
 
 /// Proves the registered engine emits the settled slug, message, URL, and failing status.
 @Test func `LINT-24 production registry reports a source without its underscore`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-manual-underscore-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "private let countCog = Cog.Manual { 0 }\n".write(
-    to: root.appending(path: "State.swift"),
-    atomically: true,
-    encoding: .utf8
-  )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["State.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "private let countCog = Cog.Manual { 0 }\n",
+    named: "State.swift"
   )
 
   #expect(execution.exitCode == 1)
