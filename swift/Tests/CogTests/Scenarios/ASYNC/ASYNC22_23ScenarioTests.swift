@@ -3,12 +3,6 @@ import CogTesting
 import Testing
 import os
 
-private nonisolated enum AsyncColdDemandSleepOutcome {
-  case cancelled
-  case due
-  case scheduled
-}
-
 @MainActor
 private final class AsyncColdDemandControlledWork {
   let starts: AsyncStream<Int>
@@ -58,7 +52,7 @@ private final class AsyncColdDemandControlledWork {
 @Test func `ASYNC-22 ASYNC-29 one-shot peek renews one grace sleeper and recreates fresh`()
   async throws
 {
-  let clock = AsyncColdDemandTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
@@ -144,7 +138,7 @@ private final class AsyncColdDemandControlledWork {
 @Test func `ASYNC-23 ASYNC-29 cold refresh is one load with one renewable grace sleeper`()
   async throws
 {
-  let clock = AsyncColdDemandTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(clock: clock, whileObservedGrace: .seconds(10))
   let work = AsyncColdDemandControlledWork()
   var selectorRuns = 0
@@ -219,133 +213,4 @@ private final class AsyncColdDemandControlledWork {
   }
   #expect(resultTurns.isEmpty)
   #endif
-}
-
-private nonisolated final class AsyncColdDemandTestClock: Clock, @unchecked Sendable {
-  private struct Sleeper {
-    let id: UInt64
-    let deadline: Instant
-    let continuation: CheckedContinuation<Void, any Error>
-  }
-
-  private struct State {
-    var now = Instant(offset: .zero)
-    var sleepers: [Sleeper] = []
-    var cancelledSleeperIDs: Set<UInt64> = []
-    var nextSleeperID: UInt64 = 0
-    var maximumActiveSleeperCount = 0
-  }
-
-  struct Instant: InstantProtocol, Hashable, Sendable {
-    let offset: Swift.Duration
-
-    static func < (lhs: Self, rhs: Self) -> Bool {
-      lhs.offset < rhs.offset
-    }
-
-    func advanced(by duration: Swift.Duration) -> Self {
-      Self(offset: offset + duration)
-    }
-
-    func duration(to other: Self) -> Swift.Duration {
-      other.offset - offset
-    }
-  }
-
-  typealias Duration = Swift.Duration
-
-  private let state = OSAllocatedUnfairLock(initialState: State())
-  private let scheduledEvents: AsyncStream<Void>
-  private let scheduledContinuation: AsyncStream<Void>.Continuation
-
-  init() {
-    (scheduledEvents, scheduledContinuation) = AsyncStream.makeStream(
-      bufferingPolicy: .bufferingNewest(1)
-    )
-  }
-
-  var now: Instant {
-    state.withLock { $0.now }
-  }
-
-  var minimumResolution: Swift.Duration { .nanoseconds(1) }
-
-  var activeSleeperCount: Int {
-    state.withLock { $0.sleepers.count }
-  }
-
-  var maximumActiveSleeperCount: Int {
-    state.withLock { $0.maximumActiveSleeperCount }
-  }
-
-  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
-    try Task.checkCancellation()
-    let sleeperID = state.withLock { state in
-      let sleeperID = state.nextSleeperID
-      state.nextSleeperID += 1
-      return sleeperID
-    }
-
-    try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation {
-        (continuation: CheckedContinuation<Void, any Error>) in
-        let outcome = state.withLock { state in
-          if state.cancelledSleeperIDs.remove(sleeperID) != nil || Task.isCancelled {
-            return AsyncColdDemandSleepOutcome.cancelled
-          }
-          guard deadline > state.now else { return .due }
-          state.sleepers.append(
-            Sleeper(id: sleeperID, deadline: deadline, continuation: continuation)
-          )
-          state.maximumActiveSleeperCount = max(
-            state.maximumActiveSleeperCount,
-            state.sleepers.count
-          )
-          return .scheduled
-        }
-
-        switch outcome {
-        case .cancelled:
-          continuation.resume(throwing: CancellationError())
-        case .due:
-          continuation.resume()
-        case .scheduled:
-          scheduledContinuation.yield()
-        }
-      }
-    } onCancel: {
-      let continuation: CheckedContinuation<Void, any Error>? = state.withLock { state in
-        guard let index = state.sleepers.firstIndex(where: { $0.id == sleeperID }) else {
-          state.cancelledSleeperIDs.insert(sleeperID)
-          return nil
-        }
-        return state.sleepers.remove(at: index).continuation
-      }
-      continuation?.resume(throwing: CancellationError())
-    }
-  }
-
-  func waitForScheduledSleep() async throws {
-    var iterator = scheduledEvents.makeAsyncIterator()
-    guard await iterator.next() != nil else {
-      throw CancellationError()
-    }
-  }
-
-  func advance(by duration: Swift.Duration) {
-    let due = state.withLock { state in
-      state.now = state.now.advanced(by: duration)
-      var due: [CheckedContinuation<Void, any Error>] = []
-      state.sleepers.removeAll { sleeper in
-        guard sleeper.deadline <= state.now else { return false }
-        due.append(sleeper.continuation)
-        return true
-      }
-      return due
-    }
-
-    for continuation in due {
-      continuation.resume()
-    }
-  }
 }

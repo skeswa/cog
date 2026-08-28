@@ -542,6 +542,20 @@ turn for a loud domain operation.
   from a selector or reaction. Cog stops me right away with a clear error
   saying seed is only for idle test setup. The guard is debug-only surface
   proven by debug exit tests; a release build has no seed at all (SEED-05).
+- **SEED-09.** `CogTesting.ControlledWork` gives one-shot async work
+  deterministic generations: `starts` announces each generation when Cog
+  begins its operation, `succeed` and `fail` complete exactly that
+  generation, and completing an unstarted generation does nothing.
+- **SEED-10.** `CogTesting.ControlledStream` does the same for latest-policy
+  streams: `starts` announces a generation when Cog begins consuming it, and
+  `yield`, `finish`, and `fail` drive exactly that generation.
+- **SEED-11.** `Cogs.forTestingWithController` returns the isolated context
+  plus a live controller. Registrations made through it after assembly
+  observe seeded state, and they order after every caller mechanism's own
+  registrations.
+- **SEED-12.** `CogTesting.TestClock` exposes `activeSleeperCount` and
+  `maximumActiveSleeperCount`, so a lifetime proof can tell one renewed
+  timer from timers that accumulated.
 
 ## 11. HIST — Debug history
 

@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-01 an unwatched source keeps its value`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
@@ -30,7 +30,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-01 a source outlives the automatic cog that was reading it`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
@@ -62,7 +62,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-05 an opted-in source starts over after release`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)
@@ -89,7 +89,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-05 an opted-in source survives while a reaction reads it`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let watcherAlive = Cog<Bool>.Manual { true }
   let draft = Cog<String>.Manual({ "" }, lifetime: .whileObserved(resetToInitial: true))
   var observed: [String] = []

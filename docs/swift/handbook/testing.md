@@ -69,6 +69,57 @@ Use `TestClock` both for code that schedules work and — as
 `Cogs.forTesting(clock:)` — when testing Cog's own lifetime grace period.
 Behavior tests never depend on timing guesses.
 
+A lifetime proof can also count the clock's timers: `activeSleeperCount` is
+how many sleeps are registered right now, and `maximumActiveSleeperCount` is
+the high-water mark. The pair distinguishes one renewed grace timer from
+timers that quietly accumulated.
+
+## Controlling async work
+
+An async cog's selector runs real work in production. Under test, the work
+itself should be an instrument: `ControlledWork` for one-shot selectors and
+`ControlledStream` for `.latest` streams. Both hand out generation-numbered
+work, announce each generation on `starts` when Cog actually begins it, and
+complete or drive exactly the generation named:
+
+```swift
+let work = ControlledWork<Forecast>()
+let cogs = Cogs.forTesting()
+let forecastCog = Cog<Forecast>.Async(default: .unknown, name: "forecast") { _ in
+  work.makeWork()
+}
+var starts = work.starts.makeAsyncIterator()
+
+cogs.refresh(forecastCog)
+#expect(await starts.next() == 0)
+work.succeed(0, with: .sunny)
+```
+
+Await `starts` before completing. A one-shot completion resumed before Cog
+installs the generation is silently lost, and generation indexing keeps a
+superseded completion from being mistaken for the current one. A stream
+buffers early elements instead, so for `ControlledStream` awaiting `starts`
+is how a test proves a particular generation went live.
+
+## Registering mid-test
+
+Registration is a controller capability, and controllers reach code only
+through a mechanism's `operate`. When a proof needs a watch, reaction, or
+gated scope of its own — rather than one a production mechanism owns — ask
+the factory for a controller:
+
+```swift
+let (cogs, controller) = Cogs.forTestingWithController()
+var statuses: [CogStatus<Forecast>] = []
+controller.status.watch(forecastCog, initial: .run, name: "watch.forecast") { _, status in
+  statuses.append(status)
+}
+```
+
+The controller belongs to a probe mechanism the factory assembles after every
+caller mechanism, and the runtime retains it for the whole test, exactly as
+it would an app-lifetime mechanism's.
+
 ## Views under test and preview
 
 Host a view under the same environment modifier production uses:

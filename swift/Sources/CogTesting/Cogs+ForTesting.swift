@@ -75,4 +75,75 @@ extension Cogs {
     cogs.operateMechanisms(mechanisms)
     return cogs
   }
+
+  /// A fresh, isolated context plus a live controller the test keeps.
+  ///
+  /// Everything ``forTesting(clock:whileObservedGrace:externalObservationTracking:seeding:mechanisms:)``
+  /// says holds here too; the addition is the returned controller. Registration
+  /// is a controller capability, and controllers reach tests only through a
+  /// mechanism's `operate` — so a test that needs a reaction, watch, task, or
+  /// gated scope mid-story would otherwise write its own capturing mechanism.
+  /// This factory assembles that probe itself, after every caller mechanism,
+  /// and returns its controller:
+  ///
+  /// ```swift
+  /// let (cogs, controller) = Cogs.forTestingWithController()
+  /// controller.status.watch(forecastCog, initial: .run, name: "watch.forecast") { _, status in
+  ///   statuses.append(status)
+  /// }
+  /// ```
+  ///
+  /// Holding the controller mirrors an app-lifetime mechanism exactly: the
+  /// runtime's scope retains every controller for the context's lifetime, so
+  /// registrations made through it live as long as the context does. The probe
+  /// operates last so its registrations always observe the caller mechanisms'
+  /// assembly-time work, and its reserved assembly name is
+  /// `CogTesting.Probe` — caller mechanisms keep their own names.
+  ///
+  /// - Parameters: The same parameters as
+  ///   ``forTesting(clock:whileObservedGrace:externalObservationTracking:seeding:mechanisms:)``.
+  /// - Returns: A new, uninstalled context whose mechanisms are live, and the
+  ///   probe's controller.
+  public static func forTestingWithController(
+    clock: any Clock<Duration> = ContinuousClock(),
+    whileObservedGrace: Duration = .seconds(30),
+    externalObservationTracking: ExternalObservationTrackingForTesting = .automatic,
+    seeding: ((Cogs) -> Void)? = nil,
+    mechanisms: [any Mechanism] = []
+  ) -> (cogs: Cogs, controller: MechanismController) {
+    var controller: MechanismController!
+    let cogs = forTesting(
+      clock: clock,
+      whileObservedGrace: whileObservedGrace,
+      externalObservationTracking: externalObservationTracking,
+      seeding: seeding,
+      mechanisms: mechanisms + [ControllerProbeMechanism { controller = $0 }]
+    )
+    return (cogs, controller)
+  }
+}
+
+/// The mechanism ``Cogs/forTestingWithController(clock:whileObservedGrace:externalObservationTracking:seeding:mechanisms:)``
+/// assembles to capture a controller for the test.
+///
+/// An implementation detail rather than API: tests hold the controller, not
+/// the probe. Its assembly name is namespaced so it cannot collide with a
+/// caller mechanism, and `operate` runs once at assembly — after every caller
+/// mechanism — doing nothing but the capture.
+private struct ControllerProbeMechanism: Mechanism {
+  /// The reserved assembly name, distinct from any reasonable caller name.
+  let name = "CogTesting.Probe"
+
+  /// Where the factory receives the captured controller.
+  let capture: @MainActor (MechanismController) -> Void
+
+  /// Creates the one probe an assembly carries.
+  init(_ capture: @escaping @MainActor (MechanismController) -> Void) {
+    self.capture = capture
+  }
+
+  /// Hands the controller to the factory; registers nothing itself.
+  func operate(_ m: MechanismController) {
+    capture(m)
+  }
 }

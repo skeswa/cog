@@ -20,7 +20,7 @@ private final class Draft {
 @MainActor
 @Test func `LIFE-12 a reset source comes back as a fresh object, not the mutated one`() async throws
 {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let cogs = Cogs.forTesting(
     clock: clock,
     whileObservedGrace: .seconds(10)

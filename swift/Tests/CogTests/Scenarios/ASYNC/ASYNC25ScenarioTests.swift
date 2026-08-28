@@ -48,7 +48,7 @@ private final class Async25ControlledWork {
 
 @MainActor
 @Test func `ASYNC-25 value-only demand releases its pending chain after one grace`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async25ControlledWork()
   var selectorRuns = 0

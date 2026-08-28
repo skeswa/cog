@@ -7,7 +7,7 @@ import Testing
   // Lifetime is per exact state, and a box's states are per key: one key's
   // grace expiry releases that key alone. The watched sibling never recomputes
   // and keeps answering warm; the released key recreates from current values.
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let workWatcherAlive = Cog<Bool>.Manual { true }
   let sources = CogBox<Int, String>.Manual { 1 }
   var runsByKey: [String: Int] = [:]

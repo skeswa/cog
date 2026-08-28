@@ -74,6 +74,8 @@ public nonisolated final class TestClock: Clock, @unchecked Sendable {
     var scheduleWaiters: [ScheduleWaiter] = []
     /// Whether ``finish()`` has made the clock terminal.
     var isFinished = false
+    /// The most sleepers ever registered at once; never decreases.
+    var maximumActiveSleeperCount = 0
 
     /// Allocates a never-reused identity or traps before wraparound.
     mutating func allocateID() -> UInt64 {
@@ -99,6 +101,26 @@ public nonisolated final class TestClock: Clock, @unchecked Sendable {
   /// The smallest duration this logical clock distinguishes.
   public var minimumResolution: Swift.Duration { .nanoseconds(1) }
 
+  /// How many sleeps are registered and not yet resumed.
+  ///
+  /// A lifetime test asserts this to prove that a grace period holds exactly
+  /// the timers it claims — for example, that a renewed grace reuses one
+  /// sleeper rather than accumulating them — and that release work actually
+  /// released its timer. The count changes only through ``sleep(until:tolerance:)``,
+  /// ``advance(by:)``, cancellation, and ``finish()``.
+  public var activeSleeperCount: Int {
+    state.withLock { $0.sleepers.count }
+  }
+
+  /// The most sleeps ever registered at once over this clock's lifetime.
+  ///
+  /// The high-water mark distinguishes "one timer, renewed N times" from "N
+  /// timers that happened to resolve before the assertion ran" — a difference
+  /// ``activeSleeperCount`` alone cannot see, because it reads one moment.
+  public var maximumActiveSleeperCount: Int {
+    state.withLock { $0.maximumActiveSleeperCount }
+  }
+
   /// Suspends until controlled time reaches `deadline`.
   ///
   /// Cancellation removes the exact registered sleep and throws
@@ -123,6 +145,10 @@ public nonisolated final class TestClock: Clock, @unchecked Sendable {
               id: id,
               deadline: deadline,
               continuation: continuation
+            )
+            state.maximumActiveSleeperCount = max(
+              state.maximumActiveSleeperCount,
+              state.sleepers.count
             )
             if state.scheduleWaiters.isEmpty {
               state.unconsumedScheduleSignals += 1

@@ -180,7 +180,12 @@ Use the result directly in non-view tests or install it above a test view with
 preview tree.
 
 Use `TestClock` for timed tests. Pass it to code that schedules work and to
-`Cogs.forTesting(clock:)` when testing Cog's lifetime grace period.
+`Cogs.forTesting(clock:)` when testing Cog's lifetime grace period; its
+`activeSleeperCount` and `maximumActiveSleeperCount` let a lifetime test count
+the timers it holds. Drive async cogs with `ControlledWork` (one-shot) and
+`ControlledStream` (`.latest` streams), which announce and complete exact
+generations. When a test needs its own watch, reaction, or gated scope,
+`Cogs.forTestingWithController()` returns the runtime plus a live controller.
 
 Only tests of production installation should use `withAssembledCogs`:
 

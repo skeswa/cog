@@ -10,7 +10,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-04 a watcher returning within grace cancels the pending release`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let watcherAlive = Cog<Bool>.Manual { true }
   var selectorRuns = 0
   let automatic = Cog<Int> { _ in
@@ -52,7 +52,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-07 a registered reaction leases the cogs it reads`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let source = Cog<Int>.Manual { 1 }
   var leasedRuns = 0
   var unleasedRuns = 0
@@ -97,7 +97,7 @@ import Testing
 
 @MainActor
 @Test func `LIFE-07 a leased cog survives its own retracking`() async throws {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let source = Cog<Int>.Manual { 1 }
   var selectorRuns = 0
   let automatic = Cog<Int> { c in

@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `EXPORT-05 subscribers own independent buffers and graph leases`() async {
-  let clock = AutomaticLifetimeTestClock()
+  let clock = TestClock()
   let sourceCog = Cog<Int>.Manual { 0 }
   var selectorRuns = 0
   let doubledCog = Cog<Int> { c in
