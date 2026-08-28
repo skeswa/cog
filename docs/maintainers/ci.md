@@ -7,9 +7,33 @@ settings. `mise run workflows:check` checks the workflow rules.
 
 ## macOS runners
 
-Trusted macOS jobs run on the `homemac` Apple Silicon Mac mini. Linux jobs use
-GitHub-hosted Ubuntu. Fork pull requests use GitHub-hosted `macos-26` and never
-reach the mini.
+Trusted macOS jobs belong on the `homemac` Apple Silicon Mac mini. Linux jobs
+use GitHub-hosted Ubuntu. Fork pull requests use GitHub-hosted `macos-26` and
+never reach the mini.
+
+### Temporary hosted topology
+
+**The mini is currently unavailable, so the same-repo macOS lane runs on
+GitHub-hosted `macos-26` for now.** The lane's jobs keep their same-repo
+guards, cache keys, and structure; only `runs-on:` changed, so restoring the
+mini is the reverse label swap in `swift-ci.yml` and `docs.yml`, nothing more.
+Three things follow from the hosted period:
+
+- Hosted VMs start cold, so the jobs that leaned on the mini's persistent
+  disk (`lint-swift`, `compile-fail`, `build-weather`) carry `actions/cache`
+  steps the mini never needed. Leave the caches in place after the swap back;
+  they are harmless on the mini.
+- The benchmark and UI-performance timing ceilings were recorded on the
+  pinned mini. Exact allocation counts stay fully meaningful on hosted Apple
+  Silicon; a p90 or hitch-ceiling failure with no allocation change during
+  this period is hosted-runner noise to read, not a regression to revert —
+  and never grounds to loosen a committed threshold, which changes only after
+  a pinned-runner session.
+- Release-candidate provenance records
+  `"runner": "github-hosted-macos-26"` for artifacts built in this period.
+
+The rest of this section describes the mini so it can return exactly as it
+left.
 
 The mini uses persistent bare metal, not a fresh virtual machine for each job.
 Job hooks clean Cog files before and after every run. A virtual-machine setup is
@@ -109,12 +133,12 @@ if: >-
 The event-name test matters because push and schedule events have no
 `pull_request` object.
 
-Manual release candidates are the only extra path to the mini. The mini builds
-both CogLint macOS executables with Xcode 26.6, checksums the archive, records
-its source and tools, and tests arm64. A hosted `macos-15-intel` job downloads
-those exact bytes, verifies them, selects Xcode 26.3 build 17C529, and tests the
-x86_64 file without rebuilding it. Pull-request code still needs to come from
-this repository.
+Manual release candidates are the only extra path into the same-repo lane. Its
+arm64 job builds both CogLint macOS executables with Xcode 26.6, checksums the
+archive, records its source and tools, and tests arm64. A hosted
+`macos-15-intel` job downloads those exact bytes, verifies them, selects Xcode
+26.3 build 17C529, and tests the x86_64 file without rebuilding it.
+Pull-request code still needs to come from this repository.
 
 ## GitHub Actions settings
 
@@ -135,7 +159,9 @@ gh api repos/skeswa/cog/actions/permissions/workflow
 ```
 
 Workflows must also use clear `permissions` blocks, timeouts, full action SHAs,
-`persist-credentials: false`, and the same-repo guard for every mini job.
+`persist-credentials: false`, and the same-repo guard on every job in the
+same-repo lane — enforced structurally for any `self-hosted` label, and kept
+on the lane's jobs through the hosted period so the topology snaps back.
 `mise run workflows:check` enforces these rules.
 
 ## Branch, tag, and environment rules
@@ -219,12 +245,12 @@ both outputs and checks their required routes.
 | Job          | Runner        | Work                                                             |
 | ------------ | ------------- | ---------------------------------------------------------------- |
 | `docc-cache` | hosted Ubuntu | Find the newest release tag and look for its saved DocC archive  |
-| `docc`       | `cog-mini`    | Build that archive only when it is missing                       |
+| `docc`       | macOS lane    | Build that archive only when it is missing                       |
 | `assemble`   | hosted Ubuntu | Build VitePress, merge both sites, and upload the Pages artifact |
 | `deploy`     | hosted Ubuntu | Publish the artifact; run no repository code                     |
 
 The API reference always describes the newest release, not `main`. A normal
-docs change does not wake the mini when that release archive is already saved.
+docs change does not wake the macOS lane when that release archive is already saved.
 The saved archive belongs to the ref that created it, so the first `main` push
 after a release builds it once; later pushes reuse it.
 The `assemble` job runs third-party npm code with a read-only token. Only the

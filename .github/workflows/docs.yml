@@ -16,10 +16,11 @@ name: Docs
 #   archive for the current release is already cached. It exists so an ordinary
 #   documentation change does not wake the Mac mini at all.
 #
-#   `docc` runs on the self-hosted Mac mini, and only on a cache miss. The DocC
-#   archive needs a full Xcode — `Cog` imports SwiftUI and Observation, so there
-#   is no Linux build of this package — and the same pinned toolchain the rest
-#   of CI uses.
+#   `docc` runs on macOS, and only on a cache miss. The DocC archive needs a
+#   full Xcode — `Cog` imports SwiftUI and Observation, so there is no Linux
+#   build of this package — and the same pinned toolchain the rest of CI uses.
+#   Its home is the self-hosted Mac mini; while the mini is unavailable it
+#   rides GitHub-hosted `macos-26` (see `docs/maintainers/ci.md`).
 #
 #   `assemble` runs on GitHub-hosted ubuntu. It installs npm dependencies,
 #   builds the VitePress half, merges in the DocC half, and uploads the Pages
@@ -117,13 +118,13 @@ jobs:
           lookup-only: true
 
   docc:
-    name: Build the DocC archive (self-hosted)
+    name: Build the DocC archive (GitHub-hosted)
     needs: docc-cache
     # Only on a miss. A cache entry is scoped to the ref that created it, so the
     # first run on `main` after a release will miss and rebuild once; every
     # documentation push after that hits and skips this job entirely.
     if: github.repository == 'skeswa/cog' && needs.docc-cache.outputs.hit != 'true'
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    runs-on: macos-26
     timeout-minutes: 30
     permissions:
       contents: read
@@ -200,7 +201,7 @@ jobs:
       - name: Require the DocC archive
         if: steps.docc.outputs.cache-hit != 'true'
         run: |
-          echo "::error title=No DocC archive::The archive for ${{ needs.docc-cache.outputs.tag }} was neither cached nor rebuilt. Re-run this workflow to rebuild it on the self-hosted runner."
+          echo "::error title=No DocC archive::The archive for ${{ needs.docc-cache.outputs.tag }} was neither cached nor rebuilt. Re-run this workflow to rebuild it on the macOS runner."
           exit 1
 
       - name: Cache npm downloads and the VitePress build cache
