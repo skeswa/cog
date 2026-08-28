@@ -52,7 +52,7 @@ const CASES = [
       "`pull_request.paths`",
       "`tools/**`",
       "`lint-swift`",
-      "[self-hosted, macOS, ARM64, cog-mini]",
+      "must run on exactly `macos-26`",
       "permissions: {contents: read}",
       "mise run lint:swift",
       "`fork-lint-swift`",
@@ -66,7 +66,7 @@ const CASES = [
     mentions: [
       "`workflow_dispatch`",
       "`lint-artifact`",
-      "[self-hosted, macOS, ARM64, cog-mini]",
+      "must run on exactly `macos-26`",
       "permissions: {contents: read}",
       "ref: ${{ github.sha }}",
       "mise run test:lint-artifact",

@@ -3,10 +3,16 @@ name: Swift CI
 # The Swift lane. Everything here needs a Swift toolchain, so every job runs on
 # macOS — and ordinary CI means one of exactly two runner lanes:
 #
-#   1. The self-hosted Mac mini, `runs-on: [self-hosted, macOS, ARM64,
-#      cog-mini]`, for pushes to `main` and same-repo pull requests.
+#   1. The same-repo lane, for pushes to `main` and same-repo pull requests.
+#      TEMPORARILY on GitHub-hosted `macos-26`: this lane belongs on the
+#      self-hosted Mac mini (`runs-on: [self-hosted, macOS, ARM64, cog-mini]`),
+#      but the mini is unavailable for a while, so its jobs carry the hosted
+#      label with their guards, caches, and structure intact. Restoring the
+#      mini is a `runs-on:` swap back, nothing more; the "macOS runner
+#      topology" section of `docs/maintainers/ci.md` records both states.
 #   2. An approval-gated GitHub-hosted `macos-26` runner, for pull requests
-#      from forks, which structurally never reach the mini.
+#      from forks, which structurally never reach the mini even when it is
+#      attached.
 #
 # A manually dispatched release-artifact proof adds one bounded third host:
 # `macos-15-intel` downloads bytes built under pinned Xcode on the mini and
@@ -20,7 +26,7 @@ name: Swift CI
 # record; do not paraphrase them here. In particular the
 # `github.event_name != 'pull_request' ||` clause is load-bearing: on `push`
 # there is no `github.event.pull_request`, so a bare comparison would evaluate
-# false and silently skip the self-hosted lane.
+# false and silently skip the same-repo lane.
 #
 # The lanes are spelled out twice rather than shared through a YAML anchor or a
 # computed `runs-on:`. A single job cannot carry both guards — the whole point
@@ -112,7 +118,7 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Self-hosted lane: pushes to `main` and same-repo pull requests.
+  # Same-repo lane: pushes to `main` and same-repo pull requests.
   # ---------------------------------------------------------------------------
 
   # Release Please PRs are created with the repository token, so GitHub does
@@ -166,9 +172,9 @@ jobs:
           mise run changes:check -- --git "$base_sha" "$head_sha"
 
   format:
-    name: Format (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 15
+    name: Format (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 20
     permissions:
       contents: read
     if: >-
@@ -197,9 +203,9 @@ jobs:
         run: mise run fmt:check:swift
 
   lint-swift:
-    name: CogLint dogfood (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 20
+    name: CogLint dogfood (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 30
     permissions:
       contents: read
     if: >-
@@ -220,6 +226,16 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
 
+      # On the mini this directory persisted between runs; a hosted VM starts
+      # cold, so the swift-syntax build behind coglint rides the cache instead.
+      - name: Restore the CogLint package build directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: swift/Lint/.build
+          key: swift-lint-${{ runner.arch }}-${{ hashFiles('swift/Lint/Package.swift', 'swift/Lint/Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-lint-${{ runner.arch }}-
+
       - name: Lint Cog and example apps with CogLint
         run: mise run lint:swift
 
@@ -229,15 +245,15 @@ jobs:
   # `github.sha`, not a PR merge commit, so the later tag can name the source
   # recorded in provenance. The dependent Intel job consumes these same bytes.
   lint-artifact:
-    name: CogLint candidate artifact (self-hosted)
+    name: CogLint candidate artifact (same-repo, GitHub-hosted)
     outputs:
       version: ${{ steps.candidate.outputs.version }}
       pr_head_sha: ${{ steps.candidate.outputs.pr_head_sha }}
       source_sha: ${{ steps.candidate.outputs.source_sha }}
       source_tree: ${{ steps.candidate.outputs.source_tree }}
       mode: ${{ steps.candidate.outputs.mode }}
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 30
+    runs-on: macos-26
+    timeout-minutes: 45
     permissions:
       contents: read
       pull-requests: read
@@ -397,7 +413,7 @@ jobs:
               checksum: $checksum,
               architectures: ["arm64", "x86_64"],
               build: {
-                runner: "self-hosted-cog-mini",
+                runner: "github-hosted-macos-26",
                 xcode_version: $xcode_version,
                 xcode_build: $xcode_build,
                 swift_version: $swift_version,
@@ -568,9 +584,9 @@ jobs:
           retention-days: 90
 
   candidate-extras:
-    name: Release-only integration and documentation (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 90
+    name: Release-only integration and documentation (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 120
     permissions:
       contents: read
     if: >-
@@ -614,9 +630,9 @@ jobs:
         run: mise run test:storefront-ui
 
   test-host:
-    name: Host tests (self-hosted, ${{ matrix.leg }})
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 45
+    name: Host tests (same-repo, GitHub-hosted, ${{ matrix.leg }})
+    runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       contents: read
     if: >-
@@ -681,9 +697,9 @@ jobs:
         run: mise run test:arena-configurations
 
   test-simulator:
-    name: Simulator boundary tests (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 45
+    name: Simulator boundary tests (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       contents: read
     if: >-
@@ -708,9 +724,9 @@ jobs:
         run: mise run test:simulator
 
   build-weather:
-    name: Example apps and macrobenchmark workload (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 30
+    name: Example apps and macrobenchmark workload (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       contents: read
     if: >-
@@ -730,6 +746,22 @@ jobs:
 
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
+
+      # On the mini the five Storefront scratch paths persisted between runs;
+      # a hosted VM starts cold, and the state-graph port alone resolves a
+      # macro toolchain, so the package suites ride the cache.
+      - name: Restore the Storefront package build directories
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build/storefront
+            .build/storefront-cog
+            .build/storefront-runtimes
+            .build/storefront-state-graph
+            .build/storefront-agreement
+          key: swift-storefront-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'swift/Benchmarks/Storefront/**/Package.swift', 'swift/Benchmarks/Storefront/**/Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-storefront-${{ runner.arch }}-
 
       - name: Build the Weather example
         run: mise run build:weather
@@ -765,9 +797,9 @@ jobs:
   # proven outside debug. Runs the default leg only; the isolation matrix is a
   # debug-side concern.
   test-release:
-    name: Release tests (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 45
+    name: Release tests (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       contents: read
     if: >-
@@ -806,9 +838,9 @@ jobs:
   # The compile-fail fixtures, type-checked in one batched `swiftc` pass. Its
   # own scratch path, so it never contends with the test legs' caches.
   compile-fail:
-    name: Compile-fail fixtures (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 20
+    name: Compile-fail fixtures (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 30
     permissions:
       contents: read
     if: >-
@@ -829,6 +861,16 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
 
+      # On the mini this scratch path persisted between runs; a hosted VM
+      # starts cold, so the debug and release library modules ride the cache.
+      - name: Restore the compile-fail build directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build/compilefail
+          key: swift-compilefail-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved', 'mise.toml') }}
+          restore-keys: |
+            swift-compilefail-${{ runner.arch }}-
+
       - name: Type-check the compile-fail fixtures
         run: mise run test:compilefail
 
@@ -836,7 +878,7 @@ jobs:
   # Fork lane: pull requests from forks, on GitHub-hosted macOS.
   #
   # These jobs are the fork's entire macOS signal, so they mirror the
-  # self-hosted lane above step for step, including the same pinned Xcode.
+  # same-repo lane above step for step, including the same pinned Xcode.
   # Pinning in one lane only would mean the two lanes prove different things.
   # `macos-26` ships several Xcodes and defaults to a newer one, so the pin is
   # doing real work here, not just documenting.
@@ -930,8 +972,9 @@ jobs:
       - name: Select the pinned Xcode and record the toolchain
         run: node tools/select-xcode.mjs
 
-      # Keyed apart from the self-hosted lane's caches: same leg, different
-      # host, different toolchain.
+      # Keyed apart from the same-repo lane's caches: same leg, and — while
+      # both lanes ride hosted `macos-26` — the same host, but a fork PR's
+      # cache writes must never feed the trusted lane's restores.
       - name: Restore the leg's build directory
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -1037,14 +1080,18 @@ jobs:
   # PERF-06 retains its exact zero-malloc requirement. The wrapper first proves
   # malloc counting is live and that every gated benchmark and threshold exists.
   #
-  # This stays on the bare Apple Silicon mini: timing ceilings are meaningful
-  # only on the pinned environment. The host services one job at a time, and
-  # the repository-wide concurrency group also prevents benchmark runs from
-  # different refs contending if another matching runner is ever added.
+  # This belongs on the bare Apple Silicon mini: timing ceilings are
+  # meaningful only on the pinned environment. While the mini is away it runs
+  # on hosted `macos-26` — also Apple Silicon, and a dedicated VM per job —
+  # where the exact allocation counts remain fully meaningful and the p90
+  # ceilings are generous absolute values with real headroom. A p90 failure
+  # here without an allocation change is hosted-runner noise to be read, not
+  # a regression to be reverted. The concurrency group still serializes
+  # benchmark runs across refs.
   bench-build:
-    name: Benchmark thresholds (self-hosted)
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
-    timeout-minutes: 30
+    name: Benchmark thresholds (same-repo, GitHub-hosted)
+    runs-on: macos-26
+    timeout-minutes: 45
     permissions:
       contents: read
     concurrency:

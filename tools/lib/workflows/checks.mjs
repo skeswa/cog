@@ -102,8 +102,18 @@ const COGLINT_TRIGGER_PATHS = [
   ".github/workflows/swift-ci.yml",
 ];
 
-/** The two concrete runner lanes permitted to execute repository Swift. */
-const COGLINT_SELF_HOSTED_LABELS = ["self-hosted", "macOS", "ARM64", "cog-mini"];
+/**
+ * The two concrete runner lanes permitted to execute repository Swift.
+ *
+ * The same-repo lane's home is the pinned Mac mini —
+ * `{ shape: "sequence", labels: ["self-hosted", "macOS", "ARM64", "cog-mini"] }`
+ * — but while the mini is unavailable the lane rides the hosted `macos-26`
+ * image, and this constant is the policy the contract enforces, so it names
+ * the hosted image for now. Restoring the mini means swapping this constant
+ * back to the label sequence in the same revision as the `runs-on:` swap in
+ * `swift-ci.yml` (see `docs/maintainers/ci.md`, "Temporary hosted topology").
+ */
+const COGLINT_SAME_REPO_RUNNER = { shape: "string", labels: ["macos-26"] };
 const COGLINT_FORK_RUNNER = "macos-26";
 const COGLINT_ARTIFACT_INTEL_RUNNER = "macos-15-intel";
 
@@ -522,8 +532,8 @@ function cogLintCiContract(workflow) {
     workflow,
     diagnostics,
     id: "lint-swift",
-    runnerShape: "sequence",
-    runnerLabels: COGLINT_SELF_HOSTED_LABELS,
+    runnerShape: COGLINT_SAME_REPO_RUNNER.shape,
+    runnerLabels: COGLINT_SAME_REPO_RUNNER.labels,
     condition: COGLINT_SELF_HOSTED_CONDITION,
   });
   inspectCogLintJob({
@@ -659,18 +669,20 @@ function cogLintArtifactCiContract(workflow) {
 
   const actualLabels = job.runsOn.labels.map((label) => label.value);
   if (
-    job.runsOn.shape !== "sequence" ||
-    actualLabels.length !== COGLINT_SELF_HOSTED_LABELS.length ||
-    !actualLabels.every((label, index) => label === COGLINT_SELF_HOSTED_LABELS[index])
+    job.runsOn.shape !== COGLINT_SAME_REPO_RUNNER.shape ||
+    actualLabels.length !== COGLINT_SAME_REPO_RUNNER.labels.length ||
+    !actualLabels.every((label, index) => label === COGLINT_SAME_REPO_RUNNER.labels[index])
   ) {
+    const expected =
+      COGLINT_SAME_REPO_RUNNER.shape === "sequence"
+        ? `[${COGLINT_SAME_REPO_RUNNER.labels.join(", ")}]`
+        : COGLINT_SAME_REPO_RUNNER.labels[0];
     diagnostics.push({
       path: workflow.path,
       line: job.runsOn.line,
       check: "coglint-artifact-ci-contract",
       job: job.id,
-      message:
-        "job `lint-artifact` must run on exactly " +
-        `\`[${COGLINT_SELF_HOSTED_LABELS.join(", ")}]\``,
+      message: `job \`lint-artifact\` must run on exactly \`${expected}\``,
     });
   }
 

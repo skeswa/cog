@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   lint-swift:
-    runs-on: [self-hosted, macOS, ARM64, cog-mini]
+    runs-on: macos-26
     timeout-minutes: 20
     permissions:
       contents: read
