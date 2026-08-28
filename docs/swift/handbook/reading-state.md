@@ -1,7 +1,5 @@
 # Reading state
 
-_August 26, 2026_
-
 The runtime guarantees that a normal read is correct: it uses the latest
 completed turn and settles every dependency the value needs. What this
 chapter adds is a discipline for how reads _look_, so a reader of the code

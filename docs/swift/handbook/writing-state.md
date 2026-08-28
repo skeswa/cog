@@ -1,7 +1,5 @@
 # Writing state
 
-_August 26, 2026_
-
 `turn` is the only write primitive, and application code never calls it
 inline. Every mutation goes through a named domain operation, and every
 operation publishes exactly one atomic turn. Those two rules are most of this

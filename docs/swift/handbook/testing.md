@@ -1,7 +1,5 @@
 # Testing
 
-_August 26, 2026_
-
 Tests and previews are separate app runtimes. Each one may create one
 isolated `Cogs`. Everything the other chapters set up — sources behind ops,
 capabilities injected into mechanisms, clocks stored rather than hard-coded

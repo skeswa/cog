@@ -1,7 +1,5 @@
 # SwiftUI integration
 
-_August 26, 2026_
-
 SwiftUI sees ordinary `@Observable` values; Cog owns the graph behind them.
 The integration conventions keep that boundary thin. Views resolve the
 runtime themselves, read flatly, mutate through named operations, and adapt
