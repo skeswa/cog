@@ -7,41 +7,9 @@ private nonisolated enum StreamFailure: Error, Equatable {
 }
 
 @MainActor
-private final class ThrowingStreamWork {
-  /// The live continuation for each selected stream generation.
-  private var continuations: [AsyncThrowingStream<Int, any Error>.Continuation] = []
-
-  /// How many independent stream generations the selector has created.
-  var generationCount: Int { continuations.count }
-
-  /// Creates one controllable throwing stream generation.
-  func makeWork() -> Work<Int> {
-    var storedContinuation: AsyncThrowingStream<Int, any Error>.Continuation?
-    let sequence = AsyncThrowingStream<Int, any Error> { continuation in
-      storedContinuation = continuation
-    }
-    guard let storedContinuation else {
-      fatalError("AsyncThrowingStream did not synchronously install its continuation.")
-    }
-    continuations.append(storedContinuation)
-    return .stream(sequence)
-  }
-
-  /// Offers one element to the requested generation.
-  func yield(_ value: Int, to generation: Int) {
-    continuations[generation].yield(value)
-  }
-
-  /// Terminates the requested generation with an error.
-  func fail(_ generation: Int, with error: any Error) {
-    continuations[generation].finish(throwing: error)
-  }
-}
-
-@MainActor
 @Test func `STREAM-07 current stream failure before first element is terminal`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = ThrowingStreamWork()
+  let work = ControlledStream<Int>()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }
@@ -71,7 +39,7 @@ private final class ThrowingStreamWork {
 @MainActor
 @Test func `STREAM-08 later stream failure retains its first accepted element`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = ThrowingStreamWork()
+  let work = ControlledStream<Int>()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
   }

@@ -549,6 +549,9 @@ turn for a loud domain operation.
 - **SEED-10.** `CogTesting.ControlledStream` does the same for latest-policy
   streams: `starts` announces a generation when Cog begins consuming it, and
   `yield`, `finish`, and `fail` drive exactly that generation.
+  `generationCount` counts selector runs, so a proof can assert an upper
+  bound — that a natural end or a terminal failure started no new work —
+  which the at-least-N `starts` probe cannot express.
 - **SEED-11.** `Cogs.forTestingWithController` returns the isolated context
   plus a live controller. Registrations made through it after assembly
   observe seeded state, and they order after every caller mechanism's own

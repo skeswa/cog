@@ -26,13 +26,16 @@ private nonisolated enum ControlledStreamFailure: Error, Equatable {
   #expect(firstElement.kind == .success)
   #expect(firstElement.value == 5)
 
-  // A natural end keeps the success; the next refresh creates — and starts —
-  // the next generation, which the same iterator observes in order.
+  // A natural end keeps the success and starts no new work — the upper bound
+  // `generationCount` exists to assert. The next refresh creates — and
+  // starts — the next generation, which the same iterator observes in order.
   try await resolveAsyncStatus(in: cogs) { work.finish(0) }
   #expect(cogs.status.peek(readingsCog).value == 5)
+  #expect(work.generationCount == 1)
 
   _ = cogs.refresh(readingsCog)
   #expect(await starts.next() == 1)
+  #expect(work.generationCount == 2)
   try await resolveAsyncStatus(in: cogs) {
     work.fail(1, with: ControlledStreamFailure.disconnected)
   }
