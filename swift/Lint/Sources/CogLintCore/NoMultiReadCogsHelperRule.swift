@@ -37,7 +37,7 @@ private final class MultiReadExtensionVisitor: SyntaxVisitor {
 
   /// Analyzes one graph extension without recursively treating its implementation as declarations.
   override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
-    guard let name = finalExtensionName(in: node.extendedType),
+    guard let name = finalNominalName(in: node.extendedType),
       name == "Cogs" || name == "CogOps"
     else {
       return .visitChildren
@@ -115,7 +115,7 @@ private final class ImmediateGraphReadVisitor: SyntaxVisitor {
 
   /// Counts `self[...]`, `status[...]`, and `self.status[...]` once each.
   override func visit(_ node: SubscriptCallExprSyntax) -> SyntaxVisitorContinueKind {
-    if isSelfReference(node.calledExpression) || isDirectStatus(node.calledExpression) {
+    if isGraphReceiverExpression(node.calledExpression) {
       count += 1
     }
     return .visitChildren
@@ -123,7 +123,11 @@ private final class ImmediateGraphReadVisitor: SyntaxVisitor {
 
   /// Counts bare or self-qualified `peek`, including the corresponding status lens.
   override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
-    if isDirectPeek(node.calledExpression) { count += 1 }
+    if directPeekToken(in: node.calledExpression, onGraphBase: { isGraphReceiverExpression($0) })
+      != nil
+    {
+      count += 1
+    }
     return .visitChildren
   }
 }
@@ -131,58 +135,6 @@ private final class ImmediateGraphReadVisitor: SyntaxVisitor {
 /// Whether a return type is a value other than void, view construction, or binding projection.
 private func isOrdinaryValueReturn(_ type: TypeSyntax) -> Bool {
   if let tuple = type.as(TupleTypeSyntax.self), tuple.elements.isEmpty { return false }
-  guard let nominal = finalReturnNominalName(in: type) else { return true }
+  guard let nominal = finalNominalName(in: type) else { return true }
   return nominal != "Void" && nominal != "View" && nominal != "Binding"
-}
-
-/// Extracts a normalized final nominal name through common return-type wrappers.
-private func finalReturnNominalName(in type: TypeSyntax) -> String? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) { return identifier.name.text }
-  if let member = type.as(MemberTypeSyntax.self) { return member.name.text }
-  if let optional = type.as(OptionalTypeSyntax.self) {
-    return finalReturnNominalName(in: optional.wrappedType)
-  }
-  if let attributed = type.as(AttributedTypeSyntax.self) {
-    return finalReturnNominalName(in: attributed.baseType)
-  }
-  if let someOrAny = type.as(SomeOrAnyTypeSyntax.self) {
-    return finalReturnNominalName(in: someOrAny.constraint)
-  }
-  return nil
-}
-
-/// Whether an expression is the extension instance itself.
-private func isSelfReference(_ expression: ExprSyntax) -> Bool {
-  expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "self"
-}
-
-/// Whether an expression is bare `status` or direct `self.status`.
-private func isDirectStatus(_ expression: ExprSyntax) -> Bool {
-  if expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "status" { return true }
-  guard let member = expression.as(MemberAccessExprSyntax.self),
-    member.declName.baseName.text == "status",
-    let base = member.base
-  else {
-    return false
-  }
-  return isSelfReference(base)
-}
-
-/// Whether a called expression is bare/self `peek` or peek on the direct status lens.
-private func isDirectPeek(_ expression: ExprSyntax) -> Bool {
-  if expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "peek" { return true }
-  guard let member = expression.as(MemberAccessExprSyntax.self),
-    member.declName.baseName.text == "peek",
-    let base = member.base
-  else {
-    return false
-  }
-  return isSelfReference(base) || isDirectStatus(base)
-}
-
-/// Extracts the final nominal component of an extension target.
-private func finalExtensionName(in type: TypeSyntax) -> String? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) { return identifier.name.text }
-  if let member = type.as(MemberTypeSyntax.self) { return member.name.text }
-  return nil
 }

@@ -53,9 +53,11 @@ private final class PrimitiveCallVisitor: SyntaxVisitor {
         violations.append(violation(for: call.nameToken))
       }
     case .member(let receiverName):
-      let hasClassifiedReceiver = receivers.reversed().contains { receiver in
-        receiver.name == receiverName && receiver.scope.contains(node)
-      }
+      let hasClassifiedReceiver = isClassifiedReceiver(
+        named: receiverName,
+        at: node,
+        among: receivers
+      )
       let isSelfOnPrimitiveExtension =
         receiverName == "self" && (extensionName == "Cogs" || extensionName == "CogOps")
       if hasClassifiedReceiver || isSelfOnPrimitiveExtension {
@@ -130,19 +132,6 @@ private func directReceiverName(_ expression: ExprSyntax?) -> String? {
 
 /// Finds the nearest lexical extension and returns its final nominal component.
 private func enclosingExtensionName(of node: some SyntaxProtocol) -> String? {
-  var cursor = Syntax(node).parent
-  while let current = cursor {
-    if let declaration = current.as(ExtensionDeclSyntax.self) {
-      return finalNominalName(in: declaration.extendedType)
-    }
-    cursor = current.parent
-  }
-  return nil
-}
-
-/// Extracts the final nominal component from an extension target.
-private func finalNominalName(in type: TypeSyntax) -> String? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) { return identifier.name.text }
-  if let member = type.as(MemberTypeSyntax.self) { return member.name.text }
-  return nil
+  nearestAncestor(ExtensionDeclSyntax.self, from: node)
+    .flatMap { finalNominalName(in: $0.extendedType) }
 }

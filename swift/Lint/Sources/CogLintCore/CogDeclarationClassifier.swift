@@ -262,25 +262,6 @@ private func nominalSpelling(in expression: ExprSyntax) -> CogNominalSpelling? {
   return nil
 }
 
-/// Extracts the last nominal component from an expression used as a member base.
-private func finalNominalName(in expression: ExprSyntax) -> String? {
-  nominalSpelling(in: expression)?.memberName
-}
-
-/// Extracts the last nominal component from a type used as a nested-type base.
-private func finalNominalName(in type: TypeSyntax) -> String? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) {
-    return identifier.name.text
-  }
-  if let member = type.as(MemberTypeSyntax.self) {
-    return member.name.text
-  }
-  if let attributed = type.as(AttributedTypeSyntax.self) {
-    return finalNominalName(in: attributed.baseType)
-  }
-  return nil
-}
-
 /// Whether a call uses the annotation-dependent `.init(...)` spelling.
 private func isDotInit(_ expression: ExprSyntax) -> Bool {
   guard let member = expression.as(MemberAccessExprSyntax.self) else { return false }

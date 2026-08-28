@@ -217,14 +217,3 @@ private func hasSomeViewBody(in members: MemberBlockSyntax) -> Bool {
   }
   return false
 }
-
-/// Extracts a qualification-preserving nominal path while ignoring generic arguments.
-private func nominalPath(of type: TypeSyntax) -> [String]? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) {
-    return [identifier.name.text]
-  }
-  if let member = type.as(MemberTypeSyntax.self), let base = nominalPath(of: member.baseType) {
-    return base + [member.name.text]
-  }
-  return nil
-}

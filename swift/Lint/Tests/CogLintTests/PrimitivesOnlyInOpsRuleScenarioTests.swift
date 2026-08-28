@@ -12,22 +12,9 @@ import Testing
 
 /// Proves the production registry reports the exact primitive and repair boundary.
 @Test func `LINT-08 production registry reports an environment primitive`() throws {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-primitive-op-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try "struct Card: View { @Environment(\\.cogs) var cogs; func tap() { cogs.refresh(itemCog) } }\n"
-    .write(
-      to: root.appending(path: "Card.swift"),
-      atomically: true,
-      encoding: .utf8
-    )
-
-  let execution = try CogLintEngine.lint(
-    paths: ["Card.swift"],
-    relativeTo: root,
-    targetRole: .production,
-    rules: CogLintRuleRegistry.all
+  let execution = try lintScratchSource(
+    "struct Card: View { @Environment(\\.cogs) var cogs; func tap() { cogs.refresh(itemCog) } }\n",
+    named: "Card.swift"
   )
 
   #expect(execution.exitCode == 1)

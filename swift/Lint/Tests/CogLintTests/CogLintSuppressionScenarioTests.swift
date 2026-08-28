@@ -112,17 +112,7 @@ private func lint(
   role: CogLintTargetRole = .production,
   rules: [any CogLintRule] = [SuppressionSentinelRule()]
 ) throws -> CogLintExecution {
-  let root = FileManager.default.temporaryDirectory
-    .appending(path: "coglint-suppression-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-  defer { try? FileManager.default.removeItem(at: root) }
-  try source.write(to: root.appending(path: "Fixture.swift"), atomically: true, encoding: .utf8)
-  return try CogLintEngine.lint(
-    paths: ["Fixture.swift"],
-    relativeTo: root,
-    targetRole: role,
-    rules: rules
-  )
+  try lintScratchSource(source, named: "Fixture.swift", targetRole: role, rules: rules)
 }
 
 /// Finds every sentinel identifier in source order with one supplied message.

@@ -270,7 +270,7 @@ private final class CogCallReceiverVisitor: SyntaxVisitor {
 private func hasCogsEnvironmentAttribute(_ declaration: VariableDeclSyntax) -> Bool {
   for element in declaration.attributes {
     guard let attribute = element.as(AttributeSyntax.self),
-      lastNominalName(in: attribute.attributeName) == "Environment"
+      finalNominalName(in: attribute.attributeName) == "Environment"
     else {
       continue
     }
@@ -294,39 +294,13 @@ private func isDirectAssembly(_ expression: ExprSyntax?) -> Bool {
 
 /// Maps only written capability types that rules may safely trust.
 private func receiverKind(forType type: TypeSyntax) -> CogGraphReceiverKind? {
-  switch lastNominalName(in: type) {
+  switch finalNominalName(in: type) {
   case "Reader": return .selectorReader
   case "ReactionReader": return .reactionReader
   case "Writer": return .writer
   case "MechanismController": return .mechanismController
   default: return nil
   }
-}
-
-/// Extracts the final nominal name through qualification and common wrappers.
-private func lastNominalName(in type: TypeSyntax) -> String? {
-  if let identifier = type.as(IdentifierTypeSyntax.self) { return identifier.name.text }
-  if let member = type.as(MemberTypeSyntax.self) { return member.name.text }
-  if let optional = type.as(OptionalTypeSyntax.self) {
-    return lastNominalName(in: optional.wrappedType)
-  }
-  if let attributed = type.as(AttributedTypeSyntax.self) {
-    return lastNominalName(in: attributed.baseType)
-  }
-  return nil
-}
-
-/// Finds the nearest ancestor of one concrete syntax type.
-private func nearestAncestor<Node: SyntaxProtocol>(
-  _ type: Node.Type,
-  from node: some SyntaxProtocol
-) -> Node? {
-  var cursor = Syntax(node).parent
-  while let current = cursor {
-    if let match = current.as(Node.self) { return match }
-    cursor = current.parent
-  }
-  return nil
 }
 
 /// Returns a parameter token unless it is the external-only underscore spelling.
