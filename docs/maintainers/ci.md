@@ -24,11 +24,15 @@ Three things follow from the hosted period:
   steps the mini never needed. Leave the caches in place after the swap back;
   they are harmless on the mini.
 - The benchmark and UI-performance timing ceilings were recorded on the
-  pinned mini. Exact allocation counts stay fully meaningful on hosted Apple
-  Silicon; a p90 or hitch-ceiling failure with no allocation change during
-  this period is hosted-runner noise to read, not a regression to revert —
-  and never grounds to loosen a committed threshold, which changes only after
-  a pinned-runner session.
+  pinned mini, and a shared VM's p90 measures the neighbors — the first
+  hosted run proved it when the state-graph comparison blew its ceiling with
+  no allocation change anywhere. The hosted `bench-build` job therefore runs
+  `bench:thresholds:check --allocations-only`: exact allocation and ARC
+  counts still gate every change (they are deterministic across hosts on one
+  toolchain), while the wall-clock ceilings are loudly skipped and resume
+  when the flag is dropped with the swap back. No committed threshold
+  changes during this period; thresholds change only after a pinned-runner
+  session.
 - Release-candidate provenance records
   `"runner": "github-hosted-macos-26"` for artifacts built in this period.
 

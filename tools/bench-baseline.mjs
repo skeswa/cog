@@ -348,11 +348,37 @@ function assertThresholdedBenchmarksRegistered() {
   );
 }
 
-/** Runs the committed exact-allocation and PERF-10 absolute threshold gate. */
-function checkStaticThresholds() {
+/**
+ * Runs the committed exact-allocation and PERF-10 absolute threshold gate.
+ *
+ * `allocationsOnly` narrows the run to the benchmarks whose committed metrics
+ * are allocation and ARC counts, skipping every wall-clock p90 ceiling — and
+ * says so loudly, because a skipped ceiling that looks covered is worse than
+ * one that is visibly deferred. The mode exists for runners that are not the
+ * pinned environment the ceilings were recorded on (see the "Temporary hosted
+ * topology" section of `docs/maintainers/ci.md`): allocation counts are
+ * deterministic across hosts with one toolchain, while a wall-clock ceiling
+ * on a shared machine measures the neighbors. Completeness and registration
+ * are still asserted for every committed threshold, so the deferred ceilings
+ * cannot quietly rot while they wait for the pinned runner.
+ *
+ * @param {{ allocationsOnly?: boolean }} [options]
+ */
+function checkStaticThresholds({ allocationsOnly = false } = {}) {
   assertStaticThresholdsComplete(thresholdDirectory);
   assertThresholdedBenchmarksRegistered();
   assertWitnessMeasured();
+
+  let gated = THRESHOLDED_BENCHMARKS;
+  if (allocationsOnly) {
+    gated = THRESHOLDED_BENCHMARKS.filter((benchmark) => benchmark in STATIC_THRESHOLD_METRICS);
+    const skipped = THRESHOLDED_BENCHMARKS.filter((benchmark) => !gated.includes(benchmark));
+    console.log(
+      `bench-baseline: SKIPPING ${skipped.length} wall-clock ceiling(s) — pinned-runner ` +
+        `only: ${skipped.join(", ")}`,
+    );
+    if (gated.length === 0) fail("--allocations-only left no benchmark to check");
+  }
 
   console.log("==> checking committed absolute benchmark thresholds");
   run("swift", [
@@ -361,14 +387,12 @@ function checkStaticThresholds() {
     "thresholds",
     "check",
     "--filter",
-    THRESHOLD_FILTER,
+    `^(${gated.join("|")})$`,
     "--path",
     thresholdDirectory,
     "--no-progress",
   ]);
-  console.log(
-    `bench-baseline: OK — ${THRESHOLDED_BENCHMARKS.length} benchmarks stayed within their ceilings`,
-  );
+  console.log(`bench-baseline: OK — ${gated.length} benchmarks stayed within their ceilings`);
 }
 
 /**
@@ -466,7 +490,12 @@ function check(name) {
   console.log(`bench-baseline: OK — no metric drifted past its threshold`);
 }
 
-const [subcommand, name = DEFAULT_BASELINE] = process.argv.slice(2);
+const allocationsOnly = process.argv.includes("--allocations-only");
+const positional = process.argv.slice(2).filter((argument) => argument !== "--allocations-only");
+const [subcommand, name = DEFAULT_BASELINE] = positional;
+if (allocationsOnly && subcommand !== "thresholds-check") {
+  fail("--allocations-only applies only to thresholds-check");
+}
 switch (subcommand) {
   case "update":
     update(name);
@@ -475,7 +504,7 @@ switch (subcommand) {
     check(name);
     break;
   case "thresholds-check":
-    checkStaticThresholds();
+    checkStaticThresholds({ allocationsOnly });
     break;
   case "thresholds-sentinel":
     checkThresholdSentinel();
@@ -485,7 +514,7 @@ switch (subcommand) {
       "expected a subcommand.\n" +
         "  node tools/bench-baseline.mjs update [name]\n" +
         "  node tools/bench-baseline.mjs check  [name]\n" +
-        "  node tools/bench-baseline.mjs thresholds-check\n" +
+        "  node tools/bench-baseline.mjs thresholds-check [--allocations-only]\n" +
         "  node tools/bench-baseline.mjs thresholds-sentinel",
     );
 }
