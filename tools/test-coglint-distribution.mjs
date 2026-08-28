@@ -3,10 +3,17 @@
 // Proves Channel B keeps ordinary Cog consumers free of linter sources and
 // artifact fetches while preserving the measured eager-fetch boundary.
 
-import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ARCHIVE_NAME,
+  COGLINT_PLUGINS,
+  PLUGINS_PACKAGE_NAME,
+  makeRunners,
+  pluginSourcePath,
+  releaseArtifactURL,
+} from "./lib/coglint-artifact.mjs";
 import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 import { currentVersion } from "./lib/version.mjs";
 
@@ -15,11 +22,13 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-distribution");
 
 /** Distribution identities that must never enter an ordinary Cog graph. */
-const PACKAGE_NAME = "CogLintPlugins";
-const ASSET_NAME = "CogLintBinary.artifactbundle.zip";
+const PACKAGE_NAME = PLUGINS_PACKAGE_NAME;
+const ASSET_NAME = ARCHIVE_NAME;
 const SOURCE_DEPENDENCIES = ["swift-syntax", "swift-argument-parser"];
 const DUMMY_CHECKSUM = "0".repeat(64);
 const VERSION = currentVersion();
+
+const { runCaptured, runSuccessful } = makeRunners(fail);
 
 main();
 
@@ -84,19 +93,19 @@ function validateDistribution(distribution) {
   }
 
   const record = JSON.parse(readFileSync(join(distribution, ".coglint-generation.json"), "utf8"));
-  const expectedURL = `https://github.com/skeswa/cog/releases/download/${VERSION}/${ASSET_NAME}`;
+  const expectedURL = releaseArtifactURL(VERSION);
   if (record.artifactURL !== expectedURL || record.checksum !== DUMMY_CHECKSUM) {
     fail("generated release record does not match its version, URL, and checksum inputs");
   }
 
-  for (const name of ["CogLintBuildToolPlugin", "CogLintCommandPlugin"]) {
-    const generated = readFileSync(join(distribution, "Plugins", name, "plugin.swift"), "utf8");
-    const source = readFileSync(
-      join(REPO_ROOT, "swift", "Lint", "Plugins", name, "plugin.swift"),
+  for (const plugin of COGLINT_PLUGINS) {
+    const generated = readFileSync(
+      join(distribution, "Plugins", plugin.name, "plugin.swift"),
       "utf8",
     );
+    const source = readFileSync(pluginSourcePath(plugin.name), "utf8");
     if (generated !== source) {
-      fail(`${name} distribution source differs from its repository owner`);
+      fail(`${plugin.name} distribution source differs from its repository owner`);
     }
   }
 }
@@ -202,7 +211,7 @@ function verifyUnusedOptInStillFetches(distribution) {
   const fixtureDistribution = join(TEST_ROOT, "UnreachableCogLintPlugins");
   cpSync(distribution, fixtureDistribution, { recursive: true });
   const manifestPath = join(fixtureDistribution, "Package.swift");
-  const realURL = `https://github.com/skeswa/cog/releases/download/${VERSION}/${ASSET_NAME}`;
+  const realURL = releaseArtifactURL(VERSION);
   const unreachableURL = `https://127.0.0.1:1/${ASSET_NAME}`;
   const manifest = readFileSync(manifestPath, "utf8").replace(realURL, unreachableURL);
   if (!manifest.includes(unreachableURL)) {
@@ -256,32 +265,6 @@ let package = Package(
 /** Removes manifest selectors so the ordinary graph uses Cog shipping defaults. */
 function cleanEnvironment() {
   return shippingManifestEnvironment(process.env);
-}
-
-/** Runs one command that must succeed. */
-function runSuccessful(command, arguments_, options) {
-  const result = runCaptured(command, arguments_, options);
-  if (result.status !== 0) {
-    process.stdout.write(result.stdout ?? "");
-    process.stderr.write(result.stderr ?? "");
-    fail(`${command} exited with status ${result.status}`);
-  }
-  return result;
-}
-
-/** Runs one command while retaining resolver output for positive and negative checks. */
-function runCaptured(command, arguments_, options = {}) {
-  const result = spawnSync(command, arguments_, {
-    maxBuffer: 64 * 1024 * 1024,
-    ...options,
-  });
-  if (result.error !== undefined) {
-    fail(`could not run ${command}: ${result.error.message}`);
-  }
-  if (result.signal !== null && result.signal !== undefined) {
-    fail(`${command} was killed by ${result.signal}`);
-  }
-  return result;
 }
 
 /** Reports a distribution-boundary failure without publishing generated output. */
