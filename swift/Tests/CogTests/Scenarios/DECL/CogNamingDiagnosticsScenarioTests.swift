@@ -52,7 +52,7 @@ import Testing
   #expect(diagnostic?.path.first == diagnostic?.path.last)
 
   let site = declarationSite(diagnostic?.path.first)
-  #expect(site?.file.hasSuffix("DECL10_11ScenarioTests.swift") == true)
+  #expect(site?.file.hasSuffix("CogNamingDiagnosticsScenarioTests.swift") == true)
   // A range, not an equality: which line of a multi-line call expression
   // `#line` reports is the compiler's business. DECL-11 asks only that the
   // fallback points at this declaration rather than at some other one.
@@ -103,13 +103,13 @@ import Testing
   let writes = entries.filter { $0.event == .write }.map(\.name)
   #expect(writes.count == 1)
   let writeSite = declarationSite(writes.first)
-  #expect(writeSite?.file.hasSuffix("DECL10_11ScenarioTests.swift") == true)
+  #expect(writeSite?.file.hasSuffix("CogNamingDiagnosticsScenarioTests.swift") == true)
   #expect(writeSite.map { $0.line > beforeSource && $0.line < afterSource } == true)
 
   let recomputes = Set(entries.filter { $0.event == .recompute }.map(\.name))
   #expect(recomputes.count == 1)
   let recomputeSite = declarationSite(recomputes.first)
-  #expect(recomputeSite?.file.hasSuffix("DECL10_11ScenarioTests.swift") == true)
+  #expect(recomputeSite?.file.hasSuffix("CogNamingDiagnosticsScenarioTests.swift") == true)
   #expect(recomputeSite.map { $0.line > beforeAutomatic && $0.line < afterAutomatic } == true)
 }
 
