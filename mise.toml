@@ -127,9 +127,18 @@ run = "node {{config_root}}/tools/storefront-state-graph-test.mjs"
 # packages still cannot see one another. Its scratch path is separate from the
 # runner so correctness and measurement builds cannot invalidate each other.
 
+# The four compared packages must compile identically, and their manifests are
+# text files, so the parity check runs in milliseconds here rather than as a
+# Swift test behind a four-runtime build. The agreement suite depends on it so
+# an agreement green still implies build-shape parity.
+
+[tasks."storefront:check-manifests"]
+description = "Verify the four Storefront manifests share one settings block"
+run = "node {{config_root}}/tools/check-storefront-manifests.mjs"
+
 [tasks."test:storefront-agreement"]
 description = "Run the guarded cross-runtime Storefront agreement suite"
-depends = ["test:guards"]
+depends = ["test:guards", "storefront:check-manifests"]
 run = "node {{config_root}}/tools/storefront-agreement-test.mjs"
 
 [tasks."test:storefront-all"]

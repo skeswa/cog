@@ -13,7 +13,7 @@ import PackageDescription
 /// The build shape every Storefront workload and runtime target uses.
 ///
 /// Each runtime package carries a byte-identical copy because SwiftPM manifests
-/// cannot import one another. The verification package checks the copies as
+/// cannot import one another. `tools/check-storefront-manifests.mjs` checks the copies as
 /// source text so a comparison cannot silently measure different compiler
 /// isolation or language settings.
 let storefrontSwiftSettings: [SwiftSetting] = [
