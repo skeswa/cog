@@ -1,7 +1,5 @@
 # Declaring state
 
-_August 26, 2026_
-
 A declaration is a fixed name and recipe. The runtime creates the mutable
 state behind it the first time something uses it. This chapter covers how to
 name declarations, which shape to pick, and the underscore-and-projection

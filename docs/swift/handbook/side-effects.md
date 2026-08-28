@@ -1,7 +1,5 @@
 # Side effects
 
-_August 26, 2026_
-
 Every app-wide side effect has one home: a `Mechanism`, registered at
 assembly. Mechanisms live in the cluster's `+Mechanisms.swift` file, own
 their capabilities as stored properties, and touch the graph only through

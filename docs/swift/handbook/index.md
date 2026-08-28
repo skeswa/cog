@@ -1,7 +1,5 @@
 # Cog for Swift: handbook
 
-_August 26, 2026_
-
 This handbook shows you how to build an app on Cog. It collects the
 conventions the project has settled on. Each chapter states its rules first,
 then shows the rules in real code.

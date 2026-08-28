@@ -1,7 +1,5 @@
 # Navigation and deep linking
 
-_August 26, 2026_
-
 Navigation is ordinary graph state. There is no router object. A router
 would hold facts — "where is the user?" — outside the one authoritative
 graph, and that is exactly what the singular-state principle forbids.

@@ -1,7 +1,5 @@
 # Structuring an app
 
-_August 26, 2026_
-
 An app built on Cog has three parts. There is one runtime. There is one state
 layer, organized into named file families. And there are views, which get
 everything they need from the environment. This chapter covers that skeleton;
