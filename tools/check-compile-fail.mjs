@@ -433,7 +433,7 @@ function readScenarioProofModes() {
   } catch {
     return null;
   }
-  /** @type {Map<string, { compileFail: boolean, releaseConfiguration: boolean }>} */
+  /** @type {Map<string, { compileFail: boolean, releaseAbsence: boolean }>} */
   const modes = new Map();
   const pattern = /^-\s+\*\*([A-Z][A-Z0-9]*-\d+[a-z]?)\.\*\*/gm;
   /** @type {RegExpExecArray | null} */

@@ -46,12 +46,12 @@ import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
 /**
  * The four legs of the isolation matrix.
  *
- * `M0-04` teaches `Package.swift` to read these variables. Until it lands the
- * manifest ignores them and all four legs build identically, which is fine:
- * setting them here now keeps `M0-04` a manifest-only change.
+ * `Package.swift` reads these variables and applies the matching build
+ * settings to its test targets; LEG-02 proves both ends of that wiring, so
+ * the legs really do build differently.
  *
- * The first entry is the default leg. It must stay in sync with the constants
- * the manifest currently hard-codes for its test targets.
+ * The first entry is the default leg. It must stay in sync with the defaults
+ * the manifest applies when the variables are absent.
  */
 const LEGS = [
   { name: "mainactor-nnbd-on", isolation: "mainactor", nnbd: "1" },

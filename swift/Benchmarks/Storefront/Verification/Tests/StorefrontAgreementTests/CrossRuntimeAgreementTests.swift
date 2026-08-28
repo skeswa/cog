@@ -18,7 +18,7 @@ import Testing
 /// purpose of the comparison is to say that Cog is faster at computing the same
 /// thing, not that it is faster at computing something else.
 ///
-/// ## Why it lives in `cog-benchmarks`
+/// ## Why it lives in `cog-storefront-verification`
 ///
 /// Because nowhere else can hold it. `cog-storefront` cannot see the ports;
 /// `cog-storefront-observation` and `cog-storefront-state-graph` cannot see each
