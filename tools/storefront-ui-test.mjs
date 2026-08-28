@@ -10,10 +10,9 @@
 // measurement of a SwiftUI app measures the optimizer's absence, exactly as a
 // debug benchmark of the graph would.
 //
-// This wrapper does not trust the exit status alone — it reads the result
-// bundle back and requires a non-zero executed count from the one bundle it
-// expects. A **UI** test bundle reports `nodeType` as `"UI test bundle"`, not
-// `"Unit test bundle"`, so the result parser must distinguish the two.
+// This wrapper does not trust the exit status alone — `lib/xcresult.mjs`
+// reads the result bundle back and requires a non-zero executed count from
+// the one **UI** test bundle it expects.
 //
 // Usage: `storefront-ui-test.mjs [extra xcodebuild arguments...]`
 // Set `COG_STOREFRONT_DESTINATION` to override the simulator destination.
@@ -21,6 +20,7 @@
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assertExactBundleExecuted } from "./lib/xcresult.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PROJECT = "swift/Benchmarks/Storefront/Apps/Cog/Storefront.xcodeproj";
@@ -71,36 +71,13 @@ const result = spawnSync(
 if (result.error !== undefined) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 
-const inspected = spawnSync(
-  "xcrun",
-  ["xcresulttool", "get", "test-results", "tests", "--path", RESULT_BUNDLE, "--compact"],
-  { cwd: REPO_ROOT, encoding: "utf8" },
-);
-if (inspected.error !== undefined) throw inspected.error;
-if (inspected.status !== 0) {
-  process.stderr.write(inspected.stderr);
-  process.exit(inspected.status ?? 1);
-}
-
-const report = JSON.parse(inspected.stdout);
-const bundles = [];
-let tests = 0;
-visit(report.testNodes ?? []);
-if (tests === 0) fail("xcodebuild completed without executing a test");
-if (bundles.length !== 1 || bundles[0] !== BUNDLE_NAME) {
-  fail(`expected only ${BUNDLE_NAME}, found ${bundles.join(", ") || "no test bundle"}`);
-}
+const tests = assertExactBundleExecuted(RESULT_BUNDLE, {
+  bundleName: BUNDLE_NAME,
+  kind: "ui",
+  cwd: REPO_ROOT,
+  fail,
+});
 console.log(`storefront ui tests: OK ${BUNDLE_NAME} — ${tests} test(s)`);
-
-/** Walks the result-bundle tree, collecting bundle names and counting cases. */
-function visit(nodes) {
-  for (const node of nodes) {
-    // `"UI test bundle"`, not `"Unit test bundle"`. See the note at the top.
-    if (node.nodeType === "UI test bundle") bundles.push(node.name);
-    if (node.nodeType === "Test Case") tests += 1;
-    visit(node.children ?? []);
-  }
-}
 
 /** Reports a wrapper-level failure and exits nonzero. */
 function fail(message) {

@@ -11,6 +11,7 @@
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assertExactBundleExecuted } from "./lib/xcresult.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const RESULT_BUNDLE = ".build/simulator-results.xcresult";
@@ -51,36 +52,15 @@ const result = spawnSync(
 if (result.error !== undefined) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 
-const inspected = spawnSync(
-  "xcrun",
-  ["xcresulttool", "get", "test-results", "tests", "--path", RESULT_BUNDLE, "--compact"],
-  { cwd: REPO_ROOT, encoding: "utf8" },
-);
-if (inspected.error !== undefined) throw inspected.error;
-if (inspected.status !== 0) {
-  process.stderr.write(inspected.stderr);
-  process.exit(inspected.status ?? 1);
-}
-
-const report = JSON.parse(inspected.stdout);
-const bundles = [];
-let tests = 0;
-visit(report.testNodes ?? []);
-if (tests === 0) fail("xcodebuild completed without executing a test");
-if (bundles.length !== 1 || bundles[0] !== "CogBoundaryTests") {
-  fail(`expected only CogBoundaryTests, found ${bundles.join(", ") || "no test bundle"}`);
-}
+const tests = assertExactBundleExecuted(RESULT_BUNDLE, {
+  bundleName: "CogBoundaryTests",
+  kind: "unit",
+  cwd: REPO_ROOT,
+  fail,
+});
 console.log(`simulator tests: OK CogBoundaryTests — ${tests} test(s)`);
 
-function visit(nodes) {
-  for (const node of nodes) {
-    if (node.nodeType === "Unit test bundle") bundles.push(node.name);
-    if (node.nodeType === "Test Case") tests += 1;
-    visit(node.children ?? []);
-  }
-}
-
 function fail(message) {
-  console.error(`error: ${message}`);
+  console.error(`error: swift-simulator-test: ${message}`);
   process.exit(1);
 }
