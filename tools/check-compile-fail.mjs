@@ -93,6 +93,7 @@ import { join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { shippingManifestEnvironment } from "./lib/cog-environment.mjs";
+import { readScenarioLedger } from "./lib/scenario-ledger.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIXTURE_ROOT = resolve(REPO_ROOT, "swift/CompileFail");
@@ -420,37 +421,12 @@ function parseFixture(path) {
 // MARK: - scenarios.md cross-check
 
 /**
- * Maps every scenario ID in scenarios.md to whether it is declared
- * `(Proof: compile-fail.)` and whether it is declared
- * `(Proof: release absence.)`. Returns null when scenarios.md is unreadable,
- * which downgrades the cross-check to a no-op rather than a failure.
+ * Reads the ledger through the shared parser, keeping this checker's
+ * downgrade behavior: null when scenarios.md is unreadable, so the
+ * cross-check becomes a no-op rather than a failure.
  */
 function readScenarioProofModes() {
-  if (!existsSync(SCENARIOS)) return null;
-  let source;
-  try {
-    source = readFileSync(SCENARIOS, "utf8");
-  } catch {
-    return null;
-  }
-  /** @type {Map<string, { compileFail: boolean, releaseAbsence: boolean }>} */
-  const modes = new Map();
-  const pattern = /^-\s+\*\*([A-Z][A-Z0-9]*-\d+[a-z]?)\.\*\*/gm;
-  /** @type {RegExpExecArray | null} */
-  let match;
-  const starts = [];
-  while ((match = pattern.exec(source)) !== null) {
-    starts.push({ id: match[1], index: match.index });
-  }
-  for (let index = 0; index < starts.length; index += 1) {
-    const end = index + 1 < starts.length ? starts[index + 1].index : source.length;
-    const body = source.slice(starts[index].index, end);
-    modes.set(starts[index].id, {
-      compileFail: /\(Proof:\s*compile-fail\.?\)/.test(body),
-      releaseAbsence: /\(Proof:\s*release absence\.?\)/.test(body),
-    });
-  }
-  return modes.size === 0 ? null : modes;
+  return readScenarioLedger(SCENARIOS);
 }
 
 // MARK: - Diagnostic parsing
@@ -655,9 +631,9 @@ function main() {
         if (!modes.has(id)) {
           report(fixture, "unknown-scenario", 1, `${id} is not declared in ${repoPath(SCENARIOS)}`);
         } else {
-          const mode = modes.get(id);
+          const entry = modes.get(id);
           const release = fixture.configuration === "release";
-          if (release ? !mode.releaseAbsence : !mode.compileFail) {
+          if (!entry.proofs.has(release ? "release absence" : "compile-fail")) {
             const required = release ? "(Proof: release absence.)" : "(Proof: compile-fail.)";
             report(
               fixture,
