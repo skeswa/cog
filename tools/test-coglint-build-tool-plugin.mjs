@@ -16,25 +16,21 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  BUILD_TOOL_PLUGIN,
+  BUNDLE_NAME,
+  BUNDLE_PATH,
+  PLUGINS_PACKAGE_NAME,
+  consumerManifest,
+  ensureCurrentArtifact,
+  pluginSourcePath,
+} from "./lib/coglint-artifact.mjs";
 
 /** The repository root, resolved from this script so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /** Stable ignored scratch space retained for failed-build inspection. */
 const TEST_ROOT = join(REPO_ROOT, ".build", "coglint-build-tool-plugin");
-
-/** The generated local artifact and checked-in plugin source under test. */
-const BUNDLE_NAME = "CogLintBinary.artifactbundle";
-const BUNDLE_PATH = join(REPO_ROOT, "swift", "Lint", "Artifacts", BUNDLE_NAME);
-const ARCHIVE_PATH = `${BUNDLE_PATH}.zip`;
-const PLUGIN_SOURCE = join(
-  REPO_ROOT,
-  "swift",
-  "Lint",
-  "Plugins",
-  "CogLintBuildToolPlugin",
-  "plugin.swift",
-);
 
 /** One unambiguous production-rule finding shared by both consumers. */
 const VIOLATING_SOURCE = "let countSourceCog = Cog.Manual(0)\n";
@@ -49,7 +45,7 @@ function main() {
     fail("LINT-17 requires the accepted Apple Silicon plugin test host");
   }
 
-  ensureCurrentArtifact();
+  ensureCurrentArtifact(fail);
   rmSync(TEST_ROOT, { force: true, recursive: true });
   mkdirSync(TEST_ROOT, { recursive: true });
 
@@ -65,65 +61,20 @@ function main() {
   );
 }
 
-/** Rebuilds when any source, pin, manifest, or builder is newer than the archive. */
-function ensureCurrentArtifact() {
-  const inputs = [
-    join(REPO_ROOT, "swift", "Lint", "Package.swift"),
-    join(REPO_ROOT, "swift", "Lint", "Package.resolved"),
-    join(REPO_ROOT, "swift", "Lint", "Sources"),
-    join(REPO_ROOT, "tools", "build-coglint-artifact.mjs"),
-  ];
-  const latestInput = Math.max(...inputs.map(latestModificationTime));
-  if (!existsSync(ARCHIVE_PATH) || statSync(ARCHIVE_PATH).mtimeMs < latestInput) {
-    run(process.execPath, [join(REPO_ROOT, "tools", "build-coglint-artifact.mjs")], {
-      stdio: "inherit",
-    });
-  } else {
-    console.log("==> Reusing the artifact built from the current CogLint sources");
-  }
-}
-
-/** Finds the newest regular file below one input path. */
-function latestModificationTime(path) {
-  const status = statSync(path);
-  if (!status.isDirectory()) {
-    return status.mtimeMs;
-  }
-  return Math.max(
-    status.mtimeMs,
-    ...readdirSync(path).map((entry) => latestModificationTime(join(path, entry))),
-  );
-}
-
 /** Creates the local binary target and plugin product consumed by both hosts. */
 function writeDistributionPackage() {
-  const directory = join(TEST_ROOT, "CogLintPlugins");
-  const pluginDirectory = join(directory, "Plugins", "CogLintBuildToolPlugin");
+  const directory = join(TEST_ROOT, PLUGINS_PACKAGE_NAME);
+  const pluginDirectory = join(directory, "Plugins", BUILD_TOOL_PLUGIN.name);
   mkdirSync(pluginDirectory, { recursive: true });
   cpSync(BUNDLE_PATH, join(directory, BUNDLE_NAME), { recursive: true });
-  cpSync(PLUGIN_SOURCE, join(pluginDirectory, "plugin.swift"));
+  cpSync(pluginSourcePath(BUILD_TOOL_PLUGIN.name), join(pluginDirectory, "plugin.swift"));
   writeFileSync(
     join(directory, "Package.swift"),
-    `// swift-tools-version:6.2
-
-import PackageDescription
-
-let package = Package(
-  name: "CogLintPlugins",
-  platforms: [.macOS(.v14)],
-  products: [
-    .plugin(name: "CogLintBuildToolPlugin", targets: ["CogLintBuildToolPlugin"]),
-  ],
-  targets: [
-    .binaryTarget(name: "CogLintBinary", path: "${BUNDLE_NAME}"),
-    .plugin(
-      name: "CogLintBuildToolPlugin",
-      capability: .buildTool(),
-      dependencies: ["CogLintBinary"]
-    ),
-  ]
-)
-`,
+    consumerManifest({
+      name: PLUGINS_PACKAGE_NAME,
+      binaryTarget: { path: BUNDLE_NAME },
+      plugins: [BUILD_TOOL_PLUGIN],
+    }),
   );
   return directory;
 }
@@ -382,24 +333,6 @@ function requireHitCount(cachePath, expected, label) {
     fail(`${label} cache hitCount is ${record.hitCount}, expected ${expected}`);
   }
   console.log(`==> ${label} cache hitCount: ${record.hitCount}`);
-}
-
-/** Runs one required successful subprocess. */
-function run(command, arguments_, options = {}) {
-  const result = spawnSync(command, arguments_, {
-    maxBuffer: 64 * 1024 * 1024,
-    ...options,
-  });
-  if (result.error !== undefined) {
-    fail(`could not run ${command}: ${result.error.message}`);
-  }
-  if (result.signal !== null && result.signal !== undefined) {
-    fail(`${command} was killed by ${result.signal}`);
-  }
-  if (result.status !== 0) {
-    fail(`${command} exited with status ${result.status}`);
-  }
-  return result;
 }
 
 /** Reports an integration failure with no false green from an expected build error. */

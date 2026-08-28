@@ -2,38 +2,33 @@
 
 // Builds the CogLint artifact and proves SwiftPM selects and executes each
 // metadata variant when the same consumer runs under each supported host.
+// The variant table and artifact paths come from `lib/coglint-artifact.mjs`;
+// the metadata schema below stays spelled here so the builder cannot drift in
+// step with its own test.
 
-import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ARCHIVE_PATH,
+  ARTIFACTS_DIRECTORY,
+  BUNDLE_NAME,
+  BUNDLE_PATH,
+  CHECKSUM_PATH,
+  VARIANTS,
+  consumerManifest,
+  makeRunners,
+} from "./lib/coglint-artifact.mjs";
 import { currentVersion } from "./lib/version.mjs";
 
 /** The repository root, resolved from this script so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-/** Generated bundle and archive paths owned by the artifact builder. */
-const ARTIFACTS_DIRECTORY = join(REPO_ROOT, "swift", "Lint", "Artifacts");
-const BUNDLE_NAME = "CogLintBinary.artifactbundle";
-const BUNDLE_PATH = join(ARTIFACTS_DIRECTORY, BUNDLE_NAME);
-const ARCHIVE_PATH = `${BUNDLE_PATH}.zip`;
-const CHECKSUM_PATH = `${ARCHIVE_PATH}.checksum`;
+/** The version LINT-19 requires the built metadata to carry. */
 const VERSION = currentVersion();
 
-/** Metadata selectors and exact contained paths LINT-19 promises. */
-const VARIANTS = [
-  {
-    architecture: "arm64",
-    supportedTriple: "arm64-apple-macosx",
-    relativePath: "coglint-arm64-apple-macosx/bin/coglint",
-  },
-  {
-    architecture: "x86_64",
-    supportedTriple: "x86_64-apple-macosx",
-    relativePath: "coglint-x86_64-apple-macosx/bin/coglint",
-  },
-];
+const { runSuccessful: run } = makeRunners(fail);
 
 main(parseOptions(process.argv.slice(2)));
 
@@ -177,28 +172,22 @@ function writeProbePackage(directory) {
   mkdirSync(pluginDirectory, { recursive: true });
   writeFileSync(
     join(directory, "Package.swift"),
-    `// swift-tools-version:6.2
-
-import PackageDescription
-
-let package = Package(
-  name: "CogLintArtifactSelectionProbe",
-  platforms: [.macOS(.v14)],
-  targets: [
-    .binaryTarget(name: "CogLintBinary", path: "${BUNDLE_NAME}"),
-    .plugin(
-      name: "SelectionProbe",
-      capability: .command(
-        intent: .custom(
-          verb: "probe-coglint-selection",
-          description: "Execute the CogLint binary selected for this host"
-        )
-      ),
-      dependencies: ["CogLintBinary"]
-    ),
-  ]
-)
-`,
+    consumerManifest({
+      name: "CogLintArtifactSelectionProbe",
+      binaryTarget: { path: BUNDLE_NAME },
+      // The probe is this test's own instrument, not a shipped plugin: it
+      // exists to execute whichever binary SwiftPM selected for the host.
+      plugins: [
+        {
+          name: "SelectionProbe",
+          command: {
+            verb: "probe-coglint-selection",
+            description: "Execute the CogLint binary selected for this host",
+          },
+        },
+      ],
+      products: false,
+    }),
   );
   writeFileSync(
     join(pluginDirectory, "plugin.swift"),
@@ -254,28 +243,6 @@ function validateHostSelection(probeDirectory, swiftExecutable, variant) {
   if (!output.includes("USAGE: coglint")) {
     fail(`the selected ${variant.supportedTriple} executable did not run its CLI`);
   }
-}
-
-/** Runs one required subprocess and retains captured output for exact assertions. */
-function run(command, arguments_, options = {}) {
-  const result = spawnSync(command, arguments_, {
-    maxBuffer: 32 * 1024 * 1024,
-    ...options,
-  });
-  if (result.error !== undefined) {
-    fail(`could not run ${command}: ${result.error.message}`);
-  }
-  if (result.signal !== null && result.signal !== undefined) {
-    fail(`${command} was killed by ${result.signal}`);
-  }
-  if (result.status !== 0) {
-    if (options.encoding !== undefined) {
-      process.stdout.write(result.stdout ?? "");
-      process.stderr.write(result.stderr ?? "");
-    }
-    fail(`${command} exited with status ${result.status}`);
-  }
-  return result;
 }
 
 /** Reports a suite failure without reducing LINT-19 to a skipped host. */

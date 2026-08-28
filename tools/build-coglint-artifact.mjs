@@ -2,46 +2,31 @@
 
 // Builds the two native CogLint host executables, assembles the SwiftPM
 // artifact bundle, and records the checksum consumers put in binaryTarget.
+// The bundle names, paths, and variant table live in
+// `lib/coglint-artifact.mjs`, shared with the generator and the pipeline
+// tests.
 //
 // Usage: `build-coglint-artifact.mjs [version]`
 
-import { spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  ARCHIVE_NAME,
+  ARCHIVE_PATH,
+  ARTIFACTS_DIRECTORY,
+  BUNDLE_PATH,
+  CHECKSUM_PATH,
+  LINT_PACKAGE,
+  SEMANTIC_VERSION,
+  VARIANTS,
+  makeRunners,
+} from "./lib/coglint-artifact.mjs";
 import { currentVersion } from "./lib/version.mjs";
-
-/** The repository root, resolved from this script so cwd never matters. */
-const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
-
-/** The isolated source package from which release executables are built. */
-const LINT_PACKAGE = join(REPO_ROOT, "swift", "Lint");
-
-/** Generated artifacts stay beside their isolated development package. */
-const ARTIFACTS_DIRECTORY = join(LINT_PACKAGE, "Artifacts");
 
 /** SwiftPM shares dependency checkouts while separating triple build products. */
 const BUILD_DIRECTORY = join(LINT_PACKAGE, ".build", "artifact-release");
 
-/** The exact bundle and release-asset names accepted by lint.md section 7. */
-const BUNDLE_NAME = "CogLintBinary.artifactbundle";
-const ARCHIVE_NAME = `${BUNDLE_NAME}.zip`;
-
-/** Native variants accepted for the first CogLint release. */
-const VARIANTS = [
-  {
-    architecture: "arm64",
-    buildTriple: "arm64-apple-macosx14.0",
-    supportedTriple: "arm64-apple-macosx",
-    directory: "coglint-arm64-apple-macosx",
-  },
-  {
-    architecture: "x86_64",
-    buildTriple: "x86_64-apple-macosx14.0",
-    supportedTriple: "x86_64-apple-macosx",
-    directory: "coglint-x86_64-apple-macosx",
-  },
-];
+const { runSuccessful: run } = makeRunners(fail);
 
 main(process.argv.slice(2));
 
@@ -55,19 +40,15 @@ function main(arguments_) {
   }
 
   const version = arguments_[0] ?? currentVersion();
-  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+  if (!SEMANTIC_VERSION.test(version)) {
     fail(`invalid semantic version: ${version}`);
   }
 
-  const bundlePath = join(ARTIFACTS_DIRECTORY, BUNDLE_NAME);
-  const archivePath = join(ARTIFACTS_DIRECTORY, ARCHIVE_NAME);
-  const checksumPath = `${archivePath}.checksum`;
-
   rmSync(BUILD_DIRECTORY, { force: true, recursive: true });
-  rmSync(bundlePath, { force: true, recursive: true });
-  rmSync(archivePath, { force: true });
-  rmSync(checksumPath, { force: true });
-  mkdirSync(bundlePath, { recursive: true });
+  rmSync(BUNDLE_PATH, { force: true, recursive: true });
+  rmSync(ARCHIVE_PATH, { force: true });
+  rmSync(CHECKSUM_PATH, { force: true });
+  mkdirSync(BUNDLE_PATH, { recursive: true });
 
   for (const variant of VARIANTS) {
     console.log(`\n==> Building coglint for ${variant.buildTriple}`);
@@ -108,7 +89,7 @@ function main(arguments_) {
     const sourceExecutable = join(binPath, "coglint");
     validateExecutable(sourceExecutable, variant);
 
-    const destinationDirectory = join(bundlePath, variant.directory, "bin");
+    const destinationDirectory = join(BUNDLE_PATH, variant.directory, "bin");
     const destinationExecutable = join(destinationDirectory, "coglint");
     mkdirSync(destinationDirectory, { recursive: true });
     copyFileSync(sourceExecutable, destinationExecutable);
@@ -122,30 +103,30 @@ function main(arguments_) {
         type: "executable",
         version,
         variants: VARIANTS.map((variant) => ({
-          path: `${variant.directory}/bin/coglint`,
+          path: variant.relativePath,
           supportedTriples: [variant.supportedTriple],
         })),
       },
     },
   };
-  writeFileSync(join(bundlePath, "info.json"), `${JSON.stringify(metadata, null, 2)}\n`);
+  writeFileSync(join(BUNDLE_PATH, "info.json"), `${JSON.stringify(metadata, null, 2)}\n`);
 
   console.log(`\n==> Archiving ${ARCHIVE_NAME}`);
-  run("zip", ["-X", "-q", "-r", archivePath, basename(bundlePath)], {
+  run("zip", ["-X", "-q", "-r", ARCHIVE_PATH, basename(BUNDLE_PATH)], {
     cwd: ARTIFACTS_DIRECTORY,
     stdio: "inherit",
   });
 
-  const checksum = run("swift", ["package", "compute-checksum", archivePath], {
+  const checksum = run("swift", ["package", "compute-checksum", ARCHIVE_PATH], {
     encoding: "utf8",
   }).stdout.trim();
   if (!/^[0-9a-f]{64}$/.test(checksum)) {
     fail(`SwiftPM returned an invalid checksum: ${JSON.stringify(checksum)}`);
   }
-  writeFileSync(checksumPath, `${checksum}\n`);
+  writeFileSync(CHECKSUM_PATH, `${checksum}\n`);
 
-  console.log(`==> Bundle: ${bundlePath}`);
-  console.log(`==> Archive: ${archivePath}`);
+  console.log(`==> Bundle: ${BUNDLE_PATH}`);
+  console.log(`==> Archive: ${ARCHIVE_PATH}`);
   console.log(`==> SwiftPM checksum: ${checksum}`);
 }
 
@@ -164,24 +145,6 @@ function validateExecutable(executable, variant) {
   if (!/^\s*minos 14\.0$/m.test(loadCommands)) {
     fail(`${variant.buildTriple} does not declare macOS 14.0 as its deployment target`);
   }
-}
-
-/** Runs one required subprocess and preserves enough context to diagnose it. */
-function run(command, arguments_, options = {}) {
-  const result = spawnSync(command, arguments_, {
-    maxBuffer: 32 * 1024 * 1024,
-    ...options,
-  });
-  if (result.error !== undefined) {
-    fail(`could not run ${command}: ${result.error.message}`);
-  }
-  if (result.signal !== null && result.signal !== undefined) {
-    fail(`${command} was killed by ${result.signal}`);
-  }
-  if (result.status !== 0) {
-    fail(`${command} exited with status ${result.status}`);
-  }
-  return result;
 }
 
 /** Reports a pipeline failure without leaving a plausible partial success. */
