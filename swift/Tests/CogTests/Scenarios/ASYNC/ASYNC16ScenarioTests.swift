@@ -50,7 +50,7 @@ private nonisolated final class Async16ControlledWork: @unchecked Sendable {
 @Test func `ASYNC-16 concurrent work runs off actor and newest result publishes on MainActor`()
   async throws
 {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
   let work = Async16ControlledWork()
   let forecast = Cog<Async16Run>.Async(

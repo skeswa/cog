@@ -20,7 +20,7 @@ import Testing
     return c[source]
   }
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

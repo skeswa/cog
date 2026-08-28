@@ -16,7 +16,7 @@ import Testing
     return c[sources[key]] * 10
   }
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

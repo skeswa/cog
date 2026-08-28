@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `TURN-08 queued turns finish one full flush at a time in FIFO order`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let trigger = Cog<Int>.Manual { 0 }
   let value = Cog<Int>.Manual { 0 }
   var events: [String] = []

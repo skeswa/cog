@@ -40,7 +40,7 @@ private final class ThrowingStreamWork {
 
 @MainActor
 @Test func `STREAM-07 current stream failure before first element is terminal`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = ThrowingStreamWork()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
@@ -70,7 +70,7 @@ private final class ThrowingStreamWork {
 
 @MainActor
 @Test func `STREAM-08 later stream failure retains its first accepted element`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = ThrowingStreamWork()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()
@@ -183,7 +183,7 @@ private final class CancellationStreamWork {
 
 @MainActor
 @Test func `STREAM-09 only Cog-caused cancellation stays silent`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = CancellationStreamWork()
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     work.makeWork()

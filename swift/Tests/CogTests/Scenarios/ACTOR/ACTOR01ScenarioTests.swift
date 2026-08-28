@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 automatic selectors execute on the MainActor`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let source = Cog<Int>.Manual { 21 }
   var selectorRuns = 0
   let doubled = Cog<Int> { c in
@@ -19,7 +19,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 turn bodies execute on the MainActor`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let source = Cog<Int>.Manual { 0 }
   var bodyRuns = 0
 
@@ -35,7 +35,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 watch handlers execute on the MainActor`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let source = Cog<Int>.Manual { 1 }
   var deliveries: [String] = []
 
@@ -51,7 +51,7 @@ import Testing
 
 @MainActor
 @Test func `ACTOR-01 reactions execute on the MainActor`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let source = Cog<Int>.Manual { 0 }
   var seen: [Int] = []
 

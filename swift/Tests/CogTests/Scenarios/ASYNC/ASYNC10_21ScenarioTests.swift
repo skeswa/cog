@@ -30,7 +30,7 @@ private final class Async10ControlledWork {
 
 @MainActor
 @Test func `ASYNC-10 refresh cycles a settled async cog again`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async10ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
@@ -74,7 +74,7 @@ private final class Async10ControlledWork {
 
 @MainActor
 @Test func `ASYNC-21 refresh replaces in-flight latest work`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async10ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)

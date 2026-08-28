@@ -32,7 +32,7 @@ private final class Async32ControlledWork {
 
 @MainActor
 @Test func `ASYNC-01 ASYNC-32 the status lens carries tracked reads with value parity`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async32ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -92,7 +92,7 @@ private final class Async32ControlledWork {
   // REACT-08's rule: installation demands the state (work starts) but calls
   // nothing; the first status turn delivers the pending it skipped as the old
   // half and the new status as the new half.
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async32ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -130,7 +130,7 @@ private final class Async32ControlledWork {
 @Test func `ASYNC-32 a status watch sees transitions an equal-success value watch gates away`()
   async
 {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async32ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
@@ -189,7 +189,7 @@ private final class Async32ControlledWork {
 
 @MainActor
 @Test func `ASYNC-32 SwiftUI observes only the status fields its body reads`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async32ControlledWork()
   let forecastCog = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()

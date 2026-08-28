@@ -3,17 +3,11 @@ import CogTesting
 
 /// A test mechanism whose `operate` is supplied by the test.
 ///
-/// Registration is a controller capability, so scenario proofs that need a
-/// reaction, watch, task, or gated scope assemble one of these and register
-/// inside the closure — or capture the controller for use after assembly,
-/// which stays legitimate because the runtime's scope retains the controller
-/// for the app (here: test) lifetime:
-///
-/// ```swift
-/// var m: MechanismController!
-/// let cogs = Cogs.forTesting(mechanisms: [MechanismProbe { m = $0 }])
-/// m.run { c in ... }
-/// ```
+/// Registration is a controller capability, so scenario proofs that need
+/// assembly-time registrations — or several distinctly named probes — assemble
+/// one of these and register inside the closure. A proof that only needs one
+/// controller after assembly uses `Cogs.forTestingWithController()` from
+/// `CogTesting` instead.
 ///
 /// The default name is `Probe`; tests that assemble several probes pass
 /// distinct names because assembly enforces uniqueness.
@@ -33,26 +27,4 @@ struct MechanismProbe: Mechanism {
   func operate(_ m: MechanismController) {
     body(m)
   }
-}
-
-/// An isolated context assembled with one probe whose controller the test
-/// keeps.
-///
-/// Scenario proofs that need a registration mid-story use the returned
-/// controller; the runtime's scope retains it for the whole isolated-context
-/// lifetime, so holding it here mirrors an app-lifetime mechanism exactly.
-@MainActor
-func probedContext(
-  clock: any Clock<Duration> = ContinuousClock(),
-  whileObservedGrace: Duration = .seconds(30),
-  seeding: ((Cogs) -> Void)? = nil
-) -> (cogs: Cogs, m: MechanismController) {
-  var m: MechanismController!
-  let cogs = Cogs.forTesting(
-    clock: clock,
-    whileObservedGrace: whileObservedGrace,
-    seeding: seeding,
-    mechanisms: [MechanismProbe { m = $0 }]
-  )
-  return (cogs, m)
 }

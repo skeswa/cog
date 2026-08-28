@@ -9,7 +9,7 @@ private nonisolated enum Policy06Error: Error, Equatable {
 
 @MainActor
 @Test func `POLICY-06 queue continues after failure with exact refresh outcomes`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = PolicyGenerationControlledWork()
   let queuedCog = Cog<Int>.Async(.queue, default: -1, name: "queued") { _ in
     work.makeRun()

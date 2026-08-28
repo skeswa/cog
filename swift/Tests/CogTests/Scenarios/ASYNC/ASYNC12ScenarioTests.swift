@@ -27,7 +27,7 @@ private final class Async12ControlledWork<Key: Hashable & Sendable> {
 
 @MainActor
 @Test func `ASYNC-12 box keys fetch and publish status independently`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async12ControlledWork<String>()
   let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, zip in
     .run { await work.run(for: zip) }

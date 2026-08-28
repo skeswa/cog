@@ -94,7 +94,7 @@ import Testing
   let draft = Cog<String>.Manual({ "" }, lifetime: .whileObserved(resetToInitial: true))
   var observed: [String] = []
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

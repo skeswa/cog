@@ -27,7 +27,7 @@ private final class Async20ControlledWork {
 
 @MainActor
 @Test func `ASYNC-20 equal reload changes status but not value consumers`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
   let work = Async20ControlledWork()
   let forecast = Cog<Int>.Async(default: 0) { c in

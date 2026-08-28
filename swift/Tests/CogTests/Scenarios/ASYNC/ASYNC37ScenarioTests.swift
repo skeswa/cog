@@ -41,7 +41,7 @@ private final class Async37ControlledWork {
   // nothing, the sibling key's work completes untouched, and re-reading the
   // released key starts fresh.
   let clock = TestClock()
-  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async37ControlledWork()
   let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, key in
     .run { await work.run(for: key) }

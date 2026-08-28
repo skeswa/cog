@@ -9,7 +9,7 @@ import Testing
   // A reaction chain queues turns during a flush. Each queued turn is its own
   // history entry in execution order, and every write attributes to the turn
   // that made it — entries from different turns never interleave.
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let trigger = Cog<Int>.Manual({ 0 }, name: "trigger")
   let middle = Cog<Int>.Manual({ 0 }, name: "middle")
   let leaf = Cog<Int>.Manual({ 0 }, name: "leaf")

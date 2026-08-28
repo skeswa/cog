@@ -40,7 +40,7 @@ private final class Async26ControlledWork {
 
 @MainActor
 @Test func `ASYNC-26 keyed value reads have stable per-key equality`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async26ControlledWork()
   let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, key in
     work.makeWork(for: key)

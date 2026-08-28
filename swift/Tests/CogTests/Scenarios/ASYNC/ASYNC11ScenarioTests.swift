@@ -59,7 +59,7 @@ private final class Async11WorkProbe {
 
 @MainActor
 @Test func `ASYNC-11 only synchronous selector reads become dependencies`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let selectorInput = Cog<Int>.Manual { 10 }
   let workInput = Cog<Int>.Manual { 20 }
   let probe = Async11WorkProbe()

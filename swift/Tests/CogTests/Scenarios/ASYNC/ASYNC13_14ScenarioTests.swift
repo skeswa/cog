@@ -41,7 +41,7 @@ private final class Async13ControlledWork {
 @MainActor
 @Test func `ASYNC-13 release cancels pending work and rejects its late result`() async throws {
   let clock = TestClock()
-  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let watcherAlive = Cog<Bool>.Manual { true }
@@ -82,7 +82,7 @@ private final class Async13ControlledWork {
 @MainActor
 @Test func `ASYNC-14 reading after release starts fresh unpolluted work`() async throws {
   let clock = TestClock()
-  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async13ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let firstWatcherAlive = Cog<Bool>.Manual { true }

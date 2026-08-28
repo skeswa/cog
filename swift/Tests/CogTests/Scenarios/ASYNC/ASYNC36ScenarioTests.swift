@@ -50,7 +50,7 @@ private nonisolated final class Async36ControlledWork: @unchecked Sendable {
   // ASYNC-16 proves a stale concurrent result cannot publish; this proves the
   // replaced background task is also told to stop. Without the cancellation
   // request, off-actor work would keep burning until it finished on its own.
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
   let work = Async36ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in

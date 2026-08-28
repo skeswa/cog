@@ -18,7 +18,7 @@ import Testing
     return 10
   }
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
@@ -65,7 +65,7 @@ import Testing
     return c[source]
   }
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
@@ -105,7 +105,7 @@ import Testing
     return c[source] * 2
   }
 
-  let (cogs, m) = probedContext(
+  let (cogs, m) = Cogs.forTestingWithController(
     clock: clock,
     whileObservedGrace: .seconds(10)
   )

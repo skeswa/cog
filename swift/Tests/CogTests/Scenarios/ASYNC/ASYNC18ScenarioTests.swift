@@ -40,7 +40,7 @@ private final class Async18ControlledWork {
 @Test func `ASYNC-18 initial pending and failure are separate turns without previous values`()
   async
 {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async18ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     .run { try await work.run() }

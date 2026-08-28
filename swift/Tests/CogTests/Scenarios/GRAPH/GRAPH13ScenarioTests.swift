@@ -18,7 +18,7 @@ import Testing
   var triplesSeen: [String] = []
   var reactionTriples: [String] = []
 
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let a = Cog<Int>.Manual { 1 }
   let b = Cog<Int> { c in
     bRuns += 1

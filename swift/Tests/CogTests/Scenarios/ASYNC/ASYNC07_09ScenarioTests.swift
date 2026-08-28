@@ -44,7 +44,7 @@ private final class Async07WorkProbe {
 
 @MainActor
 @Test func `ASYNC-07 dependency changes replace explicit and default latest work`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
   let probe = Async07WorkProbe()
   let defaultLatest = Cog<Int>.Async(default: 0, name: "default") { c in
@@ -80,7 +80,7 @@ private final class Async07WorkProbe {
 
 @MainActor
 @Test func `ASYNC-09 replaced cancellation publishes no failure status`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
   let probe = Async07WorkProbe()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in

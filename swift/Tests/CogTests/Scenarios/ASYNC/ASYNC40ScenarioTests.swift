@@ -87,7 +87,7 @@ private final class PlaceholderProbe {
   // Pending, failure, and a retry's pending all carry the resting value while
   // nothing has succeeded. Producing it at each publication would hand out
   // three different objects for one state.
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let probe = PlaceholderProbe()
   let work = AsyncStatusControlledWork<Placeholder>()
   let forecastCog = Cog<Placeholder>.Async(
@@ -131,7 +131,7 @@ private final class PlaceholderProbe {
 @MainActor
 @Test func `ASYNC-40 a recreated state rests on a fresh default object`() async throws {
   let clock = TestClock()
-  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let probe = PlaceholderProbe()
   let work = AsyncStatusControlledWork<Placeholder>()
   let forecastCog = Cog<Placeholder>.Async(

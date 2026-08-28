@@ -29,7 +29,7 @@ private final class Async24ControlledWork {
 @MainActor
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
   let clock = TestClock()
-  let (cogs, m) = probedContext(clock: clock, whileObservedGrace: .seconds(10))
+  let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let request = Cog<Int>.Manual { 0 }
   let work = Async24ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in

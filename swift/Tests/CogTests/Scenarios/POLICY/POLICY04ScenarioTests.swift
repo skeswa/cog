@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `POLICY-04 merged runs overlap and publish in landing order`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let inputCog = Cog<Int>.Manual { 0 }
   let work = PolicyGenerationControlledWork()
   let mergedCog = Cog<Int>.Async(.merged, default: -1, name: "merged") { c in

@@ -44,7 +44,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-05 a turn inside a turn flushes once when the outer body ends`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let left = Cog<Int>.Manual { 0 }
   let right = Cog<Int>.Manual { 0 }
   var selectorRuns = 0
@@ -94,7 +94,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-13 sibling turns each flush and react before the next begins`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let counter = Cog<Int>.Manual { 0 }
   var events: [String] = []
 
@@ -124,7 +124,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-05 nested turns are one turn in history`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let checking = Cog<Int>.Manual { 5 }
   let savings = Cog<Int>.Manual { 0 }
 
@@ -150,7 +150,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-06 a turn is named by its op or by the name I pass`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let price = Cog<Int>.Manual { 10 }
 
   cogs.applyDiscount(price)
@@ -164,7 +164,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-06 a joined turn contributes no name and a queued one keeps its own`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let trigger = Cog<Int>.Manual { 0 }
   let note = Cog<Int>.Manual { 0 }
   let followup = Cog<Int>.Manual { 0 }
@@ -188,7 +188,7 @@ extension Cogs {
 
 @MainActor
 @Test func `TURN-13 sibling turns are two named turns in history`() {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let counter = Cog<Int>.Manual { 0 }
 
   cogs.stepOne(counter)

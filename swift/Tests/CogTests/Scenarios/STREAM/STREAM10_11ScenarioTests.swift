@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `STREAM-10 equal elements are quiet across every public consumer`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let (sequence, continuation) = AsyncStream.makeStream(of: Int.self)
   let readingsCog = Cog<Int>.Async(.latest, default: -1, name: "readings") { _ in
     .stream(sequence)
@@ -59,7 +59,7 @@ private nonisolated struct OpaqueReading {
 
 @MainActor
 @Test func `STREAM-11 values without equality publish conservatively`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let (sequence, continuation) = AsyncStream.makeStream(of: OpaqueReading.self)
   let readingsCog = Cog<OpaqueReading>.Async(
     .latest,

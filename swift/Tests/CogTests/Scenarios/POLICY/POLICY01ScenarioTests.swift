@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 @Test func `POLICY-01 queue runs every dependency input serially in FIFO order`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let inputCog = Cog<Int>.Manual { 0 }
   let work = PolicyQueueControlledWork()
   let queuedCog = Cog<Int>.Async(.queue, default: -1, name: "queued") { c in

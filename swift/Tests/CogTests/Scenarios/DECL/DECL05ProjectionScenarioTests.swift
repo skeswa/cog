@@ -102,7 +102,7 @@ private struct ZipCode: Hashable {
   // pairs. This is the projection's whole point at the reactive surface: the
   // owning file writes the source, and a watcher of the published value
   // reference follows along.
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let countSource = Cog<Int>.Manual { 1 }
   let count = countSource.readOnly
   var deliveries: [String] = []

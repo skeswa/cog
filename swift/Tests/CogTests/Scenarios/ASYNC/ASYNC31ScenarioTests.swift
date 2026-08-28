@@ -46,7 +46,7 @@ private nonisolated struct Async31Failure: Error {}
 
 @MainActor
 @Test func `ASYNC-31 an explicit default makes every value spelling total`() async throws {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async31ControlledWork()
   let forecast = Cog<Int>.Async(default: -1, name: "forecast") { _ in
     work.makeWork()
@@ -84,7 +84,7 @@ private nonisolated struct Async31Failure: Error {}
 
 @MainActor
 @Test func `ASYNC-31 an Optional value rests at an explicit nil default`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async31ControlledWork()
   let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { _ in
     .run { try await work.performRun() }
@@ -113,7 +113,7 @@ private nonisolated struct Async31Failure: Error {}
 
 @MainActor
 @Test func `ASYNC-31 keyed declarations rest every key on the same default`() async {
-  let (cogs, m) = probedContext()
+  let (cogs, m) = Cogs.forTestingWithController()
   let work = Async31ControlledWork()
   let forecasts = CogBox<Int, String>.Async(default: 0, name: "forecast") { _, _ in
     work.makeWork()
