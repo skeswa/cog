@@ -5,11 +5,10 @@ import CogTesting
 /// The thousand-state graph PERF-03 measures.
 ///
 /// Five hundred keyed sources and five hundred keyed automatic consumers, one
-/// consumer per source, all settled. A thousand states from two declarations,
-/// which is how a real screen reaches that number — per-entity state comes
-/// from `box[key]`, not from a thousand hand-written `let`s.
+/// consumer per source, all settled. Two keyed declarations create the thousand
+/// per-entity states that a real screen would use.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``.
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``.
 @MainActor
 enum MemoryHarness {
   /// Sources, and consumers. Twice this is the state count PERF-03 names.
@@ -52,8 +51,8 @@ let memoryBenchmarks: @Sendable () -> Void = {
   // absolute figure is dominated by the process the benchmark runs inside, and
   // would move with the harness rather than with Cog.
   //
-  // No counting metrics, per `M5-11`'s rule — this benchmark builds and
-  // releases a context every iteration, so its measured region is not
+  // Per `M5-11`, this benchmark has no counting metrics. It builds and releases
+  // a context every iteration, so its measured region is not
   // quiescent and process-global counters would attribute its teardown to
   // whatever ran next.
   Benchmark(
@@ -67,10 +66,9 @@ let memoryBenchmarks: @Sendable () -> Void = {
         // metric genuinely has a distribution: resident memory is *sampled*
         // and page-granular, not counted, and the delta only grows on the
         // iterations where the peak actually advances. Measured across five
-        // runs, p50 spanned 869–1,279 KB and p100 spanned 1,278–1,556 KB, so a
-        // mebibyte is about two and a half times the worst spread observed —
-        // wide enough never to cry wolf, narrow enough that a graph which grew
-        // to twice its footprint fails.
+        // runs, p50 spanned 869–1,279 KB and p100 spanned 1,278–1,556 KB. One
+        // mebibyte is about 2.5 times the largest spread: wide enough for noise,
+        // but narrow enough to fail a doubled footprint.
         //
         // p0 is deliberately absent: it reads zero on every run, because after
         // the first build the allocator already holds the pages and resident

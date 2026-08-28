@@ -5,10 +5,9 @@ public import Cog
 extension Cogs {
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///
-  /// This is the narrow seam behind "only cogs a view actually read get a
-  /// boundary object" (UI-05): a count, never the states or the boundary
-  /// objects themselves, so a behavior test stays valid across state-storage
-  /// and core swaps.
+  /// UI-05 uses this count to prove that only view reads create boundaries. It
+  /// exposes no states or boundary objects, so the test does not depend on the
+  /// storage design.
   public var observationBoundaryCount: Int {
     observationBoundaryCountForTesting
   }

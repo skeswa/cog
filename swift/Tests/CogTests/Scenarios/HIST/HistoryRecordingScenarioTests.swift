@@ -79,8 +79,7 @@ extension Cogs {
 @MainActor
 @Test func `HIST-02 keyed writes and recomputations record their keys`() {
   // A keyed entry names the exact state, `label[key]`, so history can tell
-  // which item of a box wrote or ran — the same rendering turns and task
-  // names use.
+  // which item of a box wrote or ran. Turns and task names use the same form.
   let cogs = Cogs.forTesting()
   let temperatures = CogBox<Int, String>.Manual({ 60 }, name: "temperature")
   let weather = CogBox<String, String>(

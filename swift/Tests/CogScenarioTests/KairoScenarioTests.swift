@@ -6,8 +6,7 @@ import Testing
 // COUNT-01 through COUNT-04: the Kairo diamond, deep chain, broad fan-out, and
 // unstable graph run exactly as many selectors as their shapes require. Sizes
 // come from the scenario's parameters, so a reduced run proves the same
-// property as the upstream default — and all four are cheap enough to assert on
-// here.
+// property as the upstream default. All four are cheap enough to assert here.
 
 @MainActor
 @Test(arguments: [(1, 1), (5, 1), (5, 10), (5, 500)])
@@ -77,9 +76,8 @@ func `COUNT-04 the Kairo unstable graph costs one speculative run per flipped ed
 
   // The first settle has no recorded dependency set, so it costs the sum and
   // the one branch it reads. Every changed turn afterwards also settles the
-  // branch recorded last time, which this turn's run is about to drop — the
-  // price of scheduling a consumer's known parents before rerunning it, which
-  // is what keeps a warm deep chain off the call stack.
+  // branch recorded last time, which this run will drop. That is the price of
+  // scheduling known parents first to keep a warm deep chain off the stack.
   #expect(result.actualRuns == 2 + 3 * turns)
   #expect(result.isExact)
   // Repeated reads of one branch cost one run and `iterations` additions, so

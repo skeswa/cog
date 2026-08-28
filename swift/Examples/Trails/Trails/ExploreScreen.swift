@@ -5,8 +5,8 @@ import SwiftUI
 ///
 /// Rows push with `NavigationLink(value:)`, the idiomatic SwiftUI spelling.
 /// The link appends to the bound path, the binding's setter runs the
-/// `setPath` operation, and the push lands in the same path cog that
-/// operations and deep links write — both roads converge on one source.
+/// `setPath` operation. The push reaches the same path cog that operations and
+/// deep links write, so both paths share one source.
 struct ExploreScreen: View {
   /// Renders every catalog region.
   var body: some View {

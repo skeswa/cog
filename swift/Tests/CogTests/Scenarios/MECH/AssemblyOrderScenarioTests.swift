@@ -25,7 +25,7 @@ import Testing
   ])
 
   // Each `operate` ran synchronously, in list order, before the factory
-  // returned — no await, no later start signal.
+  // returned, with no await or later start signal.
   #expect(events == ["operate:First", "operate:Second"])
 
   // Every mechanism is live on the very next line: one turn wakes both, and

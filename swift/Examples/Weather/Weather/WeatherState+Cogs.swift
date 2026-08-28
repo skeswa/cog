@@ -15,9 +15,8 @@ private let _currentZipCodeCog = Cog<ZipCode?>.Manual { nil }
 /// How often background refresh runs, or `nil` while none is installed.
 ///
 /// `WeatherMechanism.operate` publishes its own interval here. The cadence is
-/// configuration rather than weather, but the cards describe it, and a screen
-/// that repeats the literal instead is a second source of the same fact — one
-/// that goes quietly wrong the moment the interval changes.
+/// configuration rather than weather, but the cards display it. Repeating the
+/// literal in a screen creates a second source that can drift when it changes.
 private let _refreshIntervalCog = Cog<Duration?>.Manual { nil }
 
 /// Read-only service capability used by the async selector.
@@ -125,9 +124,8 @@ extension CogOps {
   ///
   /// `refresh` is a primitive, like `turn`: it is how the graph is asked to
   /// do something, not what this app calls the asking. Wrapping it in a named
-  /// op keeps the same rule for demands as for writes — a view says what it
-  /// wants in domain words, and the declaration it resolves to stays here with
-  /// the rest of the state layer.
+  /// op applies the same rule used for writes. A view states its demand in
+  /// domain terms, while this state layer owns the declaration.
   ///
   /// - Parameter zip: Which ZIP's forecast to reload.
   func refreshForecast(for zip: ZipCode) {

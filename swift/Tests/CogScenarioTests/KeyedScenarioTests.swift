@@ -88,7 +88,7 @@ func `COUNT-08 key churn costs the window, never the family`(
   // The property stated as a comparison, because the formula alone could be
   // satisfied by a scenario that never grew the family. Ten keys and a hundred
   // keys driven for the same number of turns differ only by the cost of
-  // settling the extra keys once — never by the per-turn cost.
+  // settling the extra keys once, never by the per-turn cost.
   let small = CogScenario.keyedDiamond(keys: 10, width: 5, turns: 20)
     .run(in: Cogs.forTesting())
   let large = CogScenario.keyedDiamond(keys: 100, width: 5, turns: 20)

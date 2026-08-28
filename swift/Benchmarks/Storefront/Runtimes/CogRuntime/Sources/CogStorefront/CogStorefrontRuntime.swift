@@ -10,7 +10,7 @@ public import StorefrontWorkload
 /// `CogOps` verb of the same name declared in `StorefrontState.swift`. Nothing
 /// here decides anything: the multi-source turns, the staged reads, the
 /// equality gates, and the demand-driven invalidation all live in the graph
-/// declarations, which is exactly the point — this file is the seam that lets
+/// declarations, which is exactly the point, this file is the seam that lets
 /// the neutral trace drive them, not a second implementation of them.
 ///
 /// It is also the definition of "no port may do less". Anything this adapter
@@ -43,7 +43,7 @@ public import StorefrontWorkload
 ///
 /// Both settlement barriers are Cog's own acknowledgements rather than
 /// durations: ``settlingOneAsyncResult(_:)`` fires after the graph decides
-/// about one result — accepted *or* refused — and
+/// about one result, accepted *or* refused, and
 /// ``settlingLifetimeRelease(advancingBy:)`` fires after a grace-expiry
 /// eligibility decision, including a negative one. Neither polls and neither
 /// sleeps.
@@ -72,14 +72,11 @@ public final class CogStorefrontRuntime: StorefrontRuntime {
 
   /// What Cog is called in a benchmark name, and what it guarantees.
   ///
-  /// Every value is a claim the existing eleven-phase trace already proves
-  /// against the Cog graph: a turn coalesces into one settlement, an equal
-  /// write renders nothing, an offscreen invalidation runs no held reaction,
-  /// the account reaction runs at registration and again when the response
-  /// lands, an offscreen-only invalidation starts zero service requests,
-  /// unobserved values are released after grace, staleness is refused by
-  /// generation rather than by cancellation, and `refresh` returns a handle
-  /// bound to its own generation.
+  /// The eleven-phase trace proves every value against Cog. One turn settles
+  /// once. Equal writes and offscreen changes run nothing. The account reaction
+  /// runs at registration and response. Grace releases unobserved values.
+  /// Generations reject stale results, and `refresh` returns an exact-generation
+  /// handle.
   public static let descriptor = StorefrontRuntimeDescriptor(
     slug: "cog",
     displayName: "Cog",
@@ -162,7 +159,7 @@ public final class CogStorefrontRuntime: StorefrontRuntime {
   // billed the graph for that forwarding frame would be measuring the apparatus
   // that makes four runtimes comparable. `perf-15-storefront-interactions`
   // performs four verbs per iteration from the benchmark module, on the
-  // concrete adapter, inside the measured region — so four forwarding frames is
+  // concrete adapter, inside the measured region, so four forwarding frames is
   // four extra calls per sample, and it was measured at roughly 3% of that
   // cut's wall clock.
   //
@@ -174,7 +171,7 @@ public final class CogStorefrontRuntime: StorefrontRuntime {
   // keeps the result from depending on an inliner heuristic. Both are needed,
   // and the pairing is deliberate.
   //
-  // The alternative — cross-module optimization for this target — was rejected.
+  // The alternative, cross-module optimization for this target, was rejected.
   // It is a whole-target build flag that changes codegen for everything in the
   // target, it would have to be repeated in every consumer that wants the same
   // shape, and the comparison's legibility rests on all four runtimes sharing
@@ -379,7 +376,7 @@ public final class CogStorefrontRuntime: StorefrontRuntime {
   /// The price the graph currently reports for one product.
   ///
   /// A `peek`, so it adds no dependency edge, extends no lifetime, and renews
-  /// no grace deadline — the teardown phase's release proof depends on all
+  /// no grace deadline, the teardown phase's release proof depends on all
   /// three.
   ///
   /// - Parameter id: Which product.

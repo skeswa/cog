@@ -97,8 +97,8 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-03 the closure receives the whole key`() {
-  // Not a hash, not an index — the key itself, in its own type, so a starting
-  // value can be built out of whatever the key means.
+  // The closure receives the typed key, not a hash or index, so its starting
+  // value can use the key's meaning.
   let cogs = Cogs.forTesting()
 
   let greeting = CogBox<String, ZipCode>.Manual { zip in "hello, \(zip.digits)" }
@@ -109,9 +109,8 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-03 the closure gives each key its own starting value`() {
-  // The difference the closure form exists for: a constant hands every key one
-  // value, so a reference-typed constant would hand every key one *object*,
-  // while the closure runs per key and each key starts at its own.
+  // A reference-typed constant would give every key the same object. The
+  // closure runs per key, so each key gets its own object.
   let cogs = Cogs.forTesting()
 
   let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
@@ -122,9 +121,8 @@ private struct ZipCode: Hashable {
 @MainActor
 @Test func `DECL-03 a starting value is a starting value, not a computation`() {
   // A key's value is settled once, when that key's state first appears, and
-  // held from then on. Reading a key again does not ask the closure again —
-  // which is what makes it a source rather than an automatic cog, and is why a
-  // later write to a key is permanent.
+  // held from then on. Later reads do not call the closure again. That makes
+  // this a source rather than an automatic cog and preserves later writes.
   let cogs = Cogs.forTesting()
 
   let asked = KeyLog()
@@ -204,9 +202,8 @@ private func entriesForFive(in cogs: Cogs, using ledgers: CogBox<Ledger, Int>.Ma
 
 @MainActor
 @Test func `DECL-04 building the same key again reaches the same state`() {
-  // Value references are values built at the point of use, not handles to keep. Building
-  // one twice — or a hundred times, from a key computed a different way each
-  // time — is not a way to end up with a second piece of state.
+  // Value references are built at the point of use, not retained handles.
+  // Rebuilding one from the same key still reaches the same state.
   let cogs = Cogs.forTesting()
   let ledgers = CogBox<Ledger, Int>.Manual { _ in Ledger() }
 

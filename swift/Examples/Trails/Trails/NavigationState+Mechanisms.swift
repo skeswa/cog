@@ -3,10 +3,9 @@ import Cog
 /// Records every screen transition into the session journal.
 ///
 /// This is the analytics pattern with the analytics service replaced by a
-/// visible in-app log: one reaction on the derived `currentScreenCog`
-/// observes every navigation, however it happened — tap, gesture, deep link,
-/// or restoration — with no per-screen instrumentation. The reaction's write
-/// queues as its own later turn, after the navigation turn it observed.
+/// visible in-app log. One reaction on `currentScreenCog` observes navigation
+/// from taps, gestures, deep links, and restoration without per-screen code.
+/// Its write queues in a later turn after the navigation turn.
 struct TrailJournalMechanism: Mechanism {
   /// Watches the derived screen and appends each settled transition.
   ///

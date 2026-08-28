@@ -35,7 +35,7 @@ private enum StateGraphComparisonNode {
 ///
 /// The mapping stays on the library's primitive surface: `Stored` for mutable
 /// values, `Computed` for automatic values, `wrappedValue` for tracked reads, and
-/// `withGraphTransaction` for the write boundary. Root reads additionally sit
+/// `withGraphTransaction` for the write boundary. Root reads also sit
 /// under Swift Observation tracking, matching the Cog and raw-Observation
 /// adapters' UI-facing read scope.
 @MainActor

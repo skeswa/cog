@@ -2,11 +2,9 @@ import Cog
 import CogTesting
 import Testing
 
-// ASYNC-30 owns the whole §5.1 accessor set over one lifecycle walk: every
-// accessor at every visible state — the retired ASYNC-04, which described the
-// same set over the same walk — plus the current-generation semantics of
-// `value` and `error`: a retry's pending clears the failure while the
-// renderable value survives.
+// ASYNC-30 covers every §5.1 accessor across one lifecycle walk. It includes
+// retired ASYNC-04 and the current-generation rules for `value` and `error`: a
+// retry clears the failure while preserving the renderable value.
 
 private nonisolated enum Async04Error: Error, Equatable {
   case offline

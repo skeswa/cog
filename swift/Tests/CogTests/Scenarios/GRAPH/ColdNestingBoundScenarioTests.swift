@@ -2,9 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-/// Flat ownership, for GRAPH-03's reason: links that captured each other by
-/// value would form a descriptor chain ARC releases recursively, which would
-/// crash these children for a reason unrelated to what they prove.
+/// Uses flat ownership so ARC does not release a captured descriptor chain
+/// recursively. GRAPH-03 explains the same constraint.
 @MainActor
 private final class Graph14ChainStorage {
   var valueReferences: [Cog<Int>] = []
@@ -50,8 +49,8 @@ private func readColdChain(depth: Int) -> Int {
 @Test func `GRAPH-14 reading past the cold nesting bound fails with a clear error`() async {
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
-      // One link past the documented 128-link bound, pinning its upper edge —
-      // and far short of the roughly 2,000 links that actually smash a debug
+      // One link past the documented 128-link bound pins its upper edge. It is
+      // far short of the roughly 2,000 links that can smash a debug
       // macOS stack, since the guard has to fire long before the crash it
       // exists to prevent.
       _ = readColdChain(depth: 129)

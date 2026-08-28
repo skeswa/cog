@@ -98,11 +98,10 @@ internal nonisolated struct CogArenaStateFlags: OptionSet, Sendable {
 
 /// Context-owned scalar storage for the data-oriented core.
 ///
-/// Every array is indexed by the same ``CogArenaSlot/index``. Allocation grows
-/// the columns in lockstep; release clears the complete scalar row, advances
-/// its generation, and makes the index available for LIFO reuse. Typed values
-/// and edges deliberately live elsewhere: sibling M6 storage owns their
-/// measured representations without changing this row-ownership contract.
+/// Every array uses the same ``CogArenaSlot/index``. Allocation grows all
+/// columns together. Release clears a row, advances its generation, and makes
+/// its index available for LIFO reuse. Typed values and edges live in their own
+/// measured storage.
 @MainActor
 #if !COG_ARENA_COMPACT
 @usableFromInline
@@ -120,22 +119,18 @@ internal final class CogArenaStorage {
   /// Packed liveness, settlement, and computation marks by slot.
   /// Dynamic exclusivity enforcement is off for the scalar columns below.
   ///
-  /// `M9-22` measured it at a third of an arena turn: every `flags[row]` and
-  /// every column touch is a class-property access, so Swift brackets it with
-  /// `swift_beginAccess`/`swift_endAccess` and thread-local bookkeeping, and one
-  /// turn touches these arrays dozens of times.
+  /// `M9-22` measured exclusivity checks at a third of an arena turn. Swift
+  /// wraps each class-property access in `swift_beginAccess` and
+  /// `swift_endAccess`, and one turn touches these arrays many times.
   ///
-  /// Safe here by construction rather than by convention, on three counts. The
-  /// class is `@MainActor`, so no second thread can hold an access. Every
-  /// element type is trivial — `Int32`, `UInt32`, `UInt16`, `CogEdgeIndex`,
-  /// `CogArenaStateFlags` — so no destructor, library or user, can run inside an
-  /// access and re-enter. And no method here holds an access open across a call.
+  /// Three facts make this safe. The class is `@MainActor`, so no second thread
+  /// can hold an access. Each element type is trivial (`Int32`, `UInt32`,
+  /// `UInt16`, `CogEdgeIndex`, or `CogArenaStateFlags`), so destruction cannot
+  /// reenter the arena. No method holds an access across a call.
   ///
-  /// That last one is an invariant a future edit could break, so it is stated
-  /// rather than assumed: **do not add a method that passes one of these columns
-  /// `inout`, or calls out while a subscript access is live.** The typed value
-  /// columns deliberately keep full enforcement, because their element type is
-  /// the user's and releasing one can run arbitrary `deinit` code.
+  /// Do not pass these columns `inout` or call out while a subscript access is
+  /// live. Typed value columns keep full checks because releasing a user's value
+  /// may run its `deinit` code.
   @exclusivity(unchecked)
   #if !COG_ARENA_COMPACT
   @usableFromInline

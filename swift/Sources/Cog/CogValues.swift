@@ -177,11 +177,10 @@ private nonisolated final class CogValuesContinuation<Value> {
 
 /// Non-generic lifetime ownership behind every ``CogValues`` iterator.
 ///
-/// Keeping the owner non-generic permits an isolated deinitializer: dropping
-/// the iterator removes its dependency edges and balances its graph leases
-/// synchronously when ARC releases it on the MainActor. AsyncStream's
-/// termination callback also cancels promptly when a task is suspended in
-/// `next()` and receives cancellation.
+/// The non-generic owner can use an isolated deinitializer. Dropping the
+/// iterator removes its graph edges and leases on the MainActor. The
+/// `AsyncStream` callback also cancels when a task waiting in `next()` is
+/// cancelled.
 @MainActor
 internal final class CogValuesSubscription {
   /// The registration installed when iterator creation settles its first value.
@@ -253,12 +252,11 @@ extension Cogs {
     )
   }
 
-  /// Subscribes to an async cog's total value projection.
+  /// Subscribes to an async cog's plain value.
   ///
-  /// The initial element is the latest accepted success, or the declaration's
-  /// resting default after first demand starts its initial work. Pending and
-  /// failure transitions alone do not emit; a later changed accepted value
-  /// does, following the async declaration's ordinary equality rule.
+  /// The first element is the latest success or the resting default while the
+  /// first request runs. Pending and failure alone do not emit. A later success
+  /// emits only when the declaration's equality rule sees a changed value.
   ///
   /// - Parameters:
   ///   - valueReference: The async value projection to export.

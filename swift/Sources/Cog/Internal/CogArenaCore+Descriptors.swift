@@ -1,10 +1,9 @@
 // MARK: - Descriptors and locations
 
-/// Descriptor registration and descriptor-and-key location resolution.
+/// Registers descriptors and resolves their keys to arena rows.
 ///
-/// This is the arena's sole transition from stable public identities to typed
-/// columns and generated scalar slots. Keyless descriptor memos are validated
-/// here against both context identity and slot generation before reuse.
+/// This is the only path from public identities to typed columns and scalar
+/// rows. Before reusing a keyless memo, it checks the context and row generation.
 extension CogArenaCore {
   /// Resolves one manual row and its typed descriptor column.
   ///
@@ -13,18 +12,16 @@ extension CogArenaCore {
   /// memo on the declaration short-circuits three costs: the descriptor
   /// registry lookup, the checked downcast that restores `Value` from the
   /// record's erased column, and the identity lookup that finds the slot. The
-  /// downcast is the expensive one — in unspecialized generic code it asks the
-  /// runtime to instantiate ``CogArenaValueColumn`` metadata the caller was
-  /// already handed.
+  /// downcast costs the most. In generic code it asks the runtime to create
+  /// ``CogArenaValueColumn`` metadata the caller already has.
   ///
   /// Two conditions make the memo sound, and both are checked here rather than
   /// maintained by invalidation hooks elsewhere. The context identity proves
   /// the memo was written by *this* graph, and identities are never reused.
   /// ``CogArenaStorage/contains(_:)`` then proves the memoized slot still
-  /// names a live occupant: a released row always advances its generation
-  /// before the index can be reused, so a state that has since been released —
-  /// or replaced by another descriptor's state at the same index — fails this
-  /// check and falls through to the ordinary path.
+  /// names a live occupant. Releasing a row advances its generation before the
+  /// index can be reused. A released state, or a new state at the same index,
+  /// therefore fails this check and uses the normal path.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
@@ -79,10 +76,9 @@ extension CogArenaCore {
 
   /// Resolves one automatic row and its typed descriptor column.
   ///
-  /// The memo has the same two guards as ``manualLocation(for:)``, and the
-  /// liveness one carries real weight here: a `whileObserved` automatic state is
-  /// released when its grace expires, and the memo must not be able to hand
-  /// back the row it used to own.
+  /// The memo uses the same two guards as ``manualLocation(for:)``. The liveness
+  /// guard rejects a row after its `whileObserved` grace expires and releases
+  /// the state.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
@@ -271,9 +267,8 @@ extension CogArenaCore {
       },
       removeValue: { slot in column.remove(at: slot) },
       prepareForContextTeardown: { column.prepareForContextTeardown() },
-      // Async declarations memoize nothing: their statuses are not on the
-      // steady-turn path this memo exists for, and adding a second memo shape
-      // would widen the invalidation surface for no measured gain.
+      // Async status is not on the steady-turn path this memo speeds up. A
+      // second memo shape would add invalidation work with no measured gain.
       forgetMemoizedLocation: { _ in }
     )
     return (record, column)
@@ -338,9 +333,8 @@ extension CogArenaCore {
 
   /// Whether one exact slot still belongs to the supplied async descriptor.
   ///
-  /// Work completions combine this context identity check with the descriptor
-  /// column's UInt64 generation, so cancellation and scalar slot reuse are both
-  /// advisory rather than correctness boundaries.
+  /// Work completion also checks the descriptor column's `UInt64` generation.
+  /// Correctness does not depend on cancellation or delayed row reuse.
   func stillStores<Value>(
     _ slot: CogArenaSlot,
     descriptor: AsyncCogDescriptor<Value>

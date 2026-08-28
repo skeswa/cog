@@ -10,10 +10,10 @@ extension Cog {
   /// Name a keyless declaration with `Cog` as its final word, such as
   /// `forecastCog`; values read from it keep ordinary unsuffixed domain names.
   ///
-  /// Reading an async cog is total and value-first (§5.1): `c[valueReference]`
-  /// returns `Value` — the last accepted success, or the declaration's resting
-  /// default before one exists — so async state reads in the same shape as a
-  /// manual or automatic cog wherever only the value matters. The request
+  /// Reading an async cog is total and value-first (§5.1). `c[valueReference]`
+  /// returns the last accepted success or the resting default before one
+  /// exists. Code that needs only the value can read it like a manual or
+  /// automatic cog. The request
   /// lifecycle is read through the `status` lens on the same capability
   /// (`c.status[valueReference]`), which returns the full ``CogStatus``.
   /// Bind either form to the declaration's unsuffixed domain name before use;
@@ -46,13 +46,11 @@ extension Cog {
     /// Stable declaration identity and behavior shared by copies of this reference.
     internal let descriptor: AsyncCogDescriptor<Value>
 
-    /// Stable automatic-declaration identity for the total value projection.
+    /// Stable declaration for this async value's plain value read.
     ///
-    /// Value reads of this reference resolve through this automatic declaration:
-    /// its selector reads the async state's status and extracts its total
-    /// value, which already rests on the declaration default before success.
-    /// One projection descriptor is shared by every copy and — through boxes —
-    /// every key, exactly like `descriptor` itself.
+    /// Its selector reads the async status and returns its total value, which
+    /// uses the declaration default before success. Every copy and box key
+    /// shares this descriptor.
     internal let valueDescriptor: AutomaticCogDescriptor<Value>
 
     /// The state-identity key, or `nil` for this keyless public declaration.
@@ -178,11 +176,10 @@ extension Cog {
 
     /// The automatic reference every value spelling of this async cog reads.
     ///
-    /// This is the internal seam that makes `c[asyncCog]` an ordinary automatic
-    /// read: same settlement, equality gating, lifetime, and release behavior
-    /// as any other automatic state, with the async state reachable through the
-    /// projection's dependency edge. A value-only consumer therefore releases
-    /// the projection and its async dependency at one shared grace deadline.
+    /// This makes `c[asyncCog]` a normal automatic read with the same settlement,
+    /// equality, lifetime, and release rules. Its dependency edge reaches the
+    /// async state, so a value-only consumer releases both states at one grace
+    /// deadline.
     internal var valueCog: Cog<Value> {
       Cog(descriptor: valueDescriptor, key: key)
     }

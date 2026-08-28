@@ -10,14 +10,14 @@ internal import StorefrontWorkload
 // screen, which requests that screen implies, and a person would have to add a
 // line to it the day a screen started reading something new. That is the same
 // bargain as the invalidation file, and it is what makes this port's sharpest
-// number honest — an offscreen product is not on the list, so an invalidation
+// number honest, an offscreen product is not on the list, so an invalidation
 // that touches only offscreen products starts exactly zero requests without
 // anything having to *decide* that it should.
 //
 // The other half is the epilogue every request task runs on the MainActor:
 // compare the attempt this task was launched with against the cell's current
 // attempt, publish or discard accordingly, tell the invalidation scheme what
-// landed, settle, and fire the completion barrier — on both branches, exactly
+// landed, settle, and fire the completion barrier, on both branches, exactly
 // once. A decision to refuse a stale result is exactly as much of a decision as
 // a decision to publish one, and the trace's stale-suggestion step is built on
 // being able to await precisely that.
@@ -27,8 +27,8 @@ internal import StorefrontWorkload
 /// `any Error` is not `Sendable`, and a request result crosses from the task
 /// that produced it to the MainActor that decides about it. Rather than reach
 /// for an unsafe escape, the port carries the description across and rebuilds an
-/// error on the other side. Nothing in this workload inspects an error's type —
-/// the refresh outcome compares one word — so the description is the whole of
+/// error on the other side. Nothing in this workload inspects an error's type,
+/// the refresh outcome compares one word, so the description is the whole of
 /// what is needed.
 struct MemoObservationRequestFailure: Error, Sendable, CustomStringConvertible {
   /// What the request boundary said went wrong.
@@ -287,7 +287,7 @@ extension MemoObservationStorefrontRuntime {
   /// Asks for the shipping and tax quotes the settled cart implies.
   ///
   /// An empty cart is not a shipment and nothing in it is taxable, so an empty
-  /// cart asks for neither — which is a request a real checkout screen never
+  /// cart asks for neither, which is a request a real checkout screen never
   /// sends and a benchmark artifact nobody wants to explain.
   ///
   /// - Parameter cart: The settled cart.
@@ -344,8 +344,8 @@ extension MemoObservationStorefrontRuntime {
   /// Publishes a resting value for a request the current sources say must not
   /// be made at all.
   ///
-  /// The workload's guarded selections — an empty query, a signed-out shopper,
-  /// an empty cart, a product outside the catalog — do not merely decline to
+  /// The workload's guarded selections, an empty query, a signed-out shopper,
+  /// an empty cart, a product outside the catalog, do not merely decline to
   /// ask. They *answer*, with the declaration's resting value, and the
   /// difference is visible to a shopper: clearing the search field empties the
   /// suggestion list rather than leaving the suggestions for the query before
@@ -399,8 +399,8 @@ extension MemoObservationStorefrontRuntime {
 
   /// Runs one request off the MainActor and returns its decision to it.
   ///
-  /// The work runs `@concurrent` because the request boundary's kernels — the
-  /// index build above all — are the largest computations in the workload and
+  /// The work runs `@concurrent` because the request boundary's kernels, the
+  /// index build above all, are the largest computations in the workload and
   /// doing them on the MainActor would be a defect rather than a measurement.
   /// The decision comes back to the MainActor because a publish-or-discard
   /// decision is a MainActor decision in every runtime this workload compares.
@@ -458,7 +458,7 @@ extension MemoObservationStorefrontRuntime {
   /// Decides about one account response.
   ///
   /// The account observer runs here, and the accepted shopper is written
-  /// through to the model's own signed-in fact — one writable place for one
+  /// through to the model's own signed-in fact, one writable place for one
   /// writable thing, exactly as the Cog port's mechanism does.
   private func finishAccount(
     attempt: Int,

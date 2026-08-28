@@ -57,9 +57,9 @@ struct TrailStore {
 
 /// Restores the last session during assembly, then persists later changes.
 ///
-/// Because `operate` runs inside assembly, the restored tab, stacks, and
-/// sheet settle before `assemble` returns — the first frame SwiftUI renders
-/// is already the restored screen, with no flash of the resting defaults.
+/// Because `operate` runs inside assembly, the restored tab, stacks, and sheet
+/// settle before `assemble` returns. SwiftUI's first frame shows the restored
+/// screen without flashing the resting defaults.
 /// Cold-launch deep links then land on top of this as ordinary later turns.
 struct TrailPersistenceMechanism: Mechanism {
   /// Storage capability retained for the mechanism scope's lifetime.
@@ -86,14 +86,12 @@ struct TrailPersistenceMechanism: Mechanism {
   }
 }
 
-/// Ticks the hike logger's elapsed clock while — and only while — the logger
-/// sheet is presented.
+/// Ticks the hike logger's elapsed clock only while its sheet is presented.
 ///
 /// The `whenever` scope's gate is the derived `isLoggingHikeCog`, so the
-/// ticking task's lifetime is decided by navigation state itself: presenting
-/// the logger starts a fresh scope, and dismissal — by button, swipe, or a
-/// deep link that navigates away — cancels it in the same flush. Nothing
-/// survives a down-and-up cycle, so each presentation restarts from zero.
+/// navigation state controls the ticking task. Presenting the logger starts a
+/// fresh scope. A button, swipe, or deep link dismissal cancels it in the same
+/// flush. Each presentation restarts from zero.
 struct HikeTimerMechanism: Mechanism {
   /// Injected clock; tests substitute a controlled one.
   var clock: any Clock<Duration> = ContinuousClock()

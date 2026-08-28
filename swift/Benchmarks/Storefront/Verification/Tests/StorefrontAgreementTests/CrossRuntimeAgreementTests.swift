@@ -14,7 +14,7 @@ import Testing
 /// *transitive* argument that the four agree with one another. This suite makes
 /// the argument directly: it links all four, runs the identical eleven-phase
 /// trace against each, and compares their settled answers value for value.
-/// Without it, a fast number might simply be a wrong number — and the whole
+/// Without it, a fast number might simply be a wrong number, and the whole
 /// purpose of the comparison is to say that Cog is faster at computing the same
 /// thing, not that it is faster at computing something else.
 ///
@@ -25,7 +25,7 @@ import Testing
 /// other, deliberately, since target separation is what makes it a compile error
 /// for one port to reach into another's cache. This package already depends on
 /// all four, so it is the one place the four coexist without weakening that
-/// separation — and it depends on none of the harness here, because a
+/// separation, and it depends on none of the harness here, because a
 /// correctness proof has no business importing a benchmark runner.
 ///
 /// ## What is compared, and what is deliberately not
@@ -66,7 +66,7 @@ struct CrossRuntimeAgreementTests {
   /// failure into a puzzle for no wall-clock gain.
   ///
   /// - Returns: One observation per runtime, in the order the runtimes are
-  ///   reported in a results table — Cog first, then the floor, then the two
+  ///   reported in a results table, Cog first, then the floor, then the two
   ///   that do real work to avoid recomputation.
   func observeEveryRuntime() async throws -> [RuntimeAgreementObservation] {
     [
@@ -167,8 +167,8 @@ struct CrossRuntimeAgreementTests {
   /// boundary, and each agrees with the shared shadow wherever the shadow is an
   /// oracle.
   ///
-  /// Ten of the eleven boundaries are branch-free — every runtime executes
-  /// exactly the same steps to reach them — so all four owe identical visible
+  /// Ten of the eleven boundaries are branch-free, every runtime executes
+  /// exactly the same steps to reach them, so all four owe identical visible
   /// identifiers and identical digests at each. The eleventh, `teardown`, is
   /// not: its tail is chosen by the runtime's declared lifetime semantics, and
   /// it is handled by ``runtimesAgreeOnTheFinalSettledState()`` below.
@@ -183,7 +183,7 @@ struct CrossRuntimeAgreementTests {
   /// because the shadow is not yet an oracle for them and pretending otherwise
   /// would be checking the wrong thing. ``StorefrontWorld`` holds the catalog,
   /// the search index, and every fixture response from the moment it is
-  /// constructed — it models the *settled* world — whereas the session has
+  /// constructed, it models the *settled* world, whereas the session has
   /// released nothing at `bootstrap` and only its root responses after
   /// `rootData`. So `bootstrap` is checked for an empty screen, which is the
   /// claim the trace itself makes there, and `rootData` for visible identifiers
@@ -299,30 +299,20 @@ struct CrossRuntimeAgreementTests {
 
   /// The four runtimes settle to the same final answer, and to the same shadow.
   ///
-  /// The four values the gate names: visible identifiers, the rendered digest,
-  /// the settled suggestions, and the order total — plus the shadow each runtime
-  /// derived independently from the same profile and the same events, which is a
-  /// fifth thing that must agree and is compared here as one.
+  /// Compares visible IDs, rendered digest, suggestions, order total, and each
+  /// runtime's independent shadow from the same profile and events.
   ///
   /// ## Why the last boundary is compared in two pieces
   ///
   /// The `teardown` phase branches on
   /// ``StorefrontRuntimeSemantics/releasesUnobservedValues``. A runtime that
-  /// releases unobserved values scrolls the viewport back to re-materialize a
-  /// released row and prove it asks the service again, so it ends with rows on
-  /// screen; a runtime that caches nothing skips that proof — correctly, since
-  /// it would pass for the wrong reason — and ends with the empty window the
-  /// phase navigated to. That is a difference in the *script* those runtimes
-  /// ran, not in the answers they computed, so requiring identical final
-  /// identifiers across the branch would be asserting that the trace does not
-  /// do what it deliberately does.
+  /// releases values scrolls back to rebuild one and ends with visible rows. A
+  /// runtime that caches nothing skips that proof and keeps an empty window.
+  /// This script difference makes final IDs incomparable across branches.
   ///
-  /// So the browse screen is compared within each branch group, every group is
-  /// required to be non-empty of claims, and each runtime is separately required
-  /// to match its own shadow — which is derived from the same branch and is
-  /// therefore the right oracle. The suggestions, the cart's money, and the
-  /// outstanding-request count are untouched by that branch and are compared
-  /// across all four.
+  /// Browse output is compared within each non-empty branch group and against
+  /// each runtime's shadow. Suggestions, cart money, and outstanding requests
+  /// do not branch, so all four must agree.
   @Test("the runtimes settle to the same final answer")
   func runtimesAgreeOnTheFinalSettledState() async throws {
     let observations = try await observeEveryRuntime()
@@ -439,19 +429,13 @@ struct CrossRuntimeAgreementTests {
   /// Records what each runtime declared, requires the fields that admit no
   /// variation to be invariant, and reports the ones that legitimately differ.
   ///
-  /// ``StorefrontRuntimeSemantics`` is a licence to differ, and that licence is
-  /// what makes the comparison legible rather than a set of arbitrary failures:
-  /// a runtime that recomputes on every read genuinely does render on an equal
-  /// write and is the floor being measured. But a licence covering *every* field
-  /// would let a port declare its way out of the workload's contract, so
-  /// ``DeclaredSemanticsField`` records the ruling per field and this test
-  /// enforces it.
+  /// ``StorefrontRuntimeSemantics`` allows valid differences. For example, a
+  /// runtime that recomputes on each read also renders after an equal write.
+  /// ``DeclaredSemanticsField`` says which fields may differ so ports cannot opt
+  /// out of the shared contract.
   ///
-  /// The differing fields are printed rather than asserted, because their whole
-  /// point is that they differ. The printed table is the raw material for the
-  /// "What each runtime had to hand-write" section of the results, and printing
-  /// it from the gate means the table in the documentation and the values the
-  /// trace actually asserted against cannot drift apart unnoticed.
+  /// Differing fields are printed for the results table. Producing the table
+  /// from this gate keeps documentation tied to the checked values.
   @Test("the semantics that admit no variation are invariant across runtimes")
   func invariantSemanticsAreInvariant() async throws {
     let descriptors: [StorefrontRuntimeDescriptor] = [
@@ -492,8 +476,8 @@ struct CrossRuntimeAgreementTests {
   /// ``StorefrontRuntimeSemantics``, and reads each one correctly.
   ///
   /// Reflection rather than a hand-maintained count. A field added to the struct
-  /// and not to the table would otherwise be a field nobody ruled on — silently
-  /// neither asserted nor reported — and an accessor that read the neighbouring
+  /// and not to the table would otherwise be a field nobody ruled on, silently
+  /// neither asserted nor reported, and an accessor that read the neighbouring
   /// field would be invisible, which is the copy-paste mistake a table of eight
   /// near-identical closures invites.
   @Test("the semantics table covers every declared field")
@@ -558,10 +542,8 @@ struct CrossRuntimeAgreementTests {
       \(referenceRendering.visibleChecksum).
       """
     )
-    // The cart's money, on the same rule `requireSettledOutput(against:)` uses:
-    // an empty cart is not a shipment, so the shadow's arithmetic and a
-    // runtime's guarded shipping and tax quotes are answering different
-    // questions until a line exists.
+    // Compare money only for non-empty carts, as `requireSettledOutput` does.
+    // An empty cart has no shipping or tax quote to compare with the shadow.
     guard !rendering.shadowCartIsEmpty, !referenceRendering.shadowCartIsEmpty else { return }
     #expect(
       rendering.orderTotal == referenceRendering.orderTotal,

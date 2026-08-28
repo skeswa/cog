@@ -128,8 +128,8 @@ private struct CogDeclarationEvidence {
 
   /// The classified base identifier a `.readOnly` initializer projected.
   ///
-  /// Only the initializer channel can supply this; annotation-only projection
-  /// evidence carries `nil` because a written `Projection` type names no source.
+  /// Only an initializer can supply this value. A `Projection` type annotation
+  /// names no source, so its evidence carries `nil`.
   let projectedSourceName: String?
 
   /// Maps Cog's two family roots and their nested shapes.

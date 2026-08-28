@@ -53,9 +53,9 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
   /// the same declaration-level resting contract without consulting the value
   /// projection.
   ///
-  /// It is a closure, not a stored value, because one descriptor outlives every
-  /// state it names, and async state defaults to `whileObserved` — so a stored
-  /// value would be shared by every context, every key, and every state
+  /// It is a closure because one descriptor outlives every state it names.
+  /// Async state defaults to `whileObserved`, so a stored value would be shared
+  /// by every context, every key, and every state
   /// recreated after a release (§5.1). The public initializers take it as an
   /// `@autoclosure`, so a call site still writes `default: .empty` and never
   /// sees this shape. ``CogArenaAsyncColumn`` calls it once when it installs a
@@ -101,8 +101,8 @@ internal final class AsyncCogDescriptor<Value>: CogDescriptor {
 
   /// Whether two total values are equivalent under this declaration's policy.
   ///
-  /// A declaration without an equality rule conservatively treats every
-  /// publication as a value change, matching its ordinary value projection.
+  /// Without an equality rule, every publication counts as a value change. The
+  /// ordinary value projection uses the same policy.
   func valuesAreEqual(_ oldValue: Value, _ newValue: Value) -> Bool {
     equals?(oldValue, newValue) ?? false
   }

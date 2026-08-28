@@ -10,7 +10,7 @@
 /// `StorefrontMechanism`, which conforms to Cog's `Mechanism`, so naming it
 /// used to require importing Cog. Every state-management runtime the workload
 /// is ported to has to be told which observers to register, and none of them
-/// may be made to import Cog to say so — hoisting the type out is what keeps
+/// may be made to import Cog to say so, hoisting the type out is what keeps
 /// this vocabulary neutral. `StorefrontMechanism.Holds` survives as a
 /// typealias so existing Cog call sites keep reading the way they did.
 ///
@@ -18,8 +18,10 @@
 /// copyable, so it crosses isolation boundaries and lands in a runtime's
 /// bootstrap without ceremony.
 public nonisolated struct StorefrontHolds: OptionSet, Sendable {
+  /// The bit field that records which observers stay registered.
   public let rawValue: Int
 
+  /// Creates a hold set from its observer bit field.
   public init(rawValue: Int) {
     self.rawValue = rawValue
   }

@@ -37,10 +37,9 @@ extension Cogs {
   /// }
   /// ```
   ///
-  /// Each mechanism's `operate` runs synchronously in array order, and its
-  /// writes settle, before this method returns: when assembly is done, every
-  /// mechanism is live, and there is no later installation step. Two
-  /// mechanisms sharing a name fail fast in every build.
+  /// Each mechanism's `operate` runs in array order. Its writes settle before
+  /// this method returns. Assembly leaves every mechanism live, with no later
+  /// install step. Two mechanisms with the same name fail in every build.
   ///
   /// Keep the returned context at the app entry point. Use it there to
   /// install the SwiftUI environment above every scene. Every descendant view

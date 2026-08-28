@@ -2,12 +2,9 @@ import SwiftSyntax
 
 // The syntax micro-vocabulary shared by the classifiers and the rules.
 //
-// Every rule reads the same few written shapes — a final nominal name behind
-// sugar, the nearest enclosing declaration, a graph-read spelling — and each
-// used to carry its own private half-implementation of them. Concentrating the
-// vocabulary here means a new rule spells "nearest enclosing extension" once,
-// correctly, and a new public read spelling in Cog is one edit here rather
-// than one per rule.
+// Rules share a small syntax vocabulary: final nominal names behind sugar,
+// enclosing declarations, and graph-read spellings. Keeping those classifiers
+// here gives each shape one implementation and one place to add new spellings.
 
 // MARK: - Nominal names
 
@@ -16,11 +13,9 @@ import SwiftSyntax
 /// Sees through optional sugar (`T?`, `T!`), attributed types
 /// (`@MainActor T`), opaque and existential markers (`some T`, `any T`), and
 /// takes the last member component of a qualified spelling (`A.B.C` gives
-/// `C`) without requiring the base itself to be nominal. Rules use this when
-/// only the innermost conventional name matters — an extension target, a
-/// return type, or a capability parameter — because none of those wrappers
-/// changes which convention applies. Generic arguments are ignored rather
-/// than followed.
+/// `C`) without requiring a nominal base. Rules use this when only the final
+/// conventional name matters, such as an extension target, return type, or
+/// capability parameter. Generic arguments are ignored.
 package func finalNominalName(in type: TypeSyntax) -> String? {
   if let identifier = type.as(IdentifierTypeSyntax.self) { return identifier.name.text }
   if let member = type.as(MemberTypeSyntax.self) { return member.name.text }
@@ -63,8 +58,8 @@ package func finalNominalName(in expression: ExprSyntax) -> String? {
 /// Unlike the final-name extractors, every component must be nominal:
 /// `A.B.C` yields `["A", "B", "C"]`, while a member whose base is an array,
 /// tuple, or other structural type yields `nil`, because a partial path would
-/// misname the type it came from. Classifiers use this where qualification is
-/// identity — joining a type's same-file extensions to its declaration.
+/// misname the type it came from. Classifiers use this path to join a type's
+/// same-file extensions to its declaration.
 package func nominalPath(of type: TypeSyntax) -> [String]? {
   if let identifier = type.as(IdentifierTypeSyntax.self) {
     return [identifier.name.text]
@@ -80,9 +75,8 @@ package func nominalPath(of type: TypeSyntax) -> [String]? {
 /// Finds the nearest ancestor of one concrete syntax type, optionally filtered.
 ///
 /// Walks parent links only, so the answer is lexical rather than semantic.
-/// The filter lets a caller skip structurally similar ancestors — the nearest
-/// sequence that actually contains an assignment, say — without hand-rolling
-/// another cursor loop.
+/// The filter can skip similar ancestors, such as a sequence without an
+/// assignment, without another cursor loop.
 package func nearestAncestor<Node: SyntaxProtocol>(
   _ type: Node.Type,
   from node: some SyntaxProtocol,
@@ -101,8 +95,8 @@ package func nearestAncestor<Node: SyntaxProtocol>(
 /// Whether an expression spells the graph receiver itself.
 ///
 /// Recognizes bare `self`, the bare `status` lens, a `status` lens chained on
-/// another recognized base, and — through `orReceiver` — any identifier the
-/// caller has classified as a scoped graph capability. Both read-shape rules
+/// another recognized base, and any identifier that `orReceiver` classifies
+/// as a scoped graph capability. Both read-shape rules
 /// consume this recognizer, so a future public read spelling lands here once
 /// rather than once per rule.
 package func isGraphReceiverExpression(
@@ -151,7 +145,7 @@ package func directPeekToken(
 /// Whether one written identifier resolves to a receiver in scope at that use.
 ///
 /// Purely lexical: the name must match and the receiver's owning scope must
-/// contain the mention. Callers that additionally need the matched receiver,
+/// contain the mention. Callers that also need the matched receiver,
 /// or an ordering constraint between binding and mention, keep their own
 /// search over the same classifications.
 package func isClassifiedReceiver(

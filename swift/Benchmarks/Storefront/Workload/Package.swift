@@ -4,11 +4,9 @@ import PackageDescription
 
 // The dependency-free contract shared by every Storefront implementation.
 //
-// This package owns the domain model, deterministic fixtures, scripted service,
-// shadow model, runtime protocol, session driver, and eleven-phase trace. It
-// deliberately has no package dependency—not even Cog—so a comparison runtime
-// can resolve and compile the identical workload without resolving another
-// state-management implementation.
+// This package owns the model, fixtures, service, shadow, runtime protocol,
+// driver, and trace. It has no package dependency, including Cog. Each runtime
+// can compile the same workload without another state library.
 
 /// The build shape every Storefront workload and runtime target uses.
 ///

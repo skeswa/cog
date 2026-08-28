@@ -4,17 +4,11 @@ import PackageDescription
 
 /// The step-1 confirmation probe for swift-state-graph 0.28.0.
 ///
-/// This package exists to answer, empirically, the four questions the
-/// four-runtime Storefront specification marks "guessed" about
-/// swift-state-graph: whether `Computed` memoizes, whether a batching or
-/// transaction API coalesces N source writes into one downstream
-/// recomputation, how a keyed or dynamic node collection behaves, and what the
-/// definite settlement signal after a write actually is.
+/// Confirms four swift-state-graph behaviors used by Storefront: `Computed`
+/// memoization, batched writes, dynamic keyed nodes, and post-write settlement.
 ///
-/// It is a package of its own, nested under `swift/Benchmarks/Storefront/Runtimes/StateGraph/`,
-/// because it must resolve swift-state-graph while the port package that will
-/// eventually sit beside it does not exist yet. Nothing else in the repository
-/// depends on it, and nothing it resolves reaches the root package.
+/// This nested package resolves swift-state-graph without adding it to the root
+/// package. Nothing else depends on the probe.
 let package = Package(
   name: "sgprobe",
   platforms: [.macOS(.v14)],

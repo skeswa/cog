@@ -35,7 +35,7 @@ struct CogStorefrontRuntimeTests {
   /// The skip path exists for runtimes that declare no per-generation refresh
   /// handle and no lifetime release. Cog declares both, so a skip appearing
   /// here would mean the reference runtime had quietly stopped being asserted
-  /// against the sharpest two checkpoints in the trace — which a "every
+  /// against the sharpest two checkpoints in the trace, which a "every
   /// checkpoint holds" loop cannot detect, because a skip holds by
   /// construction.
   @Test("the reference runtime skips no checkpoint")

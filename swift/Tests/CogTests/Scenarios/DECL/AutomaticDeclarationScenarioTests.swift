@@ -35,9 +35,8 @@ import Testing
 
 @MainActor
 @Test func `DECL-07 an automatic cog can compute from another automatic cog`() {
-  // `c[valueReference]` reads an automatic cog the same way it reads a source, so a chain is
-  // written the same way a leaf is — and reading the top computes the whole
-  // chain.
+  // `c[valueReference]` reads an automatic cog like a source. A chain uses the
+  // same syntax as a leaf, and reading the top computes the whole chain.
   let cogs = Cogs.forTesting()
 
   let celsius = Cog<Double>.Manual { 100 }

@@ -6,12 +6,10 @@
 /// cancellation, generation checks, and MainActor publication of resulting
 /// statuses.
 ///
-/// The operation may throw and may return a non-`Sendable` value when Swift's
-/// region-based `sending` rules prove the transfer safe. Replacement and
-/// lifetime cancellation are advisory to the operation, but Cog rejects every
-/// completion that no longer belongs to the current stored generation. `Work`
-/// itself is a description rather than a task handle: callers cannot start,
-/// await, or cancel it directly.
+/// The operation may throw. It may return a non-`Sendable` value when Swift's
+/// `sending` rules prove the transfer safe. Cancellation is only a request;
+/// Cog rejects any completion outside the current stored generation. `Work` is
+/// a description, not a task handle, so callers cannot start, await, or cancel it.
 public struct Work<Value> {
   /// The physical work description consumed by the async runtime.
   internal let storage: WorkStorage<Value>
@@ -23,11 +21,10 @@ public struct Work<Value> {
 
   /// Describes one deferred, throwing value-producing operation.
   ///
-  /// The body does not run during this call. An unannotated body inherits the
-  /// surrounding actor, normally the MainActor of an async selector, which is
-  /// useful for async APIs isolated there. Executor-independent work can use an
-  /// explicitly `@concurrent` body to opt into the generic executor instead;
-  /// blocking a cooperative Swift executor remains inappropriate on either.
+  /// This call does not run the body. An unmarked body inherits the surrounding
+  /// actor, usually an async selector's MainActor. Mark independent work
+  /// `@concurrent` to run it on the generic executor. Neither executor should
+  /// run blocking work.
   ///
   /// Regardless of operation isolation, Cog observes completion and publishes
   /// success or failure on the MainActor. If newer work or lifetime release has
@@ -46,12 +43,11 @@ public struct Work<Value> {
 
   /// Describes an async sequence whose changed elements become Cog turns.
   ///
-  /// Constructing this value does not start iteration. Cog owns the iterator
-  /// after the selector returns, applies latest-generation cancellation, and
-  /// publishes accepted elements on the MainActor. The selector overloads
-  /// expose this factory only under ``LatestPolicy``; ``RunWork`` deliberately
-  /// has no corresponding member, so ordered stream policies are impossible to
-  /// spell.
+  /// Constructing this value does not start iteration. After selection, Cog
+  /// owns the iterator, cancels replaced generations, and publishes accepted
+  /// elements on the MainActor. Only ``LatestPolicy`` selectors expose this
+  /// factory. ``RunWork`` has no stream member, so ordered policies cannot use
+  /// a stream.
   ///
   /// - Parameter sequence: The sequence selected for this generation.
   /// - Returns: A stream work description for a latest-policy async cog.
@@ -68,11 +64,9 @@ public struct Work<Value> {
 
 /// A one-shot async operation accepted by ordered scheduling policies.
 ///
-/// `RunWork` is intentionally narrower than ``Work``. It can describe only one
-/// value-producing operation, so a selector whose policy is ``OrderedPolicy``
-/// cannot return a stream even accidentally. Cog promotes this description to
-/// its internal work representation only after the public type checker has
-/// enforced that boundary.
+/// `RunWork` describes only one value-producing operation. An
+/// ``OrderedPolicy`` selector therefore cannot return a stream. Cog converts it
+/// to internal work only after the type checker enforces that limit.
 public struct RunWork<Value> {
   /// The deferred operation with the isolation inherited at its declaration.
   internal let operation: @Sendable @isolated(any) () async throws -> sending Value
@@ -106,12 +100,11 @@ internal enum WorkStorage<Value> {
   case stream(WorkStream<Value>)
 }
 
-/// A type-erased async sequence that remains inert until Cog asks for an iterator.
+/// A type-erased async sequence that stays idle until Cog asks for an iterator.
 ///
-/// The factory and iterator stay MainActor-confined, matching selector and
-/// publication isolation while allowing the underlying sequence and iterator
-/// to remain non-`Sendable`. This erasure exposes only `next`; callers cannot
-/// recover or drive the original sequence outside Cog's generation checks.
+/// The factory and iterator stay on the MainActor, but the underlying types need
+/// not be `Sendable`. The erased type exposes only `next`, so callers cannot
+/// drive the source outside Cog's generation checks.
 internal struct WorkStream<Value> {
   /// Creates one type-erased iterator when the selected generation starts.
   private let makeIteratorBody: @MainActor () -> WorkStreamIterator<Value>
@@ -151,12 +144,11 @@ internal final class WorkStreamIterator<Value> {
 
 /// Single-consumer storage for a concrete iterator whose `next` may be concurrent.
 ///
-/// `AsyncIteratorProtocol.next` is executor-independent on the deployment
-/// floor, so the iterator cannot remain an actor-isolated stored property across
-/// that suspension. Cog supplies the synchronization invariant instead: this
-/// box is private to one stream task, and that task never calls `next` again
-/// until the preceding call returns. The unchecked conformance expresses only
-/// that exclusive ownership; it does not make the iterator generally shareable.
+/// `AsyncIteratorProtocol.next` is not tied to an executor on the deployment
+/// floor, so an actor cannot store the iterator across that call. Instead, one
+/// stream task owns this box and never overlaps calls to `next`. The unchecked
+/// conformance states that single-owner rule; it does not make the iterator safe
+/// to share.
 private nonisolated final class WorkStreamIteratorStorage<Iterator: AsyncIteratorProtocol>:
   @unchecked Sendable
 {

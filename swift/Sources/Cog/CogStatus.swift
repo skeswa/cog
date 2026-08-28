@@ -146,9 +146,8 @@ public nonisolated struct CogStatus<Value> {
 
   /// Determines which observable projections changed between two publications.
   ///
-  /// `valuesAreEqual` is the declaration's same comparator used by the ordinary
-  /// async value projection. Non-equatable declarations conservatively report
-  /// every publication as a value change, preserving their existing behavior.
+  /// `valuesAreEqual` is the comparator used by the plain async value read.
+  /// Declarations without equality treat every publication as a value change.
   @MainActor
   internal func observationChanges(
     from previous: Self?,

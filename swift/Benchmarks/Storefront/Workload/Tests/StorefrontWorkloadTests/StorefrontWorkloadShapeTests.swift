@@ -7,9 +7,9 @@ import Testing
 /// A macrobenchmark is only representative of anything if its size is known, so
 /// these tests replace every "approximately" in the design with an exact
 /// constant or a mechanically checked range. They live in the neutral target's
-/// own suite because every claim here — the profiles, the catalog, the pricing
+/// own suite because every claim here, the profiles, the catalog, the pricing
 /// ladder, the search plan, the steady interaction sequence, and the
-/// compute-only control's checksum — is a claim about the workload itself and
+/// compute-only control's checksum, is a claim about the workload itself and
 /// holds identically for every runtime the workload is ported to. Nothing here
 /// imports Cog, and that is the point: these are the numbers four runtimes must
 /// agree on before any of them is measured.

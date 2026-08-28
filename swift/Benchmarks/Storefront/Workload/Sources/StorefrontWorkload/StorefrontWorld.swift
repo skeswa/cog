@@ -4,7 +4,7 @@
 /// against a number copied out of a passing run. The rule matters: a recorded
 /// observation only says what happened once, whereas a value recomputed from
 /// the profile and the events the driver issued is a claim about what *should*
-/// happen — and a graph that quietly started computing something else fails it.
+/// happen, and a graph that quietly started computing something else fails it.
 ///
 /// The shadow is deliberately written the long way: plain loops over plain
 /// values, no graph. Correctness runs may evaluate it at every checkpoint. A
@@ -68,9 +68,8 @@ public nonisolated struct StorefrontWorld: Sendable {
 
   /// Products by identifier, built once.
   ///
-  /// Stored rather than computed because correctness checkpoints consult this
-  /// index repeatedly, and rebuilding a 1,200-entry dictionary per read would
-  /// make verification unnecessarily expensive.
+  /// Stored because checkpoints read it often. Rebuilding a 1,200-entry map on
+  /// each read would waste verification time.
   public let productIndex: [ProductID: Product]
 
   /// Category by identifier, built once.
@@ -152,7 +151,7 @@ public nonisolated struct StorefrontWorld: Sendable {
   ///
   /// The normative section order: a cross-category best-match band of at most
   /// twelve, then the remainder grouped by category in first-seen order. Every
-  /// runtime's sectioning stage — `storefrontSectionsCog` in the Cog port — is
+  /// runtime's sectioning stage, `storefrontSectionsCog` in the Cog port, is
   /// held to exactly this.
   public var flattenedSectionOrder: [ProductID] {
     let ranked = rankedProductIDs

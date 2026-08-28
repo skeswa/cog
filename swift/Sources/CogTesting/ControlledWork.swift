@@ -2,12 +2,10 @@ public import Cog
 
 /// Deterministic, generation-indexed one-shot async work for tests.
 ///
-/// An async cog's selector runs once per generation, and a test that completes
-/// work "as soon as possible" races Cog's installation of that work: a value
-/// resumed before the generation's continuation exists is silently lost. This
-/// controller removes the race. Each ``makeWork()`` call takes the next
-/// integer generation, announces it on ``starts`` when Cog actually begins the
-/// operation, and suspends until the test completes that exact generation:
+/// Completing work before Cog installs its continuation can lose the result.
+/// This controller removes that race. Each ``makeWork()`` call takes the next
+/// generation number. ``starts`` announces when Cog begins the operation, which
+/// then waits for the test to complete that generation:
 ///
 /// ```swift
 /// let work = ControlledWork<Int>()
@@ -21,11 +19,10 @@ public import Cog
 /// work.succeed(0, with: 72)
 /// ```
 ///
-/// Awaiting ``starts`` before completing keeps status assertions free of
-/// sleeps and polling, and generation indexing keeps a superseded completion
-/// from being mistaken for the current one. Completion resolves the awaited
-/// operation; observing Cog's acceptance of the result remains the
-/// acknowledgement hooks' job.
+/// Await ``starts`` before completing work instead of sleeping or polling.
+/// Generation numbers keep stale and current results separate. Completion
+/// resumes the operation; acknowledgement hooks tell the test whether Cog
+/// accepted it.
 ///
 /// Identity and lifetime are the test's: the controller is a MainActor class
 /// the test retains alongside its runtime, and it holds only continuations for
@@ -52,9 +49,8 @@ public final class ControlledWork<Value: Sendable> {
   /// Returns work that announces and then suspends its assigned generation.
   ///
   /// Call this from an async selector, once per selector run. The generation
-  /// is assigned here, but ``starts`` announces it only when Cog begins the
-  /// operation — the difference is what lets a test distinguish selected work
-  /// from started work.
+  /// is assigned here. ``starts`` announces it only when Cog begins the
+  /// operation, so tests can tell selected work from started work.
   public func makeWork() -> Work<Value> {
     let generation = nextGeneration
     nextGeneration += 1

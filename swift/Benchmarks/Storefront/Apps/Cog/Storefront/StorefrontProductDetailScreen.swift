@@ -27,7 +27,7 @@ import SwiftUI
 ///
 /// This is the leaf of the workload's async graph. Nothing on the browse screen
 /// reads `storefrontDetailCogs`, so the payload is demanded when this screen
-/// appears and released once the screen goes away and its grace elapses — which
+/// appears and released once the screen goes away and its grace elapses, which
 /// is the lifetime claim the headless driver measures and this screen exercises
 /// through a real navigation.
 struct StorefrontProductDetailScreen: View {
@@ -126,7 +126,7 @@ struct StorefrontProductDetailScreen: View {
 /// The personalized recommendation shelf.
 ///
 /// A horizontal `ScrollView` over a `LazyHStack`, so only the cards on screen
-/// build their bodies — and only those cards demand a product row, an
+/// build their bodies, and only those cards demand a product row, an
 /// inventory reading, and an offer. A plain `HStack` would demand all of them
 /// the moment the detail screen appeared, which is the request storm the
 /// workload's funnel exists to avoid.

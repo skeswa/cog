@@ -4,8 +4,8 @@ internal import StorefrontWorkload
 // Every derived value this port computes, and the caches that stop it
 // recomputing them.
 //
-// The shape mirrors the Cog port's declarations one for one — the same funnel,
-// the same kernels, the same arguments — so that the two runtimes compute the
+// The shape mirrors the Cog port's declarations one for one, the same funnel,
+// the same kernels, the same arguments, so that the two runtimes compute the
 // same session rather than two similar ones. What differs is *where the answers
 // are kept*: Cog keeps fifty-three of them and knows exactly which to discard,
 // while this port keeps seven and discards each by hand.
@@ -71,10 +71,8 @@ extension MemoObservationStorefrontRuntime {
     for id in candidateIDs {
       guard let product = catalog.productIndex[id], isEligible(product) else { continue }
       eligibleIDs.append(id)
-      // Ranking prices are the catalog's list prices, never the ladder's
-      // effective ones: sorting a thousand products by a personalized price
-      // would demand an offer and a live reading for every one of them, and no
-      // storefront does that to order a list.
+      // Ranking uses catalog list prices, not effective prices. Personalized
+      // sorting would demand an offer and live reading for every product.
       scores[id.raw] = StorefrontKernels.relevanceScore(product: product, tokens: tokens)
       prices[id.raw] = product.listPriceCents
     }
@@ -453,8 +451,8 @@ extension MemoObservationStorefrontRuntime {
   ///
   /// Wrapped in the same `withObservationTracking` scope a SwiftUI view body
   /// runs under, with an empty change callback. The empty callback is
-  /// deliberate — this port's invalidation is the hand-written scheme, not
-  /// Observation — but the registration itself is real work an `@Observable`
+  /// deliberate, this port's invalidation is the hand-written scheme, not
+  /// Observation, but the registration itself is real work an `@Observable`
   /// application pays on every render, and a comparison that skipped it would be
   /// reporting a cheaper runtime than anyone could actually ship.
   private func renderBrowse() {

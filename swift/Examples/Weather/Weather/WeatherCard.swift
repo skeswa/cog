@@ -24,9 +24,9 @@ struct WeatherCard: View {
   /// turn, and SwiftUI's one-shot tracking invalidates once per frame.
   var body: some View {
     // Every value this card shows, read flatly and bound to a domain local.
-    // They come from one settled turn because they are read in one body, so
-    // the card can never render a torn pair — and each read registers on its
-    // own, so an unrelated ZIP's turn invalidates nothing here.
+    // Reading them in one body gives the card one settled turn, so it cannot
+    // render a torn pair. Each read tracks its own ZIP, so unrelated ZIPs do
+    // not invalidate this card.
     let weatherForecast = cogs.status[weatherForecastCogs[zip]]
     let report = weatherForecast.value?.weather
     let isNiceOutside = cogs[isNiceOutsideCogs[zip]]

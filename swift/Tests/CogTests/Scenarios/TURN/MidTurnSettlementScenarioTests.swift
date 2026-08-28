@@ -47,9 +47,9 @@ import Testing
 
   #expect(cogs.peek(doubled) == 2)
 
-  // Leave the automatic cog dirty from an earlier published turn, then read it
-  // while a later turn is accumulating: it catches up to the last published
-  // value, not to this turn's staged one and not to the value it last saw.
+  // Leave the automatic cog dirty, then read it while a later turn builds. It
+  // catches up to the last published value, not the staged or previously seen
+  // value.
   cogs.turn { c in c[source] = 3 }
   cogs.turn { c in
     c[source] = 7

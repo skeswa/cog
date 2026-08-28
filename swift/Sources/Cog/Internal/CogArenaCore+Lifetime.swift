@@ -224,11 +224,9 @@ extension CogArenaCore {
     edges.removeDependencySuffix(of: slot, after: .none, in: arena)
     record.removeValue(slot)
     record.removeKey(at: row)
-    // Belt and braces, and only for the one state the memo can name. The
-    // memoized slot would already fail its liveness check once this row's
-    // generation advances below, so dropping it here is not what makes the
-    // memo correct — it is what keeps a released declaration from pinning
-    // this context's column after the state itself is gone.
+    // The generation advance below already makes this slot fail its liveness
+    // check. Clearing the memo also stops the released declaration from
+    // retaining this context's column after its state is gone.
     if key == nil {
       record.forgetMemoizedLocation(contextIdentity)
     }
@@ -274,11 +272,10 @@ extension CogArenaCore {
     for record in records {
       let record = record.takeUnretainedValue()
       record.prepareForContextTeardown()
-      // Declarations outlive contexts. Evicting here keeps a `static let`
-      // declaration from retaining this graph's typed column — and the values
-      // in it — after the context that owned them is gone. The memo would
-      // still be *correct* without this, because no later context can match
-      // this one's identity; it would merely leak one column per declaration.
+      // Declarations outlive contexts. Eviction stops a `static let` from
+      // retaining this graph's typed column and its values. The memo would stay
+      // correct because no later context can match this identity, but it would
+      // leak one column per declaration.
       record.forgetMemoizedLocation(contextIdentity)
     }
     for row in lifetimeEntries.indices where lifetimeEntries[row].task != nil {
@@ -311,11 +308,10 @@ extension CogArenaCore {
 
   /// Runs `body` with one row's descriptor record borrowed, never retained.
   ///
-  /// The context's identity table owns every record for as long as the
-  /// context lives, and the publish, settle, notify, and reaction walks that
-  /// call this run synchronously on the MainActor while it does — a release
-  /// cascade runs from a sleeper task or teardown, never from inside one of
-  /// these walks — so the reference is guaranteed for `body`'s whole scope.
+  /// The context's identity table owns every record for the context lifetime.
+  /// Publish, settle, notify, and reaction walks run in place on the MainActor.
+  /// Release cascades run only from a sleeper or teardown, never inside those
+  /// walks, so the record stays alive through `body`.
   /// This is issue #373's route C at the record seam: the returning accessor
   /// above pays one retain/release pair per call, and the walks pay that per
   /// settled node.

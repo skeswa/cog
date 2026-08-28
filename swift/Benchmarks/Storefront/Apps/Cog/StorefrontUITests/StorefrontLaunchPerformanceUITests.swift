@@ -22,7 +22,7 @@ final class StorefrontLaunchPerformanceUITests: XCTestCase {
   /// `waitUntilResponsive: true` is the point of the test. Cog assembles the
   /// whole graph inside `StorefrontApp.init`, and the mechanism's `operate`
   /// settles the installed service and the starting row window before
-  /// `assemble` returns — so a launch metric that stopped at process start
+  /// `assemble` returns, so a launch metric that stopped at process start
   /// would measure everything except the part this repository is responsible
   /// for.
   ///

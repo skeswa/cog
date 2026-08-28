@@ -88,9 +88,8 @@ internal final class CogRefreshWaiter<Value> {
 
 /// Adds explicit one-shot async demand to a context.
 ///
-/// Refresh uses the same state identity, scheduling policy, lifetime rules, and
-/// MainActor turn machinery as reads; it differs only in forcing a new
-/// generation after initial demand.
+/// Refresh follows the same identity, scheduling, lifetime, and turn rules as a
+/// read. It only adds a forced generation after initial demand.
 extension Cogs {
   /// Runs an async cog's selector and work again even when no dependency changed.
   ///

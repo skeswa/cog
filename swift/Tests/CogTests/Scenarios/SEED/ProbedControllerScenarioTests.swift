@@ -24,7 +24,7 @@ import Testing
   )
 
   // The controller registers after assembly returned, and its `.run` watch
-  // delivers the current value — proving the controller is live.
+  // delivers the current value, proving the controller is live.
   controller.watch(sourceCog.readOnly, initial: .run, name: "watch.controller") { _, value in
     order.append("controller \(value)")
   }

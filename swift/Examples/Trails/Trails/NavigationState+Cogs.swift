@@ -29,9 +29,9 @@ let screenJournalCog = _screenJournalCog.readOnly
 /// tab's path.
 ///
 /// Nothing stores this fact; it exists only as a computation over the
-/// navigation sources, so it can never disagree with them. The journal
-/// mechanism watches it, and equality gating means an unrelated turn — or a
-/// push on a tab that is not selected — re-notifies nobody.
+/// navigation sources, so it cannot disagree with them. The journal mechanism
+/// watches it. Equality gating ignores unrelated turns and pushes on an
+/// unselected tab.
 let currentScreenCog = Cog<TrailScreen> { c in
   let presentedSheet = c[presentedSheetCog]
   if case .hikeLogger(let trailID) = presentedSheet {
@@ -49,9 +49,9 @@ let currentScreenCog = Cog<TrailScreen> { c in
 
 /// Whether the hike logger sheet is up, gating the elapsed-time scope.
 ///
-/// The hike-timer mechanism hangs a `whenever` scope on this cog, so the
-/// ticking task exists exactly while the logger is presented — however it was
-/// presented, including by deep link or restoration.
+/// The hike-timer mechanism gates a `whenever` scope on this cog. The ticking
+/// task exists only while the logger is presented, including by deep link or
+/// restoration.
 let isLoggingHikeCog = Cog<Bool> { c in
   let presentedSheet = c[presentedSheetCog]
   guard case .hikeLogger = presentedSheet else { return false }
@@ -88,9 +88,9 @@ extension CogOps {
 
   /// Replaces one tab's whole stack; the `NavigationStack` binding's setter.
   ///
-  /// System-initiated navigation — the back button, the pop gesture, and
-  /// `NavigationLink(value:)` pushes — flows through here, so both roads into
-  /// navigation converge on the same source. Cog's equal-write discard makes
+  /// System navigation from the back button, pop gesture, and
+  /// `NavigationLink(value:)` pushes flows through here. Both paths into
+  /// navigation reach the same source. Cog discards equal writes, making
   /// SwiftUI's redundant binding writes free.
   ///
   /// - Parameters:
@@ -131,8 +131,8 @@ extension CogOps {
 
   /// Resolves a parsed deep link into one atomic navigation turn.
   ///
-  /// Resolution consults the catalog, so a link to a trail lands with its
-  /// region already on the stack beneath it — the restored back button works.
+  /// Resolution consults the catalog, so a trail link places its region below
+  /// it on the stack. The restored back button then works.
   /// Unknown identities drop the link rather than navigating to a broken
   /// screen. The search case reaches the query source in the domain state
   /// file by calling its operation inside this turn body; the nested turn

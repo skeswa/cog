@@ -13,7 +13,7 @@ import XCTest
 // metric, Apple writes: "A hitch rate at or below 10 ms/s is good; at or below
 // 25 ms/s is a warning; at or below 50 ms/s is critical; and above 50 ms/s
 // warrants immediate attention." That is field data from real devices through
-// the Organizer — a different instrument from `XCTHitchMetric` in a simulator.
+// the Organizer, a different instrument from `XCTHitchMetric` in a simulator.
 // It is quoted here so nobody invents a threshold.
 //
 // **No device requirement is claimed.** Apple does not document which
@@ -24,7 +24,7 @@ import XCTest
 // interval data that is reported as an observation rather than papered over.
 //
 // **What this configuration actually produced**, read out of the result bundle
-// rather than assumed — Xcode 26.4 (17E192), iPhone 17 Pro simulator running
+// rather than assumed, Xcode 26.4 (17E192), iPhone 17 Pro simulator running
 // iOS 26.4 (23E244), Release:
 //
 // - `scrollingAndDecelerationMetric` produced exactly one series,
@@ -58,8 +58,8 @@ final class StorefrontScrollPerformanceUITests: XCTestCase {
   ///
   /// Apple's own reset pattern (WWDC20, session 10077): `manuallyStop`, an
   /// explicit `stopMeasuring()`, and the scroll-position reset **after** it.
-  /// The reset is idempotent — over-scrolling a list that is already at the top
-  /// does nothing — which it has to be, because `iterationCount` is not the
+  /// The reset is idempotent, over-scrolling a list that is already at the top
+  /// does nothing, which it has to be, because `iterationCount` is not the
   /// invocation count: the block runs one extra time and the first result is
   /// discarded.
   func testSettledFeedScrollingPerformance() {
@@ -90,7 +90,7 @@ final class StorefrontScrollPerformanceUITests: XCTestCase {
   /// The burst is the workload's realistic write storm: one turn advances the
   /// inventory generation of every product currently on screen, which
   /// invalidates each of their keyed inventory requests, their pricing ladders
-  /// from the markdown stage down, their badges, and their row values — while
+  /// from the markdown stage down, their badges, and their row values, while
   /// the list is moving.
   ///
   /// It is driven from the benchmark overlay rather than from a timer inside

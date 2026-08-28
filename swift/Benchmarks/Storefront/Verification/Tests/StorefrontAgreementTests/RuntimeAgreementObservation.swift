@@ -9,7 +9,7 @@ import StorefrontWorkload
 /// runtime-invariant outputs plus the runtime's own declarations. Nothing here
 /// is a run count, a cache size, a node count, or any other figure that is
 /// legitimately a property of the implementation strategy rather than of the
-/// shopping session — a suite that compared those would fail four ways for
+/// shopping session, a suite that compared those would fail four ways for
 /// three correct reasons and one real one.
 ///
 /// The shadow's answers travel alongside the runtime's rather than being
@@ -38,11 +38,8 @@ struct RuntimeAgreementObservation: Sendable {
 
   /// How many requests the script still had outstanding when the session ended.
   ///
-  /// Zero is the only acceptable answer, and it is a stronger claim than it
-  /// looks: a runtime that had quietly stopped asking for something would end
-  /// with a *lower* request count and identical rendered output, so this is the
-  /// clause that separates "computed the same answer" from "computed the same
-  /// answer for the same reasons".
+  /// Must be zero. A lower count can also reveal skipped requests even when the
+  /// rendered output matches.
   let outstandingRequestCount: Int
 
   /// Every checkpoint the trace recorded that did not hold.
@@ -75,10 +72,9 @@ struct RuntimeAgreementObservation: Sendable {
 
   /// Whether the shadow's cart had lines in it when the session ended.
   ///
-  /// The order total is only comparable when it does, exactly as
-  /// ``StorefrontSessionDriver/requireSettledOutput(against:)`` requires: an
-  /// empty cart is not a shipment, so the shadow's arithmetic and a runtime's
-  /// guarded shipping and tax quotes are answering different questions.
+  /// Only non-empty carts have comparable order totals, as
+  /// ``StorefrontSessionDriver/requireSettledOutput(against:)`` requires. Empty
+  /// carts have no shipping or tax quotes.
   let shadowCartIsEmpty: Bool
 
   /// How this runtime is named in a failure message.
@@ -99,11 +95,8 @@ struct RuntimeAgreementObservation: Sendable {
 /// What one phase boundary put on screen, and what the shadow said it should
 /// have.
 ///
-/// The `(phase, checksum)` pair the spec's golden fixture records, plus the
-/// identifiers behind the digest so a divergence names products rather than an
-/// integer nobody can interpret, plus the cart's money — and the shadow's answer
-/// to each, captured at the same instant so the comparison never has to
-/// reconstruct a past state.
+/// Captures the phase, checksum, visible IDs, cart money, and shadow answers at
+/// one instant. A failure can name products without rebuilding past state.
 struct PhaseRendering: Sendable, Equatable {
   /// Which boundary this is.
   let phase: StorefrontPhase
@@ -128,10 +121,9 @@ struct PhaseRendering: Sendable, Equatable {
 
   /// Whether the shadow's cart had lines in it at that boundary.
   ///
-  /// The order total is only comparable when it does, exactly as
-  /// ``StorefrontSessionDriver/requireSettledOutput(against:)`` requires: an
-  /// empty cart is not a shipment, so the shadow's arithmetic and a runtime's
-  /// guarded shipping and tax quotes are answering different questions.
+  /// Only non-empty carts have comparable order totals, as
+  /// ``StorefrontSessionDriver/requireSettledOutput(against:)`` requires. Empty
+  /// carts have no shipping or tax quotes.
   let shadowCartIsEmpty: Bool
 }
 
@@ -156,8 +148,8 @@ struct PhaseRendering: Sendable, Equatable {
 ///
 /// ## Why nothing here traps
 ///
-/// The driver's own gates — `requireCheckpointsHold()` and
-/// `requireSettledOutput(against:)` — are `fatalError`s, which is right for a
+/// The driver's own gates, `requireCheckpointsHold()` and
+/// `requireSettledOutput(against:)`, are `fatalError`s, which is right for a
 /// benchmark cut whose timing would otherwise be meaningless. It is wrong here:
 /// this function is called four times before anything is compared, and a trap in
 /// the second call would kill the process before the suite could say which
@@ -170,7 +162,7 @@ struct PhaseRendering: Sendable, Equatable {
 ///   - runtime: The runtime type to build a session around.
 ///   - profile: The world's size. `smoke` is the profile the correctness gate is
 ///     defined on, and it still exercises every structure the reported profiles
-///     do — several categories, the full pricing ladder, a cart with
+///     do, several categories, the full pricing ladder, a cart with
 ///     promotions, and both halves of an inventory burst.
 /// - Returns: Everything the suite compares.
 func observeAgreementSession<Runtime: StorefrontRuntime>(

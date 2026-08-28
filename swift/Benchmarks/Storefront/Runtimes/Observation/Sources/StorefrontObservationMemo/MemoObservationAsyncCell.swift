@@ -3,40 +3,28 @@ internal import StorefrontWorkload
 /// One asynchronous value the port keeps, and everything it needs to decide
 /// whether to ask the service again.
 ///
-/// The port's asynchronous layer is a store of these — one per asynchronous
-/// identity in the Cog port's ten asynchronous declarations, keyed by product
-/// where the Cog declaration is keyed by product. A cell is created lazily on
-/// first demand, because a cell that exists for a product no screen has ever
-/// shown is exactly the eager materialization the workload exists to measure
-/// the absence of.
+/// The async layer stores one cell per demanded identity in Cog's ten async
+/// declarations. Product-keyed work uses product-keyed cells. Lazy creation
+/// avoids state for products no screen has shown.
 ///
 /// ## Reads are total
 ///
-/// ``value`` is the last accepted success, resting on the declaration's default
-/// until one exists. A read never surfaces a loading case, because a loading
-/// case would change what a screen depends on and therefore what re-renders —
-/// the Cog port keeps uncertainty in a separate status lens for the same
-/// reason, and a port that leaked it into the rendered value would be running a
-/// different workload.
+/// ``value`` holds the last success or the declaration default. Reads never
+/// expose loading because that would change screen dependencies and renders.
+/// Cog also keeps request status separate from the rendered value.
 ///
 /// ## Why a request-identity cache is allowed here
 ///
-/// It is the one carve-out the comparison grants both `@Observable` ports, and
-/// it is stated rather than assumed. Nobody re-fires a network request on every
-/// frame; without ``satisfiedKey`` and ``pendingKey`` the port would spin —
-/// render, request, publish, render, request — and measure a defect. What it is
-/// *not* is a memoization of derived work: no synchronous computation is cached
-/// here, only the fact that a particular request has been asked or answered.
+/// Both `@Observable` ports may cache request identity. Without ``satisfiedKey``
+/// and ``pendingKey``, each frame would repeat the request. This caches no
+/// derived computation, only whether a request was asked or answered.
 ///
 /// ## Generations
 ///
-/// ``generation`` is bumped every time the port starts a request for this cell
-/// and every time the cell is dropped. A completing task carries the generation
-/// it was launched with, and the epilogue compares the two: equal means accept,
-/// different means the selection moved on and the result is refused. That is a
-/// refusal by generation, never by task cancellation — the scripted request
-/// boundary leaves cancelled requests suspended by default precisely so a port
-/// cannot pass the stale-result checkpoint by accident.
+/// Starting a request or dropping the cell increments ``generation``. A result
+/// is accepted only when its launch generation still matches. The scripted
+/// service keeps cancelled work suspended, so cancellation cannot hide a stale
+/// result bug.
 ///
 /// A value type, so a cell is copied out of its dictionary, mutated, and
 /// written back. Nothing observes a cell; the port's hand-written invalidation
@@ -49,7 +37,7 @@ struct MemoObservationAsyncCell<Value> {
   /// response has been accepted.
   ///
   /// Comparing this with the identity the current sources imply is what stops
-  /// a settled screen from re-asking for something it already has — and what
+  /// a settled screen from re-asking for something it already has, and what
   /// makes "no duplicate inventory work" provable rather than hoped for.
   var satisfiedKey: StorefrontRequestID?
 
@@ -64,8 +52,8 @@ struct MemoObservationAsyncCell<Value> {
   /// asks.
   var generation = 0
 
-  /// Whether an input this cell's request is *computed from* — rather than
-  /// keyed on — has changed since the last launch.
+  /// Whether an input this cell's request is *computed from*, rather than
+  /// keyed on, has changed since the last launch.
   ///
   /// Three of the workload's requests are keyed on an identity that does not
   /// mention every input the response depends on: the search index is

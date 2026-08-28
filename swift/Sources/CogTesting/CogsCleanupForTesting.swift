@@ -3,11 +3,9 @@ public import Cog
 extension Cogs {
   /// Signals when this context's deinit cleanup reaches the MainActor.
   ///
-  /// Tests that release their last context reference from another executor
-  /// await the acknowledgement before asserting that mechanism registrations
-  /// are gone and owned tasks received cancellation. The signal fires at the
-  /// end of the context's isolated deinit, after every mechanism scope has
-  /// been cancelled and graph dependency chains broken.
+  /// A test that drops its last context reference on another executor can await
+  /// this signal before checking cleanup. It fires after isolated deinit has
+  /// cancelled mechanism scopes and broken graph dependency chains.
   ///
   /// - Parameter acknowledgement: The one-shot signal completed after
   ///   teardown finishes on the MainActor.

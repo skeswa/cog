@@ -70,12 +70,11 @@ package nonisolated struct CogCycleDiagnosticSnapshot: Sendable, Equatable {
 }
 
 extension Cogs {
-  /// Diagnoses whether reading `valueReference` now would close the active computation
-  /// path, without creating a state, recording an edge, or taking the trap.
+  /// Reports whether this read would close the active computation path. It does
+  /// not create state, record an edge, or trigger the production trap.
   ///
-  /// Requiring the exact descriptor-and-key state to exist keeps this testing
-  /// seam observational: a diagnostic query cannot change later lazy creation,
-  /// dependency order, lifetime, or history.
+  /// The exact descriptor and key must already exist. A diagnostic query cannot
+  /// change later creation, dependency order, lifetime, or history.
   package func cycleDiagnosticSnapshot<Value>(
     ifReading valueReference: Cog<Value>
   ) -> CogCycleDiagnosticSnapshot? {

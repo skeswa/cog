@@ -6,11 +6,9 @@ import Testing
 @Test func `ASYNC-39 a CancellationError from an uncancelled current run is a failure`()
   async throws
 {
-  // ASYNC-09 and ASYNC-13 prove Cog's own cancellation publishes nothing. The
-  // converse must stay honest: when work that is still the newest run — and
-  // whose task Cog never cancelled — rethrows a CancellationError from some
-  // inner operation, that is an ordinary failure, not a silent forever-pending
-  // state.
+  // ASYNC-09 and ASYNC-13 prove Cog's own cancellation publishes nothing. If
+  // the newest uncancelled work gets a CancellationError from an inner
+  // operation, it must publish an ordinary failure instead of staying pending.
   let (cogs, m) = Cogs.forTestingWithController()
   let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }

@@ -13,8 +13,8 @@ import os
 
 /// A delegate-style engine that calls back from wherever it happens to be.
 ///
-/// This stands in for the SDKs mechanisms actually wrap — a socket, a location
-/// manager, a sensor — which deliver on their own executor and know nothing
+/// This stands in for SDKs that mechanisms wrap, such as sockets, location
+/// managers, and sensors. They deliver on their own executor and know nothing
 /// about Cog. The engine holds the callback strongly, which is exactly why the
 /// callback must not hold the controller.
 private nonisolated final class SensorEngine: @unchecked Sendable {
@@ -48,9 +48,8 @@ private final class SensorMechanism: Mechanism {
     let delivered = delivered
     engine = SensorEngine { [weak m] reading in
       // The engine's executor is not the MainActor and the controller is not
-      // `Sendable`, so the hop comes first and promotion happens on the other
-      // side of it — the order that makes a torn-down controller observable
-      // rather than a crash.
+      // `Sendable`, so the hop comes first. Promotion on the MainActor makes a
+      // torn-down controller observable instead of causing a crash.
       Task { @MainActor in
         guard let m else {
           delivered.yield(false)

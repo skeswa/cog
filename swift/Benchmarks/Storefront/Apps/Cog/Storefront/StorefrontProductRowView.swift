@@ -7,8 +7,8 @@ import SwiftUI
 ///
 /// The row reads **exactly one** keyed value, `storefrontProductRowCogs[id]`,
 /// and maps it to views. That is the whole point of the declaration existing:
-/// nine inputs — the price ladder, live inventory, the personalized offer, the
-/// favorite flag, the cart quantity, the view history — funnel into one
+/// nine inputs, the price ladder, live inventory, the personalized offer, the
+/// favorite flag, the cart quantity, the view history, funnel into one
 /// equality-gated value, so this body re-runs when what it draws changed and
 /// not when something it does not draw did. An inventory burst that touches an
 /// offscreen product reaches no row on screen at all.

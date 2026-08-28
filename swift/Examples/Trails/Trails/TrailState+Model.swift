@@ -2,9 +2,8 @@ import Foundation
 
 // The value types the domain state's cogs, operations, and mechanisms manage:
 // the identities that key boxes and travel through routes and deep links, the
-// logged-hike record, and the durable snapshot document. Catalog content —
-// what a region or trail *is* — lives in `TrailCatalog.swift`, because content
-// is fixture data rather than state.
+// logged-hike record, and the durable snapshot document. `TrailCatalog.swift`
+// holds region and trail content because it is fixture data, not state.
 
 /// Stable identity for one region across Cog keys, routes, and deep links.
 nonisolated struct RegionID: RawRepresentable, Codable, Hashable, Identifiable, Sendable {

@@ -2,9 +2,9 @@ import Cog
 import Foundation
 
 // Domain state for saved trails, search, and hike logging. Navigation state
-// lives in `NavigationState+Cogs.swift`; the two files stay separate to show
-// that per-file source privacy survives cross-feature operations — a turn
-// body may call the other file's operation, and the nested turn joins.
+// lives in `NavigationState+Cogs.swift`. Per-file source privacy still supports
+// cross-feature operations: a turn may call the other file's operation, and
+// the nested turn joins.
 
 /// Bookmarked trails in the order they were saved.
 private let _savedTrailIDsCog = Cog<[TrailID]>.Manual { [] }
@@ -57,8 +57,8 @@ let hikeCountCogs = CogBox<Int, TrailID> { c, trailID in
 
 /// Whole-value document observed only by the persistence mechanism.
 ///
-/// It aggregates navigation and domain facts from one settled turn, so
-/// storage always sees a coherent app — never a new tab with an old stack.
+/// It aggregates navigation and domain facts from one settled turn, so storage
+/// never sees a new tab with an old stack.
 /// The search query and journal are session-scoped and deliberately absent.
 let trailSnapshotCog = Cog<TrailSnapshot> { c in
   let selectedTab = c[selectedTabCog]
@@ -101,9 +101,9 @@ extension CogOps {
 
   /// Commits a hike entry and dismisses the logger in one settled turn.
   ///
-  /// `dismissSheet` opens a nested turn that joins this one, so the appended
-  /// entry, the reset timer expiry, and the dismissal publish together — no
-  /// observer sees a logged hike behind a still-open logger.
+  /// `dismissSheet` opens a nested turn that joins this one. The new entry,
+  /// reset timer, and dismissal publish together, so no observer sees a logged
+  /// hike behind an open logger.
   ///
   /// - Parameters:
   ///   - trailID: The trail the hike was on.

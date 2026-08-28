@@ -1,35 +1,21 @@
 import XCTest
 
-// The shared launch, wait, and addressing helpers for the Storefront UI
-// performance suite — and the record of what the numbers this suite produces
-// do and do not mean.
+// Shared launch, wait, and addressing helpers for Storefront UI performance.
 //
 // **Simulator data is a pinned regression signal, not a user-experience
-// guarantee.** Every measurement in this bundle is taken on a simulator, which
-// runs on the host's CPU, has no thermal envelope of its own, and composites
-// through the host's window server. A hitch or a wall-clock figure collected
-// there is comparable with another figure collected on the same host, the same
-// pinned Xcode, and the same simulated device — and that comparability is
-// exactly what a regression gate needs. It is not evidence about what a person
-// holding an iPhone experiences. An **absolute** hitch-ratio target belongs on
-// a pinned physical device and nowhere else.
+// guarantee.** Simulator results are comparable only on the same host, pinned
+// Xcode, and simulated device. They can catch regressions but do not describe
+// physical iPhone performance. Absolute hitch targets need a pinned device.
 //
 // **Apple's published guidance, quoted.** For the Xcode Organizer's Hitches
-// metric, Apple writes: "A hitch rate at or below 10 ms/s is good; at or below
-// 25 ms/s is a warning; at or below 50 ms/s is critical; and above 50 ms/s
-// warrants immediate attention." Those thresholds are about field data from
-// real devices reported through the Organizer, which is a different instrument
-// from `XCTHitchMetric` in a simulator; they are recorded here so that nobody
-// invents a number, not because this suite is measured against them.
+// metric, Apple defines bands at 10, 25, and 50 ms/s. Those thresholds cover
+// Organizer field data from real devices, not simulator `XCTHitchMetric`. This
+// suite does not gate against them.
 //
 // **No device requirement is claimed.** Apple does not document which
-// `XCTMetric` types require a physical device. Some of these measurements may
-// well be less meaningful — or unavailable — on a simulator, but this file
-// makes no claim about which, because the claim would not be sourced. Where a
-// metric produced nothing on a simulator, that is reported as an observation
-// rather than turned into a rule; `StorefrontScrollPerformanceUITests.swift`
-// records the one such observation this suite has actually made, which is that
-// `XCTHitchMetric` contributes no series to a simulator result bundle.
+// `XCTMetric` types require a physical device. This file makes no unsourced
+// claim. `StorefrontScrollPerformanceUITests.swift` records one observation:
+// `XCTHitchMetric` produced no simulator result series.
 
 /// Every accessibility identifier this suite addresses.
 ///
@@ -37,7 +23,7 @@ import XCTest
 /// bundle links neither the application nor `CogStorefront`: a UI test drives
 /// an app through its interface, and a runner that linked the workload would
 /// hold a second copy of the workload's globals in its own process for no
-/// benefit — nothing asserted here needs a profile number, only a string the
+/// benefit, nothing asserted here needs a profile number, only a string the
 /// interface exposes. The cost of the copy is that renaming an identifier on
 /// one side fails a `waitForExistence` on the other, which is a loud failure at
 /// the first test rather than a quiet one later.
@@ -98,7 +84,7 @@ enum StorefrontUITestSession {
   /// behaviour of a real SwiftUI list, a real navigation, and a real search
   /// field, and it must finish quickly enough to run on every pull request. A
   /// launch that wanted the representative workload passes `standard`
-  /// explicitly — the application requires that, and defaults to `smoke`
+  /// explicitly, the application requires that, and defaults to `smoke`
   /// otherwise.
   static let profile = "smoke"
 
@@ -200,8 +186,8 @@ enum StorefrontUITestSession {
   /// `manuallyStop` is Apple's own pattern for a measurement that has to undo
   /// its own effect: the block ends the measured region with `stopMeasuring()`
   /// and then puts the app back where it started. It matters here because
-  /// `iterationCount` is **not** the invocation count — the block runs one
-  /// extra time and the first result is discarded — so every reset a block
+  /// `iterationCount` is **not** the invocation count, the block runs one
+  /// extra time and the first result is discarded, so every reset a block
   /// performs has to be idempotent and has to tolerate that extra run.
   ///
   /// - Parameter iterations: How many results to keep.

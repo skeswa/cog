@@ -26,9 +26,8 @@ import Testing
 
 @MainActor
 @Test func `READ-02 a shared automatic cog runs once for all its readers`() {
-  // The cache belongs to the cog, not to the reader, so a value two consumers
-  // both need is computed once — the property that keeps a diamond from
-  // computing its shared parent twice.
+  // The cache belongs to the cog, not the reader. Two consumers share one
+  // computation, which keeps a diamond from computing its parent twice.
   var sharedRuns = 0
 
   let cogs = Cogs.forTesting()

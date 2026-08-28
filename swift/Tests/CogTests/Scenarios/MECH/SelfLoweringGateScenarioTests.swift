@@ -4,10 +4,8 @@ import Testing
 
 @MainActor
 @Test func `MECH-11 one turn may wake a scoped reaction and lower its own gate`() async {
-  // The scope's teardown replaces a reaction run in the ordinary flush order:
-  // the gate watch registered first, so it runs first, and the woken sibling
-  // reaction inside the scope never runs after teardown even though the same
-  // turn changed its dependency.
+  // The gate watch registered first, so it tears down the scope first in flush
+  // order. A sibling reaction woken by the same turn must not run afterward.
   let scopeOpen = Cog<Bool>.Manual { true }
   let dependency = Cog<Int>.Manual { 0 }
   var scopedSeen: [Int] = []

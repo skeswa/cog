@@ -1,11 +1,9 @@
 /// The shared operation surface of the app runtime and a mechanism's
 /// controller.
 ///
-/// An op is an ordinary method written once in an `extension CogOps` and
-/// callable on both capabilities: application code and views call it on the
-/// retained `Cogs`, while a mechanism calls it on the controller its `operate`
-/// received. One definition therefore serves every legitimate write site
-/// without handing mechanisms the raw runtime (§3.2, §6.2).
+/// Define an op once in an `extension CogOps`. App code and views call it on
+/// `Cogs`; a mechanism calls it on its controller. Both can write through the
+/// same API without giving a mechanism the raw runtime (§3.2, §6.2).
 ///
 /// ```swift
 /// extension CogOps {
@@ -15,11 +13,9 @@
 /// }
 /// ```
 ///
-/// The protocol carries exactly the op primitives — `turn`, non-tracking
-/// `peek`, and async `refresh` — and nothing that registers reactions or
-/// exposes storage. Conformances outside Cog are unsupported: the two
-/// capabilities are ``Cogs`` and ``MechanismController``, and ops written
-/// against this protocol are what keeps them interchangeable.
+/// The protocol has only the op primitives: `turn`, non-tracking `peek`, and
+/// async `refresh`. It cannot register reactions or expose storage. Only
+/// ``Cogs`` and ``MechanismController`` may conform.
 @MainActor
 public protocol CogOps {
   /// Opens one named turn and runs `body` against its staged writes.

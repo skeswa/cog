@@ -49,8 +49,8 @@ import Testing
 
       // The reaction stays quiet through its assembly run (count is still 0
       // and the context reference is still nil) and seeds only when the turn
-      // below wakes it, so the trap fires mid-flush — a different re-entrancy
-      // point than the mid-turn and mid-settle children above.
+      // below wakes it. The trap fires mid-flush, unlike the mid-turn and
+      // mid-settle children above.
       var cogs: Cogs?
       cogs = Cogs.forTesting(mechanisms: [
         MechanismProbe { m in

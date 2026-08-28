@@ -7,7 +7,7 @@ import Testing
 ///
 /// This is the gate every reported state-graph number depends on. The trace
 /// itself is runtime-neutral and lives in `StorefrontWorkload`; what this suite
-/// pins is that ``StateGraphStorefrontRuntime`` satisfies it — the same
+/// pins is that ``StateGraphStorefrontRuntime`` satisfies it, the same
 /// checkpoints, against the same script and the same shadow model, that the Cog
 /// reference satisfies in its own package. A comparison benchmark whose port was
 /// never held to the reference's own claims would be measuring something nobody
@@ -34,9 +34,9 @@ struct StorefrontStateGraphRuntimeTests {
   /// The port is held to every claim the trace can make, with nothing skipped.
   ///
   /// The skip path exists for a runtime that declares no per-generation refresh
-  /// handle and no lifetime release. This one declares both — the handles and
+  /// handle and no lifetime release. This one declares both, the handles and
   /// the release sweep are hand-written, which is a fact about how much the
-  /// port had to supply rather than a reason to be excused from proving them —
+  /// port had to supply rather than a reason to be excused from proving them,
   /// so a skip appearing here would mean the two sharpest checkpoints in the
   /// trace had quietly stopped being asserted, which an "every checkpoint holds"
   /// loop cannot detect because a skip holds by construction.
@@ -56,8 +56,8 @@ struct StorefrontStateGraphRuntimeTests {
   /// Separate from the checkpoint loop because it is a different kind of claim.
   /// The checkpoints are per phase and several of them read a declared number;
   /// `requireSettledOutput(against:)` reads none, admits no per-runtime
-  /// variation, and additionally proves the session ended with no outstanding
-  /// request — so a port that reached the right screen by leaving work in flight
+  /// variation, and also proves the session ended with no outstanding
+  /// request, so a port that reached the right screen by leaving work in flight
   /// fails here rather than looking correct.
   @Test("the settled session matches the shared shadow and leaves nothing outstanding")
   func settledSessionMatchesTheShadow() async throws {

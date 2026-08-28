@@ -5,9 +5,8 @@ import SwiftUI
 ///
 /// Every row shows the URL that reproduces its screen, and tapping a row
 /// feeds that link back through the same `open` operation that Safari or a
-/// widget would use. The list itself is written by the journal mechanism's
-/// reaction on the derived current screen — the app carries no per-screen
-/// tracking code.
+/// widget would use. A journal mechanism reacts to the derived current screen
+/// and writes the list, so screens need no tracking code.
 struct JournalScreen: View {
   /// Runtime resolved directly by this screen boundary.
   @Environment(\.cogs) private var cogs

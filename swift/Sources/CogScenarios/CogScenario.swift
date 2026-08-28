@@ -3,9 +3,8 @@ public import Cog
 /// One benchmark graph shape, the turns driven through it, and the number of
 /// selector runs it should cost.
 ///
-/// The ported `js-reactivity-benchmark` cases (perf §9.2) are values of this
-/// type, shared by `CogScenarioTests` and — later — the separate benchmark
-/// package. Sharing them is the point: a run-count assertion and a timing
+/// The ported `js-reactivity-benchmark` cases (perf §9.2) use this type in both
+/// `CogScenarioTests` and the benchmark package. A run-count assertion and timing
 /// measurement that disagree about which graph they ran would make both
 /// meaningless.
 ///
@@ -52,8 +51,8 @@ public struct CogScenario {
   /// Runs the whole scenario once in `cogs` and reports actual against
   /// expected.
   ///
-  /// Each call uses a fresh counter, so a scenario may be run repeatedly — in
-  /// a benchmark loop — without earlier runs contaminating the count. Give
+  /// Each call uses a fresh counter, so benchmark loops do not mix counts from
+  /// earlier runs. Give
   /// each call its own isolated context:
   /// declarations create their state lazily per context, so a reused context
   /// would start warm and undercount.
@@ -93,7 +92,7 @@ public nonisolated struct CogScenarioResult: Sendable, Equatable {
   /// arithmetic its upstream original asserts on.
   public let finalValue: Int
 
-  /// Whether Cog did exactly the work the shape requires — no more, no less.
+  /// Whether Cog ran the exact number of selectors this shape requires.
   ///
   /// Exact equality in both directions on purpose. Too many runs is duplicate
   /// work, which is the whole point of counting; too few means the scenario

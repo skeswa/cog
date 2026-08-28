@@ -93,7 +93,7 @@ public struct ReactionReader {
   ///
   /// `c.status[asyncValue]` inside a reaction records the async state itself
   /// as the dependency, so every pending, success, and failure turn reruns
-  /// the reaction — the opposite gating from the value read beside it. The
+  /// the reaction. A value read reruns only when the value changes. The
   /// lens has no spelling for manual or automatic cogs: synchronous state has
   /// no request status, and asking for it is a type error.
   public var status: Status {

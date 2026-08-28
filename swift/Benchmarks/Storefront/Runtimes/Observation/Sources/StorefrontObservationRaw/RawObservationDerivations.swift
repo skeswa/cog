@@ -2,31 +2,21 @@ import StorefrontWorkload
 
 // Every derived value in the Storefront workload, recomputed from scratch.
 //
-// The twenty-four keyless and eight keyed derived declarations the Cog port
-// declares appear below as ordinary Swift functions. There is no cache, no
-// dirty bit, no memo, no version stamp, and no edge list anywhere in this file,
-// at any granularity — not across renders, not across observers, and not across
-// two calls inside one render. Calling `visibleProductIDs()` and then
-// `prefetchProductIDs()` runs the whole search funnel twice, because neither
-// call can know the other happened.
+// Cog's 24 keyless and eight keyed derived declarations appear as plain
+// functions. This file has no cache, dirty bit, version, or edge list. Even two
+// calls in one render recompute their shared work.
 //
 // The one thing a function does keep is its own locals. Building the product
-// index once at the top of a funnel pass and reading it inside that pass is an
-// ordinary local variable, not a cache: nothing survives the call. That line is
-// drawn deliberately and is recorded in this target's `README.md` as a
-// disclosed choice, because the alternative — rebuilding a catalog-sized
-// dictionary inside a filter that runs once per candidate — is quadratic in the
-// catalog and would measure a strawman rather than a floor. The per-row keyed
-// functions take the literal reading and rebuild what they need on every call,
-// so a row whose price and badges are both wanted builds the index twice.
+// index once inside a call is a local, not a cache. Rebuilding that index for
+// each candidate would make the filter quadratic and misstate the raw floor.
+// Per-row functions still rebuild what they need on every call.
 //
 // What each function reads is exactly what its Cog counterpart reads, including
 // the two deliberate omissions the Cog declarations document: filter
 // eligibility consults the *catalog's* stock rather than live inventory, and
 // ranking uses the *list* price rather than the sixteen-stage effective one.
-// Reproducing those is not an optimization; a port that consulted live
-// inventory to filter would demand an inventory request for every product in
-// the catalog and would be running a different session.
+// These choices preserve the workload. Filtering on live inventory would
+// request inventory for every catalog product and run a different session.
 extension RawObservationStorefrontRuntime {
   // MARK: - Query
 
@@ -189,7 +179,7 @@ extension RawObservationStorefrontRuntime {
 
   /// The visible products plus the prefetch margin on either side.
   ///
-  /// This — not the visible set — is what demands per-row asynchronous work,
+  /// This, not the visible set, is what demands per-row asynchronous work,
   /// and it is the reason a 1,200-product catalog does not produce 1,200
   /// inventory requests even in a port with no invalidation graph at all: the
   /// render walks the window, so a product outside it is never asked about.
@@ -396,7 +386,7 @@ extension RawObservationStorefrontRuntime {
   /// The best compatible set of promotions for the current cart.
   ///
   /// The bounded dynamic-programming pass, run synchronously because a shopper
-  /// who types a coupon expects the total to move on the same frame — and run
+  /// who types a coupon expects the total to move on the same frame, and run
   /// again on every read, because this port memoizes nothing.
   func promotionPlan() -> PromotionPlan {
     let cartLines = cartLines()

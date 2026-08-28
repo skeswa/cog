@@ -32,12 +32,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
   /// argument for reading the two fields below without revalidating them
   /// against the context's own descriptor registry.
   ///
-  /// The descriptor is otherwise immutable after construction. These three
-  /// fields are the deliberate exception: they are a pure cache of what
-  /// ``CogArenaCore`` would otherwise re-derive — a dictionary lookup, a
-  /// checked downcast of the erased column, and a second dictionary lookup for
-  /// the slot — on **every** keyless read, write, and lifetime renewal. They
-  /// are mutated only on the MainActor, like every other graph field.
+  /// The descriptor is otherwise immutable. These fields cache three costs:
+  /// the descriptor lookup, a checked column downcast, and the slot lookup.
+  /// Without them, every keyless read, write, and lifetime renewal would pay
+  /// all three. Like other graph fields, they change only on the MainActor.
   #if !COG_ARENA_COMPACT
   @usableFromInline
   #endif
@@ -155,8 +153,8 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 
   /// The keyless arena location memoized for `context`, if one is filed.
   ///
-  /// The caller still has to prove the slot is live — the memo deliberately
-  /// records no invalidation of its own. See ``memoizedArenaSlot``.
+  /// The caller must still prove the slot is live. The memo has no invalidation
+  /// hook of its own. See ``memoizedArenaSlot``.
   ///
   /// - Parameter context: The reading context's ``CogArenaCore/contextIdentity``.
   /// - Returns: The declaration's keyless slot and typed column in that exact
@@ -214,11 +212,10 @@ internal final class ManualCogDescriptor<Value>: CogDescriptor {
 
 /// The two forms a manual declaration's starting value can take.
 ///
-/// Both are closures, never a stored value: a descriptor outlives every state
-/// it names, so a value captured here once would be handed to every context,
-/// every key of a box, and every `whileObserved` state recreated after a
-/// release — sharing one object among all of them whenever `Value` is or
-/// contains a reference type (§3.1). Public initializers select the case from
+/// Both cases store closures because a descriptor outlives every state it names.
+/// Storing one value would share it across contexts, box keys, and recreated
+/// `whileObserved` states. Reference values would then share one object (§3.1).
+/// Public initializers select the case from
 /// `{ 0 }` or `{ key in ... }`.
 ///
 /// Both are MainActor-isolated because lazy state creation is graph work; the

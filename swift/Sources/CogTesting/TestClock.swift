@@ -103,10 +103,9 @@ public nonisolated final class TestClock: Clock, @unchecked Sendable {
 
   /// How many sleeps are registered and not yet resumed.
   ///
-  /// A lifetime test asserts this to prove that a grace period holds exactly
-  /// the timers it claims — for example, that a renewed grace reuses one
-  /// sleeper rather than accumulating them — and that release work actually
-  /// released its timer. The count changes only through ``sleep(until:tolerance:)``,
+  /// A lifetime test uses this count to check how many timers grace owns. For
+  /// example, renewal should replace one sleeper instead of adding another.
+  /// Release should remove it. The count changes only through ``sleep(until:tolerance:)``,
   /// ``advance(by:)``, cancellation, and ``finish()``.
   public var activeSleeperCount: Int {
     state.withLock { $0.sleepers.count }
@@ -114,9 +113,9 @@ public nonisolated final class TestClock: Clock, @unchecked Sendable {
 
   /// The most sleeps ever registered at once over this clock's lifetime.
   ///
-  /// The high-water mark distinguishes "one timer, renewed N times" from "N
-  /// timers that happened to resolve before the assertion ran" — a difference
-  /// ``activeSleeperCount`` alone cannot see, because it reads one moment.
+  /// The high-water mark separates one timer renewed N times from N timers that
+  /// finished before the assertion. ``activeSleeperCount`` sees only the current
+  /// moment.
   public var maximumActiveSleeperCount: Int {
     state.withLock { $0.maximumActiveSleeperCount }
   }

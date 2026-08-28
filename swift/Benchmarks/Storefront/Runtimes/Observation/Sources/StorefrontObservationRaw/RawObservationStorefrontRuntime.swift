@@ -10,7 +10,7 @@ public import StorefrontWorkload
 /// ordinary Swift function that runs end to end whenever it is called. There is
 /// no cache, no memo, no dirty bit, no version stamp, and no dependency edge
 /// anywhere in the derivation layer. A browse render runs the whole search
-/// funnel twice — once for the visible window and once for the prefetch margin —
+/// funnel twice, once for the visible window and once for the prefetch margin,
 /// and runs the seventeen-stage pricing ladder from its base price for every
 /// demanded row, twice for each row whose price and badges are both wanted.
 ///
@@ -18,7 +18,7 @@ public import StorefrontWorkload
 /// and nothing else, so the cost of Cog's machinery can be read against them
 /// rather than against an intuition. It is expected to be slow on the pricing
 /// ladder and on search over the full catalog, and its declared semantics differ
-/// from Cog's on the invalidation checkpoints — see ``descriptor``. Both are
+/// from Cog's on the invalidation checkpoints, see ``descriptor``. Both are
 /// results, not defects.
 ///
 /// ## Disclosed deviations
@@ -37,8 +37,8 @@ public import StorefrontWorkload
 ///    hiding a bespoke invalidation graph behind the scope.
 ///
 /// 2. **A request-identity cache in the asynchronous layer**, and only there.
-///    Without it the port would spin — render, request, publish, render,
-///    request — because nothing else could tell it that this is the same
+///    Without it the port would spin, render, request, publish, render,
+///    request, because nothing else could tell it that this is the same
 ///    question it already asked. It caches no derived value. See
 ///    ``RawObservationAsyncDemand``.
 ///
@@ -93,13 +93,13 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Every value is measured rather than aspirational, and three of them differ
   /// from Cog's on purpose:
   ///
-  /// - `browseRunsPerEqualWrite: 1` — writing the sort mode that is already
+  /// - `browseRunsPerEqualWrite: 1`, writing the sort mode that is already
   ///   selected renders anyway. The port cannot tell that nothing changed;
   ///   knowing that is exactly what an invalidation graph is for, and declaring
   ///   `0` here would be a lie about a claim the filter phase measures.
-  /// - `browseRunsPerUndemandedInvalidation: 1` — an inventory burst that
+  /// - `browseRunsPerUndemandedInvalidation: 1`, an inventory burst that
   ///   touches only offscreen products still renders once, for the same reason.
-  /// - `releasesUnobservedValues: false` — there is no lifetime model here
+  /// - `releasesUnobservedValues: false`, there is no lifetime model here
   ///   because there is nothing to release: no derived value survives the call
   ///   that computed it, and an accepted response is kept for the session. The
   ///   teardown phase records an explicit skip for its release proof rather than
@@ -115,7 +115,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   ///
   /// `accountRunsThroughSignIn: 2` and `browseRunsPerContentChangingTurn: 1`
   /// coincide with Cog for a reason worth stating: one transaction is one
-  /// render, and every held observer runs in every render — so registration
+  /// render, and every held observer runs in every render, so registration
   /// accounts for the first account run and the accepted response for the
   /// second.
   public static let descriptor = StorefrontRuntimeDescriptor(
@@ -177,14 +177,14 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Whether a render is in progress.
   ///
   /// Suppresses the reentrant render a write taken *inside* an observer would
-  /// otherwise cause — the account observer writes the shopper it just accepted
-  /// — so one transaction stays one settlement.
+  /// otherwise cause, the account observer writes the shopper it just accepted
+  ///, so one transaction stays one settlement.
   private var isRendering = false
 
   /// Whether asynchronous reads should record what they want.
   ///
-  /// True only during the observer pass. A settled inspection — the two peeks
-  /// the trace takes — must create no demand, and gating on this is what keeps
+  /// True only during the observer pass. A settled inspection, the two peeks
+  /// the trace takes, must create no demand, and gating on this is what keeps
   /// a peek from starting a request the session never asked for.
   var isCollectingDemand = false
 
@@ -193,7 +193,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Advanced only when an accepted catalog actually differs from the one in
   /// hand, which is what a hand-written app means by `didAcceptCatalog`. Every
   /// asynchronous slot that reads the catalog but whose request identity does
-  /// not mention it — the search index above all — carries this number in its
+  /// not mention it, the search index above all, carries this number in its
   /// demand.
   var catalogEpoch = 0
 
@@ -243,7 +243,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Builds a fresh, isolated runtime whose initial state has already settled.
   ///
   /// The service and the starting window are written before the first render,
-  /// and that first render is where every held observer runs once — which is
+  /// and that first render is where every held observer runs once, which is
   /// what the bootstrap phase's browse-run count is a claim about.
   ///
   /// - Parameters:
@@ -456,8 +456,8 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   ///
   /// Every touched product's generation advances in one transaction, which is
   /// what a warehouse feed looks like. This port renders once for the burst
-  /// whether or not anything on screen was touched — see
-  /// ``StorefrontRuntimeSemantics/browseRunsPerUndemandedInvalidation`` — but it
+  /// whether or not anything on screen was touched, see
+  /// ``StorefrontRuntimeSemantics/browseRunsPerUndemandedInvalidation``, but it
   /// still asks the service for nothing on behalf of the offscreen half,
   /// because that half is outside the window the render walks.
   ///
@@ -549,7 +549,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// The footprint cut's subject, and this port's honest answer to it: the read
   /// runs the whole funnel and then keeps **nothing**. There is no materialized
   /// search index, candidate set, eligibility map, score table, or ranking left
-  /// behind to weigh, because this port never materializes any of them — which
+  /// behind to weigh, because this port never materializes any of them, which
   /// is why its footprint number is small and its time number is not.
   ///
   /// - Returns: The ranked product identifiers, in rank order.
@@ -565,7 +565,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   ///
   /// The barrier is armed before `body` runs, because a scripted release can
   /// resume and publish before the caller would otherwise be suspended, and it
-  /// is fired on both branches of the epilogue — a refused stale result is a
+  /// is fired on both branches of the epilogue, a refused stale result is a
   /// completed decision.
   ///
   /// - Parameter body: The release that will produce the result.
@@ -580,8 +580,8 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   ///
   /// No derived value survives the call that computed it and every accepted
   /// response is kept for the session, so there is no lifetime decision to make
-  /// and no clock to advance. The declaration says so —
-  /// ``StorefrontRuntimeSemantics/releasesUnobservedValues`` is `false` — and
+  /// and no clock to advance. The declaration says so,
+  /// ``StorefrontRuntimeSemantics/releasesUnobservedValues`` is `false`, and
   /// the teardown phase records an explicit skip rather than passing its release
   /// proof for the wrong reason.
   ///
@@ -592,8 +592,8 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
 
   /// Applies one transaction's writes and settles it.
   ///
-  /// A write taken from inside a render — the account observer writing the
-  /// shopper it just accepted — applies without settling again, so one user
+  /// A write taken from inside a render, the account observer writing the
+  /// shopper it just accepted, applies without settling again, so one user
   /// action stays one render however many observers participate in it.
   ///
   /// - Parameter body: The writes this transaction owns.
@@ -606,8 +606,8 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Runs every held observer once and reconciles what they asked for.
   ///
   /// The observers run inside one `withObservationTracking` scope with an empty
-  /// change callback. The scope is not how this port decides to render — see
-  /// the type's disclosed deviations — but it keeps the registrar's
+  /// change callback. The scope is not how this port decides to render, see
+  /// the type's disclosed deviations, but it keeps the registrar's
   /// registration and notification costs in the sample, which is what makes
   /// this a measurement of raw Observation rather than of a hand-rolled
   /// invalidation graph wearing its name.
@@ -617,10 +617,8 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
     pendingDemand.removeAll(keepingCapacity: true)
     pendingGuards.removeAll(keepingCapacity: true)
     withObservationTracking {
-      // The account observer runs first, for the reason the Cog mechanism
-      // registers it first: it writes the accepted shopper, and every observer
-      // after it in this same render must price against the shopper the session
-      // actually has rather than the one it had a moment ago.
+      // The account observer runs first, matching the Cog mechanism. It writes
+      // the accepted shopper before later observers price this render.
       if holds.contains(.account) { renderAccount() }
       if holds.contains(.browse) { renderBrowse() }
       if holds.contains(.search) { renderSearch() }
@@ -684,7 +682,7 @@ public final class RawObservationStorefrontRuntime: StorefrontRuntime {
   /// Renders the open product's detail payload and the recommendation shelf.
   ///
   /// Reading nothing else when no product is open is what makes the detail
-  /// payload and the recommendation shelf undemanded — which, in a port with a
+  /// payload and the recommendation shelf undemanded, which, in a port with a
   /// lifetime model, is what would let them be released.
   private func renderDetail() {
     guard let selectedProduct = model.selectedProduct else {

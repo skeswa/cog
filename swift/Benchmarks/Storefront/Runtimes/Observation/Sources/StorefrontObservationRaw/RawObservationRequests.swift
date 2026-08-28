@@ -10,8 +10,8 @@ import StorefrontWorkload
 // accepted value on the model, and one record of what it last asked for.
 //
 // Reads are **total**. A value read returns the last accepted success and rests
-// on the same declaration default its Cog counterpart rests on — `.empty`,
-// `nil`, `[]`, `.unknown`, `.none`, `.pending` — so a request in flight never
+// on the same declaration default its Cog counterpart rests on, `.empty`,
+// `nil`, `[]`, `.unknown`, `.none`, `.pending`, so a request in flight never
 // makes a value unavailable and no loading case ever reaches a screen. Surfacing
 // one would change what the browse observer depends on and therefore its run
 // counts, which is a different session rather than a different rendering.
@@ -42,7 +42,7 @@ extension RawObservationStorefrontRuntime {
   /// The accepted search index, demanding it.
   ///
   /// Its request identity carries nothing, so the accepted-catalog epoch is what
-  /// tells the port that the index has to be built again — the whole reason a
+  /// tells the port that the index has to be built again, the whole reason a
   /// slot and a request identity are two different things here. The Cog
   /// declaration expresses the same fact by reading the catalog's products
   /// inside its selector.
@@ -61,7 +61,7 @@ extension RawObservationStorefrontRuntime {
   /// The accepted suggestions for the current query, demanding them.
   ///
   /// Keyed off the *normalized* query, so two keystrokes that normalize the same
-  /// way do not start two generations — which is exactly what the search phase
+  /// way do not start two generations, which is exactly what the search phase
   /// counts.
   func suggestionsValue() -> [String] {
     let normalizedQuery = normalizedQuery()
@@ -101,7 +101,7 @@ extension RawObservationStorefrontRuntime {
   /// The accepted inventory reading for one product, demanding it.
   ///
   /// The generation is part of the request identity, so an inventory burst that
-  /// touches this product asks a different question — but only if something
+  /// touches this product asks a different question, but only if something
   /// still reads this product at all.
   ///
   /// - Parameter id: Which product.
@@ -164,7 +164,7 @@ extension RawObservationStorefrontRuntime {
   /// discounted subtotal, which is downstream of the promotion plan, which is
   /// downstream of every cart line, which is downstream of every pricing ladder.
   /// This port recomputes that entire chain to answer the question of *which*
-  /// quote to ask for, on every render — which is the cost being measured.
+  /// quote to ask for, on every render, which is the cost being measured.
   func shippingQuoteValue() -> ShippingQuote {
     let cartLineIDs = cartLineIDs()
     guard !cartLineIDs.isEmpty else {
@@ -253,13 +253,13 @@ extension RawObservationStorefrontRuntime {
   ///
   /// Runs at the close of every render, synchronously, on the MainActor, so
   /// every selection reaches ``StorefrontService/schedule(_:)`` before any task
-  /// launches — which is what lets the scripted driver see and release work by
+  /// launches, which is what lets the scripted driver see and release work by
   /// name. A slot whose demand is unchanged is left alone: that is the
   /// request-identity cache, and without it every render would re-ask the
   /// service for answers it already has.
   ///
-  /// A slot nobody read is left alone too, in both directions — its value stays
-  /// and its request is not replaced — because this port releases nothing.
+  /// A slot nobody read is left alone too, in both directions, its value stays
+  /// and its request is not replaced, because this port releases nothing.
   func reconcileAsyncDemand() {
     for (slot, wanted) in pendingDemand {
       var record = records[slot] ?? RawObservationAsyncRecord()
@@ -463,8 +463,8 @@ extension RawObservationStorefrontRuntime {
   /// Runs one request off the MainActor and brings its result back to decide
   /// about it.
   ///
-  /// The work closure is `@concurrent` so the heavy kernels — indexing the
-  /// catalog, scoring it against a taste vector — leave the MainActor, exactly
+  /// The work closure is `@concurrent` so the heavy kernels, indexing the
+  /// catalog, scoring it against a taste vector, leave the MainActor, exactly
   /// as the Cog port's `.run { @concurrent … }` bodies do. A comparison that ran
   /// them on the MainActor in one runtime and off it in another would be
   /// measuring where the work happened.
@@ -501,7 +501,7 @@ extension RawObservationStorefrontRuntime {
   /// cancelled work suspended can defeat.
   ///
   /// The barrier fires on **both** branches, because a stale result the runtime
-  /// deliberately refuses is exactly as much of a decision as one it publishes —
+  /// deliberately refuses is exactly as much of a decision as one it publishes,
   /// and the search phase's stale step is built on being able to wait for it.
   /// Rendering happens before the barrier fires, so the trace's next line reads
   /// a settled sink.

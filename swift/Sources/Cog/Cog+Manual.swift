@@ -25,8 +25,8 @@ extension Cog {
   /// collapse to the final staged value before equality and propagation.
   ///
   /// Pass `name:` when `fileID:line` would be unclear in diagnostics or history.
-  /// Names do not define identity. The declaration and all graph access are
-  /// MainActor-isolated, allowing non-`Sendable` values to remain inside Cog.
+  /// Names do not define identity. MainActor isolation lets non-`Sendable`
+  /// values remain inside Cog.
   @MainActor
   public struct Manual {
     /// Stable declaration identity and behavior shared by reference copies.
@@ -58,9 +58,10 @@ extension Cog {
     /// one object to mutate. Cog runs the closure once per state instead, which
     /// is the only place a per-state value can be made.
     ///
-    /// Keep it cheap and free of side effects: the app decides when a state
-    /// first appears, and — under
-    /// ``ManualCogLifetime/whileObserved(resetToInitial:grace:)`` — how often.
+    /// Keep it cheap and free of side effects. The app decides when a state
+    /// first appears. Under
+    /// ``ManualCogLifetime/whileObserved(resetToInitial:grace:)``, it also
+    /// decides how often the closure runs.
     /// It is an ordinary MainActor closure, receives no ``Reader``, and creates
     /// no dependencies.
     ///

@@ -3,9 +3,8 @@ import SwiftUI
 
 // SwiftUI adapters for the navigation containers, kept separate from graph
 // declarations and operations. Each binding pairs a tracked getter with a
-// named domain operation, so system-driven mutations — tab taps, back
-// gestures, interactive sheet dismissal, NavigationLink pushes — enter the
-// graph as ordinary turns.
+// named domain operation. Tab taps, back gestures, sheet dismissal, and
+// NavigationLink pushes then enter the graph as ordinary turns.
 
 extension Cogs {
   /// Tracked binding for the tab bar's selection.

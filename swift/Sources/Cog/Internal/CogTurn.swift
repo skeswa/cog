@@ -23,8 +23,8 @@
 ///
 /// A value rather than an object. Object identity did the same job and cost an
 /// allocation and an isolated deallocation on every turn, which `M9-01`
-/// measured; a monotonically increasing integer is unforgeable for the same
-/// reason a fresh object was — the context is the only thing that advances it.
+/// measured. A monotonic integer is just as hard to forge because only the
+/// context advances it.
 #if !COG_ARENA_COMPACT
 @usableFromInline
 #endif
@@ -35,9 +35,8 @@ internal nonisolated struct CogTurnID: Hashable, Sendable {
 
 /// The staged sources and identity collected while one turn accumulates.
 ///
-/// Manual values and async status share arena slots, so one ordered flush can
-/// assign a single revision before invalidation reaches Observation boundaries
-/// and reactions.
+/// Manual values and async status share arena rows. One ordered flush gives them
+/// one revision before invalidation reaches UI boundaries and reactions.
 #if !COG_ARENA_COMPACT
 @usableFromInline
 #endif
@@ -56,9 +55,9 @@ internal final class CogTurn {
   /// The turn's diagnostic name.
   ///
   /// Debug-only storage: history and the turn-chain tracker consume the name
-  /// from `startTurn`'s parameter, and no release path reads it back off the
-  /// turn object — so a release build storing it paid a bridge retain and a
-  /// release of the previous name on every turn for a string nothing read
+  /// from `startTurn`'s parameter, and no release path reads this property.
+  /// Storing it in release caused a bridge retain and released the prior name
+  /// on every turn, even though nothing read the string
   /// (M11-04). The trap that names an attempted turn (CYCLE-06) formats its
   /// message from the call-site parameter, not from this property.
   private(set) var name = ""
@@ -73,10 +72,10 @@ internal final class CogTurn {
   /// Rebinds this object to a new turn.
   ///
   /// One object per context rather than one per turn, so the staged-source
-  /// buffers keep the capacity they reached instead of growing from zero every
-  /// time a source is written. Turns never overlap — a nested turn joins the
-  /// accumulating turn and a turn during a flush is queued — so a single
-  /// object is the whole of the state a turn needs.
+  /// buffers keep their capacity instead of growing from zero on each write.
+  /// Turns never overlap. A nested turn joins the open turn, while a turn
+  /// requested during a flush waits in the queue. One object can therefore
+  /// hold all turn state.
   ///
   /// The buffers must already be empty: `flushPendingSources` drains them, and
   /// a turn that ended without flushing would otherwise leak its writes into
@@ -160,9 +159,9 @@ extension Cogs {
 
   /// Rejects an application operation before it can open a turn during automatic computation.
   ///
-  /// The guard happens before state lookup or body execution. That keeps the
-  /// whole selector region—including dependency reconciliation and equality—
-  /// read-only and prevents a failed attempt from partially mutating the graph.
+  /// The guard runs before state lookup or body execution. It keeps dependency
+  /// capture and equality checks read-only, and a failed attempt cannot partly
+  /// change the graph.
   internal func requireOutsideAutomaticComputation(forTurnNamed name: String) {
     let computingName = arenaCore.innermostComputingName
     if let cogName = computingName {
@@ -307,11 +306,9 @@ extension Cogs {
 
   /// Runs queued turns in arrival order without recursively entering a flush.
   ///
-  /// The indexed loop intentionally observes bodies appended by reactions in a
-  /// queued turn, preserving one non-reentrant FIFO until the chain is empty.
-  /// Queue removal is delayed until all captured and newly appended entries have
-  /// run, so mutating the array during reaction write-back cannot invalidate the
-  /// current iteration index.
+  /// The indexed loop includes bodies appended by reactions in queued turns.
+  /// This keeps one non-reentrant FIFO until the chain is empty. Entries stay in
+  /// the array until all work ends, so appends cannot invalidate the index.
   private func drainQueuedTurns() {
     var index = 0
     while index < queuedTurns.count {

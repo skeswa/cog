@@ -84,10 +84,9 @@ extension Cogs {
   /// is `Cogs`, which is every application write. The protocol-extension
   /// spelling remains for `any CogOps` and for a mechanism's controller.
   ///
-  /// The sugar used to reach the primitive through two escaping closures — one
-  /// per layer — and `M9-01` measured both as heap allocations on every turn.
-  /// Only a turn during a flush genuinely escapes, because it is stored and
-  /// run after the current flush returns, so only that case still pays.
+  /// The protocol sugar reached this primitive through two escaping closures.
+  /// `M9-01` measured both as heap allocations on every turn. Only a turn
+  /// queued during a flush must escape, so only that path still allocates.
   ///
   /// - Parameters:
   ///   - valueReference: The state-owned source to update.
@@ -100,15 +99,12 @@ extension Cogs {
   ) {
     requireOutsideAutomaticComputation(forTurnNamed: name)
 
-    // Nothing between this test and the calls below can change the phase: the
-    // context is MainActor-confined and neither step reaches user code.
+    // The context is MainActor-confined, and neither step below reaches user
+    // code. The phase cannot change between this test and those calls.
     //
-    // The queued path goes through `withTurn` rather than back through
-    // `turn(named:)`. Reaching for the public primitive here would have been
-    // the library calling its own op vocabulary from inside the implementation,
-    // which `primitives-only-in-ops` exists to prevent and which Cog's own
-    // linter caught. It is also less work: the queued body stages directly and
-    // never builds a `Writer`.
+    // The queued path uses `withTurn` instead of the public `turn(named:)` op
+    // primitive. CogLint forbids library code from calling that app-facing API.
+    // Direct staging also avoids building a `Writer`.
     if case .flushing = turnPhase {
       withTurn(name) { turn in
         self.writerStage(valueReference, value: value, turnID: turn.id)
@@ -183,7 +179,9 @@ extension Cogs {
 @usableFromInline
 #endif
 internal enum WriterUsage {
+  /// A read through a writer after its turn ended.
   case reading
+  /// A write through a writer after its turn ended.
   case writing
 
   /// What the caller was doing, as the message says it.

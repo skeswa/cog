@@ -40,9 +40,8 @@ import Testing
         bodyRuns += 1
         s.run { c in seen.append(c[uploads]) }
         s.task(name: "heartbeat") {
-          // Deterministic cancellation observation: the start event proves
-          // the body is running, and the held iterator yields nothing, so
-          // `next()` returns nil exactly when the task is cancelled.
+          // The start event proves the body is running. The held iterator never
+          // yields, so `next()` returns nil only when the task is cancelled.
           taskStartContinuation.yield()
           var iterator = holds.makeAsyncIterator()
           _ = await iterator.next()

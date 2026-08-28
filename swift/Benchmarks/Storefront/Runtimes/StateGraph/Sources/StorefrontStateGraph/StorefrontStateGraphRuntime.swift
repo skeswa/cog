@@ -7,7 +7,7 @@ public import StorefrontWorkload
 /// the only one that ports the workload onto somebody else's library. It runs
 /// the identical eleven-phase trace from `StorefrontWorkload`, against the
 /// identical fixtures, the identical scripted request boundary, and the
-/// identical shadow model as the Cog reference — which is what makes its
+/// identical shadow model as the Cog reference, which is what makes its
 /// numbers comparable rather than merely adjacent.
 ///
 /// Everything that swift-state-graph 0.28.0 provides is used as it is
@@ -27,7 +27,7 @@ public import StorefrontWorkload
 /// 1. **Rendering is explicit.** swift-state-graph's derivation and
 ///    invalidation are the library's and are what is measured. Its observer
 ///    *scheduling* is not used, because `withGraphTracking` re-applies on the
-///    next event loop — measured, probe `d2` in `API-NOTES.md` — and this trace
+///    next event loop, measured, probe `d2` in `API-NOTES.md`, and this trace
 ///    reads a settled value on the next line. All three non-Cog ports therefore
 ///    render explicitly at the close of a transaction; only Cog's reactions are
 ///    the library's own. That is a scheduling mismatch, not a defect.
@@ -75,7 +75,7 @@ public import StorefrontWorkload
 ///
 /// A held observer deposits into the shared ``StorefrontSink`` and counts its
 /// own run. Because rendering is explicit, this runtime decides whether a run
-/// happened by comparing what it just read with what it last deposited — output
+/// happened by comparing what it just read with what it last deposited, output
 /// comparison, which ``StorefrontRuntimeSemantics`` requires be declared rather
 /// than assumed. Its equality gates are the library's: `Stored` is gated by
 /// `{ $0 != $1 }` and `Computed` by `isEqual: { $0 == $1 }`, so an equal write
@@ -88,7 +88,7 @@ public import StorefrontWorkload
 /// synchronously at selection time, and never by task cancellation: the request
 /// script leaves cancelled requests suspended by default precisely so a port
 /// cannot pass the stale-result checkpoint by accident. This runtime does not
-/// cancel superseded tasks at all — it lets them complete and refuses them,
+/// cancel superseded tasks at all, it lets them complete and refuses them,
 /// which is the stronger proof.
 ///
 /// `nonisolated deinit` per the repository convention: under
@@ -109,17 +109,11 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
 
   /// What this runtime is called in a benchmark name, and what it guarantees.
   ///
-  /// Every value is justified in `README.md` and repeated in
-  /// `docs/swift/impl/perf.md`, as ``StorefrontRuntimeSemantics``
-  /// requires. In short: one transaction plus one explicit render is one
-  /// settlement; `Stored`'s equality gate means an equal write invalidates
-  /// nothing, so the render finds unchanged roots and deposits nothing; an
-  /// invalidation confined to offscreen inputs reaches no root the render reads
-  /// and no slot the port polls, so it neither renders nor asks the service for
-  /// anything; the account observer runs at registration against the resting
-  /// signed-out value and again when the response lands; the port's own release
-  /// sweep frees per-product derived and asynchronous state past grace; and a
-  /// completion is accepted only when it names the generation the slot is on.
+  /// `README.md` and `docs/swift/impl/perf.md` support every value. One
+  /// transaction and render make one settlement. `Stored` ignores equal writes.
+  /// Offscreen changes reach no read root or polled slot. The account observer
+  /// runs at registration and response. The release sweep frees per-product
+  /// state after grace. A slot accepts only its current generation.
   public static let descriptor = StorefrontRuntimeDescriptor(
     slug: "state-graph",
     displayName: "swift-state-graph",
@@ -241,11 +235,10 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
 
   /// Creates a runtime around a fresh graph.
   ///
-  /// Private because a Storefront session's graph must be the one
-  /// ``make(profile:service:initialWindow:holds:sink:grace:)`` assembled: the
-  /// starting row window is written inside the node storage's initializer and
-  /// the observers register inside `make`, so a runtime assembled any other way
-  /// would let a held observer see the pre-initial world on its way past.
+  /// Private so each session uses the graph built by
+  /// ``make(profile:service:initialWindow:holds:sink:grace:)``. That factory
+  /// writes the starting window before registering observers. Other assembly
+  /// could expose the earlier state.
   private init(
     profile: StorefrontProfile,
     service: StorefrontService,
@@ -275,7 +268,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   ///
   /// The service is injected, the starting row window is written before
   /// anything observes, the requested observers register here, and the first
-  /// settlement runs before this returns — so the bootstrap phase's browse-run
+  /// settlement runs before this returns, so the bootstrap phase's browse-run
   /// count is a claim about registration rather than about a race, and its
   /// three root requests have already been scheduled by the time the driver
   /// asks.
@@ -330,7 +323,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// write boundary. `withGraphTransaction` is used on **correctness** grounds
   /// and not for run counting: it buys atomic visibility, native
   /// read-your-own-staged-writes, one notification wave, and rollback. It does
-  /// *not* coalesce recomputation — `Computed` is pull-based, so N writes
+  /// *not* coalesce recomputation, `Computed` is pull-based, so N writes
   /// followed by one read produce one recomputation with or without it (probes
   /// `b1` and `b2`). Reading once is what produces one settled render; the
   /// transaction is what stops a multi-source verb from rendering a screen no
@@ -506,7 +499,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   ///
   /// Every touched product's generation advances in **one** transaction, which
   /// is what a warehouse feed looks like. Only the generation moves: the
-  /// accepted readings are untouched, and they are what rows render — so a
+  /// accepted readings are untouched, and they are what rows render, so a
   /// burst makes readings stale without making any row wrong, and the offscreen
   /// half reaches no root the render reads and no slot the port polls.
   ///
@@ -583,8 +576,8 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Establishes a durable demand for the ranked product list and returns it.
   ///
   /// The opposite of the two peeks: reading the ranking materializes the whole
-  /// search funnel behind it — index, candidates, per-product eligibility and
-  /// scores, ranking — and those caches stay in the graph afterwards, which is
+  /// search funnel behind it, index, candidates, per-product eligibility and
+  /// scores, ranking, and those caches stay in the graph afterwards, which is
   /// what the footprint cut weighs.
   ///
   /// - Returns: The ranked product identifiers, in rank order.
@@ -600,8 +593,8 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   ///
   /// The barrier is armed before `body` runs, because a scripted release can
   /// resume and publish before the caller would otherwise be suspended. It
-  /// fires on both branches of the epilogue — for an accepted result and for a
-  /// stale one this runtime refuses — because a decision to discard is exactly
+  /// fires on both branches of the epilogue, for an accepted result and for a
+  /// stale one this runtime refuses, because a decision to discard is exactly
   /// as much of a signal as a decision to publish, and the search phase's stale
   /// step is built on that.
   ///
@@ -620,7 +613,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// the sweep runs, the released products' nodes and slots are dropped, and
   /// the graph settles again before this returns. It is `async` only because
   /// the protocol is, and it fires no barrier because there is nothing to wait
-  /// for — a runtime whose release decision needed a scheduler could not
+  /// for, a runtime whose release decision needed a scheduler could not
   /// satisfy this trace at all.
   ///
   /// - Parameter duration: How far past grace to advance.
@@ -638,7 +631,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// value synchronously and the render must see it; a fixed point rather than
   /// one pass, because one resting publication can change a value another plan
   /// reads. The render is what deposits into the sink, and it happens exactly
-  /// once per settlement — which is what
+  /// once per settlement, which is what
   /// ``StorefrontRuntimeSemantics/browseRunsPerContentChangingTurn`` claims.
   private func settle() {
     var rounds = 0
@@ -660,16 +653,10 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
 
   /// Selects every demanded asynchronous slot, starting or resting each one.
   ///
-  /// Demand is structural rather than observed, and this method is the one
-  /// place that states it: a row on screen or in the prefetch margin demands
-  /// inventory and an offer because its badges read both; a cart line demands
-  /// inventory because it reads availability, and an offer only when the
-  /// profile's pricing ladder reaches the personalized-offer stage; an open
-  /// product demands its detail payload and the recommendation shelf. That is
-  /// the same demand the derivation graph expresses, restated here because the
-  /// port owns the asynchronous layer and something has to decide which slots
-  /// to poll. An undemanded slot is never polled, which is why an inventory
-  /// burst covering offscreen products asks the service for nothing.
+  /// Demand is structural. Visible and prefetched rows need inventory and
+  /// offers. Cart lines need inventory and may need offers based on the pricing
+  /// ladder. An open product needs details and recommendations. Undemanded slots
+  /// are not polled, so offscreen bursts start no service work.
   ///
   /// - Returns: Whether any slot published a resting value synchronously, in
   ///   which case selection has to run again before the render.
@@ -779,7 +766,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Starts one generation of one slot, or publishes its resting value.
   ///
   /// Every dependency the request needs is captured here, synchronously and on
-  /// the MainActor, before any task exists — the same discipline Cog's async
+  /// the MainActor, before any task exists, the same discipline Cog's async
   /// declarations follow when they read their inputs and then hand back
   /// `.run { @concurrent … }`. The request is registered with the script
   /// through ``StorefrontService/schedule(_:)`` in the same synchronous step,
@@ -934,7 +921,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Registers one request with the script and launches its task.
   ///
   /// ``StorefrontService/schedule(_:)`` is called synchronously, on the
-  /// MainActor, strictly before the task exists — the scripted driver depends
+  /// MainActor, strictly before the task exists, the scripted driver depends
   /// on that gap being closed, because otherwise it could try to release work
   /// the script has not seen yet.
   ///
@@ -1048,7 +1035,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// The revision is what lets an asynchronous plan notice a new catalog
   /// without carrying the products themselves. It advances only when the
   /// snapshot genuinely differs, so a reload returning an equal catalog leaves
-  /// every plan downstream of it exactly where it was — the same thing Cog's
+  /// every plan downstream of it exactly where it was, the same thing Cog's
   /// equality gate on `storefrontCatalogProductsCog` achieves.
   ///
   /// - Parameter snapshot: The accepted catalog.
@@ -1101,7 +1088,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Resolves every recommendation handle older than `generation` as superseded.
   ///
   /// At the moment of replacement, not when the abandoned request eventually
-  /// completes — which in this script it may never do.
+  /// completes, which in this script it may never do.
   ///
   /// - Parameter generation: The generation that replaced them.
   private func supersedeRecommendationRefreshes(before generation: Int) {
@@ -1116,8 +1103,8 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Drops the per-product state nothing has demanded since grace elapsed.
   ///
   /// swift-state-graph has no lifetime model, so this sweep is the port's own
-  /// and its cost belongs to the port. It is an ordinary TTL eviction — a
-  /// demand stamp per product, a deadline, and a pass — which is what a careful
+  /// and its cost belongs to the port. It is an ordinary TTL eviction, a
+  /// demand stamp per product, a deadline, and a pass, which is what a careful
   /// team writes and what makes
   /// ``StorefrontRuntimeSemantics/releasesUnobservedValues`` an honest claim.
   /// An unconditional clear would make the teardown phase's release proof
@@ -1174,7 +1161,7 @@ public final class StateGraphStorefrontRuntime: StorefrontRuntime {
   /// Reads the browse screen and deposits it when it changed.
   ///
   /// The prefetch margin is read as well as the window, and reading it is what
-  /// establishes demand for its rows' inventory and offers — a list that
+  /// establishes demand for its rows' inventory and offers, a list that
   /// demanded only what is on screen would show a price arriving one frame
   /// after the row it belongs to.
   private func renderBrowse() {

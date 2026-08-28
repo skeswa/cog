@@ -6,8 +6,8 @@ import SwiftUI
 ///
 /// Row height is a measurement input, not a taste decision. `XCUIElement`
 /// scrolling moves a fixed fraction of the screen, so the number of rows a
-/// swipe crosses — and therefore the number of row bodies SwiftUI evaluates
-/// inside a measured region — is a function of this constant and the pinned
+/// swipe crosses, and therefore the number of row bodies SwiftUI evaluates
+/// inside a measured region, is a function of this constant and the pinned
 /// device. Changing it changes every scrolling number, which is why it lives
 /// here with an explanation rather than inline at the call site.
 enum StorefrontMetrics {

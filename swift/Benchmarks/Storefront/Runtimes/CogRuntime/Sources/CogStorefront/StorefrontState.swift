@@ -21,7 +21,7 @@ public import StorefrontWorkload
 /// A source rather than a global so a test, a benchmark cut, and the
 /// application can each install a different script without any of them
 /// reaching into another's world. Every async declaration reads it
-/// synchronously, so replacing it invalidates every demanded async state — the
+/// synchronously, so replacing it invalidates every demanded async state, the
 /// same behavior Weather relies on.
 private let _storefrontServiceCog = Cog<StorefrontService>.Manual(
   { StorefrontService(profile: .standard) },
@@ -82,7 +82,7 @@ private let _rowWindowCog = Cog<RowWindow>.Manual(
 ///
 /// The membership list is keyless because a cart screen renders it in order,
 /// and a keyed box cannot be enumerated. Quantities stay keyed, so changing
-/// one line's quantity does not invalidate the others — which is exactly the
+/// one line's quantity does not invalidate the others, which is exactly the
 /// split a real cart wants and the reason both declarations exist.
 private let _cartContentsCog = Cog<[ProductID]>.Manual({ [] }, name: "storefront.cartContents")
 
@@ -202,7 +202,7 @@ extension CogOps {
   /// The realistic multi-source write: tapping a category chip in a real
   /// storefront changes the filter, resets the sort when the shopper had
   /// chosen a price order that no longer makes sense, and scrolls the list
-  /// back to the top. Three sources, one turn, one settle — rather than three
+  /// back to the top. Three sources, one turn, one settle, rather than three
   /// turns, two of which render a screen no shopper ever asked for.
   ///
   /// - Parameters:
@@ -375,8 +375,8 @@ extension CogOps {
   /// Demands fresh recommendations, and hands back the demand's handle.
   ///
   /// The handle is returned rather than discarded because a superseded
-  /// recommendation request is a *definite* signal — `.superseded` resolves
-  /// without a clock, a poll, or a timeout — and the session's replacement
+  /// recommendation request is a *definite* signal, `.superseded` resolves
+  /// without a clock, a poll, or a timeout, and the session's replacement
   /// checkpoint is built on exactly that.
   @discardableResult
   public func refreshRecommendations() -> CogRefresh<[ProductID]> {

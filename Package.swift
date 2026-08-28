@@ -19,9 +19,9 @@ let baseLibrarySettings: [SwiftSetting] = [
 
 // MARK: - The isolation matrix
 
-// The same test targets compile in four legs — {MainActor-default,
-// nonisolated} × {`NonisolatedNonsendingByDefault` on, off} — selected by the
-// two environment variables read below. `tools/swift-test.mjs` sets them; an
+// The same test targets compile in four legs: {MainActor-default, nonisolated}
+// × {`NonisolatedNonsendingByDefault` on, off}. The two environment variables
+// below select the leg. `tools/swift-test.mjs` sets them; an
 // unset variable is the default leg, so a bare `swift test` still works.
 //
 // Each leg is also mirrored into a `.define()`, which is what lets the LEG-02
@@ -127,10 +127,9 @@ if let retiredValueReferenceLayout = Context.environment["COG_TEST_VALUE_REFEREN
 
 // MARK: - Arena specialization trait
 
-// The specialized arena with shared pool edges and inline AnyHashable keys is
-// the only implementation. The non-default CompactArena package trait is the
-// public binary-size opt-out: it suppresses specialization without changing
-// the arena representation or Cog's API and behavior.
+// The only implementation uses a specialized arena with shared pool edges and
+// inline AnyHashable keys. The non-default CompactArena trait reduces binary
+// size by disabling specialization. It does not change the arena or public API.
 
 /// Settings contributed by the public binary-size opt-out trait.
 let compactArenaTraitSettings: [SwiftSetting] = [

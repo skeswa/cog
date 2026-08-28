@@ -5,11 +5,9 @@ import Testing
 
 // MARK: - Scope cancellation infrastructure
 //
-// These proofs green no scenario. They pin the terminal, idempotent
-// cancellation invariants that survived the public effect-group surface:
-// cancelling a scope unregisters exactly once, a registration arriving at a
-// cancelled scope is cancelled synchronously without retention, and nothing
-// reopens a cancelled scope.
+// These infrastructure tests cover terminal, idempotent scope cancellation.
+// A scope unregisters once. A new registration on a cancelled scope is
+// cancelled at once and not retained. Nothing can reopen the scope.
 
 @MainActor
 @Test func `ScopeCancellationInfrastructure cancel unregisters reactions exactly once`() {

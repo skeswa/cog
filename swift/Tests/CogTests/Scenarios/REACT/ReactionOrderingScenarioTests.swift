@@ -45,8 +45,8 @@ extension CogOps {
   cogs.turn { c in c[source] = 2 }
 
   // One assertion carries both halves of the claim: the reaction reran
-  // because its dependency changed, and it had already completed when the
-  // line after the turn ran — no await, polling, or callback. (The second
+  // because its dependency changed, and it completed before the line after the
+  // turn ran. No await, polling, or callback is involved. (The second
   // half retired the former REACT-07: under the no-await constraint no
   // deterministic proof of one exists without the other.)
   #expect(seen == [1, 2])
@@ -259,9 +259,9 @@ extension CogOps {
 @MainActor
 @Test func `REACT-16 reaction write-back chains drain settled and FIFO`() {
   // The first hop was the former REACT-15, now REACT-16's opening claim:
-  // `second` wakes exactly once, after `first`'s whole body ran, seeing
-  // middle already settled — the reaction's op landed as a brand-new turn
-  // after the flush, never a change to the turn being flushed and never a
+  // `second` wakes once after `first` finishes, with middle already settled.
+  // The reaction's op became a new turn after the flush. It never changed the
+  // turn being flushed or caused a
   // synchronous nested flush (that would run `third` before `side`). The
   // rest of the chain is the FIFO half: each queued turn runs first-in
   // first-out, fully settled.

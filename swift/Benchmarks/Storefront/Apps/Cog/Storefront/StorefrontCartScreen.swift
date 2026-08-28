@@ -11,7 +11,7 @@ import SwiftUI
 /// both the shipping and the tax request. The two quotes are read through the
 /// status lens because a shopper is entitled to know a total is still being
 /// priced, and the total itself is read as an ordinary value because it is
-/// total — it rests on the last accepted quotes rather than blanking out.
+/// total, it rests on the last accepted quotes rather than blanking out.
 struct StorefrontCartScreen: View {
   /// The singular graph inherited from ``StorefrontApp``.
   @Environment(\.cogs) private var cogs

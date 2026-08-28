@@ -3,8 +3,8 @@ import SwiftUI
 
 /// One trail's detail, reachable by push, search, bookmark, URL, or journal.
 ///
-/// The screen reads two keyed values — its own saved flag and its own hike
-/// count — so bookmarking or logging on this trail re-renders this screen
+/// The screen reads its own keyed saved flag and hike count. Bookmarking or
+/// logging this trail re-renders this screen
 /// without touching any other detail screen that may sit on another tab's
 /// stack.
 struct TrailDetailScreen: View {

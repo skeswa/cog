@@ -1,18 +1,14 @@
 /// One bundled family of side effects, registered at assembly.
 ///
-/// A mechanism watches cogs and performs work outside the graph: alerts,
-/// haptics, logs, files, system services. It bundles the dependencies that
-/// work needs — services, clocks, notifiers — with the reactions and tasks
-/// that use them, and it is the only place reactions and tasks exist (§6.2).
+/// A mechanism watches cogs and performs work outside the graph, such as
+/// alerts, logs, file writes, or system calls. It owns the services and clocks
+/// used by its reactions and tasks. App-wide reactions and tasks live only in
+/// mechanisms (§6.2).
 ///
-/// Structs and classes both conform; dependencies are ordinary stored
-/// properties. A struct fits a stateless mechanism, while a class fits one
-/// that owns a connection or other reference-typed resource. The runtime
-/// retains the exact mechanism values supplied at assembly alongside their
-/// registration scopes, cancels every scope during teardown first, and
-/// releases the retained mechanism values only afterward, so a class-owned
-/// resource cannot disappear while one of its reactions or tasks is still
-/// registered.
+/// Dependencies are normal stored properties. Use a struct for a stateless
+/// mechanism or a class for one that owns a connection or similar resource.
+/// The runtime retains each mechanism until its registration scope has been
+/// cancelled, so class-owned resources outlive their last task or reaction.
 ///
 /// ```swift
 /// struct WeatherMechanism: Mechanism {
@@ -26,18 +22,16 @@
 /// }
 /// ```
 ///
-/// Mechanisms are specified only at `Cogs.assemble(mechanisms:)` — or the
-/// `CogTesting` factory's matching parameter — and each `operate` runs
-/// synchronously in array order before assembly returns. Declaring a
-/// mechanism does nothing by itself; a mechanism left off the assembly list
-/// never runs (§6.3).
+/// List mechanisms in `Cogs.assemble(mechanisms:)` or the matching `CogTesting`
+/// factory parameter. Each `operate` runs in list order before assembly returns.
+/// A mechanism left out of the list never runs (§6.3).
 @MainActor
 public protocol Mechanism {
   /// Names this mechanism in debug history, task names, and diagnostics.
   ///
-  /// Registration names compose beneath it — a task named `hourlyRefresh` in
-  /// a mechanism named `Weather` appears as `Weather.hourlyRefresh` — and a
-  /// turn an op opens through the mechanism's controller records this name.
+  /// Registration names build on it. A task named `hourlyRefresh` in `Weather`
+  /// appears as `Weather.hourlyRefresh`, and turns opened by this mechanism also
+  /// record its name.
   /// Assembly rejects two mechanisms that share a name, in debug and release
   /// builds, because attribution depends on the name being unambiguous.
   ///

@@ -9,9 +9,8 @@ internal import Cog
 // sweep is over those parameters, and it is the only ported case where the
 // graph Cog is asked to settle changes size and connectivity from run to run.
 //
-// Beyond the two differences every ported case carries — a `peek` in place of
-// upstream's `effect`, and selector runs counted rather than effect invocations
-// — this port makes three of its own, all in service of an exact count:
+// Every port uses `peek` instead of upstream's `effect` and counts selector runs
+// instead of effect calls. This port makes three more changes for an exact count:
 //
 // Upstream picks which nodes are dynamic with a seeded PRNG. This picks them by
 // stride. An exact expectation has to name the graph it is about, and "every
@@ -20,9 +19,8 @@ internal import Cog
 // harder to read and no more faithful to what is being measured.
 //
 // Upstream also reads a fraction of the leaves, to measure laziness. This reads
-// all of them. A partial-read count is a fact about which leaves the port
-// happens to skip rather than about Cog, and Cog's laziness — that an unread
-// branch costs nothing — is already proven exactly by GRAPH-04.
+// all of them. A partial-read count measures which leaves this port skips, not
+// Cog itself. GRAPH-04 already proves that unread branches cost nothing.
 //
 // Sums accumulate with `&+`. Fan-in multiplies magnitudes layer over layer, so
 // upstream's five-wide, five-hundred-deep sweep reaches 1e241; JavaScript
@@ -58,9 +56,8 @@ extension CogScenario {
   ///
   /// The first settle walks row by row rather than pulling a leaf. A cold read
   /// nests one Swift frame per uncomputed link and Cog stops it at 128
-  /// (GRAPH-14), so a cold top-down read of the five-hundred-layer sweep would
-  /// trap by design. Settling upward costs the same runs — every node runs
-  /// once either way — and lets the sweep keep upstream's depth.
+  /// (GRAPH-14), so a cold top-down read of five hundred layers would trap.
+  /// Settling upward still runs each node once and keeps upstream's depth.
   ///
   /// - Parameters:
   ///   - width: Sources, and computed nodes per row.
@@ -71,9 +68,8 @@ extension CogScenario {
   ///     one input according to its own value, the way upstream's dynamic
   ///     nodes do. `0` builds an entirely static graph.
   ///
-  ///     A dynamic node changes which edges exist, not how many nodes run, so
-  ///     the expectation above still holds — but only once the arc has
-  ///     saturated, because before then a node's reachability from the written
+  ///     A dynamic node changes edges, not run count. The expectation holds
+  ///     only after the arc is full, because before then a node's reachability from the written
   ///     source depends on which edge it dropped. Pass `dynamicStride > 0`
   ///     only with `sourcesPerNode >= width`, which saturates at row 1.
   ///   - turns: Changing turns after the first settle. Each writes one source,
@@ -163,9 +159,8 @@ private final class DynamicSweepGraph {
   /// Computes one node: the wrapped window of the row above, summed.
   ///
   /// A static node reads its whole window. A dynamic node reads the first
-  /// entry, then decides from that value whether to skip exactly one of the
-  /// rest — upstream's rule, which makes the node's dependency set a function
-  /// of its own input rather than of the graph's shape.
+  /// entry, then uses that value to decide whether to skip one more. This is
+  /// upstream's rule: the input, not the graph shape, sets the dependencies.
   ///
   /// - Parameters:
   ///   - c: The reader of the node currently computing.
@@ -193,9 +188,8 @@ private final class DynamicSweepGraph {
     let tailCount = fanIn - 1
     guard tailCount > 0 else { return sum }
 
-    // Upstream drops on odd sums only, so half the turns rewire and half do
-    // not — which is what makes this a *dynamic* graph rather than a graph
-    // with a different fixed shape.
+    // Upstream drops only on odd sums, so half the turns rewire. Without that
+    // change, this would be another fixed graph.
     let shouldDrop = isDynamic && !sum.isMultiple(of: 2)
     let dropOffset = shouldDrop ? Int(sum.magnitude % UInt(tailCount)) : -1
     for offset in 0..<tailCount where offset != dropOffset {

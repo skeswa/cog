@@ -79,11 +79,9 @@ import Testing
 /// cannot: that the writer outlived its turn, and that the way to write now
 /// is another `turn`.
 ///
-/// Asserted in every configuration on purpose, release included. A guard whose
-/// message only survives in debug is half a guard, and this is exactly the
-/// property that breaks quietly: an optimized `preconditionFailure` carrying a
-/// composed message prints raw bytes where the sentence should be, and nothing
-/// but a release run would ever notice.
+/// Checked in debug and release. An optimized `preconditionFailure` can print
+/// raw bytes for a composed message. The release run proves the full message
+/// survives optimization.
 private func expectEscapedWriterMessage(
   in result: ExitTest.Result?,
   mentioning attempt: String

@@ -25,7 +25,7 @@ struct StorefrontObservationMemoTests {
   /// The whole eleven-phase interaction trace, checked against the shadow.
   ///
   /// `requireSettledOutput()` then re-derives the final rendered state from the
-  /// shadow and proves the session ended with no outstanding requests — a port
+  /// shadow and proves the session ended with no outstanding requests, a port
   /// whose caches had quietly stopped it asking for something would fail there
   /// rather than merely looking fast.
   @Test("runs the standard interaction trace against the shared shadow")
@@ -45,7 +45,7 @@ struct StorefrontObservationMemoTests {
   ///
   /// The trace's two optional claims exist for runtimes that hand back no
   /// per-generation refresh handle and hold no lifetime model. This port
-  /// declares both, so both are asserted — and because a skip records as
+  /// declares both, so both are asserted, and because a skip records as
   /// holding, a "every checkpoint holds" loop could never notice one appearing.
   /// If the port ever stopped resolving a replaced demand or stopped releasing
   /// an unobserved row, this test is what fails.
@@ -65,7 +65,7 @@ struct StorefrontObservationMemoTests {
   ///
   /// Every value matches Cog's, which is this port's central result: a careful
   /// team *can* hand-write its way to the same observable behavior. What the
-  /// comparison then reports is what that cost — in wall clock, in allocation,
+  /// comparison then reports is what that cost, in wall clock, in allocation,
   /// and in the lines of invalidation code the port's `README.md` counts.
   @Test("declares the semantics the trace holds it to")
   func declaresItsSemantics() {
@@ -103,9 +103,8 @@ struct StorefrontObservationMemoTests {
     // bootstrap checkpoints assert the *loading shell* instead.
     try await driver.runBootstrapPhase()
     try await driver.runRootDataPhase()
-    // The visible identities are settled once the catalog and the index have
-    // landed; the digest is not, because no row's inventory or offer has been
-    // released yet and the shadow assumes every fixture resolved.
+    // The catalog and index settle visible IDs. The digest still needs row
+    // inventory and offers, while the shadow assumes all fixtures resolved.
     expectVisibleIdentitiesAgree(driver, after: .rootData)
     try await driver.runInitialRowDataPhase()
     expectAgreement(driver, after: .initialRowData)

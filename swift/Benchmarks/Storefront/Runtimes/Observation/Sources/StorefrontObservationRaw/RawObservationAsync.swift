@@ -8,8 +8,8 @@ import os
 /// a request identity is what the service is asked for and changes whenever the
 /// inputs change, whereas a slot is the cell that identity is asked *on* and is
 /// stable for the life of the session. Keeping the two apart is what lets the
-/// port notice that `.searchIndex` — whose request identity carries no inputs at
-/// all — must nevertheless be asked again once a different catalog has landed.
+/// port notice that `.searchIndex`, whose request identity carries no inputs at
+/// all, must nevertheless be asked again once a different catalog has landed.
 ///
 /// `nonisolated` and `Hashable` because it is a dictionary key on the MainActor
 /// and nothing more; it carries no state of its own.
@@ -41,8 +41,8 @@ nonisolated enum RawObservationAsyncSlot: Hashable {
 /// The request identity plus the dependency values that identity does not
 /// already carry. Comparing this against what a slot last asked for is the
 /// port's **request-identity cache**, and it is the single caching carve-out the
-/// raw port takes: without it the port would spin — render, request, publish,
-/// render, request — because it has no other way to tell "this is the same
+/// raw port takes: without it the port would spin, render, request, publish,
+/// render, request, because it has no other way to tell "this is the same
 /// question I already asked" from "the world moved". Nobody re-fires a network
 /// request on every frame, so a port that did would be measuring a defect rather
 /// than a floor. It caches no *derived value*; every synchronous derivation is
@@ -50,7 +50,7 @@ nonisolated enum RawObservationAsyncSlot: Hashable {
 ///
 /// The epochs are counters the runtime advances when an upstream *accepted
 /// response* actually changes, which is how a hand-written app decides whether
-/// a derived resource has to be fetched again — `didAcceptCatalog`, spelled as
+/// a derived resource has to be fetched again, `didAcceptCatalog`, spelled as
 /// a number so it can be compared rather than remembered.
 nonisolated struct RawObservationAsyncDemand: Hashable {
   /// What the service would be asked for.
@@ -72,8 +72,8 @@ nonisolated struct RawObservationAsyncDemand: Hashable {
   /// The cart lines this demand was computed against.
   ///
   /// Empty for a slot that is not a quote. Two carts can produce the same
-  /// discounted subtotal, market, and method — the whole of a quote's request
-  /// identity — while containing a different number of lines, which a shipping
+  /// discounted subtotal, market, and method, the whole of a quote's request
+  /// identity, while containing a different number of lines, which a shipping
   /// quote prices differently.
   let cartLineIDs: [ProductID]
 
@@ -125,7 +125,7 @@ nonisolated struct RawObservationAsyncRecord {
   ///
   /// Advanced whenever the demand changes. A completed response carries the
   /// generation captured synchronously when it was selected, and is published
-  /// only when the two still agree — which is how this port refuses a stale
+  /// only when the two still agree, which is how this port refuses a stale
   /// result **by generation** rather than by relying on task cancellation.
   /// ``StorefrontScript`` leaves cancelled requests suspended by default
   /// precisely so that a port relying on cancellation would fail rather than
@@ -185,8 +185,8 @@ public nonisolated final class RawObservationStorefrontRefresh: StorefrontRefres
 
   /// Creates a handle that has already decided.
   ///
-  /// Used when a demand short-circuits — a signed-out shopper has no
-  /// recommendations to fetch — so that the caller still receives a handle whose
+  /// Used when a demand short-circuits, a signed-out shopper has no
+  /// recommendations to fetch, so that the caller still receives a handle whose
   /// outcome resolves rather than one that hangs.
   ///
   /// - Parameter resolved: The outcome this handle was born with.

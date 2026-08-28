@@ -30,8 +30,7 @@ import Testing
   try await second.value
   #expect(clock.activeSleeperCount == 0)
 
-  // The high-water mark is the clock-lifetime maximum, so it survives the
-  // sleepers it counted — the difference that separates "two timers once
-  // existed" from "one timer, twice renewed".
+  // The high-water mark lasts for the clock's lifetime. It distinguishes two
+  // timers that once coexisted from one timer renewed twice.
   #expect(clock.maximumActiveSleeperCount == 2)
 }

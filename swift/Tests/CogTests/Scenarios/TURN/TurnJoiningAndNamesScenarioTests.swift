@@ -54,9 +54,8 @@ extension Cogs {
   }
   var events: [String] = []
 
-  // Registered before the turn under test on purpose: a registration made
-  // inside an accumulating body would run immediately and again at that turn's
-  // flush, putting a run in `events` that means nothing here.
+  // Register before the tested turn. Registering inside its body would add an
+  // immediate run and another at flush, creating unrelated `events` entries.
   m.run { c in events.append("react:\(c[total])") }
   #expect(events == ["react:0"])
   events.removeAll()
@@ -87,7 +86,7 @@ extension Cogs {
 
   #expect(innerWriterSaw == [1])
   #expect(midBody == ["reads:0/0", "reactions:0"])
-  // One run, and it saw both writes together — never 1 and then 3.
+  // One run saw both writes together, never 1 and then 3.
   #expect(events == ["react:3"])
   #expect(selectorRuns == 1)
 }
@@ -115,8 +114,8 @@ extension Cogs {
 
   handleTap()
 
-  // The interleave is the claim: the first turn is completely over — flushed
-  // and reacted, at its own value — before the second body starts.
+  // The first turn flushes and reacts at its own value before the second body
+  // starts.
   #expect(events == ["body:1", "react:1", "body:2", "react:2"])
 }
 
@@ -142,8 +141,8 @@ extension Cogs {
   // The joined turns' own names are gone, which is what joining means.
   #expect(turns.contains { $0.name == "credit" } == false)
   #expect(turns.contains { $0.name == "credit.record" } == false)
-  // Two sources changed, so two writes crossed the boundary — once each, and
-  // every entry belongs to the one turn.
+  // Two sources changed, so two writes crossed the boundary once each. Every
+  // entry belongs to the same turn.
   #expect(entries.filter { $0.event == .write }.count == 2)
   #expect(entries.allSatisfy { $0.turn == 1 })
 }

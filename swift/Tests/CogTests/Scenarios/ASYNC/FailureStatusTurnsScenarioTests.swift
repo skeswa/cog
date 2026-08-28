@@ -10,8 +10,8 @@ private nonisolated enum Async38Error: Error {
 @Test func `ASYNC-38 every failure is its own status turn while value consumers stay quiet`()
   async throws
 {
-  // The full-status lens has no equality gate, so a retry that fails again —
-  // even with an equal error — cycles pending and failure as fresh turns. The
+  // The full-status lens has no equality gate. A retry that fails with an equal
+  // error still cycles pending and failure as fresh turns. The
   // value projection keeps its own gate: the renderable value never changed,
   // so value consumers never rerun.
   let (cogs, m) = Cogs.forTestingWithController()

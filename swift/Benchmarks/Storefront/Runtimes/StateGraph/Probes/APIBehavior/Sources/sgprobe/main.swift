@@ -24,7 +24,7 @@ import StateGraph
 ///
 /// `nonisolated deinit` per the repository convention. This package does not
 /// compile under `.defaultIsolation(MainActor.self)`, so a synthesized deinit
-/// here would already be nonisolated and nothing changes at runtime — which is
+/// here would already be nonisolated and nothing changes at runtime, which is
 /// precisely why it is written out: a reader should not have to check a
 /// manifest to know that a class in this repository frees without asking the
 /// concurrency runtime which executor it is on.
@@ -69,7 +69,7 @@ struct OpaqueRow: Sendable {
 
 section("a. Computed memoization")
 
-// a.1 — The `Stored` equality gate. This is the *upstream* gate, and it is the
+// a.1, The `Stored` equality gate. This is the *upstream* gate, and it is the
 // one the specification's literal wording describes. An equal write to an
 // equality-gated source must notify nothing at all.
 do {
@@ -102,7 +102,7 @@ do {
   )
 }
 
-// a.2 — The `Computed` equality gate, which is the gate risk 7 is actually
+// a.2, The `Computed` equality gate, which is the gate risk 7 is actually
 // about. An upstream change that a middle rule maps to the SAME value must not
 // reach the node downstream of it. This is the test that distinguishes the
 // memoizing `where Value: Equatable` overload from the non-memoizing one,
@@ -143,7 +143,7 @@ do {
   fact("a2 leaf runs after a genuinely changed middle value", leafRuns.count)
 }
 
-// a.3 — The control. The same shape built through the explicitly
+// a.3, The control. The same shape built through the explicitly
 // non-memoizing descriptor, to prove the a.2 instrument can tell the two
 // overloads apart rather than reporting `1` for a structural reason.
 do {
@@ -174,7 +174,7 @@ do {
   )
 }
 
-// a.4 — The value types the port will actually use: a struct, an array, a
+// a.4, The value types the port will actually use: a struct, an array, a
 // dictionary, and a non-`Equatable` type. Risk 7 names arrays and dictionaries
 // specifically as the way this could silently regress.
 func memoizes<Value: Equatable & Sendable>(
@@ -229,7 +229,7 @@ do {
 
 section("b. Batching and transactions")
 
-// b.1 — Four source writes in one `withGraphTransaction`, one downstream read
+// b.1, Four source writes in one `withGraphTransaction`, one downstream read
 // afterwards. This is the `applyBrowseFilters` shape.
 do {
   let category = Stored<Int>(name: "b1.category", wrappedValue: 0)
@@ -269,7 +269,7 @@ do {
   )
 }
 
-// b.2 — The control: the same four writes with NO transaction. `Computed` is
+// b.2, The control: the same four writes with NO transaction. `Computed` is
 // pull-based, so this also produces one recomputation. The transaction's value
 // is therefore NOT recomputation coalescing; it is atomic visibility and one
 // notification wave.
@@ -301,7 +301,7 @@ do {
   )
 }
 
-// b.3 — What the transaction really buys: an intermediate state is never
+// b.3, What the transaction really buys: an intermediate state is never
 // observable. Measured by reading inside an `onDidSet` handler, which the
 // library documents as running synchronously for every staged assignment.
 do {
@@ -318,7 +318,7 @@ do {
   fact("b3 read-your-own-staged-writes", "confirmed: a's handler saw a:1 while staged")
 }
 
-// b.4 — The documented transaction caveat: a `Computed` read INSIDE a
+// b.4, The documented transaction caveat: a `Computed` read INSIDE a
 // transaction re-evaluates every time and never touches the committed cache.
 do {
   let source = Stored<Int>(name: "b4.source", wrappedValue: 0)
@@ -424,7 +424,7 @@ do {
   )
 }
 
-// d.2 — And the thing that is NOT a settlement signal: the tracking callback.
+// d.2, And the thing that is NOT a settlement signal: the tracking callback.
 // This is the specification's fact 3, measured.
 await MainActor.run {}
 

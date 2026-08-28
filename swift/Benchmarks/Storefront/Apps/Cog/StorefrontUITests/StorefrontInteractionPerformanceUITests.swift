@@ -5,8 +5,8 @@ import XCTest
 /// Each one exercises a different shape of invalidation. Search replaces the
 /// query at the top of the funnel and re-ranks the catalog. Navigation demands
 /// a leaf async payload and a recommendation shelf that nothing on the browse
-/// screen reads. A cart edit moves the deepest chain in the graph — line,
-/// subtotal, promotion optimizer, discounted subtotal — and replaces both
+/// screen reads. A cart edit moves the deepest chain in the graph, line,
+/// subtotal, promotion optimizer, discounted subtotal, and replaces both
 /// downstream quote requests.
 ///
 /// See `StorefrontUITestSupport.swift` for what simulator measurements do and
@@ -21,15 +21,12 @@ final class StorefrontInteractionPerformanceUITests: XCTestCase {
 
   /// Measures typing into the search field.
   ///
-  /// Wall clock, CPU, and memory together, because this interaction is the one
-  /// place the workload does real synchronous work per keystroke: each accepted
-  /// character normalizes the query, re-tokenizes it, re-runs the inverted
-  /// index, re-scores every candidate, re-ranks them, and regroups the sections
-  /// — and starts a new suggestion request generation while it is at it.
+  /// Reports wall clock, CPU, and memory. Each accepted character normalizes and
+  /// tokenizes the query, searches the index, scores and ranks candidates,
+  /// groups sections, and starts a suggestion request.
   ///
-  /// The reset deletes exactly as many characters as the block typed, which is
-  /// idempotent against the extra warm-up invocation: deleting from an already
-  /// empty field is a no-op.
+  /// Reset deletes the typed character count. The extra warm-up remains safe
+  /// because deleting from an empty field does nothing.
   func testSearchInteractionPerformance() {
     let app = StorefrontUITestSession.launch()
     let searchField = StorefrontUITestSession.searchField(in: app)

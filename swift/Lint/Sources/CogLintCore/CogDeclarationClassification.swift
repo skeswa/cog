@@ -11,9 +11,8 @@ package enum CogDeclarationShape: Equatable, Sendable {
 
 /// The semantic origin of state carried by a recognized declaration spelling.
 ///
-/// Origin remains writable through a read-only projection so suffix and
-/// documentation rules can understand its source, while ``CogDeclarationAccess``
-/// separately prevents a projection from being treated as a writable name.
+/// A read-only projection keeps its writable origin for suffix and documentation
+/// rules. ``CogDeclarationAccess`` still prevents treating it as writable.
 package enum CogDeclarationOrigin: Equatable, Sendable {
   /// Synchronous state computed from other graph values.
   case automatic
@@ -56,11 +55,10 @@ package struct CogDeclarationClassification: Sendable {
 
   /// The classified base identifier this binding's `.readOnly` initializer projected.
   ///
-  /// Present only for ``CogDeclarationAccess/readOnlyProjection`` evidence that
-  /// came from a written `base.readOnly` initializer whose base the classifier
-  /// had already recognized; annotation-only projection evidence carries `nil`
-  /// because a written `Projection` type names no source. Naming rules use it
-  /// to pair a projection with its underscored source declaration.
+  /// Present when a recognized `base.readOnly` initializer provides
+  /// ``CogDeclarationAccess/readOnlyProjection`` evidence. Type annotations
+  /// carry `nil` because `Projection` names no source. Naming rules use this
+  /// value to pair a projection with its underscored source.
   package let projectedSourceName: String?
 
   /// The source identifier spelling without trivia.

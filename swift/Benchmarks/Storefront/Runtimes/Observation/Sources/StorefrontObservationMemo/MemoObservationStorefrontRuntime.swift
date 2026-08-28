@@ -14,9 +14,9 @@ public import StorefrontWorkload
 /// It is **not** a re-implementation of Cog. It has no reader that records what
 /// it read, no dependency graph, no automatic transitive invalidation, no
 /// version stamps propagated between values, and no settlement algorithm.
-/// Invalidation is a list of hand-written methods —
+/// Invalidation is a list of hand-written methods,
 /// `didWriteCoupon()`, `didAcceptCatalog()`, `didChangeProduct(_:pricingAffected:)`
-/// — that a person wrote and a person would have to maintain. Every one of them
+///, that a person wrote and a person would have to maintain. Every one of them
 /// lives in `MemoObservationInvalidation.swift` so a reader can count the lines
 /// and judge how much hand-maintenance the resulting numbers cost. That count is
 /// the honest denominator of this comparison, and it is recorded in the port's
@@ -24,7 +24,7 @@ public import StorefrontWorkload
 ///
 /// The single most important granularity decision is the pricing ladder: it is
 /// memoized as **one cell per product**, not as seventeen per-policy stages.
-/// Cog gets stage granularity for free from declared dependencies — changing the
+/// Cog gets stage granularity for free from declared dependencies, changing the
 /// coupon dirties the coupon stage and everything below it and nothing above it.
 /// Reproducing that by hand would mean maintaining seventeen invalidation lists
 /// per product in the one place this workload is deliberately deepest, which is
@@ -43,8 +43,8 @@ public import StorefrontWorkload
 ///
 /// MainActor-confined. Every verb writes on the MainActor, every cache is built
 /// there, and every publish-or-discard decision is made there. Heavy request
-/// work runs off the MainActor — the request boundary's kernels are the largest
-/// computations in the workload — and only the decision returns.
+/// work runs off the MainActor, the request boundary's kernels are the largest
+/// computations in the workload, and only the decision returns.
 ///
 /// ## Turn and settlement ordering
 ///
@@ -61,8 +61,8 @@ public import StorefrontWorkload
 /// the mutation has completed, and re-registering afterwards is a scheduling
 /// decision, not a settlement. A port that scheduled its render would not be
 /// running the same script as the other three runtimes, because the trace reads
-/// the sink synchronously. The registrar's registration cost is still paid —
-/// every observer body runs inside a tracking scope — so what the deviation
+/// the sink synchronously. The registrar's registration cost is still paid,
+/// every observer body runs inside a tracking scope, so what the deviation
 /// removes is the scheduling, not the cost.
 ///
 /// ## Observation
@@ -94,28 +94,18 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
 
   /// What this runtime is called in a benchmark name, and what it guarantees.
   ///
-  /// Every value matches the Cog port's, which is the interesting result rather
-  /// than a coincidence: hand-written caching with hand-written invalidation
-  /// *can* reproduce a fine-grained graph's observable behavior. Each claim is
-  /// justified in the port's `README.md`:
+  /// Every value matches the Cog port. Hand-written caching and invalidation can
+  /// reproduce a fine-grained graph's visible behavior. The port's `README.md`
+  /// supports each claim:
   ///
-  /// - one browse run per content-changing transaction, because a verb is one
-  ///   `mutate` and a `mutate` renders once at its close;
-  /// - zero runs for an equal write, because every setter is equality-gated
-  ///   before it mutates and before it invalidates — a gate, never a comparison
-  ///   of rendered output;
-  /// - zero runs for an invalidation that touches only offscreen inputs,
-  ///   because `didChangeProduct(_:pricingAffected:)` consults the demanded set
-  ///   the window cache maintains;
-  /// - two account runs through sign-in: one at registration against the
-  ///   resting signed-out value, one when the response is accepted;
-  /// - zero service requests started by an offscreen-only invalidation, because
-  ///   demand is an explicit hand-written list of what the held screens need and
-  ///   an offscreen row is not on it;
-  /// - unobserved values are released, by a time-to-live sweep over per-product
-  ///   cache entries on the port's own injected clock;
-  /// - stale results are refused by generation rather than by cancellation; and
-  /// - a demand hands back a handle bound to that exact generation.
+  /// - One `mutate` renders once, so a changing transaction runs browse once.
+  /// - Setters gate equality before mutation, so equal writes run nothing.
+  /// - `didChangeProduct` checks demand, so offscreen input runs nothing.
+  /// - Sign-in runs the account observer at registration and acceptance.
+  /// - Explicit demand starts no service work for offscreen-only changes.
+  /// - A clock-driven sweep releases unobserved per-product cache entries.
+  /// - Generations reject stale results without relying on cancellation.
+  /// - Each demand returns a handle for its exact generation.
   public static let descriptor = StorefrontRuntimeDescriptor(
     slug: "observation-memo",
     displayName: "hand-memoized @Observable",
@@ -178,12 +168,12 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   ///
   /// Cleared per product by anything that moves that product's pricing inputs,
   /// and wholesale by anything that moves an input every product's ladder reads
-  /// — the shopper, the coupon, the shipping address, and the shipping method.
+  ///, the shopper, the coupon, the shipping address, and the shipping method.
   var pricing: [ProductID: Int] = [:]
 
   /// Everything one product's row renders.
   ///
-  /// Cleared per product alongside ``pricing``, and additionally by the inputs a
+  /// Cleared per product alongside ``pricing``, and also by the inputs a
   /// row reads but a price does not: the favorite flag and the live availability.
   var rows: [ProductID: ProductRow] = [:]
 
@@ -309,7 +299,7 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   /// before anything observes, so the bootstrap phase's browse-run count is a
   /// claim about registration rather than about a race. Each held observer runs
   /// exactly once in this call, and the demand pass that follows starts exactly
-  /// the requests those observers imply — the account, the catalog, and the
+  /// the requests those observers imply, the account, the catalog, and the
   /// search index over the empty catalog the browse funnel just asked about.
   ///
   /// - Parameters:
@@ -374,8 +364,8 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   /// screens now need.
   ///
   /// Rendering first is deliberate: a request identity is computed from settled
-  /// values — the suggestion query, the discounted subtotal, the demanded row
-  /// set — so the caches those identities are read out of must be current
+  /// values, the suggestion query, the discounted subtotal, the demanded row
+  /// set, so the caches those identities are read out of must be current
   /// before the demand pass reads them. Starting a request changes no value, so
   /// nothing rendered here goes stale by the time the pass finishes.
   func settle() {
@@ -412,7 +402,7 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   /// Two gates, not one. The outer gate is the ordinary "did the value change"
   /// every setter here has. The inner one is the gate that matters: a keystroke
   /// whose *normalization* matches what the funnel was last built for costs a
-  /// property write and nothing else — no re-tokenizing, no re-intersecting, no
+  /// property write and nothing else, no re-tokenizing, no re-intersecting, no
   /// re-ranking, and no new suggestion generation. That is one hand-written
   /// line standing in for the equality gate the Cog port gets from declaring the
   /// normalized query as a value.
@@ -635,7 +625,7 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   /// and it is worth being explicit about: a generation is the key the next
   /// inventory request is asked under, not a value a row renders. Every row
   /// keeps showing the last accepted reading, so no cache is stale and no
-  /// observer owes a run — while the demand pass at the close notices that the
+  /// observer owes a run, while the demand pass at the close notices that the
   /// demanded rows' inventory identities moved and asks for those, and only
   /// those. The offscreen half is not in the demanded set, so it starts nothing
   /// and costs nothing until something wants those rows again.
@@ -687,9 +677,8 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
     recommendationsCell.needsRefetch = true
     demandRecommendations()
     if recommendationsCell.pendingKey == nil {
-      // Nothing to ask — there is no signed-in shopper to recommend for — so
-      // the demand is answered by the value already resting here rather than
-      // left dangling for a handle nobody could ever resolve.
+      // With no signed-in shopper, return the resting value. Do not leave a
+      // demand handle that no request can resolve.
       pendingRecommendationRefresh = nil
       cell.resolve(.success(recommendationsCell.value))
     }
@@ -756,7 +745,7 @@ public final class MemoObservationStorefrontRuntime: StorefrontRuntime {
   /// Advances this runtime's injected clock past its grace period and sweeps.
   ///
   /// Synchronous and total: the sweep runs to completion before this returns, so
-  /// a phase can establish that the runtime made up its mind without polling —
+  /// a phase can establish that the runtime made up its mind without polling,
   /// including when it decides to keep everything, which is a completed decision
   /// too.
   ///

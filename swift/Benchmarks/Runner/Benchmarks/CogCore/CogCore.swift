@@ -7,23 +7,22 @@ import CogTesting
 ///
 /// The shim `M5-05bb` proved necessary, and the only one. `Benchmark` is not
 /// `Sendable` and upstream's `benchmarks` closure is nonisolated, so a
-/// measurement handle cannot cross into a MainActor region — writing
+/// measurement handle cannot cross into a MainActor region. Writing
 /// `await MainActor.run { benchmark.startMeasurement() }` does not compile.
 /// Putting the graph behind an isolated type inverts the problem: the handle
 /// stays outside, the graph stays inside, and only `Int`s pass between them.
 ///
-/// Every entry point is `static` and takes only `Sendable` arguments for that
-/// reason. Nothing here returns a graph value, either — a `Cogs` crossing back
-/// out would reintroduce exactly the error this shape avoids.
+/// Every entry point is `static` and takes only `Sendable` arguments. Nothing
+/// returns a graph value because sending `Cogs` back would restore the same
+/// isolation error.
 @MainActor
 enum GraphHarness {
   /// Runs one shared scenario to completion and checks it did the work its
   /// shape requires.
   ///
   /// The run-count check is not decoration. A benchmark measures however much
-  /// work it is given, so a graph that silently started recomputing twice per
-  /// turn would show up here as a slower number rather than as a defect —
-  /// which is the failure the whole counted suite exists to prevent. Failing
+  /// work it is given. If a graph started recomputing twice per turn, the result
+  /// would look slower instead of wrong. The counted suite prevents that. Failing
   /// loudly instead keeps the timing honest.
   ///
   /// - Parameter scenario: The shared scenario to drive, from `_CogScenarios`.
@@ -42,7 +41,7 @@ enum GraphHarness {
 }
 
 let benchmarks: @Sendable () -> Void = {
-  // Allocation shapes first, on purpose — see the ordering note below.
+  // Register allocation shapes first for the ordering reason below.
   // Upstream discovers exactly one `benchmarks` closure per target, so every
   // file registers through here.
   allocationBenchmarks()
@@ -56,9 +55,9 @@ let benchmarks: @Sendable () -> Void = {
   // Timing over the shared Kairo diamond, and **no counting metrics at all**.
   //
   // `M5-11` traced an intermittent SIGSEGV to this benchmark. The crash report
-  // is unambiguous: a call through a null `swift_release_hook`, from
-  // `completeTaskWithClosure` — the concurrency runtime finishing a task while
-  // the harness tears its ARC hooks down between iterations.
+  // shows a call through a null `swift_release_hook` from
+  // `completeTaskWithClosure`. The concurrency runtime finished a task while
+  // the harness removed its ARC hooks between iterations.
   //
   // ```text
   // EXC_BAD_ACCESS (SIGSEGV) KERN_INVALID_ADDRESS at 0x0
@@ -82,9 +81,9 @@ let benchmarks: @Sendable () -> Void = {
   // Measured 0 failures in 20 runs without them, against 2 in 12 with them.
   //
   // The same non-quiescence is why this registers **after** the allocation
-  // benchmarks. Counting is process-global, so a context torn down here would
-  // otherwise land its cancelled sleepers inside a later benchmark's measured
-  // region — which is the likeliest explanation for the stray malloc deviation
+  // benchmarks. Counting is process-global. A context torn down here could put
+  // its cancelled sleepers inside a later benchmark's measured region. That
+  // likely caused the stray malloc deviation
   // `M5-08a` saw against `perf-06-value-reference`'s zero ceiling.
   Benchmark(
     "kairo-diamond",

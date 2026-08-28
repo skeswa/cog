@@ -8,7 +8,7 @@ import SwiftUI
 //
 // A `Binding` is the one shape a graph extension may legitimately take: a
 // control needs a getter and a setter in one value, and the alternative is a
-// `@State` mirror of a fact the graph already owns — a second source of the
+// `@State` mirror of a fact the graph already owns, a second source of the
 // same thing, which rule 4 forbids outright. Each binding below reads exactly
 // one declaration and writes through exactly one named op, so nothing here
 // hides a multi-read projection behind a helper.

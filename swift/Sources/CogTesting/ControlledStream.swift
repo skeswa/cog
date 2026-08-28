@@ -2,9 +2,8 @@ public import Cog
 
 /// Deterministic, generation-indexed stream work for tests.
 ///
-/// The stream counterpart of ``ControlledWork``: each ``makeWork()`` call
-/// creates one inert stream generation, ``starts`` announces the generation
-/// when Cog begins consuming it, and the test drives that exact generation
+/// Each ``makeWork()`` call creates an idle stream generation. ``starts``
+/// announces when Cog begins consuming it. The test then drives that generation
 /// with ``yield(_:to:)``, ``finish(_:)``, and ``fail(_:with:)``:
 ///
 /// ```swift
@@ -20,9 +19,9 @@ public import Cog
 /// ```
 ///
 /// Unlike one-shot completion, elements yielded before consumption begins are
-/// buffered by the underlying stream rather than lost, so awaiting ``starts``
-/// is how a test proves a generation went live — after a refresh replaced the
-/// previous one, say — not how it avoids losing elements. Elements pass
+/// buffered by the underlying stream rather than lost. Await ``starts`` to
+/// prove a generation went live, such as after refresh replaced the prior one.
+/// It is not needed to preserve elements. Elements pass
 /// through Cog's ordinary generation checks and equality gating; observing an
 /// accepted publication remains the acknowledgement hooks' job.
 ///
@@ -37,10 +36,9 @@ public final class ControlledStream<Value: Sendable> {
   /// How many generations ``makeWork()`` has created so far.
   ///
   /// This is the count of selector runs, not of consumptions, and it is the
-  /// upper-bound probe ``starts`` cannot be: awaiting `starts` proves at least
-  /// N generations went live, while asserting this count proves the selector
-  /// ran no *more* than N times — the shape of "a natural end starts no new
-  /// work" claims.
+  /// upper-bound probe ``starts`` cannot provide. Awaiting `starts` proves at
+  /// least N generations went live. This count proves the selector ran no more
+  /// than N times, as needed to show that a natural end starts no work.
   public var generationCount: Int {
     continuations.count
   }

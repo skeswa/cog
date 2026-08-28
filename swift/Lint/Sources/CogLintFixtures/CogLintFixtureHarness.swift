@@ -21,9 +21,8 @@ package struct CogLintFixtureFailure: Equatable, Sendable, CustomStringConvertib
 package enum CogLintFixtureHarness {
   /// Returns every structural or behavioral mismatch in deterministic order.
   ///
-  /// All examples are checked even after an earlier failure, giving a rule
-  /// author one complete repair list without allowing one passing category to
-  /// conceal an empty or drifting sibling category.
+  /// Every example runs after an earlier failure. The rule author gets one
+  /// repair list, and a passing category cannot hide an empty or stale sibling.
   package static func failures(in fixture: CogLintRuleFixture) -> [CogLintFixtureFailure] {
     var failures: [CogLintFixtureFailure] = []
     validateStructure(of: fixture, into: &failures)

@@ -3,10 +3,9 @@ import SwiftUI
 
 /// One region's trail list, reachable by push or by `cog-trails://region/…`.
 ///
-/// The screen receives only an identity, exactly as a route carries it, and
-/// resolves content from the catalog. A stale identity — say, from an old
-/// bookmark URL after the catalog changed — degrades to a not-found state
-/// instead of crashing.
+/// The screen receives only the identity carried by its route and resolves the
+/// catalog content. A stale identity from an old bookmark shows a not-found
+/// state instead of crashing.
 struct RegionScreen: View {
   /// The region this screen shows.
   let regionID: RegionID

@@ -1,15 +1,12 @@
 /// The status lens over a context: the UI-boundary and one-shot read
 /// capability for async request lifecycles.
 ///
-/// `cogs.status[valueReference]` is the opt-in spelling for the full
-/// ``CogStatus`` — its kind and associated fields, updated in one turn — beside
-/// the total value read `cogs[valueReference]`. The lens carries the same
-/// read family as the value spelling: a tracked subscript, a non-tracking
-/// `peek`, and a `watch`, with identical demand and lifetime rules. The UI
-/// subscript tracks each returned field independently; selector and reaction
-/// reads and explicit watches track the complete status. The lens deliberately
-/// has no spelling for manual or automatic cogs: synchronous state has no request
-/// status, so asking for it is a type error rather than a degenerate success.
+/// `cogs.status[valueReference]` reads the full ``CogStatus`` beside the plain
+/// value read `cogs[valueReference]`. The lens supports tracked reads,
+/// non-tracking `peek`, and `watch` under the same demand and lifetime rules as
+/// value reads. UI code tracks each status field it uses. Selectors, reactions,
+/// and watches track the whole status. Manual and automatic cogs have no request
+/// status, so the lens accepts only async cogs.
 ///
 /// Bind the result to the declaration's unsuffixed domain name, just like a
 /// plain value read:
@@ -34,9 +31,8 @@ extension Cogs {
 
   /// The status-reading facet of one context.
   ///
-  /// A lens is a transient borrow of its context's read capability — it holds
-  /// no state of its own and creates none until one of its reads demands an
-  /// async value.
+  /// The lens borrows its context's read capability. It owns no state and
+  /// creates none until a read demands an async value.
   @MainActor
   public struct Status {
     /// The context whose async states this lens reads.

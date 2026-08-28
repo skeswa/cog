@@ -3,8 +3,8 @@ import CogTesting
 import Testing
 
 // An async declaration's `default:` is the value every read rests on before a
-// first success, and async state defaults to `whileObserved` — so it is
-// released and recreated as a matter of course rather than exceptionally. Both
+// first success. Async state defaults to `whileObserved`, so normal use releases
+// and recreates it. Both
 // halves matter: the default has to be per state, and within one state it has
 // to be one value rather than a fresh one at every publication.
 

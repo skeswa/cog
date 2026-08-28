@@ -9,9 +9,8 @@ import Testing
 
 @MainActor
 @Test func `ONE-02 a second app assembly traps with a message that survives release`() async {
-  // `.failure` rather than a specific signal: a Swift trap is `brk` on arm64
-  // and `ud2` on x86_64, which arrive as different signals, and the scenario
-  // is about stopping, not about how the CPU spells stopping.
+  // Check `.failure`, not a signal. Swift traps use `brk` on arm64 and `ud2` on
+  // x86_64, but this scenario cares only that execution stops.
   let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
     await MainActor.run {
       Cogs.assemble()

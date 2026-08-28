@@ -2,20 +2,15 @@ public import StorefrontWorkload
 
 /// This port's per-generation demand handle.
 ///
-/// Handed back by
-/// ``MemoObservationStorefrontRuntime/refreshRecommendations()`` and bound to
-/// *that* demand: a later demand resolves this one as
-/// ``StorefrontRefreshOutcome/superseded`` at the moment of replacement, not
-/// when its task eventually finishes, and a lifetime release resolves it as
-/// ``StorefrontRefreshOutcome/released``. That is what makes replacement a
-/// definite signal the teardown phase can await without a clock, a poll, or a
-/// timeout.
+/// ``MemoObservationStorefrontRuntime/refreshRecommendations()`` returns this
+/// handle for one demand. Replacement resolves it as
+/// ``StorefrontRefreshOutcome/superseded`` at once. Lifetime release resolves it
+/// as ``StorefrontRefreshOutcome/released``. Teardown can await either result
+/// without a clock, poll, or timeout.
 ///
-/// A `struct` wrapping a MainActor-isolated resolution cell, so copying a handle
-/// shares the one resolution rather than forking it, and so ``Sendable``
-/// conformance costs nothing: a global-actor-isolated class is `Sendable`, and
-/// the outcome is resolved on the MainActor where every publish decision in
-/// this port is made.
+/// This `struct` wraps one MainActor-isolated resolution cell. Copies share one
+/// result. The cell is `Sendable`, and the runtime resolves it where all publish
+/// decisions occur.
 public struct MemoObservationRefresh: StorefrontRefreshHandle {
   /// What this generation produced.
   public typealias Value = [ProductID]
@@ -44,23 +39,15 @@ public struct MemoObservationRefresh: StorefrontRefreshHandle {
 
 /// One demand generation's resolution, and the waiters queued on it.
 ///
-/// Separated from ``MemoObservationRefresh`` because the handle is a value that
-/// may be copied and the resolution is a fact that must not be: two copies of a
-/// handle name one generation and must observe one outcome.
+/// Separate from the value handle so all copies observe one generation result.
 ///
 /// ## Isolation and ordering
 ///
-/// MainActor-confined, because ``resolve(_:)`` is called from exactly the
-/// places a publish-or-discard decision is made — the runtime's own asynchronous
-/// epilogue, its replacement path, and its lifetime sweep — and all three are
-/// MainActor code. ``resolution()`` suspends on the MainActor rather than
-/// blocking it, so a trace awaiting a superseded handle does not stop the
-/// runtime from superseding it.
+/// MainActor-confined because the async epilogue, replacement path, and lifetime
+/// sweep resolve it there. ``resolution()`` suspends without blocking the actor.
 ///
-/// One-shot: the first ``resolve(_:)`` wins and later ones are ignored, because
-/// a generation that has already been declared superseded cannot later be
-/// declared released without the trace's checkpoint comparing a word to a word
-/// that changed underneath it.
+/// One-shot: the first ``resolve(_:)`` wins, so the outcome cannot change after
+/// a checkpoint reads it.
 ///
 /// `nonisolated deinit` per the repository convention.
 final class MemoObservationRefreshCell {

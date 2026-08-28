@@ -174,10 +174,9 @@ internal final class CogArenaDirtyPropagation {
 
   /// Rows queued so far, in notice order.
   ///
-  /// Sorted in place and read by index rather than handed back as a value.
-  /// Returning it copied the buffer — the same copy-on-write mistake `M9-09`
-  /// found in the dependency list, made again here — because the property kept
-  /// its own reference and the caller's sort then had to reallocate.
+  /// Sorted in place and read by index. Returning the array copied its buffer
+  /// when the caller sorted it because the property kept another reference.
+  /// `M9-09` found the same copy-on-write cost in the dependency list.
   var changedBoundaryRowCount: Int { changedBoundaryRows.count }
 
   /// Puts the queued rows in the order their boundaries were created.

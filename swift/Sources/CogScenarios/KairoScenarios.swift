@@ -10,9 +10,8 @@ internal import Cog
 //
 // Upstream keeps the graph hot with an `effect` that reads the root, because in
 // a pull-only library an unobserved computed may not recompute at all. A Cog
-// `peek` settles every dependency it needs before returning, so reading the
-// root is enough to drive the same propagation — and it keeps the scenario free
-// of a UI boundary, so what the counter sees is graph work.
+// `peek` settles every needed dependency, so reading the root drives the same
+// propagation. With no UI boundary, the counter sees only graph work.
 //
 // Upstream counts effect invocations; these count selector runs, which is the
 // stricter measurement. An effect firing once tells you the root settled; it
@@ -21,8 +20,8 @@ internal import Cog
 extension CogScenario {
   /// Kairo's diamond: one source, `width` parallel arms, one shared consumer.
   ///
-  /// The shape exists to catch the classic push mistake — running the shared
-  /// consumer once per changed parent instead of once per turn. With five arms
+  /// The shape catches a common push mistake: running the shared consumer once
+  /// per changed parent instead of once per turn. With five arms,
   /// that is the difference between six runs and ten per turn, and no timing
   /// measurement would tell you which one happened.
   ///
@@ -34,7 +33,7 @@ extension CogScenario {
   /// ```
   ///
   /// Each arm is `source + 1`, so the sum after writing `turn` is
-  /// `width × (turn + 1)` — the same arithmetic upstream asserts.
+  /// `width × (turn + 1)`, matching upstream's assertion.
   ///
   /// - Parameters:
   ///   - width: Parallel arms between the source and the shared consumer.
@@ -108,8 +107,8 @@ extension CogScenario {
       // chain that ARC releases recursively, and the scenario would crash on
       // teardown at depths the graph itself settles fine. Every link instead
       // reads the shared storage by index, so releasing the chain is a flat
-      // array teardown. `unowned` because the storage outlives every selector
-      // that reads it — it owns them.
+      // array teardown. The storage owns every selector, so each selector can
+      // capture it `unowned`.
       let storage = KairoDeepChain()
       storage.linkCogs.reserveCapacity(max(depth, 1))
       for link in 0..<max(depth, 1) {
@@ -141,9 +140,9 @@ extension CogScenario {
   ///
   /// The diamond fans in and the deep chain runs long; this one runs *wide*.
   /// Upstream keeps an effect on every arm, so one write has to reach fifty
-  /// live consumers, and the shape is what catches a propagation that walks
-  /// the subscriber set more than once per consumer — a mistake the diamond
-  /// hides, because there the duplicate arrivals collapse at a single sink.
+  /// live consumers. This catches propagation that walks the subscriber set
+  /// more than once per consumer. The diamond hides that error because all
+  /// duplicate arrivals meet at one sink.
   ///
   /// Each arm is two links, both of which the source's change reaches, so a
   /// settle costs two runs per arm and every changed turn costs the same
@@ -154,8 +153,8 @@ extension CogScenario {
   /// ```
   ///
   /// The `arm`th offset is `source + arm` and its leaf adds one, so the last
-  /// leaf after writing `turn` is `turn + width` — the `i + 50` upstream
-  /// asserts at its default width.
+  /// leaf after writing `turn` is `turn + width`. At the default width, this is
+  /// upstream's `i + 50` assertion.
   ///
   /// Unlike the diamond there is no single sink to read, so the scenario peeks
   /// every leaf, which is what upstream's fifty effects do. Reading only the
@@ -224,23 +223,21 @@ extension CogScenario {
   /// Settling a consumer schedules the dependencies it recorded *last* time
   /// before rerunning it, which is exactly what keeps a warm deep chain
   /// iterative instead of nesting one call frame per link (see `settle` and
-  /// GRAPH-14). When the recorded set is still right — every other ported
-  /// shape — that scheduling costs nothing. Here it settles the branch the
+  /// GRAPH-14). The recorded set stays correct in every other ported shape, so
+  /// that scheduling costs nothing. Here it settles the branch the
   /// next run is about to drop, and the branch that run actually reads is
   /// pulled during it. So a changed turn costs the stale branch, the fresh
   /// branch, and the sum; only the first settle, which has no recorded set
   /// yet, costs two.
   ///
   /// Trading one speculative run per flipped edge for a call stack that does
-  /// not grow with graph depth is the deliberate choice. The count is here so
-  /// that trade stays exactly one run — a regression that recomputed both
-  /// branches, or rescheduled per read rather than per settle, would show up
-  /// as `iterations` extra runs rather than one.
+  /// not grow with graph depth is deliberate. The count holds that cost to one
+  /// run. Recomputing both branches, or scheduling per read, would add
+  /// `iterations` runs instead.
   ///
   /// Each of the `iterations` reads adds the same branch value, so the sum is
   /// `2 × iterations × head` on an odd head and `-iterations × head` on an
-  /// even one — 40 after `head = 1` at upstream's default, which is upstream's
-  /// own assertion.
+  /// even one. At upstream's default, `head = 1` produces 40.
   ///
   /// - Parameters:
   ///   - iterations: Reads of the selected branch inside one run. Defaults to

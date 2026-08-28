@@ -10,16 +10,13 @@ extension Cog {
   /// let currentZipCog = _currentZipCog.readOnly
   /// ```
   ///
-  /// The projection creates no descriptor or state and stores no copy of the
-  /// value. It preserves the source's descriptor-and-key identity, app lifetime,
-  /// starting value, and equality behavior, so reading it is exactly the same
-  /// graph read as reading its source.
+  /// The projection creates no descriptor or state and stores no value. It keeps
+  /// the source identity and behavior, so both references perform the same graph
+  /// read.
   ///
-  /// The source stays hidden inside Cog, and ``Writer`` only accepts a
-  /// ``Cog/Manual``. Passing a `Cog.Projection` to a writer is a compile-time error.
-  /// The facade is MainActor-isolated with the graph; keep the source private in
-  /// the owning state file because projection itself is an API boundary, not a
-  /// replacement for Swift access control.
+  /// ``Writer`` accepts only ``Cog/Manual``, so passing this projection is a
+  /// compile-time error. Keep the source private in its state file; the
+  /// projection removes write capability but does not replace access control.
   @MainActor
   public struct Projection {
     /// The source this value reference reads.
@@ -32,11 +29,10 @@ extension Cog {
 // MARK: - Projecting a source
 
 extension Cog.Manual {
-  /// A value reference naming this source's state that cannot be used to write it.
+  /// A read-only reference to this source's state.
   ///
-  /// Publish this next to the source, in the file that owns it, and keep the
-  /// source itself `private`, named with a leading underscore the projection
-  /// drops:
+  /// Publish it beside the private source. Give the source a leading underscore
+  /// and give this projection the plain domain name:
   ///
   /// ```swift
   /// private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }

@@ -43,11 +43,10 @@ internal nonisolated final class CogObservationBoundary: Observable, @unchecked 
 
   /// Registers a read in the caller's active Observation tracking scope.
   ///
-  /// Registration and the corresponding state read are one synchronous
-  /// MainActor operation, so no turn can publish between them. A synchronous
-  /// automatic subscript registers before its pull; the async subscript settles
-  /// first so initial pending can be installed without invalidating that new
-  /// Observation baseline.
+  /// Registration and its state read form one MainActor operation, so no turn
+  /// can publish between them. A sync subscript registers before settlement.
+  /// An async subscript settles first, so initial pending does not invalidate
+  /// the new Observation baseline.
   func accessValue() {
     registrar.access(self, keyPath: \.value)
   }

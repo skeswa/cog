@@ -2,10 +2,9 @@ import Cog
 import CogTesting
 import Testing
 
-// DECL-10 and DECL-11 are about what Cog *calls* a declaration. Cog talks
-// about declarations in exactly two places — a cycle diagnostic and debug
-// history — so each scenario proves the same label reaches both. A test that
-// checked only one surface would let the other drift.
+// DECL-10 and DECL-11 cover declaration names. Cog uses them in cycle
+// diagnostics and debug history, so each scenario proves the same label reaches
+// both surfaces.
 
 @MainActor
 @Test func `DECL-10 a named cog carries its name into a cycle diagnostic`() {

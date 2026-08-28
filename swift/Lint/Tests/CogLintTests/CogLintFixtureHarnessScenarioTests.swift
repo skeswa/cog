@@ -28,10 +28,9 @@ import Testing
 
 /// Proves every enabled rule carries an executable specification, and no more.
 ///
-/// The two registries are written by hand in separate files, so a rule can be
-/// enabled for consumers while its corpus is forgotten — which would also skip
-/// its generated article, since the generator walks the fixture registry. This
-/// compares the two by slug so neither list can quietly outgrow the other.
+/// The two registries live in separate files. A rule could be enabled without
+/// a fixture corpus or generated article. Comparing their slugs prevents either
+/// list from growing alone.
 @Test func `LINT-02 every registered rule has exactly one fixture corpus`() {
   let enabled = CogLintRuleRegistry.all.map(\.slug).sorted()
   let specified = CogLintFixtureRegistry.all.map(\.rule.slug).sorted()

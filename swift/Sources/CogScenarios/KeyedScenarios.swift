@@ -5,9 +5,9 @@ internal import Cog
 // keyed declarations: a per-entity graph there means one signal object per
 // entity, allocated by hand.
 //
-// Cog does have keyed declarations — one `CogBox` names a family of states that
-// `box[key]` reaches — and their whole promise is that the family behaves like
-// independent graphs. That promise is exactly a run-count claim, so it belongs
+// Cog has keyed declarations. One `CogBox` names a family reached through
+// `box[key]`, and each key should act like an independent graph. That promise
+// is a run-count claim, so it belongs
 // in the counted suite rather than in a timing chart. The same shape supplied
 // the behavior proof while the inline value-reference layout was selected
 // (perf §4).
@@ -18,10 +18,9 @@ extension CogScenario {
   ///
   /// This is `kairoDiamond` with a key threaded through it, and the reason to
   /// run both is that they fail differently. The keyless diamond catches a
-  /// consumer woken once per changed parent. This one catches a keyed
-  /// declaration that behaves like one shared state — a box that invalidated
-  /// every key when one key was written would still produce correct values, and
-  /// would still pass every keyless count in the suite.
+  /// consumer woken once per changed parent. This one catches a box that treats
+  /// all keys as one state. Such a box could return correct values and still
+  /// pass every keyless count.
   ///
   /// Every turn writes exactly one key and then reads **every** key, so a key
   /// that recomputed without being written has nowhere to hide:
@@ -30,9 +29,8 @@ extension CogScenario {
   /// expectedRuns = (keys + turns) × (width + 1)
   /// ```
   ///
-  /// `keys × (width + 1)` to settle every key's diamond once, and
-  /// `width + 1` per turn — the written key's arms and its consumer, and
-  /// nothing else. A box that invalidated the whole family per write would
+  /// The first settle costs `keys × (width + 1)`. Each turn costs
+  /// `width + 1` for the written key's arms and consumer. A box that invalidated the whole family per write would
   /// report `keys × (width + 1)` per turn instead.
   ///
   /// Each key's arms are `source + 1` and its consumer sums them, so a key
@@ -75,9 +73,8 @@ extension CogScenario {
         name: "keyed.diamond.sum"
       )
 
-      // Explicitly MainActor: a nested function does not inherit the enclosing
-      // closure's isolation the way a nested closure does, and the scenario
-      // body runs on the MainActor in every test leg.
+      // A nested function does not inherit its enclosing closure's isolation.
+      // Mark it MainActor to match the scenario body in every test leg.
       @MainActor func readEveryKey() -> Int {
         var total = 0
         for key in 0..<keys { total += cogs.peek(sumCogs[key]) }
@@ -115,9 +112,9 @@ extension CogScenario {
   ///
   /// The `window` term counts the *previous* window rather than the new one,
   /// which is why the per-turn cost is `window + 2` and not `window + 1`.
-  /// Settling a consumer schedules the dependencies it recorded last time
-  /// before rerunning it — the same mechanism COUNT-04 measures — so the key
-  /// leaving the window settles one final time on the turn it leaves. It never
+  /// Before rerunning a consumer, settlement schedules its prior dependencies.
+  /// COUNT-04 measures the same rule. The key leaving the window therefore
+  /// settles once on its final turn. It never
   /// runs again after that, and no key dropped earlier runs at all, which is
   /// exactly the claim: the cost is a function of the window, never of how
   /// many keys the family has ever held.

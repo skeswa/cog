@@ -2,9 +2,8 @@ public import Cog
 
 /// External Observation runtime path selected for one isolated test context.
 ///
-/// Production always follows availability automatically. This testing-only
-/// selector makes the legacy one-shot behavior executable on newer CI hosts;
-/// it is context-local and cannot change another runtime.
+/// Production follows OS availability. Tests may force the legacy one-shot path
+/// on newer CI hosts. The choice affects only that context.
 public nonisolated enum ExternalObservationTrackingForTesting: Sendable {
   /// Follow OS availability exactly as production does.
   case automatic

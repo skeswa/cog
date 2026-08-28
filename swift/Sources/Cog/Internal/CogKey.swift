@@ -1,7 +1,7 @@
 /// The key half of a value reference's identity.
 ///
-/// A keyed declaration — ``CogBox/Manual``, ``CogBox``, or ``CogBox/Async`` —
-/// names a family of states, and `box[key]` builds a lightweight reference to
+/// A keyed declaration (``CogBox/Manual``, ``CogBox``, or ``CogBox/Async``)
+/// names a family of states. `box[key]` builds a lightweight reference to
 /// one of them. Perf §4 and §9.6 selected inline `AnyHashable` after comparing
 /// it with interned-token and generic-keyed candidates. Those experiments are
 /// preserved in the benchmark record rather than in the shipping source.

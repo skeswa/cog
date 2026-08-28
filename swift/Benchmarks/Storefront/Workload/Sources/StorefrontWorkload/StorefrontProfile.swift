@@ -1,26 +1,17 @@
 /// How large the Storefront workload is, and every number derived from that.
 ///
-/// There is no such thing as a "typical application" without production
-/// telemetry, so this type refuses to pretend. It is a **representative
-/// workload v1**: a scale that is written down, configurable, and asserted on,
-/// rather than a claim about what apps are really like. Every count the
-/// workload's shape depends on is a stored property here, so a reader can see
-/// the whole size of the thing in one screen and a checkpoint can compute an
-/// expectation from the parameters instead of copying an observed number.
+/// This is a documented **representative workload v1**, not a claim about a
+/// typical app. Every shape count is configurable and stored here. Checkpoints
+/// derive expectations from these values instead of copying observed results.
 ///
-/// Three profiles exist because three questions do:
+/// The three profiles serve different jobs:
 ///
-/// - ``smoke`` answers "is it correct and does the screen come up", fast
-///   enough to run on every pull request and on a simulator;
-/// - ``standard`` is the representative workload that gets reported and,
-///   eventually, gated;
-/// - ``stress`` answers "does it still behave at several times the size",
-///   including a substantially deeper pricing pipeline, and is for local and
-///   nightly runs only.
+/// - ``smoke`` checks correctness and launch on each pull request.
+/// - ``standard`` provides reported and gated results.
+/// - ``stress`` checks larger scale and deeper pricing in local or nightly runs.
 ///
-/// `Sendable` and `nonisolated` because the deterministic service actor and
-/// the nonisolated benchmark closure both need to carry one across an
-/// isolation boundary; it is a bag of `Int`s, so nothing is shared by doing so.
+/// `Sendable` and `nonisolated` let the service actor and benchmark closure carry
+/// this value across isolation. Its `Int` fields share no mutable state.
 public nonisolated struct StorefrontProfile: Sendable, Equatable {
   /// The profile's name, used in benchmark labels and failure messages.
   public let name: String
@@ -62,7 +53,7 @@ public nonisolated struct StorefrontProfile: Sendable, Equatable {
 
   /// Price books the pricing pipeline evaluates.
   ///
-  /// One in ``smoke`` and ``standard`` — retail. ``stress`` adds member and
+  /// One in ``smoke`` and ``standard``, retail. ``stress`` adds member and
   /// wholesale books, which is how it reaches a substantially deeper pipeline
   /// without inventing padding stages: a third book is a third real ladder
   /// over a different base price, and the effective price is the best book the
@@ -137,11 +128,9 @@ public nonisolated struct StorefrontProfile: Sendable, Equatable {
 
   /// The fast profile: correctness, and the pull-request UI coverage.
   ///
-  /// Small enough that a simulator UI test and this package's own correctness
-  /// suite both finish quickly, and large enough that every structure the
-  /// standard profile exercises still exists — several categories, a real
-  /// four-policy pricing ladder, a cart with promotions, and both halves of an
-  /// inventory burst.
+  /// Small enough for fast simulator and package tests. It still includes
+  /// several categories, four pricing policies, cart promotions, and both
+  /// halves of an inventory burst.
   public static let smoke = StorefrontProfile(
     name: "smoke",
     productCount: 120,
@@ -185,8 +174,8 @@ public nonisolated struct StorefrontProfile: Sendable, Equatable {
   /// The local and nightly profile: several times the size, and a pipeline
   /// three price books deep.
   ///
-  /// Not reported and not gated. It exists to find the cliff — the point where
-  /// a linear-looking cost stops being linear — which a profile sized to be
+  /// Not reported and not gated. It exists to find the cliff, the point where
+  /// a linear-looking cost stops being linear, which a profile sized to be
   /// comfortable can never do.
   public static let stress = StorefrontProfile(
     name: "stress",

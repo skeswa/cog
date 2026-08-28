@@ -107,9 +107,9 @@ let parameter = arguments.count > 4 ? Int(arguments[4]) ?? 0 : 0
 
 /// Iterations run before recording starts.
 ///
-/// Enough that first-run costs — lazy metadata, dyld stub binding, array growth
-/// to a stable capacity — are behind the measured region, so what it records is
-/// the steady state rather than a warm-up.
+/// Moves first-run costs outside the measured region, including lazy metadata,
+/// dyld stub binding, and initial array growth. The recording then captures
+/// steady state.
 let warmupIterations = 200
 
 /// Runs `body` through warm-up, then through the armed measured region.
@@ -183,10 +183,10 @@ case "deep":
 
 case "build":
   // Construction rather than steady state: a *fresh* context each iteration,
-  // populated with `parameter` source-and-automatic pairs. Everything the other
-  // workloads deliberately push behind their warm-up — slot allocation, column
-  // growth, identity filing — is the measured work here, so dividing by twice
-  // `parameter` gives the per-state cost of bringing a state into existence.
+  // populated with `parameter` source-and-automatic pairs. This measures the
+  // slot allocation, column growth, and identity filing that other workloads
+  // put before measurement. Dividing by twice `parameter` gives build cost per
+  // state.
   //
   // Warm-up is short because one iteration is thousands of states rather than
   // one turn; 200 of them would take minutes and prove nothing extra.

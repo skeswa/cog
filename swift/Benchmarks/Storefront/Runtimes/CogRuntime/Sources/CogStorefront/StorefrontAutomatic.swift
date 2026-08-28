@@ -11,7 +11,7 @@ public import StorefrontWorkload
 // important thing a fine-grained graph buys a list screen, and this file is
 // arranged so it is visible rather than asserted.
 //
-// Almost every declaration here is equality-gated — most of them for free,
+// Almost every declaration here is equality-gated, most of them for free,
 // because their values are `Equatable`. Where equality is what stops an
 // invalidation wave, the comment says so.
 
@@ -84,7 +84,7 @@ public let storefrontProductIndexCog = Cog<[ProductID: Product]>(
 
 /// One product's relevance score for the current query.
 ///
-/// Keyed, because a score is a fact about a product and a query — and because
+/// Keyed, because a score is a fact about a product and a query, and because
 /// keeping it keyed is what lets a query change rescore only the products the
 /// index still considers candidates.
 ///
@@ -115,7 +115,7 @@ public let storefrontSearchScoreCogs = CogBox<Int, ProductID>(
 /// inventory belongs to the rows that are on screen.
 ///
 /// And it asks whether *any* variant is stocked rather than the selected one,
-/// so selecting a variant does not invalidate eligibility — and therefore does
+/// so selecting a variant does not invalidate eligibility, and therefore does
 /// not re-rank the catalog. That is both what a real storefront means by "in
 /// stock" in a list filter and what keeps a per-product write a per-product
 /// wave. The first draft read the selected variant here, and `M10` measured
@@ -265,7 +265,7 @@ public let storefrontVisibleProductIDsCog = Cog<[ProductID]>(
 
 /// The visible products plus the prefetch margin on either side.
 ///
-/// This — not the visible set — is what actually demands per-row async work,
+/// This, not the visible set, is what actually demands per-row async work,
 /// which is why scrolling one row does not start a request storm and why the
 /// two sets are separate declarations rather than one with an adjustment.
 public let storefrontPrefetchProductIDsCog = Cog<[ProductID]>(
@@ -292,7 +292,7 @@ public let storefrontPrefetchProductIDsCog = Cog<[ProductID]>(
 /// ``StorefrontPricing/ladder``'s `n - 1`th policy to stage `n - 1`. The
 /// recursion is what makes this one declaration a sixteen-node chain per
 /// product per book, and the `switch` is what makes each node depend on only
-/// the inputs its own policy reads — so changing the coupon invalidates the
+/// the inputs its own policy reads, so changing the coupon invalidates the
 /// coupon stage and everything below it, and nothing above it.
 public let storefrontPricingStageCogs = CogBox<Int, StorefrontPricing.StageKey>(
   { c, key in
@@ -478,7 +478,7 @@ public let storefrontBadgesCogs = CogBox<ProductBadges, ProductID>(
 /// Everything one product row renders.
 ///
 /// A row reads this and nothing else, so a list row's body depends on one
-/// value rather than nine — and an inventory burst that changes an offscreen
+/// value rather than nine, and an inventory burst that changes an offscreen
 /// product changes no row that is on screen.
 public let storefrontProductRowCogs = CogBox<ProductRow, ProductID>(
   { c, id in

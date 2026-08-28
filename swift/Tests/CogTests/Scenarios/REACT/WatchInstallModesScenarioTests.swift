@@ -49,7 +49,7 @@ import Testing
     }
   ])
 
-  // Once, and before assembly returns — no await and no polling. An install
+  // It runs once before assembly returns, with no await or polling. An install
   // has no transition to report, so the current value is both halves.
   #expect(deliveries == ["1->1"])
 

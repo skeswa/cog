@@ -8,7 +8,7 @@ import CogTesting
 /// a steady turn is "same graph shape, new values", and a benchmark that
 /// rebuilt its declarations each time would be measuring construction.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``. Every
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``. Every
 /// entry point takes `Sendable` arguments and returns nothing.
 @MainActor
 enum AllocationHarness {
@@ -35,8 +35,8 @@ enum AllocationHarness {
   /// Once, not once per iteration, and that is load-bearing twice over. A
   /// steady turn is "same graph shape, new values", so a benchmark that built
   /// a fresh context each time would be measuring construction in its setup.
-  /// And tearing a context down is not instantaneous — releasing one cancels
-  /// whatever it still owns, and that cancellation completes on another thread
+  /// Context teardown is not instant. Releasing one cancels what it owns, and
+  /// that cancellation completes on another thread
   /// shortly afterwards. Malloc and ARC counting is process-global, so a
   /// thousand context teardowns would keep dropping allocations into whichever
   /// benchmark happened to be measuring next (`M5-11`).
@@ -50,8 +50,8 @@ enum AllocationHarness {
 
   /// Runs `count` steady turns: one write, one tracked read, nothing new.
   ///
-  /// The read is the tracked subscript rather than `peek`. That is not a
-  /// convenience — a `peek` is transient demand and renews the declaration's
+  /// The read uses the tracked subscript because a `peek` is transient demand.
+  /// It renews the declaration's
   /// `whileObserved` grace on every call, which costs a sleeper and is
   /// therefore a measurement of the lifetime machinery rather than of a turn.
   /// A UI read is the tracked one, and a UI read is what a steady turn serves.
@@ -76,8 +76,8 @@ enum AllocationHarness {
   /// Allocates `count` times, on purpose.
   ///
   /// The witness. `M5-05bb` found that a benchmark run with the malloc
-  /// interposer disabled reports `mallocCountTotal == 0` for a workload that
-  /// demonstrably allocates — so a suite whose every threshold is zero passes
+  /// interposer disabled reports `mallocCountTotal == 0` for a workload known
+  /// to allocate. A suite with only zero thresholds could pass
   /// just as happily when nothing is being measured at all. This benchmark is
   /// the control: it must always report a large non-zero malloc count, and
   /// `mise run bench:baseline:check` asserts that floor before it compares
@@ -104,8 +104,8 @@ private final class WitnessBox {
 /// They are **tolerances on the difference from a baseline**, not ceilings on
 /// a value, despite being spelled `absolute`. Confirmed empirically: a
 /// "ceiling" tightened below the measured cost left the check green. Absolute
-/// ceilings are a different command — `thresholds check` against static
-/// threshold files — and those belong to `M6-11d` with the timing gates.
+/// ceilings use `thresholds check` with static threshold files. `M6-11d` owns
+/// those and the timing gates.
 ///
 /// They compare **raw sums, not the scaled per-operation figures the table
 /// prints**. These benchmarks scale by `.kilo`, so the seven mallocs a steady
@@ -117,8 +117,8 @@ private final class WitnessBox {
 /// single-threaded benchmarks with quiescent background allocation", and this
 /// process is not quiescent: across forty-plus measured runs, strays appear at
 /// **two raw allocations**, at any percentile, in roughly one run in seven.
-/// Meanwhile the smallest regression that could possibly matter — one
-/// allocation added per operation — is **1,000**.
+/// The smallest useful regression is one allocation per operation, or **1,000**
+/// raw allocations.
 ///
 /// So the two populations are three orders of magnitude apart, and 100 sits
 /// between them with room on both sides: fifty times the largest noise ever
@@ -126,8 +126,8 @@ private final class WitnessBox {
 /// is the tempting choice and the wrong one; it failed roughly one run in
 /// seven, and a gate that cries wolf teaches everyone to rerun.
 ///
-/// The absolute numbers this pins against live in `impl/perf.md` — that a steady
-/// turn costs seven mallocs and `box[key]` costs none.
+/// `impl/perf.md` records the pinned values: seven mallocs per steady turn and
+/// none for `box[key]`.
 private func allocationDrift(exactP90: Bool = false) -> BenchmarkThresholds {
   let tolerance = 100
   return BenchmarkThresholds(
@@ -150,8 +150,8 @@ let allocationBenchmarks: @Sendable () -> Void = {
   // Measured, reported, and deliberately not gated. A metric with thresholds
   // on neither side is skipped by `baseline check`, which is the right answer
   // for wall clock and ARC in M5: timing gates belong to M6 (`M6-11d`,
-  // generous absolute thresholds), and upstream's default relative threshold
-  // is 5% — tight enough that ordinary jitter would fail a check that has
+  // generous absolute thresholds). Upstream's default 5% relative threshold is
+  // tight enough that ordinary jitter would fail a check that has
   // nothing to say about allocations. A gate that cries wolf is worse than no
   // gate, because it teaches everyone to rerun.
   let measuredNotGated = BenchmarkThresholds()

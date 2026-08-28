@@ -5,9 +5,9 @@ import StorefrontWorkload
 ///
 /// These strings are the application's test-facing contract and the only thing
 /// the UI-test bundle knows about it. That bundle deliberately links neither
-/// this target nor `CogStorefront` — a UI test drives an app through its
+/// this target nor `CogStorefront`, a UI test drives an app through its
 /// interface, and a runner that linked the workload would hold a second copy of
-/// the workload's globals — so `StorefrontUITests` repeats these literals in
+/// the workload's globals, so `StorefrontUITests` repeats these literals in
 /// its own file. Changing one without the other breaks a test loudly at the
 /// first `waitForExistence`, which is the failure mode we want; sharing them
 /// through a linked module would be worse than the duplication.
