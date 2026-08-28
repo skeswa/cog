@@ -72,8 +72,9 @@ Run `mise tasks` for benchmark and CogLint artifact commands.
 ## Put tests in the right place
 
 - Public behavior tests go in
-  `swift/Tests/CogTests/Scenarios/<PREFIX>/...ScenarioTests.swift`. They import
-  only `Cog` and `CogTesting` and own scenario IDs.
+  `swift/Tests/CogTests/Scenarios/<PREFIX>/...ScenarioTests.swift`, in files
+  named by topic rather than by ID. They import only `Cog` and `CogTesting`
+  and own scenario IDs in their test names.
 - Internal tests go in
   `swift/Tests/CogTests/Infrastructure/<seam>/...InfrastructureTests.swift`.
   They may use `@testable import Cog` and do not own scenario IDs.

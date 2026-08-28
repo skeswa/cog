@@ -161,7 +161,7 @@ extension Cogs {
   #expect(effects.count == 1)
   // No `name:` was given, so the label falls back to the registration site.
   // This test only checks that the fallback belongs to this registration.
-  #expect(effects.first?.name.contains("HIST01_02_03_05ScenarioTests.swift") == true)
+  #expect(effects.first?.name.contains("HistoryRecordingScenarioTests.swift") == true)
 }
 
 @MainActor

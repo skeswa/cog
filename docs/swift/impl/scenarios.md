@@ -58,9 +58,12 @@ Every test follows these rules:
    edges, or other storage details. COUNT-09 through COUNT-11 prove that the
    same tests work across internal layouts. Group 18 is the only exception.
 4. **Separate proof kinds.** Public behavior proofs in
-   `CogTests` live under `Scenarios/<PREFIX>/`, and each
-   `<PREFIX><IDs>ScenarioTests.swift` file contains only raw IDs from that
-   scenario family. Fixtures live beside that family without a `Tests` suffix.
+   `CogTests` live under `Scenarios/<PREFIX>/` in files with descriptive
+   topic names ending in `ScenarioTests.swift`; a file's tests carry only IDs
+   from that scenario family in their display names, and
+   `mise run scenarios:check` enforces the ID linkage, so retiring an ID is a
+   ledger edit plus a comment edit, never a file rename.
+   Fixtures live beside that family without a `Tests` suffix.
    Proofs that green no scenario live under
    `Infrastructure/<seam>/`, use the `...InfrastructureTests.swift` suffix,
    and use no scenario ID. Only infrastructure tests may use
