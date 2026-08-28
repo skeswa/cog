@@ -45,10 +45,12 @@ public nonisolated struct ProductID: Hashable, Sendable, Comparable, CustomStrin
     self.raw = raw
   }
 
+  /// Orders product identifiers by their fixture ordinal.
   public static func < (lhs: ProductID, rhs: ProductID) -> Bool {
     lhs.raw < rhs.raw
   }
 
+  /// The trace label `p` followed by the fixture ordinal.
   public var description: String { "p\(raw)" }
 }
 
@@ -62,14 +64,16 @@ public nonisolated struct CategoryID: Hashable, Sendable, Comparable, CustomStri
     self.raw = raw
   }
 
+  /// Orders category identifiers by their fixture ordinal.
   public static func < (lhs: CategoryID, rhs: CategoryID) -> Bool {
     lhs.raw < rhs.raw
   }
 
+  /// The trace label `c` followed by the fixture ordinal.
   public var description: String { "c\(raw)" }
 }
 
-/// One variant of a product — a size, a colourway, a capacity.
+/// One variant of a product, a size, a colourway, a capacity.
 ///
 /// Variants carry their own price delta and their own stock, which is what
 /// makes selecting one a write that genuinely changes downstream pricing and
@@ -118,8 +122,8 @@ public nonisolated struct Product: Hashable, Sendable, Identifiable {
 
   /// A fixed-dimensional feature vector used by ranking and recommendations.
   ///
-  /// Eight signed dimensions — popularity, margin, freshness, rating,
-  /// return rate, seasonality, breadth, and price band — held as a fixed-size
+  /// Eight signed dimensions, popularity, margin, freshness, rating,
+  /// return rate, seasonality, breadth, and price band, held as a fixed-size
   /// array so scoring is a dot product with no allocation and no branching on
   /// length.
   public let features: StorefrontFeatureVector
@@ -277,10 +281,14 @@ public nonisolated enum SortMode: String, Hashable, Sendable, CaseIterable {
 
 /// The shopper's membership tier, which several pricing policies read.
 public nonisolated enum MembershipTier: Int, Hashable, Sendable, Comparable, CaseIterable {
+  /// A shopper without a registered account.
   case guest = 0
+  /// A registered shopper on the free plan.
   case member = 1
+  /// A registered shopper on the paid plan.
   case plus = 2
 
+  /// Orders tiers from guest through plus.
   public static func < (lhs: MembershipTier, rhs: MembershipTier) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
@@ -336,8 +344,11 @@ public nonisolated struct ShippingAddress: Hashable, Sendable {
 
 /// How the order ships.
 public nonisolated enum ShippingMethod: String, Hashable, Sendable, CaseIterable {
+  /// The lowest base rate and the only method eligible for free shipping.
   case standard
+  /// A two-day base quote priced above standard shipping.
   case express
+  /// A one-day base quote with the highest base rate.
   case overnight
 
   /// Display name for the shipping picker.
@@ -575,8 +586,10 @@ public nonisolated struct CartLine: Hashable, Sendable, Identifiable {
 /// comparison and an equality-gated declaration can stop an invalidation wave
 /// on it without allocating.
 public nonisolated struct ProductBadges: OptionSet, Hashable, Sendable {
+  /// The bit field that stores the selected badges.
   public let rawValue: Int
 
+  /// Creates a badge set from its bit field.
   public init(rawValue: Int) {
     self.rawValue = rawValue
   }

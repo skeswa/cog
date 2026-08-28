@@ -1,43 +1,29 @@
 /// A one-shot MainActor barrier a runtime fires when it has finished deciding
 /// about one asynchronous result.
 ///
-/// The analogue of Cog's `MainActorCleanupAcknowledgement`, for ports that
-/// cannot import `CogTesting`. Deliberately valueless: a waiter learns that a
-/// decision *happened*, never what it was, because a decision to discard a
-/// stale result is exactly as much of a signal as a decision to publish one.
+/// The non-Cog counterpart to `MainActorCleanupAcknowledgement`. It reports that
+/// a publish or discard decision finished, but carries no value.
 ///
 /// ## Structure
 ///
-/// One `AsyncStream` buffering the newest single element, which is exactly the
-/// shape `MainActorCleanupAcknowledgement` uses. The mirroring is deliberate
-/// and load-bearing rather than incidental: the Cog adapter fires Cog's
-/// primitive and every other port fires this one, so a difference in how the
-/// two resolve an already-delivered event would surface as a flake in one
-/// runtime only — the hardest kind of benchmark defect to attribute.
+/// Uses the same one-element `AsyncStream` shape as Cog's barrier. This keeps
+/// delivery order equal across all ports.
 ///
 /// ## Identity and ownership
 ///
 /// One instance per awaited result, created by the runtime's
 /// `settlingOneAsyncResult(_:)` and released once its waiter resumes. It is
-/// never reused: a runtime arms a fresh instance for each awaited decision and
-/// clears its reference in the epilogue that fires it.
+/// never reused. Each decision gets a fresh instance that its epilogue clears.
 ///
 /// ## Isolation and ordering
 ///
-/// The class itself is `nonisolated` so a waiter suspended on a task that is
-/// not the MainActor can resume without a hop, while ``signal()`` is
-/// MainActor-confined because a publish-or-discard decision is a MainActor
-/// decision in every runtime. Arming is a MainActor operation and must happen
-/// strictly before the release that produces the result, because a scripted
-/// release can resume and publish synchronously. Signalling before anyone waits
-/// is safe: the buffered event wakes a later ``wait()`` immediately rather than
-/// hanging.
+/// The class is `nonisolated`, while ``signal()`` stays on the MainActor with
+/// publish decisions. Arm it before releasing work because release may publish
+/// at once. Its buffer also supports signalling before ``wait()``.
 ///
 /// One-shot in both directions. A second ``signal()`` on the same instance
-/// traps, because a barrier that silently absorbed a second completion would
-/// let a port satisfy a one-result step with two. A second ``wait()`` has no
-/// buffered event left to consume and would hang, so make one signal per
-/// awaited decision rather than waiting twice on one.
+/// traps so two completions cannot satisfy one-result work. A second ``wait()``
+/// has no event, so use one barrier per decision.
 ///
 /// ## Cancellation
 ///

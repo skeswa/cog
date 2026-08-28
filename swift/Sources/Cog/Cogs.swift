@@ -1,16 +1,14 @@
 /// The MainActor-confined runtime for one Cog state graph.
 ///
-/// A context creates state lazily as declarations are read, refreshed, or
-/// written. Declaration identity plus an optional box key names one state slot,
-/// so copied value references converge inside a context while separate contexts
-/// remain isolated. One running app uses one context; each test or preview may
-/// create its own.
+/// A context creates state when a declaration is first read, refreshed, or
+/// written. A declaration and optional box key name one state. Copies point to
+/// that state within one context, while each context stays isolated. An app has
+/// one context; each test or preview can have its own.
 ///
-/// Reads settle every dependency needed by the returned value. Application
-/// writes and runtime-owned async status changes publish as ordered turns;
-/// notifications and reactions run only after the active value computation has
-/// finished. UI subscripts participate in Swift Observation, selector and
-/// reaction readers record graph edges, and `peek` deliberately does neither.
+/// Reads settle every dependency needed for the answer. App writes and async
+/// status changes publish as ordered turns. Notifications and reactions wait
+/// until the active computation ends. UI reads use Swift Observation, tracked
+/// readers record graph edges, and `peek` does neither.
 ///
 /// `Cogs` and all graph access are MainActor-isolated. It is not a container
 /// to pass between arbitrary executors: enter the MainActor before reading,
@@ -37,13 +35,11 @@ public final class Cogs {
 
   /// At most one test-installed acknowledgement per runtime event.
   ///
-  /// The events are the runtime's deterministic negative-event signals —
-  /// moments with no public status, value, or history event to await; each
-  /// ``CogRuntimeEvent`` case documents its own. Only the `CogTesting`
-  /// product installs callbacks, through ``acknowledgeNext(_:with:)``, and
-  /// each fires once through ``acknowledge(_:)``. Production code never
-  /// installs one, and context teardown releases the stored callbacks with
-  /// the graph.
+  /// These events let tests await decisions that publish no status, value, or
+  /// history entry. Each ``CogRuntimeEvent`` case defines its decision. Only
+  /// `CogTesting` installs a callback through ``acknowledgeNext(_:with:)``.
+  /// ``acknowledge(_:)`` consumes it after one firing, and teardown drops any
+  /// callback still stored.
   private var runtimeAcknowledgements = CogRuntimeAcknowledgements()
 
   /// The monotonic clock used by context-owned timing work.
@@ -113,8 +109,8 @@ public final class Cogs {
 
   /// Tracked export terminals this context owns, in registration order.
   ///
-  /// Keeping the phase physically separate makes the common effect-only flush
-  /// scan each effect once while still giving exports their earlier phase.
+  /// Keeping exports separate lets an effect-only flush scan each effect once
+  /// while exports keep their earlier phase.
   internal var exportReactions: [CogReaction] = []
 
   /// Tracked effect terminals this context owns, in registration order.
@@ -184,13 +180,11 @@ public final class Cogs {
 
   /// Installs a one-shot acknowledgement for one runtime event's next firing.
   ///
-  /// The callback acknowledges a completed decision — the event's own case
-  /// documents which — not merely that some work returned. One waiter per
-  /// event, because the seam exists for one deterministic test assertion at a
-  /// time; ``CogRuntimeEvent/deinitCleanup`` alone may be re-installed, since
-  /// teardown fires at most once. The caller must retain this context until
-  /// the event can fire: the paths that fire it capture the context weakly,
-  /// and teardown releases stored callbacks together with the graph.
+  /// The callback marks the decision named by the event, not merely a returned
+  /// task. Each event allows one waiter so a test has one clear assertion.
+  /// ``CogRuntimeEvent/deinitCleanup`` may be replaced because teardown fires
+  /// only once. The caller must retain this context until the event fires;
+  /// event paths capture it weakly, and teardown drops its callbacks.
   ///
   /// - Parameters:
   ///   - event: The runtime event whose next firing the test awaits.
@@ -209,11 +203,10 @@ public final class Cogs {
 
   /// Consumes one runtime event's acknowledgement, when a test installed one.
   ///
-  /// Firing paths call this after their eligibility decision completes —
-  /// often from `defer`, and for async completions only after obtaining the
-  /// weakly captured context — so rejected and accepted outcomes both unblock
-  /// the waiter, and an event that outlives the context cannot acknowledge a
-  /// callback the context no longer owns.
+  /// Firing paths call this after their eligibility decision, often from
+  /// `defer`. Async paths first regain the weakly captured context. Accepted
+  /// and rejected outcomes both unblock the waiter, while work that outlives
+  /// the context cannot reach a callback the context no longer owns.
   internal func acknowledge(_ event: CogRuntimeEvent) {
     let acknowledgement = runtimeAcknowledgements[event]
     runtimeAcknowledgements[event] = nil
@@ -222,11 +215,10 @@ public final class Cogs {
 
   /// Cancels graph-owned work before stored properties release.
   ///
-  /// Mechanism scopes cancel first — unregistering reactions, requesting task
-  /// cancellation, and releasing controllers — and the retained mechanism
-  /// values are released only afterward, so a class-owned resource outlives
-  /// its last registration (§6.2). Arena teardown then cancels async tasks,
-  /// invalidates their generations, and clears scalar topology iteratively.
+  /// Mechanism scopes cancel before retained mechanism values are released.
+  /// This keeps a class-owned resource alive through its last registration
+  /// (§6.2). Arena teardown then cancels async tasks, rejects their generations,
+  /// and clears scalar topology without recursion.
   isolated deinit {
     for scope in mechanismScopes {
       scope.cancel()
@@ -239,10 +231,9 @@ public final class Cogs {
     }
     externalObservationBridges.removeAll()
 
-    // Mechanism scopes removed their registrations above. Any survivors are
-    // externally owned value subscriptions: clear their raw teardown leases,
-    // then cancel them so their waiting AsyncSequences finish instead of
-    // retaining inert reaction bodies after the graph is gone.
+    // Mechanism scopes removed their registrations above. The remaining
+    // reactions are external value subscriptions. Clear their teardown leases,
+    // then cancel them so waiting sequences finish and release their bodies.
     let remainingExports = exportReactions
     for reaction in remainingExports {
       reaction.releaseArenaLeasesForContextTeardown()
@@ -263,11 +254,10 @@ public final class Cogs {
 extension Cogs {
   /// Operates the runtime's mechanisms, exactly once, in list order.
   ///
-  /// Only `assemble(mechanisms:)` and the `CogTesting` factory call this,
-  /// which is what makes registration assembly-only: there is no later
-  /// installation API. Each mechanism receives its own scope and curated
-  /// controller; `operate` runs synchronously, so every mechanism is live —
-  /// and its operate-time writes settled — before the factory returns.
+  /// Only `assemble(mechanisms:)` and the `CogTesting` factory call this; there
+  /// is no later install API. Each mechanism gets its own scope and controller.
+  /// `operate` runs in place, so all mechanisms and their writes are settled
+  /// before the factory returns.
   ///
   /// Two mechanisms sharing a name fail fast in debug and release builds,
   /// because history attribution and task naming depend on the name being
@@ -318,10 +308,9 @@ extension Cogs {
 extension Cogs {
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///
-  /// A diagnostic seam for `CogTesting`, not UI API. It reports only the count
-  /// of boundary-pinned states — never the states, their storage, or the
-  /// boundary objects — so behavior tests (UI-05) can hold "only what a view
-  /// read pays for a boundary" without coupling to state representation.
+  /// This `CogTesting` seam returns only a count, not states, storage, or
+  /// boundary objects. UI-05 can measure the cost of view reads without
+  /// depending on the state layout.
   package var observationBoundaryCountForTesting: Int {
     arenaCore.observationBoundaryCount
   }

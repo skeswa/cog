@@ -144,9 +144,8 @@ internal struct CogTurnChainTracker {
 extension Cogs {
   /// The turn-chain behavior a test may observe without seeing graph storage.
   ///
-  /// Idle is deliberately stronger than `turnPhase == .idle`: queued system
-  /// turns, a popped-but-computing settle path, consumer tracking, reaction work,
-  /// or an active debug chain all mean observable synchronous work remains.
+  /// `turnPhase == .idle` is not enough. Queued turns, active computation,
+  /// tracking, reaction work, or a debug chain mean sync work remains.
   package var turnChainDiagnosticSnapshot: CogTurnChainDiagnosticSnapshot {
     let phaseIsIdle: Bool
     if case .idle = turnPhase {

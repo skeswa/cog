@@ -9,11 +9,10 @@ import CogTesting
 /// a per-*node* cost, and a fan makes the node count the only thing that
 /// changes between this shape and the single-consumer graph PERF-01 measures.
 /// Subtracting one from the other therefore attributes ARC traffic to
-/// propagation rather than to the turn boundary, which is what PERF-02 is
-/// actually about — a turn has a fixed cost no matter how small the graph, and
-/// that fixed cost is not propagation.
+/// propagation rather than to the turn boundary. PERF-02 excludes that fixed
+/// cost because it exists for every graph size.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``. One
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``. One
 /// context for the whole benchmark, for the reason `M5-11` recorded: tearing a
 /// context down leaves cancellation work on another thread, and the counters
 /// here are process-global.
@@ -64,9 +63,8 @@ enum PropagationHarness {
 /// The chain PERF-13 measures: one source pulled through `chainDepth` automatic
 /// nodes, every turn.
 ///
-/// A chain rather than a fan, because PERF-13 is about the settle *walk* — what
-/// entering and leaving one node costs — and a fan settles sixteen nodes that
-/// are each one hop from the source. Depth is what makes the walk deep.
+/// A chain measures the settle walk through depth. A fan also settles many
+/// nodes, but each is only one hop from the source.
 ///
 /// The nodes are keyed so the depth is a parameter rather than sixteen
 /// declarations, and so the shape matches the probe `M9-01` profiled. This is
@@ -123,9 +121,9 @@ enum DeepChainHarness {
 }
 
 let propagationBenchmarks: @Sendable () -> Void = {
-  // PERF-02. ARC traffic is what this shape is for, so retains, releases, and
-  // object allocations are the gated metrics here — the mirror image of
-  // `AllocationBenchmarks`, where they are reported and ARC is not the claim.
+  // PERF-02 gates retains, releases, and object allocations because this shape
+  // measures ARC traffic. `AllocationBenchmarks` reports them without making
+  // them its claim.
   //
   // Gated against drift rather than against zero, for the same reason PERF-01
   // is: propagation over class states with edge arrays does ARC work by
@@ -169,9 +167,8 @@ let propagationBenchmarks: @Sendable () -> Void = {
   //
   // Allocations are gated at exactly zero: `M9-09` removed the per-node
   // copy-on-write that made this shape allocate once per node, and there is no
-  // reason for a settled chain to allocate at all. ARC is gated against drift,
-  // because it is emphatically not zero yet — §5's rule is unmet and the routes
-  // that would meet it are still on issue #373.
+  // reason for a settled chain to allocate. ARC is gated against drift because
+  // it is not zero yet. §5 remains unmet, with possible routes in issue #373.
   Benchmark(
     "perf-13-deep-chain",
     configuration: .init(

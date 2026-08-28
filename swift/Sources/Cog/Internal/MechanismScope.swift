@@ -1,17 +1,14 @@
 /// The terminal ownership boundary behind one mechanism or `whenever` scope.
 ///
-/// A scope owns reaction registrations, named tasks, child scopes, and the
-/// ``MechanismController`` that registered them. The runtime retains one scope
-/// per assembly mechanism, and each open `whenever` gate owns one child scope
-/// registered with its parent, so cancelling a parent tears its whole family
-/// down as one unit.
+/// A scope owns reactions, tasks, child scopes, and their
+/// ``MechanismController``. The runtime keeps one scope per mechanism. Each open
+/// `whenever` gate adds a child to its parent, so parent cancellation closes the
+/// whole tree.
 ///
-/// Cancellation is terminal and idempotent: repeated calls do nothing, a
-/// registration arriving afterward is cancelled synchronously without being
-/// retained, and nothing reopens a cancelled scope. Task cancellation is a
-/// cooperative request; the controller is released only after registrations
-/// and tasks have been cancelled, which is what lets weakly captured
-/// controllers become inert instead of outliving their lifetime.
+/// Cancellation is final and safe to repeat. New registrations are cancelled at
+/// once, and a closed scope cannot reopen. Task cancellation stays cooperative.
+/// The controller is released after its work is cancelled, so weak captures
+/// become inert when the scope ends.
 ///
 /// Scopes are MainActor-isolated final classes. None of this surface is
 /// public API: application code expresses lifetime through assembly and
@@ -33,9 +30,8 @@ internal final class MechanismScope {
 
   /// The controller whose registrations this scope owns.
   ///
-  /// Retained until terminal cancellation so asynchronous and delegate-driven
-  /// work may capture the controller weakly for exactly as long as the scope
-  /// authorizes graph access.
+  /// Retained until cancellation so async and delegate work can hold a weak
+  /// reference for the allowed graph lifetime.
   private var controller: MechanismController?
 
   /// Terminal state shared by every reference to this scope.
@@ -126,11 +122,9 @@ internal final class MechanismScope {
 
   /// Cancels everything this scope owns and leaves it terminal.
   ///
-  /// Children cancel first so a nested family never observes a half-closed
-  /// ancestor, then reactions and tasks, and only then is the controller
-  /// released — the ordering that keeps a mechanism's resources alive until
-  /// its last registration is gone. Stored handles are released before their
-  /// cancellation callbacks run, avoiding reentrant ownership surprises.
+  /// Children cancel first so they never see a half-closed parent. Reactions
+  /// and tasks follow, then the controller. Stored handles are removed before
+  /// their cancellation callbacks run, which avoids reentrant ownership changes.
   internal func cancel() {
     guard !isCancelled else { return }
     isCancelled = true

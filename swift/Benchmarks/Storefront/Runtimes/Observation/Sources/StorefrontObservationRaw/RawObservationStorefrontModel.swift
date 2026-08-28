@@ -5,7 +5,7 @@ import StorefrontWorkload
 /// stored properties.
 ///
 /// This is the whole state layer of the raw port. The seventeen sources the Cog
-/// graph declares — twelve keyless and five keyed — land here as twelve stored
+/// graph declares, twelve keyless and five keyed, land here as twelve stored
 /// properties and five dictionaries, and the ten asynchronous values land as ten
 /// more stored properties holding the last accepted response. There is nothing
 /// else: no derived storage, no dirty bits, no edge list, and no per-node
@@ -20,9 +20,9 @@ import StorefrontWorkload
 /// product its own cell. Here they are five dictionaries on a single
 /// `@Observable` object, because that is what a team writes when Observation is
 /// the only tool available: one model object per screen's worth of state, keyed
-/// collections inside it. The consequence is coarse invalidation — writing one
+/// collections inside it. The consequence is coarse invalidation, writing one
 /// product's favorite flag notifies every reader of the whole `favorites`
-/// dictionary — and that coarseness is part of what is being measured rather
+/// dictionary, and that coarseness is part of what is being measured rather
 /// than a defect to be engineered around.
 ///
 /// ## Identity and ownership
@@ -43,7 +43,7 @@ import StorefrontWorkload
 /// The properties are macro-instrumented, so a read taken inside
 /// `withObservationTracking` registers with the standard-library registrar and a
 /// later write notifies it. The runtime deliberately keeps that registration in
-/// the measured path — see ``RawObservationStorefrontRuntime`` — while driving
+/// the measured path, see ``RawObservationStorefrontRuntime``, while driving
 /// its own rendering explicitly, because Observation's change callback is not a
 /// settlement barrier.
 ///
@@ -81,7 +81,7 @@ final class RawObservationStorefrontModel {
   /// Deliberately a source of its own rather than a read of ``account``:
   /// signing out is a local action that must not wait on a request, and the
   /// runtime's account observer writes the accepted response here. One writable
-  /// fact, one writable place — the same split the Cog port makes.
+  /// fact, one writable place, the same split the Cog port makes.
   var signedInShopper: Shopper?
 
   /// The coupon the shopper typed, or `nil`.

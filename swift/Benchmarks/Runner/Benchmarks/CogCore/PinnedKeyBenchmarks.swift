@@ -19,7 +19,7 @@ import CogTesting
 /// safe here: sources have `.app` lifetime and the pinned keys are *observed*
 /// rather than peeked, so nothing owns a grace sleeper.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``.
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``.
 @MainActor
 enum PinnedKeyHarness {
   /// The keyed source a turn writes.
@@ -40,8 +40,8 @@ enum PinnedKeyHarness {
 
   /// Builds a context with `pinnedKeyCount` rows pinned by a UI read.
   ///
-  /// Once per count, not once per iteration — tearing a context down leaves
-  /// cancellation on another thread, and these counters are process-global
+  /// Runs once per count, not per iteration. Context teardown leaves
+  /// cancellation on another thread, while these counters are process-global
   /// (`M5-11`).
   ///
   /// - Parameter pinnedKeyCount: Rows the UI reads once and then forgets. The
@@ -126,18 +126,18 @@ let pinnedKeyBenchmarks: @Sendable () -> Void = {
   // table are 71,000 here, and a ceiling written as 90 would gate nothing while
   // looking like it gated everything. `M9-06` found this the way `M5-11` found
   // it for baselines: by watching a deliberately impossible ceiling pass.
-  // The one-key shape is also the **keyed steady turn**: the graph PERF-01
-  // measures — a manual source, one automatic consumer reading it, one tracked
-  // read — with every reference keyed. The pair is therefore the only
+  // The one-key shape is also the **keyed steady turn**: the PERF-01 graph with
+  // a manual source, one automatic consumer, and one tracked read, all keyed.
+  // The pair is therefore the only
   // measurement of what keying itself costs, and nothing gated it until a
   // 2026-08-24 comparison priced it at 2.18x the keyless turn ([E13], with the
   // call-site attribution beside it in `impl/perf.md`). These ceilings
   // hold that price. Allocations are exactly zero at the gated percentile,
   // because a keyed turn allocates nothing for the same reason a keyless one
   // does and a claim of nothing is checkable exactly. ARC sits just above the
-  // measured 27 retains and 34 releases per turn: tight enough that restoring
-  // a per-turn record or slot lookup fails it — each costs two pairs — and
-  // loose enough to survive the couple of pairs an inlining change can move
+  // measured 27 retains and 34 releases per turn. A per-turn record or slot
+  // lookup would fail it because each costs two pairs. The limits still allow
+  // the few pairs an inlining change can move
   // when the Xcode pin advances.
   //
   // Raw sums, like the slope ceilings below.

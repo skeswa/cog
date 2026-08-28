@@ -10,9 +10,8 @@ import SwiftSyntax
 /// cannot return. A getter that reads through `peek` registers no dependency,
 /// so the control renders once and then silently stops following the fact it
 /// displays. A binding constructed inline in a view spreads the writable
-/// surface across the view layer, so no one file answers what the system may
-/// mutate — which is the whole reason the adapters were collected in the first
-/// place.
+/// surface across the view layer. Then no single file defines what the system
+/// may mutate, which defeats the purpose of collecting the adapters.
 ///
 /// The two checks divide by where the construction sits, so one binding never
 /// reports both: a construction inside a recognized view is a placement
@@ -31,10 +30,8 @@ package struct TrackedBindingAdaptersRule: CogLintRule {
 
   /// Reports view-local graph bindings and untracked binding getters.
   ///
-  /// Both roles are checked. Unlike the primitive rule, nothing here is a
-  /// capability a test target is entitled to use directly: an untracked getter
-  /// is as wrong in a harness view as in an app view, and a test that means to
-  /// build one anyway can say so with a next-line suppression.
+  /// Both roles are checked in app and test views. A test that needs an
+  /// untracked getter can use a next-line suppression.
   package func violations(
     in source: SourceFileSyntax,
     context _: CogLintRuleContext

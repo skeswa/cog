@@ -9,8 +9,8 @@ import Testing
   // This walk contains the retired LIFE-02 whole: the automatic cog uses the
   // default `whileObserved` lifetime, its last watcher leaves, injected grace
   // elapses, and the release acknowledgement fires. LIFE-03's own claim is
-  // the recreation: the same value reference comes back computed fresh —
-  // `c.curr` is nil again — from the state the source has now.
+  // the recreation. The same value reference computes fresh from the source's
+  // current state, with `c.curr` nil again.
   let clock = TestClock()
   let watcherAlive = Cog<Bool>.Manual { true }
   let source = Cog<Int>.Manual { 1 }

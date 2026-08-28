@@ -11,8 +11,8 @@ import Testing
 /// scheduler events, and the script's whole job is to hold the gap between
 /// them open so a driver can release work by name.
 ///
-/// `@testable` because the synchronous selection path — `schedule(_:)` on the
-/// script and `begin(_:)` — is internal to the workload module: a runtime
+/// `@testable` because the synchronous selection path, `schedule(_:)` on the
+/// script and `begin(_:)`, is internal to the workload module: a runtime
 /// records selections through ``StorefrontService/schedule(_:)`` and never
 /// reaches these directly. This suite is the workload package's own test, not a
 /// Cog scenario test, so the repository's rule about `@testable` in scenario

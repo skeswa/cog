@@ -1,7 +1,7 @@
 // scenario: DECL-06
 //
-// A read-only value reference cannot be written, and "cannot" means the write does not
-// compile — not that it traps, warns, or is merely discouraged by a comment.
+// A write through a read-only value reference does not compile. It does not
+// trap, warn, or rely on a comment for enforcement.
 //
 // This is the enforcement half of write ownership. A file keeps its
 // sources `fileprivate` so only it can name them, and publishes `.readOnly`

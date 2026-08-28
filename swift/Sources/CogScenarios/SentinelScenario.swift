@@ -4,10 +4,9 @@ extension CogScenario {
   /// The smallest shape that can catch duplicate work: one diamond, driven for
   /// `turns` turns.
   ///
-  /// A source feeds two automatic cogs, and a third reads both. It is the
-  /// shape a naive push implementation gets wrong — the shared consumer runs
-  /// twice per turn, once per changed parent — so a harness that cannot fail
-  /// on this one cannot be trusted on the ported cases either.
+  /// A source feeds two automatic cogs, and a third reads both. A naive push
+  /// runtime may run the shared consumer twice per turn, once per changed
+  /// parent. A harness that misses this error cannot be trusted on larger cases.
   ///
   /// The expectation is arithmetic, not observation. Settling the diamond
   /// costs one run of each of its three automatic cogs, and every turn that

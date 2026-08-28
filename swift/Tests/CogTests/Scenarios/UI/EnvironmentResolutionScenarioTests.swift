@@ -3,9 +3,8 @@ import CogTesting
 import SwiftUI
 import Testing
 
-/// Captures the context a body actually resolved, so the test can compare it
-/// by identity with the installed one instead of trusting that any render
-/// implies the right environment value arrived.
+/// Captures the context resolved by a view body. The test compares its identity
+/// with the installed context instead of treating any render as proof.
 @MainActor
 private final class ResolvedContextBox {
   var resolved: Cogs?
@@ -49,7 +48,7 @@ private struct ContextProbeHost: View {
   // the view would not prove the environment arrives before @Environment reads.
   #expect(renderer.cgImage != nil)
 
-  // The descendant body read the installed context itself — not a default,
-  // fallback, or value forwarded by its parent.
+  // The descendant body read the installed context, not a default, fallback,
+  // or value forwarded by its parent.
   #expect(box.resolved === cogs)
 }

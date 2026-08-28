@@ -11,12 +11,12 @@ import Testing
 /// derived from the profile and the events the driver issued, and never read
 /// back out of the port being measured. Because all four runtimes are checked
 /// against that same shadow, a green here is also half of the transitive proof
-/// that the four agree with one another — without any test having to link two
+/// that the four agree with one another, without any test having to link two
 /// runtimes at once, which target separation forbids.
 ///
 /// The `smoke` profile throughout: it is the profile the correctness gate is
 /// defined on, and it still exercises every structure the reported profile does
-/// — several categories, a real pricing ladder, a cart with promotions, and both
+///, several categories, a real pricing ladder, a cart with promotions, and both
 /// halves of an inventory burst.
 ///
 /// Not `@testable`: this suite holds the port to the public
@@ -29,7 +29,7 @@ struct StorefrontObservationRawTests {
   /// Forty checkpoints, of which exactly one is skipped and the skip is
   /// asserted by name below. `requireSettledOutput()` then re-derives the final
   /// rendered state from the shadow and proves the session ended with no
-  /// outstanding requests — a port that had quietly stopped asking for
+  /// outstanding requests, a port that had quietly stopped asking for
   /// something would fail there rather than merely being fast.
   @Test("runs the standard interaction trace against the shared shadow")
   func runsTheStandardTrace() async throws {
@@ -48,9 +48,9 @@ struct StorefrontObservationRawTests {
   ///
   /// The teardown phase's release proof, because this port declares no lifetime
   /// release: nothing is cached, so re-demanding a row after grace would ask the
-  /// service again for the wrong reason. Every other claim — including the burst
+  /// service again for the wrong reason. Every other claim, including the burst
   /// phase's offscreen-work claim, which is asserted against a declared number
-  /// rather than skipped — is one this port is held to. A second skip appearing
+  /// rather than skipped, is one this port is held to. A second skip appearing
   /// here means a claim stopped being checked.
   @Test("skips exactly the one claim this port does not make")
   func skipsOnlyTheLifetimeReleaseProof() async throws {
@@ -69,7 +69,7 @@ struct StorefrontObservationRawTests {
   /// offscreen-only invalidation because it cannot tell that nothing changed,
   /// and it releases nothing because it caches nothing.
   ///
-  /// `declaredUndemandedRequestStarts` is zero, matching Cog — but for a
+  /// `declaredUndemandedRequestStarts` is zero, matching Cog, but for a
   /// structural reason rather than a state-management one, since the render
   /// walks only the visible window widened by the prefetch margin. The results
   /// table has to say so; this test only fixes the number.
@@ -101,8 +101,8 @@ struct StorefrontObservationRawTests {
   /// The first two boundaries are compared more narrowly, because the shadow is
   /// not yet an oracle for them and pretending otherwise would be checking the
   /// wrong thing. ``StorefrontWorld`` holds the catalog, the search index, and
-  /// every fixture response from the moment it is constructed — it models the
-  /// *settled* world — whereas the session has released nothing at bootstrap and
+  /// every fixture response from the moment it is constructed, it models the
+  /// *settled* world, whereas the session has released nothing at bootstrap and
   /// has released only its root responses after `rootData`. So bootstrap is
   /// checked for an empty screen, which is the claim the trace itself makes
   /// there, and `rootData` is checked for the visible identifiers only: the

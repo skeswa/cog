@@ -12,19 +12,16 @@ internal import StorefrontWorkload
 /// harness behind each case is MainActor-isolated, per the shim
 /// `swift/Benchmarks/README.md` records.
 ///
-/// The raw value is the runtime's benchmark-name slug, and it is the same slug
-/// ``StorefrontRuntimeDescriptor/slug`` carries — ``requireSlugsAgree()``
-/// proves that rather than trusting it, because a name that drifted from the
-/// runtime it names would mislabel every recorded number.
+/// The raw value matches ``StorefrontRuntimeDescriptor/slug``.
+/// ``requireSlugsAgree()`` checks this so a stale name cannot mislabel results.
 nonisolated enum StorefrontRuntimeBackend: String, Sendable, CaseIterable {
   /// Cog, the reference implementation.
   case cog
 
-  /// Raw Swift Observation, recomputing on every read — the hardware floor.
+  /// Raw Swift Observation, recomputing on every read as the hardware floor.
   case observationRaw = "observation-raw"
 
-  /// Swift Observation with hand-written memoization — the realistic
-  /// competitor.
+  /// Swift Observation with hand-written memoization as the realistic competitor.
   case observationMemo = "observation-memo"
 
   /// swift-state-graph 0.28.0.
@@ -36,11 +33,10 @@ nonisolated enum StorefrontRuntimeBackend: String, Sendable, CaseIterable {
 ///
 /// Every entry point is `static`, takes a ``StorefrontRuntimeBackend`` plus
 /// `Sendable` arguments, and returns `Sendable` values or nothing. That shape is
-/// forced rather than stylistic: `Benchmark` is not `Sendable` and upstream's
-/// registration closure is nonisolated, so a harness — which owns a live
-/// runtime — can never cross back out. Dispatching on the backend inside this
-/// type keeps every non-`Sendable` value on the MainActor and lets only `Int`s
-/// and plain structs pass between them (`M5-05bb`).
+/// required because `Benchmark` is not `Sendable` and upstream's registration
+/// closure is nonisolated. A harness owns a live runtime and cannot cross back
+/// out. Backend dispatch here keeps non-`Sendable` values on the MainActor and
+/// passes only `Int`s and plain structs (`M5-05bb`).
 ///
 /// The four harnesses are the same generic ``StorefrontHarness`` at four
 /// concrete `Runtime` bindings, so all four runtimes are measured through
@@ -230,23 +226,20 @@ enum StorefrontComparisonHarness {
   /// state.
   ///
   /// The root demand is written here, against the concrete
-  /// `CogStorefrontRuntime`, because it is the one step of the footprint cut
-  /// that no neutral verb expresses. The read is deliberately the *candidate
-  /// list* — the last node upstream of the keyed funnel. It pulls the catalog
-  /// and the search index and produces a list of ordinals, and it creates not
-  /// one per-product state, which is what leaves the whole funnel for the
-  /// measured region.
+  /// `CogStorefrontRuntime`, because no neutral verb expresses this footprint
+  /// step. The read targets the *candidate list*, the last node before the keyed
+  /// funnel. It reads the catalog and search index to produce ordinals without
+  /// creating per-product state. The measured region still builds the funnel.
   ///
   /// Tracked, never `peek`: a one-shot peek renews a `whileObserved` grace
   /// sleeper, which is a task and an allocation, and this cut exists to count
   /// allocations.
   ///
   /// This is why the footprint cut has no `perf-16` twin. Every other cut's
-  /// preparation is expressible in ``StorefrontRuntime`` verbs;
-  /// this one needs "start the catalog and the search index while materializing
-  /// none of the funnel", and the protocol has no verb for it —
-  /// ``StorefrontRuntime/demandRankedProductIDs()`` materializes exactly the
-  /// funnel the measured region is supposed to build.
+  /// preparation uses ``StorefrontRuntime`` verbs. This cut must start the
+  /// catalog and search index without building the funnel, and the protocol has
+  /// no such verb. ``StorefrontRuntime/demandRankedProductIDs()`` would build
+  /// the funnel before measurement.
   static func prepareCogFootprint() async throws {
     requireSlugsAgree()
     try await cog.prepareFootprint { runtime in
@@ -292,7 +285,7 @@ enum StorefrontComparisonHarness {
 /// process-wide allocation counter. Registered with the other counting
 /// benchmarks and ahead of anything that drops a runtime.
 ///
-/// Reported, never gated — and unlike the `perf-15` family that is a permanent
+/// Reported but never gated. Unlike `perf-15`, this comparison is a permanent
 /// property rather than a stage. No `perf-16` name appears in
 /// `THRESHOLDED_BENCHMARKS`, because three of the four runtimes measured here
 /// are somebody else's code: gating their numbers would let an upstream release

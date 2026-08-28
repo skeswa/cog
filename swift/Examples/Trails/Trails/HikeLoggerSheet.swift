@@ -3,11 +3,9 @@ import SwiftUI
 
 /// The hike logger, presented as the app's one modal layer.
 ///
-/// The elapsed clock it shows is graph state ticked by a `whenever` scope
-/// gated on this sheet's presence, so opening the sheet — by button, deep
-/// link, or restoration — starts the clock, and any dismissal stops it. The
-/// note draft, by contrast, is truly view-local until committed, so it stays
-/// in `@State`.
+/// A `whenever` scope ticks the elapsed clock only while this sheet is present.
+/// Opening by button, deep link, or restoration starts it; any dismissal stops
+/// it. The note draft stays view-local in `@State` until committed.
 struct HikeLoggerSheet: View {
   /// Runtime resolved directly by this sheet boundary.
   @Environment(\.cogs) private var cogs

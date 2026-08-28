@@ -8,7 +8,7 @@ import Testing
 // selector-owned counters. Nothing observes turns, reactions, history, graph
 // storage, or settle flags; those belong to later seed tasks.
 
-// The retired SEED-01 — the next read returns the seeded value — is a
+// Retired SEED-01 says the next read returns the seeded value. It is a
 // precondition asserted inside every test here and in SEED-02's, so it needs
 // no test of its own.
 

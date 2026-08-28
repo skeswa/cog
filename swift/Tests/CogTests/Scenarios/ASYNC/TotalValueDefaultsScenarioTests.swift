@@ -24,8 +24,8 @@ private final class Async31ControlledWork {
   }
 
   /// The same controlled run, callable from a `Work` literal whose value type
-  /// is optional — a `Work<Int>` cannot convert to `Work<Int?>`, but a
-  /// closure returning `Int` can.
+  /// is optional. A `Work<Int>` cannot convert to `Work<Int?>`, but a closure
+  /// returning `Int` can.
   func performRun() async throws -> Int {
     let run = nextRun
     nextRun += 1

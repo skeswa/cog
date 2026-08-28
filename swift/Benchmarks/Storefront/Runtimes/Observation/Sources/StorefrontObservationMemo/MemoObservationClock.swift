@@ -4,7 +4,7 @@
 /// anything sleeps on. The port's lifetime model is a time-to-live sweep over
 /// per-product cache entries, so the only question it ever asks time is "how
 /// long since this row was last on screen", and the only thing that moves time
-/// is ``advance(by:)`` — called from
+/// is ``advance(by:)``, called from
 /// ``MemoObservationStorefrontRuntime/settlingLifetimeRelease(advancingBy:)``,
 /// which is the one place the neutral trace is allowed to move a runtime's
 /// clock at all.

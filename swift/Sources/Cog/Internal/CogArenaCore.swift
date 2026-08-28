@@ -306,9 +306,8 @@ internal final class CogArenaCore {
 
   /// Process-unique identity of this graph, issued once at construction.
   ///
-  /// Descriptors are shared across contexts — a test, a preview, and an app
-  /// each build their own `Cogs` over the same declarations — so anything a
-  /// declaration remembers about "its" graph has to say which graph it means.
+  /// Tests, previews, and apps share descriptors but own separate contexts. Any
+  /// graph data cached on a descriptor must identify the context that wrote it.
   /// Object identity cannot: a deallocated context's address is reusable, and
   /// a memo compared against a recycled address would silently read another
   /// context's state. A strictly increasing counter is never reused, so a

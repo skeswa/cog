@@ -2,11 +2,10 @@ import Cog
 import CogTesting
 import Testing
 
-// A reaction leases only what it reads itself. Everything further upstream is
-// held by nothing but a dependency edge, and LIFE-09 is the promise that such
-// an edge delays removal without ever becoming observation: it earns the
-// upstream state no grace window of its own and cannot keep it resident once
-// its consumer leaves.
+// A reaction leases only what it reads. Dependency edges hold all earlier
+// upstream state. LIFE-09 proves that an edge delays removal without becoming
+// observation. It gives the upstream state no grace period and cannot keep it
+// after its consumer leaves.
 
 @MainActor
 @Test func `LIFE-09 an internal edge does not keep an upstream cog alive`() async throws {

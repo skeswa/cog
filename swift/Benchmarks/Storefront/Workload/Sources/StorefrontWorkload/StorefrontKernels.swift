@@ -8,7 +8,7 @@
 /// Nothing here imports Cog. That is what lets ``computeControl(for:)`` run the
 /// exact same algorithms over the exact same inputs with no graph at all, so a
 /// reader can see how much of the application workload is Cog and how much is
-/// arithmetic — without subtracting two noisy measurements to manufacture a
+/// arithmetic, without subtracting two noisy measurements to manufacture a
 /// number, which is a different and much worse thing.
 public nonisolated enum StorefrontKernels {
   // MARK: - Search index
@@ -55,12 +55,9 @@ public nonisolated enum StorefrontKernels {
       // wildly different lengths, which the intersection has to cope with.
       postings[String(product.id.raw), default: []].append(product.id.raw)
     }
-    // `Array(postings.keys)` rather than `postings.keys`: the lazy `keys` view
-    // is a projection of the dictionary, and mutating a dictionary while
-    // iterating its own key view is the classic way to turn an O(n) loop into a
-    // copy-on-write O(n²) one. Measured here at no difference on the standard
-    // profile — the optimizer evidently sees through it — and written this way
-    // anyway, because relying on that is relying on a compiler's mood.
+    // Copy the keys before mutating the dictionary. Iterating its lazy key view
+    // during mutation can turn O(n) work into copy-on-write O(n²) work. The
+    // current optimizer removes that cost, but this code does not depend on it.
     for key in Array(postings.keys) {
       postings[key]?.sort()
     }
@@ -266,8 +263,8 @@ public nonisolated enum StorefrontKernels {
   /// decision rather than a sum: promotions exclude one another, so the best
   /// set is not the set of individually best promotions. The bound is
   /// ``StorefrontFixtures/maximumPromotions``, and the table is built
-  /// incrementally — `compatible[mask]` is derived from
-  /// `compatible[mask without its lowest bit]` — so the pass is
+  /// incrementally, `compatible[mask]` is derived from
+  /// `compatible[mask without its lowest bit]`, so the pass is
   /// `O(2^n)` table writes rather than `O(2^n · n²)` recomputation.
   ///
   /// - Parameters:
@@ -323,9 +320,8 @@ public nonisolated enum StorefrontKernels {
       )
     }
 
-    // Exclusion masks, symmetric: if A excludes B then B excludes A, whatever
-    // the fixture says, because a one-sided exclusion is a bug that only shows
-    // up in one enumeration order.
+    // Make exclusion masks symmetric even if the fixture is not. One-sided
+    // exclusion would depend on enumeration order.
     let indexByID = Dictionary(
       uniqueKeysWithValues: promotions.enumerated().map { ($0.element.id, $0.offset) }
     )

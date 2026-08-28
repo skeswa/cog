@@ -7,10 +7,10 @@ import Testing
   // The classic glitch topology, carrying the balanced diamond inside it: A
   // feeds D directly and through two independent automatic arms B and C, so
   // the paths to D differ in length and the join also has two dirty automatic
-  // parents. Naive settlement fails this shape two ways — running D after the
-  // short arm alone shows new-A beside old-B, and waking the join once per
-  // changed parent runs D or an arm twice. One run per node per turn with a
-  // consistent triple — pulled or pushed through a watcher — is the proof;
+  // parents. Naive settlement can show new A beside old B after the short arm,
+  // or run D or an arm twice by waking the join once per changed parent. The
+  // proof requires one run per node and a consistent triple, whether pulled or
+  // pushed through a watcher.
   // the balanced diamond's per-node exactly-once claim (the retired GRAPH-02)
   // lives in the two arm counters.
   var bRuns = 0

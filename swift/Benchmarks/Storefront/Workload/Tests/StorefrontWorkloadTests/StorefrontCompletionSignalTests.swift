@@ -4,17 +4,12 @@ import Testing
 /// The neutral one-shot barrier every non-Cog port fires from its own publish
 /// epilogue.
 ///
-/// ``StorefrontCompletionSignal`` is the analogue of Cog's
-/// `MainActorCleanupAcknowledgement`, and the whole comparison rests on the two
-/// behaving identically: the Cog adapter awaits Cog's primitive while the other
-/// three ports await this one, so an ordering difference between them would
-/// surface as a flake in exactly one runtime — the hardest kind of benchmark
-/// defect to attribute. These three cases pin the barrier's complete ordering
-/// contract: buffered before a waiter arrives, suspending until a signal
-/// arrives, and one-shot in both directions.
+/// This is the non-Cog counterpart to `MainActorCleanupAcknowledgement`. Cog
+/// awaits its primitive; the other ports await this one. The tests require the
+/// same ordering: buffering before a waiter, suspension before a signal, and
+/// one-shot delivery in both orders.
 ///
-/// No `@testable`: every member under test is public API of the workload
-/// module, because a port in another module has to fire it.
+/// No `@testable` is needed because ports use this public API across modules.
 @Suite("Storefront completion signal")
 @MainActor
 struct StorefrontCompletionSignalTests {
@@ -62,10 +57,8 @@ struct StorefrontCompletionSignalTests {
       }
     }
 
-    // Asserting on the child's standard error rather than only its exit status:
-    // a bare trap and a clear diagnostic are the same exit code, and the
-    // repository spells fail-fast traps `fatalError` precisely so the message
-    // survives `-O`.
+    // Check standard error because a bare trap and clear diagnostic share an
+    // exit code. `fatalError` keeps the message under `-O`.
     let standardError = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
     #expect(
       standardError.contains("A Storefront completion signal was fired twice"),

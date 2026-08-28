@@ -3,15 +3,12 @@
 extension Cogs {
   /// Registers one effect body under `label` and schedules its first tracking run.
   ///
-  /// Application reactions remain a ``MechanismController`` capability, never
-  /// public context API: reactions have one application-facing door, and it is
-  /// a mechanism's controller (§6.3).
+  /// App reactions are available only through ``MechanismController`` (§6.3),
+  /// not through the public context.
   ///
-  /// Shared by reactions and watches to preserve registration order and initial
-  /// run scheduling. Registration owns the body, while the returned token owns
-  /// the registration's terminal lifetime. During a flush, deferring the
-  /// initial run prevents reentrant effects from observing a partially settled
-  /// graph.
+  /// Reactions and watches share this path to keep registration order. The
+  /// registration owns the body, and the returned token controls its lifetime.
+  /// During a flush, the first run waits until the graph is settled.
   internal func register(
     label: CogLabel,
     body: @escaping @MainActor (ReactionReader) -> Void

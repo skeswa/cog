@@ -1,20 +1,14 @@
 /// The pricing pipeline: a ladder of real policies, applied in a fixed order.
 ///
-/// Sixteen stages, and not one of them is an identity node or a `+ 1`. Each
-/// stage is a policy a real storefront has — a regional book, a membership
-/// tier, a campaign, a coupon, a quantity break, a markdown, a clearance rule,
-/// a loyalty burn, a variant premium, a levy, a shipping subsidy, a competitor
-/// match, a retargeting nudge, a personalized offer, a floor, and a charm
-/// rounding — and each reads a **different** part of the graph. That last
-/// point is what makes the pipeline worth measuring: changing the coupon
-/// invalidates the coupon stage and everything below it and nothing above it,
-/// which is precisely the behavior a fine-grained graph exists to provide and
-/// a pipeline of identity nodes could never demonstrate.
+/// Its sixteen real policies range from regional books to charm rounding. Each
+/// reads a different graph input. A coupon change invalidates its stage and the
+/// stages below it, but none above it. That fine-grained behavior is what this
+/// pipeline measures.
 ///
 /// Every function here is pure arithmetic over integer cents. The graph side
 /// lives in ``StorefrontState``, which reads the inputs each policy needs and
-/// calls the matching function; the compute-only control calls the same
-/// functions in the same order with no graph at all.
+/// calls each function. The compute-only control calls the same functions in
+/// the same order without a graph.
 public nonisolated enum StorefrontPricing {
   /// One policy in the ladder.
   ///
@@ -125,6 +119,7 @@ public nonisolated enum StorefrontPricing {
       return ladder[stage - 1]
     }
 
+    /// A slash-separated trace key containing the product, book, and stage.
     public var description: String { "\(productID)/\(book)/\(stage)" }
   }
 
@@ -173,7 +168,7 @@ public nonisolated enum StorefrontPricing {
   /// Applies the campaign running in a category.
   ///
   /// Campaigns are a deterministic function of the category ordinal, so a
-  /// category filter change moves a whole band of prices at once — which is
+  /// category filter change moves a whole band of prices at once, which is
   /// the invalidation wave the sectioned list is there to show.
   public static func categoryCampaign(_ cents: Int, category: CategoryID) -> Int {
     let basisPoints = [10_000, 9_600, 10_000, 9_200, 10_000, 9_800][category.raw % 6]
@@ -282,7 +277,7 @@ public nonisolated enum StorefrontPricing {
   ///
   /// Ninety-five cents below fifty dollars, ninety-nine above, which is a real
   /// merchandising rule and, usefully, one that makes many nearby inputs
-  /// collapse to the same output — so an equality-gated declaration on top of
+  /// collapse to the same output, so an equality-gated declaration on top of
   /// it genuinely stops invalidation waves.
   public static func charmRounding(_ cents: Int) -> Int {
     guard cents > 0 else { return 0 }

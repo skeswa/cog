@@ -1,14 +1,12 @@
 extension Cogs {
   /// How many arena settle walks may nest before Cog stops and explains itself.
   ///
-  /// Fixed rather than calculated from the remaining stack, so one graph fails the
-  /// same way everywhere. The real ceilings measured on 2026-08-16 vary by an
-  /// order of magnitude — roughly 6,100 cold links in release on an 8 MiB macOS
-  /// main stack, but roughly 770 in release and 240 in debug on iOS's 1 MiB —
-  /// and a bound that moved with them would let a graph pass in the simulator
-  /// and crash on a phone. This sits below the smallest of them with room to
-  /// spare, and far above any chain of never-read cogs a screen plausibly
-  /// builds.
+  /// The fixed limit makes the same graph fail the same way on every device.
+  /// Measurements from 2026-08-16 reached about 6,100 cold links on an 8 MiB
+  /// macOS stack, 770 in iOS release, and 240 in iOS debug on a 1 MiB stack. A
+  /// device-based limit could pass in the simulator and crash on a phone. This
+  /// value stays below the smallest measured ceiling and above a reasonable UI
+  /// chain.
   internal static let maximumSettleDepth = 128
 
   /// What Cog says when a first read nests further than it will follow.

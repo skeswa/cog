@@ -25,7 +25,7 @@ struct StorefrontApp: App {
   /// happens here, and the local exists only to be retained.
   ///
   /// The mechanism holds exactly `.account`, and no other lease. A SwiftUI
-  /// application's views *are* its observation — the browse list, the cart
+  /// application's views *are* its observation, the browse list, the cart
   /// screen, and the detail screen each demand what they render, and release
   /// it when they disappear. Registering a browse or cart reaction beside them
   /// would pin state no screen is looking at and quietly turn every scroll

@@ -2,8 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// Both scenarios here assert a negative — nothing was released — so both use
-// the injected clock's sleeper count as the proof. A state with a pending
+// Both scenarios prove that nothing was released by checking the injected
+// clock's sleeper count. A state with a pending
 // release has exactly one sleeping deadline; a state that is leased, or whose
 // deadline was cancelled, has none. Counting sleepers therefore says what
 // "never released" means without polling, sleeping, or reaching into storage.
@@ -44,8 +44,8 @@ import Testing
   clock.advance(by: .seconds(30))
   #expect(clock.activeSleeperCount == 0)
 
-  // The returning watcher found the same live state, so nothing recomputed —
-  // neither its own tracking run nor this read.
+  // The returning watcher found the same live state. Neither its tracking run
+  // nor this read recomputed it.
   #expect(cogs.peek(automatic) == 10)
   #expect(selectorRuns == 1)
 }

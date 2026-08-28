@@ -163,13 +163,12 @@ extension CogBox {
       )
     }
 
-    /// Builds the box's one async descriptor, wrapping the keyed selector in
-    /// the erased-key resolution every state of this declaration shares.
+    /// Builds the box's one async descriptor and restores each erased key before
+    /// calling the keyed selector.
     ///
-    /// The cast trap fires only on corrupt state storage: no other code can
-    /// build value references for this declaration, so an erased key of the
-    /// wrong type means the context's storage itself is broken, and continuing
-    /// would run the selector against an impossible identity.
+    /// Only this box builds its value references. A key of the wrong type means
+    /// state storage is corrupt, so the cast traps instead of calling the
+    /// selector with an invalid identity.
     internal static func makeDescriptor(
       policy: AsyncSchedulingPolicy,
       default defaultValue: @escaping @MainActor () -> Value,

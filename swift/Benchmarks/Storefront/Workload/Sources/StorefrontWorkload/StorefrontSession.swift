@@ -25,7 +25,7 @@ public nonisolated enum StorefrontSession {
   /// The distinct normalized queries ``searchPrefixes`` produces.
   ///
   /// The analytically derived expectation for how many suggestion generations
-  /// the search phase starts — derived from the query and the normalizer, never
+  /// the search phase starts, derived from the query and the normalizer, never
   /// copied from a run.
   public static var distinctNormalizedQueries: [String] {
     var seen: Set<String> = []

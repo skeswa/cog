@@ -3,7 +3,7 @@
 /// Two jobs, both of which a benchmark needs and neither of which a screen
 /// does. It carries settled values out of the graph so a measured region never
 /// has to perform a read of its own, and it counts how many times each held
-/// reaction actually ran — which is this workload's public, layout-agnostic way
+/// reaction actually ran, which is this workload's public, layout-agnostic way
 /// of observing invalidation. A reaction runs again exactly when something it
 /// read changed, so "the browse reaction did not run" is a provable claim about
 /// an inventory burst that only touched offscreen products.

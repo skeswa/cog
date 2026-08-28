@@ -11,7 +11,7 @@ public import StorefrontWorkload
 /// the pre-initial world on its way past.
 ///
 /// The `holds` set is the one thing that differs between the application and
-/// the headless driver. A SwiftUI app needs no leases — its views are the
+/// the headless driver. A SwiftUI app needs no leases, its views are the
 /// observation. A benchmark has no views, so it registers reactions instead,
 /// which is also what keeps a measured region quiescent: a reaction lease
 /// neither drops the context nor renews a `whileObserved` grace sleeper the way
@@ -22,8 +22,8 @@ public struct StorefrontMechanism: Mechanism {
   /// A typealias rather than a nested type: the set of screens a session holds
   /// open is runtime-neutral vocabulary and now lives in `StorefrontWorkload`
   /// as ``StorefrontHolds``, where a port with no Cog in it can name it. The
-  /// alias keeps `StorefrontMechanism.Holds` — and, more importantly, the bare
-  /// `[.account]` literal at every existing call site — spelled exactly as it
+  /// alias keeps `StorefrontMechanism.Holds`, and, more importantly, the bare
+  /// `[.account]` literal at every existing call site, spelled exactly as it
   /// was.
   public typealias Holds = StorefrontHolds
 

@@ -13,8 +13,8 @@ private struct CogArenaDeferredRun<Value> {
 
 /// Whether one arena async row has accepted a successful value.
 ///
-/// A dedicated enum preserves a successful optional `nil` distinctly from no
-/// success without adding another optional layer to every status operation.
+/// The enum keeps a successful optional `nil` separate from no success. Status
+/// code does not need another optional layer.
 private enum CogArenaAsyncSuccess<Value> {
   /// No generation has succeeded for this row occupant.
   case absent
@@ -25,11 +25,11 @@ private enum CogArenaAsyncSuccess<Value> {
 
 /// Descriptor-local task and status sidecars for arena-backed async rows.
 ///
-/// Status itself lives in a concrete ``CogArenaValueColumn`` and participates
-/// in the arena's scalar versions and indexed topology. Cold runtime concerns
-/// that cannot be scalar—tasks, generation waiters, retained successes, and
-/// Observation field masks—live here once per descriptor and are indexed by
-/// the same global row. No async state object enters the graph or a hot edge.
+/// Status lives in a ``CogArenaValueColumn`` and uses the arena's scalar
+/// versions and topology. Tasks, generation waiters, retained successes, and
+/// Observation field masks need typed storage. They live here once per
+/// descriptor and use the same global row. No async state object enters a hot
+/// graph edge.
 @MainActor
 internal final class CogArenaAsyncColumn<Value> {
   /// Scalar arena whose exact slot lifetimes govern every sidecar cell.
@@ -73,11 +73,9 @@ internal final class CogArenaAsyncColumn<Value> {
 
   /// This row's own resting default, produced once when the row was installed.
   ///
-  /// The declaration supplies a closure rather than a value, so the default has
-  /// to be materialized somewhere per state; here is that place. Holding it per
-  /// row — rather than calling the closure at each publication — is what makes
-  /// the pending, failure, and retry-pending statuses a state publishes before
-  /// its first success carry one value instead of a new one each time. A
+  /// The declaration supplies a closure, so each state must store the result.
+  /// Calling it once per row gives pending, failure, and retry-pending statuses
+  /// the same value until the first success. A
   /// released row clears the cell, so the next install produces a fresh
   /// default, which is exactly the `whileObserved` reset async state expects.
   ///

@@ -135,11 +135,9 @@ internal final class CogLegacyObservationShim<Value> {
 
 /// One runtime-appropriate Observation read feeding one hidden Cog source.
 ///
-/// The source is an implementation detail: selectors record an ordinary graph
-/// edge to it, so the arena reuses its existing invalidation, settlement,
-/// equality, and turn machinery. The bridge stays MainActor-bound
-/// with the external model and never sends its possibly non-Sendable value
-/// across an isolation boundary.
+/// Selectors record a normal graph edge to the hidden source. The arena can then
+/// use its normal turn, settlement, and equality logic. The bridge and external
+/// model stay on the MainActor, so a non-`Sendable` value never crosses actors.
 @MainActor
 internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridge {
   /// Read performed while Observation records its exact property accesses.
@@ -164,9 +162,8 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
     turnName: String
   ) {
     self.read = read
-    // The descriptor is per-bridge and reaches exactly one context, so
-    // capturing the already-armed value is the intended per-state semantics
-    // rather than the shared-object hazard the closure form exists to prevent.
+    // This bridge and descriptor belong to one context. Capturing the value
+    // already used to arm Observation cannot share it with another state.
     self.sourceCog = Cog.Manual({ initialValue }, name: "c.track")
     self.turnName = turnName
   }

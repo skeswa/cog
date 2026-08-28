@@ -26,10 +26,9 @@ extension Cogs {
 
   /// Signals after the next automatic grace-expiry eligibility check.
   ///
-  /// Unlike ``acknowledgeNextAutomaticRelease(with:)``, this fires after the
-  /// deadline reaches the MainActor even when identity, renewal, a lease, UI
-  /// pinning, or a subscriber correctly prevents removal. Tests use it to
-  /// establish that a negative release decision has completed without polling.
+  /// Unlike ``acknowledgeNextAutomaticRelease(with:)``, this fires even when a
+  /// changed identity, renewal, lease, UI pin, or subscriber prevents removal.
+  /// Tests can await a rejected release without polling.
   /// Install at most one check acknowledgement at a time.
   ///
   /// - Parameter acknowledgement: The one-shot MainActor signal completed

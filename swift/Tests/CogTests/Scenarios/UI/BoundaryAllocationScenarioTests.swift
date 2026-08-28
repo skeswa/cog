@@ -2,10 +2,8 @@ import Cog
 import CogTesting
 import Testing
 
-// Boundary allocation is proved through the CogTesting seam — a count and a
-// per-reference membership probe — never by looking at state storage, so this
-// scenario survives value-reference layout and core swaps (COUNT-09 through
-// COUNT-11).
+// CogTesting proves boundary allocation with a count and reference probe. It
+// does not expose storage, so COUNT-09 through COUNT-11 survive layout changes.
 
 @MainActor
 @Test func `UI-05 only states read through the UI boundary allocate boundary objects`() {

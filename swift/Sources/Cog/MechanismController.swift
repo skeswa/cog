@@ -1,21 +1,15 @@
-/// The capability a mechanism's `operate` receives: its entire relationship
-/// with the graph.
+/// The graph capability passed to a mechanism's `operate` method.
 ///
-/// The controller carries registration (``run(fileID:line:_:)``,
-/// `watch`, ``task(name:_:)``, and gated ``whenever(_:name:fileID:line:_:)-(Cog<Bool>,_,_,_,_)`` scopes), untracked
-/// ``peek(_:)-(Cog<Value>.Manual)`` reads, and the shared ``CogOps`` op surface. There is
-/// deliberately no raw ``Cogs`` here: a mechanism that could reach the runtime
-/// could also leak it past its own discipline, and routing every act through
-/// the controller is what makes attribution and isolated testing exact (§6.2).
+/// It can register `run`, `watch`, `task`, and gated `whenever` scopes. It also
+/// has untracked `peek` reads and the shared ``CogOps`` surface. It cannot expose
+/// the raw ``Cogs``. Keeping all access on this controller preserves attribution
+/// and lets tests isolate a mechanism (§6.2).
 ///
-/// A controller is a final-class lifetime capability retained by its scope, so
-/// asynchronous and delegate-driven work may capture it weakly. It does not
-/// own the app runtime. When its scope ends — runtime teardown for an assembly
-/// mechanism, a falling gate for a `whenever` sub-controller — the runtime
-/// cancels the scope's registrations and tasks and releases the controller;
-/// a `[weak m]` callback then fails promotion and returns. Storing a
-/// controller strongly in an external engine is unsupported, because it would
-/// let the engine outlive the lifetime that authorized its graph access.
+/// Its scope retains it, but it does not own the app runtime. Async and delegate
+/// work should capture it weakly. When the scope ends, the runtime cancels its
+/// work and releases the controller. A `[weak m]` callback then returns when
+/// promotion fails. An external engine must not retain the controller past the
+/// scope that allowed graph access.
 ///
 /// Every registration is attributed: `watch`, `run`, and `task` names compose
 /// under the mechanism's name, and a turn an op opens through the controller
@@ -96,13 +90,10 @@ extension MechanismController {
   /// replaces the dependency set, so branches may change what triggers later
   /// work. `peek` reads remain one-shot and do not become dependencies.
   ///
-  /// The runtime owns registrations in call order — across mechanisms, array
-  /// order at assembly. A turn marks only reactions reachable from changed
-  /// state; the flush then runs those reactions after their dependencies
-  /// settle and leaves unrelated registrations quiet. Outside a flush the
-  /// initial run completes before this method returns. A registration made
-  /// during a flush joins that reaction queue's tail instead of re-entering
-  /// its caller.
+  /// The runtime keeps call order, including mechanism order at assembly. A
+  /// turn runs only reactions reached by changed state, after their dependencies
+  /// settle. Outside a flush, the first run finishes before this method returns.
+  /// A reaction added during a flush joins the end of that flush's queue.
   ///
   /// The registration lives until this controller's scope ends; there is no
   /// public token. A shorter lifetime is a ``whenever(_:name:fileID:line:_:)-(Cog<Bool>,_,_,_,_)`` gate expressed in
@@ -313,9 +304,9 @@ extension MechanismController {
   /// Starts a named unstructured task owned by this controller's scope.
   ///
   /// The task belongs to the scope that started it and receives cooperative
-  /// cancellation when that scope ends. Its name composes under the
-  /// mechanism's — a `hourlyRefresh` task in the `Weather` mechanism appears
-  /// as `Weather.hourlyRefresh` in Apple task diagnostics.
+  /// cancellation when the scope ends. Its name includes the mechanism name.
+  /// For example, `hourlyRefresh` under `Weather` becomes
+  /// `Weather.hourlyRefresh` in Apple task diagnostics.
   ///
   /// Time-based work injects a `Clock` so tests control it. Task bodies call
   /// ops, so writes keep useful names in debug history. A long-running body
@@ -348,23 +339,16 @@ extension MechanismController {
 extension MechanismController {
   /// Runs a nested scope while a Bool cog reads true.
   ///
-  /// A lifetime shorter than the app is graph state, not a registration
-  /// ceremony. When the gate reads true — at registration or after a later
-  /// turn — `body` runs once with a fresh sub-controller and its
-  /// registrations become live. When a turn settles the gate to false,
-  /// everything registered through that sub-controller ends: reactions
-  /// unregister and tasks cancel. The teardown replaces a reaction run in
-  /// the ordinary flush order, so effects never observe a half-closed scope.
-  /// The next rise runs `body` again from scratch; nothing survives a
-  /// down-and-up cycle, so a scope that needs continuity keeps it in graph
-  /// state.
+  /// When the gate is true, `body` runs once with a fresh sub-controller and
+  /// makes its registrations live. A turn that settles the gate to false ends
+  /// those registrations and cancels their tasks in normal flush order. The
+  /// next rise starts from a new scope. State that must survive a close and
+  /// reopen belongs in the graph.
   ///
-  /// The body itself is not a reaction: the gate is the scope's only tracked
-  /// dependency, and reads inside the body other than through its own
-  /// `watch`/`run` registrations use the sub-controller's `peek` and never
-  /// re-trigger the scope. Scopes nest — the sub-controller offers this full
-  /// controller surface, including `whenever` — and names continue to
-  /// compose.
+  /// The body is not a reaction; only the gate can reopen the scope. Reads in
+  /// `watch` or `run` track their own dependencies, while direct `peek` reads do
+  /// not retrigger the scope. Sub-controllers support nested `whenever` scopes,
+  /// and their names keep composing.
   ///
   /// - Parameters:
   ///   - gate: The automatic Bool that opens and closes this scope.
@@ -503,8 +487,8 @@ extension MechanismController {
     ///
     /// Pending, success, and failure are published in separate turns. After
     /// each such turn settles, the watch runs in registration order and
-    /// receives its previous and current status — including an equal-success
-    /// reload the value watch beside this lens would gate away. The
+    /// receives its previous and current status. This includes an equal-success
+    /// reload that a value watch would gate away. The
     /// registration holds a `whileObserved` lease on the async state; the end
     /// of the controller's scope cancels the watch and begins ordinary grace
     /// when no other durable consumer remains.
@@ -563,8 +547,8 @@ extension MechanismController: CogOps {
   /// Opens one turn attributed to this mechanism.
   ///
   /// The turn name composes under the controller's name path, so history
-  /// records which mechanism asked for the write — `Weather.checkWeather`
-  /// rather than a bare `checkWeather`. After the runtime is gone the turn
+  /// records which mechanism asked for the write, such as
+  /// `Weather.checkWeather` instead of `checkWeather`. After the runtime is gone, the turn
   /// is inert: there is no graph left to write.
   public func turn(named name: String, _ body: @escaping (Writer) -> Void) {
     guard let cogtext else { return }

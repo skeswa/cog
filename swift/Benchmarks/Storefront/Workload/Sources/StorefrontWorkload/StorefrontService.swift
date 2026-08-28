@@ -5,7 +5,7 @@ import os
 ///
 /// This is a benchmark-only service and it never touches a network, a clock, or
 /// a random number generator. Every response is a pure function of the fixture
-/// seed and the request's own inputs, and — in ``Mode/scripted`` — every
+/// seed and the request's own inputs, and, in ``Mode/scripted``, every
 /// response is delivered exactly when the driver says so, by name.
 ///
 /// That last property is what makes the headless driver deterministic rather
@@ -237,6 +237,7 @@ public nonisolated enum StorefrontRequestID: Hashable, Sendable, CustomStringCon
   /// A tax quote for one cart shape.
   case taxQuote(subtotalCents: Int, market: Int)
 
+  /// A stable trace label containing the request kind and identity fields.
   public var description: String {
     switch self {
     case .catalog: "catalog"
@@ -257,9 +258,9 @@ public nonisolated enum StorefrontRequestID: Hashable, Sendable, CustomStringCon
 /// The actor that records requests and releases them by name.
 ///
 /// Every suspended request holds one ticket. Tickets exist because the same
-/// semantic request can legitimately be in flight twice — a product's inventory
+/// semantic request can legitimately be in flight twice, a product's inventory
 /// is demanded, released, invalidated, and demanded again at the same
-/// generation — and a dictionary keyed only by request identity would lose the
+/// generation, and a dictionary keyed only by request identity would lose the
 /// first continuation and hang the run.
 public actor StorefrontScript {
   /// Synchronously selected work that has not reached ``begin(_:)`` yet.
@@ -306,16 +307,10 @@ public actor StorefrontScript {
 
   /// Whether a cancelled request stays suspended instead of throwing.
   ///
-  /// On by default, and that default is what makes the headless driver
-  /// deterministic. A runtime that keeps only the newest of several demands
-  /// will normally cancel the task it superseded, and a task that resumed on
-  /// cancellation would complete on another thread at a moment nothing
-  /// controls — racing the one-shot ``StorefrontCompletionSignal`` the driver
-  /// arms before each release. Leaving a cancelled request suspended means the
-  /// driver releases *every* completion by name, and it buys a second thing for
-  /// free: releasing a superseded request later is exactly the stale completion
-  /// ``StorefrontRuntimeSemantics/refusesStaleResultsByGeneration`` claims a
-  /// runtime refuses by generation rather than by cancellation.
+  /// Enabled by default for deterministic runs. A cancelled task could finish
+  /// on another thread and race the ``StorefrontCompletionSignal`` armed before
+  /// release. Keeping it suspended lets the driver release every completion by
+  /// name. A later release also tests that generations reject stale results.
   ///
   /// A driver turns it off around a step whose subject *is* cancellation.
   private var ignoresCancellation = true
@@ -367,7 +362,7 @@ public actor StorefrontScript {
     }
   }
 
-  /// Records that a request started, and — in `scripted` mode — waits.
+  /// Records that a request started, and, in `scripted` mode, waits.
   ///
   /// - Parameter id: What started.
   func begin(_ id: StorefrontRequestID) async throws {
@@ -532,7 +527,7 @@ public actor StorefrontScript {
   /// Whether this identity is selected or suspended and can therefore be released.
   ///
   /// A driver checks this before releasing, because releasing an identity that
-  /// is not suspended is silently recorded as an early release — and a driver
+  /// is not suspended is silently recorded as an early release, and a driver
   /// that then awaited a completion would wait forever. Turning that mistake
   /// into a loud failure is worth one extra actor hop.
   ///

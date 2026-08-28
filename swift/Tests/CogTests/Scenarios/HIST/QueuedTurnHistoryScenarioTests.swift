@@ -8,7 +8,7 @@ import Testing
 @Test func `HIST-07 queued turns land whole and in order`() {
   // A reaction chain queues turns during a flush. Each queued turn is its own
   // history entry in execution order, and every write attributes to the turn
-  // that made it — entries from different turns never interleave.
+  // that made it. Entries from different turns never interleave.
   let (cogs, m) = Cogs.forTestingWithController()
   let trigger = Cog<Int>.Manual({ 0 }, name: "trigger")
   let middle = Cog<Int>.Manual({ 0 }, name: "middle")

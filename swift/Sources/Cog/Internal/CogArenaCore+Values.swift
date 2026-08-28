@@ -1,20 +1,17 @@
 // MARK: - Values
 
-/// Typed source, automatic, async, and Observation-facing operations on the arena core.
+/// Typed value and Observation operations on the arena core.
 ///
-/// These entry points resolve public descriptor-and-key identities before the
-/// scalar settlement machinery takes over. Keeping that boundary together
-/// makes the representation transition explicit without adding a helper object
-/// or another call on steady reads and writes.
+/// These methods resolve public descriptors and keys before scalar settlement
+/// begins. Keeping the conversion here avoids a helper object or another call
+/// on steady reads and writes.
 extension CogArenaCore {
   /// Stages one typed source, registers its row once with the active turn,
   /// and renews the source's transient-demand grace.
   ///
-  /// A write is transient demand for lifetime purposes, so the grace renewal
-  /// is fused here rather than left as a second call the writer must
-  /// remember: the descriptor-and-key identity resolves once, and forgetting
-  /// the lifetime half — which would leak a `whileObserved` state — is not a
-  /// mistake a call site can make.
+  /// A write is transient demand, so this method also renews grace. The
+  /// descriptor and key resolve once, and a caller cannot forget the lifetime
+  /// step and leak a `whileObserved` state.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
@@ -106,9 +103,9 @@ extension CogArenaCore {
 
   /// Reads one source for transient demand: current value plus renewed grace.
   ///
-  /// The two halves are fused so a one-shot public read cannot take the value
-  /// and forget the lifetime — an omission the compiler could not catch, and
-  /// one that would leak a `whileObserved` state. ``manualValue(for:)`` stays
+  /// One-shot public reads get the value and renew grace in one call, so they
+  /// cannot leak a `whileObserved` state by omitting the lifetime step.
+  /// ``manualValue(for:)`` stays
   /// beside this as the pure half, because a testing seed must read without
   /// accidentally creating a sleeper.
   #if !COG_ARENA_COMPACT
@@ -340,9 +337,8 @@ extension CogArenaCore {
       propagation.sortChangedBoundaryRows { boundary[Int($0)] < boundary[Int($1)] }
     }
 
-    // By index, and dropped afterwards, for the reason this method snapshots
-    // its count: a notice can run a synchronous Observation handler that queues
-    // another boundary, and that one belongs to the next flush.
+    // Read by index, then drop the prefix. A notice may run a synchronous
+    // Observation handler that queues another boundary for the next flush.
     let queuedCount = propagation.changedBoundaryRowCount
     for position in 0..<queuedCount {
       let rawRow = propagation.changedBoundaryRow(at: position)
@@ -354,17 +350,14 @@ extension CogArenaCore {
       let index = Int(entryIndex)
       let slot = observationEntries[index].slot
 
-      // Settle before the guard, because settling is what makes `changedAt`
-      // current. The flag test comes first so a clean row — every pinned key on
-      // an ordinary turn — never resolves its descriptor record at all.
+      // Settle before the guard because settlement updates `changedAt`. Check
+      // the flag first so clean pinned rows skip descriptor resolution.
       if needsSettlement(row), withDescriptorRecord(forRow: row, { $0.kind }) != .manual {
         settle(slot, in: cogs)
       }
 
-      // The guard, then the entry and the record. `M9-03` put them in this
-      // order when the walk still visited every boundary; a queued row can
-      // still turn out unchanged — an equal recomputation settles clean — so
-      // the order still earns its keep.
+      // Check the guard before loading the entry and record. A queued row can
+      // settle to an equal value, so the order still avoids needless work.
       let changedThisTurn = arena.changedAt[row] == revision
       #if DEBUG
       // A deferred seed change has to be consumed whether or not the row
@@ -384,10 +377,9 @@ extension CogArenaCore {
 
   /// Releases one unobserved automatic row and allocates a replacement row.
   ///
-  /// This package diagnostic drives PERF-05 through real descriptor lookup,
-  /// typed-column removal, edge cleanup, identity removal, and arena reuse. The
-  /// replacement is settled before the result returns, proving its new slot
-  /// lifetime carries an independent value rather than stale column storage.
+  /// This PERF-05 diagnostic uses real lookup, removal, edge cleanup, and row
+  /// reuse. It settles the replacement before returning, proving the new row
+  /// holds its own value rather than stale data.
   func slotReuseSnapshot<ReleasedValue, ReplacementValue>(
     releasing releasedReference: Cog<ReleasedValue>,
     replacingWith replacementReference: Cog<ReplacementValue>,

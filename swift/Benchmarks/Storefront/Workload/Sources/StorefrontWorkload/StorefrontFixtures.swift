@@ -36,7 +36,7 @@ public nonisolated enum StorefrontFixtures {
   /// SplitMix64, the whole random source of this package.
   ///
   /// Chosen because it is four lines, has no state beyond one `UInt64`, and
-  /// produces the same stream on every platform — which `SystemRandomNumberGenerator`
+  /// produces the same stream on every platform, which `SystemRandomNumberGenerator`
   /// explicitly does not, and which is the entire requirement here.
   struct Generator {
     /// The running state.
@@ -207,7 +207,7 @@ public nonisolated enum StorefrontFixtures {
   /// The shopper the account service returns.
   ///
   /// One shopper, deterministic, with a taste vector derived from the same
-  /// seed so that recommendations are reproducible and non-trivial — a taste
+  /// seed so that recommendations are reproducible and non-trivial, a taste
   /// vector of all ones would make every product tie and hide the ranking.
   ///
   /// - Parameter profile: The profile, which decides nothing here today but is

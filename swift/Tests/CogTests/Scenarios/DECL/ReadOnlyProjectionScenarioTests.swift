@@ -132,10 +132,8 @@ private struct ZipCode: Hashable {
 
 @MainActor
 @Test func `DECL-05 a projected box still starts each key from its own closure`() {
-  // Projecting changes who may write, and nothing else: the declaration behind
-  // the projection is the same declaration, so the starting-value closure runs
-  // for a key reached through the projection exactly as it would for the
-  // source.
+  // A projection changes only who may write. It keeps the source declaration,
+  // so each key uses the same starting-value closure through either reference.
   let cogs = Cogs.forTesting()
 
   let greetingSource = CogBox<String, ZipCode>.Manual { zip in "hello, \(zip.digits)" }

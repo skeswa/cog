@@ -1,36 +1,27 @@
 /// Drives the standard interaction trace against one isolated runtime.
 ///
-/// Generic over ``StorefrontRuntime`` so that Cog, raw Swift Observation,
-/// hand-memoized Observation, and swift-state-graph run the *same* shopping
-/// session rather than four similar ones. Nothing here names a state-management
-/// symbol: every user action goes through a named runtime verb, every
-/// expectation comes from the runtime-neutral shadow ``StorefrontWorld``, the
-/// runtime-neutral ``StorefrontScript``, or the shared ``StorefrontSink``, and
-/// every asynchronous step is released by name and awaited on a definite signal
-/// the runtime itself gives — so nothing here waits on a duration and nothing
-/// polls.
+/// Generic over ``StorefrontRuntime`` so all four ports run the same session.
+/// User actions call named runtime verbs. Expectations come from
+/// ``StorefrontWorld``, ``StorefrontScript``, or ``StorefrontSink``. Async steps
+/// release by name and await runtime signals without timers or polling.
 ///
 /// ## Identity and ownership
 ///
 /// One driver per session. It creates the runtime in ``init(profile:holds:preparedWorld:recordsCheckpoints:grace:)``
-/// and retains it for the session's life; the runtime is never replaced. The
-/// driver owns the script, the sink, and the shadow world; the runtime owns its
-/// own storage, its own asynchronous work, and its own clock. The driver never
-/// reaches into the runtime's representation, which is what makes four runtimes
-/// comparable rather than merely similar.
+/// and retains it for the session. The driver owns the script, sink, and shadow.
+/// The runtime owns storage, async work, and its clock. The driver never reads a
+/// runtime's private representation.
 ///
 /// ## Isolation
 ///
 /// MainActor-confined, like every runtime it drives. The trace's suspensions
-/// are all awaits on the script actor or on a runtime settlement barrier; every
-/// verb and every sink read happens on the MainActor between them.
+/// await the script actor or a settlement barrier. Verbs and sink reads stay on
+/// the MainActor.
 ///
 /// ## Turn and settlement ordering
 ///
-/// A verb returns settled, so the trace reads ``sink`` on the line after it.
-/// The driver relies on that everywhere and provides no barrier of its own for
-/// synchronous work — a runtime that settled lazily could not be driven by this
-/// class at all.
+/// A verb returns settled, so the next line may read ``sink``. The driver adds
+/// no barrier for synchronous work and cannot support lazy settlement.
 ///
 /// `nonisolated deinit` per the repository convention: under
 /// `.defaultIsolation(MainActor.self)` a synthesized deinit would ask the
@@ -153,7 +144,7 @@ public final class StorefrontSessionDriver<Runtime: StorefrontRuntime> {
   ///
   /// The barrier fires for accepted completions *and* for stale, cancelled,
   /// released, and invalidated ones the runtime drops, so this is a definite
-  /// signal even when the completion is refused — which is precisely what the
+  /// signal even when the completion is refused, which is precisely what the
   /// stale-suggestion step needs.
   ///
   /// - Parameter id: The request to release.
@@ -240,7 +231,7 @@ public final class StorefrontSessionDriver<Runtime: StorefrontRuntime> {
   /// gap a reader must guess at.
   ///
   /// Because a skip records as holding, it is an opt-out, and there are exactly
-  /// **two** legal call sites in the whole trace — the two genuinely optional
+  /// **two** legal call sites in the whole trace, the two genuinely optional
   /// claims: the teardown phase's superseded-refresh checkpoint, guarded by
   /// ``StorefrontRuntimeSemantics/hasPerGenerationRefreshHandles``, and the
   /// teardown phase's release proof, guarded by
@@ -250,7 +241,7 @@ public final class StorefrontSessionDriver<Runtime: StorefrontRuntime> {
   /// nothing would re-request the released row for the wrong reason. Every other
   /// claim, the burst phase's offscreen-work claim above all, is a requirement of
   /// every runtime and is asserted against a declared number rather than skipped
-  /// — see ``StorefrontRuntimeSemantics/declaredUndemandedRequestStarts``. A
+  ///, see ``StorefrontRuntimeSemantics/declaredUndemandedRequestStarts``. A
   /// third call site is a review failure, not a new feature.
   ///
   /// - Parameters:

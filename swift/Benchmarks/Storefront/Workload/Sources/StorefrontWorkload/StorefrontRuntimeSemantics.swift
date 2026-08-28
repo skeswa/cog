@@ -40,7 +40,7 @@ public nonisolated struct StorefrontRuntimeDescriptor: Sendable, Hashable {
 /// number of held-observer runs, and two more assert how many requests an
 /// offscreen half started. Those numbers are claims about *invalidation*, and a
 /// runtime that recomputes on every read cannot produce Cog's numbers and is
-/// not wrong for failing to — it is the floor being measured. Rather than
+/// not wrong for failing to, it is the floor being measured. Rather than
 /// deleting the sharpest claims in the trace, each runtime declares what its
 /// numbers should be and the trace asserts against the declaration. Declaring
 /// a convenient lie does not help: the identity, checksum, money, and promotion
@@ -72,7 +72,7 @@ public nonisolated struct StorefrontRuntimeSemantics: Sendable, Hashable {
   public let accountRunsThroughSignIn: Int
 
   /// How many service requests this runtime starts when a transaction
-  /// invalidates only *offscreen* inputs — the burst phase's central claim, and
+  /// invalidates only *offscreen* inputs, the burst phase's central claim, and
   /// the sharpest claim this whole macrobenchmark makes.
   ///
   /// A declared number rather than a yes-or-no, because a yes-or-no lets a port
@@ -106,29 +106,27 @@ public nonisolated struct StorefrontRuntimeSemantics: Sendable, Hashable {
   /// outcome resolves on replacement.
   public let hasPerGenerationRefreshHandles: Bool
 
-  /// Declares one runtime's structural guarantees.
+  /// Declares one runtime's behavior.
   ///
-  /// Every parameter is a claim the trace will hold the runtime to, so a port
-  /// states them once, here, rather than scattering per-runtime conditionals
-  /// through the trace's forty-one checkpoints.
+  /// The trace checks each value here instead of branching by runtime.
   ///
   /// - Parameters:
-  ///   - browseRunsPerContentChangingTurn: Browse-observer runs per settled
-  ///     transaction that changes visible content.
+  ///   - browseRunsPerContentChangingTurn: Browse runs per turn that changes
+  ///     visible content.
   ///   - browseRunsPerEqualWrite: Browse-observer runs per write of an
   ///     already-current value.
-  ///   - browseRunsPerUndemandedInvalidation: Browse-observer runs per
-  ///     transaction that touches only offscreen inputs.
+  ///   - browseRunsPerUndemandedInvalidation: Browse runs for an offscreen-only
+  ///     change.
   ///   - accountRunsThroughSignIn: Account-observer runs from registration
   ///     through the accepted account response.
-  ///   - declaredUndemandedRequestStarts: How many service requests an
-  ///     offscreen-only invalidation starts. Asserted exactly, never skipped.
+  ///   - declaredUndemandedRequestStarts: Requests started by an offscreen-only
+  ///     change.
   ///   - releasesUnobservedValues: Whether an unobserved value is released
   ///     after grace.
-  ///   - refusesStaleResultsByGeneration: Whether stale results are refused by
-  ///     generation rather than by cancellation.
-  ///   - hasPerGenerationRefreshHandles: Whether a demand hands back a handle
-  ///     bound to that exact generation.
+  ///   - refusesStaleResultsByGeneration: Whether generations reject stale
+  ///     results.
+  ///   - hasPerGenerationRefreshHandles: Whether each demand returns its own
+  ///     generation handle.
   public init(
     browseRunsPerContentChangingTurn: Int,
     browseRunsPerEqualWrite: Int,

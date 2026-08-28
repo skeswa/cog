@@ -31,8 +31,8 @@ import Testing
 
   cogs.turn { c in c[count] = 4 }
 
-  // The source really changed, so the automatic cog really recomputed — this is
-  // not a turn that quietly did nothing.
+  // The source changed and the automatic cog recomputed. This turn was not
+  // empty.
   #expect(parityRuns == 2)
   #expect(cogs.peek(isEven) == true)
   // It landed on the value it already had, so nothing downstream changed and

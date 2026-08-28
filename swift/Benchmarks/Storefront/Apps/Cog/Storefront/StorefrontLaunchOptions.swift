@@ -26,7 +26,7 @@ struct StorefrontLaunchOptions {
   /// The launch argument that selects the workload profile.
   ///
   /// Spelled with a leading dash and followed by a separate value argument, so
-  /// `UserDefaults`'s `NSArgumentDomain` also parses it — which keeps the same
+  /// `UserDefaults`'s `NSArgumentDomain` also parses it, which keeps the same
   /// spelling usable from an Xcode scheme's argument list.
   static let profileArgument = "-cog-storefront-profile"
 

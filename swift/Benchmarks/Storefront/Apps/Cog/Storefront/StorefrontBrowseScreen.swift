@@ -6,7 +6,7 @@ import SwiftUI
 /// The catalog list: a search field, a filter bar, and every ranked product
 /// grouped into sections.
 ///
-/// The list is the shape Apple's own list-performance guidance asks for — a
+/// The list is the shape Apple's own list-performance guidance asks for, a
 /// dynamic number of sections, each with a nested `ForEach`, and a **constant**
 /// number of views per row. Every row is pinned to one height so the number of
 /// rows on screen is a function of the device rather than of the content, which
@@ -147,7 +147,7 @@ private struct StorefrontFilterBar: View {
 
         // One tap, three sources, one turn. A storefront that wrote the
         // category, the sort, and the stock switch as three turns would
-        // settle — and render — two screens no shopper ever asked for on the
+        // settle, and render, two screens no shopper ever asked for on the
         // way to the one they did.
         Button("Deals") {
           cogs.applyBrowseFilters(

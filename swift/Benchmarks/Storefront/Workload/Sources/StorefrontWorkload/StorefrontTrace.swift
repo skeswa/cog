@@ -2,7 +2,7 @@ extension StorefrontSessionDriver {
   /// Runs the whole standard interaction trace.
   ///
   /// Every step is a named domain verb and every suspension is a definite
-  /// signal, so this method finishes in bounded time or fails — it never waits
+  /// signal, so this method finishes in bounded time or fails, it never waits
   /// on a duration and never polls.
   public func runStandardTrace() async throws {
     try await runBootstrapPhase()
@@ -40,15 +40,14 @@ extension StorefrontSessionDriver {
   /// demanded as soon as anything asks which products match the (empty) query,
   /// so it is requested over an empty catalog and then superseded the moment a
   /// real catalog lands. That is lazy demand behaving correctly rather than a
-  /// defect — the index's *selector* depends on the catalog, so it must run to
-  /// find that out — and the release order below accepts both generations in
+  /// defect, the index's *selector* depends on the catalog, so it must run to
+  /// find that out, and the release order below accepts both generations in
   /// turn rather than pretending only one exists.
   public func runBootstrapPhase() async throws {
     let phase = StorefrontPhase.bootstrap.rawValue
     check(phase: phase, "visible rows", expected: 0, actual: sink.visibleProductIDs.count)
-    // Registration itself is a content-changing settlement — the shell goes
-    // from nothing to an empty list — so the count a runtime owes here is the
-    // one it declares for exactly that, not a literal every port must match.
+    // Registration settles the shell from nothing to an empty list. Each
+    // runtime declares the run count for that change.
     check(
       phase: phase,
       "browse runs",
@@ -76,7 +75,7 @@ extension StorefrontSessionDriver {
   /// The release order is load-bearing and deliberately not the start order.
   /// The account lands **first** so the shopper exists before any row does; a
   /// row materialized while signed out would request an offer, get none, and
-  /// then request it again after sign-in — real duplicate work that this
+  /// then request it again after sign-in, real duplicate work that this
   /// ordering avoids and that the no-duplicate-work checkpoint would catch.
   public func runRootDataPhase() async throws {
     let phase = StorefrontPhase.rootData.rawValue
@@ -95,9 +94,8 @@ extension StorefrontSessionDriver {
       actual: sink.accountRuns
     )
 
-    // The empty-catalog index generation is current until the catalog lands, so
-    // it is accepted rather than abandoned; accepting it and then accepting its
-    // replacement is what keeps every request in this trace resolved by name.
+    // Accept the empty-catalog index while it is current. After the catalog
+    // lands, accept its replacement. This resolves both requests by name.
     try await release(.searchIndex)
     try await release(.catalog)
     await awaitStarted([.searchIndex, .searchIndex])
@@ -278,14 +276,12 @@ extension StorefrontSessionDriver {
 
   /// Toggles stock, category, and sort, and checks each is exactly one turn.
   ///
-  /// The multi-source verb comes first, and the claim about it is the sharp
-  /// one: four sources changed and the browse observer ran the number of times
-  /// one settled transaction costs. A port that performed
+  /// The first verb changes four sources in one transaction. The browse observer
+  /// must run only the declared count for that transaction. A port that performed
   /// ``StorefrontRuntime/applyBrowseFilters(category:sortMode:inStockOnly:)``
-  /// as separate writes would run it three or four times and render two or
-  /// three screens no shopper asked for, and this checkpoint is what catches
-  /// that — the trace itself cannot split the verb, because the protocol gives
-  /// it no way to reach the four sources individually.
+  /// as separate writes would run three or four times and render unwanted
+  /// screens. The protocol hides those sources, so this checkpoint detects the
+  /// mistake through the run count.
   public func runFilterPhase() async throws {
     let phase = StorefrontPhase.filters.rawValue
     // Filter to a category the shopper can actually see a chip for. Picking a
@@ -385,7 +381,7 @@ extension StorefrontSessionDriver {
     // A cart product is usually nowhere near the viewport, so adding one
     // demands a row's worth of work for a product no screen is showing. Those
     // requests must land before the quote identities the shadow computes are
-    // the ones the graph asks for — a quote priced from unresolved inventory is
+    // the ones the graph asks for, a quote priced from unresolved inventory is
     // a different request, and awaiting the wrong one would hang.
     await awaitRowRequests(for: cartIDs, includeOffers: pricingReadsOffers)
     await awaitRowRequests()
@@ -421,7 +417,7 @@ extension StorefrontSessionDriver {
     world.viewRanks[id] = nextViewRank
     await awaitStarted([.detail(id: id), .recommendations(accountID: world.shopper.accountID)])
 
-    // Recommendations first, detail second — the opposite of the order a
+    // Recommendations first, detail second, the opposite of the order a
     // detail screen needs them in.
     try await release(.recommendations(accountID: world.shopper.accountID))
     try await release(.detail(id: id))
@@ -467,7 +463,7 @@ extension StorefrontSessionDriver {
   ///
   /// Each edit supersedes the in-flight shipping and tax quotes. Because the
   /// script leaves superseded requests suspended, the drain that follows
-  /// releases the newest first — so the current generation is accepted and
+  /// releases the newest first, so the current generation is accepted and
   /// every stale one is refused afterwards, which is the strongest ordering to
   /// check the generation rule against.
   public func runCheckoutPhase() async throws {
@@ -519,7 +515,7 @@ extension StorefrontSessionDriver {
   /// offscreen half re-rendered nothing": the offscreen half **asks the service
   /// for nothing at all**. A row that scrolled out of the prefetch margin is no
   /// longer read by anything, so invalidating its inventory marks it stale and
-  /// stops — no selector runs, no request starts, no work happens until
+  /// stops, no selector runs, no request starts, no work happens until
   /// something wants that row again. That is what fine-grained laziness buys a
   /// storefront receiving a warehouse feed it did not ask for, and it is the
   /// single most valuable claim in this trace.
@@ -653,7 +649,7 @@ extension StorefrontSessionDriver {
   /// This is the one phase with two optional claims in it. A runtime that hands
   /// back no per-generation refresh handle, or that has no lifetime model at
   /// all, records an explicit skip for the claim it does not make and is held
-  /// to everything else in the phase — including "nothing on screen", which no
+  /// to everything else in the phase, including "nothing on screen", which no
   /// runtime is exempt from.
   public func runTeardownPhase() async throws {
     let phase = StorefrontPhase.teardown.rawValue
@@ -704,7 +700,7 @@ extension StorefrontSessionDriver {
 
     guard semantics.releasesUnobservedValues else {
       // A runtime with no lifetime model has nothing to release, so the proof
-      // below would pass for the wrong reason — the row would be re-requested
+      // below would pass for the wrong reason, the row would be re-requested
       // because it was never cached, not because it was released. Record the
       // skip and stop.
       skip(
@@ -768,7 +764,7 @@ extension StorefrontSessionDriver {
   /// This is the barrier that replaces guessing when a `@concurrent` request
   /// task has reached the service. Draining without it can return before the
   /// work has suspended, and the graph then looks like it settled without ever
-  /// asking — which is the difference between a benchmark and a coin flip.
+  /// asking, which is the difference between a benchmark and a coin flip.
   func awaitRowRequests() async {
     await awaitRowRequests(for: world.prefetchProductIDs)
   }
@@ -778,7 +774,7 @@ extension StorefrontSessionDriver {
   /// Whether an *offer* is among them depends on who is reading. A row on
   /// screen always demands one, because its badges do. A cart line demands one
   /// only when the profile's policy prefix reaches the personalized-offer
-  /// stage — the smoke profile's four-policy ladder stops well before it, so
+  /// stage, the smoke profile's four-policy ladder stops well before it, so
   /// awaiting an offer for a cart product there would be waiting for a request
   /// the graph is correct never to make.
   ///
@@ -808,8 +804,8 @@ extension StorefrontSessionDriver {
   /// Waits until the shipping and tax quotes for the current cart have started.
   ///
   /// The identities are computed from the shadow model, so this both waits for
-  /// the right requests and asserts — by hanging loudly rather than passing
-  /// quietly — that the graph asked for the quote the cart implies.
+  /// the right requests and asserts, by hanging loudly rather than passing
+  /// quietly, that the graph asked for the quote the cart implies.
   func awaitQuoteRequests() async {
     guard !world.cartLines.isEmpty else { return }
     let total = world.orderTotal()
@@ -851,8 +847,8 @@ extension StorefrontSessionDriver {
 
   /// Asserts how much service work an undemanded invalidation started.
   ///
-  /// Shared by the burst phase's two identical claims — before and after the
-  /// demanded half is released — so the two cannot drift apart. The expectation
+  /// Shared by the burst phase's two identical claims, before and after the
+  /// demanded half is released, so the two cannot drift apart. The expectation
   /// is always ``StorefrontRuntimeSemantics/declaredUndemandedRequestStarts``,
   /// and this helper deliberately has no skip branch: "offscreen updates do no
   /// visible work" is the sharpest claim the macrobenchmark makes, and letting a

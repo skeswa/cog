@@ -4,8 +4,8 @@ import CogTesting
 
 /// The graph PERF-04 measures: a thousand states, twelve of them on screen.
 ///
-/// Nine hundred and eighty-eight keyed sources and twelve keyed consumers —
-/// exactly a thousand states, and exactly twelve values a view reads. Sources
+/// Nine hundred and eighty-eight keyed sources plus twelve keyed consumers make
+/// a thousand states. A view reads exactly twelve values. Sources
 /// for the bulk on purpose: they have `.app` lifetime, so filling the graph
 /// costs no grace sleepers and the measured region stays quiescent (`M5-11`).
 ///
@@ -14,7 +14,7 @@ import CogTesting
 /// other nine hundred and eighty-eight are settled with `peek`, which is
 /// deliberately not a UI read.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``.
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``.
 @MainActor
 enum BoundaryHarness {
   /// States a view never reads.
@@ -54,9 +54,8 @@ enum BoundaryHarness {
 
 /// Boundary objects the context owns after twelve UI reads.
 ///
-/// A custom metric because this is a *count of live objects*, which no built-in
-/// metric expresses — `objectAllocCount` counts allocations over a region, and
-/// what PERF-04 claims is about what survives, not about what was made.
+/// This custom metric counts live objects. `objectAllocCount` instead counts
+/// allocations over a region, while PERF-04 measures what survives.
 /// Unscaled: twelve is twelve, not twelve per thousand iterations.
 private let boundaryMetric = BenchmarkMetric.custom(
   "observationBoundaries",
@@ -70,8 +69,8 @@ let boundaryBenchmarks: @Sendable () -> Void = {
   // report 1,000 where the baseline says 12, and there is no noise floor to
   // leave room for.
   //
-  // Only the custom metric and wall clock. No counting metrics, per `M5-11`'s
-  // rule — the context is built and dropped every iteration.
+  // Use only the custom metric and wall clock. Per `M5-11`, process-wide counts
+  // are unsafe because each iteration builds and drops a context.
   let exact = BenchmarkThresholds(
     absolute: [.p0: 0, .p25: 0, .p50: 0, .p75: 0, .p90: 0, .p99: 0, .p100: 0]
   )

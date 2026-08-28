@@ -17,9 +17,9 @@
 internal final class ReactionToken {
   /// The exact context-owned registration controlled by every token reference.
   ///
-  /// The context also retains the registration to preserve execution order,
-  /// but token lifetime determines whether it remains active: deinitialization
-  /// cancels the registration before releasing this reference.
+  /// The context also retains the registration to keep execution order. The
+  /// token decides whether it stays active; deinitialization cancels it before
+  /// releasing this reference.
   internal let reaction: CogReaction
 
   /// Wraps a newly registered reaction without creating another registration.

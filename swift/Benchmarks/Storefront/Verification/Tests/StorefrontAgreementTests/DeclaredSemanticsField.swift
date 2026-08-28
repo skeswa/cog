@@ -9,7 +9,7 @@ import StorefrontWorkload
 /// recomputes on every read genuinely does render on an equal write, and is the
 /// floor being measured rather than a defect. But a licence that covered every
 /// field would let a port declare its way out of the workload's contract, so
-/// this table records, per field, which of the two it is and why — and the
+/// this table records, per field, which of the two it is and why, and the
 /// suite asserts the ones that admit no variation instead of merely printing
 /// them.
 ///
@@ -39,13 +39,9 @@ struct DeclaredSemanticsField: Sendable {
 
   /// Every field of ``StorefrontRuntimeSemantics``, in declaration order.
   ///
-  /// Exhaustiveness is proved rather than asserted by hand: the suite reflects
-  /// over a real ``StorefrontRuntimeSemantics`` value and requires this table's
-  /// names to be exactly the struct's stored-property labels, in the same
-  /// order, and each ``value`` accessor to render exactly what the reflected
-  /// child holds. So a field added to the struct and not to this table fails,
-  /// and so does an accessor that reads the neighbouring field — which is the
-  /// copy-paste mistake a table of eight near-identical closures invites.
+  /// The suite reflects a real ``StorefrontRuntimeSemantics`` value. It checks
+  /// these names, their order, and every rendered value. A missing field or an
+  /// accessor that reads its neighbor fails.
   static let all: [DeclaredSemanticsField] = [
     DeclaredSemanticsField(
       name: "browseRunsPerContentChangingTurn",

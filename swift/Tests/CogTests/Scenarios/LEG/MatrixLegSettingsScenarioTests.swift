@@ -1,21 +1,19 @@
 import Foundation
 import Testing
 
-// The isolation matrix runs these test targets four times — {MainActor
-// default isolation, nonisolated} × {`NonisolatedNonsendingByDefault` on, off}
-// — under environment variables that `Package.swift` reads. Nothing about a
+// The isolation matrix runs these test targets four times: {MainActor default
+// isolation, nonisolated} × {`NonisolatedNonsendingByDefault` on, off}.
+// `Package.swift` reads environment variables to select each leg. Nothing about a
 // leg is visible in a passing run, so the matrix's worst failure is silent:
 // if the manifest stopped reading the environment, all four legs would compile
 // identically and all four would still go green.
 //
 // The test below closes that hole with two independent comparisons:
 //
-//   1. the environment the runner asked for, against the `.define()`s the
-//      manifest compiled in — this catches a manifest that ignores the
-//      environment; and
-//   2. those `.define()`s against the isolation the compiler actually applied,
-//      observed through `#isolation` — this catches a manifest that mirrors
-//      the environment into defines but forgets to apply the settings.
+//   1. the runner's environment against the manifest's `.define()`s, catching
+//      a manifest that ignores the environment; and
+//   2. those `.define()`s against the compiler's `#isolation`, catching a
+//      manifest that defines the leg but does not apply its settings.
 //
 // Neither comparison can be satisfied by the other, and neither is a
 // tautology: comparison 1 has the environment on one side and the build on the

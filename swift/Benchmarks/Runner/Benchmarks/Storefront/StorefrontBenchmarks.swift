@@ -28,8 +28,8 @@ enum StorefrontWorkloadInputs {
 
   /// The catalog the compute-only control scores, built once.
   ///
-  /// Fixture construction is not part of what the control measures — it is the
-  /// *input* — so it happens here rather than inside the measured region.
+  /// Fixture construction produces the input, so it stays outside the measured
+  /// region.
   static let controlCatalog = preparedWorld.catalog
 
   /// Runs every heavy kernel over the same inputs with no graph at all.
@@ -82,12 +82,10 @@ struct StorefrontBurstInput: Sendable {
   let generation: Int
 }
 
-/// The Storefront macrobenchmark's cuts, and the MainActor owner they run
-/// behind — generic over the state-management runtime that performs them.
+/// Storefront benchmark cuts and their generic MainActor runtime owner.
 ///
-/// This is the one workload in the suite that is an *application* rather than a
-/// graph shape. Everything else here measures a structure — a diamond, a fan, a
-/// chain — chosen because it isolates one cost. This measures a commerce
+/// This workload measures an *application*, not a graph shape. Other benchmarks
+/// use diamonds, fans, and chains to isolate one cost. This measures a commerce
 /// session: a catalog, a search, a filter bar, a sixteen-stage pricing ladder,
 /// a cart, quotes, and an inventory feed, driven through named domain verbs by
 /// the same trace the SwiftUI benchmark application performs.
@@ -97,9 +95,9 @@ struct StorefrontBurstInput: Sendable {
 ///
 /// ## Why it is generic
 ///
-/// `perf-16` measures four runtimes — Cog, raw Swift Observation, hand-memoized
-/// Observation, and swift-state-graph — over the identical eleven-phase
-/// session. Four similar-but-separate harnesses would compare the harnesses:
+/// `perf-16` measures Cog, raw Swift Observation, hand-memoized Observation, and
+/// swift-state-graph over the same eleven-phase session. Separate harnesses
+/// could compare their own differences:
 /// one that settled its runtime a little differently, or validated a little
 /// less, would produce a number that looks like a property of the runtime and
 /// is a property of the apparatus. One generic harness makes the measured code
@@ -112,11 +110,10 @@ struct StorefrontBurstInput: Sendable {
 /// One instance per runtime, created once and retained for the whole process by
 /// ``StorefrontComparisonHarness``. A class rather than the `enum` this used to
 /// be because Swift has no static stored properties in a generic type, and the
-/// settled interaction runtime, the settled burst runtime, and the retained
-/// footprint contexts have to outlive individual samples — that persistence is
-/// what `M5-11` requires of a region carrying process-global counters.
+/// settled interaction runtime, burst runtime, and footprint contexts must
+/// outlive each sample. `M5-11` requires this for process-global counters.
 ///
-/// Isolated for the reason `M5-05bb` recorded — see ``GraphHarness``.
+/// MainActor-isolated for the reason `M5-05bb` records; see ``GraphHarness``.
 @MainActor
 final class StorefrontHarness<Runtime: StorefrontRuntime> {
   /// The profile every cut this harness runs uses.
@@ -178,10 +175,9 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
   /// The phase-by-phase verifier is the workload package's correctness gate. A
   /// reported sample instead proves its final independent shadow digest and
   /// exact request quiescence here, keeping verifier kernels out of the timing.
-  /// Every claim it makes is runtime-invariant — the visible identifiers, the
-  /// rendered checksum, the suggestions, the order total, and that nothing is
-  /// still outstanding — so a runtime that computed a different session fails
-  /// here rather than reporting a fast wrong answer.
+  /// It checks runtime-neutral output: visible IDs, rendered checksum,
+  /// suggestions, order total, and no outstanding work. A wrong session fails
+  /// instead of reporting a fast result.
   func validateMeasuredDriver() async {
     guard let driver = lastMeasuredDriver else {
       fatalError("A Storefront sample was validated without having been measured.")
@@ -238,9 +234,8 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
   /// Four verbs per iteration, and every one of them is a write a shopper
   /// actually performs: a favorite toggle, a cart quantity, a variant
   /// selection, and the two-source verb that opens a product and records that
-  /// it was viewed. None of them changes *which* rows are on screen, and that
-  /// restriction is deliberate rather than incidental — a query change would
-  /// materialize new rows, which would start inventory and offer requests, and
+  /// it was viewed. None changes *which* rows are on screen. A query change
+  /// would materialize rows and start inventory and offer requests, and
   /// a measured region that starts async work is not a region process-global
   /// counters may be attached to. Search interactions are measured by the
   /// session cut instead, on wall clock alone.
@@ -250,12 +245,9 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
     guard let driver = interactionDriver else {
       fatalError("The Storefront interaction cut was driven before it was settled.")
     }
-    // The **runtime**, deliberately, and never the generic driver. Reading it
-    // out once binds `Runtime` to this harness's concrete type for the whole
-    // loop, so the specializer can devirtualize all four verbs; going back
-    // through the driver on every iteration would put protocol-witness
-    // dispatches inside the measured region and quietly make this cut report
-    // the cost of the apparatus that makes four runtimes comparable.
+    // Read the concrete runtime once so the specializer can devirtualize all
+    // four verbs. Calling through the generic driver each time would measure
+    // protocol-witness dispatch inside the loop.
     let runtime = driver.runtime
     let products = interactionProducts
     let start = interactionIteration
@@ -322,9 +314,9 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
   ///
   /// Retained, not released, and that is the whole reason this cut can carry
   /// allocation counters at all. Releasing a runtime between iterations would
-  /// drop thousands of states and cancel their grace sleepers, and the frees
-  /// would land inside the *next* iteration's measured region — the exact
-  /// process-global attribution error `M5-11` recorded, with the null
+  /// drop thousands of states and cancel their grace sleepers. Those frees
+  /// could land in the *next* measured region, causing the process-global
+  /// attribution error `M5-11` records and the null
   /// `swift_release_hook` crash on the other side of it. Nothing is ever torn
   /// down here, so nothing can be misattributed.
   ///
@@ -347,11 +339,9 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
   /// The root demand is supplied by the caller rather than performed here, and
   /// it is the one step of this cut that is *not* runtime-neutral. What has to
   /// happen is precise: start the catalog and the search index without
-  /// materializing the funnel those two feed, because the funnel is the thing
-  /// the measured region exists to build. ``StorefrontRuntime`` has no verb for
-  /// that — ``StorefrontRuntime/demandRankedProductIDs()`` deliberately
-  /// materializes the funnel — so the demand is written per runtime, at a call
-  /// site where `Runtime` is concrete, and is documented there.
+  /// building their funnel because measurement must build it. ``StorefrontRuntime``
+  /// has no verb for this. ``StorefrontRuntime/demandRankedProductIDs()`` builds
+  /// the funnel, so each concrete runtime supplies the root demand.
   ///
   /// - Parameter demandRoots: Starts the catalog and search-index requests
   ///   while creating none of the per-product funnel this cut weighs.
@@ -387,10 +377,9 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
   /// - one `storefrontSearchScoreCogs` state per eligible product; and
   /// - the two keyless nodes that gather them.
   ///
-  /// With no query, no category, and no stock filter, every product is
-  /// eligible, so the count is exactly `2 × productCount + 2` states — and the
-  /// returned rank count proves it, because a product can only appear in the
-  /// ranked list if both of its keyed states were created and read.
+  /// With no query, category, or stock filter, every product is eligible. The
+  /// count is `2 × productCount + 2` states. A product appears in the returned
+  /// ranking only after both keyed states are created and read.
   ///
   /// No async is demanded anywhere on that path, which is what keeps the region
   /// quiescent.
@@ -516,19 +505,17 @@ final class StorefrontHarness<Runtime: StorefrontRuntime> {
 let storefrontCountingBenchmarks: @Sendable () -> Void = {
   // Allocation *counts* and allocation *bytes*, both net and gross.
   //
-  // `peakMemoryResidentDelta` is what the non-quiescent cuts have to settle
-  // for, and it is a poor instrument: resident memory is OS-sampled,
-  // page-granular, and a high-water mark that never comes down, so it answers
-  // "did this process ever get big" rather than "what does this graph cost".
-  // The interposer's counters answer the real question exactly:
+  // Non-quiescent cuts use `peakMemoryResidentDelta`. It is OS-sampled,
+  // page-sized, and based on a high-water mark. It measures process growth, not
+  // the graph's exact cost. The interposer provides exact counts:
   //
-  // - `mallocCountTotal` / `freeCountTotal` — allocations made and returned;
-  // - `mallocFreeDelta` — allocations that **survived** the region, which for a
+  // - `mallocCountTotal` / `freeCountTotal`: allocations made and returned.
+  // - `mallocFreeDelta`: allocations that **survived** the region, which for a
   //   build region is the graph's allocation footprint and for a steady-state
-  //   region should be zero;
-  // - `mallocBytesCount` — gross bytes requested;
-  // - `memoryLeakedBytes` — bytes that survived the region, which is the
-  //   closest thing to "heap held" that can be counted rather than sampled.
+  //   region should be zero.
+  // - `mallocBytesCount`: gross bytes requested.
+  // - `memoryLeakedBytes`: bytes that survived the region, which is the
+  //   nearest counted measure of retained heap bytes.
   let countingMetrics = storefrontCountingMetrics
   // Reported, never gated. This workload has no pinned-CI history yet, and a
   // threshold with no repeated measurement behind it is a guess that fails at
@@ -574,9 +561,9 @@ let storefrontCountingBenchmarks: @Sendable () -> Void = {
 
   // What a catalog-wide keyed funnel costs to *build and hold*.
   //
-  // Three iterations and no warm-up, because every iteration retains a whole
-  // standard-profile context forever — see `StorefrontHarness.footprintContexts`
-  // for why releasing one would make the next iteration's counters a fiction.
+  // Use three iterations with no warm-up. Each retains a standard-profile
+  // context; `StorefrontHarness.footprintContexts` explains why release would
+  // corrupt the next iteration's counts.
   // Three is enough: these are exact interposer counts rather than a sampled
   // distribution, so agreement from p0 to p100 is the result, and disagreement
   // would itself be the finding.
@@ -624,10 +611,9 @@ let storefrontCountingMetrics: [BenchmarkMetric] = [
 ///
 /// Wall clock, instructions, and resident memory only. Each cut that uses them
 /// builds or drives a runtime that starts tasks, accepts async completions, or
-/// is dropped at the end of a sample, and `M5-11`'s rule is explicit that such a
-/// region must stay off the ARC and malloc counters — the harness tears its ARC
-/// hooks down between iterations, and a task finishing on another thread then
-/// calls through a null `swift_release_hook`.
+/// is dropped at the end of a sample. Per `M5-11`, such regions cannot use ARC
+/// or malloc counters. A task can finish after the harness removes its ARC
+/// hooks and call a null `swift_release_hook`.
 let storefrontTimingMetrics: [BenchmarkMetric] = [
   .wallClock, .cpuTotal, .instructions, .peakMemoryResidentDelta, .peakMemoryResident,
 ]
@@ -651,10 +637,9 @@ let storefrontTimingBenchmarks: @Sendable () -> Void = {
   // rather than the timing ones. `peakMemoryResident` is a process-wide
   // high-water mark that never comes down, and `peakMemoryResidentDelta` only
   // advances on iterations where that mark moves. Left to a duration budget, a
-  // core that is ten times faster runs ten times as many build-and-drop cycles
-  // in the same window and gives the allocator ten times as many chances to
-  // reach higher — so the two columns would compare throughput while looking
-  // like they compare footprint. A fixed iteration count makes them comparable.
+  // core that is ten times faster runs ten times as many build-and-drop cycles.
+  // That gives the allocator more chances to raise the peak, making the memory
+  // columns reflect throughput. A fixed iteration count makes them comparable.
   // The exact footprint question is answered by
   // `perf-15-storefront-footprint`'s counted bytes, not by these.
   let reported = BenchmarkThresholds()

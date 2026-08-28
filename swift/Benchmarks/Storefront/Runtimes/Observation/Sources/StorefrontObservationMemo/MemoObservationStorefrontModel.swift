@@ -4,42 +4,30 @@ internal import StorefrontWorkload
 /// Every writable fact the hand-memoized Storefront port owns, on one
 /// `@Observable` object.
 ///
-/// This is the port's whole *source* layer: seventeen mutable facts, mapped one
-/// for one onto the Cog port's seventeen manual declarations — eleven keyless
-/// stored properties here, five `[ProductID: T]` dictionaries here, and the
-/// installed ``StorefrontService``, which the runtime holds directly because it
-/// is injected once at construction and never written again.
+/// This is the full source layer. Its seventeen facts match Cog's manual
+/// declarations: eleven keyless properties, five keyed dictionaries, and the
+/// installed ``StorefrontService``.
 ///
 /// ## Why dictionaries rather than an object per product
 ///
-/// Because that is what a team writes. A per-product `@Observable` object would
-/// buy finer Observation-level invalidation, at the cost of allocating and
-/// wiring twelve hundred objects for a catalog whose rows are mostly never
-/// visited. The coarser thing is both the realistic choice and part of what the
-/// comparison is measuring: a write to any product's favorite flag notifies
-/// every reader of `favorites`. The port's *own* caches are what recover the
-/// per-product granularity, by hand, and the cost of writing that by hand is
-/// the number this runtime exists to produce.
+/// A per-product `@Observable` object would improve invalidation but allocate
+/// 1,200 mostly unused objects. Dictionaries are the practical choice. A write
+/// to one favorite notifies all `favorites` readers, so hand-written caches
+/// restore per-product granularity. This benchmark measures that cost.
 ///
 /// ## Identity, ownership, and isolation
 ///
 /// One instance per runtime, created in
 /// ``MemoObservationStorefrontRuntime/make(profile:service:initialWindow:holds:sink:grace:)``
-/// and never replaced or shared. MainActor-confined, like every other type in
-/// this port and like the `@Observable` models a SwiftUI application keeps:
-/// every verb writes it on the MainActor and every render reads it there.
+/// and never shared or replaced. Every verb and render accesses it on the
+/// MainActor.
 ///
 /// ## Observation
 ///
-/// The `@Observable` macro is here for the same reason it would be in a real
-/// application — a SwiftUI sibling app reads these properties from view bodies
-/// — and the headless port reads them inside `withObservationTracking` so the
-/// registrar's registration cost stays inside the measured sample rather than
-/// being quietly optimized away by a benchmark that never observes anything.
-/// Observation is **not** this port's invalidation mechanism. Nothing here
-/// subscribes to a change callback; every cache this port keeps is invalidated
-/// by a hand-written, explicitly enumerated `didWrite…`/`didAccept…` method in
-/// `MemoObservationInvalidation.swift`.
+/// SwiftUI reads these properties from view bodies. The headless port uses
+/// `withObservationTracking` so samples include registrar cost. Observation is
+/// not the invalidation system: methods in `MemoObservationInvalidation.swift`
+/// invalidate each cache by hand.
 ///
 /// `nonisolated deinit` per the repository convention: under
 /// `.defaultIsolation(MainActor.self)` a synthesized deinit would ask the
@@ -106,7 +94,7 @@ final class MemoObservationStorefrontModel {
   /// generation says "the reading you are holding is out of date"; it does not
   /// say what the new reading is. The row keeps rendering the last accepted
   /// reading until the new response lands, so a generation write invalidates no
-  /// cache at all — see
+  /// cache at all, see
   /// ``MemoObservationStorefrontRuntime/publishInventoryBurst(_:generation:)``.
   var inventoryGenerations: [ProductID: Int] = [:]
 

@@ -12,9 +12,8 @@ extension Cogs {
   ///
   /// The factory mirrors production's single-call assembly exactly, with one
   /// addition: the `seeding` closure runs after the context exists and before
-  /// any mechanism's `operate`, so a test arranges state first — quiet seeds
-  /// and loud turns both — and then watches mechanisms come alive against
-  /// it. An `initial: .run` watch therefore observes seeded values on its
+  /// any mechanism's `operate`. A test can arrange state with seeds or turns
+  /// before mechanisms start. An `initial: .run` watch therefore observes seeded values on its
   /// registration run. There is no late-start API, even for tests.
   ///
   /// Make one context per test or preview and pass it through that runtime.
@@ -78,13 +77,10 @@ extension Cogs {
 
   /// A fresh, isolated context plus a live controller the test keeps.
   ///
-  /// Everything ``forTesting(clock:whileObservedGrace:externalObservationTracking:seeding:mechanisms:)``
-  /// says holds here too; the addition is the returned controller. Registration
-  /// is a controller capability, and controllers reach tests only through a
-  /// mechanism's `operate` — so a test that needs a reaction, watch, task, or
-  /// gated scope mid-story would otherwise write its own capturing mechanism.
-  /// This factory assembles that probe itself, after every caller mechanism,
-  /// and returns its controller:
+  /// This follows the same rules as ``forTesting`` but also returns a
+  /// controller. Tests normally receive one only through a mechanism's
+  /// `operate`. This factory adds a probe after the caller's mechanisms and
+  /// returns the controller it captures:
   ///
   /// ```swift
   /// let (cogs, controller) = Cogs.forTestingWithController()
@@ -93,12 +89,9 @@ extension Cogs {
   /// }
   /// ```
   ///
-  /// Holding the controller mirrors an app-lifetime mechanism exactly: the
-  /// runtime's scope retains every controller for the context's lifetime, so
-  /// registrations made through it live as long as the context does. The probe
-  /// operates last so its registrations always observe the caller mechanisms'
-  /// assembly-time work, and its reserved assembly name is
-  /// `CogTesting.Probe` — caller mechanisms keep their own names.
+  /// The probe's scope retains the controller for the context lifetime, as it
+  /// would for an app-lifetime mechanism. It runs last, after caller mechanisms
+  /// finish their assembly work. Its reserved name is `CogTesting.Probe`.
   ///
   /// - Parameters: The same parameters as
   ///   ``forTesting(clock:whileObservedGrace:externalObservationTracking:seeding:mechanisms:)``.
@@ -128,8 +121,8 @@ extension Cogs {
 ///
 /// An implementation detail rather than API: tests hold the controller, not
 /// the probe. Its assembly name is namespaced so it cannot collide with a
-/// caller mechanism, and `operate` runs once at assembly — after every caller
-/// mechanism — doing nothing but the capture.
+/// caller mechanism. Its `operate` runs last at assembly and only captures the
+/// controller.
 private struct ControllerProbeMechanism: Mechanism {
   /// The reserved assembly name, distinct from any reasonable caller name.
   let name = "CogTesting.Probe"

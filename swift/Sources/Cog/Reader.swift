@@ -90,7 +90,7 @@ public struct Reader<Value> {
   /// This is a total read: it returns the last accepted success, or the
   /// declaration's resting default before one exists. The read resolves
   /// through the async cog's internal value projection, so it settles like
-  /// any automatic read — a first read creates the async state, starts its
+  /// any automatic read. A first read creates the async state, starts its
   /// work, and returns the default while that work runs. Equality gating on
   /// the projection keeps this selector quiet when a reload succeeds with an
   /// equal value; read `c.status[valueReference]` instead where the request
@@ -110,10 +110,9 @@ public struct Reader<Value> {
   ///
   /// `c.status[asyncValue]` records a dependency on the async state itself, so
   /// later pending, success, and failure turns each rerun this selector even
-  /// when the successful value is unchanged — the opposite gating from the
-  /// value read beside it. The lens deliberately has no spelling for manual
-  /// or automatic cogs: synchronous state has no request status, and asking for it is a
-  /// type error rather than a degenerate success.
+  /// when the successful value stays equal. A value read reruns only when the
+  /// value changes. The lens accepts no manual or automatic cogs because
+  /// synchronous state has no request status.
   public var status: Status {
     Status(cogs: cogs, arenaState: requiredArenaState())
   }

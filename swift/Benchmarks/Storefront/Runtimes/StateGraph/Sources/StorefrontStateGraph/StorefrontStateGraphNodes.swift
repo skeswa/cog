@@ -108,7 +108,7 @@ func makeMemoizedComputed<Value: Equatable & Sendable>(
 /// ``StateGraphStorefrontRuntime``. It owns every node: the keyless ones as
 /// stored properties, the keyed ones in dictionaries it creates on first demand
 /// and drops on release. Every rule captures it `unowned`, so the storage owns
-/// the nodes and the nodes never own the storage — dropping this object drops
+/// the nodes and the nodes never own the storage, dropping this object drops
 /// the whole graph, and dropping one dictionary entry drops exactly one
 /// product's worth of it.
 ///
@@ -229,7 +229,7 @@ final class StorefrontStateGraphNodes {
   /// change; a plan that carried the `[Product]` array would have to compare a
   /// thousand products on every poll of every demanded slot to learn the same
   /// thing. The runtime bumps this exactly when it publishes a catalog that
-  /// differs from the one already accepted — one comparison per response
+  /// differs from the one already accepted, one comparison per response
   /// instead of tens of thousands per session.
   let catalogRevision = makeSource("storefront.catalogRevision", 0)
 
@@ -321,11 +321,8 @@ final class StorefrontStateGraphNodes {
 
   /// Eligible products in presentation order.
   ///
-  /// Price ordering uses the catalog's list price, not the effective price and
-  /// not the selected variant's adjusted one — the same product decision Cog's
-  /// declaration records, and for the same reason: sorting a thousand products
-  /// by a personalized price would demand a personalized offer and a live
-  /// inventory reading for every one of them.
+  /// Price ordering uses catalog list prices, matching Cog. Personalized
+  /// sorting would demand an offer and live inventory for every product.
   lazy var rankedProductIDs: Computed<[ProductID]> = makeDerived("storefront.rankedProducts") {
     nodes in
     let eligible = nodes.eligibleProductIDs.wrappedValue
@@ -402,7 +399,7 @@ final class StorefrontStateGraphNodes {
 
   /// The visible products plus the prefetch margin on either side.
   ///
-  /// This — not the visible set — is what demands per-row asynchronous work,
+  /// This, not the visible set, is what demands per-row asynchronous work,
   /// which is why scrolling one row does not start a request storm.
   lazy var prefetchProductIDs: Computed<[ProductID]> = makeDerived("storefront.prefetchProducts") {
     nodes in
@@ -619,7 +616,7 @@ final class StorefrontStateGraphNodes {
   /// derived node in the port therefore goes through. What happens here is the
   /// crossing between the library's world and this port's. A `Computed` rule is
   /// `@Sendable` and may outlive the call that created it, so the storage is
-  /// captured `unowned` — the storage owns the nodes, never the reverse — and
+  /// captured `unowned`, the storage owns the nodes, never the reverse, and
   /// `MainActor.assumeIsolated` states and checks the synchronous invariant
   /// that this port only ever reads on the MainActor. The rule receives the
   /// storage as an argument rather than closing over `self` so that both of
@@ -689,7 +686,7 @@ final class StorefrontStateGraphNodes {
 
   /// Which inventory generation one product is asking the service for.
   ///
-  /// Never released. A generation is the shopper's — or the warehouse feed's —
+  /// Never released. A generation is the shopper's, or the warehouse feed's,
   /// own write, and a lifetime sweep that reset it would make a product ask for
   /// a reading it has already been told is stale.
   ///
@@ -800,7 +797,7 @@ final class StorefrontStateGraphNodes {
   /// ``StorefrontPricing/ladder``'s `n - 1`th policy to stage `n - 1`. The
   /// recursion is what makes one accessor a seventeen-node chain per product
   /// per book, and the `switch` is what makes each node depend on only the
-  /// inputs its own policy reads — so changing the coupon invalidates the
+  /// inputs its own policy reads, so changing the coupon invalidates the
   /// coupon stage and everything below it, and nothing above it. The full
   /// granularity is reproduced because swift-state-graph genuinely provides it;
   /// collapsing the ladder would understate the library.
@@ -1030,7 +1027,7 @@ final class StorefrontStateGraphNodes {
   /// recency rank, and an inventory generation are writes somebody made; a
   /// sweep that reset them would not be releasing a cache, it would be losing
   /// data. What goes is the derived and asynchronous state that can be rebuilt
-  /// by asking again — which is exactly what the teardown phase's release proof
+  /// by asking again, which is exactly what the teardown phase's release proof
   /// demands: the released row has to ask the service a second time.
   ///
   /// The funnel-wide keyed nodes are kept too, for a different reason:

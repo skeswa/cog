@@ -54,7 +54,7 @@ private struct GenerationError: Error, CustomStringConvertible {
   /// The complete explanation printed by SwiftPM.
   let description: String
 
-  /// Creates one actionable generator failure.
+  /// Creates one generator failure with its repair details.
   init(_ description: String) {
     self.description = description
   }

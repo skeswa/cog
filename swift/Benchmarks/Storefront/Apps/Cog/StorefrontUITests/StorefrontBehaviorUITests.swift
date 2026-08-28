@@ -5,7 +5,7 @@ import XCTest
 ///
 /// A UI performance test measures whatever the app happens to do. An app that
 /// rendered an empty list, ignored the search field, and never updated the cart
-/// would still produce five perfectly reproducible numbers per metric — and
+/// would still produce five perfectly reproducible numbers per metric, and
 /// they would mean nothing. This test proves the three behaviours every
 /// measurement below depends on: rows render, adding to the cart reaches the
 /// cart tab, and search filters the list. If it fails, the timings are noise
@@ -59,8 +59,8 @@ final class StorefrontBehaviorUITests: XCTestCase {
       "the cart tab showed no line after adding a product"
     )
     // The total specifically, addressed by identifier. Several summary rows are
-    // legitimately zero — there is no coupon, and the quotes rest at their
-    // pending defaults until they land — so "is any zero on screen" would be a
+    // legitimately zero, there is no coupon, and the quotes rest at their
+    // pending defaults until they land, so "is any zero on screen" would be a
     // question about the wrong text.
     let total = app.staticTexts[StorefrontUITestIdentifiers.orderTotal]
     XCTAssertTrue(
@@ -94,7 +94,7 @@ final class StorefrontBehaviorUITests: XCTestCase {
   ///
   /// The overlay publishes inventory bursts and resets session state. Those are
   /// measurement instruments, not shop features, and the launch-argument gate is
-  /// the only thing keeping them out of the interface a shopper sees — the
+  /// the only thing keeping them out of the interface a shopper sees, the
   /// Release image contains their code either way. That makes this the one
   /// property of the gate worth asserting rather than assuming.
   func testBenchmarkControlsAreAbsentFromAnOrdinaryLaunch() {

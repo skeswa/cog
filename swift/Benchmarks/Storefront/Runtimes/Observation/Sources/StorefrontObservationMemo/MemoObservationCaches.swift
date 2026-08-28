@@ -3,32 +3,23 @@ internal import StorefrontWorkload
 // The four whole-screen caches this port keeps, and the granularity decision
 // behind them.
 //
-// There are seven caches in the port in total: the four value types declared in
-// this file, plus two `[ProductID: …]` dictionaries and the asynchronous cell
-// store, which live as stored properties on the runtime because they are keyed
-// rather than whole-screen. Seven, not fifty-three — the Cog port declares
-// fifty-three nodes, and a hand-written port that reproduced them one for one
-// would be reimplementing a dependency graph by hand rather than being compared
-// against one.
+// The port has seven caches: these four value types, two keyed dictionaries, and
+// the async cell store. Cog declares 53 nodes. Matching them one for one would
+// rebuild a dependency graph by hand instead of providing a fair comparison.
 //
-// The grouping is the one a person picks: a cache boundary is drawn where a
-// human would think "that is one screen's worth of work", not where a
-// dependency edge happens to be. The search funnel is one cache because a query
-// change re-does all of it anyway; the pricing ladder is one cell per product
-// because seventeen per-policy invalidation lists is precisely the hand-written
-// dependency graph this port must not contain.
+// Cache boundaries follow screen-level work, not each dependency edge. The
+// search funnel is one cache because a query rebuilds it. Pricing uses one cell
+// per product to avoid seventeen hand-written invalidation lists.
 //
-// Every type here is an immutable snapshot rebuilt wholesale on a miss. None of
-// them carries a version stamp, a dirty bit of its own, or a list of what it
-// depends on: the *only* thing that clears one is a hand-written invalidation
-// method naming it by name, and those all live in
-// `MemoObservationInvalidation.swift` so a reader can count them.
+// Each type is an immutable snapshot rebuilt after a miss. It has no version,
+// dirty bit, or dependency list. Named methods in
+// `MemoObservationInvalidation.swift` clear the caches.
 
 /// The accepted catalog, indexed for lookup.
 ///
-/// Covers three of the Cog port's automatic declarations —
+/// Covers three of the Cog port's automatic declarations,
 /// `storefrontCatalogProductsCog`, `storefrontCategoriesCog`, and
-/// `storefrontProductIndexCog` — plus the category-name map the row builder
+/// `storefrontProductIndexCog`, plus the category-name map the row builder
 /// needs. One cache rather than four because they all have exactly one input,
 /// the accepted catalog, so splitting them could never invalidate one without
 /// the others.
@@ -61,7 +52,7 @@ struct MemoObservationCatalogIndexCache {
 /// all of them. A query keystroke re-tokenizes, re-intersects the postings,
 /// rescores, re-ranks, and re-sections; a category chip re-filters, re-ranks,
 /// and re-sections. Splitting the funnel into eight cells would let a sort-mode
-/// change skip re-scoring — which is real, and which is exactly the granularity
+/// change skip re-scoring, which is real, and which is exactly the granularity
 /// a declared dependency graph gives away for free and a hand-written port pays
 /// for in maintenance. This port declines to pay it, and the results table says
 /// so.
@@ -100,7 +91,7 @@ struct MemoObservationWindowCache {
 
   /// The visible products plus the prefetch margin on either side.
   ///
-  /// This — not the visible set — is what demands per-row asynchronous work.
+  /// This, not the visible set, is what demands per-row asynchronous work.
   let prefetchIDs: [ProductID]
 
   /// Membership set behind ``prefetchIDs``.

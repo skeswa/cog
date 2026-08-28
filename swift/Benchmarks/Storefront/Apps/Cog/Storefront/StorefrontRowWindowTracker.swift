@@ -4,15 +4,15 @@ import StorefrontWorkload
 /// Which rows the browse list currently has materialized.
 ///
 /// This is platform-ephemeral UI state and deliberately not graph state. The
-/// facts it holds — the lowest and highest flat row index SwiftUI has realized
-/// — are produced by the list's own layout, are meaningless the moment the
+/// facts it holds, the lowest and highest flat row index SwiftUI has realized
+///, are produced by the list's own layout, are meaningless the moment the
 /// screen goes away, and have exactly one consumer: the ``CogOps/scrollRows(to:)``
 /// op that tells the graph which rows to demand data for. The graph owns the
 /// window; this type owns the accounting that produces it.
 ///
 /// It is a **class held in `@State`** rather than two `@State` integers, and
 /// that is the entire design. Two `@State` integers would invalidate the browse
-/// screen's `body` on every row that scrolled into view — rebuilding the
+/// screen's `body` on every row that scrolled into view, rebuilding the
 /// section list, and turning a scroll into a per-frame rebuild of the very view
 /// under measurement. Mutating a property of a reference held in `@State`
 /// notifies nobody, which is exactly what a scroll-position ledger should do.

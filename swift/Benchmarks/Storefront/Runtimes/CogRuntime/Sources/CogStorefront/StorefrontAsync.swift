@@ -95,7 +95,7 @@ public let storefrontSuggestionsCog = Cog<[String]>.Async(
 
 /// Personalized recommendations, scored over the whole catalog.
 ///
-/// Depends on both async roots, so it cannot start until each has landed —
+/// Depends on both async roots, so it cannot start until each has landed,
 /// which is what makes it the workload's one genuinely three-deep async chain.
 public let storefrontRecommendationsCog = Cog<[ProductID]>.Async(
   default: [],
@@ -121,7 +121,7 @@ public let storefrontRecommendationsCog = Cog<[ProductID]>.Async(
 /// The keyed generation is a dependency, so an inventory burst that touches
 /// this product invalidates exactly this state and no other. A product whose
 /// row is not demanded has no state at all, so a burst covering it costs
-/// nothing — which is the claim the burst checkpoint exists to prove.
+/// nothing, which is the claim the burst checkpoint exists to prove.
 public let storefrontInventoryCogs = CogBox<InventoryReading, ProductID>.Async(
   default: .unknown,
   name: "storefront.inventory"
@@ -137,7 +137,7 @@ public let storefrontInventoryCogs = CogBox<InventoryReading, ProductID>.Async(
 /// The personalized offer for one product.
 ///
 /// Depends on the shopper, so signing in or out replaces every demanded
-/// offer — a wide, keyed invalidation wave with a narrow trigger.
+/// offer, a wide, keyed invalidation wave with a narrow trigger.
 public let storefrontOfferCogs = CogBox<PersonalizedOffer, ProductID>.Async(
   default: .none,
   name: "storefront.offer"
@@ -213,7 +213,7 @@ public let storefrontShippingQuoteCog = Cog<ShippingQuote>.Async(
 ///
 /// A sibling of the shipping quote, and deliberately a separate request: the
 /// two start together, complete in whichever order the driver chooses, and both
-/// feed the order total — which is the fan-in shape a checkout screen actually
+/// feed the order total, which is the fan-in shape a checkout screen actually
 /// has.
 public let storefrontTaxQuoteCog = Cog<TaxQuote>.Async(
   default: .pending,

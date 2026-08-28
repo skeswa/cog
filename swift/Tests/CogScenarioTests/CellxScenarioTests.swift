@@ -5,8 +5,8 @@ import Testing
 
 // COUNT-06: the cellx lattice runs every node exactly once to settle and
 // exactly once for the turn that rewrites all four sources. Nothing is pruned
-// here, by construction — the two orbits differ in every component at every
-// layer — so any count other than `8 × layers` is duplicate or missed work.
+// here because the two orbits differ in every component at every layer. Any
+// count other than `8 × layers` is duplicate or missed work.
 
 /// One step of upstream's layer transform, computed here rather than read off
 /// the scenario.

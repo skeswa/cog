@@ -27,13 +27,10 @@ internal final class AutomaticCogDescriptor<Value>: CogDescriptor {
 
   /// Arena context whose keyless location the two fields below memoize.
   ///
-  /// Identical in shape, contract, and safety argument to
-  /// ``ManualCogDescriptor``'s memo; read the commentary there. The invariant
-  /// that carries the most weight for a *automatic* declaration is the second
-  /// one: a `whileObserved` automatic state is released as soon as its grace
-  /// expires, and the memo must not be able to resurrect it. It cannot,
-  /// because the released row advances its occupant generation before the
-  /// index is reusable, so the memoized slot stops naming a live occupant.
+  /// This has the same contract as ``ManualCogDescriptor``'s memo. One extra
+  /// case matters here: a `whileObserved` automatic state may be released after
+  /// grace. Release advances the row generation before reuse, so a stale memo
+  /// cannot revive the old state.
   #if !COG_ARENA_COMPACT
   @usableFromInline
   #endif
@@ -95,10 +92,9 @@ internal final class AutomaticCogDescriptor<Value>: CogDescriptor {
 
   /// Whether a recomputation is equivalent to the state's cached value.
   ///
-  /// The public declaration overloads install `==`, preserve a custom rule,
-  /// or leave the comparator absent so an opaque value assumes change. This
-  /// comparison runs after dependency capture but before the state records its
-  /// final versions, within the enclosing computation barrier.
+  /// Public overloads install `==`, keep a custom rule, or omit equality so each
+  /// result counts as changed. The comparison runs after dependency capture and
+  /// before final version stamps, inside the computation barrier.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif

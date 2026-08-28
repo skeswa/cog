@@ -43,19 +43,17 @@ extension Cogs {
   ///
   /// This is a total read: it returns the last accepted success, or the
   /// declaration's resting default before one exists. The read resolves
-  /// through the async cog's internal value projection, so a first read
-  /// creates the async state, starts its work, and returns the default while
-  /// that work runs; settlement happens before boundary access, so the cold
-  /// pending publication cannot reenter this read or send a redundant
-  /// baseline notice. Equality gating keeps the UI consumer quiet when a
+  /// through the async cog's internal value projection. A first read creates
+  /// the state, starts work, and returns the default. Settlement happens before
+  /// boundary access, so the cold pending publication cannot reenter the read
+  /// or send a duplicate baseline notice. Equality gating keeps the UI quiet when a
   /// reload succeeds with an equal value; read ``Cogs/status`` where the
   /// request lifecycle itself drives chrome.
   ///
-  /// This is UI tracking, not a selector or reaction dependency edge. Creating
-  /// the boundary pins the projection — and, through its dependency, the async
-  /// state — against `whileObserved` release. Use ``peek(_:)-(Cog<Value>.Async)`` for a one-shot
-  /// read that should not invalidate UI and does not keep the async state
-  /// durably observed.
+  /// This tracks UI access, not a selector or reaction dependency. The boundary
+  /// pins both the projection and its async dependency against `whileObserved`
+  /// release. Use ``peek(_:)-(Cog<Value>.Async)`` for a one-shot read that
+  /// neither invalidates UI nor pins the async state.
   ///
   /// - Parameter valueReference: The async value the UI reads.
   /// - Returns: Its newest settled value in this context.

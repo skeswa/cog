@@ -8,9 +8,9 @@
 extension CogArenaCore {
   /// Allocates one value-less terminal row for a reaction registration.
   ///
-  /// The reaction object still owns its closure and cancellation identity, but
-  /// dependency and subscriber topology terminates at this generated slot. A
-  /// terminal has no descriptor, value column, boundary, or subscribers.
+  /// The reaction object owns its closure and cancellation identity. Its graph
+  /// edges end at this generated slot, which has no descriptor, value, boundary,
+  /// or subscribers.
   func allocateReaction() -> CogArenaSlot {
     let slot = arena.allocate()
     arena.checkedAt[arena.index(of: slot)] = revision
@@ -19,9 +19,9 @@ extension CogArenaCore {
 
   /// Reconciles one reaction terminal's ordered arena dependency prefix.
   ///
-  /// Nested automatic settlement temporarily pushes selector captures above this
-  /// one. The generated slot therefore participates in the same concrete edge
-  /// storage without a class-backed bridge or a second selector run.
+  /// Nested automatic settlement may push selector captures above this one.
+  /// The generated slot can still use the same edge storage without a bridge
+  /// object or a second selector run.
   func captureReactionDependencies<Result>(
     for reaction: CogArenaSlot,
     _ body: () -> Result
@@ -107,10 +107,10 @@ extension CogArenaCore {
 
   /// Settles a reaction's arena producers and reports whether its body must run.
   ///
-  /// Producer slots are copied into reused storage before pulls begin because a
-  /// automatic recomputation may recapture other lists in the shared edge pool.
-  /// Equal recomputations leave their older `changedAt`, allowing this terminal
-  /// to backdate and stay quiet exactly like an ordinary automatic consumer.
+  /// Producer slots are copied into reused storage before pulls begin because
+  /// an automatic recomputation may change other lists in the shared edge pool.
+  /// An equal result keeps its old `changedAt`, so this terminal can backdate
+  /// and stay quiet like an automatic consumer.
   func settleReactionDependencies(_ reaction: CogArenaSlot, in cogs: Cogs) -> Bool {
     let reactionRow = requireReactionRow(reaction)
     guard needsSettlement(reactionRow) else { return false }

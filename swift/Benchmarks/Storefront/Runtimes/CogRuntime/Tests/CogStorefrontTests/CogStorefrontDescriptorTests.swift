@@ -8,8 +8,8 @@ import Testing
 /// Eight of the trace's checkpoints once carried integer literals written into
 /// `StorefrontTrace` itself. They now read
 /// ``CogStorefrontRuntime/descriptor``'s semantics instead, so that the same
-/// script can hold four runtimes to four different — and individually
-/// justified — sets of numbers. That indirection has a cost this suite exists
+/// script can hold four runtimes to four different, and individually
+/// justified, sets of numbers. That indirection has a cost this suite exists
 /// to pay back: with the literals gone, the cheapest way to green a genuine Cog
 /// invalidation regression became a one-character edit to the descriptor, and
 /// nothing in either package would have noticed.
@@ -18,9 +18,9 @@ import Testing
 /// reads. A regression that changes Cog's real behavior now fails the trace; a
 /// "fix" that edits the descriptor to match the new behavior fails this suite
 /// instead. Changing a value below is therefore a deliberate, reviewed
-/// statement that Cog's guarantees have genuinely changed — accompanied by the
+/// statement that Cog's guarantees have genuinely changed, accompanied by the
 /// justification `swift/Benchmarks/Storefront/Workload/README.md` and `docs/swift/impl/perf.md`
-/// are both required to carry — and never a convenient way to make a failing
+/// are both required to carry, and never a convenient way to make a failing
 /// checkpoint pass.
 @Suite("Cog Storefront descriptor")
 struct CogStorefrontDescriptorTests {

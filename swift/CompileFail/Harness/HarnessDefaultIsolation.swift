@@ -6,7 +6,7 @@
 // MainActor` from `Package.swift`; drop either and it compiles cleanly and the
 // harness reports `no-diagnostic`.
 //
-// It is deliberately not ACTOR-02 — that scenario proves the shipped graph API
+// This is not ACTOR-02. That scenario proves the shipped graph API
 // is unreachable off the MainActor, and M1 owns its fixture.
 
 enum HarnessDefaultIsolation {

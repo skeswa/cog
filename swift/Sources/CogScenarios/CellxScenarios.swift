@@ -13,11 +13,9 @@ internal import Cog
 // p2 = m.p1 - m.p3   p4 = m.p3
 // ```
 //
-// The interesting part is that the whole lattice is *one write away* from
-// changing: a turn writes all four sources at once, and every node in every
-// layer has to be reached exactly once. Where the Kairo diamond catches a
-// consumer woken once per changed parent, this catches it a thousand layers
-// deep, where a per-arrival wake would cost a multiple rather than a constant.
+// One turn writes all four sources, so every node in every layer must run once.
+// The Kairo diamond catches a consumer woken once per changed parent. This case
+// repeats that risk across a thousand layers, where the extra cost multiplies.
 //
 // Two notes on how the port differs, both recorded on the shapes themselves:
 // a `peek` stands in for upstream's per-layer `effect`, and the counter counts
@@ -29,9 +27,8 @@ extension CogScenario {
   ///
   /// Nothing prunes. The transform is a linear recurrence whose orbit has
   /// period twelve, and starting it from `(1, 2, 3, 4)` versus `(4, 3, 2, 1)`
-  /// produces two orbits that differ in **every** component at **every** layer.
-  /// So the equality gate — which the diamond and the sweeps lean on heavily —
-  /// stops nothing here by construction, and the count is the clean one:
+  /// produces two orbits that differ in every component at every layer.
+  /// Equality therefore stops nothing here, unlike in the diamond and sweeps:
   ///
   /// ```text
   /// expectedRuns = 4 × layers × 2
@@ -52,17 +49,15 @@ extension CogScenario {
   ///   - layers: Four-node layers above the sources. Upstream runs 1,000 and
   ///     2,500.
   /// - Returns: A scenario whose final value packs the four end values before
-  ///   the turn and the four after it, in that order — see
+  ///   the turn, then the four after it. See
   ///   ``CogScenario/packCellxValues(_:)``.
   public static func cellxLattice(layers: Int = 1000) -> CogScenario {
     CogScenario(
       name: "COUNT-06-CellxLattice",
       expectedRuns: 8 * layers
     ) { cogs, counter in
-      // Flat ownership, for the reason `kairoDeep` gives: a thousand layers of
-      // selectors each retaining the layer above would be a chain ARC releases
-      // recursively, and the scenario would crash on teardown at depths the
-      // graph settles fine.
+      // Flat ownership avoids a recursive ARC release chain. Without it, a
+      // thousand settled layers could still crash during teardown.
       let lattice = CellxLattice()
       lattice.sourceCogs = (0..<CellxLattice.width).map { property in
         Cog<Int>.Manual({ property + 1 }, name: "cellx.source.p\(property + 1)")
@@ -104,10 +99,9 @@ extension CogScenario {
 
   /// Packs the cellx end values into one integer, reversibly.
   ///
-  /// ``CogScenario`` reports a single number, and cellx's result is eight of
-  /// them — four before the turn and four after. A digit-packing rather than a
-  /// hash so a failure is readable: subtract the bias and read the values back
-  /// out in order.
+  /// ``CogScenario`` reports one number, but cellx produces eight: four before
+  /// the turn and four after. Digits make failures easier to read than a hash;
+  /// subtract the bias and unpack the values in order.
   ///
   /// The orbit is periodic and every value it visits is small, so base 64 with
   /// a bias of 32 holds eight of them with room to spare.

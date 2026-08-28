@@ -3,9 +3,8 @@ import CogTesting
 
 /// A test mechanism whose `operate` is supplied by the test.
 ///
-/// Registration is a controller capability, so scenario proofs that need
-/// assembly-time registrations — or several distinctly named probes — assemble
-/// one of these and register inside the closure. A proof that only needs one
+/// Scenario proofs use this mechanism for assembly-time registrations or
+/// several named probes, then register inside the closure. A proof that needs one
 /// controller after assembly uses `Cogs.forTestingWithController()` from
 /// `CogTesting` instead.
 ///

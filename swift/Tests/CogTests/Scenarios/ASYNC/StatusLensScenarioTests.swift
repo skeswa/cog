@@ -27,8 +27,8 @@ import os
   }
   #expect(await startIterator.next() == 0)
 
-  // ASYNC-01: the first tracked read published exactly one pending turn —
-  // there is no observable `initial` kind and no initialize-then-replace pair.
+  // ASYNC-01: the first tracked read publishes one pending turn. There is no
+  // observable `initial` kind or initialize-then-replace pair.
   #if DEBUG
   let pendingTurns = cogs.debugHistory.entries.filter {
     $0.event == .turn && $0.name == "forecast pending"
@@ -62,10 +62,9 @@ import os
 @Test func `ASYNC-32 a skipping status watch is quiet at install and delivers old and new`()
   async
 {
-  // The lens carries the whole watch family, so `initial: .skip` follows
-  // REACT-08's rule: installation demands the state (work starts) but calls
-  // nothing; the first status turn delivers the pending it skipped as the old
-  // half and the new status as the new half.
+  // The lens follows REACT-08 for `initial: .skip`. Installation starts work
+  // but calls nothing. The first status turn reports the skipped pending status
+  // as old and the new status as new.
   let (cogs, m) = Cogs.forTestingWithController()
   let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
@@ -140,8 +139,8 @@ import os
   }
   #expect(valueEvents == [0, 42])
 
-  // An equal-success refresh cycles the full status — pending, then success —
-  // while the value watch beside the lens stays quiet.
+  // An equal-success refresh cycles the full status from pending to success,
+  // while the value watch stays quiet.
   cogs.refresh(forecast)
   guard let reloadPending = await statusIterator.next(),
     reloadPending.kind == .pending, reloadPending.value == 42, reloadPending.hasSucceeded

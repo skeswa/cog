@@ -17,7 +17,7 @@ import Testing
 /// A regression that changes the port's real behavior fails the trace; a "fix"
 /// that edits the descriptor to match the new behavior fails this suite
 /// instead. Changing a value below is a deliberate, reviewed statement that the
-/// port's guarantees have genuinely changed — accompanied by the justification
+/// port's guarantees have genuinely changed, accompanied by the justification
 /// `swift/Benchmarks/Storefront/Runtimes/StateGraph/README.md` and `docs/swift/impl/perf.md`
 /// are both required to carry.
 @Suite("swift-state-graph Storefront descriptor")
@@ -59,7 +59,7 @@ struct StorefrontStateGraphDescriptorTests {
     // full: an offscreen-only invalidation polls no slot and asks for nothing.
     #expect(semantics.declaredUndemandedRequestStarts == 0)
     // The release sweep is the port's own, because swift-state-graph has no
-    // lifetime model — but it is real, so the teardown release proof is too.
+    // lifetime model, but it is real, so the teardown release proof is too.
     #expect(semantics.releasesUnobservedValues)
     // Staleness is refused by generation. The port never cancels a superseded
     // task; it lets it complete and refuses it.

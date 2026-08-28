@@ -1,8 +1,8 @@
 // scenario: ASYNC-33
 //
 // The `status` lens exists only for async references, and "only" means a
-// synchronous cog cannot be asked for request status at all — the request
-// does not compile, rather than answering with fabricated always-success data.
+// synchronous cog has no request status. The request does not compile instead
+// of returning fake success data.
 //
 // This is the type-system half of the value-first read model (§5.1). Manual
 // and automatic cogs are always settled values; uncertainty is an async-only

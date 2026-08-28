@@ -29,8 +29,8 @@ func lintScratchSource(
 
 /// Runs one filesystem scenario under an isolated, automatically removed directory.
 ///
-/// For proofs whose subject is the filesystem itself — path discovery,
-/// multi-file ordering — where one scratch source is not enough.
+/// Use this for filesystem behavior, such as path discovery or multi-file
+/// ordering, that needs more than one scratch source.
 func withTemporaryLintDirectory(
   _ body: (URL) throws -> Void
 ) throws {

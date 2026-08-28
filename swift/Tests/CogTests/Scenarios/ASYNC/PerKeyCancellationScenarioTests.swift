@@ -36,10 +36,9 @@ private final class Async37ControlledWork {
 
 @MainActor
 @Test func `ASYNC-37 releasing one key cancels only that key's work`() async throws {
-  // Lifetime, work, and generations are all per exact keyed state: one key's
-  // grace expiry cancels and releases that key alone, its late result turns
-  // nothing, the sibling key's work completes untouched, and re-reading the
-  // released key starts fresh.
+  // Each key owns its lifetime, work, and generations. Expiring one key cancels
+  // and releases only that key. Its late result does nothing, its sibling can
+  // finish, and a later read starts fresh.
   let clock = TestClock()
   let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let work = Async37ControlledWork()

@@ -1,22 +1,17 @@
 /// A runtime event `CogTesting` can await through a one-shot acknowledgement.
 ///
-/// These are the runtime's deterministic negative-event signals: moments a
-/// test must await that produce no public status, value, or history event —
-/// a rejected async result, a grace-expiry check, a released state closure, a
-/// legacy Observation re-arm, or context teardown itself. Production code
-/// never installs an acknowledgement; the `CogTesting` product's public
-/// functions are the only installers, and each names exactly one case here.
+/// These events let a test await a decision that publishes no status, value,
+/// or history entry. They cover rejected async results, grace checks, released
+/// state closures, legacy Observation re-arms, and context teardown. Production
+/// code never installs one. Each public `CogTesting` installer names one case.
 ///
-/// One enum rather than one stored callback per event keeps the install and
-/// consume protocol in a single place: one installer owns the double-install
-/// trap, one firer owns consume-then-call ordering, and adding an event is a
-/// new case plus a storage slot rather than a third parallel method family.
+/// One enum keeps install checks and consume-before-call ordering in one place.
+/// Adding an event needs one case and one storage slot.
 package enum CogRuntimeEvent {
   /// `isolated deinit` finished cancelling scopes and clearing the graph.
   ///
-  /// Unlike every other event, installation may replace an earlier callback:
-  /// teardown fires at most once per context, so "next" and "only" coincide
-  /// and re-installation is a test rearranging its own wait, not a conflict.
+  /// Installation may replace the earlier callback. Teardown fires once, so a
+  /// test is only moving its wait for that single event.
   case deinitCleanup
 
   /// An eligible automatic-state closure was actually removed.

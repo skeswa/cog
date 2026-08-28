@@ -3,27 +3,19 @@ internal import os
 
 // The port-authored asynchronous layer, and the reason it has to exist.
 //
-// swift-state-graph 0.28.0 supplies no async node primitive comparable to
-// Cog's `Async`. `Node.observe()` is an `AsyncSequence` for *consuming*
-// changes and `GraphUserDefault` is an unrelated persistence bridge; the
-// complete public surface of the `StateGraph` module was enumerated for
-// `API-NOTES.md` §6 and there is nothing else. So this file is the port's own
-// answer to the four questions Cog's `Async` answers for it: what identifies a
-// request, when does a new one supersede the one in flight, which completions
-// are accepted, and what does a caller await while one is outstanding.
+// swift-state-graph 0.28.0 has no async node like Cog's `Async`.
+// `Node.observe()` consumes changes, and `GraphUserDefault` handles persistence.
+// This layer owns request identity, replacement, result acceptance, and waits.
 //
-// Everything here is ordinary Swift. None of it is measured *as* the library,
-// and `docs/swift/impl/perf.md` says so in one sentence: the cost of
-// this plumbing sits inside the state-graph runtime's numbers because a
-// storefront that cannot await anything is not a storefront, not because
-// swift-state-graph is being blamed for lacking it.
+// This is port code, not library code. Its cost remains in the runtime result
+// because Storefront needs async work.
 
 /// One asynchronous identity in the Storefront graph.
 ///
 /// Ten cases for the ten `Cog.Async` and `CogBox.Async` declarations in
 /// `swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources/CogStorefront/StorefrontAsync.swift`, keyed the
 /// same way they are: seven keyless, three per product. This is the key of the
-/// port's own slot table, not of anything the library provides — 0.28.0 has no
+/// port's own slot table, not of anything the library provides, 0.28.0 has no
 /// keyed-node facility at all (`NodeStore` is a weak, `DEBUG`-only `graphViz`
 /// aid), so the table and everything it costs belong to the port.
 ///
@@ -54,21 +46,13 @@ nonisolated enum StorefrontStateGraphAsyncKey: Hashable, Sendable {
 
 /// What one asynchronous slot would ask for, given the graph as it stands.
 ///
-/// The port's stand-in for Cog's async *selector*, and the shape is chosen for
-/// one measured reason. A Cog selector is a graph node: it re-runs when any
-/// dependency is invalidated, and every re-run is a new generation. Reproducing
-/// that here means the plan must change exactly when Cog's selector would have
-/// re-selected — including the case that has nothing to do with the request's
-/// name, where a fresh catalog makes the search index ask the same
-/// ``StorefrontRequestID/searchIndex`` question about different products.
+/// The port's stand-in for Cog's async selector. A dependency change creates a
+/// new generation, even when the request ID stays the same. For example, a new
+/// catalog rebuilds the same ``StorefrontRequestID/searchIndex`` identity.
 ///
-/// So a plan carries the *inputs* that decide the answer, not merely the
-/// request's identity. It carries them cheaply: bulky inputs appear as a
-/// revision counter the port bumps when it publishes a genuinely different
-/// value, never as the `[Product]` array itself. The plan is compared on every
-/// poll of every demanded slot — tens of comparisons per user action — and an
-/// array comparison there would put a thousand-element `==` in the hot path of
-/// a benchmark whose whole subject is invalidation cost. The payload each
+/// A plan therefore carries answer inputs, not only request identity. Revision
+/// counters represent large values so each poll avoids a thousand-item array
+/// comparison. The payload each
 /// request actually needs is captured when the request starts, exactly as a
 /// Cog selector captures its dependencies synchronously before handing back
 /// `.run { @concurrent … }`.
@@ -79,8 +63,8 @@ nonisolated enum StorefrontStateGraphPlan: Hashable, Sendable {
   /// The selector short-circuited: publish the declaration's resting value and
   /// ask for nothing.
   ///
-  /// The five guard branches Cog's declarations spell as `return .run { … }` —
-  /// an empty query, a signed-out shopper, an empty cart, an unknown product —
+  /// The five guard branches Cog's declarations spell as `return .run { … }`,
+  /// an empty query, a signed-out shopper, an empty cart, an unknown product,
   /// all land here. They publish and schedule nothing, which is what keeps the
   /// bootstrap phase's "exactly three root requests" checkpoint true.
   case resting
@@ -114,22 +98,17 @@ nonisolated enum StorefrontStateGraphPlan: Hashable, Sendable {
 
 /// One asynchronous slot's bookkeeping, which is deliberately not in the graph.
 ///
-/// Cog keeps a generation and an in-flight identity inside its async state;
-/// this port keeps them beside the graph instead, and the difference is
-/// measurable rather than stylistic. A `Stored<AsyncCell<Value>>` holding the
-/// value *and* the generation would invalidate every reader of the value each
-/// time a generation advanced — so an inventory burst that only made readings
-/// stale would re-render every row it touched, and the burst phase's central
-/// claim would be lost to bookkeeping. The graph therefore holds the accepted
-/// *value* alone, in an equality-gated `Stored`, exactly as Cog's value read
-/// sees it; generation, plan, and demand stamp live here.
+/// Cog stores generations inside async state; this port stores them beside the
+/// graph. Putting a generation in `Stored` would invalidate value readers on
+/// every advance. The graph therefore stores only the accepted, equality-gated
+/// value. This type stores generation, plan, and demand time.
 nonisolated struct StorefrontStateGraphSlot {
   /// How many times this slot has been selected.
   ///
   /// Starts at zero, which reads as "never selected": the first poll advances
   /// it to one. A completion is accepted only when it names the generation the
   /// slot is currently on, which is what makes staleness a refusal by
-  /// generation rather than a reliance on task cancellation — the request
+  /// generation rather than a reliance on task cancellation, the request
   /// script leaves cancelled requests suspended precisely so a port cannot
   /// pass the stale-result checkpoint by accident.
   var generation = 0
@@ -152,7 +131,7 @@ nonisolated struct StorefrontStateGraphSlot {
 /// a *definite* signal at the moment a generation is replaced, without a clock,
 /// a poll, or a timeout. The teardown phase's superseded-refresh checkpoint
 /// awaits exactly that on the line after the replacing call, so the resolution
-/// has to happen when the runtime advances the slot's generation — not when the
+/// has to happen when the runtime advances the slot's generation, not when the
 /// abandoned task eventually finishes, which in this script it never does.
 ///
 /// ## Identity and ownership
@@ -160,8 +139,8 @@ nonisolated struct StorefrontStateGraphSlot {
 /// One instance per `refreshRecommendations()` call, retained by the runtime's
 /// generation table until it resolves and by whatever holds the handle
 /// afterwards. Resolution is idempotent and first-writer-wins, so the two paths
-/// that can resolve it — replacement, and the completion of the generation it
-/// names — cannot fight: whichever happens first is the answer, and the other
+/// that can resolve it, replacement, and the completion of the generation it
+/// names, cannot fight: whichever happens first is the answer, and the other
 /// is a no-op rather than a trap.
 ///
 /// ## Isolation
@@ -251,14 +230,12 @@ nonisolated final class StorefrontStateGraphRefreshPromise: Sendable {
 /// The port's per-generation recommendation demand handle, in neutral
 /// vocabulary.
 ///
-/// A thin `struct` around ``StorefrontStateGraphRefreshPromise`` for the same
-/// reason `CogStorefrontRefresh` is a thin struct around `CogRefresh`: the
-/// translation into ``StorefrontRefreshOutcome`` belongs in one visible place,
-/// and `StorefrontWorkload` must stay free of any runtime's own vocabulary.
+/// Wraps ``StorefrontStateGraphRefreshPromise`` and translates its result into
+/// ``StorefrontRefreshOutcome``. This keeps runtime terms out of
+/// `StorefrontWorkload`.
 ///
-/// `Sendable` because ``StorefrontRefreshHandle`` is: a handle may be awaited
-/// from a task other than the one that created it, and the runtime resolves the
-/// underlying promise on the MainActor.
+/// The handle is `Sendable` so another task may await it. The runtime resolves
+/// its promise on the MainActor.
 public nonisolated struct StateGraphStorefrontRefresh: StorefrontRefreshHandle {
   /// What this generation produced.
   public typealias Value = [ProductID]
@@ -276,10 +253,9 @@ public nonisolated struct StateGraphStorefrontRefresh: StorefrontRefreshHandle {
 
   /// The terminal result of this exact generation.
   ///
-  /// Resolves without a clock and without a poll: replacement resolves it as
-  /// ``StorefrontRefreshOutcome/superseded`` at the moment the runtime advances
-  /// the slot's generation, and a lifetime release resolves it as
-  /// ``StorefrontRefreshOutcome/released``.
+  /// Replacement resolves it as ``StorefrontRefreshOutcome/superseded`` when
+  /// the slot advances. Lifetime release resolves it as
+  /// ``StorefrontRefreshOutcome/released``. Neither path polls or uses a clock.
   public var outcome: StorefrontRefreshOutcome<[ProductID]> {
     get async { await promise.outcome }
   }

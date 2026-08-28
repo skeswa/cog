@@ -10,15 +10,13 @@ extension CogBox {
   /// let weatherReportCogs = _weatherReportCogs.readOnly
   /// ```
   ///
-  /// The projection holds the source box's descriptor identity but no keys,
-  /// states, or copied values. Equal keys name the same app-lifetime manual state
-  /// through either facade, so reads remain singular while ``Writer`` accepts
-  /// only the hidden writable references. Creating or subscripting the projection
-  /// is inert; a context creates a key's state on first use.
+  /// The projection holds the box descriptor but no keys, states, or values. A
+  /// key names the same manual state through either facade, while ``Writer``
+  /// accepts only the hidden source. Creating or subscripting the projection
+  /// does not create graph state.
   ///
-  /// The facade is MainActor-isolated with the source it names. It is an access
-  /// boundary, not a security boundary: keep the source declaration private in
-  /// the file that owns its write operations.
+  /// Keep the source private in the file that owns its writes. This facade
+  /// removes write capability but does not replace Swift access control.
   @MainActor
   public struct Projection {
     /// The source box this projection reads.

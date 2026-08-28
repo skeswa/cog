@@ -4,7 +4,7 @@ internal import StorefrontWorkload
 //
 // This is the file the comparison is really about. Everything a fine-grained
 // graph derives from declared dependencies, a hand-written port writes out: one
-// method per source, each naming — by name — every cache that source's value
+// method per source, each naming, by name, every cache that source's value
 // reaches and every observer that owes a run afterwards. There is no mechanism
 // here. Nothing walks an edge list, nothing compares a version stamp, nothing
 // records what a computation read. A human decided each of these lines, and a
@@ -17,7 +17,7 @@ internal import StorefrontWorkload
 // `didWriteShippingAddress()` existed, produces a screen that shows a stale
 // price until something unrelated happens to clear the cache. Nothing in this
 // file can catch that. The port's `README.md` records the line count below for
-// exactly this reason — it is the maintenance surface the numbers are bought
+// exactly this reason, it is the maintenance surface the numbers are bought
 // with.
 //
 // Two conventions hold throughout:
@@ -120,7 +120,7 @@ extension MemoObservationStorefrontRuntime {
   func didWriteCart(affecting id: ProductID) {
     cart = nil
     cartDirty = true
-    // A quantity is a pricing input — the bundle-quantity break reads it — and
+    // A quantity is a pricing input, the bundle-quantity break reads it, and
     // an in-cart badge is a row input.
     didChangeProduct(id, pricingAffected: true)
   }
@@ -132,8 +132,8 @@ extension MemoObservationStorefrontRuntime {
   /// The demanded check is the honest team's optimization and the reason the
   /// burst phase's central claim is true for this port: a product nothing is
   /// showing has its cached row dropped and stops there. No observer re-runs, no
-  /// ladder is recomputed, and — because the demand pass only ever walks what
-  /// the held screens want — no request is started for it either.
+  /// ladder is recomputed, and, because the demand pass only ever walks what
+  /// the held screens want, no request is started for it either.
   ///
   /// - Parameters:
   ///   - id: Which product moved.
@@ -168,7 +168,7 @@ extension MemoObservationStorefrontRuntime {
   /// The root of the browse half of the workload, so nearly everything goes:
   /// the index, the funnel, the window, every ladder, every row, and the cart.
   /// Three requests are keyed on an identity that does not mention the catalog
-  /// — the search index, suggestions, and recommendations — so each is told
+  ///, the search index, suggestions, and recommendations, so each is told
   /// explicitly that its input moved.
   func didAcceptCatalog() {
     catalogIndex = nil

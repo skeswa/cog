@@ -13,7 +13,7 @@ import Testing
 /// `isEqual: { _, _ in false }`, which marks every outgoing edge pending on
 /// every recomputation. A `Value` that is not `Equatable` at the call site binds
 /// the second one, compiles, produces correct answers, and turns that branch of
-/// the graph into a recompute-on-read floor — so the comparison would be
+/// the graph into a recompute-on-read floor, so the comparison would be
 /// reporting a number about a port nobody meant to write. The library's own doc
 /// comment on the memoizing initializer still describes the non-memoizing
 /// behavior, so reading comments rather than bodies reaches the opposite
@@ -23,8 +23,8 @@ import Testing
 /// `Value: Equatable` constraint, so inside it the memoizing initializer is the
 /// only applicable overload, and every derived node in the port is built
 /// through it. This suite refuses to take that on trust. It builds the probe's
-/// shape — an upstream that changes, a middle rule that maps the change to an
-/// **equal** value, and a leaf that counts its own invocations — through the
+/// shape, an upstream that changes, a middle rule that maps the change to an
+/// **equal** value, and a leaf that counts its own invocations, through the
 /// port's own constructor, and then builds the same shape a second time through
 /// an explicitly non-memoizing descriptor to prove the instrument can tell the
 /// two apart. Without that control, a leaf that ran once would be evidence of
@@ -95,9 +95,8 @@ struct StorefrontStateGraphMemoizationTests {
       """
     )
 
-    // And a change the middle rule maps to a different value must propagate,
-    // so the assertion above is about memoization rather than about a graph
-    // that never propagates anything.
+    // A change that maps to a new middle value must still propagate. This proves
+    // memoization instead of a graph that never updates.
     source.wrappedValue = 5
     #expect(leaf.wrappedValue == 101)
     #expect(leafRuns.count == 2)
@@ -106,8 +105,8 @@ struct StorefrontStateGraphMemoizationTests {
   /// The instrument is sensitive: it reports two when memoization is off.
   ///
   /// The control for the test above. The same shape is built with a middle node
-  /// whose descriptor is explicitly `isEqual: { _, _ in false }` — which is what
-  /// `Computed`'s unconstrained `rule:` initializer installs — and the leaf must
+  /// whose descriptor is explicitly `isEqual: { _, _ in false }`, which is what
+  /// `Computed`'s unconstrained `rule:` initializer installs, and the leaf must
   /// run twice. Without this, "the leaf ran once" could be true for a
   /// structural reason and would prove nothing about the binding.
   @Test("the instrument reports a non-memoizing middle as two leaf runs")
@@ -145,7 +144,7 @@ struct StorefrontStateGraphMemoizationTests {
   /// (`Stored.swift:645`) installs `shouldNotify: { _, _ in true }`, so a source
   /// whose `Value` is not `Equatable` notifies on every assignment. The port
   /// builds every source through `makeSource(_:_:)`, whose `Value: Equatable`
-  /// constraint makes the gated initializer the only applicable one — which is
+  /// constraint makes the gated initializer the only applicable one, which is
   /// what ``StorefrontRuntimeSemantics/browseRunsPerEqualWrite`` of zero rests
   /// on.
   @Test("an equal source assignment invalidates nothing")

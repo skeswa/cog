@@ -2,12 +2,11 @@
 
 /// The tracked-read machinery beneath every `MechanismController` watch.
 ///
-/// Watches are MainActor-isolated registrations owned by the context and, at
-/// the public surface, by a mechanism's scope. Installation captures one
-/// baseline through ``ReactionReader``; later runs preserve normal reaction
-/// ordering and execute only after the changed turn has settled. The public
-/// overloads live on ``MechanismController``, because registration is a
-/// controller capability (§6.3).
+/// A context owns each MainActor watch, and a mechanism scope controls its
+/// public lifetime. Installation reads one baseline through ``ReactionReader``.
+/// Later runs keep reaction order and wait for the changed turn to settle. The
+/// public overloads live on ``MechanismController`` because only a controller
+/// can register app effects (§6.3).
 extension Cogs {
   /// Implements every watch overload through one tracked read.
   ///

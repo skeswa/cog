@@ -6,8 +6,8 @@ import Testing
 /// How many Cog declarations the Storefront actually declares, counted rather
 /// than described.
 ///
-/// The rest of the workload's shape — profiles, catalog, pricing ladder, search
-/// plan, steady interactions, compute control — is runtime-neutral and is
+/// The rest of the workload's shape, profiles, catalog, pricing ladder, search
+/// plan, steady interactions, compute control, is runtime-neutral and is
 /// asserted in `StorefrontWorkloadShapeTests`. What stays here is the one claim
 /// that is specifically about *Cog*: the declaration count `impl/perf.md`
 /// quotes beside every recorded number. It is cheap and it runs in the

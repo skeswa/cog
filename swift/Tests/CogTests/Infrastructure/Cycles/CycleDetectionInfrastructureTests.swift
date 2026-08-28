@@ -6,8 +6,8 @@ import Testing
 // These internal checks cover arena computation paths. Scenario tests use the
 // CogTesting diagnostic and child processes to cover public failures: the
 // cold keyed trap is CYCLE-07's proof, so the only child process here is the
-// warm one — the trap at explicit-stack re-entry, a settlement path no public
-// scenario drives through the real trap.
+// warm one. It traps during explicit-stack re-entry, a settlement path that no
+// public scenario drives through the real trap.
 
 @MainActor
 @Test func `CycleDetectionInfrastructure catches a warm cycle at explicit stack entry`() async {

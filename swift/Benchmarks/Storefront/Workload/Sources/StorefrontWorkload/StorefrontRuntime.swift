@@ -1,56 +1,38 @@
 /// One state-management runtime's implementation of the Storefront workload.
 ///
-/// The eleven-phase interaction trace is generic over this protocol so that
-/// Cog, raw Swift Observation, hand-memoized Observation, and swift-state-graph
-/// perform the *same* shopping session rather than four similar ones.
-/// Everything a phase does is either a verb declared here, a read of the shared
-/// ``StorefrontSink``, a read of the runtime-neutral ``StorefrontScript``, or a
-/// read of the runtime-neutral shadow ``StorefrontWorld``. Nothing a phase does
-/// reaches into a runtime's own representation, which is what makes the
-/// resulting numbers comparable.
+/// The eleven-phase trace uses this protocol so all four ports run the same
+/// session. A phase calls these verbs or reads ``StorefrontSink``,
+/// ``StorefrontScript``, and ``StorefrontWorld``. It never reads private runtime
+/// state, keeping results comparable.
 ///
 /// ## Identity and ownership
 ///
 /// A runtime is one app-wide object, created by
 /// ``make(profile:service:initialWindow:holds:sink:grace:)`` and retained by the
 /// driver for the life of a session. It is never copied, never handed to a
-/// phase by value, and never recreated mid-session — hence `AnyObject`. It owns
-/// its own state storage, its own asynchronous work, and its own clock; the
-/// driver owns the script, the sink, and the shadow.
+/// phase by value, or recreated. It owns storage, async work, and a clock. The
+/// driver owns the script, sink, and shadow.
 ///
 /// ## Isolation
 ///
-/// MainActor-confined, because the storefront's whole graph is: every verb
-/// writes on the MainActor, every derived read settles on it, and every
-/// asynchronous result is published on it. A port may run heavy kernels off the
-/// MainActor — it *must*, see ``StorefrontService`` — but the decision to
-/// publish a result is a MainActor decision in all four runtimes.
+/// MainActor-confined: verbs write there, derived reads settle there, and async
+/// results publish there. Heavy kernels may run elsewhere, but every publish
+/// decision returns to the MainActor.
 ///
 /// ## Turn and settlement ordering
 ///
 /// Each verb is exactly one user action and therefore exactly one settlement.
-/// A verb documented as multi-source writes all of its sources in one
-/// transaction; performing it as separate writes renders a screen no shopper
-/// asked for, and is wrong rather than merely slower. A verb that reads before
-/// it writes must observe its own staged values inside that transaction, not
-/// the pre-transaction ones. When a verb returns, the runtime has settled: every
-/// synchronously derivable value is current and every held observer that
-/// depended on something that changed has already run and deposited into the
-/// sink. A port that settles lazily, on the next frame, or on an actor hop
-/// cannot satisfy the trace, because the trace reads the sink on the very next
-/// line.
+/// Multi-source verbs write all sources in one transaction. Reads inside that
+/// transaction see staged values. On return, derived values are current and
+/// affected held observers have written to the sink. The trace reads the sink
+/// on the next line, so lazy settlement cannot satisfy it.
 ///
 /// ## Observation
 ///
 /// The `holds` set names the screens a shopper would have open. A runtime must
-/// register exactly those observers and no others: an unheld screen must demand
-/// nothing, start no request, and keep nothing alive. Each observer deposits
-/// what it read into the shared ``StorefrontSink`` and increments that
-/// observer's run counter. The run counters are this workload's public,
-/// layout-agnostic way of observing invalidation, so a port must increment them
-/// on exactly the occasions its own semantics say an observer ran — see
-/// ``StorefrontRuntimeSemantics``, which is where a port declares what those
-/// occasions are instead of being silently held to Cog's.
+/// register only those observers. Unheld screens create no demand or requests.
+/// Each observer writes to ``StorefrontSink`` and increments its run count.
+/// ``StorefrontRuntimeSemantics`` declares when each port should run.
 ///
 /// ## Cancellation and races
 ///
@@ -85,7 +67,7 @@ public protocol StorefrontRuntime: AnyObject {
   /// the pre-initial world on its way past. In Cog that is a mechanism's
   /// `operate`; in another runtime it is whatever runs before the first read.
   /// Registering the observers named by `holds` is also this call's job, and
-  /// each of them runs once here — the bootstrap phase's browse-run count is a
+  /// each of them runs once here, the bootstrap phase's browse-run count is a
   /// claim about exactly that.
   ///
   /// - Parameters:
@@ -143,7 +125,7 @@ public protocol StorefrontRuntime: AnyObject {
   /// Applies the browse screen's filters and resets the window, in one settle.
   ///
   /// **Multi-source, and it reads its own staged state.** Four sources change
-  /// together — category, sort mode, stock filter, and the row window — and the
+  /// together, category, sort mode, stock filter, and the row window, and the
   /// window's new value is `RowWindow(offset: 0, length: <the transaction's own
   /// staged window length>)`. Three or four separate writes would render two or
   /// three screens no shopper asked for, and the filter phase's one-run
@@ -219,7 +201,7 @@ public protocol StorefrontRuntime: AnyObject {
   /// when the staged quantity was zero. Writing the two separately would let a
   /// settled state observe a product that is in the cart with quantity zero,
   /// and would start a shipping and tax quote generation for that impossible
-  /// subtotal — which the checkout phase's quote-replacement checkpoint counts.
+  /// subtotal, which the checkout phase's quote-replacement checkpoint counts.
   ///
   /// - Parameters:
   ///   - id: Which product.
@@ -298,7 +280,7 @@ public protocol StorefrontRuntime: AnyObject {
   ///
   /// An *untracked* settled read: a checkpoint reading a value, not a screen
   /// observing one. It must not create a dependency, extend a lifetime, or
-  /// renew a grace deadline — the teardown phase's release proof would be
+  /// renew a grace deadline, the teardown phase's release proof would be
   /// invalidated by either, and a port whose only read primitive establishes
   /// demand must arrange an untracked path rather than let this one leak.
   ///
@@ -317,7 +299,7 @@ public protocol StorefrontRuntime: AnyObject {
   ///
   /// The opposite of the two peeks above, and the footprint cut's whole
   /// subject: this read *does* create demand, so the search funnel it pulls in
-  /// — index, candidates, eligibility, scores, ranking — stays materialized
+  ///, index, candidates, eligibility, scores, ranking, stays materialized
   /// afterwards and can be weighed.
   ///
   /// - Returns: The ranked product identifiers, in rank order.
@@ -338,7 +320,7 @@ public protocol StorefrontRuntime: AnyObject {
   ///
   /// The request script cannot supply this signal on a port's behalf. A
   /// released continuation resumes, and the script's outstanding count drops,
-  /// *before* the runtime has decided anything — so a port that awaited the
+  /// *before* the runtime has decided anything, so a port that awaited the
   /// script would return too early and race its own publication. The signal
   /// must be fired by the runtime, on the MainActor, on both the publish and
   /// the discard branch of its own result epilogue. See
