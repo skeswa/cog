@@ -29,6 +29,7 @@ flowchart TB
   lint["swift/Lint<br/>separate development package"]
   weather["Weather<br/>Xcode example app"]
   todomvc["TodoMVC<br/>Xcode example app"]
+  trails["Trails<br/>Xcode example app"]
   storefrontApp["Storefront<br/>Xcode benchmark driver app<br/>Storefront/Apps/Cog"]
   root --> cog
   root --> testing --> cog
@@ -52,6 +53,7 @@ flowchart TB
   verification --> workload
   weather --> root
   todomvc --> root
+  trails --> root
   storefrontApp --> root
   storefrontApp --> storefront
   storefrontApp --> workload
@@ -256,6 +258,15 @@ membership beside keyed row cells, dynamic filter dependencies, automatic
 counts, and multi-source operations; `TodoState+Bindings.swift` holds the
 SwiftUI adapters; and `TodoState+Mechanisms.swift` shows assembly-time restore
 and a persistence reaction.
+
+The [Trails example](https://github.com/skeswa/cog/tree/main/swift/Examples/Trails/Trails)
+is the navigation map. Every container — tab selection, four
+`NavigationStack` paths, and the modal sheet — is graph state:
+`NavigationState+Cogs.swift` holds the sources, `NavigationState+Model.swift`
+the route values and deep-link parsing, `NavigationState+Bindings.swift` the
+tracked SwiftUI adapters, and `NavigationState+Mechanisms.swift` assembly-time
+restoration; `TrailState+*.swift` carries the domain half in the same family
+shape.
 
 The [Storefront Cog port](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources/CogStorefront)
 is the large-graph map. It is the Cog runtime of the
