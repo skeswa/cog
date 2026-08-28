@@ -110,10 +110,6 @@ internal final class CogArenaDirtyPropagation {
       fatalError("Cog found an arena edge whose producer row was out of range.")
     }
 
-    guard producerRow >= 0, Int(producerRow) < arena.rowCount else {
-      fatalError("Cog found an arena edge whose producer row was out of range.")
-    }
-
     var cursor = arena.subs[Int(producerRow)]
     while cursor != .none {
       let edge = edges.edge(at: cursor)
