@@ -76,6 +76,17 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/TodoMVC/Todo
 description = "Build the Trails example for the iOS simulator"
 run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Trails/Trails.xcodeproj" -scheme Trails -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath "{{config_root}}/.build/trails-derived-data" CODE_SIGNING_ALLOWED=NO build"""
 
+# Every guarded package wrapper rides one implementation in
+# `tools/lib/guarded-package-test.mjs`, so one fixture suite proves the refusal
+# paths — zero tests listed, a filter or alternative selecting nothing, zero
+# tests executed, no report produced — against a fake `swift` executable
+# instead of a Swift build. The guarded tasks depend on it, matching how
+# `changes:check` and `workflows:check` prove their checkers first.
+
+[tasks."test:guards"]
+description = "Test the guarded package-test module against its fixtures"
+run = "node {{config_root}}/tools/test-guarded-package-test.mjs"
+
 # The Storefront macrobenchmark's neutral workload and Cog implementation are
 # separate packages, so each correctness suite has a guarded wrapper. The
 # guards are the ones every other Swift test command
@@ -86,10 +97,12 @@ run = """xcodebuild -quiet -project "{{config_root}}/swift/Examples/Trails/Trail
 
 [tasks."test:storefront"]
 description = "Run the guarded Storefront workload package tests"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/storefront-test.mjs"
 
 [tasks."test:storefront-cog"]
 description = "Run the guarded Cog Storefront runtime tests"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/storefront-cog-test.mjs"
 
 # The comparison runtimes live in two further packages. Package separation
@@ -99,10 +112,12 @@ run = "node {{config_root}}/tools/storefront-cog-test.mjs"
 
 [tasks."test:storefront-runtimes"]
 description = "Run the guarded plain-Swift Storefront comparison runtime tests"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/storefront-runtimes-test.mjs"
 
 [tasks."test:storefront-state-graph"]
 description = "Run the guarded swift-state-graph Storefront runtime tests"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/storefront-state-graph-test.mjs"
 
 # The cross-runtime agreement suite lives in Storefront's Verification package,
@@ -112,6 +127,7 @@ run = "node {{config_root}}/tools/storefront-state-graph-test.mjs"
 
 [tasks."test:storefront-agreement"]
 description = "Run the guarded cross-runtime Storefront agreement suite"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/storefront-agreement-test.mjs"
 
 [tasks."test:storefront-all"]
@@ -172,6 +188,7 @@ run = "node {{config_root}}/tools/check-compile-fail.mjs"
 
 [tasks."test:lint"]
 description = "Run the guarded CogLint package tests"
+depends = ["test:guards"]
 run = "node {{config_root}}/tools/swift-lint-test.mjs"
 
 [tasks."lint:swift"]

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 // Runs the cross-runtime Storefront agreement suite with the guards SwiftPM
-// does not provide itself.
+// does not provide itself; `lib/guarded-package-test.mjs` implements the
+// guarantee.
 //
 // This is the strongest correctness gate the Storefront macrobenchmark has: it
 // links all four runtimes — the Cog port, the raw `@Observable` floor, the
@@ -11,113 +12,29 @@
 //
 // The suite lives in Storefront's dedicated Verification package. That package
 // is the intentional integration point where all four runtimes coexist;
-// individual runtime packages still cannot see one another.
-//
-// The guards matter more here than anywhere: SwiftPM exits 0 when a filter
-// selects nothing, so an empty run would report agreement that was never
-// checked. Every run enumerates the built tests first, requires every filter
-// alternative to match something, owns its own xUnit report, and rejects an
-// authoritative executed count of zero.
+// individual runtime packages still cannot see one another. The guards matter
+// more here than anywhere: an empty run would report agreement that was never
+// checked.
 //
 // Usage: `storefront-agreement-test.mjs [swift test arguments...]`
 
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  assertFiltersSelectTests,
-  assertRunSelectedTests,
-  extractFilters,
-  isXUnitArgument,
-  parseSpecifiers,
-} from "./lib/swift-test-guard.mjs";
+import { runGuardedPackageTests } from "./lib/guarded-package-test.mjs";
 
 /** The repository root, resolved from this file so cwd never matters. */
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-/** The separate verification package that hosts the agreement suite. */
-const VERIFICATION_PACKAGE = join(REPO_ROOT, "swift", "Benchmarks", "Storefront", "Verification");
-
-/**
- * What the guards call the thing they are guarding.
- *
- * The package name names the one responsibility this package has.
- */
-const SUBJECT = "cog-storefront-verification";
-
-/**
- * A scratch path of its own, under the repository's ignored `.build`.
- *
- * Shared with nothing, and in particular not with the headless runner. The
- * verification and measurement packages compile the same runtimes for
- * different purposes, so sharing would make each invalidate the other.
- */
-const SCRATCH_PATH = join(REPO_ROOT, ".build", "storefront-agreement");
-
-main(process.argv.slice(2));
-
-/** Enumerates, executes, and authoritatively counts one agreement-suite run. */
-function main(passthrough) {
-  if (passthrough.some(isXUnitArgument)) {
-    fail("`--xunit-output` is reserved for the wrapper's executed-test count");
-  }
-
-  const filters = extractFilters(passthrough, fail);
-  const common = ["-c", "debug", "--scratch-path", SCRATCH_PATH];
-
-  console.log(`\n==> swift test [${SUBJECT}] [debug]`);
-
-  const listed = spawnSync("swift", ["test", "list", ...common], {
-    cwd: VERIFICATION_PACKAGE,
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", "inherit"],
-  });
-  exitOnFailure(listed, "swift test list");
-
-  const specifiers = parseSpecifiers(listed.stdout);
-  if (specifiers.length === 0) {
-    fail(`${SUBJECT} lists zero tests, so the test run was refused`);
-  }
-  assertFiltersSelectTests(filters, specifiers, SUBJECT, fail);
-
-  const reportDirectory = mkdtempSync(join(tmpdir(), "cog-storefront-agreement-test-"));
-  process.on("exit", () => rmSync(reportDirectory, { force: true, recursive: true }));
-  const reportPath = join(reportDirectory, "results.xml");
-
-  const tested = spawnSync(
-    "swift",
-    ["test", ...common, "--xunit-output", reportPath, ...passthrough],
-    {
-      cwd: VERIFICATION_PACKAGE,
-      stdio: "inherit",
-    },
-  );
-  exitOnFailure(tested, "swift test");
-
-  const executed = assertRunSelectedTests(filters, reportDirectory, SUBJECT, fail, {
-    requireReport: true,
-  });
-  console.log(`==> ${SUBJECT} authoritative executed-test count: ${executed}`);
-}
-
-/** Propagates a child process failure, including death by signal. */
-function exitOnFailure(result, what) {
-  if (result.error !== undefined) {
-    fail(`could not run \`${what}\`: ${result.error.message}`);
-  }
-  if (result.signal !== null && result.signal !== undefined) {
-    fail(`\`${what}\` was killed by ${result.signal}`);
-  }
-  if (result.status !== 0) {
-    console.error(`error: \`${what}\` failed for ${SUBJECT}`);
-    process.exit(result.status);
-  }
-}
-
-/** Reports a wrapper-level failure and exits nonzero. */
-function fail(message) {
-  console.error(`error: storefront-agreement-test: ${message}`);
-  process.exit(1);
-}
+runGuardedPackageTests(
+  {
+    packagePath: join(REPO_ROOT, "swift", "Benchmarks", "Storefront", "Verification"),
+    // The package name names the one responsibility this package has.
+    subject: "cog-storefront-verification",
+    // A scratch path of its own, under the repository's ignored `.build`.
+    // Shared with nothing, and in particular not with the headless runner. The
+    // verification and measurement packages compile the same runtimes for
+    // different purposes, so sharing would make each invalidate the other.
+    scratchPath: join(REPO_ROOT, ".build", "storefront-agreement"),
+  },
+  process.argv.slice(2),
+);
