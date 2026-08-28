@@ -42,20 +42,34 @@ run = "swift format lint --strict --parallel --recursive swift Package.swift"
 # arguments are passed straight through:
 # `mise run test --filter 'DECL-01|ONE-04'`.
 
+# The scenario ledger and the test sources are crossed both ways before every
+# root suite run: every live ID whose proof lives in this repository must be
+# mentioned where its proof mode says, and every ID a @Test display name
+# claims must be a live ledger ID, so a retired ID cannot come back. The check
+# reads source text only — no build — so it costs milliseconds.
+
+[tasks."scenarios:check"]
+description = "Cross the scenario ledger against the test sources"
+run = "node {{config_root}}/tools/check-scenario-ledger.mjs"
+
 [tasks.test]
 description = "Run the Swift tests on the default matrix leg"
+depends = ["scenarios:check"]
 run = "node {{config_root}}/tools/swift-test.mjs default --no-parallel"
 
 [tasks."test:matrix"]
 description = "Run the Swift tests across all four isolation-matrix legs"
+depends = ["scenarios:check"]
 run = "node {{config_root}}/tools/swift-test.mjs matrix --no-parallel"
 
 [tasks."test:arena-configurations"]
 description = "Test the specialized default and CompactArena trait"
+depends = ["scenarios:check"]
 run = "node {{config_root}}/tools/swift-test.mjs arena-configurations"
 
 [tasks."test:release"]
 description = "Run the Swift tests on the default leg in release configuration"
+depends = ["scenarios:check"]
 run = "node {{config_root}}/tools/swift-test.mjs release --no-parallel"
 
 [tasks."api:check"]

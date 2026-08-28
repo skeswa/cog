@@ -13,6 +13,10 @@ CogLint.
 - Scenario IDs are stable. Never renumber or reuse an ID; add new scenarios at
   the end of their group. Tests should carry their scenario ID in their name
   or a comment so the suite and this tree stay linked.
+  `mise run scenarios:check` — run automatically before every root test task —
+  enforces the link both ways: a live ID whose proof lives in this repository
+  must be mentioned where its proof mode says, and an ID in a `@Test` display
+  name must be a live ID here.
 - If an API name changes, update the story and test but keep the scenario ID.
   The ID names the behavior, not its spelling.
 - Each group links to its design section. Section
