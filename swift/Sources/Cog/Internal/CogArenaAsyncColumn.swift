@@ -274,7 +274,7 @@ internal final class CogArenaAsyncColumn<Value> {
       do {
         let value = try await operation()
         guard let self, let cogs else { return }
-        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        defer { cogs.acknowledge(.asyncCompletionCheck) }
         guard self.acceptsResult(for: generation, at: slot, in: cogs.arenaCore) else {
           self.resolveRefresh(at: slot, for: generation, as: .superseded)
           return
@@ -293,7 +293,7 @@ internal final class CogArenaAsyncColumn<Value> {
         self.advanceOrderedScheduler(at: slot, key: key, in: cogs.arenaCore, cogs: cogs)
       } catch {
         guard let self, let cogs else { return }
-        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        defer { cogs.acknowledge(.asyncCompletionCheck) }
         guard !Task.isCancelled,
           self.acceptsResult(for: generation, at: slot, in: cogs.arenaCore)
         else {
@@ -418,12 +418,12 @@ internal final class CogArenaAsyncColumn<Value> {
         while let value = try await iterator.next() {
           guard let cogs else { return }
           guard let self else {
-            cogs.acknowledgeAsyncCompletionCheckIfRequested()
+            cogs.acknowledge(.asyncCompletionCheck)
             return
           }
           guard self.acceptsResult(for: generation, at: slot, in: cogs.arenaCore) else {
             self.resolveRefresh(at: slot, for: generation, as: .superseded)
-            cogs.acknowledgeAsyncCompletionCheckIfRequested()
+            cogs.acknowledge(.asyncCompletionCheck)
             return
           }
 
@@ -447,18 +447,18 @@ internal final class CogArenaAsyncColumn<Value> {
             )
           }
           self.resolveRefresh(at: slot, for: generation, as: .success(value))
-          cogs.acknowledgeAsyncCompletionCheckIfRequested()
+          cogs.acknowledge(.asyncCompletionCheck)
         }
 
         guard let self, let cogs else { return }
-        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        defer { cogs.acknowledge(.asyncCompletionCheck) }
         guard self.acceptsResult(for: generation, at: slot, in: cogs.arenaCore) else { return }
         let row = self.installedRow(for: slot)
         self.activeTasks[row] = nil
         self.activeRunGenerations[row] = nil
       } catch {
         guard let self, let cogs else { return }
-        defer { cogs.acknowledgeAsyncCompletionCheckIfRequested() }
+        defer { cogs.acknowledge(.asyncCompletionCheck) }
         guard !Task.isCancelled,
           self.acceptsResult(for: generation, at: slot, in: cogs.arenaCore)
         else {

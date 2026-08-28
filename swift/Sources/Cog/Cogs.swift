@@ -35,13 +35,16 @@ public final class Cogs {
   /// surface deliberately has no reaction, watch, or effect-group API (§6.3).
   private var mechanismScopes: [MechanismScope] = []
 
-  /// One package-only deinit signal consumed by deterministic cleanup tests.
+  /// At most one test-installed acknowledgement per runtime event.
   ///
-  /// Fired at the end of `isolated deinit`, after mechanism scopes have been
-  /// cancelled and graph dependency chains broken, so a test that dropped its
-  /// last context reference off the MainActor can await actor-correct
-  /// teardown instead of polling.
-  private var deinitCleanupAcknowledgement: (@MainActor @Sendable () -> Void)?
+  /// The events are the runtime's deterministic negative-event signals —
+  /// moments with no public status, value, or history event to await; each
+  /// ``CogRuntimeEvent`` case documents its own. Only the `CogTesting`
+  /// product installs callbacks, through ``acknowledgeNext(_:with:)``, and
+  /// each fires once through ``acknowledge(_:)``. Production code never
+  /// installs one, and context teardown releases the stored callbacks with
+  /// the graph.
+  private var runtimeAcknowledgements = CogRuntimeAcknowledgements()
 
   /// The monotonic clock used by context-owned timing work.
   ///
@@ -57,27 +60,6 @@ public final class Cogs {
   /// Production is always automatic. `CogTesting` can force the legacy path on
   /// a newer host without changing another isolated context or global state.
   internal let externalObservationTrackingMode: CogExternalObservationTrackingMode
-
-  /// One test-only acknowledgement installed through the CogTesting product.
-  private var nextLifetimeReleaseAcknowledgement: (@MainActor @Sendable () -> Void)?
-
-  /// Signals after the next grace-expiry release check, including a pinned skip.
-  private var nextLifetimeReleaseCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
-
-  /// One test-only signal after an async result reaches its turn eligibility check.
-  ///
-  /// Cancellation and ignored-cancellation scenarios need to prove that a
-  /// result was rejected, which produces no public status event to await. The
-  /// `CogTesting` seam installs this callback as a deterministic negative-event
-  /// acknowledgement. Production code never installs one.
-  private var nextAsyncCompletionCheckAcknowledgement: (@MainActor @Sendable () -> Void)?
-
-  /// One test-only signal after the legacy external observer re-arms.
-  ///
-  /// The legacy bridge consumes this callback after installing its next
-  /// one-shot registration and publishing the post-setter value. Production
-  /// never installs one.
-  private var nextExternalObservationRearmAcknowledgement: (@MainActor @Sendable () -> Void)?
 
   /// The data-oriented graph owned by this context.
   ///
@@ -200,61 +182,41 @@ public final class Cogs {
     self.arenaCore = CogArenaCore()
   }
 
-  /// Installs a one-shot acknowledgement for the next async completion check.
+  /// Installs a one-shot acknowledgement for one runtime event's next firing.
   ///
-  /// The callback runs after a work result has been accepted or rejected by
-  /// the generation and state-identity checks. It therefore acknowledges a
-  /// completed decision, not merely that the work closure returned. Only one
-  /// waiter is supported because the seam exists for one deterministic test
-  /// assertion at a time. The caller must retain this context until the result
-  /// returns: the work task captures it weakly, and context teardown releases
-  /// this stored callback together with the graph.
+  /// The callback acknowledges a completed decision — the event's own case
+  /// documents which — not merely that some work returned. One waiter per
+  /// event, because the seam exists for one deterministic test assertion at a
+  /// time; ``CogRuntimeEvent/deinitCleanup`` alone may be re-installed, since
+  /// teardown fires at most once. The caller must retain this context until
+  /// the event can fire: the paths that fire it capture the context weakly,
+  /// and teardown releases stored callbacks together with the graph.
   ///
-  /// - Parameter acknowledgement: MainActor callback consumed after the next
-  ///   accepted or rejected completion reaches its eligibility decision.
-  package func acknowledgeNextAsyncCompletionCheck(
-    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
+  /// - Parameters:
+  ///   - event: The runtime event whose next firing the test awaits.
+  ///   - acknowledgement: MainActor callback consumed by that firing.
+  package func acknowledgeNext(
+    _ event: CogRuntimeEvent,
+    with acknowledgement: @escaping @MainActor @Sendable () -> Void
   ) {
-    guard nextAsyncCompletionCheckAcknowledgement == nil else {
-      fatalError("CogTesting installed two acknowledgements for the next async completion check.")
+    if event != .deinitCleanup, runtimeAcknowledgements[event] != nil {
+      fatalError(
+        "CogTesting installed two acknowledgements for the next \(event.diagnosticName)."
+      )
     }
-    nextAsyncCompletionCheckAcknowledgement = acknowledgement
+    runtimeAcknowledgements[event] = acknowledgement
   }
 
-  /// Consumes the next async-completion acknowledgement, when a test installed one.
+  /// Consumes one runtime event's acknowledgement, when a test installed one.
   ///
-  /// Async completion paths call this from `defer` after obtaining the weakly
-  /// captured context, so stale, cancelled, state-released, and accepted results
-  /// all unblock the waiter after their eligibility check has finished. A
-  /// result that outlives the context cannot reach this method or acknowledge a
+  /// Firing paths call this after their eligibility decision completes —
+  /// often from `defer`, and for async completions only after obtaining the
+  /// weakly captured context — so rejected and accepted outcomes both unblock
+  /// the waiter, and an event that outlives the context cannot acknowledge a
   /// callback the context no longer owns.
-  internal func acknowledgeAsyncCompletionCheckIfRequested() {
-    let acknowledgement = nextAsyncCompletionCheckAcknowledgement
-    nextAsyncCompletionCheckAcknowledgement = nil
-    acknowledgement?()
-  }
-
-  /// Installs a one-shot signal for the next legacy Observation re-arm.
-  ///
-  /// Only compatibility tests use this package seam. The caller installs it
-  /// after the initial tracked read and before the mutation whose completed
-  /// transition it needs to await.
-  ///
-  /// - Parameter acknowledgement: MainActor callback consumed after the next
-  ///   post-change one-shot registration is installed and its value published.
-  package func acknowledgeNextExternalObservationRearm(
-    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
-  ) {
-    guard nextExternalObservationRearmAcknowledgement == nil else {
-      fatalError("CogTesting installed two acknowledgements for the next Observation re-arm.")
-    }
-    nextExternalObservationRearmAcknowledgement = acknowledgement
-  }
-
-  /// Consumes the next legacy re-arm acknowledgement, when one is installed.
-  internal func acknowledgeExternalObservationRearmIfRequested() {
-    let acknowledgement = nextExternalObservationRearmAcknowledgement
-    nextExternalObservationRearmAcknowledgement = nil
+  internal func acknowledge(_ event: CogRuntimeEvent) {
+    let acknowledgement = runtimeAcknowledgements[event]
+    runtimeAcknowledgements[event] = nil
     acknowledgement?()
   }
 
@@ -292,7 +254,7 @@ public final class Cogs {
       reaction.cancel()
     }
     arenaCore.prepareForContextTeardown()
-    deinitCleanupAcknowledgement?()
+    acknowledge(.deinitCleanup)
   }
 }
 
@@ -349,74 +311,11 @@ extension Cogs {
     }
   }
 
-  /// Installs the package-only signal emitted after isolated deinit cleanup.
-  ///
-  /// `CogTesting` uses this acknowledgement instead of sleeping or polling
-  /// graph storage when a test drops its last context reference on another
-  /// executor. Production clients cannot install the hook.
-  ///
-  /// - Parameter body: The MainActor callback invoked after teardown
-  ///   finishes.
-  package func acknowledgeDeinitCleanup(
-    with body: @escaping @MainActor @Sendable () -> Void
-  ) {
-    deinitCleanupAcknowledgement = body
-  }
 }
 
 // MARK: - State storage
 
 extension Cogs {
-  /// Installs a one-shot acknowledgement for the next successful state release.
-  ///
-  /// Pinned or otherwise ineligible expiry checks do not consume this callback;
-  /// use ``acknowledgeNextAutomaticReleaseCheck(_:)`` when the check itself is the
-  /// event under test.
-  ///
-  /// - Parameter acknowledgement: MainActor callback consumed after the next
-  ///   eligible automatic-state closure is removed.
-  package func acknowledgeNextAutomaticRelease(
-    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
-  ) {
-    guard nextLifetimeReleaseAcknowledgement == nil else {
-      fatalError("CogTesting installed two acknowledgements for the next automatic release.")
-    }
-    nextLifetimeReleaseAcknowledgement = acknowledgement
-  }
-
-  /// Installs a one-shot acknowledgement for the next grace-expiry check.
-  ///
-  /// The callback runs after the owned sleeper's identity, generation, lease,
-  /// boundary, and subscriber checks, whether or not they permit removal.
-  ///
-  /// - Parameter acknowledgement: MainActor callback consumed after the next
-  ///   grace-expiry eligibility check finishes.
-  package func acknowledgeNextAutomaticReleaseCheck(
-    _ acknowledgement: @escaping @MainActor @Sendable () -> Void
-  ) {
-    guard nextLifetimeReleaseCheckAcknowledgement == nil else {
-      fatalError("CogTesting installed two acknowledgements for the next release check.")
-    }
-    nextLifetimeReleaseCheckAcknowledgement = acknowledgement
-  }
-
-  /// Consumes the package-only signal after one grace check completes.
-  ///
-  /// The callback remains context-owned: it never enters arena storage or
-  /// changes release eligibility.
-  internal func acknowledgeLifetimeReleaseCheckIfRequested() {
-    let acknowledgement = nextLifetimeReleaseCheckAcknowledgement
-    nextLifetimeReleaseCheckAcknowledgement = nil
-    acknowledgement?()
-  }
-
-  /// Consumes the package-only signal after one state closure is released.
-  internal func acknowledgeLifetimeReleaseIfRequested() {
-    let acknowledgement = nextLifetimeReleaseAcknowledgement
-    nextLifetimeReleaseAcknowledgement = nil
-    acknowledgement?()
-  }
-
   /// How many exact states a UI read has pinned with an Observation boundary.
   ///
   /// A diagnostic seam for `CogTesting`, not UI API. It reports only the count
@@ -509,9 +408,7 @@ extension Cogs {
   @inlinable
   #endif
   public func peek<Value>(_ valueReference: Cog<Value>.Manual) -> Value {
-    let value = arenaCore.manualValue(for: valueReference)
-    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
-    return value
+    arenaCore.manualValueForTransientDemand(for: valueReference, in: self)
   }
 
   /// Reads an automatic cog's value without creating a dependency edge.
@@ -530,9 +427,7 @@ extension Cogs {
   @inlinable
   #endif
   public func peek<Value>(_ valueReference: Cog<Value>) -> Value {
-    let value = arenaCore.automaticValue(for: valueReference, in: self)
-    arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: self)
-    return value
+    arenaCore.automaticValueForTransientDemand(for: valueReference, in: self)
   }
 
   /// Reads an async cog's current value without creating a dependency edge.

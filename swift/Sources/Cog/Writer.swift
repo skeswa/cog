@@ -148,8 +148,7 @@ extension Cogs {
   ) {
     let turn = requireWriterTurn(turnID, usage: .writing, target: valueReference)
 
-    let slot = arenaCore.writerStage(valueReference, value: value, in: turn)
-    arenaCore.scheduleLifetimeReleaseIfUnobserved(slot, in: self)
+    arenaCore.writerStage(valueReference, value: value, in: turn, for: self)
   }
 
   /// The turn a writer may act on, or a trap if that turn is no longer open.

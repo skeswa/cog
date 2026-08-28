@@ -35,7 +35,7 @@ extension Cogs {
   public func acknowledgeNextExternalObservationRearm(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextExternalObservationRearm {
+    acknowledgeNext(.externalObservationRearm) {
       acknowledgement.acknowledge()
     }
   }

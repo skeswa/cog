@@ -19,7 +19,7 @@ extension Cogs {
   public func acknowledgeNextAutomaticRelease(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextAutomaticRelease {
+    acknowledgeNext(.lifetimeRelease) {
       acknowledgement.acknowledge()
     }
   }
@@ -37,7 +37,7 @@ extension Cogs {
   public func acknowledgeNextAutomaticReleaseCheck(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextAutomaticReleaseCheck {
+    acknowledgeNext(.lifetimeReleaseCheck) {
       acknowledgement.acknowledge()
     }
   }
