@@ -560,9 +560,10 @@ turn for a loud domain operation.
   bound — that a natural end or a terminal failure started no new work —
   which the at-least-N `starts` probe cannot express.
 - **SEED-11.** `Cogs.forTestingWithController` returns the isolated context
-  plus a live controller. Registrations made through it after assembly
-  observe seeded state, and they order after every caller mechanism's own
-  registrations.
+  plus a live controller. Registrations made through it after assembly work
+  exactly as assembly-time registrations do, and they order after every
+  caller mechanism's own. Its `seeding:` runs before mechanisms the way
+  MECH-12 pins for `forTesting`.
 - **SEED-12.** `CogTesting.TestClock` exposes `activeSleeperCount` and
   `maximumActiveSleeperCount`, so a lifetime proof can tell one renewed
   timer from timers that accumulated.

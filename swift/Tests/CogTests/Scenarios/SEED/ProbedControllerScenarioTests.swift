@@ -6,11 +6,14 @@ import Testing
 @Test func `SEED-11 forTestingWithController hands back a live controller operated last`()
   throws
 {
-  let sourceCog = Cog<Int>.Manual { 1 }
+  let sourceCog = Cog<Int>.Manual { 5 }
   var order: [String] = []
 
+  // No `seeding:` here on purpose: `seed` is debug-only (SEED-05), and this
+  // proof runs in every leg, release included. Seeding-before-mechanisms is
+  // MECH-12's pinned behavior; this scenario's own claims are the controller
+  // being live after assembly and the probe operating last.
   let (cogs, controller) = Cogs.forTestingWithController(
-    seeding: { cogs in cogs.seed(sourceCog, to: 5) },
     mechanisms: [
       MechanismProbe(name: "Caller") { m in
         m.watch(sourceCog.readOnly, initial: .skip, name: "watch.caller") { _, value in
@@ -21,8 +24,7 @@ import Testing
   )
 
   // The controller registers after assembly returned, and its `.run` watch
-  // observes the seeded value — proving both that the controller is live and
-  // that seeding preceded every mechanism.
+  // delivers the current value — proving the controller is live.
   controller.watch(sourceCog.readOnly, initial: .run, name: "watch.controller") { _, value in
     order.append("controller \(value)")
   }
