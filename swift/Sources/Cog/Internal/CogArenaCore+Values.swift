@@ -7,25 +7,27 @@
 /// makes the representation transition explicit without adding a helper object
 /// or another call on steady reads and writes.
 extension CogArenaCore {
-  /// Stages one typed source and registers its row once with the active turn.
+  /// Stages one typed source, registers its row once with the active turn,
+  /// and renews the source's transient-demand grace.
   ///
-  /// Returns the resolved slot so the caller can hand it straight to the
-  /// lifetime half without resolving the same descriptor-and-key identity a
-  /// second time; each resolution retains the memoized typed column, and a
-  /// steady turn should pay that once.
+  /// A write is transient demand for lifetime purposes, so the grace renewal
+  /// is fused here rather than left as a second call the writer must
+  /// remember: the descriptor-and-key identity resolves once, and forgetting
+  /// the lifetime half — which would leak a `whileObserved` state — is not a
+  /// mistake a call site can make.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  @discardableResult
   func writerStage<Value>(
     _ valueReference: Cog<Value>.Manual,
     value: Value,
-    in turn: CogTurn
-  ) -> CogArenaSlot {
+    in turn: CogTurn,
+    for cogs: Cogs
+  ) {
     let location = manualLocation(for: valueReference)
     location.column.stage(value, at: location.slot)
     touchArenaSource(location.slot, in: turn)
-    return location.slot
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
   }
 
   /// Registers one staged arena source exactly once with its accumulating turn.
@@ -102,7 +104,31 @@ extension CogArenaCore {
   }
   #endif
 
+  /// Reads one source for transient demand: current value plus renewed grace.
+  ///
+  /// The two halves are fused so a one-shot public read cannot take the value
+  /// and forget the lifetime — an omission the compiler could not catch, and
+  /// one that would leak a `whileObserved` state. ``manualValue(for:)`` stays
+  /// beside this as the pure half, because a testing seed must read without
+  /// accidentally creating a sleeper.
+  #if !COG_ARENA_COMPACT
+  @inlinable
+  #endif
+  func manualValueForTransientDemand<Value>(
+    for valueReference: Cog<Value>.Manual,
+    in cogs: Cogs
+  ) -> Value {
+    let location = manualLocation(for: valueReference)
+    let value = location.column.current(at: location.slot)
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
+    return value
+  }
+
   /// Pulls one automatic value current without recording a dependency.
+  ///
+  /// The pure half: the slot-reuse diagnostics read through it to force
+  /// creation and settlement without renewing grace. Public transient reads
+  /// use ``automaticValueForTransientDemand(for:in:)`` instead.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
@@ -112,44 +138,24 @@ extension CogArenaCore {
     return location.column.current(at: location.slot)
   }
 
-  /// Renews grace after one transient manual-source demand.
+  /// Settles one automatic value for transient demand and renews its grace.
   ///
-  /// The value operation stays pure so testing seeds and internal tracked reads
-  /// cannot accidentally create a sleeper. Public `peek` and ordinary writes
-  /// call this explicit lifetime half after resolving the same stable identity.
+  /// Fused for the same reason as
+  /// ``manualValueForTransientDemand(for:in:)``: the identity resolves once,
+  /// and the lifetime half cannot be forgotten at a call site. Tracked reads
+  /// go through the dependency-recording path instead and never come here.
   #if !COG_ARENA_COMPACT
   @inlinable
   #endif
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: Cog<Value>.Manual,
-    in cogs: Cogs
-  ) {
-    let location = manualLocation(for: valueReference)
-    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
-  }
-
-  /// Renews grace after one transient synchronous-automatic demand.
-  #if !COG_ARENA_COMPACT
-  @inlinable
-  #endif
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
+  func automaticValueForTransientDemand<Value>(
     for valueReference: Cog<Value>,
     in cogs: Cogs
-  ) {
+  ) -> Value {
     let location = automaticLocation(for: valueReference)
+    settle(location.slot, in: cogs)
+    let value = location.column.current(at: location.slot)
     scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
-  }
-
-  /// Renews grace after one transient async status demand.
-  func scheduleLifetimeReleaseIfUnobserved<Value>(
-    for valueReference: Cog<Value>.Async,
-    in cogs: Cogs
-  ) {
-    let location = asyncLocation(
-      descriptor: valueReference.descriptor,
-      key: valueReference.key
-    )
-    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
+    return value
   }
 
   /// Reads one source through its lazily allocated Observation boundary.
@@ -193,16 +199,25 @@ extension CogArenaCore {
     return location.column.status(at: location.slot).observed(by: boundary)
   }
 
-  /// Settles and returns one async status without installing a graph consumer.
-  func asyncStatus<Value>(
+  /// Settles one async status for transient demand and renews its grace.
+  ///
+  /// Fused for the same reason as
+  /// ``manualValueForTransientDemand(for:in:)``: the descriptor-and-key
+  /// identity resolves once, and the lifetime half cannot be forgotten at a
+  /// call site. ``asyncStatus(descriptor:key:in:)`` stays beside this as the
+  /// pure half the value projection reads through.
+  func asyncStatusForTransientDemand<Value>(
     for valueReference: Cog<Value>.Async,
     in cogs: Cogs
   ) -> CogStatus<Value> {
-    asyncStatus(
+    let location = asyncLocation(
       descriptor: valueReference.descriptor,
-      key: valueReference.key,
-      in: cogs
+      key: valueReference.key
     )
+    settle(location.slot, in: cogs)
+    let status = location.column.status(at: location.slot)
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
+    return status
   }
 
   /// Settles an async descriptor-and-key status used by its value projection.
@@ -217,6 +232,10 @@ extension CogArenaCore {
   }
 
   /// Forces one fresh arena async generation and returns its exact waiter.
+  ///
+  /// Refresh is transient demand, so the grace renewal is fused at both exits
+  /// the way the `ForTransientDemand` reads fuse it: the identity resolves
+  /// once, and the lifetime half cannot be forgotten at a call site.
   func refresh<Value>(_ valueReference: Cog<Value>.Async, in cogs: Cogs) -> CogRefresh<Value> {
     let location = asyncLocation(
       descriptor: valueReference.descriptor,
@@ -231,6 +250,7 @@ extension CogArenaCore {
         for: location.column.generation(at: location.slot),
         at: location.slot
       )
+      scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
       return refresh
     }
 
@@ -255,6 +275,7 @@ extension CogArenaCore {
         in: cogs
       )
     }
+    scheduleLifetimeReleaseIfUnobserved(location.slot, in: cogs)
     return refresh
   }
 

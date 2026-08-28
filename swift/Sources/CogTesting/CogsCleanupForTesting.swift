@@ -14,7 +14,7 @@ extension Cogs {
   public func acknowledgeDeinitCleanup(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeDeinitCleanup {
+    acknowledgeNext(.deinitCleanup) {
       acknowledgement.acknowledge()
     }
   }

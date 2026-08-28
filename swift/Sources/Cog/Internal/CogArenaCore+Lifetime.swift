@@ -135,7 +135,7 @@ extension CogArenaCore {
     lifetimeGeneration: UInt64,
     in cogs: Cogs
   ) {
-    defer { cogs.acknowledgeLifetimeReleaseCheckIfRequested() }
+    defer { cogs.acknowledge(.lifetimeReleaseCheck) }
 
     guard arena.contains(slot) else { return }
     let row = arena.index(of: slot)
@@ -152,7 +152,7 @@ extension CogArenaCore {
     guard arena.subs[row] == .none else { return }
 
     releaseUnobservedClosure(startingAt: slot)
-    cogs.acknowledgeLifetimeReleaseIfRequested()
+    cogs.acknowledge(.lifetimeRelease)
   }
 
   /// Releases the root and newly disconnected unobserved dependencies.

@@ -31,7 +31,7 @@ extension Cogs {
   public func acknowledgeNextAsyncCompletionCheck(
     with acknowledgement: MainActorCleanupAcknowledgement
   ) {
-    acknowledgeNextAsyncCompletionCheck {
+    acknowledgeNext(.asyncCompletionCheck) {
       acknowledgement.acknowledge()
     }
   }

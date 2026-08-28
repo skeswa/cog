@@ -82,9 +82,7 @@ extension Cogs {
     /// - Returns: Its current full status, beginning with pending on first
     ///   demand.
     public func peek<Value>(_ valueReference: Cog<Value>.Async) -> CogStatus<Value> {
-      let status = cogs.arenaCore.asyncStatus(for: valueReference, in: cogs)
-      cogs.arenaCore.scheduleLifetimeReleaseIfUnobserved(for: valueReference, in: cogs)
-      return status
+      cogs.arenaCore.asyncStatusForTransientDemand(for: valueReference, in: cogs)
     }
   }
 }

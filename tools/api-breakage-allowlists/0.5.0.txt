@@ -4,3 +4,9 @@ API breakage: constructor CogBox.Manual.init(_:lifetime:name:fileID:line:) has p
 API breakage: constructor CogBox.Manual.init(_:equals:lifetime:name:fileID:line:) has parameter 0 type change from Value to () -> Value
 API breakage: constructor Cog.Async.init(_:default:name:fileID:line:_:) has parameter 1 type change from Value to () -> Value
 API breakage: constructor CogBox.Async.init(_:default:name:fileID:line:_:) has parameter 1 type change from Value to () -> Value
+API breakage: func Cogs.acknowledgeDeinitCleanup(with:) has been removed
+API breakage: func Cogs.acknowledgeNextAsyncCompletionCheck(_:) has been renamed to func acknowledgeNext(_:with:)
+API breakage: func Cogs.acknowledgeNextAsyncCompletionCheck(_:) has parameter 0 type change from () -> Swift.Void to Cog.CogRuntimeEvent
+API breakage: func Cogs.acknowledgeNextAutomaticRelease(_:) has been removed
+API breakage: func Cogs.acknowledgeNextAutomaticReleaseCheck(_:) has been removed
+API breakage: func Cogs.acknowledgeNextExternalObservationRearm(_:) has been removed

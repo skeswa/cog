@@ -234,7 +234,7 @@ internal final class CogTrackedValueBridge<Tracked>: CogExternalObservationBridg
       didChange: { [weak cogs] value in
         guard let cogs else { return }
         cogs.turn(turnName) { c in c[sourceCog] = value }
-        cogs.acknowledgeExternalObservationRearmIfRequested()
+        cogs.acknowledge(.externalObservationRearm)
       }
     )
     legacyObservation = observation
