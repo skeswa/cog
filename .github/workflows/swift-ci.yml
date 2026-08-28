@@ -1082,12 +1082,13 @@ jobs:
   #
   # This belongs on the bare Apple Silicon mini: timing ceilings are
   # meaningful only on the pinned environment. While the mini is away it runs
-  # on hosted `macos-26` — also Apple Silicon, and a dedicated VM per job —
-  # where the exact allocation counts remain fully meaningful and the p90
-  # ceilings are generous absolute values with real headroom. A p90 failure
-  # here without an allocation change is hosted-runner noise to be read, not
-  # a regression to be reverted. The concurrency group still serializes
-  # benchmark runs across refs.
+  # on hosted `macos-26` with `--allocations-only`, which gates the exact
+  # allocation and ARC counts — deterministic across hosts on one toolchain —
+  # and loudly skips the wall-clock p90 ceilings, because a shared VM's p90
+  # measures the neighbors (the first hosted run proved it: the state-graph
+  # comparison blew its ceiling with no allocation change anywhere). Dropping
+  # the flag restores the full gate when the mini returns. The concurrency
+  # group still serializes benchmark runs across refs.
   bench-build:
     name: Benchmark thresholds (same-repo, GitHub-hosted)
     runs-on: macos-26
@@ -1123,8 +1124,8 @@ jobs:
           restore-keys: |
             swift-bench-${{ runner.arch }}-
 
-      - name: Check exact allocation and PERF-10 p90 ceilings
-        run: mise run bench:thresholds:check
+      - name: Check exact allocation and ARC ceilings
+        run: mise run bench:thresholds:check --allocations-only
 
   candidate-gate:
     name: Release candidate
