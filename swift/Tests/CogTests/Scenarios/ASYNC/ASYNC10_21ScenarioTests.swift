@@ -3,35 +3,9 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class Async10ControlledWork {
-  let starts: AsyncStream<Int>
-
-  private let startContinuation: AsyncStream<Int>.Continuation
-  private var nextRun = 0
-  private var continuations: [Int: CheckedContinuation<Int, Never>] = [:]
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func makeWork() -> Work<Int> {
-    let run = nextRun
-    nextRun += 1
-    return .run {
-      self.startContinuation.yield(run)
-      return await withCheckedContinuation { self.continuations[run] = $0 }
-    }
-  }
-
-  func finish(_ run: Int, with value: Int) {
-    continuations.removeValue(forKey: run)?.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-10 refresh cycles a settled async cog again`() async {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async10ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }
@@ -40,7 +14,7 @@ private final class Async10ControlledWork {
 
   _ = await statusIterator.next()
   #expect(await startIterator.next() == 0)
-  work.finish(0, with: 10)
+  work.succeed(0, with: 10)
   _ = await statusIterator.next()
 
   let refresh = cogs.refresh(forecast)
@@ -54,7 +28,7 @@ private final class Async10ControlledWork {
     Issue.record("Expected refresh pending with the settled value")
   }
   #expect(await startIterator.next() == 1)
-  work.finish(1, with: 20)
+  work.succeed(1, with: 20)
 
   guard let success = await statusIterator.next() else {
     Issue.record("The status stream ended before refreshed success")
@@ -75,7 +49,7 @@ private final class Async10ControlledWork {
 @MainActor
 @Test func `ASYNC-21 refresh replaces in-flight latest work`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async10ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }
@@ -110,7 +84,7 @@ private final class Async10ControlledWork {
 
   let staleChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: staleChecked)
-  work.finish(0, with: 100)
+  work.succeed(0, with: 100)
   try await staleChecked.wait()
   let statusAfterStaleCompletion = cogs.status.peek(forecast)
   if statusAfterStaleCompletion.kind != .pending || statusAfterStaleCompletion.hasSucceeded {
@@ -119,10 +93,10 @@ private final class Async10ControlledWork {
 
   let replacedChecked = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: replacedChecked)
-  work.finish(1, with: 150)
+  work.succeed(1, with: 150)
   try await replacedChecked.wait()
 
-  work.finish(2, with: 200)
+  work.succeed(2, with: 200)
   guard let success = await statusIterator.next() else {
     Issue.record("The status stream ended before replacement success")
     return

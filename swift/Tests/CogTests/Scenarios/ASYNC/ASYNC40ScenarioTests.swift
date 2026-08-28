@@ -43,7 +43,7 @@ private final class PlaceholderProbe {
 @MainActor
 @Test func `ASYNC-40 two contexts rest on their own default object`() async throws {
   let probe = PlaceholderProbe()
-  let work = AsyncStatusControlledWork<Placeholder>()
+  let work = ControlledWork<Placeholder>()
   let forecastCog = Cog<Placeholder>.Async(
     default: probe.make(),
     name: "forecast"
@@ -64,7 +64,7 @@ private final class PlaceholderProbe {
 @MainActor
 @Test func `ASYNC-40 two keys of one box rest on their own default object`() async throws {
   let probe = PlaceholderProbe()
-  let work = AsyncStatusControlledWork<Placeholder>()
+  let work = ControlledWork<Placeholder>()
   let forecastCogs = CogBox<Placeholder, String>.Async(
     default: probe.make(),
     name: "forecast"
@@ -89,7 +89,7 @@ private final class PlaceholderProbe {
   // three different objects for one state.
   let (cogs, m) = Cogs.forTestingWithController()
   let probe = PlaceholderProbe()
-  let work = AsyncStatusControlledWork<Placeholder>()
+  let work = ControlledWork<Placeholder>()
   let forecastCog = Cog<Placeholder>.Async(
     default: probe.make(),
     name: "forecast"
@@ -133,7 +133,7 @@ private final class PlaceholderProbe {
   let clock = TestClock()
   let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let probe = PlaceholderProbe()
-  let work = AsyncStatusControlledWork<Placeholder>()
+  let work = ControlledWork<Placeholder>()
   let forecastCog = Cog<Placeholder>.Async(
     default: probe.make(),
     name: "forecast"

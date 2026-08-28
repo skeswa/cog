@@ -12,7 +12,7 @@ import Testing
   // dependency-started run, whose result alone may turn.
   let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
-  let work = AsyncStatusControlledWork<Int>()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
     _ = c[request]
     return work.makeWork()

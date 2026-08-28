@@ -5,35 +5,9 @@ import Testing
 import os
 
 @MainActor
-private final class Async32ControlledWork {
-  let starts: AsyncStream<Int>
-
-  private let startContinuation: AsyncStream<Int>.Continuation
-  private var continuations: [Int: CheckedContinuation<Int, Never>] = [:]
-  private var nextRun = 0
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func makeWork() -> Work<Int> {
-    let run = nextRun
-    nextRun += 1
-    return .run {
-      self.startContinuation.yield(run)
-      return await withCheckedContinuation { self.continuations[run] = $0 }
-    }
-  }
-
-  func succeed(_ run: Int, with value: Int) {
-    continuations.removeValue(forKey: run)?.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-01 ASYNC-32 the status lens carries tracked reads with value parity`() async {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async32ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
@@ -93,7 +67,7 @@ private final class Async32ControlledWork {
   // nothing; the first status turn delivers the pending it skipped as the old
   // half and the new status as the new half.
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async32ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
@@ -131,7 +105,7 @@ private final class Async32ControlledWork {
   async
 {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async32ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }
@@ -190,7 +164,7 @@ private final class Async32ControlledWork {
 @MainActor
 @Test func `ASYNC-32 SwiftUI observes only the status fields its body reads`() async throws {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async32ControlledWork()
+  let work = ControlledWork<Int>()
   let forecastCog = Cog<Int>.Async(default: 0, name: "forecast") { _ in
     work.makeWork()
   }

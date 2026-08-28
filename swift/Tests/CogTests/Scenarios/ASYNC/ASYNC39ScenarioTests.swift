@@ -12,7 +12,7 @@ import Testing
   // inner operation, that is an ordinary failure, not a silent forever-pending
   // state.
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = AsyncStatusControlledWork<Int>()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }

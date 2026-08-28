@@ -13,37 +13,13 @@ private nonisolated enum Async18Observation: Equatable {
 }
 
 @MainActor
-private final class Async18ControlledWork {
-  private var continuation: CheckedContinuation<Int, any Error>?
-  private var didStart = false
-  private var startWaiter: CheckedContinuation<Void, Never>?
-
-  func run() async throws -> Int {
-    didStart = true
-    startWaiter?.resume()
-    startWaiter = nil
-    return try await withCheckedThrowingContinuation { continuation = $0 }
-  }
-
-  func waitForStart() async {
-    guard !didStart else { return }
-    await withCheckedContinuation { startWaiter = $0 }
-  }
-
-  func fail(with error: any Error) {
-    continuation?.resume(throwing: error)
-    continuation = nil
-  }
-}
-
-@MainActor
 @Test func `ASYNC-18 initial pending and failure are separate turns without previous values`()
   async
 {
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = Async18ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in
-    .run { try await work.run() }
+    work.makeWork()
   }
   let (observations, continuation) = AsyncStream.makeStream(of: Async18Observation.self)
   m.status.watch(forecast, initial: .run, name: "watch.forecast") { old, new in
@@ -67,8 +43,9 @@ private final class Async18ControlledWork {
 
   #expect(await iterator.next() == .initialPendingWithoutSuccess)
 
-  await work.waitForStart()
-  work.fail(with: Async18Error.offline)
+  var startIterator = work.starts.makeAsyncIterator()
+  #expect(await startIterator.next() == 0)
+  work.fail(0, with: Async18Error.offline)
 
   #expect(await iterator.next() == .pendingToFailureWithoutSuccess(.offline))
 

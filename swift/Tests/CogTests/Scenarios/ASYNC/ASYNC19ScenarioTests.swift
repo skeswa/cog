@@ -7,38 +7,15 @@ private nonisolated enum Async19Error: Error, Equatable {
 }
 
 @MainActor
-private final class Async19ControlledWork {
-  let starts: AsyncStream<Int>
-
-  private let startContinuation: AsyncStream<Int>.Continuation
-  private var continuations: [Int: CheckedContinuation<Int, any Error>] = [:]
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func run(for request: Int) async throws -> Int {
-    startContinuation.yield(request)
-    return try await withCheckedThrowingContinuation { continuations[request] = $0 }
-  }
-
-  func succeed(_ request: Int, with value: Int) {
-    continuations.removeValue(forKey: request)?.resume(returning: value)
-  }
-
-  func fail(_ request: Int, with error: any Error) {
-    continuations.removeValue(forKey: request)?.resume(throwing: error)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-19 failures and repeated reloads retain the last success`() async {
   let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
-  let work = Async19ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
-    let currentRequest = c[request]
-    return .run { try await work.run(for: currentRequest) }
+    // The tracked read keeps the request dependency that drives each reload;
+    // the controller's own generations index the work.
+    _ = c[request]
+    return work.makeWork()
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in continuation.yield(c.status[forecast]) }

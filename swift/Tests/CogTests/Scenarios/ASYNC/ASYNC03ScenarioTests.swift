@@ -3,35 +3,15 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class Async03ControlledWork {
-  private var continuations: [Int: CheckedContinuation<Int?, any Error>] = [:]
-  private let startContinuation: AsyncStream<Int>.Continuation
-  let starts: AsyncStream<Int>
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func run(for request: Int) async throws -> Int? {
-    startContinuation.yield(request)
-    return try await withCheckedThrowingContinuation {
-      continuations[request] = $0
-    }
-  }
-
-  func succeed(_ request: Int, with value: Int?) {
-    continuations.removeValue(forKey: request)?.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-03 reload preserves an explicit previous nil`() async {
   let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
-  let work = Async03ControlledWork()
+  let work = ControlledWork<Int?>()
   let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { c in
-    let currentRequest = c[request]
-    return .run { try await work.run(for: currentRequest) }
+    // The tracked read keeps the request dependency that drives the reload;
+    // the controller's own generations index the work.
+    _ = c[request]
+    return work.makeWork()
   }
   let (statuses, continuation) = AsyncStream.makeStream(of: CogStatus<Int?>.self)
   m.run { c in continuation.yield(c.status[forecast]) }

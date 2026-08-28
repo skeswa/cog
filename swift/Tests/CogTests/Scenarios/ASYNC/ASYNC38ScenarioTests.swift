@@ -15,7 +15,7 @@ private nonisolated enum Async38Error: Error {
   // value projection keeps its own gate: the renderable value never changed,
   // so value consumers never rerun.
   let (cogs, m) = Cogs.forTestingWithController()
-  let work = AsyncStatusControlledWork<Int>()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   var valueRuns = 0
   let projected = Cog<Int> { c in

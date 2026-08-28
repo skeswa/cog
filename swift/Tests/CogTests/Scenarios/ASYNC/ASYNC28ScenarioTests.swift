@@ -5,38 +5,13 @@ import Testing
 import os
 
 @MainActor
-private final class Async28ControlledWork {
-  let starts: AsyncStream<Void>
-
-  private let startContinuation: AsyncStream<Void>.Continuation
-  private var continuation: CheckedContinuation<Int, Never>?
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Void.self)
-  }
-
-  func run() async -> Int {
-    startContinuation.yield()
-    return await withCheckedContinuation { continuation = $0 }
-  }
-
-  func succeed(with value: Int) {
-    guard let continuation else {
-      fatalError("ASYNC-28 work completed before it started.")
-    }
-    self.continuation = nil
-    continuation.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-28 an initial UI value read does not reenter automatic computation`()
   async throws
 {
   let cogs = Cogs.forTesting()
-  let work = Async28ControlledWork()
+  let work = ControlledWork<Int?>()
   let forecast = Cog<Int?>.Async(default: nil, name: "forecast") { _ in
-    .run { await work.run() }
+    work.makeWork()
   }
   let notices = OSAllocatedUnfairLock(initialState: 0)
 
@@ -57,11 +32,11 @@ private final class Async28ControlledWork {
   #endif
 
   var startIterator = work.starts.makeAsyncIterator()
-  _ = await startIterator.next()
+  #expect(await startIterator.next() == 0)
 
   let completed = MainActorCleanupAcknowledgement()
   cogs.acknowledgeNextAsyncCompletionCheck(with: completed)
-  work.succeed(with: 42)
+  work.succeed(0, with: 42)
   try await completed.wait()
 
   #expect(notices.withLock { $0 } == 1)

@@ -3,36 +3,15 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class Async20ControlledWork {
-  private var continuations: [Int: CheckedContinuation<Int, Never>] = [:]
-  private let startContinuation: AsyncStream<Int>.Continuation
-  let starts: AsyncStream<Int>
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func run(_ request: Int) async -> Int {
-    startContinuation.yield(request)
-    return await withCheckedContinuation { continuations[request] = $0 }
-  }
-
-  func succeed(_ request: Int, with value: Int) {
-    guard let continuation = continuations.removeValue(forKey: request) else {
-      fatalError("Async request \(request) completed before its work started.")
-    }
-    continuation.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-20 equal reload changes status but not value consumers`() async {
   let (cogs, m) = Cogs.forTestingWithController()
   let request = Cog<Int>.Manual { 0 }
-  let work = Async20ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0) { c in
-    let currentRequest = c[request]
-    return .run { await work.run(currentRequest) }
+    // The tracked read keeps the request dependency that drives the reload;
+    // the controller's own generations index the work.
+    _ = c[request]
+    return work.makeWork()
   }
   var valueConsumerRuns = 0
   let valueConsumer = Cog<Int> { c in

@@ -3,38 +3,16 @@ import CogTesting
 import Testing
 
 @MainActor
-private final class Async24ControlledWork {
-  let starts: AsyncStream<Int>
-
-  private let startContinuation: AsyncStream<Int>.Continuation
-  private var continuations: [Int: CheckedContinuation<Int, Never>] = [:]
-
-  init() {
-    (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
-  }
-
-  func run(for request: Int) async -> Int {
-    startContinuation.yield(request)
-    return await withCheckedContinuation { continuations[request] = $0 }
-  }
-
-  func succeed(_ request: Int, with value: Int) {
-    guard let continuation = continuations.removeValue(forKey: request) else {
-      fatalError("Async request \(request) completed before its work started.")
-    }
-    continuation.resume(returning: value)
-  }
-}
-
-@MainActor
 @Test func `ASYNC-24 an invalidated cold run cannot clear its dependency change`() async throws {
   let clock = TestClock()
   let (cogs, m) = Cogs.forTestingWithController(clock: clock, whileObservedGrace: .seconds(10))
   let request = Cog<Int>.Manual { 0 }
-  let work = Async24ControlledWork()
+  let work = ControlledWork<Int>()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { c in
-    let selectedRequest = c[request]
-    return .run { await work.run(for: selectedRequest) }
+    // The tracked read keeps the request dependency the cold change dirties;
+    // the controller's own generations index the work.
+    _ = c[request]
+    return work.makeWork()
   }
   let initialWatcherAlive = Cog<Bool>.Manual { true }
   let (initialStatuses, initialContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
