@@ -127,17 +127,12 @@ export function assertFiltersSelectTests(filters, specifiers, subject, fail) {
 /**
  * Counts test cases in the xUnit files SwiftPM wrote for one invocation.
  *
- * Returns `undefined` only when no report exists and `requireReport` is false.
- * Cog's older root wrapper retains that compatibility mode; CogLint requires a
- * report because its executed count is part of every test command's contract.
+ * A report is required: a run whose executed count cannot be read is refused
+ * rather than trusted, because the count is part of every guarded test
+ * command's contract. Callers that let a `--xunit-output` passthrough claim
+ * the report destination skip this check entirely rather than weakening it.
  */
-export function assertRunSelectedTests(
-  filters,
-  reportDirectory,
-  subject,
-  fail,
-  { requireReport = false } = {},
-) {
+export function assertRunSelectedTests(filters, reportDirectory, subject, fail) {
   let reports = 0;
   let executed = 0;
   for (const entry of readdirSync(reportDirectory)) {
@@ -150,10 +145,7 @@ export function assertRunSelectedTests(
   }
 
   if (reports === 0) {
-    if (requireReport) {
-      fail(`${subject} produced no xUnit report, so its executed-test count is unknown.`);
-    }
-    return undefined;
+    fail(`${subject} produced no xUnit report, so its executed-test count is unknown.`);
   }
   if (executed > 0) return executed;
 

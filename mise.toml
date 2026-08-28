@@ -34,11 +34,13 @@ run = "swift format lint --strict --parallel --recursive swift Package.swift"
 
 # Testing goes through `tools/swift-test.mjs`, never `swift test` directly.
 # The wrapper gives every isolation-matrix leg and configuration its own
-# SwiftPM scratch path, and — whenever `--filter` is passed — enumerates the
-# built tests before running and fails when the expression selects none.
-# SwiftPM exits 0 on an empty selection, so a raw `swift test --filter` can
-# report a green for work it never ran. Extra arguments are passed straight
-# through: `mise run test --filter 'DECL-01|ONE-04'`.
+# SwiftPM scratch path, owns an xUnit report for every run so an executed
+# count of zero is refused, and — whenever `--filter` is passed — also
+# enumerates the built tests before running and fails when the expression
+# selects none. SwiftPM exits 0 on an empty selection, so a raw
+# `swift test --filter` can report a green for work it never ran. Extra
+# arguments are passed straight through:
+# `mise run test --filter 'DECL-01|ONE-04'`.
 
 [tasks.test]
 description = "Run the Swift tests on the default matrix leg"

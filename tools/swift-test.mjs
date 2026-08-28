@@ -7,9 +7,12 @@
 //   1. SwiftPM exits 0 when `--filter` selects nothing. It prints
 //      `warning: No matching test cases were run` and then reports a passing
 //      run of zero tests. A task whose `_Verify:_` line is a filtered run
-//      could therefore claim a green it never proved. Every filtered run
-//      through this wrapper is guarded twice: `swift test list` is consulted
-//      before the run, and the run's own xUnit report is counted after it.
+//      could therefore claim a green it never proved. Every run through this
+//      wrapper owns an xUnit report and refuses an executed count of zero;
+//      filtered runs are guarded twice, because `swift test list` is also
+//      consulted before the run. The one exemption is a caller who claims
+//      the report destination with `--xunit-output` — that run's count is
+//      the caller's to read.
 //   2. The four legs of the isolation matrix differ only by environment
 //      (`COG_TEST_ISOLATION`, `COG_TEST_NNBD`), which SwiftPM does not model
 //      as a build input. Each leg — and each build configuration — therefore
@@ -189,11 +192,12 @@ function runLeg(
   }
 
   // Counting the run itself is the authoritative guard; the pre-run check
-  // above only models SwiftPM's matching. Skipped when the caller wants the
-  // xUnit report somewhere of their own, since there is only one such flag.
+  // above only models SwiftPM's matching. Skipped only when the caller wants
+  // the xUnit report somewhere of their own, since there is only one such
+  // flag — that run's count is the caller's to read.
   let reportDirectory;
   let reportArguments = [];
-  if (filters.length > 0 && !passthrough.some(isXUnitArgument)) {
+  if (!passthrough.some(isXUnitArgument)) {
     reportDirectory = mkdtempSync(join(tmpdir(), "cog-swift-test-"));
     reportArguments = ["--xunit-output", join(reportDirectory, "results.xml")];
     // `process.exit` skips `finally`, and every failure path here exits, so
@@ -209,7 +213,8 @@ function runLeg(
   });
   exitOnFailure(tested, leg, "swift test");
   if (reportDirectory !== undefined) {
-    assertRunSelectedTests(filters, reportDirectory, `leg ${leg.name}`, fail);
+    const executed = assertRunSelectedTests(filters, reportDirectory, `leg ${leg.name}`, fail);
+    console.log(`==> leg ${leg.name} authoritative executed-test count: ${executed}`);
   }
 }
 

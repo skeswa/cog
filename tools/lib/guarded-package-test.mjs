@@ -82,9 +82,7 @@ export function runGuardedPackageTests({ packagePath, subject, scratchPath }, pa
   );
   exitOnFailure(tested, "swift test", subject);
 
-  const executed = assertRunSelectedTests(filters, reportDirectory, subject, fail, {
-    requireReport: true,
-  });
+  const executed = assertRunSelectedTests(filters, reportDirectory, subject, fail);
   console.log(`==> ${subject} authoritative executed-test count: ${executed}`);
 }
 
