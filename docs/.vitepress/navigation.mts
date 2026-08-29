@@ -16,84 +16,118 @@ import type { DefaultTheme } from "vitepress";
  * inside fenced code blocks that a line-based scanner reads as headings.
  *
  * Sidebars are keyed by path prefix so each section shows only its own
- * documents.
+ * documents. The two shared pages are the exception, and `sharedSidebar`
+ * below explains why they carry both libraries instead.
  */
+
+/**
+ * The two documents that belong to no single library.
+ *
+ * Both reading orders open on the shared state model and close on the design
+ * history, so each library sidebar links them directly. The pages themselves
+ * live outside `/swift/` and `/kotlin/`, which is why they need the shared
+ * sidebar below: a reader who follows one of these links from deep inside a
+ * library would otherwise land on a page whose sidebar has forgotten the
+ * library entirely.
+ */
+const sharedStateModel: DefaultTheme.SidebarItem = {
+  text: "Shared state model",
+  link: "/design",
+};
+const designHistory: DefaultTheme.SidebarItem = { text: "Design history", link: "/history" };
+
+/**
+ * The Swift documents, without the two shared pages that bracket them.
+ *
+ * The shared sidebar re-uses this list inside a collapsed group, and a group
+ * holding the active link expands itself, so the shared pages have to stay out
+ * of it — including them would open both libraries in full on every visit to
+ * `/design`.
+ */
+const swiftDocuments: DefaultTheme.SidebarItem[] = [
+  {
+    text: "Design",
+    items: [
+      { text: "Core design", link: "/swift/design/exploration" },
+      { text: "Mechanisms and background work", link: "/swift/design/mechanisms" },
+      { text: "Rx operator map", link: "/swift/design/rx" },
+      { text: "Data-oriented runtime", link: "/swift/design/perf" },
+      { text: "Prior art and public names", link: "/swift/design/prior-art" },
+      { text: "Lint tooling", link: "/swift/design/lint" },
+    ],
+  },
+  {
+    text: "Handbook",
+    link: "/swift/handbook/",
+    items: [
+      { text: "Structuring an app", link: "/swift/handbook/app-structure" },
+      { text: "Declaring state", link: "/swift/handbook/declaring-state" },
+      { text: "Reading state", link: "/swift/handbook/reading-state" },
+      { text: "Writing state", link: "/swift/handbook/writing-state" },
+      { text: "SwiftUI integration", link: "/swift/handbook/swiftui" },
+      { text: "Side effects", link: "/swift/handbook/side-effects" },
+      { text: "Navigation and deep linking", link: "/swift/handbook/navigation" },
+      { text: "Testing", link: "/swift/handbook/testing" },
+    ],
+  },
+  {
+    text: "Implementation",
+    items: [
+      {
+        text: "Architecture",
+        link: "/swift/impl/architecture/",
+        items: [
+          { text: "State and graph", link: "/swift/impl/architecture/state-and-graph" },
+          { text: "Turns", link: "/swift/impl/architecture/turns" },
+          {
+            text: "Boundaries and effects",
+            link: "/swift/impl/architecture/boundaries-and-effects",
+          },
+          {
+            text: "Async work and lifetime",
+            link: "/swift/impl/architecture/async-and-lifetime",
+          },
+          {
+            text: "Arena core internals",
+            items: [
+              { text: "Core", link: "/swift/impl/architecture/arena-core" },
+              {
+                text: "Identity and caching",
+                link: "/swift/impl/architecture/arena-identity-and-caching",
+              },
+              { text: "Storage", link: "/swift/impl/architecture/arena-storage" },
+              { text: "Edges", link: "/swift/impl/architecture/arena-edges" },
+              { text: "Settlement", link: "/swift/impl/architecture/arena-settlement" },
+              {
+                text: "Specialization",
+                link: "/swift/impl/architecture/arena-specialization",
+              },
+            ],
+          },
+          { text: "Codebase tour", link: "/swift/impl/architecture/codebase-tour" },
+        ],
+      },
+      { text: "Test scenarios", link: "/swift/impl/scenarios" },
+      { text: "Performance record", link: "/swift/impl/perf" },
+      { text: "Performance history", link: "/swift/impl/perf-history" },
+    ],
+  },
+];
+
+/** The Kotlin documents, on the same terms as `swiftDocuments`. */
+const kotlinDocuments: DefaultTheme.SidebarItem[] = [
+  { text: "Core design", link: "/kotlin/exploration" },
+  { text: "Worked weather example", link: "/kotlin/example" },
+  { text: "Flow map", link: "/kotlin/flows" },
+  { text: "Effects and background work", link: "/kotlin/effects" },
+  { text: "Performance model", link: "/kotlin/perf" },
+];
 
 const swiftSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Cog for Swift",
     link: "/swift/",
-    items: [
-      { text: "Shared state model", link: "/design" },
-      {
-        text: "Design",
-        items: [
-          { text: "Core design", link: "/swift/design/exploration" },
-          { text: "Mechanisms and background work", link: "/swift/design/mechanisms" },
-          { text: "Rx operator map", link: "/swift/design/rx" },
-          { text: "Data-oriented runtime", link: "/swift/design/perf" },
-          { text: "Prior art and public names", link: "/swift/design/prior-art" },
-          { text: "Lint tooling", link: "/swift/design/lint" },
-        ],
-      },
-      {
-        text: "Handbook",
-        link: "/swift/handbook/",
-        items: [
-          { text: "Structuring an app", link: "/swift/handbook/app-structure" },
-          { text: "Declaring state", link: "/swift/handbook/declaring-state" },
-          { text: "Reading state", link: "/swift/handbook/reading-state" },
-          { text: "Writing state", link: "/swift/handbook/writing-state" },
-          { text: "SwiftUI integration", link: "/swift/handbook/swiftui" },
-          { text: "Side effects", link: "/swift/handbook/side-effects" },
-          { text: "Navigation and deep linking", link: "/swift/handbook/navigation" },
-          { text: "Testing", link: "/swift/handbook/testing" },
-        ],
-      },
-      {
-        text: "Implementation",
-        items: [
-          {
-            text: "Architecture",
-            link: "/swift/impl/architecture/",
-            items: [
-              { text: "State and graph", link: "/swift/impl/architecture/state-and-graph" },
-              { text: "Turns", link: "/swift/impl/architecture/turns" },
-              {
-                text: "Boundaries and effects",
-                link: "/swift/impl/architecture/boundaries-and-effects",
-              },
-              {
-                text: "Async work and lifetime",
-                link: "/swift/impl/architecture/async-and-lifetime",
-              },
-              {
-                text: "Arena core internals",
-                items: [
-                  { text: "Core", link: "/swift/impl/architecture/arena-core" },
-                  {
-                    text: "Identity and caching",
-                    link: "/swift/impl/architecture/arena-identity-and-caching",
-                  },
-                  { text: "Storage", link: "/swift/impl/architecture/arena-storage" },
-                  { text: "Edges", link: "/swift/impl/architecture/arena-edges" },
-                  { text: "Settlement", link: "/swift/impl/architecture/arena-settlement" },
-                  {
-                    text: "Specialization",
-                    link: "/swift/impl/architecture/arena-specialization",
-                  },
-                ],
-              },
-              { text: "Codebase tour", link: "/swift/impl/architecture/codebase-tour" },
-            ],
-          },
-          { text: "Test scenarios", link: "/swift/impl/scenarios" },
-          { text: "Performance record", link: "/swift/impl/perf" },
-          { text: "Performance history", link: "/swift/impl/perf-history" },
-        ],
-      },
-      { text: "Design history", link: "/history" },
-    ],
+    items: [sharedStateModel, ...swiftDocuments, designHistory],
   },
 ];
 
@@ -101,15 +135,7 @@ const kotlinSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Cog for Kotlin",
     link: "/kotlin/",
-    items: [
-      { text: "Shared state model", link: "/design" },
-      { text: "Core design", link: "/kotlin/exploration" },
-      { text: "Worked weather example", link: "/kotlin/example" },
-      { text: "Flow map", link: "/kotlin/flows" },
-      { text: "Effects and background work", link: "/kotlin/effects" },
-      { text: "Performance model", link: "/kotlin/perf" },
-      { text: "Design history", link: "/history" },
-    ],
+    items: [sharedStateModel, ...kotlinDocuments, designHistory],
   },
 ];
 
@@ -124,16 +150,24 @@ const maintainersSidebar: DefaultTheme.SidebarItem[] = [
   },
 ];
 
+/**
+ * The sidebar for the two pages that sit above both libraries.
+ *
+ * It carries the whole site rather than the shared pages alone. These two
+ * documents are reached from inside a library as often as from the top-level
+ * menu, and a sidebar holding four links would strand that reader: the tree
+ * they were working through would vanish, leaving the header as the only way
+ * back. Both libraries therefore reappear here as collapsed groups, in the
+ * same order and with the same labels the library sidebars use, so returning
+ * costs one disclosure click rather than a fresh descent from `/swift/`.
+ */
 const sharedSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Shared foundation",
-    items: [
-      { text: "Shared state model", link: "/design" },
-      { text: "Design history", link: "/history" },
-      { text: "Swift design", link: "/swift/" },
-      { text: "Kotlin design", link: "/kotlin/" },
-    ],
+    items: [sharedStateModel, designHistory],
   },
+  { text: "Cog for Swift", link: "/swift/", collapsed: true, items: swiftDocuments },
+  { text: "Cog for Kotlin", link: "/kotlin/", collapsed: true, items: kotlinDocuments },
 ];
 
 export const sidebar: DefaultTheme.Sidebar = {
