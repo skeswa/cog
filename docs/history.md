@@ -77,9 +77,11 @@ The last Dart draft reduced the front door to sources, automatic state, keyed
 boxes, controlled reads, and reactions. The team then tested the same model on
 native platforms instead of shipping another Dart API.
 
-Swift came first and uses Observation only at the SwiftUI boundary. Kotlin has
-a separate design based on the Compose snapshot system. They share behavior,
-not identical APIs.
+Swift came first and uses Observation only at the SwiftUI boundary. The Kotlin
+design originally considered using Compose snapshots as its graph engine, then
+converged on the same Cog-owned runtime model with Compose state only at the UI
+boundary. The libraries keep minor language-native API differences while
+sharing state semantics and turn behavior.
 
 ## What remains
 
