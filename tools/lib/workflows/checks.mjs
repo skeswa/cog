@@ -1148,7 +1148,7 @@ function releaseWorkflowContract(workflow) {
   const recoverySource = recovery?.steps.map((step) => step.run ?? "").join("\n") ?? "";
   if (
     !recoverySource.includes("object.type") ||
-    !recoverySource.includes('gh release view "$TAG" --repo "$GITHUB_REPOSITORY"') ||
+    !recoverySource.includes("contents/version.txt?ref=${TAG}") ||
     !recoverySource.includes("gh workflow run swift-ci.yml") ||
     !recoverySource.includes("recovery_tag=${TAG}") ||
     !recoverySource.includes("gh run watch")
@@ -1159,7 +1159,7 @@ function releaseWorkflowContract(workflow) {
       check: "release-workflow-contract",
       job: "recover-candidate",
       message:
-        "recovery must require an immutable tag and draft-aware release lookup, dispatch tag-bound Swift CI, and wait for it",
+        "recovery must require an immutable tag with a matching version, dispatch tag-bound Swift CI, and wait for it",
     });
   }
 
