@@ -96,7 +96,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&head_sha=${tag_sha}&per_page=100" \
             --jq '.workflow_runs[].id' > "$before"
 
-          gh workflow run swift-ci.yml --ref "$TAG" \
+          gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" \
             -f "release_pr=${RELEASE_PR}" \
             -f "recovery_tag=${TAG}"
 
@@ -118,7 +118,7 @@ jobs:
             exit 1
           fi
           echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
-          gh run watch "$run_id" --exit-status
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
 
   publish:
     name: Publish verified release
@@ -353,4 +353,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.publish.outputs.tag }}
-        run: gh workflow run docs.yml --ref "$TAG"
+        run: gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

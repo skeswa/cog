@@ -1149,9 +1149,9 @@ function releaseWorkflowContract(workflow) {
   if (
     !recoverySource.includes("object.type") ||
     !recoverySource.includes("contents/version.txt?ref=${TAG}") ||
-    !recoverySource.includes("gh workflow run swift-ci.yml") ||
+    !recoverySource.includes('gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY"') ||
     !recoverySource.includes("recovery_tag=${TAG}") ||
-    !recoverySource.includes("gh run watch")
+    !recoverySource.includes('gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status')
   ) {
     diagnostics.push({
       path: workflow.path,
@@ -1159,7 +1159,7 @@ function releaseWorkflowContract(workflow) {
       check: "release-workflow-contract",
       job: "recover-candidate",
       message:
-        "recovery must require an immutable tag with a matching version, dispatch tag-bound Swift CI, and wait for it",
+        "recovery must require an immutable tag with a matching version, then dispatch and wait for tag-bound Swift CI with explicit repository context",
     });
   }
 
@@ -1215,14 +1215,18 @@ function releaseWorkflowContract(workflow) {
   if (
     docs === undefined ||
     text(docs.needs) !== "publish" ||
-    !docs.steps.some((step) => step.run?.trim() === 'gh workflow run docs.yml --ref "$TAG"')
+    !docs.steps.some(
+      (step) =>
+        step.run?.trim() === 'gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"',
+    )
   ) {
     diagnostics.push({
       path: workflow.path,
       line: docs?.line ?? 1,
       check: "release-workflow-contract",
       job: "dispatch-docs",
-      message: "a successful publication must explicitly dispatch `docs.yml` at the release tag",
+      message:
+        "a successful publication must explicitly dispatch `docs.yml` at the release tag and repository",
     });
   }
   return diagnostics;
