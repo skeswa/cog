@@ -116,6 +116,7 @@ const COGLINT_TRIGGER_PATHS = [
 const COGLINT_SAME_REPO_RUNNER = { shape: "string", labels: ["macos-26"] };
 const COGLINT_FORK_RUNNER = "macos-26";
 const COGLINT_ARTIFACT_INTEL_RUNNER = "macos-15-intel";
+const COGLINT_CANDIDATE_RUNNER_RECORD = "github-hosted-macos-26";
 
 /** The routing predicates that keep same-repo and fork code in separate lanes. */
 const COGLINT_SELF_HOSTED_CONDITION =
@@ -621,7 +622,7 @@ function inspectCogLintJob({ workflow, diagnostics, id, runnerShape, runnerLabel
  *
  * Keeping this separate from ordinary PR dogfood prevents every synchronization
  * from paying for two native release builds. The manual run still follows the
- * fixed self-hosted topology, and the uploaded unit must contain the archive,
+ * fixed same-repository topology, and the uploaded unit must contain the archive,
  * its independently checked checksum, and source/toolchain provenance. A
  * dependent real-Intel host must then download those bytes and exercise the
  * x86_64 member: Xcode 26.6's arm64-only SwiftPM driver cannot do that under
@@ -763,6 +764,7 @@ function cogLintArtifactCiContract(workflow) {
       step.run.includes("pr_head_sha") &&
       step.run.includes("source_tree") &&
       step.run.includes('architectures: ["arm64", "x86_64"]') &&
+      step.run.includes(`runner: "${COGLINT_CANDIDATE_RUNNER_RECORD}"`) &&
       step.run.includes('arm64_probe: "passed"'),
   );
   if (provenance === undefined) {
@@ -772,7 +774,7 @@ function cogLintArtifactCiContract(workflow) {
       check: "coglint-artifact-ci-contract",
       job: job.id,
       message:
-        "job `lint-artifact` must verify the PR/source tree, toolchain, architectures, and checksum before writing versioned JSON provenance",
+        "job `lint-artifact` must record the candidate runner and verify the PR/source tree, toolchain, architectures, and checksum before writing versioned JSON provenance",
     });
   }
 
@@ -1162,6 +1164,17 @@ function releaseWorkflowContract(workflow) {
 
   const publish = workflow.jobs.find((job) => job.id === "publish");
   const publishSource = publish?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (!publishSource.includes(`.build.runner == "${COGLINT_CANDIDATE_RUNNER_RECORD}"`)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: publish?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "publish",
+      message:
+        `publisher must require the current candidate runner record ` +
+        `\`${COGLINT_CANDIDATE_RUNNER_RECORD}\``,
+    });
+  }
   if (
     environmentName(publish) !== "cog-release" ||
     !publishSource.includes(".github/workflows/swift-ci.yml") ||
