@@ -434,16 +434,22 @@ rm -f "{{config_root}}/Package.resolved"
 # thing in this repository with a dependency tree.
 
 [tasks."docs:build"]
-description = "Build the VitePress documentation site from docs/"
-run = "{{config_root}}/node_modules/.bin/vitepress build {{config_root}}/docs"
+description = "Build and verify the VitePress documentation site from docs/"
+run = """
+node {{config_root}}/tools/check-getting-started.mjs
+{{config_root}}/node_modules/.bin/vitepress build {{config_root}}/docs
+node {{config_root}}/tools/check-docs-social-metadata.mjs
+"""
 
 # The Cog mark is generated rather than drawn: `tools/build-cog-mark.mjs`
-# holds the gear geometry and writes all three files that show it — the site's
-# Vue component and the two standalone lockups the root README renders, which
-# have to be separate files because GitHub strips inline SVG out of Markdown.
+# holds the gear geometry and writes every file that shows it — the site's Vue
+# component, the two standalone lockups the root README renders, the raster
+# social card, and the favicon set. The README files have to stay separate
+# because GitHub strips inline SVG out of Markdown; unfurlers need a fixed-size
+# PNG; browser chrome needs the gears cropped square without the wordmark.
 
 [tasks."docs:mark"]
-description = "Regenerate the Cog mark: the site component and both README lockups"
+description = "Regenerate the Cog mark: site component, README lockups, favicons, and social card"
 run = "node {{config_root}}/tools/build-cog-mark.mjs"
 
 [tasks."docs:dev"]

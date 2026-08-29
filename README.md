@@ -17,10 +17,10 @@ Cog is fine-grained state management for native mobile apps:
 - **iOS:** a working Swift library for SwiftUI. It uses `@Observable` at the UI
   edge and one app-wide state graph on the MainActor.
 - **Android:** a planned Kotlin library for Jetpack Compose. It will use one
-  app-wide store over the Compose snapshot system.
+  app-wide Cog graph, with Compose state carrying UI invalidation.
 
-Both libraries follow one [shared state model](./docs/design.md), but each uses
-the normal tools and style of its platform.
+Both libraries implement one [shared runtime model](./docs/design.md). Each
+uses the names and native UI tools of its platform.
 
 ## Core rules
 
@@ -103,7 +103,7 @@ Use the `Cog` product in app targets. Use `CogTesting` in tests and preview
 support. Cog requires iOS 17 or macOS 14 and Swift tools 6.2. Releases are
 tested with Xcode 26.6 and Swift 6.3.3.
 
-Read [Getting Started](https://skeswa.github.io/cog/documentation/cog/gettingstarted)
+Read [Getting started](https://skeswa.github.io/cog/swift/getting-started)
 to put a value on screen. Read
 [Linting your app](https://skeswa.github.io/cog/documentation/cog/lintingyourapp)
 to add the separate, version-matched CogLint plugins without adding lint tools

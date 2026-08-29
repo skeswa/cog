@@ -5,11 +5,11 @@ import type { DefaultTheme } from "vitepress";
  * filesystem.
  *
  * The Swift order below is not alphabetical and must not become alphabetical:
- * it reproduces the numbered reading order in `docs/swift/README.md` under
- * "The documents", which is editorial. `docs/kotlin/README.md` carries the
- * same kind of list under "Start here". Those two files remain the source of
- * truth; this file mirrors them, and a document added there belongs here in
- * the same revision.
+ * it reproduces the editorial path in `docs/swift/README.md`, with installation
+ * and the tutorial before the numbered design and implementation documents.
+ * `docs/kotlin/README.md` carries the same kind of list under "Start here".
+ * Those two files remain the source of truth; this file mirrors them, and a
+ * document added there belongs here in the same revision.
  *
  * Deriving labels from each file's first heading was the alternative, and it
  * is unsafe here: `docs/maintainers/ci.md` contains eight `#` shell comments
@@ -45,6 +45,8 @@ const designHistory: DefaultTheme.SidebarItem = { text: "Design history", link: 
  * `/design`.
  */
 const swiftDocuments: DefaultTheme.SidebarItem[] = [
+  { text: "Installation", link: "/swift/installation" },
+  { text: "Getting started", link: "/swift/getting-started" },
   {
     text: "Design",
     items: [

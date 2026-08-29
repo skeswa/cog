@@ -34,10 +34,10 @@ name: Docs
 #   job, and pair of scopes in `PERMISSION_EXCEPTIONS`, so the grant is reviewed
 #   policy rather than a hole in the check.
 #
-# DocC is always built from the newest release tag, never from `main`, so the
-# API reference keeps describing released code even though the site around it
-# republishes on every push. That guarantee dates to the first tagged release
-# and survives here.
+# DocC and the VitePress site's current-version references always use GitHub's
+# newest published release, never `main`, so a draft tag or a source checkout
+# cannot leak an unreleased or stale version into Pages. That guarantee dates
+# to the first tagged release and survives here.
 #
 # There is deliberately no `paths:` filter. GitHub applies path filters to tag
 # pushes as well as branch pushes, and a release tag usually points at a commit
@@ -91,18 +91,17 @@ jobs:
 
       - name: Resolve the release the API reference should describe
         id: release
-        # `github.ref_name` reaches the shell through the environment rather
-        # than through `${{ }}` interpolation, so a ref name can never be
-        # spliced into the script as code.
         env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [ "${REF_TYPE}" = "tag" ]; then
-            tag="${REF_NAME}"
-          elif ! tag="$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' 2>/dev/null)"; then
-            echo "::error title=No release tag::The API reference is built from the newest release tag, and this repository has none. Push a release tag before publishing the site."
+          if ! tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"; then
+            echo "::error title=No published release::The documentation site is built from GitHub's newest published release, and the API did not return one."
+            exit 1
+          fi
+          if ! grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$tag" || \
+             ! git rev-parse --verify --quiet "refs/tags/${tag}^{commit}" >/dev/null; then
+            echo "::error title=Invalid published release::GitHub's latest release names ${tag}, which is not a checked-out bare semantic-version tag."
             exit 1
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
@@ -219,6 +218,8 @@ jobs:
         run: npm ci
 
       - name: Build the VitePress site
+        env:
+          COG_DOCS_RELEASE_VERSION: ${{ needs.docc-cache.outputs.tag }}
         run: mise run docs:build
 
       - name: Assemble both halves into one site
