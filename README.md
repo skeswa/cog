@@ -38,7 +38,7 @@ say what Cog's machinery costs and what it buys. Android work has not started.
 
 <!-- x-release-please-start-version -->
 
-The current Swift release is 0.5.0.
+The current Swift release is 0.6.0.
 <!-- x-release-please-end -->
 
 See the [Swift context guide](./docs/swift/README.md#production-tests-and-previews)
@@ -58,7 +58,7 @@ Cog has no runtime dependencies. Add it to `Package.swift`:
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.5.0")
+    .upToNextMinor(from: "0.6.0")
   )
 ]
 // x-release-please-end
@@ -74,7 +74,7 @@ for a smaller binary:
 // x-release-please-start-version
 .package(
   url: "https://github.com/skeswa/cog.git",
-  exact: "0.5.0",
+  exact: "0.6.0",
   traits: ["CompactArena"]
 )
 // x-release-please-end

@@ -9,6 +9,35 @@ releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## [0.6.0](https://github.com/skeswa/cog/compare/0.5.0...0.6.0) (2026-08-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **swift:** `Cog<Value>.Manual` and the key-ignoring `CogBox<Value, Key>.Manual` initializers take a `@MainActor` closure instead of a value. `Cog<Int>.Manual(0)` becomes `Cog<Int>.Manual { 0 }`. No deprecated overload is provided. Async `default:` call sites are unchanged.
+
+### Features
+
+* **examples:** add native TodoMVC app ([e64d82e](https://github.com/skeswa/cog/commit/e64d82ebb2dd008982ecb99f10d347e3760b2697))
+* **examples:** add Trails navigation example ([54a8cda](https://github.com/skeswa/cog/commit/54a8cda60f77e9b5912d9aa7ac5e23b566509a5b))
+* **lint:** add manual-cog-underscore rule ([b208dad](https://github.com/skeswa/cog/commit/b208dad787be3eae51be4b42316f641a0e43d878))
+* **lint:** add tracked-binding-adapters rule ([a9f2bff](https://github.com/skeswa/cog/commit/a9f2bfff7417951468aaa5774adfe409777af6e5))
+* **swift:** count created generations on ControlledStream ([22ae340](https://github.com/skeswa/cog/commit/22ae340c7945b6656ebd13793d764a97a85cfcda))
+* **swift:** produce cog starting values and async defaults per state ([edd1136](https://github.com/skeswa/cog/commit/edd113656bb44d3afd74c09da26746951f04f7f2))
+* **swift:** ship the async test harness in CogTesting ([7edd607](https://github.com/skeswa/cog/commit/7edd60719df172b78da50bb09ea6411c10b20445))
+
+
+### Bug Fixes
+
+* **swift:** prove the probed controller without debug-only seeding ([1b64c4e](https://github.com/skeswa/cog/commit/1b64c4e1102dcef9449aade14ddd00da24dfb371))
+
+
+### Performance Improvements
+
+* **swift:** borrow descriptor records through the arena walks ([12651b2](https://github.com/skeswa/cog/commit/12651b27d6800c4cdaff4afaed67c9efd86d1552))
+* **swift:** cut steady-turn ARC in the turn machinery ([5cca865](https://github.com/skeswa/cog/commit/5cca8651e5dc5a0ba8ddd8e5ba31c37286585fa8))
+* **swift:** cut the boundary-sort and turn-name ARC sites ([71ed12f](https://github.com/skeswa/cog/commit/71ed12f5c37b44147fd904bf4d58241ad4fedc22))
+
 ## 0.5.0 (2026-08-23)
 
 
