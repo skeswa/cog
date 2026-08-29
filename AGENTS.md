@@ -8,8 +8,8 @@ it for Claude Code; keep the two files in sync.
 **Cog**, a fine-grained state-management project for native mobile UI:
 
 - a Swift library for SwiftUI on iOS, built over `@Observable` at the boundary
-  with one app-wide MainActor-confined dependency graph inside — implemented,
-  currently released at 0.5.0; and
+  with one app-wide MainActor-confined dependency graph inside — implemented;
+  and
 - a Kotlin library for Jetpack Compose on Android with one app-wide graph —
   fully designed, not implemented.
 
