@@ -232,27 +232,30 @@ onBeforeUnmount(() => {
     <header class="hero">
       <p class="eyebrow">State for native mobile UI</p>
       <h1 class="display">
-        Nothing<br />
-        else<br />
-        <em>runs.</em>
+        State that<br />
+        <em>feels</em><br />
+        simple
       </h1>
       <div class="hero-side">
         <p class="lede">
-          Cog keeps one graph of state for your whole app. You declare each fact once and derive the
-          rest. When something changes, Cog settles exactly the values that depend on it and
-          notifies exactly the views that read them.
+          Cog keeps your app's state in one graph. Declare each fact once, then derive the rest.
+          After a change, Cog settles the values that depend on it and notifies the views that read
+          them.
         </p>
         <div class="actions">
           <a class="btn btn-primary" :href="withBase('/documentation/cog/gettingstarted')">
             Get started
           </a>
-          <a class="btn" :href="withBase('/swift/')">Swift design</a>
-          <a class="btn btn-quiet" href="https://github.com/skeswa/cog">GitHub</a>
+          <a class="btn" :href="withBase('/swift/')">Learn more</a>
         </div>
         <dl class="facts">
           <div>
             <dt>Swift</dt>
-            <dd>0.4.0, shipping</dd>
+            <dd>
+              <a class="release-link" href="https://github.com/skeswa/cog/releases/latest">
+                0.5.0
+              </a>
+            </dd>
           </div>
           <div>
             <dt>Kotlin</dt>
@@ -266,11 +269,14 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <!-- ── The mechanism ────────────────────────────────────────────── -->
-    <section ref="root" class="panel" aria-labelledby="mechanism-title">
+    <!-- ── Graph demo ───────────────────────────────────────────────── -->
+    <section ref="root" class="panel" aria-labelledby="graph-title">
       <div class="panel-head">
-        <h2 id="mechanism-title">The mechanism</h2>
-        <p>A real graph, running Cog's rules. Write to a source and watch how little happens.</p>
+        <h2 id="graph-title">How a turn settles</h2>
+        <p>
+          This eight-node graph runs Cog's settlement rules. Change a source to see which derived
+          values run and which views redraw.
+        </p>
       </div>
 
       <div class="stage-scroll">
@@ -313,23 +319,23 @@ onBeforeUnmount(() => {
       </div>
 
       <p class="aside">
-        <strong>Write the same value</strong> and no selector re-runs at all. Cross 70° and
-        <code>advice</code> changes, so <code>headline</code>
-        re-runs and two views redraw — the third never hears about it.
+        Writing the same value does not rerun a selector. When the temperature crosses 70°,
+        <code>advice</code> changes. Cog then reruns <code>headline</code> and redraws two views;
+        the third view is unchanged.
       </p>
     </section>
 
     <!-- ── Code ─────────────────────────────────────────────────────── -->
     <section class="split" aria-labelledby="code-title">
       <div class="split-text">
-        <h2 id="code-title">Declare it once</h2>
+        <h2 id="code-title">Declarations are names</h2>
         <p>
-          A declaration is not state. It is a lightweight name, and the value behind it lives in one
-          runtime — so the same declaration names state in your app, your tests, and your previews.
+          A declaration is a lightweight name for a value stored in one runtime. Use the same
+          declaration with an app, test, or preview runtime, and each runtime keeps its own state.
         </p>
         <p>
-          <code>adviceCog</code> runs the first time something reads it, and again only when the
-          temperature it read actually changes.
+          <code>adviceCog</code> runs on its first read. It runs again only after the temperature
+          value it read changes.
         </p>
         <a class="more" :href="withBase('/swift/')">Read the Swift design →</a>
       </div>
@@ -353,124 +359,127 @@ onBeforeUnmount(() => {
     <!-- ── Measurements ─────────────────────────────────────────────── -->
     <section class="panel measures" aria-labelledby="measures-title">
       <div class="panel-head">
-        <h2 id="measures-title">Measured, not asserted</h2>
-        <p>Every number here is a committed CI gate, not a marketing round-up.</p>
+        <h2 id="measures-title">Current measurements</h2>
+        <p>These results come from benchmark thresholds checked in CI.</p>
       </div>
       <div class="grid">
         <figure>
           <div class="figure-num">0</div>
           <figcaption>
             <b>allocations in a steady turn</b>
-            Down from 7. Exact zero at every percentile across 1,751 samples; the gate requires
-            zero, not a tolerance around it.
+            All 1,751 samples report zero at every percentile. The previous result was 7, and CI now
+            requires zero.
           </figcaption>
         </figure>
         <figure>
           <div class="figure-num">0</div>
           <figcaption>
             <b>allocations settling 100 nodes</b>
-            Down from 107, pulling one source through a hundred derived values.
+            Settling one source through 100 derived values previously allocated 107 objects. It now
+            allocates none.
           </figcaption>
         </figure>
         <figure>
           <div class="figure-num">12</div>
           <figcaption>
             <b>observation boundaries of 1,000</b>
-            A graph held 1,000 states and 12 were read. Exactly 12 boundaries existed, at both p0
-            and p100.
+            The graph contained 1,000 states, 12 of which were read. The run created 12 observation
+            boundaries at p0 and p100.
           </figcaption>
         </figure>
         <figure>
           <div class="figure-num">1.64<span class="unit">µs</span></div>
           <figcaption>
-            <b>an ordinary turn</b>
-            Down from 2.20 µs. Cost stays flat from 1 pinned key to 1,000.
+            <b>steady turn latency</b>
+            This benchmark previously measured 2.20 µs. Its cost stays flat from 1 pinned key
+            through 1,000.
           </figcaption>
         </figure>
       </div>
       <p class="footnote">
-        Release builds on an Apple M4 Pro, Xcode 26.4, Swift 6.3, with a malloc interposer.
-        Environments and full tables are recorded in
-        <a :href="withBase('/swift/impl/benchmarks')">the benchmark record</a>.
+        Measurements use release builds on an Apple M4 Pro with Xcode 26.4, Swift 6.3, and a malloc
+        interposer. The
+        <a :href="withBase('/swift/impl/benchmarks')">benchmark record</a>
+        includes the environment details and full tables.
       </p>
     </section>
 
     <!-- ── Principles ───────────────────────────────────────────────── -->
     <section class="principles" aria-labelledby="principles-title">
-      <h2 id="principles-title">Four rules, never traded</h2>
+      <h2 id="principles-title">Core rules</h2>
       <ol>
         <li>
           <span class="rule-n">01</span>
           <div>
-            <b>Cog should feel simple.</b>
-            Declaring, reading, and changing state looks like normal Swift. Runtime complexity stays
-            behind the API.
+            <b>Keep it simple.</b>
+            State should be easy to declare, read, and change. The API keeps runtime details out of
+            app code.
           </div>
         </li>
         <li>
           <span class="rule-n">02</span>
           <div>
-            <b>Every state read should be correct.</b>
-            A read matches the latest committed state after settling every dependency it needs —
-            never a torn update or a stale derived value.
+            <b>Make every read correct.</b>
+            Before a read returns, Cog settles the dependencies it needs against the latest
+            committed state. This prevents torn updates and stale derived values.
           </div>
         </li>
         <li>
           <span class="rule-n">03</span>
           <div>
-            <b>Overhead is measured.</b>
-            Needless recomputation, allocation, and redraws are treated as defects, and competing
-            implementations are benchmarked.
+            <b>Measure the overhead.</b>
+            Benchmarks track recomputation, memory allocation, and view updates. They also compare
+            Cog with other implementations.
           </div>
         </li>
         <li>
           <span class="rule-n">04</span>
           <div>
-            <b>State is singular.</b>
-            One running app has one authoritative graph, and each mutable fact has exactly one
-            writable source in it.
+            <b>Keep one source of truth.</b>
+            A running app has one authoritative graph. Each mutable fact has one writable source in
+            that graph.
           </div>
         </li>
       </ol>
-      <p class="creed">Correctness and singular state are never traded for speed.</p>
     </section>
 
     <!-- ── Platforms ────────────────────────────────────────────────── -->
     <section class="platforms" aria-labelledby="platforms-title">
-      <h2 id="platforms-title">Two libraries, one idea</h2>
+      <h2 id="platforms-title">Swift and Kotlin</h2>
       <div class="cards">
         <a class="card" :href="withBase('/swift/')">
-          <span class="card-tag shipping">Shipping · 0.4.0</span>
-          <h3>Swift, for SwiftUI</h3>
+          <span class="card-tag shipping">Released · 0.5.0</span>
+          <h3>Swift for SwiftUI</h3>
           <p>
-            Built over <code>@Observable</code> at the boundary with one app-wide,
-            MainActor-confined graph inside. Mechanisms, declared lifetimes, async policies and
-            streams, value exports, and first-party lint plugins.
+            The Swift library uses <code>@Observable</code> at the UI boundary and keeps one
+            MainActor-confined graph for the app. It supports mechanisms, declared lifetimes, async
+            state and streams, value exports, and SwiftPM lint plugins.
           </p>
-          <span class="card-go">Reading order, decisions, open questions →</span>
+          <span class="card-go">Read the Swift docs →</span>
         </a>
         <a class="card" :href="withBase('/kotlin/')">
           <span class="card-tag planned">Designed</span>
-          <h3>Kotlin, for Compose</h3>
+          <h3>Kotlin for Compose</h3>
           <p>
-            A complete first design over the Compose snapshot runtime, with one process-wide store
-            plus turn, lifetime, and async rules. Not implemented yet.
+            The Kotlin design uses Compose snapshot state at the UI boundary and keeps state in one
+            process-wide store. It defines turn, lifetime, and async behavior. The library is not
+            implemented yet.
           </p>
-          <span class="card-go">Architecture, worked example, Flow map →</span>
+          <span class="card-go">Read the Kotlin design →</span>
         </a>
       </div>
     </section>
 
     <!-- ── Install ──────────────────────────────────────────────────── -->
     <section class="install" aria-labelledby="install-title">
-      <h2 id="install-title">Add it</h2>
+      <h2 id="install-title">Install Cog</h2>
       <pre class="code install-code"><code>.package(
   url: <span class="s">"https://github.com/skeswa/cog.git"</span>,
-  .upToNextMinor(from: <span class="s">"0.4.0"</span>)
+  .upToNextMinor(from: <span class="s">"0.5.0"</span>)
 )</code></pre>
       <p>
-        Pin to a minor, not a major: Cog is in 0.x, where a minor may break source compatibility and
-        says so in the changelog. Requires iOS 17 or macOS 14.
+        Cog is still in 0.x, so a minor release may include source-breaking changes; the changelog
+        records them. The package requires iOS 17 or macOS 14.
       </p>
     </section>
   </div>
@@ -576,7 +585,6 @@ onBeforeUnmount(() => {
 
 .display em {
   font-style: italic;
-  color: var(--accent);
 }
 
 .hero-side {
@@ -631,11 +639,6 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.btn-quiet {
-  border-color: transparent;
-  color: var(--ink-2);
-}
-
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -657,6 +660,20 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
+.release-link {
+  color: var(--ink);
+  text-decoration-color: var(--rule-2);
+  text-underline-offset: 3px;
+  transition:
+    color 0.16s ease,
+    text-decoration-color 0.16s ease;
+}
+
+.release-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
 /* ── Panels ─────────────────────────────────────────────────────── */
 .panel {
   margin-top: 88px;
@@ -673,6 +690,8 @@ onBeforeUnmount(() => {
   font-family: var(--display);
   font-size: 34px;
   margin: 0 0 8px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .panel-head p {
@@ -987,14 +1006,6 @@ onBeforeUnmount(() => {
   color: var(--ink);
   font-weight: 500;
   margin-bottom: 3px;
-}
-
-.creed {
-  margin: 26px 0 0;
-  font-family: var(--display);
-  font-size: 25px;
-  color: var(--ink);
-  max-width: 34ch;
 }
 
 /* ── Platforms ──────────────────────────────────────────────────── */

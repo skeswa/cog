@@ -1,4 +1,16 @@
-# Cog
+<h1>
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="./docs/public/cog-lockup-dark.svg"
+    />
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="./docs/public/cog-lockup-light.svg"
+    />
+    <img src="./docs/public/cog-lockup-light.svg" alt="Cog" height="72" />
+  </picture>
+</h1>
 
 Cog is fine-grained state management for native mobile apps:
 
