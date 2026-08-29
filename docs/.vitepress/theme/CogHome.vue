@@ -272,10 +272,10 @@ onBeforeUnmount(() => {
     <!-- ── Graph demo ───────────────────────────────────────────────── -->
     <section ref="root" class="panel" aria-labelledby="graph-title">
       <div class="panel-head">
-        <h2 id="graph-title">How a turn settles</h2>
+        <h2 id="graph-title">What updates when state changes</h2>
         <p>
-          This eight-node graph runs Cog's settlement rules. Change a source to see which derived
-          values run and which views redraw.
+          This eight-node graph shows how an update moves through dependent state. Change a source
+          to see which derived values run and which views redraw.
         </p>
       </div>
 
@@ -328,10 +328,10 @@ onBeforeUnmount(() => {
     <!-- ── Code ─────────────────────────────────────────────────────── -->
     <section class="split" aria-labelledby="code-title">
       <div class="split-text">
-        <h2 id="code-title">Declarations are names</h2>
+        <h2 id="code-title">State lives in the runtime</h2>
         <p>
-          A declaration is a lightweight name for a value stored in one runtime. Use the same
-          declaration with an app, test, or preview runtime, and each runtime keeps its own state.
+          A Cog declaration identifies a value; the runtime stores it. Your app, each test, and each
+          preview can use the same declarations while keeping separate state.
         </p>
         <p>
           <code>adviceCog</code> runs on its first read. It runs again only after the temperature
@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
     <!-- ── Measurements ─────────────────────────────────────────────── -->
     <section class="panel measures" aria-labelledby="measures-title">
       <div class="panel-head">
-        <h2 id="measures-title">Current measurements</h2>
+        <h2 id="measures-title">Minimal overhead</h2>
         <p>These results come from benchmark thresholds checked in CI.</p>
       </div>
       <div class="grid">
@@ -397,8 +397,9 @@ onBeforeUnmount(() => {
         </figure>
       </div>
       <p class="footnote">
-        Measurements use release builds on an Apple M4 Pro with Xcode 26.4, Swift 6.3, and a malloc
-        interposer. The
+        Measurements use release builds on a 12-core Apple M4 Pro with 24 GB of memory, running
+        macOS 26.4.1, Xcode 26.4 (17E192), and Swift 6.3, with allocation counts provided by a
+        malloc interposer. The
         <a :href="withBase('/swift/impl/benchmarks')">benchmark record</a>
         includes the environment details and full tables.
       </p>
