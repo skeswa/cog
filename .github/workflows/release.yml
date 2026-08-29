@@ -62,7 +62,7 @@ jobs:
     outputs:
       run_id: ${{ steps.candidate.outputs.run_id }}
     steps:
-      - name: Require an existing lightweight tag and release
+      - name: Require an existing lightweight tag and version
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
@@ -77,7 +77,6 @@ jobs:
             echo "::error title=Mutable release identity::${TAG} is not a lightweight commit tag"
             exit 1
           fi
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           encoded="$(gh api "repos/${GITHUB_REPOSITORY}/contents/version.txt?ref=${TAG}" --jq .content | tr -d '\n')"
           if [ "$(printf '%s' "$encoded" | base64 --decode | tr -d '[:space:]')" != "$TAG" ]; then
             echo "::error title=Recovery version mismatch::version.txt at ${TAG} does not name the tag"
