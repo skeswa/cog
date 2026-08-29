@@ -2,19 +2,19 @@
 
 _Authored August 6, 2026._
 
-Cog is a fine-grained state graph for Android UI. It uses the Compose snapshot
-runtime as its engine. Cog adds names, write rules, async work, lifetimes, and
-debug tools.
+Cog is a fine-grained state graph for Android UI. It uses the same runtime
+model as Cog for Swift. Compose state connects each changed Cog value to the UI
+scopes that read it.
 
 The goal is small code that stays correct under change.
 
 ## Shared foundation
 
-The [shared state model](../design.md) owns Cog's principles, vocabulary, and
-cross-platform behavior. On Kotlin, its single runtime is one process-wide
-`CogStore`; correct reads settle through Compose snapshots on the store lane;
-async uncertainty is explicit in `CogPhase`; and Compose `State` is the UI
-boundary. This set owns those Android choices rather than inheriting Swift's.
+The [shared state model](../design.md) owns Cog's runtime behavior, principles,
+and vocabulary. On Kotlin, its single runtime is one process-wide `CogStore`;
+correct reads settle through the Cog-owned graph on the store lane; async
+uncertainty is explicit in `CogPhase`; and a small Compose adapter tracks UI
+reads and invalidates their scopes. The application value stays in the graph.
 
 ## Start here
 
@@ -27,7 +27,8 @@ boundary. This set owns those Android choices rather than inheriting Swift's.
 7. [Design history](../history.md)
 
 The section numbers match the Swift set where that helps comparison. The
-Kotlin choices stand on their own.
+Kotlin docs choose language spelling, physical representation, and native
+adapters for the shared state model.
 
 ## The short version
 
@@ -35,31 +36,31 @@ One process-wide `CogStore` owns the production graph. A descriptor
 such as `Cog<User>` names one value in that graph. A keyed descriptor
 such as `CogBox<User, UserId>` names a set of values.
 
-Compose already has the right low-level parts:
-
-- `MutableState` stores source values.
-- `derivedStateOf` caches automatic values and tracks changing dependencies.
-- snapshots make a group of writes visible at once.
-- a `State` read invalidates only the Compose scopes that used it.
-
-Cog builds policy around those parts:
+Cog owns the runtime parts:
 
 - the app creates one store and shares it across every screen;
 - descriptors have stable identity and readable debug labels;
+- the store owns source and cached automatic values;
+- selectors record dynamic dependency edges in the Cog graph;
 - writable descriptors stay private;
-- all writes happen in a named `turn`;
+- named turns stage and publish complete changes;
+- equality stops propagation before any UI notice;
 - UI, reactions, and Flow collectors keep only the graph they need alive;
 - async state is explicit in `CogPhase`;
 - debug builds can explain why a value changed.
 
+Compose tracks the scope that reads a small version token. Changing the token
+invalidates that scope. Cog creates the token when a state first reaches
+Compose and continues to hold and compute the value itself.
+
 ```mermaid
 flowchart LR
-    UI["Composable"] -->|"read"| State["Cog state<br/>Compose State"]
+    UI["Composable"] -->|"read value + token"| Boundary["Compose adapter<br/>version token"]
     Event["Event handler"] -->|"turn"| Store["CogStore"]
-    Store -->|"snapshot write"| State
-    State --> Automatic["derivedStateOf"]
-    Automatic --> UI
-    Store -.-> Policy["names · lifetime · async · debug"]
+    Store --> Graph["Cog-owned graph<br/>values · edges · settlement"]
+    Graph -->|"changed after equality"| Boundary
+    Boundary -->|"invalidate exact scope"| UI
+    Store -.-> Policy["turns · lifetime · async · debug"]
 ```
 
 The common path stays small:
@@ -96,10 +97,11 @@ without changing the production singleton rule.
 
 The first design is ready for a prototype. The prototype must prove:
 
+- parity with the shared Swift scenario and turn contracts;
 - staged and atomic writes;
 - escaped-writer failure in every build;
 - dynamic automatic dependencies;
-- exact Compose invalidation;
+- lazy, equality-gated Compose boundary notices;
 - ordered reactions;
 - keyed state cleanup;
 - async cancellation and stale-result guards;

@@ -2,9 +2,9 @@
 
 _Authored August 6, 2026._
 
-The [shared state model](../design.md) owns the cross-platform rule that work
-avoidance comes before representation tricks. This document owns the Android
-cost model and the measurements that will choose its runtime.
+The [shared state model](../design.md) fixes the cross-platform runtime and puts
+work avoidance before representation tricks. This document defines the Android
+cost model. Its measurements choose the Kotlin representation.
 
 Correct reads come first. The public API comes second. Data layout comes third.
 An internal win is not a win if it weakens correctness, the public API, or the
@@ -42,27 +42,22 @@ That target is a benchmark gate, not a claim.
 
 ## 2. Platform advantages to keep
 
-The Compose runtime already invests in:
+Compose tracks UI reads, provides an efficient `MutableIntState`, schedules
+recomposition, and supports compiler-driven skipping. Cog uses those tools at
+the UI seam while keeping its graph in `CogStore`.
 
-- snapshot records and atomic apply;
-- read observation;
-- cached automatic state;
-- mutation policies;
-- primitive snapshot state;
-- low-allocation internal collections;
-- compiler-driven skipping.
+The first prototype must use:
 
-Cog should not copy this machinery without proof that its public APIs are too
-costly or cannot meet turn semantics.
-
-The snapshot-backed prototype must use:
-
-- direct `State.value` reads in the smallest useful Compose scope;
-- explicit structural equality for every automatic state;
-- one mutable snapshot per outer turn;
-- one observer per store or effect group, not per state;
+- one lazily created version token per UI-seen Cog state and key;
+- direct token reads in the smallest useful Compose scope;
+- direct Cog value reads with no copied Compose value;
+- equality-gated token writes after the Cog turn settles;
 - stable descriptor objects;
 - descriptor-and-key reads without a temporary handle.
+
+Benchmarks will show whether a turn should batch changed token writes in a
+mutable Compose snapshot. That choice affects boundary delivery; Cog still
+owns the turn and graph.
 
 ## 3. Work avoidance
 
@@ -76,15 +71,9 @@ large edge set every read may lose even when it saves later work.
 
 ### 3.2 Equality gates
 
-Use Kotlin `==` by default. Pass
-`structuralEqualityPolicy()` to `derivedStateOf`.
-
-The policy argument matters. An automatic state without one may invalidate readers
-whenever a dependency changes, even when its result stays equal.
-
-Android's own guidance calls `derivedStateOf` expensive. Cog uses it for
-real shared automatic computation, not simple string joining. The spike must still measure
-its cost across a large graph.
+Use Kotlin `==` by default in Cog-owned value columns. A custom equality rule
+belongs to the descriptor and gates downstream dirtiness, reactions, exports,
+and Compose token changes in one place.
 
 Equality itself can be costly for large values. Prefer small immutable values,
 stable ids, or a domain equality policy with clear meaning. Do not use
@@ -95,13 +84,9 @@ referential equality just to hide in-place mutation.
 Cold automatic states compute on read. Hot roots settle after a turn so
 reactions and UI have ready, equality-gated values.
 
-The prototype must compare:
-
-- settle every live root after each turn;
-- let Compose pull UI-only roots during recomposition;
-- a hybrid: eagerly settle reactions, leave UI-only roots lazy.
-
-The hybrid may do less work. It may also make debug timing harder. Measure it.
+The shared runtime settles live roots before it notifies their adapters. Kotlin
+benchmarks may improve how it finds and walks those roots, but must preserve
+that turn ordering. Cold branches remain lazy.
 
 ### 3.4 Read close to use
 
@@ -116,26 +101,19 @@ shows composition is the cost.
 
 ### 4.1 Sources and automatic values
 
-First candidate:
+The shared design fixes the runtime shape. Benchmarks choose its Kotlin
+representation:
 
-| State data      | Candidate                      |
-| --------------- | ------------------------------ |
-| source value    | private `MutableState<T>`      |
-| automatic value | `derivedStateOf(policy)`       |
-| reaction reads  | shared `SnapshotStateObserver` |
-| Cog metadata    | store-owned flat table         |
-| UI boundary     | the same state `State<T>`      |
+| State data      | Required role                                     |
+| --------------- | ------------------------------------------------- |
+| source value    | Cog-owned typed storage                           |
+| automatic value | Cog-owned cached storage                          |
+| graph edges     | Cog-owned dynamic dependency representation       |
+| turn            | Cog-owned staging buffer and revision             |
+| UI boundary     | Compose `MutableIntState` token with no Cog value |
 
-This gives one value cell rather than a Cog value plus a copied UI value.
-
-Second candidate, only if needed:
-
-- a custom push-pull Cog graph;
-- one Compose `MutableState` version token per live UI root;
-- direct Cog value reads after the token read.
-
-The second shape controls graph layout but duplicates more logic. Correctness
-tests must be identical for both.
+This shape matches the shared runtime and keeps one application value. The UI
+token contains the version counter needed for native invalidation.
 
 ### 4.2 State and key tables
 
@@ -156,8 +134,7 @@ mapping supports those isolated stores safely.
 
 ### 4.3 Edges
 
-Cog may need coarse dependency edges for leases and debug data even while
-Compose owns correctness edges.
+Cog owns correctness dependency edges, lease paths, and debug graph data.
 
 Candidates:
 
@@ -171,9 +148,8 @@ when keyed states die.
 
 ### 4.4 Primitive values
 
-Compose provides primitive snapshot state such as `MutableIntState` to
-avoid boxing on primitive access. A generic `Cog<T>` may still box values
-in Cog metadata or erased callbacks.
+Compose provides `MutableIntState` for an unboxed UI version token. A generic
+`Cog<T>` may still box domain values in Cog metadata or erased callbacks.
 
 Possible specializations are `IntCog`, `LongCog`, `FloatCog`,
 and `DoubleCog`. Do not add them until a realistic benchmark shows a
@@ -223,7 +199,7 @@ The prototype must count:
 
 - recompositions;
 - skipped recompositions;
-- state `State` reads;
+- version-token `State` reads;
 - leases created and released;
 - allocations on first composition and steady recomposition;
 - time to enter and leave a large lazy list;
@@ -232,9 +208,9 @@ The prototype must count:
 Use stable lazy-list item keys. A box key should normally match the item's
 domain id.
 
-Do not wrap a direct Cog in `collectAsStateWithLifecycle`. That adds a
-Flow, a collector job, and another Compose state cell around a value that is
-already snapshot state.
+Do not wrap a direct Cog in `collectAsStateWithLifecycle`. That adds a Flow, a
+collector job, and a second Compose state cell around a value whose boundary
+token already provides exact invalidation.
 
 ## 7. Async and lifetime costs
 
@@ -291,7 +267,9 @@ output.
 
 ### 9.1 Correctness corpus
 
-The same tests run against the snapshot-backed and custom-graph candidates:
+The Kotlin runtime ports the shared Swift scenario IDs and expected turn
+traces. Platform-specific tests then cover the Compose adapter and JVM
+representation:
 
 - chain, diamond, broad fan-out, and broad fan-in;
 - dynamic branch switch;
@@ -328,11 +306,10 @@ Port useful shapes from
 
 Compare:
 
-1. Cog on Compose snapshots;
-2. raw `MutableState` plus `derivedStateOf`;
-3. the custom Cog graph candidate;
-4. `MutableStateFlow` with `combine` and collection;
-5. Molecule for whole-model cases where that comparison is fair.
+1. the Cog-owned Kotlin graph with Compose version-token boundaries;
+2. raw `MutableState` plus `derivedStateOf` as a platform baseline;
+3. `MutableStateFlow` with `combine` and collection;
+4. Molecule for whole-model cases where that comparison is fair.
 
 Do not tune only to win a synthetic case.
 
@@ -352,6 +329,8 @@ both results.
 
 The first prototype passes only if:
 
+- every shared scenario has the same observable result and phase ordering as
+  Swift;
 - every correctness test passes;
 - direct UI reads recompose no wider than raw Compose state;
 - a steady one-source turn does not allocate after warm-up, or the remaining
@@ -367,12 +346,12 @@ devices after the first run.
 
 Benchmarks decide:
 
-- snapshot-backed graph or custom graph;
 - HashMap or scatter table;
 - edge representation;
 - key-handle representation;
 - primitive-specialized APIs;
-- eager, lazy, or hybrid hot-root settling;
+- hot-root queue and settlement representation;
+- version-token storage and notification batching;
 - grace-period defaults;
 - history and tracing level in release builds.
 
@@ -399,7 +378,7 @@ Until then, all remain candidates.
 - [Diagnose stability](https://developer.android.com/develop/ui/compose/performance/stability/diagnose)
 - [Compose tooling and recomposition counts](https://developer.android.com/develop/ui/compose/tooling/debug)
 
-## Appendix B: runtime sources and prior art
+## Appendix B: platform sources and comparison baselines
 
 - [Compose `DerivedState` source](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/compose/runtime/runtime/src/commonMain/kotlin/androidx/compose/runtime/DerivedState.kt)
 - [Compose `SnapshotStateObserver` source](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/compose/runtime/runtime/src/commonMain/kotlin/androidx/compose/runtime/snapshots/SnapshotStateObserver.kt)
@@ -411,5 +390,5 @@ Until then, all remain candidates.
 - [Reactively algorithm notes](https://github.com/milomg/reactively/blob/main/Reactive-algorithms.md)
 - [alien-signals](https://github.com/stackblitz/alien-signals)
 
-Reading source helps form candidates. Only Cog's own tests and measurements can
+Compose graph sources provide comparison data. Cog's tests and measurements
 settle its layout.

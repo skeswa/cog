@@ -5,29 +5,28 @@ _Authored August 6, 2026._
 Cog should feel like normal Kotlin and normal Compose. It should not ask an app
 to learn a second UI model.
 
-The [shared state model](../design.md) defines the principles, vocabulary, and
-behavioral invariants Swift and Kotlin have in common. This document maps that
-model onto Kotlin and owns every Android-specific choice.
+The [shared state model](../design.md) defines the runtime, principles,
+vocabulary, and behavioral invariants Swift and Kotlin have in common. This
+document maps that model onto Kotlin and owns its language spelling, physical
+representation, Compose adapter, and Android integration.
 
-The main decision is to build on the Compose snapshot runtime. It already gives
-us tracked reads, cached automatic state, atomic writes, and exact UI
-invalidation. Cog adds the missing product rules.
+`CogStore` owns the graph. A state-specific Compose token records which
+recomposition scopes read a value and invalidates them after a completed Cog
+turn changes it. Source storage, automatic values, dependency capture, and
+turn atomicity remain in Cog.
 
 For all pieces in one place, see the
 [worked weather feature](example.md).
 
 ## 1. What the platform gives us, and what it does not
 
-Compose state is already a signal graph:
+Compose gives the UI adapter two useful operations:
 
-- `MutableState` is a writable signal.
-- `derivedStateOf` is a cached computed signal with dynamic dependencies.
-- a snapshot gives many values one consistent view of state;
-- reading `State.value` in Compose records the exact UI scope to update.
+- reading a `State` records the exact recomposition scope;
+- changing that state requests recomposition of scopes that read it.
 
-That is the hard base. Cog should reuse it.
-
-Compose does not give the app one clear place for:
+Cog uses those operations through a small version token. `CogStore` supplies
+the rest of the shared runtime:
 
 - stable identity and readable labels for graph states;
 - private write rights;
@@ -37,25 +36,19 @@ Compose does not give the app one clear place for:
 - async status and stale-result rules;
 - graph history and inspection.
 
-`CogStore` supplies those rules.
+The Kotlin implementation follows the Swift runtime model with
+JVM-appropriate storage.
 
 ```mermaid
 flowchart TB
-    subgraph App["Cog policy"]
-        Name["descriptors"]
-        Turn["turns"]
-        Life["lifetime"]
-        Async["async policy"]
-        Debug["debug history"]
+    subgraph Runtime["CogStore"]
+        Source["source storage"]
+        Automatic["automatic cache + graph edges"]
+        Turn["staged turns + settlement"]
+        Policy["lifetime · async · debug"]
     end
-    subgraph Runtime["Compose runtime"]
-        Source["MutableState"]
-        Automatic["derivedStateOf"]
-        Snapshot["snapshots"]
-        Observe["read observation"]
-    end
-    App --> Runtime
-    Runtime --> UI["Jetpack Compose UI"]
+    Runtime --> Boundary["Compose adapter<br/>version token"]
+    Boundary --> UI["Jetpack Compose UI"]
 ```
 
 ### 1.1 The graph stays on one lane
@@ -107,8 +100,10 @@ state; an explicit operation does.
 
 1. A descriptor names a state.
 2. One app-wide `CogStore` owns state values and runtime state.
-3. Compose snapshot state stores sources and computes automatic values.
-4. Leases say which graph roots must stay hot.
+3. The Cog-owned graph stores sources, caches automatic values, and captures
+   dependencies.
+4. Leases say which graph roots must stay hot, and native UI adapters notify
+   scopes that read changed roots.
 
 A descriptor has no app value inside it. Production resolves it in the app
 store. An isolated test resolves the same descriptor in its test store.
@@ -126,7 +121,7 @@ flowchart LR
 A normal read sees the latest completed turn. It settles every automatic state
 needed for that value before it returns.
 
-A grouped read pins one read-only snapshot:
+A grouped read pins one completed Cog revision:
 
 ```kotlin
 val header = cogs.read {
@@ -181,8 +176,9 @@ After sign-in, they do.
 
 ### 2.5 Equality stops needless work
 
-Every state has an equality rule. The default is Kotlin `==`. An automatic
-state uses an explicit Compose structural equality policy.
+Every state has an equality rule. The default is Kotlin `==`. The Cog value
+column applies that rule when a source publishes or an automatic state
+recomputes.
 
 If a new value equals the old value:
 
@@ -249,12 +245,13 @@ outside it cannot assign to `ManualCog`.
 
 One outer call to `turn` creates one graph turn:
 
-1. run the body in an isolated mutable snapshot;
-2. let reads see staged source values;
-3. apply all writes at once;
-4. settle hot roots;
-5. run dirty reactions in registration order;
-6. notify debug tools.
+1. stage source writes in a turn-owned buffer;
+2. let writer reads see those staged values;
+3. publish changed sources under one new graph revision;
+4. propagate dirtiness and settle hot roots;
+5. notify changed UI and Flow boundaries;
+6. run dirty reactions in registration order; and
+7. finish history and drain later turns from the FIFO.
 
 Nested turns join the outer turn. Writer access carries its turn. When the
 outer body returns, the turn closes, and an escaped writer fails in every
@@ -265,15 +262,16 @@ exactly where it is hardest to see. A failed body applies nothing.
 sequenceDiagram
     participant E as Event
     participant C as CogStore
-    participant S as Mutable snapshot
+    participant G as Cog graph
     participant R as Reactions
     participant U as Compose
     E->>C: turn("save")
-    C->>S: stage source writes
-    S-->>C: writer reads staged values
-    C->>S: apply once
-    S-->>U: changed State records
-    S-->>R: dirty observed roots
+    C->>G: stage source writes
+    G-->>C: writer reads staged values
+    C->>G: publish one revision
+    G->>G: settle hot roots + equality gate
+    G-->>U: increment changed boundary tokens
+    G-->>R: dirty reaction roots
     C->>R: run in order
     R-->>C: later writes queue a new turn
 ```
@@ -329,7 +327,8 @@ dependency-injection root.
 
 This read does two jobs:
 
-- it reads the state's Compose `State`, so Compose tracks the exact scope;
+- it settles the Cog-owned value, reads that state's Compose version token so
+  Compose tracks the exact scope, and then returns the value;
 - it owns a remembered lease until that call leaves composition.
 
 The operator is `@Composable`. An event callback cannot call it by
@@ -346,26 +345,27 @@ to hide every parameter behind a global store.
 
 ## 4. Write ownership and runtime rules
 
-### 4.1 The snapshot runtime is the data engine
+### 4.1 The Cog runtime is the data engine
 
-Candidate state storage:
+The first prototype follows the shared runtime shape:
 
-- source state: private `MutableState<T>`;
-- automatic state: `State<T>` from
-  `derivedStateOf(structuralEqualityPolicy())`;
-- reaction observation: `SnapshotStateObserver`;
-- turn: one isolated mutable snapshot applied on the store lane.
+- source values live in Cog-owned typed storage;
+- automatic values live in a Cog-owned cache;
+- tracked selector and reaction reads create Cog dependency edges;
+- a turn-owned buffer stages source writes before one graph revision publishes;
+- dirty propagation and parent-first settlement update only needed paths;
+- equality gates graph propagation, boundary notices, exports, and reactions;
+- a lazily created `MutableIntState` version token adapts one UI-seen state to
+  Compose without holding the Cog value.
 
-Observer callbacks only mark reactions dirty. The store coalesces those marks
-and flushes reactions once for the turn.
+The token carries notification metadata. Reading it lets Compose maintain its
+scope subscriptions; incrementing it after settlement requests recomposition.
+Cog's tables continue to own every source, automatic value, dependency edge,
+and turn.
 
-Cog keeps its own small state table for names, keys, leases, async state,
-dependency summaries, and debug data. It does not reach into private Compose
-runtime types.
-
-The spike must test this candidate. If public snapshot APIs cannot preserve a
-turn rule, the fallback is a small Cog graph with Compose `State` only at
-live UI boundaries.
+Benchmarks choose the Kotlin state tables, typed value columns, and edge
+layouts. Those representations may differ from Swift's arena. The runtime
+state machine and scenario results stay the same.
 
 ### 4.2 Correctness rules
 
@@ -427,9 +427,9 @@ Source defaults remain available. Automatic values use
 `whileObserved(gracePeriod)` by default. Query-like boxes may opt into
 a bounded cache. Exact cache layout is benchmark-gated.
 
-Compose owns UI read tracking. Cog must also record coarse descriptor edges for
-lifetime and debug tools, because Compose's private dependency graph is not an
-app API. The spike will measure this extra edge record.
+Compose maps each boundary token to its recomposition scopes. Cog records
+selector and reaction dependencies, root leases, settlement, and debug data
+in its own graph.
 
 ## 5. Async cogs
 
@@ -521,15 +521,21 @@ The UI bridge must:
 
 - provide the app singleton through a static composition local above
   navigation;
-- read the exact state `State` at the call site;
+- settle the exact Cog state before establishing its Compose baseline;
+- lazily create and read one version token for that descriptor and key;
 - remember one lease by store, descriptor, and key;
 - close the lease in `DisposableEffect`;
 - keep the last completed value during normal recomposition;
+- increment the token only after equality proves that state changed in a
+  completed turn;
 - show explicit `CogPhase` for async uncertainty;
 - give each preview or test runtime one isolated store with overrides.
 
 It must not:
 
+- store or compute the Cog value in Compose state;
+- use `derivedStateOf` or `SnapshotStateObserver` as the Cog graph;
+- retain and invalidate `RecomposeScope` objects itself;
 - copy every Cog into `collectAsStateWithLifecycle`;
 - launch one coroutine per sync value;
 - turn event callbacks into graph reads;
@@ -558,10 +564,10 @@ The first prototype targets the current stable Kotlin, Compose runtime,
 coroutines, and Lifecycle lines. The release must publish its exact minimums
 after the spike.
 
-Core graph code should stay Android-light. The Compose bridge, ViewModel
-helpers, saved-state adapters, and WorkManager adapters belong in separate
-artifacts. This keeps plain JVM tests fast and avoids forcing all Android
-dependencies on every consumer.
+Core graph code has no Compose dependency. Separate artifacts hold the Compose
+bridge, ViewModel helpers, saved-state adapters, and WorkManager adapters.
+Plain JVM tests can then exercise the shared scenario contract without UI, and
+core consumers avoid Android dependencies.
 
 Candidate modules:
 
@@ -580,7 +586,8 @@ collection. Measure the gain and offer a compatible fallback.
 
 ### Settled for the first spike
 
-- Compose snapshots are the first graph engine to test.
+- Kotlin implements the shared Cog-owned runtime model, with Compose snapshots
+  confined to UI notification;
 - production has one process-wide `CogStore`;
 - screens and ViewModels never create or close that production store;
 - tests and previews may use isolated stores;
@@ -593,7 +600,10 @@ collection. Measure the gain and offer a compatible fallback.
 - an escaped writer fails in every build, not only in debug;
 - automatic dependencies are dynamic;
 - equality gates publication;
-- UI reads a state directly as Compose `State`;
+- each UI-seen state lazily owns a Compose version token that contains no Cog
+  value;
+- a direct UI read settles the Cog state, reads its token, and returns the
+  Cog-owned value;
 - boxes use direct descriptor-and-key reads on the hot path;
 - UI, reaction, and Flow use leases;
 - async state uses `CogPhase` and generation guards;
@@ -603,11 +613,11 @@ collection. Measure the gain and offer a compatible fallback.
 
 ### Still open
 
-- whether public Compose snapshot APIs can implement every turn rule cleanly;
-- whether `SnapshotStateObserver` is the final reaction bridge;
 - the exact grace period and keyed-cache limits;
 - whether primitive-specialized cogs pay for their API weight;
 - descriptor, key, state-table, and edge layouts;
+- the version-token table layout and whether one turn batches token writes in
+  a mutable Compose snapshot;
 - whether `at(key)` handles are interned, inline, or short-lived;
 - whether an optional property-delegate form is worth its access cost just to
   infer debug labels;
@@ -625,20 +635,22 @@ collection. Measure the gain and offer a compatible fallback.
 
 Build a small vertical slice before freezing names.
 
-1. Implement guarded app bootstrap, source, automatic, box, grouped read, and
-   turn.
-2. Prove staged reads and atomic apply with hostile tests.
-3. Add direct Compose reads and count recompositions.
-4. Add dynamic dependencies, equality, cycles, and exceptions.
-5. Add reactions and queued write-back.
+1. Port the shared source, automatic, box, grouped-read, and turn scenarios to
+   a headless Kotlin runtime with the same scenario IDs and expected traces.
+2. Prove staged reads and atomic publication with hostile tests.
+3. Add dynamic dependencies, equality, cycles, and exceptions.
+4. Add direct Compose reads through lazy version tokens and count
+   recompositions.
+5. Add reactions, exports, and queued write-back in the shared phase order.
 6. Add leases and show keyed states and jobs are released.
 7. Add latest async work with a cancellation-ignoring fake.
 8. Run the benchmark matrix in [§9](perf.md#9-spike-and-benchmark-plan).
-9. Compare the snapshot-backed graph with the small custom-graph fallback.
+9. Compare the Cog-owned runtime with raw Compose, Flow, and relevant signal
+   baselines. The Cog engine stays fixed.
 10. Prove a second production install fails and navigation does not reset
     manual state.
-11. Freeze the public API only after correctness, singularity, and cost gates
-    pass.
+11. Freeze the public API only after parity, correctness, singularity, and cost
+    gates pass.
 
 ## Appendix A: why not only StateFlow?
 
@@ -662,15 +674,15 @@ and graph tools.
 The Android design was checked against:
 
 - [Compose state and snapshots](https://developer.android.com/develop/ui/compose/state)
-  for observable state and UI read tracking;
+  for version-token reads and exact UI invalidation;
 - [Compose `Snapshot` API](https://developer.android.com/reference/kotlin/androidx/compose/runtime/snapshots/Snapshot)
-  for isolated, consistent, atomic mutable snapshots;
+  for the optional batching of boundary-token notices;
 - [`derivedStateOf` API](https://developer.android.com/reference/kotlin/androidx/compose/runtime/package-summary)
   and its [runtime source](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/compose/runtime/runtime/src/commonMain/kotlin/androidx/compose/runtime/DerivedState.kt)
-  for caching, dynamic dependencies, and mutation policy;
+  as a raw Compose comparison;
 - [`SnapshotStateObserver`](https://developer.android.com/reference/kotlin/androidx/compose/runtime/snapshots/SnapshotStateObserver)
   and its [runtime source](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/compose/runtime/runtime/src/commonMain/kotlin/androidx/compose/runtime/snapshots/SnapshotStateObserver.kt)
-  for non-UI read observation;
+  as prior art for read observation;
 - [Compose state hoisting](https://developer.android.com/develop/ui/compose/state-hoisting)
   for screen state ownership and plain-value leaf UI;
 - [Android UI state production](https://developer.android.com/topic/architecture/ui-layer/state-production)

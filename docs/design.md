@@ -2,12 +2,15 @@
 
 _Authored August 21, 2026._
 
-Cog has separate Swift and Kotlin libraries. This page defines the behavior
-they share. The [Swift](./swift/README.md) and [Kotlin](./kotlin/README.md) docs
-define their own APIs, runtimes, UI support, and internal designs.
+Cog has separate Swift and Kotlin libraries. This page defines the runtime
+model and behavior they share. The [Swift](./swift/README.md) and
+[Kotlin](./kotlin/README.md) docs define platform-appropriate API spelling,
+physical representation, UI adapters, and native integration.
 
-Platform choices do not become shared rules just because both libraries use
-them. See [design history](./history.md) only when you need background.
+Cog owns state semantics on both platforms. Observation and Compose translate
+changed Cog values into native UI updates. A choice shared by both adapters
+still needs a place in this model before it becomes a shared rule. See
+[design history](./history.md) only when you need background.
 
 ## Why Cog exists
 
@@ -35,9 +38,19 @@ Cog keeps setup small and publishes each change as one complete state.
 4. **Keep one source of truth.** One running app has one Cog graph. Each
    mutable fact has one writable source in that graph. Screens and features do
    not create their own copies.
+5. **Keep one runtime model.** Swift and Kotlin use the same graph behavior,
+   turn ordering, lifetime rules, and async guarantees. Native frameworks
+   connect at the UI and operating-system seams. Cog defines the rules behind
+   those seams.
 
 Speed must not weaken correctness or create more sources of truth. Internal
 speed work must not make normal app code harder to read.
+
+Cog stores sources and cached automatic values. It records graph edges, stages
+turns, settles reads, applies equality, and owns async and lifetime state. A
+native UI adapter records the exact state a UI scope reads, then invalidates
+that scope when a completed turn changes the state. The application value
+stays in Cog; the adapter carries a change token.
 
 ## Main parts
 
@@ -56,14 +69,14 @@ speed work must not make normal app code harder to read.
 
 Platform names differ where needed:
 
-| Shared part       | Swift                                        | Kotlin                                        |
-| ----------------- | -------------------------------------------- | --------------------------------------------- |
-| Runtime           | `Cogs`                                       | `CogStore`                                    |
-| Keyed state       | `CogBox` and value references                | `CogBox` and descriptor-plus-key reads        |
-| Operation         | a `CogOps` method                            | a `CogStore` extension                        |
-| Side-effect owner | assembly `Mechanism`                         | lifecycle-owned `CogEffects`                  |
-| Async state       | `CogStatus` through the optional status lens | `CogPhase`                                    |
-| UI boundary       | Observation and the SwiftUI environment      | Compose `State` and a composition-local store |
+| Shared part       | Swift                                        | Kotlin                                             |
+| ----------------- | -------------------------------------------- | -------------------------------------------------- |
+| Runtime           | `Cogs`                                       | `CogStore`                                         |
+| Keyed state       | `CogBox` and value references                | `CogBox` and descriptor-plus-key reads             |
+| Operation         | a `CogOps` method                            | a `CogStore` extension                             |
+| Side-effect owner | assembly `Mechanism`                         | lifecycle-owned `CogEffects`                       |
+| Async state       | `CogStatus` through the optional status lens | `CogPhase`                                         |
+| UI boundary       | Observation and the SwiftUI environment      | Compose state tokens and a composition-local store |
 
 ### Descriptors name state; runtimes store it
 
@@ -133,9 +146,10 @@ Unused branches stay lazy. If an automatic value stays equal, the change stops
 there. A reaction may ask for another turn, but it cannot change the finished
 turn it is reading.
 
-Swift runs its graph on the MainActor. Kotlin's first design uses the Compose
-snapshot system on the store lane with a small Cog policy layer. Both must meet
-the read and turn rules above.
+Swift runs its graph on the MainActor. Kotlin runs the same runtime model on
+the store lane. Each implementation owns dependency capture, staging,
+settlement, equality, and publication. Storage layouts remain
+platform-specific.
 
 ## Writes are named operations
 
@@ -202,9 +216,10 @@ One app runtime does not mean one large view model or full-screen update.
 Features group declarations and operations. Views pass normal values and IDs.
 They do not copy Cog values into another writable UI model.
 
-Swift bridges UI-read values to Observation. Kotlin uses Compose snapshot state
-if it can keep the same turn rules. The platform docs define exact tracking and
-lifetime behavior.
+Swift bridges UI-read values to Observation. Kotlin reads a Compose version
+token attached to each UI-seen Cog state. The Cog runtime keeps the value;
+changing the token asks the exact Compose scopes that read it to recompose.
+The platform docs define exact tracking and lifetime mechanics.
 
 ## Lifetime and ownership
 
@@ -243,8 +258,9 @@ keep enough data to build one. Do not put logging side effects in selectors.
 
 Tests use isolated runtimes with controlled time and completion events. They
 can set starting state, test automatic values, call operations, control async
-order, check effect order and cleanup, and run the same public tests against
-more than one internal design.
+order, and check effect order and cleanup. Swift and Kotlin carry the same
+cross-platform scenarios and expected turn traces; platform suites add tests
+for their native adapters and physical representations.
 
 Silent test setup is not a production write path. To test app startup, use the
 same mechanisms, effects, or startup inputs as production.
@@ -257,13 +273,13 @@ writable copies in sync for the long term.
 
 Each platform chooses its own:
 
-- actors, threads, snapshots, locks, and queues;
-- public names and APIs;
-- Observation, Compose, Flow, and AsyncSequence support;
-- storage, key, graph-link, and specialization designs;
-- effect lifetime and dependency injection;
-- saved state and background work; and
+- ordered-lane primitive and off-lane execution tools;
+- public spelling where Swift and Kotlin idioms require it;
+- Observation, Compose, Flow, and AsyncSequence adapters;
+- physical storage, key, graph-link, and specialization representations;
+- dependency injection, saved state, and background-work integration; and
 - release plan and compatibility promises.
 
-A platform may learn from the other's work, but it must record and test its own
-choice before using it.
+Those choices affect representation and syntax. The shared state machine, turn
+phases, observable results, and ownership rules stay fixed. Each platform
+records and tests its native choices against that model.

@@ -16,7 +16,7 @@ real work starts.
 flowchart LR
     DB["Room / DataStore / repository"] -->|"Flow"| A["Cog async or manual adapter"]
     A --> G["fine-grained Cog graph"]
-    G -->|"direct State read"| UI["Compose"]
+    G -->|"direct Cog read<br/>+ boundary token"| UI["Compose"]
     G -->|"flow(cog)"| Old["legacy Flow consumer"]
 ```
 
