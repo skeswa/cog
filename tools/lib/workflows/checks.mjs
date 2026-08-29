@@ -1148,6 +1148,7 @@ function releaseWorkflowContract(workflow) {
   const recoverySource = recovery?.steps.map((step) => step.run ?? "").join("\n") ?? "";
   if (
     !recoverySource.includes("object.type") ||
+    !recoverySource.includes('gh release view "$TAG" --repo "$GITHUB_REPOSITORY"') ||
     !recoverySource.includes("gh workflow run swift-ci.yml") ||
     !recoverySource.includes("recovery_tag=${TAG}") ||
     !recoverySource.includes("gh run watch")
@@ -1158,7 +1159,7 @@ function releaseWorkflowContract(workflow) {
       check: "release-workflow-contract",
       job: "recover-candidate",
       message:
-        "recovery must require an immutable tag, dispatch tag-bound Swift CI, and wait for it",
+        "recovery must require an immutable tag and draft-aware release lookup, dispatch tag-bound Swift CI, and wait for it",
     });
   }
 
@@ -1173,6 +1174,18 @@ function releaseWorkflowContract(workflow) {
       message:
         `publisher must require the current candidate runner record ` +
         `\`${COGLINT_CANDIDATE_RUNNER_RECORD}\``,
+    });
+  }
+  if (
+    !publishSource.includes('gh release view "$tag" --repo "$GITHUB_REPOSITORY"') ||
+    !publishSource.includes("--json isDraft,isPrerelease,targetCommitish")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: publish?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "publish",
+      message: "publisher must use a draft-aware release lookup before publication",
     });
   }
   if (

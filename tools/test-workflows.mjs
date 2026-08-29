@@ -106,6 +106,7 @@ const CASES = [
     mentions: [
       "v5.0.0 SHA",
       "immutable tag",
+      "draft-aware release lookup",
       "current candidate runner record",
       "`cog-release`",
       "dispatch `docs.yml`",
