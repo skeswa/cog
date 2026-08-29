@@ -41,10 +41,10 @@ in the graph rather than in view objects.
 
 The rule is one graph per *running app*, not one graph per process. A test and
 a preview are each their own app runtime, so each may create exactly one
-isolated context:
+isolated context. Continuing the `Forecast` module from <doc:GettingStarted>:
 
 ```swift
-import Cog
+@testable import Forecast
 import CogTesting
 import Testing
 
@@ -53,7 +53,7 @@ import Testing
   let cogs = Cogs.forTesting()
 
   #expect(cogs.peek(adviceCog) == "coat")
-  cogs.turn(_temperatureCog, to: 80)
+  cogs.warmUp()
   #expect(cogs.peek(adviceCog) == "shorts")
 }
 ```

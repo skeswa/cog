@@ -1,8 +1,8 @@
 # Contributing to Cog
 
-Cog has a working Swift package and a planned Kotlin library. Each platform has
-its own design. Read the root README first, then use
-`docs/swift/README.md` for current Swift decisions and work.
+Cog has a working Swift package and a planned Kotlin library. Both implement
+one runtime model through native APIs and UI adapters. Read the root README
+first, then use `docs/swift/README.md` for current Swift decisions and work.
 
 ## Set up
 
@@ -93,19 +93,24 @@ no dependencies.
 ```sh
 npm ci
 mise run docs:dev       # local site with live reload
-mise run docs:build     # production site; fails on broken links
+mise run docs:build     # production site; checks tutorials, links, and social previews
 mise run docs           # full site, including DocC
 mise run docs:mark      # regenerate the Cog mark after changing its geometry
 ```
 
 The Cog mark is generated, not drawn. `tools/build-cog-mark.mjs` holds the gear
-geometry and writes three files from it: `docs/.vitepress/theme/CogMark.vue` for
-the site, and `docs/public/cog-lockup-{light,dark}.svg` for the root README,
-which needs standalone files because GitHub strips inline SVG out of Markdown.
-Edit the script and run `mise run docs:mark`; never edit the three outputs. The
-palette is the exception — it lives in `docs/.vitepress/theme/theme.css`, where
-the site needs it anyway, and the script reads it back out so the README cannot
-drift from the navigation bar.
+geometry and writes seven files from it: `docs/.vitepress/theme/CogMark.vue` for
+the site, `docs/public/cog-lockup-{light,dark}.svg` for the root README,
+`docs/public/cog-social-card.png` for link previews, and
+`docs/public/favicon.svg`, `docs/public/favicon-96.png`, and
+`docs/public/apple-touch-icon.png` for browser chrome. The README needs
+standalone files because GitHub strips inline SVG out of Markdown; social
+unfurlers need a fixed-size raster image; the icons drop the wordmark and crop
+square, because at 16 pixels a wordmark is a smear. Edit the script and run
+`mise run docs:mark`; never edit the seven outputs. The palette is the exception — it lives in
+`docs/.vitepress/theme/theme.css`, where the site needs it anyway, and the script
+reads it back out so neither the README nor the social card can drift from the
+navigation bar.
 
 When you add a page, add it to `docs/.vitepress/navigation.mts` and to the
 platform README that gives its reading order. Run `mise run docs:build` after
@@ -115,10 +120,11 @@ Three conventions govern the pages themselves:
 
 - Dated files are frozen; undated files are living. A living design doc uses a
   short lowercase name and carries an authorship date below its title.
-- Swift and Kotlin documents own their own platform APIs, runtime mechanics,
-  and framework integration. Cross-platform invariants and vocabulary live in
-  `docs/design.md`, and a platform choice is never copied across without a
-  decision recorded for the receiving platform.
+- Swift and Kotlin documents own their platform APIs, physical representations,
+  framework adapters, and native integrations. The shared runtime model,
+  invariants, and vocabulary live in `docs/design.md`; a platform-specific
+  choice is never copied across without a decision recorded for the receiving
+  platform.
 - The companion docs were split out of `exploration.md` and keep its numbering:
   Swift `mechanisms.md` is §6 and `rx.md` is §5.4, and Kotlin `effects.md` and
   `flows.md` mirror them. A reference such as "§6.4" resolves inside the

@@ -2,13 +2,17 @@
 // Builds the Cog mark — two meshing gears — into every form the project shows
 // it in, from one description of the geometry.
 //
-// There are two consumers and they cannot share a file. The documentation site
-// needs a Vue component, because only an inline SVG can take its colours from
-// the theme's custom properties and follow the light and dark palettes. The
-// repository README is rendered by GitHub, which strips inline `<svg>` out of
-// Markdown entirely and allows only `<img>` — so that consumer needs standalone
-// SVG files instead, one per palette, each carrying its own baked colours and
-// the wordmark as outlines rather than as text.
+// There are four consumers and they cannot share a file. The documentation
+// site needs a Vue component, because only an inline SVG can take its colours
+// from the theme's custom properties and follow the light and dark palettes.
+// The repository README is rendered by GitHub, which strips inline `<svg>` out
+// of Markdown entirely and allows only `<img>` — so that consumer needs
+// standalone SVG files instead, one per palette, each carrying its own baked
+// colours and the wordmark as outlines rather than as text. Social link
+// unfurlers need a fixed-size raster image, so the same geometry also becomes a
+// 1200×630 PNG for Open Graph and large Twitter cards. Browser chrome needs the
+// mark without its wordmark and cropped square, at the handful of sizes a tab,
+// a bookmark, and a home screen ask for.
 //
 // The outlines are not an optimisation. GitHub serves README images through
 // its camo proxy under `default-src 'none'; img-src data:; style-src
@@ -20,7 +24,7 @@
 // font at all, and the file is a twentieth of the size it would otherwise be.
 //
 // Writing those by hand would mean maintaining the same involute tooth
-// geometry in three places, so this script emits all three. Run it after
+// geometry in seven files, so this script emits all seven. Run it after
 // changing anything about the mark:
 //
 //     mise run docs:mark
@@ -32,11 +36,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const THEME_CSS = join(ROOT, "docs/.vitepress/theme/theme.css");
 const COMPONENT = join(ROOT, "docs/.vitepress/theme/CogMark.vue");
 const LOCKUP = (name) => join(ROOT, `docs/public/cog-lockup-${name}.svg`);
+const SOCIAL_CARD = join(ROOT, "docs/public/cog-social-card.png");
+const MONO_FONT = join(
+  ROOT,
+  "node_modules/@expo-google-fonts/jetbrains-mono/500Medium/JetBrainsMono_500Medium.ttf",
+);
 
 const round = (x) => Math.round(x * 1000) / 1000;
 
@@ -481,6 +491,33 @@ function palette(css, selector) {
   throw new Error(`theme.css: no "${selector}" block declares --cog-mark-0 through -3`);
 }
 
+/**
+ * The rules that paint the shared markup, for one palette.
+ *
+ * Every standalone consumer bakes its colours in rather than inheriting them,
+ * because none of them is inside the site's stylesheet: the README lockups are
+ * served through GitHub's camo proxy, and a favicon is rendered by the browser
+ * chrome with no page around it. `indent` lets the same rules nest inside a
+ * media query without the file looking machine-folded.
+ */
+function paintRules(steps, indent = "    ") {
+  const i = indent;
+  return [
+    `${i}.cog-mark__stop-0 { stop-color: ${steps[0]}; }`,
+    `${i}.cog-mark__stop-1 { stop-color: ${steps[1]}; }`,
+    `${i}.cog-mark__stop-2 { stop-color: ${steps[2]}; }`,
+    `${i}.cog-mark__stop-3 { stop-color: ${steps[3]}; }`,
+    `${i}.cog-mark__chamfer { fill: ${steps[3]}; }`,
+    `${i}.cog-mark__gear--small .cog-mark__chamfer { fill: ${steps[2]}; }`,
+    `${i}.cog-mark__bore {`,
+    `${i}  fill: none;`,
+    `${i}  stroke: ${steps[3]};`,
+    `${i}  stroke-width: 0.5;`,
+    `${i}  stroke-opacity: 0.55;`,
+    `${i}}`,
+  ].join("\n");
+}
+
 function lockup({ steps, ink }) {
   return `<svg
   xmlns="http://www.w3.org/2000/svg"
@@ -494,18 +531,7 @@ function lockup({ steps, ink }) {
   <title>Cog</title>
   <style>
     /* Baked rather than inherited: nothing outside this file reaches in. */
-    .cog-mark__stop-0 { stop-color: ${steps[0]}; }
-    .cog-mark__stop-1 { stop-color: ${steps[1]}; }
-    .cog-mark__stop-2 { stop-color: ${steps[2]}; }
-    .cog-mark__stop-3 { stop-color: ${steps[3]}; }
-    .cog-mark__chamfer { fill: ${steps[3]}; }
-    .cog-mark__gear--small .cog-mark__chamfer { fill: ${steps[2]}; }
-    .cog-mark__bore {
-      fill: none;
-      stroke: ${steps[3]};
-      stroke-width: 0.5;
-      stroke-opacity: 0.55;
-    }
+${paintRules(steps)}
     .cog-mark__word { fill: ${ink}; }
 
     /* Meshed teeth cannot slip, so the periods are the inverse of the tooth
@@ -536,6 +562,204 @@ ${BODY}
 `;
 }
 
+// ── The favicon ──────────────────────────────────────────────────────────
+//
+// A browser draws this at 16 CSS pixels in a tab strip, so it is the mark
+// alone: at that size the wordmark is a smear, and cropping to the gears buys
+// back every pixel it would have cost. The crop is square because the
+// consumers are — a tab, a bookmark, a home screen — and a non-square icon
+// gets letterboxed into one anyway.
+//
+// The animation is dropped rather than carried. No browser runs CSS
+// animations in a favicon, and an unhonoured `animation` is one more thing in
+// the file that could change what the first frame looks like.
+
+/**
+ * The ground under the Apple touch icon.
+ *
+ * The same near-black the site paints and `config.mts` publishes as its
+ * `theme-color`, so a home-screen icon and the browser chrome around the site
+ * are the same colour. It is written out rather than read from `theme.css`
+ * because that file states the mark's palette, not the page's.
+ */
+const APPLE_GROUND = "#0b0b10";
+
+const FAVICON = join(ROOT, "docs/public/favicon.svg");
+const FAVICON_PNG = join(ROOT, "docs/public/favicon-96.png");
+const APPLE_ICON = join(ROOT, "docs/public/apple-touch-icon.png");
+
+/** The mark's bounding box grown to a square, centred, with a little air. */
+const iconBox = (() => {
+  const side = Math.max(markBox.width, markBox.height) * 1.06;
+  return {
+    x: round(markBox.x + markBox.width / 2 - side / 2),
+    y: round(markBox.y + markBox.height / 2 - side / 2),
+    side: round(side),
+  };
+})();
+
+/**
+ * The mark cropped square, at a fixed pixel size.
+ *
+ * `dark` adds a `prefers-color-scheme` block, which Chrome and Firefox honour
+ * for an SVG favicon; the rasters bake one palette instead, because a PNG
+ * cannot answer the question. `ground` paints an opaque backdrop — iOS
+ * composites a transparent touch icon onto black, so that surface has to bring
+ * its own. `inset` is the fraction of the canvas left clear on each side,
+ * which is what keeps a home-screen icon's mark inside the rounded corner the
+ * system masks it with.
+ */
+function icon({ px, steps, dark = null, ground = null, inset = 0 }) {
+  const k = round((px * (1 - 2 * inset)) / iconBox.side);
+  const tx = round(px * inset - iconBox.x * k);
+  const ty = round(px * inset - iconBox.y * k);
+  return `<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 ${px} ${px}"
+  width="${px}"
+  height="${px}"
+  fill-rule="evenodd"
+  role="img"
+  aria-label="Cog"
+>
+  <title>Cog</title>
+  <style>
+${paintRules(steps)}${
+    dark ? `\n    @media (prefers-color-scheme: dark) {\n${paintRules(dark, "      ")}\n    }` : ""
+  }
+  </style>
+${ground ? `  <rect width="${px}" height="${px}" fill="${ground}" />\n` : ""}  <g transform="translate(${tx} ${ty}) scale(${k})">
+${DEFS}
+
+${BODY}
+  </g>
+</svg>
+`;
+}
+
+// ── The social preview ───────────────────────────────────────────────────
+
+const SOCIAL_WIDTH = 1200;
+const SOCIAL_HEIGHT = 630;
+
+/**
+ * Builds the source drawing for the Open Graph card.
+ *
+ * The lockup is the same outlined wordmark and measured gear pair as every
+ * other Cog surface. The graph on the right borrows the landing page's visual
+ * grammar without trying to reproduce its interactive demo at thumbnail size.
+ * Text outside the wordmark uses the pinned JetBrains Mono dependency,
+ * which Resvg receives explicitly below so the PNG is identical on every host.
+ */
+function socialCard({ steps }) {
+  const lockupScale = 7.75;
+  const lockupX = round(84 - lockupBox.x * lockupScale);
+  const lockupY = round(156 - lockupBox.y * lockupScale);
+
+  return `<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="${SOCIAL_WIDTH}"
+  height="${SOCIAL_HEIGHT}"
+  viewBox="0 0 ${SOCIAL_WIDTH} ${SOCIAL_HEIGHT}"
+  fill-rule="evenodd"
+>
+  <defs>
+    <pattern id="social-grid" width="72" height="72" patternUnits="userSpaceOnUse">
+      <path d="M72 0H0V72" fill="none" stroke="#23232e" stroke-width="1" />
+    </pattern>
+    <radialGradient id="social-glow" cx="78%" cy="45%" r="52%">
+      <stop offset="0%" stop-color="#1a1aff" stop-opacity="0.2" />
+      <stop offset="55%" stop-color="#1a1aff" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#1a1aff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+${DEFS}
+  <style>
+    .cog-mark__stop-0 { stop-color: ${steps[0]}; }
+    .cog-mark__stop-1 { stop-color: ${steps[1]}; }
+    .cog-mark__stop-2 { stop-color: ${steps[2]}; }
+    .cog-mark__stop-3 { stop-color: ${steps[3]}; }
+    .cog-mark__chamfer { fill: ${steps[3]}; }
+    .cog-mark__gear--small .cog-mark__chamfer { fill: ${steps[2]}; }
+    .cog-mark__bore {
+      fill: none;
+      stroke: ${steps[3]};
+      stroke-width: 0.5;
+      stroke-opacity: 0.55;
+    }
+    .cog-mark__word { fill: #eeeef4; }
+    .social-type { font-family: "JetBrains Mono"; font-weight: 500; }
+    .social-edge { fill: none; stroke: #33333f; stroke-width: 2; }
+    .social-edge--live { stroke: #6f78ff; }
+    .social-node { fill: #14141b; stroke: #4b4b5a; stroke-width: 2; }
+    .social-node--live { fill: #17172a; stroke: #6f78ff; stroke-width: 3; }
+    .social-node__core { fill: #6f78ff; }
+  </style>
+
+  <rect width="1200" height="630" fill="#0b0b10" />
+  <rect width="1200" height="630" fill="url(#social-grid)" opacity="0.56" />
+  <rect width="1200" height="630" fill="url(#social-glow)" />
+  <rect x="24" y="24" width="1152" height="582" fill="none" stroke="#33333f" />
+  <rect x="24" y="24" width="6" height="582" fill="#6f78ff" />
+
+  <text class="social-type" x="84" y="102" fill="#9e9eaa" font-size="18" letter-spacing="4.2">
+    STATE FOR NATIVE MOBILE UI
+  </text>
+
+  <g transform="translate(${lockupX} ${lockupY}) scale(${lockupScale})">
+${BODY}
+    <path
+      class="cog-mark__word"
+      transform="translate(${textX} ${baseline}) scale(${round(scale)})"
+      d="${WORDMARK.d}"
+    />
+  </g>
+
+  <text class="social-type" x="84" y="452" fill="#eeeef4" font-size="25" letter-spacing="1.2">
+    FINE-GRAINED STATE MANAGEMENT
+  </text>
+  <text class="social-type" x="84" y="493" fill="#6f78ff" font-size="19" letter-spacing="1.5">
+    SWIFTUI  +  JETPACK COMPOSE
+  </text>
+
+  <g aria-hidden="true">
+    <text class="social-type" x="672" y="102" fill="#7a7a88" font-size="15" letter-spacing="3.4">
+      ONE GRAPH
+    </text>
+    <path class="social-edge social-edge--live" d="M700 180C760 180 786 148 850 148" />
+    <path class="social-edge" d="M700 180C770 180 782 312 850 312" />
+    <path class="social-edge social-edge--live" d="M700 390C770 390 782 312 850 312" />
+    <path class="social-edge" d="M700 390C760 390 786 476 850 476" />
+    <path class="social-edge social-edge--live" d="M850 148C930 148 946 222 1038 222" />
+    <path class="social-edge" d="M850 312C930 312 946 222 1038 222" />
+    <path class="social-edge social-edge--live" d="M850 312C930 312 946 430 1038 430" />
+    <path class="social-edge" d="M850 476C930 476 946 430 1038 430" />
+
+    <circle class="social-node social-node--live" cx="700" cy="180" r="26" />
+    <circle class="social-node__core" cx="700" cy="180" r="7" />
+    <circle class="social-node" cx="700" cy="390" r="26" />
+    <circle class="social-node" cx="850" cy="148" r="21" />
+    <circle class="social-node social-node--live" cx="850" cy="312" r="26" />
+    <circle class="social-node__core" cx="850" cy="312" r="7" />
+    <circle class="social-node" cx="850" cy="476" r="21" />
+    <rect class="social-node social-node--live" x="1010" y="194" width="56" height="56" rx="9" />
+    <rect class="social-node" x="1010" y="402" width="56" height="56" rx="9" />
+
+    <text class="social-type" x="680" y="226" fill="#7a7a88" font-size="12">SOURCE</text>
+    <text class="social-type" x="820" y="358" fill="#7a7a88" font-size="12">DERIVED</text>
+    <text class="social-type" x="1017" y="278" fill="#7a7a88" font-size="12">VIEW</text>
+  </g>
+
+  <line x1="84" y1="550" x2="1116" y2="550" stroke="#33333f" />
+  <text class="social-type" x="84" y="582" fill="#7a7a88" font-size="14" letter-spacing="1.2">
+    SKESWA.GITHUB.IO/COG
+  </text>
+  <text class="social-type" x="1116" y="582" fill="#9e9eaa" font-size="14" text-anchor="end">
+    SWIFT · KOTLIN
+  </text>
+</svg>`;
+}
+
 // ── Emit ──────────────────────────────────────────────────────────────────
 
 const clearance = verifyMesh();
@@ -547,15 +771,32 @@ if (!(clearance > 0.05)) {
 }
 
 const css = readFileSync(THEME_CSS, "utf8");
+const lightPalette = palette(css, "\\.cog-mark");
+const darkPalette = palette(css, "\\.dark \\.cog-mark");
+
+/** Rasterises one of the icon drawings. No text, so no font has to be loaded. */
+const raster = (svg) => new Resvg(svg).render().asPng();
 
 writeFileSync(COMPONENT, COMPONENT_DOC.replace("MESH", clearance.toFixed(2)));
-writeFileSync(LOCKUP("light"), lockup({ steps: palette(css, "\\.cog-mark"), ink: "#1f2328" }));
+writeFileSync(LOCKUP("light"), lockup({ steps: lightPalette, ink: "#1f2328" }));
+writeFileSync(LOCKUP("dark"), lockup({ steps: darkPalette, ink: "#e6edf3" }));
+
+writeFileSync(FAVICON, icon({ px: 64, steps: lightPalette, dark: darkPalette }));
+writeFileSync(FAVICON_PNG, raster(icon({ px: 96, steps: lightPalette })));
 writeFileSync(
-  LOCKUP("dark"),
-  lockup({ steps: palette(css, "\\.dark \\.cog-mark"), ink: "#e6edf3" }),
+  APPLE_ICON,
+  raster(icon({ px: 180, steps: darkPalette, ground: APPLE_GROUND, inset: 0.14 })),
+);
+writeFileSync(
+  SOCIAL_CARD,
+  new Resvg(socialCard({ steps: darkPalette }), {
+    font: { fontFiles: [MONO_FONT], loadSystemFonts: false },
+  })
+    .render()
+    .asPng(),
 );
 
 console.log(
-  `build-cog-mark: wrote the component and both lockups; ` +
+  `build-cog-mark: wrote the component, both lockups, the favicon set, and social card; ` +
     `narrowest mesh clearance ${clearance.toFixed(4)} units`,
 );

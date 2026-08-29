@@ -248,15 +248,16 @@ both outputs and checks their required routes.
 
 | Job          | Runner        | Work                                                             |
 | ------------ | ------------- | ---------------------------------------------------------------- |
-| `docc-cache` | hosted Ubuntu | Find the newest release tag and look for its saved DocC archive  |
+| `docc-cache` | hosted Ubuntu | Resolve the newest published release and find its DocC archive   |
 | `docc`       | macOS lane    | Build that archive only when it is missing                       |
 | `assemble`   | hosted Ubuntu | Build VitePress, merge both sites, and upload the Pages artifact |
 | `deploy`     | hosted Ubuntu | Publish the artifact; run no repository code                     |
 
-The API reference always describes the newest release, not `main`. A normal
-docs change does not wake the macOS lane when that release archive is already saved.
-The saved archive belongs to the ref that created it, so the first `main` push
-after a release builds it once; later pushes reuse it.
+The API reference and VitePress release labels always describe GitHub's newest
+published release, not `main`, a draft tag, or the workflow's source ref. A
+normal docs change does not wake the macOS lane when that release archive is
+already saved. The saved archive belongs to the ref that created it, so the
+first `main` push after a release builds it once; later pushes reuse it.
 The `assemble` job runs third-party npm code with a read-only token. Only the
 single-action `deploy` job receives `pages: write` and `id-token: write`.
 

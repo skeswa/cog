@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { currentVersion } from "./lib/version.mjs";
 import { collectGitCommits, collectJjRevisions } from "./lib/changes.mjs";
+import { resolveSwiftRelease } from "../docs/.vitepress/release.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BOOTSTRAP_SHA = "16ade4bac358bf1c6f6dbc6e95fad2d467600250";
@@ -23,6 +24,7 @@ const MOVING_FILES = [
   "CLAUDE.md",
   "README.md",
   "docs/swift/README.md",
+  "docs/swift/installation.md",
   "swift/Sources/Cog/Cog.docc/GettingStarted.md",
   "swift/Sources/Cog/Cog.docc/LintingYourApp.md",
 ];
@@ -75,6 +77,7 @@ function main() {
 
   verifyInitialNotes();
   verifyChangelogState(version);
+  verifyDocsReleaseResolution();
   const releaseWorkflow = read(".github/workflows/release.yml", false);
   if (
     releaseWorkflow !== null &&
@@ -83,6 +86,57 @@ function main() {
     fail("release.yml does not pin release-please-action v5.0.0 by its full SHA");
   }
   console.log("test-release-configuration: Release Please bootstrap and 0.5.0 notes passed");
+}
+
+/** The site accepts only a published workflow value or the newest local stable tag. */
+function verifyDocsReleaseResolution() {
+  requireEqual(
+    resolveSwiftRelease({ COG_DOCS_RELEASE_VERSION: " 1.12.3 " }, () => {
+      fail("the tagged fallback ran despite an explicit docs release");
+    }),
+    "1.12.3",
+    "docs workflow release",
+  );
+  requireEqual(
+    resolveSwiftRelease({}, () => ["1.9.0", "2.0.0-rc.1", "1.12.3", "not-a-tag"]),
+    "1.12.3",
+    "docs local release",
+  );
+  requireFailure(
+    () => resolveSwiftRelease({ COG_DOCS_RELEASE_VERSION: "1.12.3-rc.1" }),
+    "not a bare stable semantic version",
+    "docs prerelease override",
+  );
+  requireFailure(
+    () => resolveSwiftRelease({}, () => ["1.12.3-rc.1", "unrelated"]),
+    "requires a stable release tag",
+    "docs missing stable release",
+  );
+
+  const config = read("docs/.vitepress/config.mts");
+  const homepage = read("docs/.vitepress/theme/CogHome.vue");
+  const workflow = read(".github/workflows/docs.yml");
+  for (const [source, fragment, label] of [
+    [config, "const swiftRelease = resolveSwiftRelease();", "docs config release resolver"],
+    [config, "__COG_SWIFT_RELEASE__: JSON.stringify(swiftRelease)", "docs config release value"],
+    [homepage, "const swiftRelease = __COG_SWIFT_RELEASE__;", "homepage release value"],
+    [workflow, 'releases/latest" --jq .tag_name', "published release lookup"],
+    [
+      workflow,
+      "COG_DOCS_RELEASE_VERSION: ${{ needs.docc-cache.outputs.tag }}",
+      "VitePress release handoff",
+    ],
+  ]) {
+    if (!source.includes(fragment)) fail(`${label} is missing`);
+  }
+  requireEqual(
+    homepage.match(/\{\{ swiftRelease \}\}/gu)?.length ?? 0,
+    3,
+    "homepage release reference count",
+  );
+  if (/Released · \d|upToNextMinor\(from:[^\n]*\d+\.\d+\.\d+/u.test(homepage)) {
+    fail("the homepage bypasses its resolved release with a hard-coded version");
+  }
 }
 
 /** Accepts the checked-in bootstrap once, then requires manifest and runtime versions to agree. */
@@ -257,6 +311,16 @@ function json(path) {
 function requireEqual(actual, expected, label) {
   if (actual !== expected)
     fail(`${label} is ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
+}
+
+function requireFailure(action, expectedMessage, label) {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(expectedMessage)) return;
+    throw error;
+  }
+  fail(`${label} did not fail with ${JSON.stringify(expectedMessage)}`);
 }
 
 function fail(message) {

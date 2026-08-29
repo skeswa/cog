@@ -14,7 +14,12 @@ For Swift, one `Cogs` object owns the app's state. Reads settle through its
 graph, async status uses `CogStatus`, and Observation exists only at the UI
 edge.
 
-Read the Swift docs in this order:
+If you are adding Cog to a project, start with
+**[Installation](./installation.md)**. Then follow
+**[Getting started](./getting-started.md)** to put a value on screen, change it
+from a button, and test the same state through an isolated runtime.
+
+Then read the Swift docs in this order:
 
 1. **[Core design](./design/exploration.md)** — graph behavior, public API,
    writes, async state, SwiftUI, decisions, and open questions.

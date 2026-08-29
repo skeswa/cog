@@ -33,6 +33,10 @@
         },
         {
           "type": "generic",
+          "path": "docs/swift/installation.md"
+        },
+        {
+          "type": "generic",
           "path": "swift/Sources/Cog/Cog.docc/GettingStarted.md"
         },
         {

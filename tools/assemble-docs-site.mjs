@@ -46,7 +46,9 @@ const DEFAULT_OUT = resolve(REPO_ROOT, ".build/docs-site");
  * Each one stands for a published URL. The first two are the API reference
  * itself and the JSON payload its single-page app fetches to render — a site
  * with the routes but not the data looks fine until every page loads empty.
- * The last two are the article routes `README.md` links by name.
+ * The last two are the article routes linked by name from outside the archive:
+ * `README.md` points at `lintingyourapp`, and `gettingstarted` is a bookmarked
+ * URL the site's own `docs/swift/getting-started.md` now fronts.
  */
 const REQUIRED_ROUTES = [
   "documentation/cog/index.html",

@@ -47,11 +47,12 @@ Three ideas carry most of the library:
 
 ### Where to go next
 
-<doc:GettingStarted> takes an app from an empty `Package.swift` to a value on
-screen. <doc:OneGraph> explains why an app has exactly one graph, and what that
-means for tests and previews. <doc:LintingYourApp> makes Cog's conventions
-build-time checks. <doc:StreamsAndExternalState> shows how async sequences and
-external Observation values cross the graph boundary.
+<doc:GettingStarted> adds Cog to a SwiftUI app, puts a value on screen, changes
+it through a named operation, and tests it. <doc:OneGraph> explains why an app
+has exactly one graph, and what that means for tests and previews.
+<doc:LintingYourApp> makes Cog's conventions build-time checks.
+<doc:StreamsAndExternalState> shows how async sequences and external
+Observation values cross the graph boundary.
 
 ### Prior art
 
