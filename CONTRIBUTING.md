@@ -95,7 +95,17 @@ npm ci
 mise run docs:dev       # local site with live reload
 mise run docs:build     # production site; fails on broken links
 mise run docs           # full site, including DocC
+mise run docs:mark      # regenerate the Cog mark after changing its geometry
 ```
+
+The Cog mark is generated, not drawn. `tools/build-cog-mark.mjs` holds the gear
+geometry and writes three files from it: `docs/.vitepress/theme/CogMark.vue` for
+the site, and `docs/public/cog-lockup-{light,dark}.svg` for the root README,
+which needs standalone files because GitHub strips inline SVG out of Markdown.
+Edit the script and run `mise run docs:mark`; never edit the three outputs. The
+palette is the exception — it lives in `docs/.vitepress/theme/theme.css`, where
+the site needs it anyway, and the script reads it back out so the README cannot
+drift from the navigation bar.
 
 When you add a page, add it to `docs/.vitepress/navigation.mts` and to the
 platform README that gives its reading order. Run `mise run docs:build` after

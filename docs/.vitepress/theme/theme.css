@@ -39,12 +39,8 @@
 /* ── Wordmark ───────────────────────────────────────────────────────
    The nav title is the one piece of the default chrome that should look
    like the landing page rather than like VitePress, so it borrows the
-   display serif and carries a gear.
-
-   The gear is U+2699 followed by U+FE0E, the text-presentation variation
-   selector. Without it the character renders as a colour emoji that
-   ignores `color` and clashes with the palette; with it the glyph is
-   monochrome and inherits the brand blue. */
+   display serif and carries the two-gear mark `Layout.vue` slots in
+   ahead of the text. */
 .VPNavBarTitle .title {
   font-family: "Instrument Serif", ui-serif, Georgia, serif;
   font-size: 23px;
@@ -52,28 +48,144 @@
   letter-spacing: 0.01em;
 }
 
-.VPNavBarTitle .title::before {
-  content: "\2699\FE0E";
-  color: var(--vp-c-brand-1);
-  margin-right: 7px;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.78em;
-  display: inline-block;
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+/* Two sizings the drawing does not give for free.
+
+   The height is set off the mark's own box, not off the text. The pair is
+   diagonal, so only about seven tenths of that box is the large gear;
+   matching the two heights would leave the gear reading smaller than the
+   capitals beside it. 30px puts the large gear a shade above the cap
+   height of the 23px serif.
+
+   The offset centres the lockup on weight rather than on geometry. Flex
+   alignment centres the mark's box, but the large gear — which is what the
+   eye reads as the mark — sits 64.5% of the way down that box, with only
+   the small gear above it. Lifting the mark 3px puts that axle on the
+   middle of the wordmark's ink, measured between the cap of the C and the
+   descender of the g.
+
+   The gap has to be set by eye rather than by the box for the same reason.
+   The mark's right edge is reached by the small gear's corner alone, up at
+   cap height; the large gear stops well short of it, so the space beside
+   the wordmark is wider than the margin says. 4px is what makes the two
+   read as a lockup with air in it rather than as one crowded shape. */
+.cog-mark {
+  height: 30px;
+  width: auto;
+  margin-right: 4px;
+  position: relative;
+  top: -3px;
+  flex-shrink: 0;
+  overflow: visible;
 }
 
-/* A cog that turns when you reach for it. One rotation, not a loop: an
-   idle animation in the chrome of a documentation site is a distraction. */
-.VPNavBarTitle:hover .title::before {
-  transform: rotate(120deg);
+/* Four steps of steel. The mark is the one element on the page that is not
+   painted in the brand blue: it is a machined part, and a machined part is
+   grey. The greys are pulled a little toward blue rather than left neutral,
+   which is enough to sit with the accent without competing with it.
+
+   The steps do the modelling. A dome runs from `-1` at the hub out to `-2`
+   at the rim with `-3` under it as the chamfer, and the small gear is cut
+   one step lighter — `-0` to `-1` over `-2` — so the pair still reads as
+   two bodies where the teeth mesh a fifth of a pixel apart. On the
+   near-black ground the light end has to come down and the dark end has to
+   come up: reused as they are, the highlights would glare and the chamfer
+   would disappear into the page. */
+.cog-mark {
+  --cog-mark-0: #eaedf2;
+  --cog-mark-1: #c3cad6;
+  --cog-mark-2: #8f99a9;
+  --cog-mark-3: #414b5a;
+}
+
+.dark .cog-mark {
+  --cog-mark-0: #dbe0e8;
+  --cog-mark-1: #aeb6c3;
+  --cog-mark-2: #7d8796;
+  --cog-mark-3: #4a5361;
+}
+
+.cog-mark__stop-0 {
+  stop-color: var(--cog-mark-0);
+}
+
+.cog-mark__stop-1 {
+  stop-color: var(--cog-mark-1);
+}
+
+.cog-mark__stop-2 {
+  stop-color: var(--cog-mark-2);
+}
+
+.cog-mark__stop-3 {
+  stop-color: var(--cog-mark-3);
+}
+
+/* The chamfer is the full-size outline showing past the inset top face, so
+   it wants the step below whatever that face ends on. */
+.cog-mark__chamfer {
+  fill: var(--cog-mark-3);
+}
+
+.cog-mark__gear--small .cog-mark__chamfer {
+  fill: var(--cog-mark-2);
+}
+
+/* The bore is a hole, so its depth has to come from the rim: a hairline of
+   the darkest step, drawn inside the opening. */
+.cog-mark__bore {
+  fill: none;
+  stroke: var(--cog-mark-3);
+  stroke-width: 0.5;
+  stroke-opacity: 0.55;
+}
+
+/* Each gear turns about its own axle rather than about the middle of the
+   drawing: `fill-box` measures the transform origin from the group's
+   bounding box, which the unpainted tip circle inside each group holds
+   concentric with the axle. */
+.cog-mark__gear {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The mark turns.
+
+   Neither period is free. Meshed teeth cannot slip, so the two wheels have
+   to sweep the same arc length in the same time, which locks their periods
+   to the inverse of their tooth counts: eight teeth against twelve is 24s
+   against 36s, and in opposite directions. Get that ratio wrong by any
+   amount and the pair drifts out of mesh within a minute, with teeth
+   sliding through each other for the rest of the session.
+
+   Both animations are linear and both start on the document timeline, so
+   they begin in the phase the geometry was drawn in and hold it forever;
+   an eased curve would break the lock on every cycle. 36s for a full turn
+   of the large gear is roughly a tooth every three seconds — slow enough
+   to be movement you notice rather than motion competing with the page. */
+@keyframes cog-mark-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cog-mark-turn-back {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.cog-mark__gear--large {
+  animation: cog-mark-turn 36s linear infinite;
+}
+
+.cog-mark__gear--small {
+  animation: cog-mark-turn-back 24s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .VPNavBarTitle .title::before {
-    transition: none;
-  }
-  .VPNavBarTitle:hover .title::before {
-    transform: none;
+  .cog-mark__gear--large,
+  .cog-mark__gear--small {
+    animation: none;
   }
 }
 

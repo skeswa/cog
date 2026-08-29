@@ -437,6 +437,15 @@ rm -f "{{config_root}}/Package.resolved"
 description = "Build the VitePress documentation site from docs/"
 run = "{{config_root}}/node_modules/.bin/vitepress build {{config_root}}/docs"
 
+# The Cog mark is generated rather than drawn: `tools/build-cog-mark.mjs`
+# holds the gear geometry and writes all three files that show it — the site's
+# Vue component and the two standalone lockups the root README renders, which
+# have to be separate files because GitHub strips inline SVG out of Markdown.
+
+[tasks."docs:mark"]
+description = "Regenerate the Cog mark: the site component and both README lockups"
+run = "node {{config_root}}/tools/build-cog-mark.mjs"
+
 [tasks."docs:dev"]
 description = "Serve the VitePress documentation site with hot reload"
 run = "{{config_root}}/node_modules/.bin/vitepress dev {{config_root}}/docs"
