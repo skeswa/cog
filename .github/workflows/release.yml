@@ -279,7 +279,7 @@ jobs:
              .workflow_run_id == $run_id and
              .checksum == $checksum and
              .architectures == ["arm64", "x86_64"] and
-             .build.runner == "self-hosted-cog-mini" and
+             .build.runner == "github-hosted-macos-26" and
              .build.xcode_version == "26.6" and
              .build.xcode_build == "17F113" and
              (.build.swift_version | contains("Apple Swift version 6.3.3")) and

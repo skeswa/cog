@@ -103,7 +103,13 @@ const CASES = [
     name: "Release Please pin, recovery, environment, provenance, and docs drift",
     workflow: resolve(FIXTURES, "release-contract-drift/release.yml"),
     checks: ["release-workflow-contract"],
-    mentions: ["v5.0.0 SHA", "immutable tag", "`cog-release`", "dispatch `docs.yml`"],
+    mentions: [
+      "v5.0.0 SHA",
+      "immutable tag",
+      "current candidate runner record",
+      "`cog-release`",
+      "dispatch `docs.yml`",
+    ],
   },
   {
     name: "self-hosted job with no guard",
