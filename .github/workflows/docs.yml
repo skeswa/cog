@@ -39,26 +39,54 @@ name: Docs
 # cannot leak an unreleased or stale version into Pages. That guarantee dates
 # to the first tagged release and survives here.
 #
-# There is deliberately no `paths:` filter. GitHub applies path filters to tag
-# pushes as well as branch pushes, and a release tag usually points at a commit
-# whose diff touches nothing under `docs/` — the filter would silently skip the
-# release publish, which is the one run that must never be skipped. Publishing
-# is idempotent and cheap, so running on every push to `main` is the safer
-# trade.
+# The `push` trigger deliberately has no `paths:` filter. GitHub applies path
+# filters to tag pushes as well as branch pushes, and a release tag usually
+# points at a commit whose diff touches nothing under `docs/` — the filter would
+# silently skip the release publish, which is the one run that must never be
+# skipped. Publishing is idempotent and cheap, so running on every push to
+# `main` is the safer trade.
+#
+# `pull_request` is filtered, and that is not a contradiction: no tag arrives by
+# pull request, so the trap above cannot fire there. This lane exists because
+# nothing else checks the site before it merges. Swift CI builds the whole site
+# too, but only under `candidate-extras`, which is dispatch-only and gates a
+# release — so until this trigger existed, a docs change first met a site build
+# after it was already on `main`. A dead link, a `check-getting-started.mjs`
+# mismatch, or a missing merge route reddened `main` rather than the pull
+# request that introduced it. On a pull request every job below runs exactly as
+# it does on `main` except `deploy`, which has nothing to publish to.
 on:
   push:
     branches:
       - main
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "swift/Sources/Cog/Cog.docc/**"
+      - "package.json"
+      - "package-lock.json"
+      - "mise.toml"
+      - "tools/assemble-docs-site.mjs"
+      - "tools/build-cog-mark.mjs"
+      - "tools/check-docs-social-metadata.mjs"
+      - "tools/check-getting-started.mjs"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 # Keyed on the Pages deployment rather than on the ref, because that is the
 # resource two concurrent runs would actually fight over. Never cancel in
 # progress: a half-replaced Pages deployment is worse than a slow one.
+#
+# Pull requests deploy nothing, so they contend for nothing. Putting them in the
+# `pages` group would make one open pull request delay a release publish for no
+# reason, so they group per ref and supersede themselves instead — the ordinary
+# treatment for a check whose only consumer is the pull request it is reporting
+# on.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -122,7 +150,16 @@ jobs:
     # Only on a miss. A cache entry is scoped to the ref that created it, so the
     # first run on `main` after a release will miss and rebuild once; every
     # documentation push after that hits and skips this job entirely.
-    if: github.repository == 'skeswa/cog' && needs.docc-cache.outputs.hit != 'true'
+    #
+    # The same-repo clause keeps a fork's pull request from spending half an
+    # hour of macOS on a cold cache. It checks out a release tag rather than the
+    # pull request's head, so no fork code would run here either way — this is
+    # about the bill, not about trust. A fork that does hit a cold cache fails in
+    # `assemble` with the explicit message below, which is the honest outcome.
+    if: >-
+      github.repository == 'skeswa/cog' && needs.docc-cache.outputs.hit != 'true'
+      && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: macos-26
     timeout-minutes: 30
     permissions:
@@ -225,7 +262,12 @@ jobs:
       - name: Assemble both halves into one site
         run: node tools/assemble-docs-site.mjs
 
+      # Everything above this line is the check: the site built, both halves
+      # merged, and `assemble-docs-site.mjs` satisfied that the required routes
+      # arrived. Only the upload is deployment machinery, so only the upload is
+      # skipped on a pull request.
       - name: Package the site for Pages
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: .build/docs-site
@@ -243,7 +285,11 @@ jobs:
     # artifact, and then silently published none of it, because a skipped job
     # leaves the run green. Guard on `assemble` alone, which is the only result
     # that decides whether there is an artifact worth deploying.
-    if: always() && needs.assemble.result == 'success'
+    # A pull request has no artifact to publish and no business replacing the
+    # live site, so it never reaches this job.
+    if: >-
+      always() && needs.assemble.result == 'success' && github.event_name !=
+      'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The repository's one write grant. See the header, and
