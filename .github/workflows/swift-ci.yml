@@ -685,15 +685,31 @@ jobs:
       # point of the matrix is to learn which legs disagree.
       fail-fast: false
       matrix:
-        # The four legs of the isolation matrix, named exactly as
+        # The legs of the isolation matrix, named exactly as
         # `tools/swift-test.mjs` names them — the wrapper takes each leg name
         # as a mode of its own. Each leg gets its own job so the legs
         # parallelize across the mini's runners and cache separately.
-        leg:
-          - mainactor-nnbd-on
-          - mainactor-nnbd-off
-          - nonisolated-nnbd-on
-          - nonisolated-nnbd-off
+        #
+        # A pull request runs the diagonal rather than the square. The two axes
+        # are the consumer's `defaultIsolation` and its
+        # `NonisolatedNonsendingByDefault`, and `mainactor-nnbd-on` paired with
+        # `nonisolated-nnbd-off` is the smallest set in which every value of
+        # both appears — so a regression on either axis still fails the pull
+        # request that caused it, at half the macOS cost. `mainactor-nnbd-on`
+        # is in the pair because it is what the library itself ships under, and
+        # because the leg-gated steps below key on it.
+        #
+        # Only the interaction bugs are deferred: something that breaks under
+        # `mainactor` with the feature off, and under nothing else. Pushes to
+        # `main` and the release candidate still run all four, so a leg-specific
+        # regression is caught when the change merges rather than when someone
+        # cuts a release. LEG-01 promises the suite passes in every leg; this is
+        # where that promise is proven.
+        leg: >-
+          ${{ github.event_name == 'pull_request' &&
+          fromJSON('["mainactor-nnbd-on", "nonisolated-nnbd-off"]') ||
+          fromJSON('["mainactor-nnbd-on", "mainactor-nnbd-off",
+          "nonisolated-nnbd-on", "nonisolated-nnbd-off"]') }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -994,11 +1010,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        leg:
-          - mainactor-nnbd-on
-          - mainactor-nnbd-off
-          - nonisolated-nnbd-on
-          - nonisolated-nnbd-off
+        # The same diagonal-on-pull-request rule as the same-repo lane above,
+        # which documents it. This lane only ever runs for a fork's pull
+        # request, so in practice it is always the two-leg diagonal.
+        leg: >-
+          ${{ github.event_name == 'pull_request' &&
+          fromJSON('["mainactor-nnbd-on", "nonisolated-nnbd-off"]') ||
+          fromJSON('["mainactor-nnbd-on", "mainactor-nnbd-off",
+          "nonisolated-nnbd-on", "nonisolated-nnbd-off"]') }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

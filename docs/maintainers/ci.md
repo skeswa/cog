@@ -225,6 +225,17 @@ The final `Release candidate` job requires all commit, format, host, simulator,
 example, Storefront, lint, docs, task, benchmark, and artifact jobs. Its hosted
 commit check also supplies the required result for a bot-created release PR.
 
+Host tests run the isolation matrix, and a pull request runs its diagonal. The
+two axes are the consumer's `defaultIsolation` and its
+`NonisolatedNonsendingByDefault`, so `mainactor-nnbd-on` with
+`nonisolated-nnbd-off` is the smallest pair covering every value of both: a
+regression on either axis fails the pull request that caused it, for half the
+macOS cost. Pushes to `main` and the release candidate run all four legs, which
+is where LEG-01 is proven and where an interaction bug — one that needs
+`mainactor` _and_ the feature off — is caught. Keep `mainactor-nnbd-on` in the
+pair: it is what the library ships under, and the CompactArena trait and
+`api:check` steps are gated on it.
+
 The `paths:` lists on `push` and `pull_request` describe what an ordinary run
 compiles, lints, or tests, and nothing more. They do not bound a candidate:
 `workflow_dispatch` carries no `paths:`, so every dispatch-only job — including
