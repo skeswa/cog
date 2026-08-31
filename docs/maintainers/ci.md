@@ -225,6 +225,16 @@ The final `Release candidate` job requires all commit, format, host, simulator,
 example, Storefront, lint, docs, task, benchmark, and artifact jobs. Its hosted
 commit check also supplies the required result for a bot-created release PR.
 
+Benchmark thresholds are dispatch-only, so they run for a release candidate and
+nowhere else. The committed ceilings are deterministic rather than flaky —
+`--allocations-only` already defers every wall-clock ceiling to the pinned
+runner, and allocation and ARC counts hold across hosts on one toolchain — so
+this is a decision about what an ordinary push should cost, not a statement
+about the gate. The trade is that an allocation regression surfaces at the
+candidate rather than at the merge that caused it, with more commits to bisect;
+`mise run bench:thresholds:check` is the local answer, and `candidate-gate`
+still requires the job, so no candidate reaches a release without it.
+
 Host tests run the isolation matrix, and a pull request runs its diagonal. The
 two axes are the consumer's `defaultIsolation` and its
 `NonisolatedNonsendingByDefault`, so `mainactor-nnbd-on` with
