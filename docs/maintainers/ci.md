@@ -266,6 +266,14 @@ at the tag because events made by a repository token do not usually start
 another workflow. If the API reference is missing, rerun Docs; the merge step
 will fail instead of publishing broken `/documentation/cog/` links.
 
+Keep the `always()` guard on every job downstream of `docc`. A skipped job
+skips whatever needs it, and that travels the whole `needs` chain instead of
+stopping at the first job to recover: `assemble` surviving a skipped `docc` is
+not enough to let `deploy` run, so both carry their own guard. Drop either one
+and an ordinary docs push hits the DocC cache, skips `docc`, builds and uploads
+a Pages artifact, publishes none of it, and still reports the run green. That
+went unnoticed for six runs between 0.6.0 and 0.6.1.
+
 ## Open questions
 
 These are unresolved operational choices, not defects. Each is written down so

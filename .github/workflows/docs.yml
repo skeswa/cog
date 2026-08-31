@@ -233,6 +233,17 @@ jobs:
   deploy:
     name: Publish to GitHub Pages
     needs: assemble
+    # `always()` for the same reason `assemble` needs it, one step further down.
+    # A skipped job skips everything that needs it, and that propagates through
+    # the whole `needs` ancestry rather than stopping at the job that recovered:
+    # `assemble` survives a skipped `docc` on its own guard, but the default
+    # `success()` here still sees the skip two levels up and takes this job with
+    # it. That is not a hypothetical — every documentation push between 0.6.0
+    # and 0.6.1 hit the DocC cache, skipped `docc`, built and uploaded a Pages
+    # artifact, and then silently published none of it, because a skipped job
+    # leaves the run green. Guard on `assemble` alone, which is the only result
+    # that decides whether there is an artifact worth deploying.
+    if: always() && needs.assemble.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The repository's one write grant. See the header, and
