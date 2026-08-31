@@ -55,6 +55,12 @@ name: Swift CI
 # compile-fail jobs, then `test-simulator` and the example-app builds, then the
 # benchmark package gate, then CogLint dogfood on both macOS runner lanes, and
 # finally the manually dispatched, exact-source release-artifact job.
+#
+# What an ordinary push or pull request pays for has since been pulled back to
+# what it can actually conclude. Host tests run the isolation diagonal rather
+# than the square on a pull request, and the benchmark thresholds moved to the
+# release candidate outright. Both still run in full before a release, which is
+# the property that matters; `docs/maintainers/ci.md` records the cadence.
 
 # The two path lists are deliberately duplicated rather than shared through a
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
@@ -1151,7 +1157,7 @@ jobs:
   # the flag restores the full gate when the mini returns. The concurrency
   # group still serializes benchmark runs across refs.
   bench-build:
-    name: Benchmark thresholds (same-repo, GitHub-hosted)
+    name: Release-only benchmark thresholds (same-repo, GitHub-hosted)
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -1159,9 +1165,21 @@ jobs:
     concurrency:
       group: swift-bench-cog-mini
       cancel-in-progress: false
+    # Dispatch-only, the same lane `candidate-extras` runs in, so the committed
+    # allocation and ARC ceilings are asserted once per release candidate rather
+    # than on every push. They are deterministic rather than flaky — the
+    # wall-clock ceilings are the ones a shared runner cannot measure, and
+    # `--allocations-only` already defers those — so this is a decision about
+    # what a pull request should cost, not about whether the gate can be
+    # trusted. The trade is that an allocation regression now surfaces at the
+    # release candidate instead of at the merge that caused it, with more
+    # commits to bisect. `bench:thresholds:check` still runs locally, and
+    # `candidate-gate` still requires this job, so no candidate reaches a
+    # release without it.
     if: >-
-      github.repository == 'skeswa/cog' && (github.event_name != 'pull_request'
-      || github.event.pull_request.head.repo.full_name == github.repository)
+      github.repository == 'skeswa/cog' && github.event_name ==
+      'workflow_dispatch' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
