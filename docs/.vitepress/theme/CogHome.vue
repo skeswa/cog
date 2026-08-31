@@ -1384,8 +1384,8 @@ onBeforeUnmount(() => {
   --live: #087f4f;
   --code-bg: #f2f2f7;
 
-  --display: "Instrument Serif", ui-serif, Georgia, serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: var(--cog-font-display);
+  --mono: var(--cog-font-mono);
 
   color: var(--ink);
   font-family: var(--mono);

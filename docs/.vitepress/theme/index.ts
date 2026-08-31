@@ -1,5 +1,6 @@
 import DefaultTheme from "vitepress/theme";
 import type { Theme } from "vitepress";
+import "./fonts.css";
 import "@fontsource/instrument-serif/latin-400.css";
 import "@fontsource/instrument-serif/latin-400-italic.css";
 import "@fontsource/jetbrains-mono/latin-400.css";
@@ -25,7 +26,9 @@ import "./theme.css";
  *
  * The fonts are self-hosted through `@fontsource` rather than linked from a
  * font CDN, so reading the documentation does not require a third-party
- * request.
+ * request. `fonts.css` is loaded ahead of them because it holds the metric-
+ * matched fallbacks those faces swap in from, and the stacks that name them;
+ * `../font-head.mjs` is the other half of the same fix.
  */
 export default {
   extends: DefaultTheme,

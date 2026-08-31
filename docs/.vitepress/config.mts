@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import { fontPreloadHead } from "./font-head.mjs";
 import { renderMermaidDiagrams } from "./mermaid-markdown.mjs";
 import { nav, sidebar } from "./navigation.mjs";
 import { resolveSwiftRelease } from "./release.mjs";
@@ -52,7 +53,11 @@ export default defineConfig({
   },
 
   sitemap: { hostname: siteUrl },
-  transformHead: (context) => socialHead(context, siteUrl),
+  // The font preloads come first because they are the only entries here that
+  // race the render: the sooner the scanner sees them the less of the page is
+  // painted in the fallback. `socialHead` returns nothing for the 404 page,
+  // which still wants the font.
+  transformHead: (context) => [...fontPreloadHead(context.assets), ...socialHead(context, siteUrl)],
 
   vite: {
     define: {
