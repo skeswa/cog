@@ -291,5 +291,5 @@ Current measurements are in the [performance record](./impl/perf.md).
 
 <!-- x-release-please-start-version -->
 
-The current published Swift release is 0.6.0.
+The current published Swift release is 0.6.1.
 <!-- x-release-please-end -->

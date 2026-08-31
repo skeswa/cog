@@ -9,6 +9,13 @@ releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## [0.6.1](https://github.com/skeswa/cog/compare/0.6.0...0.6.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **docs:** keep both libraries reachable from the shared pages ([9e933e2](https://github.com/skeswa/cog/commit/9e933e2c0cd15063f2ec3ee12db7b5f4a01be9d4))
+
 ## [0.6.0](https://github.com/skeswa/cog/compare/0.5.0...0.6.0) (2026-08-29)
 
 

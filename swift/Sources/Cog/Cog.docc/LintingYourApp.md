@@ -21,11 +21,11 @@ For SwiftPM, add both version-matched packages and attach
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.6.0")
+    .upToNextMinor(from: "0.6.1")
   ),
   .package(
     url: "https://github.com/skeswa/coglint-plugins.git",
-    exact: "0.6.0"
+    exact: "0.6.1"
   ),
 ],
 // x-release-please-end
