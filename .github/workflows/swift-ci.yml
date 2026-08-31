@@ -60,6 +60,14 @@ name: Swift CI
 # YAML anchor, for the reason `markdown.yml` records: `on:` is read by the
 # trigger parser rather than the runner, and a parse failure there does not
 # error — the lane simply never runs.
+#
+# The lists say what an ordinary push or pull request compiles, lints, or tests,
+# and the negations exist because a glob was claiming more than that. They do
+# not bound the release candidate: `workflow_dispatch` carries no `paths:`, so
+# the dispatch-only jobs — `candidate-extras` above all, which builds the
+# complete documentation site — see every change regardless of what is listed
+# here. Widen this list when a new input can change what an ordinary run
+# concludes; a file that only the site consumes belongs in `docs.yml`.
 on:
   workflow_dispatch:
     inputs:
@@ -76,9 +84,26 @@ on:
       - "Package.swift"
       - "Package.resolved"
       - "swift/**"
+      # The DocC catalogue is thirteen markdown files and nothing compilable.
+      # `.oxfmtrc.json` ignores it, no ordinary job reads it, and the two things
+      # that do are covered elsewhere: `docs.yml` builds the catalogue on every
+      # documentation pull request, and `candidate-extras` builds the whole site
+      # before a release. Editing prose there should not wake a macOS runner.
+      - "!swift/Sources/**/*.docc/**"
       - ".swift-format"
       - "mise.toml"
       - "tools/**"
+      # `tools/**` stays a glob so a new checker defaults to running this lane;
+      # only the four scripts that exist solely to build the documentation site
+      # are carved back out. Every one of them is reachable from `mise run docs`
+      # and from nothing else, and `mise run docs` lives in `candidate-extras`,
+      # which is dispatch-only — and `workflow_dispatch` ignores `paths:`
+      # entirely, so the release candidate still builds the site these four
+      # produce. `docs.yml` covers them on pull requests.
+      - "!tools/assemble-docs-site.mjs"
+      - "!tools/build-cog-mark.mjs"
+      - "!tools/check-docs-social-metadata.mjs"
+      - "!tools/check-getting-started.mjs"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
   push:
@@ -88,9 +113,26 @@ on:
       - "Package.swift"
       - "Package.resolved"
       - "swift/**"
+      # The DocC catalogue is thirteen markdown files and nothing compilable.
+      # `.oxfmtrc.json` ignores it, no ordinary job reads it, and the two things
+      # that do are covered elsewhere: `docs.yml` builds the catalogue on every
+      # documentation pull request, and `candidate-extras` builds the whole site
+      # before a release. Editing prose there should not wake a macOS runner.
+      - "!swift/Sources/**/*.docc/**"
       - ".swift-format"
       - "mise.toml"
       - "tools/**"
+      # `tools/**` stays a glob so a new checker defaults to running this lane;
+      # only the four scripts that exist solely to build the documentation site
+      # are carved back out. Every one of them is reachable from `mise run docs`
+      # and from nothing else, and `mise run docs` lives in `candidate-extras`,
+      # which is dispatch-only — and `workflow_dispatch` ignores `paths:`
+      # entirely, so the release candidate still builds the site these four
+      # produce. `docs.yml` covers them on pull requests.
+      - "!tools/assemble-docs-site.mjs"
+      - "!tools/build-cog-mark.mjs"
+      - "!tools/check-docs-social-metadata.mjs"
+      - "!tools/check-getting-started.mjs"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
 

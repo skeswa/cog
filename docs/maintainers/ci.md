@@ -225,6 +225,18 @@ The final `Release candidate` job requires all commit, format, host, simulator,
 example, Storefront, lint, docs, task, benchmark, and artifact jobs. Its hosted
 commit check also supplies the required result for a bot-created release PR.
 
+The `paths:` lists on `push` and `pull_request` describe what an ordinary run
+compiles, lints, or tests, and nothing more. They do not bound a candidate:
+`workflow_dispatch` carries no `paths:`, so every dispatch-only job — including
+`candidate-extras`, which builds the complete documentation site — sees every
+change however the lists read. The negations exist because `swift/**` and
+`tools/**` were each claiming files no ordinary job reads: the DocC catalogue is
+prose that `.oxfmtrc.json` already ignores, and four scripts under `tools/` are
+reachable only from `mise run docs`. Those belong to the Docs workflow, which
+now checks them on pull requests. Add to these lists when a new input can change
+what an ordinary run concludes; leave a site-only file out and let Docs cover
+it.
+
 ### Release publication
 
 `release.yml` keeps four hosted jobs and four separate tokens:
@@ -253,10 +265,21 @@ both outputs and checks their required routes.
 | `assemble`   | hosted Ubuntu | Build VitePress, merge both sites, and upload the Pages artifact |
 | `deploy`     | hosted Ubuntu | Publish the artifact; run no repository code                     |
 
+Docs also runs on pull requests that touch the site, and that lane is the only
+thing checking the site before it merges — Swift CI builds it too, but only in
+`candidate-extras`, which is dispatch-only. Every job above runs on a pull
+request exactly as it does on `main`, except that `assemble` skips the artifact
+upload and `deploy` never starts. The check is therefore the build, the merge,
+and the required-route assertion; publishing is the part pull requests do not
+get. Unlike `push`, the pull-request trigger is path-filtered, which is safe
+because no tag arrives by pull request.
+
 The API reference and VitePress release labels always describe GitHub's newest
 published release, not `main`, a draft tag, or the workflow's source ref. A
 normal docs change does not wake the macOS lane when that release archive is
-already saved. The saved archive belongs to the ref that created it, so the
+already saved, and `docc` additionally refuses to build for a fork's pull
+request: it checks out a release tag rather than the pull request's head, so the
+guard is about the macOS bill rather than about trust. The saved archive belongs to the ref that created it, so the
 first `main` push after a release builds it once; later pushes reuse it.
 The `assemble` job runs third-party npm code with a read-only token. Only the
 single-action `deploy` job receives `pages: write` and `id-token: write`.
