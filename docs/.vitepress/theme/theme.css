@@ -42,7 +42,7 @@
    display serif and carries the two-gear mark `Layout.vue` slots in
    ahead of the text. */
 .VPNavBarTitle .title {
-  font-family: "Instrument Serif", ui-serif, Georgia, serif;
+  font-family: var(--cog-font-display);
   font-size: 23px;
   font-weight: 400;
   letter-spacing: 0.01em;

@@ -1,0 +1,76 @@
+/*
+ * Fallback faces for the display serif, so the moment the real font arrives is
+ * a change of ink rather than a change of layout.
+ *
+ * `@fontsource` ships every face as `font-display: swap`, which means the
+ * headline is painted in whatever the stack falls through to and then
+ * repainted once `Instrument Serif` loads. That repaint is only jarring
+ * because the two fonts do not measure alike. Instrument Serif is a narrow
+ * display serif — its frequency-weighted advance is 0.344em against Times New
+ * Roman's 0.415em — so the landing page's `State that feels simple` wraps to
+ * three lines in the real font and four in the fallback, and everything below
+ * the hero jumps when the swap lands.
+ *
+ * The faces below fix that by re-describing a font that is already on the
+ * machine. `size-adjust` scales Times New Roman down until its average
+ * advance matches Instrument Serif's, which holds the line breaks and the
+ * block height still across the swap; the metric overrides then restate
+ * Instrument Serif's own vertical metrics, divided by that same scale, so the
+ * line box and the baseline within it do not move either. What is left to
+ * change is glyph shape and a slightly shorter cap height, which reads as the
+ * headline settling rather than as the page reflowing.
+ *
+ * `local()` only ever names fonts that ship with an operating system, so this
+ * costs no bytes. Times New Roman covers macOS and Windows; Liberation Serif
+ * and Tinos are metric-compatible clones and carry the same numbers on the
+ * Linux distributions that have them. Where none of them resolve — Android,
+ * most notably — the family drops out of the stack entirely and the page falls
+ * through to `ui-serif` exactly as it did before.
+ *
+ * The numbers are derived, not tuned by eye: `size-adjust` is the ratio of the
+ * two fonts' advance widths averaged over English letter frequencies, and each
+ * override is Instrument Serif's `hhea` metric over its unitsPerEm, divided by
+ * `size-adjust` because the browser applies the scale to the overrides too.
+ * Recompute them if the display face is ever replaced.
+ */
+
+@font-face {
+  font-family: "Instrument Serif Fallback";
+  font-style: normal;
+  font-weight: 400;
+  src:
+    local("Times New Roman"), local("TimesNewRomanPSMT"), local("Liberation Serif"), local("Tinos");
+  size-adjust: 82.86%;
+  ascent-override: 119.48%;
+  descent-override: 37.41%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Serif Fallback";
+  font-style: italic;
+  font-weight: 400;
+  src:
+    local("Times New Roman Italic"), local("TimesNewRomanPS-ItalicMT"),
+    local("Liberation Serif Italic"), local("Tinos Italic");
+  size-adjust: 87.19%;
+  ascent-override: 113.55%;
+  descent-override: 35.56%;
+  line-gap-override: 0%;
+}
+
+/*
+ * The one display stack the site has. The landing page and the navigation
+ * wordmark are the two places the serif appears, and they have to agree: a
+ * fallback that only one of them names would leave the other reflowing.
+ *
+ * The mono stack is deliberately not given the same treatment. JetBrains Mono
+ * advances at 0.600em and the faces it falls through to on Apple platforms —
+ * `ui-monospace`, which resolves to SF Mono, and Menlo behind it — advance at
+ * 0.618em and 0.602em, so the text it sets is already within a few thousandths
+ * of its final width and does not visibly move.
+ */
+:root {
+  --cog-font-display: "Instrument Serif", "Instrument Serif Fallback", ui-serif, Georgia, serif;
+  --cog-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
