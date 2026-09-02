@@ -1,0 +1,10 @@
+{
+  "name": "cog",
+  "description": "Conventions and code shapes for Swift apps built on Cog, generated from the Cog handbook.",
+  "author": {
+    "name": "Sandile Keswa"
+  },
+  "homepage": "https://skeswa.github.io/cog/swift/agent-guide",
+  "repository": "https://github.com/skeswa/cog",
+  "license": "MIT"
+}
