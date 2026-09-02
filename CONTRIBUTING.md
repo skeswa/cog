@@ -113,8 +113,16 @@ reads it back out so neither the README nor the social card can drift from the
 navigation bar.
 
 When you add a page, add it to `docs/.vitepress/navigation.mts` and to the
-platform README that gives its reading order. Run `mise run docs:build` after
-moving or renaming a page.
+platform README that gives its reading order. Give it a frontmatter
+`description`: the site's `llms.txt`, which coding agents read first, is built
+from those. Run `mise run docs:build` after moving or renaming a page.
+
+The agent skill under `skills/cog/` is generated, never edited. `SKILL.md` is
+`docs/swift/agent-guide.md` and `references/` holds the handbook chapters, with
+links rewritten for a copy that lives outside this repository. After changing
+either source, run `mise run skill:build` and commit the result; `docs:build`
+runs `mise run skill:check` and fails on a stale skill. `context7.json` at the
+root tells the Context7 index which of these same files to read.
 
 Three conventions govern the pages themselves:
 

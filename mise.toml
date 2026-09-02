@@ -402,6 +402,14 @@ run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-sentinel"
 #
 # The flag is experimental, so `tools/assemble-docs-site.mjs` asserts the
 # content actually arrived rather than trusting that it did.
+#
+# The two markdown flags are the agent-facing half of the same idea. Swift 6.3's
+# DocC writes a Markdown twin of every page into `data/documentation/` plus a
+# manifest at the archive root. The assembler mirrors those twins beside their
+# HTML routes, so `documentation/cog/lintingyourapp.md` is the article a
+# `coglint` finding links to, as plain Markdown, and lists the articles in the
+# site's `llms.txt`. These flags are experimental too, and the assembler checks
+# for the twins the same way it checks for rendered content.
 
 [tasks."docs"]
 description = "Build the whole documentation site: DocC, VitePress, and the merge"
@@ -423,6 +431,8 @@ COG_DOCC=1 swift package \
   --disable-indexing \
   --transform-for-static-hosting \
   --experimental-transform-for-static-hosting-with-content \
+  --enable-experimental-markdown-output \
+  --enable-experimental-markdown-output-manifest \
   --hosting-base-path cog \
   --output-path "{{config_root}}/.build/docs/Cog.doccarchive"
 rm -f "{{config_root}}/Package.resolved"
@@ -437,6 +447,7 @@ rm -f "{{config_root}}/Package.resolved"
 description = "Build and verify the VitePress documentation site from docs/"
 run = """
 node {{config_root}}/tools/check-getting-started.mjs
+node {{config_root}}/tools/build-cog-skill.mjs --check
 {{config_root}}/node_modules/.bin/vitepress build {{config_root}}/docs
 node {{config_root}}/tools/check-docs-social-metadata.mjs
 """
@@ -451,6 +462,21 @@ node {{config_root}}/tools/check-docs-social-metadata.mjs
 [tasks."docs:mark"]
 description = "Regenerate the Cog mark: site component, README lockups, favicons, and social card"
 run = "node {{config_root}}/tools/build-cog-mark.mjs"
+
+# The agent skill under `skills/cog/` is generated from the docs, never
+# edited: `SKILL.md` is `docs/swift/agent-guide.md` and the references are the
+# handbook chapters, with links rewritten for a file that has been copied out
+# of this repository. `npx skills add skeswa/cog` and Claude Code's plugin
+# marketplace both read it from the tree, so it is committed, and `docs:build`
+# runs the check so a handbook edit cannot leave the skill behind.
+
+[tasks."skill:build"]
+description = "Regenerate the agent skill under skills/cog from the docs"
+run = "node {{config_root}}/tools/build-cog-skill.mjs"
+
+[tasks."skill:check"]
+description = "Verify the generated agent skill matches the docs"
+run = "node {{config_root}}/tools/build-cog-skill.mjs --check"
 
 [tasks."docs:dev"]
 description = "Serve the VitePress documentation site with hot reload"

@@ -72,6 +72,8 @@ on:
       - "tools/build-cog-mark.mjs"
       - "tools/check-docs-social-metadata.mjs"
       - "tools/check-getting-started.mjs"
+      - "tools/build-cog-skill.mjs"
+      - "skills/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 

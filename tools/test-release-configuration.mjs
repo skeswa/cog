@@ -24,7 +24,9 @@ const MOVING_FILES = [
   "CLAUDE.md",
   "README.md",
   "docs/swift/README.md",
+  "docs/swift/agent-guide.md",
   "docs/swift/installation.md",
+  "skills/cog/SKILL.md",
   "swift/Sources/Cog/Cog.docc/GettingStarted.md",
   "swift/Sources/Cog/Cog.docc/LintingYourApp.md",
 ];

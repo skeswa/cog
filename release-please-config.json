@@ -33,7 +33,15 @@
         },
         {
           "type": "generic",
+          "path": "docs/swift/agent-guide.md"
+        },
+        {
+          "type": "generic",
           "path": "docs/swift/installation.md"
+        },
+        {
+          "type": "generic",
+          "path": "skills/cog/SKILL.md"
         },
         {
           "type": "generic",

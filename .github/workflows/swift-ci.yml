@@ -104,12 +104,13 @@ on:
       # are carved back out. Every one of them is reachable from `mise run docs`
       # and from nothing else, and `mise run docs` lives in `candidate-extras`,
       # which is dispatch-only — and `workflow_dispatch` ignores `paths:`
-      # entirely, so the release candidate still builds the site these four
+      # entirely, so the release candidate still builds the site these five
       # produce. `docs.yml` covers them on pull requests.
       - "!tools/assemble-docs-site.mjs"
       - "!tools/build-cog-mark.mjs"
       - "!tools/check-docs-social-metadata.mjs"
       - "!tools/check-getting-started.mjs"
+      - "!tools/build-cog-skill.mjs"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
   push:
@@ -133,12 +134,13 @@ on:
       # are carved back out. Every one of them is reachable from `mise run docs`
       # and from nothing else, and `mise run docs` lives in `candidate-extras`,
       # which is dispatch-only — and `workflow_dispatch` ignores `paths:`
-      # entirely, so the release candidate still builds the site these four
+      # entirely, so the release candidate still builds the site these five
       # produce. `docs.yml` covers them on pull requests.
       - "!tools/assemble-docs-site.mjs"
       - "!tools/build-cog-mark.mjs"
       - "!tools/check-docs-social-metadata.mjs"
       - "!tools/check-getting-started.mjs"
+      - "!tools/build-cog-skill.mjs"
       - "docs/swift/impl/scenarios.md"
       - ".github/workflows/swift-ci.yml"
 
