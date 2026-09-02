@@ -20,7 +20,9 @@ name: Docs
 #   full Xcode — `Cog` imports SwiftUI and Observation, so there is no Linux
 #   build of this package — and the same pinned toolchain the rest of CI uses.
 #   Its home is the self-hosted Mac mini; while the mini is unavailable it
-#   rides GitHub-hosted `macos-26` (see `docs/maintainers/ci.md`).
+#   rides GitHub-hosted `macos-26` (see `docs/maintainers/ci.md`). It documents
+#   the release tag's sources with this ref's `docs:api` recipe, so a change to
+#   how the archive is built reaches the site without waiting for a release.
 #
 #   `assemble` runs on GitHub-hosted ubuntu. It installs npm dependencies,
 #   builds the VitePress half, merges in the DocC half, and uploads the Pages
@@ -135,7 +137,11 @@ jobs:
             exit 1
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "key=docc-${tag}-xcode${COG_XCODE_VERSION}-${COG_XCODE_BUILD}-v1" >> "$GITHUB_OUTPUT"
+          # The trailing `-vN` names the recipe. The tag and Xcode pin the
+          # sources and toolchain, but the flags `docs:api` passes are part of
+          # what gets cached too, so bump it whenever those flags change:
+          # v2 added DocC's Markdown twins and their manifest.
+          echo "key=docc-${tag}-xcode${COG_XCODE_VERSION}-${COG_XCODE_BUILD}-v2" >> "$GITHUB_OUTPUT"
           echo "Building the API reference from ${tag}."
 
       - name: Ask whether that archive is already cached
@@ -154,10 +160,11 @@ jobs:
     # documentation push after that hits and skips this job entirely.
     #
     # The same-repo clause keeps a fork's pull request from spending half an
-    # hour of macOS on a cold cache. It checks out a release tag rather than the
-    # pull request's head, so no fork code would run here either way — this is
-    # about the bill, not about trust. A fork that does hit a cold cache fails in
-    # `assemble` with the explicit message below, which is the honest outcome.
+    # hour of macOS on a cold cache, and it is also the trust boundary: the
+    # `docs:api` recipe below comes from the pull request's head, and only the
+    # documented sources come from the release tag. A fork that does hit a cold
+    # cache fails in `assemble` with the explicit message below, which is the
+    # honest outcome.
     if: >-
       github.repository == 'skeswa/cog' && needs.docc-cache.outputs.hit != 'true'
       && (github.event_name != 'pull_request' ||
@@ -167,10 +174,20 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Two checkouts. The first is this ref: `mise.toml`, whose `docs:api`
+      # task is the recipe, and `tools/select-xcode.mjs`. The second is the
+      # release the archive documents, placed under `.build/` so it is the
+      # package DocC reads and nothing else.
+      - name: Check out the repository for the docs recipe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Check out the release the archive documents
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.docc-cache.outputs.tag }}
+          path: .build/docs-source
           clean: true
           persist-credentials: false
 
@@ -183,19 +200,26 @@ jobs:
         run: node tools/select-xcode.mjs
 
       - name: Build the DocC archive
+        env:
+          COG_DOCS_PACKAGE_PATH: ${{ github.workspace }}/.build/docs-source
         run: mise run docs:api
 
       # `Package.resolved` exists only because `COG_DOCC=1` pulled in
       # swift-docc-plugin. Consumers must resolve this package with no
       # dependencies at all, so the file never leaves this job — and a
-      # surviving copy would be a real defect, not a tidiness issue.
+      # surviving copy would be a real defect, not a tidiness issue. Both
+      # checkouts are checked: the resolve writes beside the package it
+      # resolved, and a task edit that pointed it at the wrong one would
+      # otherwise pass here.
       - name: Prove the docs build left no dependency pins behind
         run: |
           set -euo pipefail
-          if [ -e Package.resolved ]; then
-            echo "::error title=Package.resolved survived::The docs build left dependency pins in the working tree. mise run docs:api must delete it."
-            exit 1
-          fi
+          for pins in Package.resolved .build/docs-source/Package.resolved; do
+            if [ -e "$pins" ]; then
+              echo "::error title=Package.resolved survived::The docs build left dependency pins at ${pins}. mise run docs:api must delete it."
+              exit 1
+            fi
+          done
 
       - name: Cache the archive for later documentation pushes
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
