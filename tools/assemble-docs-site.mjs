@@ -27,10 +27,21 @@
 // bookmarked. So the merge is not trusted — it is checked, by `REQUIRED_ROUTES`
 // below, and a missing route fails the build rather than publishing a site
 // that 404s its own API reference.
+//
+// The merge also finishes the site's agent-readable twin. VitePress's half
+// already ships a `.md` beside every HTML route and an `llms.txt` index of
+// them (`vitepress-plugin-llms`, in `docs/.vitepress/config.mts`). DocC's half
+// writes its Markdown into `data/documentation/`, one file per page, which is
+// not where a fetcher that appends `.md` to a page URL will look. So the
+// archive's twins are mirrored to `documentation/<route>.md`, next to the
+// route's `index.html`, and the top-level articles — the getting-started
+// tutorial, the lint guide, and the rule pages that every `coglint` finding
+// links to — are appended to `llms.txt` and `llms-full.txt` so the index
+// covers the whole site rather than half of it.
 
-import { cp, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
 
@@ -39,6 +50,13 @@ const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DEFAULT_DOCC = resolve(REPO_ROOT, ".build/docs/Cog.doccarchive");
 const DEFAULT_SITE = resolve(REPO_ROOT, "docs/.vitepress/dist");
 const DEFAULT_OUT = resolve(REPO_ROOT, ".build/docs-site");
+
+/** Where the assembled site is served from; the `llms.txt` links are absolute. */
+const configuredSite = process.env.VITEPRESS_SITE_URL ?? "https://skeswa.github.io/cog/";
+const SITE_URL = configuredSite.endsWith("/") ? configuredSite.slice(0, -1) : configuredSite;
+
+/** DocC's manifest of every Markdown twin it wrote, at the archive root. */
+const MARKDOWN_MANIFEST = "Cog-markdown-manifest.json";
 
 /**
  * Paths that must exist in the assembled site, relative to its root.
@@ -58,7 +76,28 @@ const REQUIRED_ROUTES = [
 ];
 
 /** Paths that must exist in the assembled site from the VitePress half. */
-const REQUIRED_SITE_ROUTES = ["index.html", "swift/index.html", "kotlin/index.html"];
+const REQUIRED_SITE_ROUTES = [
+  "index.html",
+  "swift/index.html",
+  "kotlin/index.html",
+  "llms.txt",
+  "llms-full.txt",
+  "swift/agent-guide.md",
+];
+
+/**
+ * Markdown twins that must exist beside their routes after the mirror.
+ *
+ * `lintingyourapp.md` is the page `coglint` diagnostics link to and the one
+ * `README.md` tells an agent to read as Markdown, so it is the twin whose
+ * absence would be noticed by a machine rather than a person.
+ */
+const REQUIRED_MARKDOWN_TWINS = [
+  "documentation/cog.md",
+  "documentation/cog/gettingstarted.md",
+  "documentation/cog/lintingyourapp.md",
+  "documentation/cog/primitivesonlyinops.md",
+];
 
 /**
  * Pages whose rendered content must be present in the HTML itself, with the
@@ -190,11 +229,109 @@ async function main() {
     );
   }
 
+  const twins = await mirrorMarkdownTwins(out);
+  const articles = await appendApiReferenceToIndexes(docc, out);
+
+  const missingTwins = REQUIRED_MARKDOWN_TWINS.filter((twin) => !existsSync(resolve(out, twin)));
+  if (missingTwins.length > 0) {
+    fail(
+      "the API reference was built without its Markdown twins:\n" +
+        missingTwins.map((twin) => `  - ${twin}`).join("\n") +
+        "\n  `mise run docs:api` must pass `--enable-experimental-markdown-output` and\n" +
+        "  `--enable-experimental-markdown-output-manifest`, or the lint articles that\n" +
+        "  `coglint` findings link to are unreadable to a coding agent.",
+    );
+  }
+
   process.stdout.write(`assemble-docs-site: assembled ${out}\n`);
   for (const route of REQUIRED_ROUTES) process.stdout.write(`  verified ${route}\n`);
   for (const { path: route } of REQUIRED_CONTENT) {
     process.stdout.write(`  verified rendered content in ${route}\n`);
   }
+  process.stdout.write(`  mirrored ${twins} Markdown twin(s) beside their routes\n`);
+  process.stdout.write(`  indexed ${articles} API reference article(s) in llms.txt\n`);
+}
+
+/**
+ * Copies every `data/documentation/<route>.md` to `documentation/<route>.md`.
+ *
+ * The walk is over the files DocC actually wrote rather than over the
+ * manifest, because the manifest names pages by identifier and the file names
+ * are those identifiers lowercased — deriving one from the other would be a
+ * second copy of DocC's naming rule. The manifest is used only for titles.
+ */
+async function mirrorMarkdownTwins(out) {
+  const source = resolve(out, "data/documentation");
+  if (!existsSync(source)) return 0;
+  let count = 0;
+  for (const file of await markdownFiles(source)) {
+    const target = resolve(out, "documentation", relative(source, file));
+    await mkdir(dirname(target), { recursive: true });
+    await cp(file, target);
+    count += 1;
+  }
+  return count;
+}
+
+async function markdownFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) files.push(...(await markdownFiles(path)));
+    else if (entry.isFile() && entry.name.endsWith(".md")) files.push(path);
+  }
+  return files;
+}
+
+/**
+ * Appends the API reference's top-level articles to the two `llms.txt` files.
+ *
+ * Only articles directly under the module — `/documentation/Cog/<Name>` — are
+ * listed. The synthesized "Equatable Implementations" pages and the ~250
+ * symbol pages are reachable by appending `.md` to any reference URL, and
+ * the index says so once instead of listing them all; an `llms.txt` is a
+ * map, and a map that lists every symbol is the site again.
+ */
+async function appendApiReferenceToIndexes(docc, out) {
+  const manifestPath = resolve(docc, MARKDOWN_MANIFEST);
+  if (!existsSync(manifestPath)) {
+    fail(
+      `the DocC archive has no ${MARKDOWN_MANIFEST}.\n  \`mise run docs:api\` must pass ` +
+        "`--enable-experimental-markdown-output-manifest`.",
+    );
+  }
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const articles = (manifest.documents ?? [])
+    .filter((document) => document.documentType === "article")
+    .filter((document) => document.identifier.split("/").length === 4)
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  const entries = articles.map((document) => {
+    const route = `${document.identifier.toLowerCase()}.md`;
+    if (!existsSync(resolve(out, route.slice(1))))
+      fail(`${route} is in the manifest but not on disk`);
+    return `- [${document.title}](${SITE_URL}${route})`;
+  });
+  const section = [
+    "",
+    "## API reference",
+    "",
+    "The DocC reference for the shipping Swift library. Every symbol page has a",
+    `Markdown twin at the same URL with \`.md\` appended; the module root is`,
+    `${SITE_URL}/documentation/cog.md. The articles:`,
+    "",
+    ...entries,
+    "",
+  ].join("\n");
+
+  for (const index of ["llms.txt", "llms-full.txt"]) {
+    const path = resolve(out, index);
+    if (!existsSync(path))
+      fail(`the VitePress site has no ${index}; is vitepress-plugin-llms configured?`);
+    await writeFile(path, (await readFile(path, "utf8")).trimEnd() + "\n" + section);
+  }
+  return entries.length;
 }
 
 await main();
