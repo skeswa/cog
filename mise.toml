@@ -403,6 +403,13 @@ run = "node {{config_root}}/tools/bench-baseline.mjs thresholds-sentinel"
 # The flag is experimental, so `tools/assemble-docs-site.mjs` asserts the
 # content actually arrived rather than trusting that it did.
 #
+# `COG_DOCS_PACKAGE_PATH` separates the recipe from the sources. The published
+# API reference describes the newest release, so `docs.yml` documents a
+# checkout of that tag — but with this task and these flags, not the tag's.
+# Without the split, a flag added here would not reach the site until the next
+# release shipped a `mise.toml` carrying it. The scratch and output paths stay
+# under this checkout either way.
+#
 # The two markdown flags are the agent-facing half of the same idea. Swift 6.3's
 # DocC writes a Markdown twin of every page into `data/documentation/` plus a
 # manifest at the archive root. The assembler mirrors those twins beside their
@@ -420,10 +427,11 @@ run = "node {{config_root}}/tools/assemble-docs-site.mjs"
 description = "Build the Cog DocC archive into .build/docs"
 run = """
 set -euo pipefail
+package_path="${COG_DOCS_PACKAGE_PATH:-{{config_root}}}"
 rm -rf "{{config_root}}/.build/docs"
 mkdir -p "{{config_root}}/.build/docs"
 COG_DOCC=1 swift package \
-  --package-path "{{config_root}}" \
+  --package-path "$package_path" \
   --scratch-path "{{config_root}}/.build/docc" \
   --allow-writing-to-directory "{{config_root}}/.build/docs" \
   generate-documentation \
@@ -435,7 +443,7 @@ COG_DOCC=1 swift package \
   --enable-experimental-markdown-output-manifest \
   --hosting-base-path cog \
   --output-path "{{config_root}}/.build/docs/Cog.doccarchive"
-rm -f "{{config_root}}/Package.resolved"
+rm -f "$package_path/Package.resolved"
 """
 
 # The VitePress half. These shell out to the locally installed `vitepress`

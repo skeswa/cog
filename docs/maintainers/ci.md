@@ -299,9 +299,14 @@ The API reference and VitePress release labels always describe GitHub's newest
 published release, not `main`, a draft tag, or the workflow's source ref. A
 normal docs change does not wake the macOS lane when that release archive is
 already saved, and `docc` additionally refuses to build for a fork's pull
-request: it checks out a release tag rather than the pull request's head, so the
-guard is about the macOS bill rather than about trust. The saved archive belongs to the ref that created it, so the
-first `main` push after a release builds it once; later pushes reuse it.
+request. That guard is about the macOS bill and also about trust: `docc`
+documents the release tag's sources, checked out under `.build/docs-source`,
+but it builds them with the `docs:api` recipe from the workflow's own ref, so
+a change to the archive's flags reaches the site without waiting for the next
+release. When those flags change, bump the `-vN` suffix on the cache key in
+`docc-cache`; the key otherwise names only the tag and the Xcode pin. The
+saved archive belongs to the ref that created it, so the first `main` push
+after a release builds it once; later pushes reuse it.
 The `assemble` job runs third-party npm code with a read-only token. Only the
 single-action `deploy` job receives `pages: write` and `id-token: write`.
 
