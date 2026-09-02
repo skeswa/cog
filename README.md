@@ -109,6 +109,43 @@ to put a value on screen. Read
 to add the separate, version-matched CogLint plugins without adding lint tools
 to normal Cog users.
 
+## Use Cog with a coding agent
+
+Agents do not read a dependency's docs on their own. Point yours at the
+one-page brief, [Cog for coding agents](https://skeswa.github.io/cog/swift/agent-guide),
+which states the model, the recurring code shapes, and the conventions
+`coglint` enforces. Three ways, from cheapest to most complete:
+
+**Add two lines to your instruction file.** This works for every agent that
+reads `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, or a
+Cursor rule:
+
+```markdown
+State management is Cog. Before writing or changing state, read
+https://skeswa.github.io/cog/swift/agent-guide.md and follow it. Run
+`swift package coglint Sources --target-role production` before finishing.
+```
+
+**Install the skill.** It carries the same page plus the handbook chapters as
+references, and works in Claude Code, Codex, Cursor, Copilot, Gemini CLI, and
+the other agents the installer supports:
+
+```sh
+npx skills add skeswa/cog
+```
+
+Claude Code can install it as a plugin instead:
+
+```text
+/plugin marketplace add skeswa/cog
+/plugin install cog@cog
+```
+
+**Give the agent the whole site.** Every page has a Markdown twin at the same
+URL with `.md` appended, `https://skeswa.github.io/cog/llms.txt` indexes them,
+and the repository carries a `context7.json` so agents using the Context7 MCP
+server get the handbook on demand.
+
 ## Work on Cog
 
 [CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, tests, docs, and the Jujutsu
@@ -138,6 +175,8 @@ pages are also available here:
 - [Swift docs](./docs/swift/README.md) — current Swift design and work
 - [Swift handbook](./docs/swift/handbook/index.md) — the working conventions for
   building an app on Cog, with chapters from file layout to testing
+- [Cog for coding agents](./docs/swift/agent-guide.md) — the handbook, its
+  recurring code shapes, and the lint rules on one page for a coding model
 - [Kotlin docs](./docs/kotlin/README.md) — planned Kotlin and Compose design
 - [TodoMVC example](./swift/Examples/TodoMVC/README.md) — a complete native
   SwiftUI app demonstrating keyed state, derived filters, atomic actions, and persistence
