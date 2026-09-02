@@ -1,0 +1,38 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Cog",
+  "description": "Fine-grained state management for SwiftUI: one app-wide MainActor graph, derived values that recompute only when a dependency changes, and named operations that publish atomic turns.",
+  "folders": [
+    "docs/swift/agent-guide.md",
+    "docs/swift/handbook",
+    "docs/swift/getting-started.md",
+    "docs/swift/installation.md",
+    "docs/design.md",
+    "swift/Sources/Cog/Cog.docc"
+  ],
+  "excludeFolders": [
+    "docs/swift/impl",
+    "docs/swift/design",
+    "docs/maintainers",
+    "docs/kotlin",
+    "swift/Benchmarks",
+    "swift/Lint",
+    "swift/CompileFail",
+    "swift/Tests",
+    ".build",
+    "node_modules"
+  ],
+  "excludeFiles": ["CHANGELOG.md", "SECURITY.md"],
+  "rules": [
+    "Declare state as file-scope lets in <Cluster>State+Cogs.swift; keyless names end in Cog and keyed boxes end in Cogs.",
+    "Manual sources are private and start with an underscore; expose them through a .readOnly projection that takes the clean name.",
+    "Call turn and refresh only inside an extension CogOps named operation; app code, views, and mechanisms call the operation, never the primitive.",
+    "Unwrap every read into a domain local on its own line; never bundle reads into a struct or a Cogs helper. Declare a derived value as an automatic cog instead.",
+    "Every Cog-using view resolves @Environment(\\.cogs) itself; never pass Cogs through a view initializer.",
+    "SwiftUI bindings are tracked adapters on Cogs in <Cluster>State+Bindings.swift, with a tracked getter and a setter that calls a named operation; never build a Binding in a view or read the getter with peek.",
+    "Assemble Cogs once in the App entry point and write initial state in a Mechanism's operate, not in App.init.",
+    "Tests and previews create one isolated Cogs.forTesting() runtime each, drive it through the same operations, and assert with peek.",
+    "Run swift package coglint on production sources; the linter enforces these conventions and links each finding to its rule article."
+  ],
+  "previousVersions": []
+}
