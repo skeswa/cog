@@ -1,3 +1,7 @@
+---
+description: "One runtime assembled once, the State+Aspect file families, and how views reach the graph."
+---
+
 # Structuring an app
 
 An app built on Cog has three parts. There is one runtime. There is one state

@@ -1,7 +1,8 @@
 import { defineConfig } from "vitepress";
+import llmstxt from "vitepress-plugin-llms";
 import { fontPreloadHead } from "./font-head.mjs";
 import { renderMermaidDiagrams } from "./mermaid-markdown.mjs";
-import { nav, sidebar } from "./navigation.mjs";
+import { flattenedSidebar, nav, sidebar } from "./navigation.mjs";
 import { resolveSwiftRelease } from "./release.mjs";
 import { socialHead } from "./social-head.mjs";
 
@@ -63,6 +64,30 @@ export default defineConfig({
     define: {
       __COG_SWIFT_RELEASE__: JSON.stringify(swiftRelease),
     },
+    // The agent-readable twin of the site. Coding agents fetch HTML badly:
+    // the rendered page is an app shell plus chrome, and a client-rendered
+    // route is empty to a fetcher that runs no JavaScript. This plugin writes
+    // three things into the build output beside the HTML: `llms.txt`, the
+    // index that Cursor, Claude Code, Copilot, and Cline request first when
+    // pointed at a docs site; `llms-full.txt`, every page in one file; and a
+    // `.md` twin of every route, so `/swift/agent-guide.md` is the page's own
+    // Markdown. It also adds a hidden hint on each page that names the twin.
+    // Links inside the generated files carry the site origin because agents
+    // cannot resolve relative Markdown links against a page they fetched; the
+    // plugin appends `base` itself, so `domain` is the origin alone. The
+    // sidebar it is given is flattened for the reason `flattenedSidebar`
+    // explains.
+    plugins: [
+      llmstxt({
+        domain: new URL(siteUrl).origin,
+        sidebar: flattenedSidebar(),
+        title: "Cog",
+        description:
+          "Fine-grained state management for native mobile UI: a Swift library for SwiftUI and a designed Kotlin library for Jetpack Compose.",
+        details:
+          "Start with /swift/agent-guide.md, the one-page brief for coding agents. The handbook chapters under /swift/handbook/ are the full conventions.",
+      }),
+    ],
   },
 
   head: [

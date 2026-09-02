@@ -1,3 +1,7 @@
+---
+description: "Named CogOps operations, one atomic turn per operation, and composing writes across files with nested turns."
+---
+
 # Writing state
 
 `turn` is the only write primitive, and application code never calls it

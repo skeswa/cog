@@ -1,3 +1,7 @@
+---
+description: "The working conventions for building an app on Cog, each proven in the example apps."
+---
+
 # Cog for Swift: handbook
 
 This handbook shows you how to build an app on Cog. It collects the

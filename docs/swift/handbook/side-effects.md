@@ -1,3 +1,7 @@
+---
+description: "Mechanisms, initial state in operate, the persistence pattern, and gated scopes."
+---
+
 # Side effects
 
 Every app-wide side effect has one home: a `Mechanism`, registered at

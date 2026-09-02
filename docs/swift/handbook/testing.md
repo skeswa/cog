@@ -1,3 +1,7 @@
+---
+description: "Isolated runtimes, seeding versus mechanisms, injected clocks, controlled async work, and views under test."
+---
+
 # Testing
 
 Tests and previews are separate app runtimes. Each one may create one

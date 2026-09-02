@@ -1,3 +1,7 @@
+---
+description: "Unwrapping reads into domain locals, reading flatly, tracked versus one-time reads, and async status."
+---
+
 # Reading state
 
 The runtime guarantees that a normal read is correct: it uses the latest
