@@ -29,22 +29,23 @@ it there.
 Follow the map down rather than searching. Each entry is authoritative for its
 subject, and this file does not restate them.
 
-| To learn                                       | Read                                            |
-| ---------------------------------------------- | ----------------------------------------------- |
-| What Cog is, its principles, how to install it | `README.md`                                     |
-| Setup, checks, test placement, docs, revisions | `CONTRIBUTING.md`                               |
-| The cross-platform state model and vocabulary  | `docs/design.md`                                |
-| The Swift docs, and where each one starts      | `docs/swift/README.md`                          |
-| Packages, why each is separate, the source map | `docs/swift/impl/architecture/codebase-tour.md` |
-| How an app should use Cog                      | `docs/swift/handbook/index.md`                  |
-| The Swift API and architecture design          | `docs/swift/design/exploration.md`              |
-| What is settled and what is open               | `docs/swift/design/exploration.md` §10          |
-| How the runtime is actually built              | `docs/swift/impl/architecture/index.md`         |
-| Promised behavior, as scenario IDs             | `docs/swift/impl/scenarios.md`                  |
-| What the current build measures                | `docs/swift/impl/perf.md`                       |
-| The linter, its rules, and its distribution    | `docs/swift/design/lint.md`                     |
-| Kotlin                                         | `docs/kotlin/README.md`                         |
-| Commits, CI, and releases                      | `docs/maintainers/`                             |
+| To learn                                       | Read                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| What Cog is, its principles, how to install it | `README.md`                                                                        |
+| Setup, checks, test placement, docs, revisions | `CONTRIBUTING.md`                                                                  |
+| The cross-platform state model and vocabulary  | `docs/design.md`                                                                   |
+| The Swift docs, and where each one starts      | `docs/swift/README.md`                                                             |
+| Packages, why each is separate, the source map | `docs/swift/impl/architecture/codebase-tour.md`                                    |
+| How an app should use Cog                      | `docs/swift/handbook/index.md`                                                     |
+| How a coding agent is pointed at Cog           | `docs/swift/agent-guide.md`, and `CONTRIBUTING.md` for the generated `skills/cog/` |
+| The Swift API and architecture design          | `docs/swift/design/exploration.md`                                                 |
+| What is settled and what is open               | `docs/swift/design/exploration.md` §10                                             |
+| How the runtime is actually built              | `docs/swift/impl/architecture/index.md`                                            |
+| Promised behavior, as scenario IDs             | `docs/swift/impl/scenarios.md`                                                     |
+| What the current build measures                | `docs/swift/impl/perf.md`                                                          |
+| The linter, its rules, and its distribution    | `docs/swift/design/lint.md`                                                        |
+| Kotlin                                         | `docs/kotlin/README.md`                                                            |
+| Commits, CI, and releases                      | `docs/maintainers/`                                                                |
 
 Every package under `swift/` has its own `README.md` explaining why it is a
 separate package and how to run it; read that before changing one. `tools/`

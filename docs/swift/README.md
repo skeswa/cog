@@ -19,6 +19,10 @@ If you are adding Cog to a project, start with
 **[Getting started](./getting-started.md)** to put a value on screen, change it
 from a button, and test the same state through an isolated runtime.
 
+If you are a coding model or agent working in an app that uses Cog, read
+**[Cog for coding agents](./agent-guide.md)** instead: the handbook's
+conventions, the recurring code shapes, and the lint rules on one page.
+
 Then read the Swift docs in this order:
 
 1. **[Core design](./design/exploration.md)** — graph behavior, public API,
