@@ -47,6 +47,7 @@ const designHistory: DefaultTheme.SidebarItem = { text: "Design history", link: 
 const swiftDocuments: DefaultTheme.SidebarItem[] = [
   { text: "Installation", link: "/swift/installation" },
   { text: "Getting started", link: "/swift/getting-started" },
+  { text: "For coding agents", link: "/swift/agent-guide" },
   {
     text: "Design",
     items: [
@@ -171,6 +172,49 @@ const sharedSidebar: DefaultTheme.SidebarItem[] = [
   { text: "Cog for Swift", link: "/swift/", collapsed: true, items: swiftDocuments },
   { text: "Cog for Kotlin", link: "/kotlin/", collapsed: true, items: kotlinDocuments },
 ];
+
+/**
+ * The same documents as the sidebars, flattened for the `llms.txt` index.
+ *
+ * `vitepress-plugin-llms` walks a sidebar to order the index, but it loses the
+ * site `base` on every nested group: a group inside a group is resolved with
+ * an empty base, so its links come out as `/swift/design/…` on a site served
+ * from `/cog/`. Handing it a sidebar with no nesting sidesteps that. Each
+ * nested group becomes its own top-level section, named by the path of group
+ * titles that led to it, and a group that is itself a link (the handbook
+ * index, the architecture index) appears as a leaf of its parent section.
+ * The shared sidebar is left out: its groups are copies of the library ones,
+ * and an index that lists every page twice is a worse map, not a fuller one.
+ */
+export function flattenedSidebar(): DefaultTheme.SidebarItem[] {
+  const sections: DefaultTheme.SidebarItem[] = [];
+  const seen = new Set<string>();
+
+  const leaf = (item: DefaultTheme.SidebarItem): DefaultTheme.SidebarItem | undefined => {
+    if (typeof item.link !== "string" || seen.has(item.link)) return undefined;
+    seen.add(item.link);
+    return { text: item.text, link: item.link };
+  };
+
+  const walk = (group: DefaultTheme.SidebarItem, trail: string[]) => {
+    const title = [...trail, group.text].filter((text) => text !== undefined).join(" · ");
+    const items: DefaultTheme.SidebarItem[] = [];
+    const nested: DefaultTheme.SidebarItem[] = [];
+    for (const item of group.items ?? []) {
+      const own = leaf(item);
+      if (own) items.push(own);
+      if (item.items && item.items.length > 0) nested.push(item);
+    }
+    if (items.length > 0) sections.push({ text: title, items });
+    for (const item of nested) walk(item, [...trail, group.text ?? ""]);
+  };
+
+  for (const root of [...swiftSidebar, ...kotlinSidebar, ...maintainersSidebar]) {
+    const own = leaf(root);
+    walk(own ? { ...root, items: [own, ...(root.items ?? [])] } : root, []);
+  }
+  return sections;
+}
 
 export const sidebar: DefaultTheme.Sidebar = {
   "/swift/": swiftSidebar,
