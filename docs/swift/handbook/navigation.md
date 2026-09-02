@@ -1,3 +1,7 @@
+---
+description: "Driving tabs, stacks, sheets, deep links, and restoration from ordinary graph state."
+---
+
 # Navigation and deep linking
 
 Navigation is ordinary graph state. There is no router object. A router

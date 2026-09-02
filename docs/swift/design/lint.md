@@ -1,3 +1,7 @@
+---
+description: "Why Cog ships coglint, its rules, its plugins, and how it is distributed."
+---
+
 # Cog for Swift: lint tooling
 
 _August 17, 2026_

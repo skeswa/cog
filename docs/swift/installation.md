@@ -1,3 +1,7 @@
+---
+description: "Add Cog to an Xcode app or a Swift package, with CogTesting for tests and previews."
+---
+
 # Install Cog for Swift
 
 Cog requires iOS 17 or macOS 14, Swift tools 6.2, and a full Xcode. Releases

@@ -1,3 +1,7 @@
+---
+description: "The state model Cog shares across Swift and Kotlin: the graph, turns, settlement, async status, and the vocabulary."
+---
+
 # Cog: shared state model
 
 _Authored August 21, 2026._

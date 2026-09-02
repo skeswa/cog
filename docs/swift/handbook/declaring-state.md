@@ -1,3 +1,7 @@
+---
+description: "Naming declarations, the underscore-and-projection pattern, and choosing manual, automatic, async, or keyed state."
+---
+
 # Declaring state
 
 A declaration is a fixed name and recipe. The runtime creates the mutable

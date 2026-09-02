@@ -1,3 +1,7 @@
+---
+description: "Build a small SwiftUI screen on Cog: declare state, assemble one runtime, read and change values from a view, and test the state layer."
+---
+
 # Getting started
 
 This tutorial builds a small SwiftUI screen backed by Cog. It starts at 60°,

@@ -1,3 +1,7 @@
+---
+description: "Resolving Cogs from the environment, flat reads in bodies, tracked binding adapters, and what stays view-local."
+---
+
 # SwiftUI integration
 
 SwiftUI sees ordinary `@Observable` values; Cog owns the graph behind them.
