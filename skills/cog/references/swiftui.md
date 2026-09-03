@@ -5,7 +5,7 @@
 SwiftUI sees ordinary `@Observable` values; Cog owns the graph behind them.
 The integration conventions keep that boundary thin. Views resolve the
 runtime themselves, read flatly, mutate through named operations, and adapt
-to SwiftUI's binding-shaped APIs in one dedicated file per cluster.
+to SwiftUI's binding-shaped APIs in one dedicated file per rig.
 
 ## Resolve `Cogs` in every consumer
 
@@ -52,7 +52,7 @@ var body: some View {
 SwiftUI's container APIs — `TabView`, `NavigationStack(path:)`,
 `sheet(item:)`, `.searchable` — speak `Binding`. Cog ships no binding helper
 on purpose (decision record, [core design §10](https://skeswa.github.io/cog/swift/design/exploration.md)).
-Each app writes its own thin adapters in the cluster's `+Bindings.swift`
+Each app writes its own thin adapters in the rig's `+Bindings.swift`
 file, and every adapter has the same shape: a tracked getter, and a setter
 that calls a named operation. `coglint`'s `tracked-binding-adapters` rule
 enforces that shape, so the library ships the convention even though it ships

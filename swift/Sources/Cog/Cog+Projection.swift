@@ -5,7 +5,7 @@ extension Cog {
   /// source's name without the leading underscore:
   ///
   /// ```swift
-  /// // WeatherState+Cogs.swift
+  /// // WeatherRig+Cogs.swift
   /// private let _currentZipCog = Cog<ZipCode?>.Manual { nil }
   /// let currentZipCog = _currentZipCog.readOnly
   /// ```

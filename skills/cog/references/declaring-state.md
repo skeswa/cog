@@ -43,7 +43,7 @@ let selectedTabCog = _selectedTabCog.readOnly
 Why this shape:
 
 - Only code in the declaring file can write `_selectedTabCog`. Everything
-  else — views, other clusters, mechanisms — reads the projection and
+  else — views, other rigs, mechanisms — reads the projection and
   mutates through the file's named operations
   ([Writing state](./writing-state.md)).
 - The underscore makes a write site easy to spot: a `turn` body touching
@@ -124,7 +124,7 @@ connection. Otherwise rely on the defaults.
 
 ## Where declarations live
 
-Declarations are file-scope `let`s in the cluster's `+Cogs.swift` file
+Declarations are file-scope `let`s in the rig's `+Cogs.swift` file
 ([Structuring an app](./app-structure.md)). The target's MainActor default
 isolation puts them on the same actor as the graph. The value types they
-manage live in the cluster's `+Model.swift`.
+manage live in the rig's `+Model.swift`.

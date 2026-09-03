@@ -256,7 +256,7 @@ the status tracks no field until code reads one. Writer targets and `refresh`
 arguments stay direct because they are references, not read values.
 
 ```swift
-// WeatherState+Cogs.swift
+// WeatherRig+Cogs.swift
 
 private let _weatherServiceCog = Cog<WeatherService>.Manual { .live }
 let weatherServiceCog = _weatherServiceCog.readOnly
@@ -454,14 +454,14 @@ Sources are `private`, so views cannot name writable references. A bindings
 file may export an ordinary SwiftUI adapter when a control requires `Binding`:
 
 ```swift
-// WeatherState+Cogs.swift
+// WeatherRig+Cogs.swift
 extension CogOps {
     func selectCurrentLocation(_ zip: ZipCode?) {
         turn(_currentZipCog, to: zip)
     }
 }
 
-// WeatherState+Bindings.swift
+// WeatherRig+Bindings.swift
 extension Cogs {
     var currentZipBinding: Binding<ZipCode?> {
         Binding(
@@ -897,6 +897,13 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     reads worse and trips the formatter's `OnlyOneTrailingClosureArgument` rule.
     The two shapes are spelled differently because their call sites are shaped
     differently, not because their semantics differ.
+31. **Rigs — settled.** The unit of application state is a rig: one `<Rig>Rig`
+    prefix and the four files that share it, `<Rig>Rig+<Aspect>.swift`, with
+    `+Model`, `+Cogs`, `+Bindings`, and `+Mechanisms` as the aspects. The word
+    replaces both "state cluster" and "file family", and the file prefix moved
+    from `…State` to `…Rig` so the name on disk says what the unit is.
+    "Family" was retired for this use because it already names the shape
+    families (item 28) and a keyed box's per-key values.
 
 ---
 

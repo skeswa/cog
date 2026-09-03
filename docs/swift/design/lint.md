@@ -239,7 +239,7 @@ same syntax-only boundary as every other classifier evasion.
 An explicit `Binding(get:set:)` construction is checked by where it sits. A
 construction inside a recognized view fails when any of its closures mentions a
 classified graph receiver: a binding that reaches the runtime is a writable
-surface, and those belong in the cluster's `+Bindings.swift` adapters. Every
+surface, and those belong in the rig's `+Bindings.swift` adapters. Every
 other construction fails when its `get:` closure reads through `peek`, which
 registers no dependency and leaves the control showing a value it has stopped
 following.

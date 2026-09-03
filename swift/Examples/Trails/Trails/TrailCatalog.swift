@@ -1,8 +1,9 @@
 import Foundation
 
-// The immutable content model for regions and trails. The graph manages
-// identities and user facts with the `TrailState+Model.swift` types. Screens
-// resolve those identities through this catalog.
+// The immutable content model for regions and trails. It stays outside the
+// Trail rig because it is content, not state: the graph manages identities and
+// user facts with the `TrailRig+Model.swift` types, and screens resolve those
+// identities through this catalog.
 
 /// Effort rating shown on trail rows and detail screens.
 nonisolated enum TrailDifficulty: String, CaseIterable, Codable, Sendable {

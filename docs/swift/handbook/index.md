@@ -28,7 +28,7 @@ the handbook's companion code:
 ## The chapters
 
 1. **[Structuring an app](./app-structure.md)** — one app-wide runtime, how
-   views reach it, and the `…State+Aspect.swift` files that organize a state
+   views reach it, and the `…Rig+Aspect.swift` files that organize a state
    layer.
 2. **[Declaring state](./declaring-state.md)** — how to name state, the
    underscore-and-projection pattern, and how to choose among manual,

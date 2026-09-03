@@ -27,7 +27,7 @@ Create a state-layer file. Keep the writable source and the operation that
 changes it together so Swift's `private` access control protects the write
 boundary.
 
-```swift [ForecastState+Cogs.swift]
+```swift [ForecastRig+Cogs.swift]
 import Cog
 
 @MainActor
@@ -158,7 +158,7 @@ state with another test, so there is nothing to reset or uninstall.
 App-wide side effects live in mechanisms. This one watches the computed advice
 and writes its next change to the console.
 
-```swift [ForecastState+Mechanisms.swift]
+```swift [ForecastRig+Mechanisms.swift]
 import Cog
 
 struct AdviceMechanism: Mechanism {
@@ -190,8 +190,8 @@ is the app's complete app-wide side-effect surface.
 
 ## Where to go next
 
-- [Structure a larger state layer](./handbook/app-structure.md) with file
-  families and feature-sized state clusters.
+- [Structure a larger state layer](./handbook/app-structure.md) with
+  feature-sized rigs.
 - [Load asynchronous data](./handbook/declaring-state.md) with async cogs and
   explicit status.
 - [Add persistence or background work](./handbook/side-effects.md) with

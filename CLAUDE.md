@@ -104,7 +104,7 @@ is the explanation, with worked examples from the three example apps.
 
 | Rule                                                                              | Chapter                                  |
 | --------------------------------------------------------------------------------- | ---------------------------------------- |
-| App state lives in `…State+Aspect.swift` families                                 | `docs/swift/handbook/app-structure.md`   |
+| App state lives in rigs, `…Rig+Aspect.swift` files                                | `docs/swift/handbook/app-structure.md`   |
 | Keyless declarations end in `Cog`; boxes end in `Cogs`                            | `docs/swift/handbook/declaring-state.md` |
 | Manual sources are `private` and underscored; the projection takes the clean name | `docs/swift/handbook/declaring-state.md` |
 | Every read is unwrapped into a domain local, read flatly, never repackaged        | `docs/swift/handbook/reading-state.md`   |

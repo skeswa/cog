@@ -5,7 +5,7 @@ description: "Mechanisms, initial state in operate, the persistence pattern, and
 # Side effects
 
 Every app-wide side effect has one home: a `Mechanism`, registered at
-assembly. Mechanisms live in the cluster's `+Mechanisms.swift` file, own
+assembly. Mechanisms live in the rig's `+Mechanisms.swift` file, own
 their capabilities as stored properties, and touch the graph only through
 the controller they are handed.
 

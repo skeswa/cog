@@ -8,7 +8,7 @@ Cog vends no binding helper, so every binding over graph state is an app's own a
 
 ## How to fix it
 
-Move the binding into the state cluster's `+Bindings.swift` file as a member of `extension Cogs`, and give it the one adapter shape: a getter that reads with the tracked subscript, and a setter that calls a named `CogOps` operation. Call that adapter from the view.
+Move the binding into the rig's `+Bindings.swift` file as a member of `extension Cogs`, and give it the one adapter shape: a getter that reads with the tracked subscript, and a setter that calls a named `CogOps` operation. Call that adapter from the view.
 
 <!-- Generated from the tracked-binding-adapters CogLint fixture corpus; do not edit. -->
 

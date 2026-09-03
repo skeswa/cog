@@ -248,25 +248,24 @@ renewed deadline for the same occupant. `ArenaLifetimeInfrastructureTests`, `LIF
 
 The [Weather example](https://github.com/skeswa/cog/tree/main/swift/Examples/Weather/Weather)
 is the best feature-sized map. Start with
-[`WeatherState+Cogs.swift`](https://github.com/skeswa/cog/blob/main/swift/Examples/Weather/Weather/WeatherState%2BCogs.swift),
-then read `WeatherState+Bindings.swift`, `WeatherDashboard`, `WeatherCard`, and
-`WeatherState+Mechanisms.swift` for UI and effect boundaries.
+[`WeatherRig+Cogs.swift`](https://github.com/skeswa/cog/blob/main/swift/Examples/Weather/Weather/WeatherRig%2BCogs.swift),
+then read `WeatherRig+Bindings.swift`, `WeatherDashboard`, `WeatherCard`, and
+`WeatherRig+Mechanisms.swift` for UI and effect boundaries.
 
 The [TodoMVC example](https://github.com/skeswa/cog/tree/main/swift/Examples/TodoMVC/TodoMVC)
-is the smallest complete application map. `TodoState+Cogs.swift` shows ordered
+is the smallest complete application map. `TodoRig+Cogs.swift` shows ordered
 membership beside keyed row cells, dynamic filter dependencies, automatic
-counts, and multi-source operations; `TodoState+Bindings.swift` holds the
-SwiftUI adapters; and `TodoState+Mechanisms.swift` shows assembly-time restore
+counts, and multi-source operations; `TodoRig+Bindings.swift` holds the
+SwiftUI adapters; and `TodoRig+Mechanisms.swift` shows assembly-time restore
 and a persistence reaction.
 
 The [Trails example](https://github.com/skeswa/cog/tree/main/swift/Examples/Trails/Trails)
 is the navigation map. Every container — tab selection, four
 `NavigationStack` paths, and the modal sheet — is graph state:
-`NavigationState+Cogs.swift` holds the sources, `NavigationState+Model.swift`
-the route values and deep-link parsing, `NavigationState+Bindings.swift` the
-tracked SwiftUI adapters, and `NavigationState+Mechanisms.swift` assembly-time
-restoration; `TrailState+*.swift` carries the domain half in the same family
-shape.
+`NavigationRig+Cogs.swift` holds the sources, `NavigationRig+Model.swift`
+the route values and deep-link parsing, `NavigationRig+Bindings.swift` the
+tracked SwiftUI adapters, and `NavigationRig+Mechanisms.swift` assembly-time
+restoration; `TrailRig+*.swift` carries the domain half as a second rig.
 
 The [Storefront Cog port](https://github.com/skeswa/cog/tree/main/swift/Benchmarks/Storefront/Runtimes/CogRuntime/Sources/CogStorefront)
 is the large-graph map. It is the Cog runtime of the

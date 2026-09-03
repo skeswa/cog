@@ -216,6 +216,9 @@ These rules are settled. The linked design files hold the full details.
 ### State and writes
 
 - One app has one MainActor `Cogs` graph.
+- Application state is organized into rigs: `<Rig>Rig+<Aspect>.swift` files,
+  one rig per prefix, with `+Model`, `+Cogs`, `+Bindings`, and `+Mechanisms`
+  as the aspects.
 - `Cog<T>` is the automatic shape. Its manual, async, and projection shapes
   are `Cog<T>.Manual`, `.Async`, and `.Projection`; `CogBox<T, K>` has the
   matching nested family for keyed values. The former prefixed spellings are

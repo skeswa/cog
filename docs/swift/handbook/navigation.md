@@ -18,8 +18,8 @@ example implements every pattern in this chapter as a working app.
 
 ## One source per container
 
-Each navigation fact gets its own manual source in a `NavigationState`
-cluster, so the UI updates precisely:
+Each navigation fact gets its own manual source in the navigation rig, so the
+UI updates precisely:
 
 ```swift
 /// The selected tab.
