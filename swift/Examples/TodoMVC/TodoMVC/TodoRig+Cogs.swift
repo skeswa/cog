@@ -1,9 +1,9 @@
 import Cog
 
-// TodoMVC's state is deliberately split by update shape. Membership is an
-// ordered keyless value; row fields are keyed values. A row edit therefore
-// notices only that row, while list operations can still change several facts
-// atomically in one turn.
+// The Todo rig's declarations and ops. TodoMVC's state is deliberately split
+// by update shape. Membership is an ordered keyless value; row fields are
+// keyed values. A row edit therefore notices only that row, while list
+// operations can still change several facts atomically in one turn.
 
 /// Ordered membership for the list.
 private let _todoIDsCog = Cog<[TodoID]>.Manual { [] }

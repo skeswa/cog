@@ -14,7 +14,7 @@ mise run build:todomvc
 ## What it demonstrates
 
 - `TodoMVCApp` assembles and retains one app-wide `Cogs` runtime.
-- `TodoState+Cogs.swift` keeps ordered membership in one manual cog and each row's
+- `TodoRig+Cogs.swift` keeps ordered membership in one manual cog and each row's
   title and completion in keyed manual boxes. Editing one row therefore does
   not invalidate another.
 - `visibleTodoIDsCog` changes its dependencies with the selected filter. Under
@@ -24,9 +24,9 @@ mise run build:todomvc
   equality-gated independently from the rows.
 - Every mutation is a domain operation on `CogOps`. Multi-value actions such as
   adding a row and clearing the composer settle in one turn.
-- `TodoState+Bindings.swift` keeps SwiftUI adapters separate from graph
+- `TodoRig+Bindings.swift` keeps SwiftUI adapters separate from graph
   declarations and domain operations.
-- `TodoState+Mechanisms.swift` restores persisted JSON during assembly and
+- `TodoRig+Mechanisms.swift` restores persisted JSON during assembly and
   owns the one persistence reaction. `UserDefaults` is durable storage, not a
   second live source of truth.
 - Every Cog-consuming view resolves `Cogs` from the environment and reads its

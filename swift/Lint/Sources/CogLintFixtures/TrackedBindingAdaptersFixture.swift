@@ -11,7 +11,7 @@ extension CogLintFixtureRegistry {
       rationale:
         "Cog vends no binding helper, so every binding over graph state is an app's own adapter and the convention supplies the shape the library does not. A getter that peeks registers no dependency, so the control renders once and then silently stops following the fact it displays — a failure that looks like a rendering bug rather than a read bug. Constructing bindings inline in views spreads the writable surface across the view layer, so no single file answers what the system may mutate, which is the reason the adapters were collected onto the runtime in the first place.",
       repair:
-        "Move the binding into the state cluster's `+Bindings.swift` file as a member of `extension Cogs`, and give it the one adapter shape: a getter that reads with the tracked subscript, and a setter that calls a named `CogOps` operation. Call that adapter from the view."
+        "Move the binding into the rig's `+Bindings.swift` file as a member of `extension Cogs`, and give it the one adapter shape: a getter that reads with the tracked subscript, and a setter that calls a named `CogOps` operation. Call that adapter from the view."
     ),
     triggering: [
       CogLintTriggeringExample(

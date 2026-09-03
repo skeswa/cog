@@ -49,7 +49,7 @@ complete manifest and the optional binary-size trait.
 
 ### Declare state and an operation
 
-Create `ForecastState+Cogs.swift`. The writable source and its operation stay
+Create `ForecastRig+Cogs.swift`. The writable source and its operation stay
 together so Swift's `private` access control protects the write boundary.
 
 ```swift

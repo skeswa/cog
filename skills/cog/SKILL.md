@@ -27,7 +27,7 @@ checks. When a rule here is too short, the linked
 4. Writes happen only inside named operations on `CogOps`. One op is one
    atomic `turn`.
 5. App-wide side effects live in `Mechanism`s registered at assembly.
-6. SwiftUI bindings are thin tracked adapters on `Cogs`, one file per cluster.
+6. SwiftUI bindings are thin tracked adapters on `Cogs`, one file per rig.
 7. Tests and previews each create one isolated `Cogs.forTesting()`.
 
 > **Isolation.** Every declaration and op below is MainActor-isolated. The example apps get
@@ -38,8 +38,9 @@ checks. When a rule here is too short, the linked
 
 ## File layout
 
-State lives in file families named `<Cluster>State+<Aspect>.swift`. A small
-app has one cluster. Add clusters as the app grows; do not grow the files.
+State lives in rigs. A rig is one `<Rig>Rig` prefix and the four files that
+share it, `<Rig>Rig+<Aspect>.swift`. A small app has one rig. Add rigs as the
+app grows; do not grow the files.
 
 | File                | Holds                                                           |
 | ------------------- | --------------------------------------------------------------- |
@@ -48,7 +49,7 @@ app has one cluster. Add clusters as the app grows; do not grow the files.
 | `+Bindings.swift`   | SwiftUI `Binding` adapters on `Cogs`                            |
 | `+Mechanisms.swift` | Mechanisms and the capabilities they own                        |
 
-Immutable content that never enters the graph stays outside the family.
+Immutable content that never enters the graph stays outside the rig.
 
 ## Recipes
 
@@ -182,7 +183,7 @@ write.
 
 ### Compose ops across files
 
-Another cluster's sources are private, so call its op inside your turn body.
+Another rig's sources are private, so call its op inside your turn body.
 The nested turn joins the outer one and both publish together.
 
 ```swift
@@ -227,7 +228,7 @@ would care about a value, it is view state.
 
 ### Bind a SwiftUI control
 
-Cog ships no binding helper. Write one adapter per control in the cluster's
+Cog ships no binding helper. Write one adapter per control in the rig's
 `+Bindings.swift`: a tracked getter through `self[…]`, a setter that calls a
 named op. Never build a `Binding` inside a view, and never read the getter
 with `peek`.
@@ -363,8 +364,8 @@ Effects that matter only while one screen is visible use SwiftUI's own
 
 ### Drive navigation from state
 
-There is no router. Each container has one manual source in a
-`NavigationState` cluster: an enum for the tab, a keyed box of route arrays
+There is no router. Each container has one manual source in the navigation
+rig: an enum for the tab, a keyed box of route arrays
 for the stacks, one optional enum for modality. Routes carry identities, never
 loaded models.
 

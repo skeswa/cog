@@ -71,8 +71,8 @@ automatic computation — the runtime rejects that with a clear error.
 ## Compose across files with nested turns
 
 A nested `turn` joins the outer turn. This is the idiom that lets each
-cluster keep its sources file-private and still take part in atomic
-cross-cluster actions. An op calls the _other file's op_ inside its turn
+rig keep its sources file-private and still take part in atomic
+cross-rig actions. An op calls the _other file's op_ inside its turn
 body, and both publish as one turn:
 
 ```swift
@@ -87,7 +87,7 @@ func logHike(for trailID: TrailID, note: String, …) {
 
 Trails uses the same idiom for restoration (`installTrailState` calls
 `installNavigation`) and for deep links (`open(.search)` calls
-`setSearchQuery`). The composed op never needs the other cluster's sources —
+`setSearchQuery`). The composed op never needs the other rig's sources —
 only its public operation. So the write boundary drawn by file privacy
 survives composition.
 

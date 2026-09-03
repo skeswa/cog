@@ -54,7 +54,7 @@ before releasing the value, so owned resources stay alive while work can use
 them.
 
 ```swift
-// WeatherState+Mechanisms.swift
+// WeatherRig+Mechanisms.swift
 
 struct WeatherMechanism: Mechanism {
     var notifier: Notifier
@@ -253,7 +253,7 @@ cannot reach them. The owning state file exposes only narrow, debug-only seed ca
 and any loud domain helpers:
 
 ```swift
-// WeatherState+Cogs.swift
+// WeatherRig+Cogs.swift
 #if DEBUG
 let currentZipSeedTargetCog = _currentZipCog
 let weatherSeedTargetsCogs = _weatherReportCogs

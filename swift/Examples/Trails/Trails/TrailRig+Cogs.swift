@@ -1,10 +1,11 @@
 import Cog
 import Foundation
 
-// Domain state for saved trails, search, and hike logging. Navigation state
-// lives in `NavigationState+Cogs.swift`. Per-file source privacy still supports
-// cross-feature operations: a turn may call the other file's operation, and
-// the nested turn joins.
+// The Trail rig's declarations and ops: saved trails, search, and hike
+// logging. Navigation state lives in the Navigation rig's
+// `NavigationRig+Cogs.swift`. Per-file source privacy still supports cross-rig
+// operations: a turn may call the other rig's operation, and the nested turn
+// joins.
 
 /// Bookmarked trails in the order they were saved.
 private let _savedTrailIDsCog = Cog<[TrailID]>.Manual { [] }

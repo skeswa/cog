@@ -1,7 +1,7 @@
 // The value types the navigation state's cogs, operations, and mechanisms
 // manage: the tab, route, sheet, and derived-screen vocabulary, plus the
 // journal's visit record. Routes carry identities from
-// `TrailState+Model.swift` and never loaded content.
+// `TrailRig+Model.swift` and never loaded content.
 
 /// The four top-level destinations in the tab bar.
 ///

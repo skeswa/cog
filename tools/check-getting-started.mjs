@@ -22,11 +22,11 @@ const docc = read(DOCC_PATH);
 const guideBlocks = swiftBlocks(guide);
 const doccBlocks = swiftBlocks(docc);
 
-const state = namedGuideBlock("ForecastState+Cogs.swift");
+const state = namedGuideBlock("ForecastRig+Cogs.swift");
 const app = namedGuideBlock("ForecastApp.swift", 0);
 const view = namedGuideBlock("Dashboard.swift");
 const test = namedGuideBlock("ForecastStateTests.swift");
-const mechanism = namedGuideBlock("ForecastState+Mechanisms.swift");
+const mechanism = namedGuideBlock("ForecastRig+Mechanisms.swift");
 
 for (const [label, source] of [
   ["state layer", state],

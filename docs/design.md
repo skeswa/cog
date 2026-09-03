@@ -58,18 +58,19 @@ stays in Cog; the adapter carries a change token.
 
 ## Main parts
 
-| Part               | Meaning                                                                     |
-| ------------------ | --------------------------------------------------------------------------- |
-| Descriptor         | A stable name for state; it does not hold the app's live value              |
-| Source             | The one writable input for a mutable fact                                   |
-| Automatic state    | A saved value computed from other state                                     |
-| Keyed box          | One state shape used for many keys, such as account IDs                     |
-| Runtime            | The app-wide owner of values, graph links, turns, lifetimes, and async work |
-| Read capability    | The limited object used for tracked or untracked reads                      |
-| Writer             | The turn-only object used to stage source values                            |
-| Operation          | A named app action that changes the graph                                   |
-| Reaction or effect | Work that changes something outside the graph                               |
-| UI boundary        | Native UI tracking for the exact state a UI scope reads                     |
+| Part               | Meaning                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| Descriptor         | A stable name for state; it does not hold the app's live value                              |
+| Source             | The one writable input for a mutable fact                                                   |
+| Automatic state    | A saved value computed from other state                                                     |
+| Keyed box          | One state shape used for many keys, such as account IDs                                     |
+| Runtime            | The app-wide owner of values, graph links, turns, lifetimes, and async work                 |
+| Read capability    | The limited object used for tracked or untracked reads                                      |
+| Writer             | The turn-only object used to stage source values                                            |
+| Operation          | A named app action that changes the graph                                                   |
+| Reaction or effect | Work that changes something outside the graph                                               |
+| UI boundary        | Native UI tracking for the exact state a UI scope reads                                     |
+| Rig                | The unit an app grows by: one prefix's models, declarations, UI adapters, and effect owners |
 
 Platform names differ where needed:
 
@@ -81,6 +82,7 @@ Platform names differ where needed:
 | Side-effect owner | assembly `Mechanism`                         | lifecycle-owned `CogEffects`                       |
 | Async state       | `CogStatus` through the optional status lens | `CogPhase`                                         |
 | UI boundary       | Observation and the SwiftUI environment      | Compose state tokens and a composition-local store |
+| Rig               | `<Rig>Rig+<Aspect>.swift` files              | not yet specified                                  |
 
 ### Descriptors name state; runtimes store it
 

@@ -1,7 +1,7 @@
 import Cog
 
-// Weather's whole state layer: the sources, the automatic values, and
-// the ops that write them.
+// The Weather rig's declarations and ops — Weather's whole state layer: the
+// sources, the automatic values, and the ops that write them.
 //
 // Everything here is main-actor-isolated without saying so. The target builds
 // with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (Config/Shared.xcconfig),
