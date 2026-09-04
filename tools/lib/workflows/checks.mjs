@@ -70,6 +70,7 @@ const PERMISSION_EXCEPTIONS = new Map([
       [
         "release-please",
         new Map([
+          ["actions", "write"],
           ["contents", "write"],
           ["pull-requests", "write"],
           ["issues", "write"],
@@ -1086,16 +1087,20 @@ function conventionalCommitsContract(workflow) {
   return diagnostics;
 }
 
-/** Release Please, protected publication, recovery, and docs dispatch stay narrowly separated. */
+/** Release Please, candidate dispatch, protected publication, recovery, and the two handoffs stay narrowly separated. */
 function releaseWorkflowContract(workflow) {
   if ((workflow.path.split("/").pop() ?? workflow.path) !== "release.yml") return [];
   /** @type {Diagnostic[]} */
   const diagnostics = [];
   const expected = [
-    ["release-please", { contents: "write", "pull-requests": "write", issues: "write" }],
+    [
+      "release-please",
+      { actions: "write", contents: "write", "pull-requests": "write", issues: "write" },
+    ],
     ["recover-candidate", { actions: "write", contents: "read" }],
     ["publish", { actions: "read", contents: "write", "pull-requests": "read" }],
     ["dispatch-docs", { actions: "write", contents: "read" }],
+    ["dispatch-plugins", { contents: "read" }],
   ];
   for (const [id, permissions] of expected) {
     const job = workflow.jobs.find((candidate) => candidate.id === id);
@@ -1141,6 +1146,23 @@ function releaseWorkflowContract(workflow) {
       job: "release-please",
       message:
         "Release Please must use the v5.0.0 SHA and manifest configuration without checking out repository code",
+    });
+  }
+
+  const releasePleaseSource = releasePlease?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    !releasePleaseSource.includes(
+      'gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"',
+    ) ||
+    !releasePleaseSource.includes("release_pr=${number}")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: releasePlease?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "release-please",
+      message:
+        "Release Please must dispatch the Swift CI candidate at the proposed PR head with explicit repository context",
     });
   }
 
@@ -1227,6 +1249,27 @@ function releaseWorkflowContract(workflow) {
       job: "dispatch-docs",
       message:
         "a successful publication must explicitly dispatch `docs.yml` at the release tag and repository",
+    });
+  }
+
+  const plugins = workflow.jobs.find((job) => job.id === "dispatch-plugins");
+  const pluginsSource = plugins?.steps.map((step) => step.run ?? "").join("\n") ?? "";
+  if (
+    plugins === undefined ||
+    !pluginsSource.includes(
+      'gh workflow run publish.yml --repo skeswa/coglint-plugins --ref main -f "cog_version=${VERSION}"',
+    ) ||
+    !plugins.steps.some((step) =>
+      text(get(step.env, "GH_TOKEN"))?.includes("secrets.COGLINT_PLUGINS_DISPATCH_TOKEN"),
+    )
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: plugins?.line ?? 1,
+      check: "release-workflow-contract",
+      job: "dispatch-plugins",
+      message:
+        "a successful publication must dispatch the sibling `coglint-plugins` publication at the released version under its scoped token",
     });
   }
   return diagnostics;

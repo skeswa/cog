@@ -4,8 +4,8 @@ _August 21, 2026._
 
 Every release step runs in GitHub Actions. A maintainer computer does not build
 files, edit the changelog, create tags, upload assets, deploy docs, or publish
-plugins. The maintainer reviews pull requests, starts workflows, approves runs,
-and approves protected environments.
+plugins. The maintainer reviews the release PR and merges it. Every other step
+starts itself.
 
 [Change management](./changes.md) defines commit messages and checked ranges.
 The policy below defines what a release is and who may produce one; the
@@ -15,8 +15,11 @@ numbered sections after it give the Actions UI steps.
 
 - **Authority.** Release preparation and publication run entirely in GitHub
   Actions. A maintainer workstation may perform optional developer preflight,
-  but it never supplies release evidence or bytes. Human control is review,
-  workflow dispatch, queued-run approval, and protected-environment approval.
+  but it never supplies release evidence or bytes. Human control is review and
+  the merge of the release PR. The `cog-release` and `coglint-release`
+  environments scope write tokens to their publisher jobs and hold no required
+  reviewer, because every fact a reviewer would check by eye is verified
+  mechanically before any write.
 - **History.** jj revision descriptions are Conventional Commits and survive
   rebase-only pull-request merges as the authoritative linear release input.
   The required `Conventional Commits` check has no path filter and lints every
@@ -32,9 +35,11 @@ numbered sections after it give the Actions UI steps.
   the manifest, `version.txt`, and only explicitly marked current-version or
   consumer-pin statements. Published changelog entries and historical design
   evidence are immutable inputs. The release PR stays draft until its exact
-  current head passes the complete manual candidate workflow.
-- **Candidate.** Manual `swift-ci.yml` requires the release PR number and
-  rejects a dispatch at any other SHA. Its hosted revision-range job supplies
+  current head passes the complete candidate workflow.
+- **Candidate.** `swift-ci.yml` requires the release PR number and rejects a
+  dispatch at any other SHA. `release.yml` dispatches it whenever Release
+  Please proposes or updates the PR; a maintainer may dispatch it again by
+  hand. Its hosted revision-range job supplies
   the required `Conventional Commits` context that a repository-token-created
   Release Please PR cannot trigger for itself. The full Actions graph covers
   formatting, host and release tests, both arena configurations, simulator and
@@ -54,11 +59,12 @@ numbered sections after it give the Actions UI steps.
   events do not generally start another workflow. DocC and VitePress still
   merge into the one Pages deployment at
   `https://skeswa.github.io/cog/documentation/cog/`.
-- **Sibling.** After Cog and Docs publish, a human dispatches the
-  `coglint-plugins` repository's workflow with the Cog version. Read-only
+- **Sibling.** After Cog publishes and Docs is dispatched, a narrow job
+  starts the `coglint-plugins` repository's workflow with the Cog version,
+  under a token scoped to that repository's Actions and nothing else. Read-only
   preparation verifies the public tag, assets, checksum, and provenance; runs
-  the exact tag's generator; and smoke-tests SwiftPM. A `coglint-release`-gated
-  job with only sibling `contents: write` re-hashes without executing
+  the exact tag's generator; and smoke-tests SwiftPM. A `coglint-release` job
+  with only sibling `contents: write` re-hashes without executing
   downloaded Cog code, requires sibling `main` unchanged, fast-forwards one
   conventional release commit and creates the matching immutable tag in one
   atomic, non-forced push. A retry accepts an existing tag only when its commit
@@ -115,14 +121,13 @@ an Actions result.
 
 ## 2. Test the exact PR head
 
-Open **Actions → Swift CI → Run workflow**:
+`release.yml` dispatches **Swift CI** at the PR's head each time Release Please
+proposes or updates the PR, so a candidate is normally already running by the
+time you open the PR. To run one again by hand, open **Actions → Swift CI → Run
+workflow**, select the Release Please branch, enter its PR number in
+`release_pr`, leave `recovery_tag` empty, and start the workflow.
 
-1. Select the Release Please branch.
-2. Enter its PR number in `release_pr`.
-3. Leave `recovery_tag` empty.
-4. Start the workflow.
-
-The workflow looks up the PR again. It fails if the selected ref is not the
+Either way, the workflow looks up the PR again. It fails if the selected ref is not the
 PR's current head. If Release Please changes the branch, start a new candidate.
 An older run no longer counts.
 
@@ -142,12 +147,9 @@ only allowed merge type, so the tested revision messages stay in `main`.
 ## 3. Publish Cog
 
 The merge runs `release.yml`. Release Please creates the permanent lightweight
-tag and a draft GitHub Release. `Publish verified release` then waits for
-approval in the `cog-release` environment.
-
-Before approval, check the shown tag, release PR, candidate run, and version.
-Approval gives the hosted publisher `contents: write`. Before it publishes, the
-job checks that:
+tag and a draft GitHub Release. `Publish verified release` then runs in the
+`cog-release` environment, which gives the hosted publisher `contents: write`
+and asks nobody for approval. Before it publishes, the job checks that:
 
 - the tag is lightweight, points at the Release Please commit, and matches
   `version.txt`;
@@ -162,15 +164,20 @@ The job uploads the archive, checksum, and record, names the release
 starts `docs.yml` at the tag. This direct start is required because events made
 by the repository token do not usually start another workflow.
 
-Wait for Docs to finish. Confirm that the
+Nothing waits for Docs to finish. If the
 [published API reference](https://skeswa.github.io/cog/documentation/cog/)
-opens before publishing plugins.
+does not open afterwards, dispatch `docs.yml` at the tag by hand.
 
 ## 4. Publish `coglint-plugins`
 
-Open **skeswa/coglint-plugins → Actions → Publish CogLintPlugins**. Select
-`main`, enter the published Cog version, and start the workflow. It uses only
-that repo's own token.
+After the Docs dispatch, `release.yml` starts **Publish CogLintPlugins** in
+skeswa/coglint-plugins with the published Cog version. It authenticates with
+the `COGLINT_PLUGINS_DISPATCH_TOKEN` repository secret, a fine-grained token
+for that repository with Actions write and nothing else; the job fails with a
+named error when the secret is missing. Every check and write inside the
+sibling workflow uses that repo's own token. To start it by hand, open
+**skeswa/coglint-plugins → Actions → Publish CogLintPlugins**, select `main`,
+and enter the Cog version.
 
 The read-only preparation job:
 
@@ -180,8 +187,8 @@ The read-only preparation job:
 4. checks the generated package and a test SwiftPM app; and
 5. records the sibling `main` SHA and uploads the generated tree.
 
-The publish job then waits at `coglint-release`. Approve it only after
-preparation passes. Its `contents: write` step runs no downloaded Cog code. It
+The publish job then runs in `coglint-release`, which scopes `contents: write`
+to it and holds no reviewer. It runs no downloaded Cog code. It
 checks the generated files again, requires `main` to be unchanged, and rejects
 a different existing version or tag. It pushes one
 `chore(release): publish CogLintPlugins <version>` commit and its matching bare

@@ -178,8 +178,9 @@ on the lane's jobs through the hosted period so the topology snaps back.
   person or workflow may later move or delete it.
 - The sibling `coglint-plugins` repo uses the same tag rule and read-only
   default token permissions.
-- `cog-release` and `coglint-release` each require `skeswa` as reviewer and
-  allow self-review. Only their hosted publisher jobs get `contents: write`.
+- `cog-release` and `coglint-release` hold no required reviewer. They exist to
+  scope `contents: write` to their hosted publisher jobs, which verify every
+  fact a reviewer would check before they write.
 
 During first setup, let the parent PR land under the old branch rules. Register
 the new `Conventional Commits` check with the release-management PR, then add
@@ -191,14 +192,15 @@ not seen.
 `PERMISSION_EXCEPTIONS` in `tools/lib/workflows/checks.mjs` lists every allowed
 write grant by workflow, job, permission, and value:
 
-| Job                         | Allowed write access                       |
-| --------------------------- | ------------------------------------------ |
-| Pages deploy                | `pages`, `id-token`                        |
-| Release Please              | `contents`, `pull-requests`, `issues`      |
-| Release recovery            | `actions`                                  |
-| Docs handoff                | `actions`                                  |
-| Protected Cog publisher     | `contents`                                 |
-| Protected sibling publisher | `contents` in the sibling workflow fixture |
+| Job                         | Allowed write access                             |
+| --------------------------- | ------------------------------------------------ |
+| Pages deploy                | `pages`, `id-token`                              |
+| Release Please              | `contents`, `pull-requests`, `issues`, `actions` |
+| Release recovery            | `actions`                                        |
+| Docs handoff                | `actions`                                        |
+| Protected Cog publisher     | `contents`                                       |
+| Protected sibling publisher | `contents` in the sibling workflow fixture       |
+| Plugins handoff             | none; a sibling-scoped secret, not the token     |
 
 These exceptions work only on GitHub-hosted jobs. A write token must never
 reach the Mac mini. The workflow checker also tests the protected environments,
@@ -215,8 +217,9 @@ no path filters. It checks every commit in the pull-request or push range. See
 
 ### Swift CI and release candidates
 
-`swift-ci.yml` accepts a Release Please PR number for a manual candidate. The
-dispatch ref must equal that PR's current head. Recovery instead uses an
+`swift-ci.yml` accepts a Release Please PR number for a candidate, dispatched
+by `release.yml` at each PR update or by hand. The dispatch ref must equal that
+PR's current head. Recovery instead uses an
 existing tag whose tree matches the merged release PR.
 
 The arm64 job creates a versioned CogLint archive and JSON record. The hosted
@@ -260,13 +263,18 @@ it.
 
 ### Release publication
 
-`release.yml` keeps four hosted jobs and four separate tokens:
+`release.yml` keeps five hosted jobs and five separate credentials:
 
-1. Release Please creates or updates the release PR without checking out code.
+1. Release Please creates or updates the release PR without checking out code,
+   then dispatches the Swift CI candidate at that PR's head.
 2. Recovery may dispatch and wait for tag-bound Swift CI.
 3. The `cog-release` publisher verifies the candidate, source trees, tools,
-   architectures, record, and checksum before publishing matching bytes.
+   architectures, record, and checksum before publishing matching bytes. No
+   reviewer stands in front of it.
 4. A narrow `actions: write` job dispatches Docs at the published tag.
+5. A job with only `contents: read` on its own token dispatches the sibling
+   `Publish CogLintPlugins` workflow through `COGLINT_PLUGINS_DISPATCH_TOKEN`,
+   a fine-grained secret scoped to that repository's Actions.
 
 The sibling repo uses the same split. Read-only preparation builds and checks
 the generated package. The `coglint-release` writer runs no downloaded Cog code,

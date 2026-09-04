@@ -30,6 +30,7 @@ import { entries, get, items, parseYaml, text } from "./yaml.mjs";
  * @property {string | null} run
  * @property {number} runLine
  * @property {import("./yaml.mjs").Node | null | undefined} with
+ * @property {import("./yaml.mjs").Node | null | undefined} env the step's own `env:` mapping
  */
 
 /**
@@ -173,6 +174,7 @@ function readJob(jobEntry) {
       run: run === undefined ? null : (text(run.value) ?? ""),
       runLine: run?.line ?? stepNode.line,
       with: get(stepNode, "with"),
+      env: get(stepNode, "env"),
     });
     index += 1;
   }
