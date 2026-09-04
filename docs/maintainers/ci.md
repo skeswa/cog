@@ -277,7 +277,8 @@ it.
    a fine-grained secret scoped to that repository's Actions.
 
 The sibling repo uses the same split. Read-only preparation builds and checks
-the generated package. The `coglint-release` writer runs no downloaded Cog code,
+the generated package, verifying the Cog provenance by identity alone; the
+toolchain pins live only in `release.yml` and the checker rejects a copy. The `coglint-release` writer runs no downloaded Cog code,
 requires sibling `main` to be unchanged, pushes without force, and creates the
 matching tag. A final read-only job uses that public tag.
 

@@ -62,8 +62,10 @@ numbered sections after it give the Actions UI steps.
 - **Sibling.** After Cog publishes and Docs is dispatched, a narrow job
   starts the `coglint-plugins` repository's workflow with the Cog version,
   under a token scoped to that repository's Actions and nothing else. Read-only
-  preparation verifies the public tag, assets, checksum, and provenance; runs
-  the exact tag's generator; and smoke-tests SwiftPM. A `coglint-release` job
+  preparation verifies the public tag, assets, checksum, and provenance
+  identity; runs the exact tag's generator; and smoke-tests SwiftPM. It does
+  not repeat Cog's toolchain pins, which the Cog publisher enforced before the
+  release became public and which drift when copied. A `coglint-release` job
   with only sibling `contents: write` re-hashes without executing
   downloaded Cog code, requires sibling `main` unchanged, fast-forwards one
   conventional release commit and creates the matching immutable tag in one
@@ -182,7 +184,8 @@ and enter the Cog version.
 The read-only preparation job:
 
 1. requires the public Cog tag and release;
-2. downloads and checks all three Cog assets;
+2. downloads all three Cog assets and checks that the provenance names this
+   version, tree, checksum, both architectures, and both passed probes;
 3. checks out the exact Cog tag and runs its generator;
 4. checks the generated package and a test SwiftPM app; and
 5. records the sibling `main` SHA and uploads the generated tree.

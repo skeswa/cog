@@ -23,6 +23,8 @@ jobs:
           jq 'select(.architectures == ["arm64", "x86_64"])'
           echo '.build.arm64_probe == "passed"'
           echo '.intel.x86_64_probe == "passed"'
+          echo '.build.runner == "self-hosted-cog-mini"'
+          echo '.build.xcode_build == "17F113"'
           node cog/tools/generate-coglint-plugins.mjs
           swift build --package-path consumer
           echo sibling_main_sha
