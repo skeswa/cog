@@ -206,7 +206,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
       needs.recover-candidate.result == 'success'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Long enough to wait out a candidate that was still building at merge
+    # time; the wait itself is bounded by Swift CI's own job timeouts.
+    timeout-minutes: 180
     environment:
       name: cog-release
       url: ${{ steps.publish.outputs.url }}
@@ -293,8 +295,25 @@ jobs:
             expected_mode=recovery
             expected_workflow_ref="${GITHUB_REPOSITORY}/.github/workflows/swift-ci.yml@refs/tags/${tag}"
           else
-            run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&status=success&head_sha=${pr_head_sha}&per_page=100" \
-              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id')"
+            successful_candidate() {
+              gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&status=success&head_sha=${pr_head_sha}&per_page=100" \
+                --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id'
+            }
+            run_id="$(successful_candidate)"
+            if [ -z "$run_id" ] || [ "$run_id" = null ]; then
+              # The release PR can be merged while its candidate is still
+              # building; hosted macOS queues make that likely. Waiting costs
+              # nothing in rigor: the finished run is verified exactly as one
+              # that had finished before the merge, and a failed candidate
+              # fails this job through --exit-status.
+              pending_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?event=workflow_dispatch&head_sha=${pr_head_sha}&per_page=100" \
+                --jq '[.workflow_runs[] | select(.status != "completed")] | sort_by(.created_at) | reverse | .[0].id')"
+              if [ -n "$pending_id" ] && [ "$pending_id" != null ]; then
+                echo "Candidate run ${pending_id} at ${pr_head_sha} is still running; waiting for it."
+                gh run watch "$pending_id" --repo "$GITHUB_REPOSITORY" --exit-status --interval 60
+                run_id="$(successful_candidate)"
+              fi
+            fi
             expected_source_sha="$pr_head_sha"
             expected_mode=candidate
             expected_workflow_ref="${GITHUB_REPOSITORY}/.github/workflows/swift-ci.yml@refs/heads/${pr_head_ref}"

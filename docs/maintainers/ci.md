@@ -271,7 +271,8 @@ it.
 2. Recovery may dispatch and wait for tag-bound Swift CI.
 3. The `cog-release` publisher verifies the candidate, source trees, tools,
    architectures, record, and checksum before publishing matching bytes. No
-   reviewer stands in front of it.
+   reviewer stands in front of it, and it waits for a candidate that is still
+   building at merge time rather than failing.
 4. A narrow `actions: write` job dispatches Docs at the published tag.
 5. A job with only `contents: read` on its own token dispatches the sibling
    `Publish CogLintPlugins` workflow through `COGLINT_PLUGINS_DISPATCH_TOKEN`,
