@@ -26,6 +26,7 @@ jobs:
           echo '.build.runner == "self-hosted-cog-mini"'
           echo '.build.xcode_build == "17F113"'
           node cog/tools/generate-coglint-plugins.mjs
+          echo 'platforms: [.macOS(.v14)]'
           swift build --package-path consumer
           echo sibling_main_sha
 
@@ -56,4 +57,5 @@ jobs:
     steps:
       - run: |
           echo https://github.com/skeswa/coglint-plugins.git
+          echo 'platforms: [.macOS(.v14)]'
           swift build --package-path consumer

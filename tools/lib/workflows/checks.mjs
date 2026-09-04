@@ -1333,6 +1333,7 @@ function cogLintPublicationContract(workflow) {
     !prepareSource.includes('.build.arm64_probe == "passed"') ||
     !prepareSource.includes('.intel.x86_64_probe == "passed"') ||
     !prepareSource.includes("generate-coglint-plugins.mjs") ||
+    !prepareSource.includes("platforms: [.macOS(.v14)]") ||
     !prepareSource.includes("swift build --package-path") ||
     !prepareSource.includes("sibling_main_sha")
   ) {
@@ -1395,6 +1396,7 @@ function cogLintPublicationContract(workflow) {
     !isHostedRunner(consume, COGLINT_SIBLING_RUNNER) ||
     !hasExactContentsRead(consume.permissions) ||
     !consumeSource.includes("https://github.com/skeswa/coglint-plugins.git") ||
+    !consumeSource.includes("platforms: [.macOS(.v14)]") ||
     !consumeSource.includes("swift build --package-path")
   ) {
     diagnostics.push({
