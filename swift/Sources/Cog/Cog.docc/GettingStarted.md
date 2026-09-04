@@ -23,7 +23,7 @@ For a package-based target, add Cog to the existing manifest:
 dependencies: [
   .package(
     url: "https://github.com/skeswa/cog.git",
-    .upToNextMinor(from: "0.6.1")
+    .upToNextMinor(from: "0.7.0")
   )
 ],
 targets: [
