@@ -2,6 +2,14 @@ name: Release
 
 # Ordinary pushes let Release Please maintain its draft release PR and, after
 # that PR is rebased into main, create the lightweight tag and draft release.
+# Each time the release PR is proposed or updated, this workflow dispatches the
+# Swift CI candidate at that PR's head, so the only manual step in a release is
+# marking the PR ready and merging it. Publication then runs without an
+# approval: the `cog-release` environment scopes `contents: write` to the
+# publisher and no longer holds a required reviewer, because everything a
+# reviewer would check by eye is verified mechanically before any upload.
+# After Cog publishes, narrow jobs dispatch Docs here and `Publish
+# CogLintPlugins` in the sibling repository.
 # Recovery never moves a tag: it rebuilds an existing tag through Swift CI and
 # feeds those newly verified bytes through the same protected publisher.
 on:
@@ -32,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: write
       contents: write
       pull-requests: write
       issues: write
@@ -50,6 +59,28 @@ jobs:
           token: ${{ github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Every proposal or update of the release PR gets its candidate built at
+      # once, so the PR is ready to merge as soon as `Release candidate` is
+      # green. Swift CI still rejects a dispatch whose ref is not the PR's
+      # current head, so a stale candidate cannot be mistaken for a fresh one.
+      - name: Dispatch the release candidate at the proposed PR head
+        if: steps.release.outputs.pr != '' && steps.release.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          set -euo pipefail
+          number="$(jq -r .number <<<"$RELEASE_PR_JSON")"
+          branch="$(jq -r .headBranchName <<<"$RELEASE_PR_JSON")"
+          case "$number" in
+            ''|*[!0-9]*) echo "::error title=Invalid release PR::Release Please reported no pull request number"; exit 1 ;;
+          esac
+          if [ -z "$branch" ] || [ "$branch" = null ]; then
+            echo "::error title=Invalid release PR::Release Please reported no head branch for #${number}"
+            exit 1
+          fi
+          gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch" -f "release_pr=${number}"
 
   recover-candidate:
     name: Rebuild recovery candidate
@@ -354,3 +385,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.publish.outputs.tag }}
         run: gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+
+  # The sibling package is version-coupled to this release, so its publication
+  # is started here rather than remembered. The default token cannot reach
+  # another repository, so this job carries a fine-grained token scoped to
+  # `skeswa/coglint-plugins` with Actions write only; the sibling's own
+  # workflow still does every verification and every write under its own
+  # token. Docs is a dependency for ordering only: the lint articles that
+  # `coglint` findings link to should be live before the plugin tag exists.
+  dispatch-plugins:
+    name: Dispatch plugin publication
+    needs: [publish, dispatch-docs]
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch Publish CogLintPlugins at the published version
+        env:
+          GH_TOKEN: ${{ secrets.COGLINT_PLUGINS_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.publish.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=Missing sibling dispatch token::add the COGLINT_PLUGINS_DISPATCH_TOKEN repository secret, a fine-grained token for skeswa/coglint-plugins with Actions: write"
+            exit 1
+          fi
+          gh workflow run publish.yml --repo skeswa/coglint-plugins --ref main -f "cog_version=${VERSION}"

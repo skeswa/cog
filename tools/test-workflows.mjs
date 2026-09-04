@@ -111,6 +111,8 @@ const CASES = [
       "current candidate runner record",
       "`cog-release`",
       "dispatch `docs.yml`",
+      "proposed PR head",
+      "`coglint-plugins`",
     ],
   },
   {
