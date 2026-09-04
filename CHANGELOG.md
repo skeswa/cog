@@ -9,6 +9,19 @@ releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## [0.7.0](https://github.com/skeswa/cog/compare/0.6.1...0.7.0) (2026-09-04)
+
+
+### Features
+
+* **swift:** name the state file unit a rig and rename files to &lt;Rig&gt;Rig+&lt;Aspect&gt;.swift ([a14135e](https://github.com/skeswa/cog/commit/a14135e11830e48d9951fed98c2094845e25861b))
+
+
+### Bug Fixes
+
+* **ci:** publish the docs site when DocC is cached ([6d5a579](https://github.com/skeswa/cog/commit/6d5a579d3ae1363ca5aa0df12d92f5137db6d3bf))
+* **docs:** keep the display serif from reflowing the hero ([59f7098](https://github.com/skeswa/cog/commit/59f7098e84973442b54d08504ca5d3de234682a3))
+
 ## [0.6.1](https://github.com/skeswa/cog/compare/0.6.0...0.6.1) (2026-08-31)
 
 

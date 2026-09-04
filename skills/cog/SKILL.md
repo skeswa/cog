@@ -480,8 +480,8 @@ Add it beside Cog and attach the build-tool plugin to each source target:
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.6.1")),
-  .package(url: "https://github.com/skeswa/coglint-plugins.git", exact: "0.6.1"),
+  .package(url: "https://github.com/skeswa/cog.git", .upToNextMinor(from: "0.7.0")),
+  .package(url: "https://github.com/skeswa/coglint-plugins.git", exact: "0.7.0"),
 ],
 targets: [
   .target(

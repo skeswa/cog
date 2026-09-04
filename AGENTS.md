@@ -15,7 +15,7 @@ it for Claude Code; keep the two files in sync.
 
 <!-- x-release-please-start-version -->
 
-The current published Swift release is 0.6.1.
+The current published Swift release is 0.7.0.
 
 <!-- x-release-please-end -->
 
