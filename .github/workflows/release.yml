@@ -64,20 +64,66 @@ jobs:
       # once, so the PR is ready to merge as soon as `Release candidate` is
       # green. Swift CI still rejects a dispatch whose ref is not the PR's
       # current head, so a stale candidate cannot be mistaken for a fresh one.
-      - name: Dispatch the release candidate at the proposed PR head
-        if: steps.release.outputs.pr != '' && steps.release.outputs.release_created != 'true'
+      #
+      # Release Please leaves its PR alone when a push changes nothing in the
+      # changelog, so a `ci:` or `docs:` merge silently strands the PR behind
+      # main. The main ruleset then refuses the merge, and the publisher would
+      # reject the tag anyway because the rebased tree no longer equals the
+      # tested one. So when Release Please reports no PR of its own, this step
+      # finds the open release PR, rebases it through GitHub when it is behind,
+      # and builds a candidate at the new head.
+      - name: Dispatch the release candidate at the current PR head
+        if: steps.release.outputs.release_created != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
           set -euo pipefail
-          number="$(jq -r .number <<<"$RELEASE_PR_JSON")"
-          branch="$(jq -r .headBranchName <<<"$RELEASE_PR_JSON")"
+          if [ -n "$RELEASE_PR_JSON" ]; then
+            number="$(jq -r .number <<<"$RELEASE_PR_JSON")"
+            branch="$(jq -r .headBranchName <<<"$RELEASE_PR_JSON")"
+          else
+            open_pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --label 'autorelease: pending' \
+              --json number,headRefName,headRefOid --jq '.[0] // empty')"
+            if [ -z "$open_pr" ]; then
+              echo "No open release PR; nothing to build."
+              exit 0
+            fi
+            number="$(jq -r .number <<<"$open_pr")"
+            branch="$(jq -r .headRefName <<<"$open_pr")"
+            head="$(jq -r .headRefOid <<<"$open_pr")"
+            behind="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${head}" --jq .behind_by)"
+            if [ "$behind" = 0 ]; then
+              echo "Release PR #${number} is current; its candidate stands."
+              exit 0
+            fi
+            echo "Release PR #${number} is ${behind} commit(s) behind main; rebasing."
+            node_id="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .node_id)"
+            gh api graphql -F id="$node_id" -f query='mutation($id: ID!) {
+              updatePullRequestBranch(input: {pullRequestId: $id, updateMethod: REBASE}) {
+                pullRequest { number }
+              }
+            }' > /dev/null
+            rebased=false
+            for _ in $(seq 1 24); do
+              new_head="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .head.sha)"
+              if [ "$new_head" != "$head" ] && \
+                 [ "$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${new_head}" --jq .behind_by)" = 0 ]; then
+                rebased=true
+                break
+              fi
+              sleep 5
+            done
+            if [ "$rebased" != true ]; then
+              echo "::error title=Release PR rebase did not land::#${number} is still behind main after rebasing"
+              exit 1
+            fi
+          fi
           case "$number" in
-            ''|*[!0-9]*) echo "::error title=Invalid release PR::Release Please reported no pull request number"; exit 1 ;;
+            ''|*[!0-9]*) echo "::error title=Invalid release PR::no pull request number to build"; exit 1 ;;
           esac
           if [ -z "$branch" ] || [ "$branch" = null ]; then
-            echo "::error title=Invalid release PR::Release Please reported no head branch for #${number}"
+            echo "::error title=Invalid release PR::no head branch for #${number}"
             exit 1
           fi
           gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch" -f "release_pr=${number}"

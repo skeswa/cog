@@ -38,8 +38,10 @@ numbered sections after it give the Actions UI steps.
   current head passes the complete candidate workflow.
 - **Candidate.** `swift-ci.yml` requires the release PR number and rejects a
   dispatch at any other SHA. `release.yml` dispatches it whenever Release
-  Please proposes or updates the PR; a maintainer may dispatch it again by
-  hand. Its hosted revision-range job supplies
+  Please proposes or updates the PR. When a push changes nothing in the
+  changelog, Release Please leaves the PR behind `main`, so the same step
+  rebases the open release PR through GitHub and dispatches at its new head.
+  A maintainer may dispatch it again by hand. Its hosted revision-range job supplies
   the required `Conventional Commits` context that a repository-token-created
   Release Please PR cannot trigger for itself. The full Actions graph covers
   formatting, host and release tests, both arena configurations, simulator and
@@ -124,8 +126,9 @@ an Actions result.
 ## 2. Test the exact PR head
 
 `release.yml` dispatches **Swift CI** at the PR's head each time Release Please
-proposes or updates the PR, so a candidate is normally already running by the
-time you open the PR. To run one again by hand, open **Actions → Swift CI → Run
+proposes or updates the PR, and each time another merge leaves the PR behind
+`main`, after rebasing it. A candidate is normally already running by the time
+you open the PR, and the PR's tree is the one that will become the tag. To run one again by hand, open **Actions → Swift CI → Run
 workflow**, select the Release Please branch, enter its PR number in
 `release_pr`, leave `recovery_tag` empty, and start the workflow.
 
