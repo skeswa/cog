@@ -24,9 +24,12 @@ jobs:
           echo '.build.arm64_probe == "passed"'
           echo '.intel.x86_64_probe == "passed"'
           node cog/tools/generate-coglint-plugins.mjs
-          echo 'platforms: [.macOS(.v14)]'
           swift build --package-path consumer
           echo sibling_main_sha
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          path: generated
+          include-hidden-files: true
 
   publish:
     needs: prepare
@@ -55,5 +58,4 @@ jobs:
     steps:
       - run: |
           echo https://github.com/skeswa/coglint-plugins.git
-          echo 'platforms: [.macOS(.v14)]'
           swift build --package-path consumer
