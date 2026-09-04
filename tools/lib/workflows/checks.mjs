@@ -118,6 +118,12 @@ const COGLINT_SAME_REPO_RUNNER = { shape: "string", labels: ["macos-26"] };
 const COGLINT_FORK_RUNNER = "macos-26";
 const COGLINT_ARTIFACT_INTEL_RUNNER = "macos-15-intel";
 const COGLINT_CANDIDATE_RUNNER_RECORD = "github-hosted-macos-26";
+/**
+ * The hosted image for the sibling's read-only jobs. It must carry the Swift
+ * tools version the generated manifest declares; `macos-15` ships Swift 6.1
+ * and refused the 6.2 manifest on the first real dispatch.
+ */
+const COGLINT_SIBLING_RUNNER = "macos-26";
 
 /** The routing predicates that keep same-repo and fork code in separate lanes. */
 const COGLINT_SELF_HOSTED_CONDITION =
@@ -1307,7 +1313,7 @@ function cogLintPublicationContract(workflow) {
   const consume = workflow.jobs.find((job) => job.id === "consume");
   if (
     prepare === undefined ||
-    !isHostedRunner(prepare, "macos-15") ||
+    !isHostedRunner(prepare, COGLINT_SIBLING_RUNNER) ||
     !hasExactContentsRead(prepare.permissions)
   ) {
     diagnostics.push({
@@ -1386,7 +1392,7 @@ function cogLintPublicationContract(workflow) {
   const consumeSource = consume?.steps.map((step) => step.run ?? "").join("\n") ?? "";
   if (
     consume === undefined ||
-    !isHostedRunner(consume, "macos-15") ||
+    !isHostedRunner(consume, COGLINT_SIBLING_RUNNER) ||
     !hasExactContentsRead(consume.permissions) ||
     !consumeSource.includes("https://github.com/skeswa/coglint-plugins.git") ||
     !consumeSource.includes("swift build --package-path")
