@@ -154,7 +154,9 @@ only allowed merge type, so the tested revision messages stay in `main`.
 The merge runs `release.yml`. Release Please creates the permanent lightweight
 tag and a draft GitHub Release. `Publish verified release` then runs in the
 `cog-release` environment, which gives the hosted publisher `contents: write`
-and asks nobody for approval. Before it publishes, the job checks that:
+and asks nobody for approval. If the candidate at the PR's head is still
+building when the PR merges, the publisher waits for it and fails only if the
+candidate does. Before it publishes, the job checks that:
 
 - the tag is lightweight, points at the Release Please commit, and matches
   `version.txt`;

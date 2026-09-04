@@ -1223,6 +1223,9 @@ function releaseWorkflowContract(workflow) {
     !publishSource.includes('.build.xcode_build == "17F113"') ||
     !publishSource.includes('.intel.xcode_build == "17C529"') ||
     !publishSource.includes("Release was published early") ||
+    !publishSource.includes(
+      'gh run watch "$pending_id" --repo "$GITHUB_REPOSITORY" --exit-status',
+    ) ||
     !publishSource.includes("Divergent release asset") ||
     !publishSource.includes('gh release edit "$TAG" --title "Cog ${VERSION}" --draft=false')
   ) {
