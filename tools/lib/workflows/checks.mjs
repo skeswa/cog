@@ -1380,6 +1380,29 @@ function cogLintPublicationContract(workflow) {
     });
   }
 
+  // The prepared tree is synced into the repository root with --delete. If it
+  // were downloaded inside the checkout, rsync would treat its own download
+  // directory as extraneous and delete the source mid-transfer, which is how
+  // the first publication attempt ended.
+  const download = publish?.steps.find((step) =>
+    actionName(step.uses ?? "")
+      .toLowerCase()
+      .startsWith("actions/download-artifact"),
+  );
+  if (
+    download === undefined ||
+    !(text(get(download.with, "path")) ?? "").startsWith("${{ runner.temp }}/")
+  ) {
+    diagnostics.push({
+      path: workflow.path,
+      line: download?.line ?? publish?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "publish",
+      message:
+        "publication must download the prepared tree under `${{ runner.temp }}`, outside the checkout it syncs into",
+    });
+  }
+
   const publishSource = publish?.steps.map((step) => step.run ?? "").join("\n") ?? "";
   if (
     publish === undefined ||

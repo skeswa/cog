@@ -101,6 +101,7 @@ const CASES = [
       "`cog_version`",
       "preparation",
       "include-hidden-files",
+      "outside the checkout",
       "protected sibling publication",
       "exact-tag",
     ],
