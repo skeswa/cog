@@ -88,6 +88,12 @@ const CASES = [
     checks: [],
   },
   {
+    name: "sibling preparation that repeats Cog's toolchain pins",
+    workflow: resolve(FIXTURES, "coglint-publication-pinned/publish.yml"),
+    checks: ["coglint-publication-contract"],
+    mentions: ["identity only", "toolchain policy"],
+  },
+  {
     name: "sibling preparation, environment, immutable push, and consumer drift",
     workflow: resolve(FIXTURES, "coglint-publication-drift/publish.yml"),
     checks: ["coglint-publication-contract"],

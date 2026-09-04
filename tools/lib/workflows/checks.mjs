@@ -1316,8 +1316,10 @@ function cogLintPublicationContract(workflow) {
   if (
     !prepareSource.includes("releases/tags/${VERSION}") ||
     !prepareSource.includes("source_tree == $tree") ||
-    !prepareSource.includes('.build.xcode_build == "17F113"') ||
-    !prepareSource.includes('.intel.xcode_build == "17C529"') ||
+    !prepareSource.includes(".checksum == $checksum") ||
+    !prepareSource.includes('.architectures == ["arm64", "x86_64"]') ||
+    !prepareSource.includes('.build.arm64_probe == "passed"') ||
+    !prepareSource.includes('.intel.x86_64_probe == "passed"') ||
     !prepareSource.includes("generate-coglint-plugins.mjs") ||
     !prepareSource.includes("swift build --package-path") ||
     !prepareSource.includes("sibling_main_sha")
@@ -1329,6 +1331,22 @@ function cogLintPublicationContract(workflow) {
       job: "prepare",
       message:
         "preparation must verify the public Cog release/provenance, generate with that tag, smoke-test SwiftPM, and record sibling main",
+    });
+  }
+  // Toolchain policy — which runner, Xcode, and Swift may build a candidate —
+  // is Cog's publisher's to enforce, and it already has before a release is
+  // public. A second copy in the sibling can only drift, and did: it pinned
+  // the self-hosted runner after Cog moved candidates to hosted macOS. The
+  // sibling verifies identity (version, tree, checksum, architectures, both
+  // probes) and nothing about how the bytes were produced.
+  if (/\.build\.runner ==|xcode_version ==|xcode_build ==|swift_version/u.test(prepareSource)) {
+    diagnostics.push({
+      path: workflow.path,
+      line: prepare?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "prepare",
+      message:
+        "preparation must verify provenance identity only; toolchain policy belongs to Cog's publisher and drifts when copied",
     });
   }
 
