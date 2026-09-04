@@ -7,7 +7,7 @@ permissions: {}
 
 jobs:
   prepare:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 10
     permissions:
       contents: read
@@ -25,7 +25,7 @@ jobs:
 
   consume:
     needs: publish
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 10
     permissions:
       contents: read
