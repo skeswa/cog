@@ -1154,7 +1154,10 @@ function releaseWorkflowContract(workflow) {
     !releasePleaseSource.includes(
       'gh workflow run swift-ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"',
     ) ||
-    !releasePleaseSource.includes("release_pr=${number}")
+    !releasePleaseSource.includes("release_pr=${number}") ||
+    !releasePleaseSource.includes("--label 'autorelease: pending'") ||
+    !releasePleaseSource.includes("--jq .behind_by") ||
+    !releasePleaseSource.includes("updateMethod: REBASE")
   ) {
     diagnostics.push({
       path: workflow.path,
@@ -1162,7 +1165,7 @@ function releaseWorkflowContract(workflow) {
       check: "release-workflow-contract",
       job: "release-please",
       message:
-        "Release Please must dispatch the Swift CI candidate at the proposed PR head with explicit repository context",
+        "Release Please must rebase a stale open release PR and dispatch the Swift CI candidate at the proposed PR head with explicit repository context",
     });
   }
 

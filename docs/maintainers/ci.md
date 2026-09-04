@@ -266,7 +266,8 @@ it.
 `release.yml` keeps five hosted jobs and five separate credentials:
 
 1. Release Please creates or updates the release PR without checking out code,
-   then dispatches the Swift CI candidate at that PR's head.
+   rebases it through GitHub when another merge has left it behind `main`,
+   then dispatches the Swift CI candidate at its head.
 2. Recovery may dispatch and wait for tag-bound Swift CI.
 3. The `cog-release` publisher verifies the candidate, source trees, tools,
    architectures, record, and checksum before publishing matching bytes. No
