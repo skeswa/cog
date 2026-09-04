@@ -1333,7 +1333,6 @@ function cogLintPublicationContract(workflow) {
     !prepareSource.includes('.build.arm64_probe == "passed"') ||
     !prepareSource.includes('.intel.x86_64_probe == "passed"') ||
     !prepareSource.includes("generate-coglint-plugins.mjs") ||
-    !prepareSource.includes("platforms: [.macOS(.v14)]") ||
     !prepareSource.includes("swift build --package-path") ||
     !prepareSource.includes("sibling_main_sha")
   ) {
@@ -1344,6 +1343,24 @@ function cogLintPublicationContract(workflow) {
       job: "prepare",
       message:
         "preparation must verify the public Cog release/provenance, generate with that tag, smoke-test SwiftPM, and record sibling main",
+    });
+  }
+  // The generation record is a dotfile. upload-artifact drops hidden files
+  // unless told otherwise, and without the record the publisher's tree hash
+  // and record checks cannot match what preparation verified.
+  const upload = prepare?.steps.find((step) =>
+    actionName(step.uses ?? "")
+      .toLowerCase()
+      .startsWith("actions/upload-artifact"),
+  );
+  if (upload === undefined || text(get(upload.with, "include-hidden-files")) !== "true") {
+    diagnostics.push({
+      path: workflow.path,
+      line: upload?.line ?? prepare?.line ?? 1,
+      check: "coglint-publication-contract",
+      job: "prepare",
+      message:
+        "preparation must retain the generated tree with `include-hidden-files: true`, or the generation record never reaches publication",
     });
   }
   // Toolchain policy — which runner, Xcode, and Swift may build a candidate —
@@ -1396,7 +1413,6 @@ function cogLintPublicationContract(workflow) {
     !isHostedRunner(consume, COGLINT_SIBLING_RUNNER) ||
     !hasExactContentsRead(consume.permissions) ||
     !consumeSource.includes("https://github.com/skeswa/coglint-plugins.git") ||
-    !consumeSource.includes("platforms: [.macOS(.v14)]") ||
     !consumeSource.includes("swift build --package-path")
   ) {
     diagnostics.push({

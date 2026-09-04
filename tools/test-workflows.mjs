@@ -97,7 +97,13 @@ const CASES = [
     name: "sibling preparation, environment, immutable push, and consumer drift",
     workflow: resolve(FIXTURES, "coglint-publication-drift/publish.yml"),
     checks: ["coglint-publication-contract"],
-    mentions: ["`cog_version`", "preparation", "protected sibling publication", "exact-tag"],
+    mentions: [
+      "`cog_version`",
+      "preparation",
+      "include-hidden-files",
+      "protected sibling publication",
+      "exact-tag",
+    ],
   },
   {
     name: "Conventional Commit range and command drift",
