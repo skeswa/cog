@@ -606,7 +606,9 @@ test waits wall-clock time.
   reads stay alive.
 - **LIFE-08.** Once a cog has been read through the UI subscript — the read
   a view's body makes — it is pinned for the life of the app context. It is
-  never released behind SwiftUI's back.
+  never released behind SwiftUI's back: no grace period, lease release, or
+  dependency change lets it go, and only an explicit `discard` (LIFE-13), which
+  notifies its readers first, ever does.
 - **LIFE-09.** Automatic cog B reads automatic cog A, then both lose their last
   external consumer. Their internal graph edge does not keep them alive.
   After the grace period, reading either value reference recreates the needed states
@@ -619,6 +621,27 @@ test waits wall-clock time.
   sibling key stays watched. After the grace period only that key's state is
   released: the watched key never recomputes and keeps answering warm, and
   reading the released key recreates it from current values.
+
+_Explicit release for state a domain lifetime owned (§5.3, §6.2)._
+
+- **LIFE-13.** A screen's keyed source is read through the UI subscript, which
+  pins it for the context. The op that closes the screen `discard`s it: the
+  row, its value, and its Observation boundary all go, the boundary count
+  returns to its previous value, and a later read starts over at the
+  declaration's starting value. A reader still tracking that boundary receives
+  a change notice before the state disappears, so its re-read recreates the
+  state and attaches to a fresh boundary rather than freezing on stale content.
+- **LIFE-14.** Discard names one state, not a feature. A sibling screen's
+  values, shared resource state, and any state another consumer still leases
+  are all left alone — a leased state keeps its value and keeps delivering
+  changes to that consumer. Across two hundred open-type-read-close cycles, the
+  Observation boundary count returns to baseline, so per-screen state is
+  bounded rather than merely unreferenced. Discard through a retired controller
+  is inert, on the same rule as a turn.
+- **LIFE-15.** I discard a source declared `.app`. Cog stops with a clear error
+  naming the declaration change that would make the request meaningful, in
+  debug builds and release builds: a released source has no value to come back
+  as. (Proof: exit test.)
 
 ## 10. SEED — Test helpers: seed and stub
 

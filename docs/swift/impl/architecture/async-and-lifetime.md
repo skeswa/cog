@@ -278,6 +278,38 @@ while it had a subscriber can leave in the same cascade. One with a still-live
 independent deadline keeps that grace. UI-pinned, leased, subscribed, app-life,
 computing, or touched rows cannot be released.
 
+## Explicit discard
+
+`CogOps.discard(_:)` is the only path that releases a UI-pinned row while its
+context lives, and it exists because the pin is one-way. A boundary records that
+some view read the state; Observation never reports that the last reader left,
+so no amount of graph evidence can retire that row. The application supplies the
+missing fact.
+
+The row still has to satisfy every other release precondition — no durable
+lease beyond the boundary's own, no live subscriber, not computing, not touched
+— and its declaration must already permit release and reset, which is checked
+before anything is detached. A row failing an ownership precondition is left
+alone rather than forced: it belongs to whoever holds it.
+
+Detachment, release, and notification happen in that order, and the order is
+load-bearing. Detaching swaps the boundary table's last entry into the vacated
+index and repoints the moved entry's row, since the row stores that index.
+Releasing then runs the ordinary cascade above, so upstream states the discard
+disconnects leave with it. Notifying last means a reader still tracking the old
+boundary is invalidated _after_ the state is gone: its re-render reads the value
+reference again, recreating the state and attaching to the fresh boundary that
+read installs. Notifying first would let a handler that synchronously re-reads
+pin a new boundary on the row about to be released, quietly cancelling the
+discard.
+
+The work runs through `withSystemTurn`, so it happens at the first safe graph
+boundary — immediately when the context is idle, otherwise as a later FIFO turn.
+Releasing a row while its values are staged or its dependents are settling would
+remove storage from under active work. A discard requested through a mechanism
+controller carries that scope as its deferred-turn owner, so a retired scope's
+queued discard is rejected like any other queued write.
+
 ## Context teardown
 
 `Cogs` teardown first cancels mechanism scopes and external bridges, then
@@ -294,7 +326,8 @@ evicted so static declarations do not retain a dead context's typed columns.
 - Slot identity plus policy-specific generation—not cancellation—decides
   whether a result may publish.
 - UI boundaries and direct reaction roots are durable owners; graph reachability
-  alone is not.
+  alone is not. Only an explicit `discard` removes a boundary, and only after
+  proving no other owner remains.
 - Every stale sleeper, slot, task, and refresh handle has a generation-safe
   outcome.
 

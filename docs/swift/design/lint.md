@@ -148,16 +148,16 @@ A shared classifier finds four kinds of syntax:
 
 The classifier does not follow assignments or infer across files.
 
-| Rule                         | Required form                                            |
-| ---------------------------- | -------------------------------------------------------- |
-| `cog-declaration-suffix`     | Keyless names end in `Cog`; box names end in `Cogs`      |
-| `no-cogs-in-view-init`       | Views read `Cogs` from the environment                   |
-| `primitives-only-in-ops`     | App code calls `turn` and `refresh` only inside `CogOps` |
-| `initial-state-in-mechanism` | App assembly does no graph work                          |
-| `manual-cog-private`         | Writable sources are `private` or `fileprivate`          |
-| `manual-cog-underscore`      | Sources begin with `_`; projections drop the underscore  |
-| `no-multi-read-cogs-helper`  | Reads stay flat instead of hiding in a runtime helper    |
-| `tracked-binding-adapters`   | Graph bindings are tracked adapters on `Cogs`            |
+| Rule                         | Required form                                                        |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `cog-declaration-suffix`     | Keyless names end in `Cog`; box names end in `Cogs`                  |
+| `no-cogs-in-view-init`       | Views read `Cogs` from the environment                               |
+| `primitives-only-in-ops`     | App code calls `turn`, `refresh`, and `discard` only inside `CogOps` |
+| `initial-state-in-mechanism` | App assembly does no graph work                                      |
+| `manual-cog-private`         | Writable sources are `private` or `fileprivate`                      |
+| `manual-cog-underscore`      | Sources begin with `_`; projections drop the underscore              |
+| `no-multi-read-cogs-helper`  | Reads stay flat instead of hiding in a runtime helper                |
+| `tracked-binding-adapters`   | Graph bindings are tracked adapters on `Cogs`                        |
 
 ### 4.1 `cog-declaration-suffix`
 
@@ -182,9 +182,14 @@ A `View` conformance written in another file is a known miss.
 
 ### 4.3 `primitives-only-in-ops`
 
-App code may call `turn(...)` or `refresh(...)` only as a bare call inside an
-`extension CogOps`. Calls on a known graph receiver fail everywhere else. Bare
-or `self.` calls inside `extension Cogs` also fail.
+App code may call `turn(...)`, `refresh(...)`, or `discard(...)` only as a bare
+call inside an `extension CogOps`. Calls on a known graph receiver fail
+everywhere else. Bare or `self.` calls inside `extension Cogs` also fail.
+
+Each of those names a runtime mechanic rather than a domain intent: publish a
+turn, demand a fresh generation, release a state the app is finished with. The
+rule is syntax-only, so it checks where they are written, never whether the
+release or receipt they express is correct.
 
 Tests may call primitives directly under their test-role exemption. A nested
 writer turn inside a `CogOps` method remains valid.

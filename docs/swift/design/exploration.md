@@ -691,13 +691,38 @@ State lifetime depends on state kind:
   advances its generation, and blocks late results from a new slot.
 - **Query:** explicit `.cache(...)` policy with separate freshness and
   retention rules.
-- **UI boundary:** pinned to the app context in v1 because SwiftUI exposes no
+- **UI boundary:** pinned to the app context because SwiftUI exposes no
   reliable observer-removal hook. Reactions and exported streams have exact
-  lease tokens and may release normally.
+  lease tokens and may release normally. The pin is unconditional against every
+  inference Cog could make on its own; the one thing that lifts it is the
+  application saying so, through `discard` below.
 
-Lifetime follows state kind rather than a declaration convenience flag. If
-UI-pinned keyed growth becomes a measured problem, an optional
-`DynamicProperty` can own an exact view lease.
+Lifetime follows state kind rather than a declaration convenience flag.
+
+**Explicit release.** UI-pinned keyed growth is not hypothetical: state keyed by
+a domain lifetime — a presentation ID, a workflow ID — leaves a row, a value,
+and a boundary behind for every identity the app has ever shown, and no
+inference the graph can make will ever reclaim them. Every signal Cog has says
+"someone might still be reading", because for the UI half that is the only
+answer Observation can give.
+
+`CogOps.discard(_:)` supplies the missing fact: the application declaring one
+keyed lifetime finished. It names one exact state, works only on declarations
+that already say they may be released and start over, and refuses state another
+consumer still leases or subscribes to. It detaches and releases the state, then
+notifies the boundary it detached — in that order, so a reader still tracking is
+invalidated after the state is gone and its re-read recreates the state and
+attaches to a fresh boundary rather than holding one that can never fire again.
+It runs at the first safe graph boundary as its own named turn.
+
+It is deliberately not a reset, not a feature-scoped operation, and not a scope
+hook: scope retirement issues no discards, because registration ownership and
+state ownership are separate responsibilities and the op that ends a lifetime
+should state both. Async state is excluded — its generations belong to demand,
+and dropping one consumer must not cancel work another still wants.
+
+If per-view leases later become worth their cost, an optional `DynamicProperty`
+could own an exact view lease and make the pin conditional rather than explicit.
 
 `whileObserved` uses the context default when grace is omitted. Production uses
 30 seconds. Tests inject a shorter duration and a controlled clock.
@@ -802,7 +827,7 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | Async work           | `.latest` is the default. `.queue`, `.merged`, and `.exhaustLatest` apply to one-shot work. Streams use `.latest` only. Generations reject late results.                                                                                                                                               |
 | Stream end and error | Natural end publishes no turn. A current thrown error publishes failure. Cog-led cancellation is silent. Equal elements are no-ops when equality exists.                                                                                                                                               |
 | Refresh result       | `CogRefresh` reports success, failure, superseded, or released for the exact generation it started.                                                                                                                                                                                                    |
-| Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds.                                                                                                                                                                  |
+| Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds. `discard` is the one explicit release: it names an exact releasable state, refuses one another consumer owns, and notifies its UI boundary before releasing it.  |
 | Mechanisms           | Assembly owns app-wide effects. `scope` owns shorter work, selected by a Bool, an optional identity, or a collection of identities. Retirement revokes a controller's graph access and rejects its queued writes. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.     |
 | UI and exports       | Views resolve `\.cogs` themselves. Bindings use a tracked getter and named-op setter. Exports never block a turn.                                                                                                                                                                                      |
 | Runtime creation     | Production calls `assemble(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                                                                                                                                                             |
@@ -919,6 +944,21 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     from `…State` to `…Rig` so the name on disk says what the unit is.
     "Family" was retired for this use because it already names the shape
     families (item 28) and a keyed box's per-key values.
+
+32. **Explicit state release — settled.** `CogOps.discard(_:)` releases one
+    exact source or automatic state, including the Observation boundary that
+    pinned it. It exists because the UI pin is one-way: Observation has no
+    observer-removal hook, so state keyed by a domain lifetime accumulates a
+    row, a value, and a boundary per identity the app has ever shown, and no
+    evidence the graph can gather will ever reclaim them. The application is the
+    only thing that knows a keyed lifetime is over, so it says so. Guardrails
+    keep it narrow rather than turning it into a reset facility: only a
+    declaration that already permits release and reset is eligible, a state with
+    a durable lease or a live subscriber is left to its real owner, the boundary
+    is notified after detachment so a surviving reader re-renders and reattaches
+    instead of freezing, and async work is out of scope because its generations
+    belong to demand. Scope retirement issues no discards; the op that ends a
+    lifetime states registration ownership and state ownership separately.
 
 ---
 

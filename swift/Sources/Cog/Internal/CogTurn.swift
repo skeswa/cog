@@ -221,17 +221,26 @@ extension Cogs {
   /// Async status publication originates from automatic computation itself. It is
   /// still a named turn, but it is not an application write and therefore may
   /// be requested while the async selector is on the computation path. This
-  /// exception is internal-only: it must stage runtime-owned status, never
-  /// invoke an application operation or expose a writer.
+  /// exception is internal-only: it must stage runtime-owned status or perform
+  /// a runtime-owned lifetime operation, never invoke an application operation
+  /// or expose a writer.
+  ///
+  /// `owner` is supplied only when a mechanism controller requested the work, so
+  /// a deferred entry whose scope is retired before it drains is rejected on the
+  /// same rule as any other controller-originated turn.
   ///
   /// If another turn is active, queue rather than nest a flush. That preserves
   /// completed-turn reads and ensures pending, success, and failure each occupy
   /// their own visible revision. The same deferral applies while otherwise-idle
   /// selector or reaction tracking is active; the first safe outer boundary
   /// drains the preserved name and body in FIFO order.
-  internal func withSystemTurn(_ name: String, _ body: @escaping (CogTurn) -> Void) {
+  internal func withSystemTurn(
+    _ name: String,
+    owner: CogTurnOwner? = nil,
+    _ body: @escaping (CogTurn) -> Void
+  ) {
     guard canRunSystemTurnImmediately else {
-      queuedTurns.append(QueuedCogTurn(name: name, body: body, owner: nil))
+      queuedTurns.append(QueuedCogTurn(name: name, body: body, owner: owner))
       return
     }
 

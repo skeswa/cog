@@ -52,6 +52,101 @@ extension CogArenaCore {
     return boundary
   }
 
+  /// Detaches one slot's Observation boundary and returns the pin it held.
+  ///
+  /// The boundary table is index-addressed from the arena row, so removal moves
+  /// the last entry into the vacated position and repoints the moved entry's
+  /// own row. Nothing else in the table shifts, which is what keeps a
+  /// `boundary` column value meaningful after a removal.
+  ///
+  /// Only ``discardObservedState(_:in:)`` calls this. Every other path treats a
+  /// boundary as permanent, because Cog cannot otherwise learn that a UI reader
+  /// has gone: this one is reached solely when the application has said so.
+  private func detachObservationBoundary(from slot: CogArenaSlot) -> CogObservationBoundary? {
+    let row = arena.index(of: slot)
+    let entryIndex = arena.boundary[row]
+    guard entryIndex != CogArenaStorage.noIndex else { return nil }
+    let index = Int(entryIndex)
+    guard index >= 0, index < observationEntries.count else {
+      fatalError("Cog found an arena row with an invalid Observation boundary index.")
+    }
+    let entry = observationEntries[index]
+    guard entry.slot == slot else {
+      fatalError("Cog found an Observation boundary attached to another arena slot lifetime.")
+    }
+
+    arena.boundary[row] = CogArenaStorage.noIndex
+    let lastIndex = observationEntries.count - 1
+    if index != lastIndex {
+      let moved = observationEntries[lastIndex]
+      observationEntries[index] = moved
+      arena.boundary[arena.index(of: moved.slot)] = Int32(index)
+    }
+    observationEntries.removeLast()
+    decrementLeaseWithoutScheduling(on: slot)
+    return entry.boundary
+  }
+
+  /// Releases one exact state the application has declared finished with.
+  ///
+  /// This is the only way a row that reached the UI Observation boundary ever
+  /// leaves the graph while its context lives. Ordinary release cannot do it:
+  /// SwiftUI offers no observer-removal hook, so a boundary is a permanent pin
+  /// and Cog has no way to discover that the last view reading a per-screen
+  /// value has gone. Explicit ownership is the missing signal. The application
+  /// knows the presentation ended; this call is it saying so.
+  ///
+  /// The order inside matters. Any surviving reader is notified **before** the
+  /// state disappears, so a body still tracking this boundary is invalidated,
+  /// re-renders, reads the value reference again, and reattaches to the state
+  /// that read recreates. Detaching silently is what would strand a reader on a
+  /// boundary that can never fire again.
+  ///
+  /// A state another consumer still owns is left alone. A durable lease means a
+  /// reaction or export is watching, and a live subscriber means a dependent
+  /// state is reading; either way this is not the caller's state to reclaim, and
+  /// it follows its ordinary release path when its real last owner leaves. The
+  /// same applies to a row taking part in active graph work.
+  ///
+  /// - Parameters:
+  ///   - identity: The exact descriptor-and-key state to release.
+  /// - Returns: Whether the state existed and was released.
+  @discardableResult
+  func discardObservedState(_ identity: CogStateIdentity) -> Bool {
+    guard let slot = slots[identity], arena.contains(slot) else { return false }
+    let row = arena.index(of: slot)
+    guard case .whileObserved = descriptorRecord(forRow: row).lifetime else {
+      fatalError(
+        """
+        Cog cannot discard a state whose declaration keeps it for the life of \
+        the context. Declare the source `.whileObserved(resetToInitial: true)` \
+        if a later read should start over, or leave it alone: discarding an \
+        `.app` source would lose a value that exists nowhere else.
+        """
+      )
+    }
+    guard arena.subs[row] == .none else { return false }
+    guard !arena.flags[row].contains(.computing), !arena.flags[row].contains(.touched) else {
+      return false
+    }
+
+    // The boundary holds a lease of its own, so the ownership test is "no owner
+    // but the UI pin", not "no owner at all".
+    let hasBoundary = arena.boundary[row] != CogArenaStorage.noIndex
+    guard arena.leaseCount[row] == (hasBoundary ? 1 : 0) else { return false }
+
+    // Detach, release, then notify — in that order. Notifying first would let
+    // a handler that synchronously re-reads the value pin a fresh boundary on
+    // the row about to be released, quietly cancelling the discard. Notifying
+    // last means a surviving reader is invalidated after the state is gone, so
+    // its re-read recreates the state at its starting value and attaches to the
+    // new boundary that read installs.
+    let boundary = detachObservationBoundary(from: slot)
+    releaseUnobservedClosure(startingAt: slot)
+    boundary?.notifyValueChange()
+    return true
+  }
+
   /// Adds one durable owner to a releasable row without permitting wraparound.
   ///
   /// App-lifetime rows need no count: their descriptor policy alone keeps them

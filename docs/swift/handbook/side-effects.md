@@ -117,6 +117,11 @@ presented or dismissed — button, gesture, deep link, or restoration.
 
 ## When the lifetime has a name, select its identity
 
+The two sketches below are not from the example apps. Trails' navigation stack
+holds routes rather than per-opening identities, and none of the three examples
+has a session, so these show the shape rather than pointing at code you can
+open.
+
 A Bool says whether work should exist. It cannot say _which_ lifetime owns it,
 and some work needs to know. A session ends and another begins while onboarding
 stays active; a user signs the same account in twice; a screen is dismissed and
@@ -224,9 +229,11 @@ inside its body retires the scope, the statements after that are running through
 a retired controller like any others. Re-check after every `await`.
 
 Note what retirement does _not_ do. It ends registrations and asks tasks to
-stop. It writes nothing, resets nothing, and reclaims no state — a departed
-screen's values follow their own declared lifetime, and shared trail data stays
-owned by whoever else is reading it.
+stop. It writes nothing, resets nothing, and reclaims no state. That is a
+deliberate split, not an omission: releasing a departed screen's values is the
+job of the op that closed the screen, through `discard`
+([Writing state](./writing-state.md)). Shared trail data stays owned by whoever
+else is reading it either way.
 
 ## Task closures are nonisolated
 
