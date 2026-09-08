@@ -709,7 +709,9 @@ extension MechanismController {
   ///
   /// This owns registrations, and only registrations. Retiring a child ends its
   /// effects; it issues no writes and reclaims no state. What a departed entry
-  /// leaves in the graph is governed by that state's own declared retention.
+  /// leaves in the graph is governed by that state's own declared retention —
+  /// see ``CogOps/discard(_:)-(Cog<Value>.Manual)`` for releasing what an ended
+  /// entry keeps.
   ///
   /// - Parameters:
   ///   - identities: The automatic collection of live identities. Order is not
@@ -1014,6 +1016,33 @@ extension MechanismController: CogOps {
     requiredRuntime(for: "refresh").refresh(valueReference)
   }
 
+  /// Releases one source state this mechanism has finished with; see
+  /// ``CogOps/discard(_:)-(Cog<Value>.Manual)``.
+  ///
+  /// Inert after retirement, on the same rule as `turn`: a scope that has ended
+  /// must not reclaim state its replacement may already own. A discard that has
+  /// to wait for an open flush is rechecked before it runs.
+  public func discard<Value>(_ valueReference: Cog<Value>.Manual) {
+    guard let cogtext, !ownedScope.isRetired else { return }
+    cogtext.discardState(
+      named: "\(namePath).discard",
+      owner: CogTurnOwner(ownedScope),
+      CogStateIdentity(
+        descriptor: valueReference.descriptor.identity, key: valueReference.key)
+    )
+  }
+
+  /// Releases one automatic cog's state, including its UI boundary; see
+  /// ``CogOps/discard(_:)-(Cog<Value>)``.
+  public func discard<Value>(_ valueReference: Cog<Value>) {
+    guard let cogtext, !ownedScope.isRetired else { return }
+    cogtext.discardState(
+      named: "\(namePath).discard",
+      owner: CogTurnOwner(ownedScope),
+      CogStateIdentity(
+        descriptor: valueReference.descriptor.identity, key: valueReference.key)
+    )
+  }
 }
 
 // MARK: - Guarded access

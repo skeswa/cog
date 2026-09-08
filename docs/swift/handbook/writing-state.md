@@ -102,6 +102,46 @@ the navigation itself.
 Mechanisms can still form a turn → reaction → turn loop. If one spins, a
 debug guard warns after about 64 turns and prints the named cause chain.
 
+## Ending a lifetime releases its state too
+
+An op that ends a domain lifetime has two things to say, and they are not the
+same thing. Removing the ID stops the work: the `scope(each:)` child for that
+entry retires, its watches unregister, its tasks cancel
+([Side effects](./side-effects.md)). But the entry's own values are still in the
+graph, and if a view read them they will stay there for the life of the app —
+Observation gives Cog no way to learn the last reader is gone.
+
+`discard` says the second half (a sketch — the example apps have no per-opening
+screen state):
+
+```swift
+/// Closes one trail screen and releases what that screen owned.
+func closeTrailScreen(_ id: TrailScreenID) {
+  turn { c in c[_openTrailScreensCog].removeAll { $0 == id } }
+  discard(_trailFilterCogs[id])
+  discard(_trailDraftNoteCogs[id])
+}
+```
+
+The rules worth knowing at a call site:
+
+- **It releases; it does not reset.** Only a source declared
+  `lifetime: .whileObserved(resetToInitial: true)` is eligible, which is the
+  declaration a per-screen value should already have. Discarding an `.app`
+  source fails: a released source has no value to come back as.
+- **It cannot take state from another owner.** A state some other reaction is
+  watching, or some other cog depends on, is left alone and follows its ordinary
+  release path. Closing one screen cannot damage another.
+- **It names one state.** There is no feature-wide reset, and scope retirement
+  never issues discards on your behalf. Say what you are releasing.
+- **A view still reading it is told first.** The state is released and its
+  reader invalidated, so the next render reads a fresh state at its starting
+  value rather than freezing on the old one.
+
+Shared resource data is not per-screen state and does not belong here. A trail
+that two screens showed is owned by its own declaration, not by whichever screen
+closed last.
+
 ## Where this is specified
 
 Turn semantics and the write model are

@@ -7,11 +7,11 @@ extension CogLintFixtureRegistry {
     rule: PrimitivesOnlyInOpsRule(),
     documentation: CogLintRuleDocumentation(
       violation:
-        "Production code calls `turn` or `refresh` outside a bare primitive call in an `extension CogOps` domain operation.",
+        "Production code calls `turn`, `refresh`, or `discard` outside a bare primitive call in an `extension CogOps` domain operation.",
       rationale:
         "Graph primitives describe how Cog performs work, not what the application is asking for. Named operations keep the domain verb beside its state declarations, give every call site one readable intent, and apply the same boundary to views, mechanisms, selectors, writers, and runtime helpers.",
       repair:
-        "Move the primitive into a named method on `CogOps`, spell `turn(...)` or `refresh(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly."
+        "Move the primitive into a named method on `CogOps`, spell `turn(...)`, `refresh(...)`, or `discard(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly."
     ),
     triggering: [
       CogLintTriggeringExample(
@@ -32,6 +32,7 @@ extension CogLintFixtureRegistry {
               let appGraph = Cogs.assemble()
               appGraph.turn(_countCog, to: 1)
               appGraph.refresh(forecastCog)
+              appGraph.discard(_draftCogs["one"])
             }
             """
         ),
@@ -40,6 +41,7 @@ extension CogLintFixtureRegistry {
           CogLintFixturePosition(line: 5, column: 15),
           CogLintFixturePosition(line: 10, column: 12),
           CogLintFixturePosition(line: 11, column: 12),
+          CogLintFixturePosition(line: 12, column: 12),
         ]
       ),
       CogLintTriggeringExample(
@@ -111,6 +113,7 @@ extension CogLintFixtureRegistry {
               }
             }
             func refreshForecast() { refresh(forecastCog) }
+            func closeDraft(_ id: String) { discard(_draftCogs[id]) }
           }
           struct CounterCard: View {
             @Environment(\\.cogs) private var cogs

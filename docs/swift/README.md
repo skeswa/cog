@@ -266,6 +266,10 @@ These rules are settled. The linked design files hold the full details.
   automatic and async state may expire. The default grace period is 30 seconds.
 - An ephemeral source must use
   `lifetime: .whileObserved(resetToInitial: true)`.
+- `discard` is the one explicit release. It exists because a UI read pins state
+  permanently, so state keyed by a domain lifetime would otherwise accumulate
+  forever. It releases one exact state and its boundary, notifies any reader
+  first, and refuses state another consumer still owns.
 - Tests may seed state before mechanisms start. Seeding creates no turn,
   notice, or reaction.
 

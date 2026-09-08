@@ -1,6 +1,6 @@
 # primitives-only-in-ops
 
-Production code calls `turn` or `refresh` outside a bare primitive call in an `extension CogOps` domain operation.
+Production code calls `turn`, `refresh`, or `discard` outside a bare primitive call in an `extension CogOps` domain operation.
 
 ## Why this rule exists
 
@@ -8,7 +8,7 @@ Graph primitives describe how Cog performs work, not what the application is ask
 
 ## How to fix it
 
-Move the primitive into a named method on `CogOps`, spell `turn(...)` or `refresh(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly.
+Move the primitive into a named method on `CogOps`, spell `turn(...)`, `refresh(...)`, or `discard(...)` bare there, and call that domain method through the capability at the original site. Tests may select the explicit test target role when they need to drive primitives directly.
 
 <!-- Generated from the primitives-only-in-ops CogLint fixture corpus; do not edit. -->
 
@@ -18,7 +18,7 @@ Move the primitive into a named method on `CogOps`, spell `turn(...)` or `refres
 
 View and assembly graph receivers must call domain operations instead of primitives.
 
-Expected diagnostic positions: 4:10, 5:15, 10:12, 11:12.
+Expected diagnostic positions: 4:10, 5:15, 10:12, 11:12, 12:12.
 
 ```swift
 struct CounterCard: View {
@@ -32,6 +32,7 @@ func launch() {
   let appGraph = Cogs.assemble()
   appGraph.turn(_countCog, to: 1)
   appGraph.refresh(forecastCog)
+  appGraph.discard(_draftCogs["one"])
 }
 ```
 
@@ -88,6 +89,7 @@ extension CogOps {
     }
   }
   func refreshForecast() { refresh(forecastCog) }
+  func closeDraft(_ id: String) { discard(_draftCogs[id]) }
 }
 struct CounterCard: View {
   @Environment(\.cogs) private var cogs

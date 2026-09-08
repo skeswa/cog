@@ -451,6 +451,28 @@ Task closures are nonisolated, so graph access inside them is an awaited op
 or `await s.peek(...)`. Inside a `scope` body, read anything other than the
 selected state with `peek`. Inject clocks so tests can drive time.
 
+### Release per-lifetime state when its lifetime ends
+
+Retiring a scope ends its effects. It does not release the values that lifetime
+kept, and a value a view read stays in the graph for the life of the app —
+Observation gives Cog no way to learn the last reader left. The op that ends the
+lifetime says both halves:
+
+```swift
+extension CogOps {
+  func closeTrailScreen(_ id: TrailScreenID) {
+    turn { c in c[_openTrailScreensCog].removeAll { $0 == id } }
+    discard(_trailFilterCogs[id])
+  }
+}
+```
+
+`discard` releases one exact state, including its UI boundary, and notifies any
+reader first. Only a source declared
+`lifetime: .whileObserved(resetToInitial: true)` is eligible, and a state
+another consumer still watches is left alone. It is not a reset and not a
+feature-wide operation; shared resource data belongs to its own declaration.
+
 Effects that matter only while one screen is visible use SwiftUI's own
 `.task`, not a mechanism.
 
@@ -547,7 +569,7 @@ Each line is enforced by the named `coglint` rule where one exists.
 | Name keyless declarations `…Cog`, keyed boxes `…Cogs`, qualifiers before the suffix | `…Source`, `…State`, or no suffix on a graph reference            | `cog-declaration-suffix`     |
 | Declare manual sources `private`                                                    | Expose a writable source                                          | `manual-cog-private`         |
 | Start a manual source with `_`; the `.readOnly` projection drops it                 | Give the projection a different name                              | `manual-cog-underscore`      |
-| Call `turn` and `refresh` only inside `extension CogOps`                            | `cogs.turn { … }` in a view, mechanism, or `extension Cogs`       | `primitives-only-in-ops`     |
+| Call `turn`, `refresh`, and `discard` only inside `extension CogOps`                | `cogs.turn { … }` in a view, mechanism, or `extension Cogs`       | `primitives-only-in-ops`     |
 | Write initial state in a mechanism's `operate`                                      | Read or write the graph in `App.init`                             | `initial-state-in-mechanism` |
 | Resolve `@Environment(\.cogs)` in every Cog-using view                              | Pass `Cogs` through a view initializer or store it                | `no-cogs-in-view-init`       |
 | Read flatly, one line per read, unwrapped into a domain local                       | A `Cogs` helper or struct that packages several reads             | `no-multi-read-cogs-helper`  |

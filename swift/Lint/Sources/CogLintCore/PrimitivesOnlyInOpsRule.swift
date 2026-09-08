@@ -114,9 +114,13 @@ private func primitiveCall(in call: FunctionCallExprSyntax) -> PrimitiveCall? {
   )
 }
 
-/// Whether a call name is one of the two public graph-demand primitives.
+/// Whether a call name is one of the public graph primitives.
+///
+/// Each of these names one runtime mechanic — publish a turn, demand a fresh
+/// generation, release a state the app is finished with — and none of them
+/// names a domain intent. A call site should read as the intent.
 private func isPrimitive(_ name: String) -> Bool {
-  name == "turn" || name == "refresh"
+  name == "turn" || name == "refresh" || name == "discard"
 }
 
 /// Extracts an identifier from `receiver.method` or `self.receiver.method`.
