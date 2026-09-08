@@ -54,6 +54,7 @@ public protocol CogOps {
   /// See ``Cogs/refresh(_:)`` for the demand, grace, and handle contract.
   @discardableResult
   func refresh<Value>(_ valueReference: Cog<Value>.Async) -> CogRefresh<Value>
+
 }
 
 extension CogOps {

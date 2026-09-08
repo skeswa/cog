@@ -366,19 +366,21 @@ is never a second live source.
 A write from a `watch` handler becomes its own later turn. It does not join
 the turn it observed.
 
-### Tie work to a fact with a gated scope
+### Tie work to a fact with a scope
 
-Do not start and cancel work by hand. Hang a scope on a Bool cog with
-`whenever`. Everything registered through `s` ends when the gate falls, and
-the body runs again from scratch on the next rise. Prefer a derived gate, so
+Do not start and cancel work by hand. Hang a scope on the state that decides
+its lifetime. Everything registered through `s` ends when that lifetime ends,
+and the body runs again from scratch for the next one. Prefer derived state, so
 the lifetime follows the fact however it changed.
+
+For work that exists while a condition holds, select a Bool:
 
 ```swift
 struct HikeTimerMechanism: Mechanism {
   var clock: any Clock<Duration> = ContinuousClock()
 
   func operate(_ m: MechanismController) {
-    m.whenever(isLoggingHikeCog, name: "hikeTimer") { s in
+    m.scope(isLoggingHikeCog, name: "hikeTimer") { s in
       s.resetHikeTimer()
       s.task(name: "tick") { [weak s] in
         while true {
@@ -392,9 +394,62 @@ struct HikeTimerMechanism: Mechanism {
 }
 ```
 
+For work that belongs to a _particular_ session, screen, or workflow, select an
+optional identity. The body receives the exact identity that opened it, so a
+replacement retires the old child and opens a new one in one turn — no invented
+gap, and no chance of a late completion picking up the next lifetime's
+credentials:
+
+```swift
+m.scope(activeSessionCog, name: "session") { session, s in
+  let credentials = credentials.bound(to: session)
+  s.watch(pendingUploadsCog, initial: .run, name: "sync") { _, uploads in
+    sync.enqueue(uploads, using: credentials)
+  }
+}
+```
+
+An equal identity is the same lifetime and does not restart it. Mint the
+identity in the op that creates the lifetime — signing in, opening a screen —
+never inside a selector, which would make every recomputation a new lifetime.
+
+For a navigation stack, reconcile the whole collection with one registration:
+
+```swift
+m.scope(each: openTrailScreensCog, name: "trailScreen") { screenID, s in
+  s.watch(trailFilterCogs[screenID], initial: .skip, name: "filter") { _, filter in
+    analytics.record(.filterChanged(filter), screen: screenID)
+  }
+}
+```
+
+Added IDs open children, removed IDs retire them, and unchanged IDs keep their
+exact children — reordering restarts nothing.
+
+A retired scope is inert, not merely cancelled: `turn` does nothing (including
+a turn already queued), registrations register nothing, `task` returns an
+already-cancelled task, and `peek`, `status.peek`, and `refresh` trap. So a
+completion publishes through a receipt-bearing op and validates inside the
+writer body, rather than checking state before calling it:
+
+```swift
+extension CogOps {
+  func acceptTrail(_ trail: Trail, receipt: TrailScreenID) {
+    turn { c in
+      guard c[_openTrailScreensCog].contains(receipt) else { return }
+      c[_loadedTrailCogs[receipt]] = trail
+    }
+  }
+}
+```
+
+When a late completion truly must read, wrap that read in
+`s.ifLive { $0.peek(...) }`, which returns `nil` instead of trapping. It checks
+once, at the call; it reserves nothing, so re-check after every `await`.
+
 Task closures are nonisolated, so graph access inside them is an awaited op
-or `await s.peek(...)`. Inside a `whenever` body, read anything other than the
-gate with `peek`. Inject clocks so tests can drive time.
+or `await s.peek(...)`. Inside a `scope` body, read anything other than the
+selected state with `peek`. Inject clocks so tests can drive time.
 
 Effects that matter only while one screen is visible use SwiftUI's own
 `.task`, not a mechanism.
@@ -499,9 +554,9 @@ Each line is enforced by the named `coglint` rule where one exists.
 | Build bindings as tracked adapters on `Cogs` in `+Bindings.swift`                   | `Binding(get:set:)` inside a view, or a getter that uses `peek`   | `tracked-binding-adapters`   |
 | One op, one turn; cross-file writes nest another file's op                          | Two ops for one user action, or one file writing another's source |                              |
 | Initial values are closures: `.Manual { 0 }`                                        | `.Manual(0)` or a shared reference instance                       |                              |
-| `peek` for one-time reads: `operate`, `whenever` bodies, tests                      | `peek` in a view body or a computation                            |                              |
+| `peek` for one-time reads: `operate`, `scope` bodies, tests                         | `peek` in a view body or a computation                            |                              |
 | Derive from the plain async read                                                    | Derive from `status`, which flickers on every reload              |                              |
-| Name every `watch`, `whenever`, and `task` registration                             | Anonymous registrations                                           |                              |
+| Name every `watch`, `scope`, and `task` registration                                | Anonymous registrations                                           |                              |
 | Inject clocks, stores, and services through stored properties or cogs               | `ContinuousClock()` or a live service hard-coded inside a body    |                              |
 | One `Cogs.forTesting()` per test or preview                                         | A second runtime in the same test tree, or `assemble` in a test   |                              |
 

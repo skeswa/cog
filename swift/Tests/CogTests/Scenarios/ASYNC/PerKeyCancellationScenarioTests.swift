@@ -48,7 +48,7 @@ private final class Async37ControlledWork {
   let awayWatcherAlive = Cog<Bool>.Manual { true }
   let (homeStatuses, homeContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
   m.run { c in homeContinuation.yield(c.status[forecasts["home"]]) }
-  m.whenever(awayWatcherAlive) { s in
+  m.scope(awayWatcherAlive) { s in
     s.run { c in _ = c.status[forecasts["away"]] }
   }
   var homeIterator = homeStatuses.makeAsyncIterator()

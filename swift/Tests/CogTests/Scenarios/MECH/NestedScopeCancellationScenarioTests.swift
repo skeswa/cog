@@ -15,9 +15,9 @@ import Testing
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
-      m.whenever(sessionOpen, name: "session") { s in
+      m.scope(sessionOpen, name: "session") { s in
         s.run { c in outerSeen.append(c[uploads]) }
-        s.whenever(syncing, name: "sync") { inner in
+        s.scope(syncing, name: "sync") { inner in
           inner.run { c in innerSeen.append(c[uploads]) }
           inner.task(name: "pump") {
             taskStartContinuation.yield()

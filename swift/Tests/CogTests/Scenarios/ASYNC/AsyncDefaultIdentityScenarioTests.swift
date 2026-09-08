@@ -139,7 +139,7 @@ private final class PlaceholderProbe {
     name: "forecast"
   ) { _ in work.makeWork() }
   let watcherAliveCog = Cog<Bool>.Manual { true }
-  m.whenever(watcherAliveCog) { s in
+  m.scope(watcherAliveCog) { s in
     s.run { c in _ = c[forecastCog] }
   }
   var startIterator = work.starts.makeAsyncIterator()

@@ -111,6 +111,40 @@ internal final class CogTurn {
   }
 }
 
+/// The mechanism scope whose retirement invalidates one deferred turn.
+///
+/// A controller-originated turn that arrives during a flush cannot run yet, and
+/// what happens between queuing and draining decides whether it may run at all.
+/// If an earlier entry in the same FIFO retires the requesting scope — a session
+/// replacement, a dismissed presentation, a torn-down mechanism — the queued
+/// body belongs to a lifetime that no longer exists and must not execute.
+///
+/// The check is the exact scope **instance**, held weakly, never the domain
+/// identity that selected it. Identities are reused: an app that returns to
+/// session `A` after `B` opens a second, different `A` child, and work queued by
+/// the first must stay rejected. Instance identity says that; value equality
+/// does not. A weak reference also rejects work whose scope has been released
+/// outright, and keeps a queued body from reviving a dead subtree.
+internal struct CogTurnOwner {
+  /// The requesting scope, weakly held so a queued body cannot retain it.
+  private weak var scope: MechanismScope?
+
+  /// Records the scope that owns one deferred controller turn.
+  internal init(_ scope: MechanismScope) {
+    self.scope = scope
+  }
+
+  /// Whether the exact requesting scope instance may still write.
+  ///
+  /// Read immediately before the queued turn would start, so retirement that
+  /// happened while the entry waited rejects it before any turn, revision,
+  /// history entry, or writer body exists.
+  internal var admitsQueuedWork: Bool {
+    guard let scope else { return false }
+    return !scope.isRetired
+  }
+}
+
 /// One application or system turn body waiting for the active flush to finish.
 ///
 /// Bodies are retained in arrival order and receive a fresh turn only after the
@@ -120,6 +154,13 @@ internal struct QueuedCogTurn {
   let name: String
   /// The deferred staging body, executed only in its fresh accumulating turn.
   let body: (CogTurn) -> Void
+  /// The mechanism scope whose retirement rejects this entry, when one asked.
+  ///
+  /// `nil` for application turns opened on the runtime itself and for
+  /// graph-owned system publication: neither belongs to a shorter lifetime, and
+  /// a child must not gain ownership of an unrelated turn merely by having
+  /// demanded the state it publishes.
+  let owner: CogTurnOwner?
 }
 
 /// Where a context is in its turn lifecycle.
@@ -190,7 +231,7 @@ extension Cogs {
   /// drains the preserved name and body in FIFO order.
   internal func withSystemTurn(_ name: String, _ body: @escaping (CogTurn) -> Void) {
     guard canRunSystemTurnImmediately else {
-      queuedTurns.append(QueuedCogTurn(name: name, body: body))
+      queuedTurns.append(QueuedCogTurn(name: name, body: body, owner: nil))
       return
     }
 
@@ -226,16 +267,23 @@ extension Cogs {
   /// Sibling turns start separate turns. Turns during flush enter the FIFO
   /// queue, allowing reaction write-back without reentrant propagation. Automatic
   /// computation rejects a turn before any of these paths run.
-  internal func withTurn(_ name: String = #function, _ body: @escaping (CogTurn) -> Void) {
+  internal func withTurn(
+    _ name: String = #function,
+    owner: CogTurnOwner? = nil,
+    _ body: @escaping (CogTurn) -> Void
+  ) {
     requireOutsideAutomaticComputation(forTurnNamed: name)
 
     switch turnPhase {
     case .accumulating:
+      // Joining an open turn runs now, in FIFO position, which is exactly the
+      // case the admission rule preserves: a child write that executes before
+      // its replacement is valid and is never rolled back afterward.
       body(reusedTurn)
       return
 
     case .flushing:
-      queuedTurns.append(QueuedCogTurn(name: name, body: body))
+      queuedTurns.append(QueuedCogTurn(name: name, body: body, owner: owner))
       return
 
     case .idle:
@@ -309,11 +357,20 @@ extension Cogs {
   /// The indexed loop includes bodies appended by reactions in queued turns.
   /// This keeps one non-reentrant FIFO until the chain is empty. Entries stay in
   /// the array until all work ends, so appends cannot invalidate the index.
+  ///
+  /// Admission is rechecked here, immediately before an entry would start, and
+  /// never earlier. A scope that was live when its op ran can be retired by an
+  /// entry ahead of it in this same drain, so the decision belongs at the
+  /// execution point. Rejection skips the entry entirely: no turn starts, the
+  /// revision does not advance, no history entry appears, and the writer body
+  /// never runs. Order is otherwise untouched — admitted entries keep their
+  /// arrival order, and a replacement never overtakes an earlier write.
   private func drainQueuedTurns() {
     var index = 0
     while index < queuedTurns.count {
       let queued = queuedTurns[index]
       index += 1
+      if let owner = queued.owner, !owner.admitsQueuedWork { continue }
       runOuterTurn(named: queued.name, queued.body)
     }
     queuedTurns.removeAll(keepingCapacity: true)

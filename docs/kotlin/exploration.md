@@ -622,6 +622,11 @@ collection. Measure the gain and offer a compatible fallback.
 - whether an optional property-delegate form is worth its access cost just to
   infer debug labels;
 - exception policy for reaction bodies;
+- whether an app-scoped effect group needs identity-owned replacement, as
+  Swift's `scope` gained, or whether closing and recreating a group at its
+  application owner is enough — and, either way, where the capability check that
+  makes a closed group's deferred writes inert actually lives
+  ([§6.3](./effects.md#_6-3-registration-and-lifecycle));
 - exact module and version floors;
 - exact application bootstrap and dependency-injection helpers;
 - whether Kotlin should mirror Swift's settled nested shape families through

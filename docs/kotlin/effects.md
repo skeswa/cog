@@ -120,6 +120,36 @@ was passed in.
 Registration order is effect order within one completed turn. A slow suspending
 effect does not block later registrations; its launch order is still fixed.
 
+**What transfers from Swift's scope retirement, and what does not.** Swift
+replaced its Boolean `whenever` gate with `scope`, which selects a Bool, an
+optional identity, or a collection of identities, and made retirement revoke a
+controller's graph access rather than only cancelling its jobs. Two things in
+that work are runtime invariants rather than Swift spelling, so they apply here:
+
+- **A closed owner cannot publish through its capability.** Kotlin already says
+  closing a group "blocks late callbacks from writing through the group", which
+  is the same claim. Swift found that cancelling jobs and using weak references
+  is not enough to keep it: work can hold a strong reference across a suspension
+  point, so the check has to live in the capability's own operations.
+- **A write deferred past its owner's closure must be re-checked when it runs,
+  not when it was requested.** Swift's deferred turns carry the exact owner
+  instance and are rejected at their execution point, before any turn or
+  revision exists. Kotlin's effect writes go through the same store-lane turn
+  FIFO, so the same window exists here.
+
+Two things do **not** transfer. Kotlin's effect groups are owned by Android
+lifecycle owners, so a group's lifetime is already expressed by `AutoCloseable`
+and `addCloseable` rather than by graph state; Swift needed `scope` precisely
+because it has no such owner. And identity-driven replacement is an open
+receiving-platform question, not a settled requirement: a `ViewModel` keyed by a
+navigation entry already gets one group per entry, which is the shape Swift's
+`scope(each:)` had to construct. What Kotlin lacks is the _session-replacement_
+case — an app-scoped group whose work belongs to one sign-in — and whether that
+deserves identity-owned groups or an explicit close-and-recreate at the
+application owner is undecided. It is recorded as open in
+[§10](./exploration.md#_10-decision-record) rather than answered by copying a
+Swift name.
+
 Errors go to a group error handler with the effect name and turn. The default
 prototype handler should report and cancel that run, not crash unrelated
 effects. The final policy remains open.

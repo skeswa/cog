@@ -10,7 +10,7 @@ import Testing
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
-      m.whenever(loggedIn) { s in
+      m.scope(loggedIn) { s in
         s.run { c in seen.append(c[uploads]) }
       }
     }
@@ -36,7 +36,7 @@ import Testing
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
-      m.whenever(loggedIn, name: "session") { s in
+      m.scope(loggedIn, name: "session") { s in
         bodyRuns += 1
         s.run { c in seen.append(c[uploads]) }
         s.task(name: "heartbeat") {

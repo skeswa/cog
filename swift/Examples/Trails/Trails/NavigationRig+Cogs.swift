@@ -49,7 +49,7 @@ let currentScreenCog = Cog<TrailScreen> { c in
 
 /// Whether the hike logger sheet is up, gating the elapsed-time scope.
 ///
-/// The hike-timer mechanism gates a `whenever` scope on this cog. The ticking
+/// The hike-timer mechanism gates a `scope` on this cog. The ticking
 /// task exists only while the logger is presented, including by deep link or
 /// restoration.
 let isLoggingHikeCog = Cog<Bool> { c in

@@ -78,6 +78,35 @@ extension Cogs {
     }
   }
 
+  /// Opens one named turn owned by a mechanism scope's lifetime.
+  ///
+  /// The same boundary as ``turn(named:_:)`` with one addition: if the call
+  /// arrives during a flush and has to wait in the FIFO, the entry remembers
+  /// which scope asked. The drain rechecks that scope immediately before the
+  /// entry would start, so a write queued by a child that an earlier entry then
+  /// retired is discarded before it can open a turn, advance the revision, or
+  /// run its writer body. An entry whose turn is already open joins it and runs
+  /// now, which is the ordering rule: a child write that reaches its execution
+  /// point before its replacement is valid and is never rolled back.
+  ///
+  /// ``MechanismController`` is the only caller; it has already rejected the
+  /// call outright when its own scope was retired before the request.
+  ///
+  /// - Parameters:
+  ///   - name: The turn name recorded for diagnostics and history, already
+  ///     composed under the requesting mechanism's name path.
+  ///   - owner: The scope whose retirement invalidates a deferred entry.
+  ///   - body: The synchronous writes that make up the turn.
+  internal func turn(
+    named name: String,
+    owner: MechanismScope,
+    _ body: @escaping (Writer) -> Void
+  ) {
+    withTurn(name, owner: CogTurnOwner(owner)) { turn in
+      body(Writer(cogs: self, turnID: turn.id))
+    }
+  }
+
   /// Writes one value to one manual source in its own turn, without building a closure.
   ///
   /// This shadows ``CogOps/turn(_:to:name:)`` for a caller whose static type

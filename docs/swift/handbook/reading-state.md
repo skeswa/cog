@@ -64,7 +64,7 @@ Tracked reads use subscripts — `c[…]` inside a computation or reaction,
 is recorded.
 
 Use `peek` where a dependency would be wrong: a mechanism reading during
-`operate`, a `whenever` body checking state without re-triggering the scope,
+`operate`, a `scope` body checking state without re-triggering the scope,
 and test assertions (`cogs.peek(savedTrailIDsCog)`).
 
 ## Async reads are total; uncertainty is opt-in

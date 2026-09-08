@@ -88,7 +88,7 @@ struct TrailPersistenceMechanism: Mechanism {
 
 /// Ticks the hike logger's elapsed clock only while its sheet is presented.
 ///
-/// The `whenever` scope's gate is the derived `isLoggingHikeCog`, so the
+/// The `scope`'s gate is the derived `isLoggingHikeCog`, so the
 /// navigation state controls the ticking task. Presenting the logger starts a
 /// fresh scope. A button, swipe, or deep link dismissal cancels it in the same
 /// flush. Each presentation restarts from zero.
@@ -100,7 +100,7 @@ struct HikeTimerMechanism: Mechanism {
   ///
   /// - Parameter m: Assembly-only controller owned by the runtime scope.
   func operate(_ m: MechanismController) {
-    m.whenever(isLoggingHikeCog, name: "hikeTimer") { s in
+    m.scope(isLoggingHikeCog, name: "hikeTimer") { s in
       s.resetHikeTimer()
       s.task(name: "tick") { [weak s] in
         while true {

@@ -14,7 +14,7 @@ package enum CogGraphReceiverKind: Equatable, Sendable {
   /// A turn closure's inferred or explicitly typed writer.
   case writer
 
-  /// A mechanism `operate` parameter or `whenever` child controller.
+  /// A mechanism `operate` parameter or `scope` child controller.
   case mechanismController
 
   /// A local bound directly from `Cogs.assemble(...)`.
@@ -224,7 +224,14 @@ private final class CogCallReceiverVisitor: SyntaxVisitor {
     super.init(viewMode: .sourceAccurate)
   }
 
-  /// Recognizes `turn`, mechanism `run`, and mechanism `whenever` closures.
+  /// Recognizes `turn`, mechanism `run`, and mechanism `scope` closures.
+  ///
+  /// A `scope` registration body comes in two shapes. The condition form takes
+  /// only its sub-controller; the identity and collection forms take the
+  /// selected identity first and the sub-controller second. Syntax alone
+  /// distinguishes them: with two parameters the controller is the second, and
+  /// with one it is the only one. That is the whole rule, and it holds for every
+  /// `scope` overload without the linter knowing which one was called.
   override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
     guard let member = node.calledExpression.as(MemberAccessExprSyntax.self),
       let baseName = receiverBaseName(member.base),
@@ -246,9 +253,10 @@ private final class CogCallReceiverVisitor: SyntaxVisitor {
     case "run" where base.kind == .mechanismController:
       kind = .reactionReader
       token = closureParameterTokens(in: closure).first(where: { $0.text == "c" })
-    case "whenever" where base.kind == .mechanismController:
+    case "scope" where base.kind == .mechanismController:
       kind = .mechanismController
-      token = closureParameterTokens(in: closure).first
+      let parameters = closureParameterTokens(in: closure)
+      token = parameters.count >= 2 ? parameters[1] : parameters.first
     default:
       return .visitChildren
     }

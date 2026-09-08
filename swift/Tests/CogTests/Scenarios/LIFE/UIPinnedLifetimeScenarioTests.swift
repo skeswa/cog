@@ -16,7 +16,7 @@ import Testing
     clock: clock,
     whileObservedGrace: .seconds(10)
   )
-  m.whenever(watcherAlive) { s in
+  m.scope(watcherAlive) { s in
     s.run { c in _ = c[automatic] }
   }
   #expect(selectorRuns == 1)

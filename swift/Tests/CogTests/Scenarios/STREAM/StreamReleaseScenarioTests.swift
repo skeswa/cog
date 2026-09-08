@@ -12,7 +12,7 @@ import Testing
     work.makeWork(dependency: 0)
   }
   var observedStatuses: [CogStatus<Int>] = []
-  m.whenever(watcherAlive, name: "readings.scope") { scope in
+  m.scope(watcherAlive, name: "readings.scope") { scope in
     scope.run { c in
       let readings = c.status[readingsCog]
       observedStatuses.append(readings)

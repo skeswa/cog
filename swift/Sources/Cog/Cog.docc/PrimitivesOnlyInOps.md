@@ -39,7 +39,7 @@ func launch() {
 
 Every classifier-proven capability stays behind the same named-operation boundary.
 
-Expected diagnostic positions: 1:36, 2:33, 5:7, 6:7, 7:20, 8:45.
+Expected diagnostic positions: 1:36, 2:33, 5:7, 6:7, 7:20, 8:42.
 
 ```swift
 let invalidCog = Cog<Int> { c in c.refresh(forecastCog); return 0 }
@@ -49,7 +49,7 @@ struct Loader: Mechanism {
     m.turn(_countCog, to: 1)
     m.refresh(forecastCog)
     m.run { c in c.refresh(forecastCog) }
-    m.whenever(enabledCog) { child in child.turn(_countCog, to: 2) }
+    m.scope(enabledCog) { child in child.turn(_countCog, to: 2) }
   }
 }
 ```

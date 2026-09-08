@@ -408,11 +408,13 @@ these stories run inside a small test mechanism's `operate`.
 
 _Design: §6.2, §6.3._
 
-Every side effect lives in a named mechanism specified at assembly; a
-shorter lifetime is a `whenever` gate expressed in state. (The GROUP family —
-public effect groups and reaction tokens — retired on 2026-08-14 when
-mechanisms replaced them; REACT-10 through REACT-13 and REACT-18 retired with
-it. Retired IDs stay retired.)
+Every side effect lives in a named mechanism specified at assembly; a shorter
+lifetime is a `scope` whose condition or identity is expressed in state. (The
+GROUP family — public effect groups and reaction tokens — retired on 2026-08-14
+when mechanisms replaced them; REACT-10 through REACT-13 and REACT-18 retired
+with it. Retired IDs stay retired. `whenever` was renamed to `scope` on
+2026-09-08 and its behavior extended; MECH-07 through MECH-11 keep their IDs,
+because an ID names the behavior rather than its spelling.)
 
 - **MECH-01.** I assemble with a list of mechanisms. Each `operate` runs
   synchronously in list order, and when assembly returns every mechanism is
@@ -436,14 +438,14 @@ it. Retired IDs stay retired.)
   reusable `CogTesting.TestClock` and then calls an op every hour. When the
   clock jumps an hour, the op runs and its named turn lands in debug history.
   Before that, it does not run, and the app entry point retains only `Cogs`.
-- **MECH-07.** A `whenever` gate already reads true when its mechanism
+- **MECH-07.** A `scope` gate already reads true when its mechanism
   operates. The scope body runs immediately, and its registrations are live
   when assembly returns.
-- **MECH-08.** A `whenever` gate starts false and a later turn raises it:
+- **MECH-08.** A `scope` gate starts false and a later turn raises it:
   the scope body runs then. Another turn lowers it: the scope's reactions
   never run again and its tasks receive cancellation. A further rise runs
   the body again from scratch, with fresh registrations.
-- **MECH-09.** A `whenever` scope nests inside another. Lowering the outer
+- **MECH-09.** A `scope` nests inside another. Lowering the outer
   gate cancels the inner scope's reactions and tasks along with the outer
   scope's own.
 - **MECH-11.** One turn both changes state a scoped reaction reads and
@@ -475,6 +477,105 @@ it. Retired IDs stay retired.)
   attribution. After the context is torn down, the engine can invoke the
   callback again, but the controller no longer promotes, no op runs, and the
   callback does not retain the context.
+
+_Scopes owned by an identity (§6.2)._
+
+- **MECH-17.** I select an optional identity instead of a Bool. An identity
+  already present when the mechanism operates opens its child once; `nil`
+  installs the selector and opens nothing. A distinct but equal identity is
+  the same lifetime and does not restart it, `nil → A` opens a fresh child,
+  `A → B` retires A and opens B, and `A → nil` retires A with no replacement.
+- **MECH-18.** I return to an identity I used before, across completed turns —
+  `A → nil → A`, then `A → B → A`. Each arrival opens a fresh instance, and
+  only the newest instance reacts; no earlier one is ever revived.
+- **MECH-19.** One atomic turn stages several identities. Settling back on the
+  identity already open is not a transition at all, and settling on a different
+  one transitions exactly once, from the previously observed identity.
+- **MECH-20.** The selected identity is the scope's only lifetime dependency.
+  A `peek` in the registration body does not restart it, and a selector that
+  changes which upstream it reads while returning the same identity preserves
+  the child — after which changes through the new upstream are observed.
+- **MECH-21.** Both scope families accept an automatic cog, a manual source,
+  and a read-only projection; the Bool bodies receive only a controller and the
+  identity bodies receive the exact nonoptional identity. Keyed selections own
+  independent lifetimes, and a source that republishes an equal identity does
+  not reopen the child.
+- **MECH-22.** An identity is replaced while a Bool derived from it stays true.
+  The old child's watches stop, its tasks receive cancellation, and the new
+  child's registrations install exactly once.
+- **MECH-23.** Boolean and identity scopes nest inside one another. Retiring
+  the outermost identity retires every descendant, and repeated teardown
+  afterward is safe.
+- **MECH-24.** One turn both replaces an identity and changes state the old
+  child's reaction reads. The old child's queued run is skipped, and only the
+  replacement's fresh registration runs, against the settled value. The
+  replacement's registrations join the current flush's reaction tail rather than
+  reentering the selector that opened them, so a sibling registered after the
+  selector still runs before the new child's first run.
+
+_Retirement revokes graph access (§6.2)._
+
+- **MECH-25.** I hold a retired controller and its status lens strongly. Turns
+  are inert, `run`, `watch`, `status.watch`, and both `scope` families register
+  nothing and run no user code, and `task` returns an already-cancelled task
+  whose operation never starts.
+- **MECH-26.** `peek`, `status.peek`, and `refresh` through a retired
+  controller trap with a message naming the operation, the composed scope name,
+  and the recoverable spelling. The diagnostic distinguishes a retired scope
+  from a dead runtime, and a rejected refresh never fabricates a `released`
+  outcome. (Proof: exit test.)
+- **MECH-27.** `m.ifLive { ... }` performs the read while the scope is live and
+  returns `nil` once it is retired — for a value read, a status read, and a
+  follow-up `refresh`, which starts a real generation and reports its real
+  outcome while live and starts nothing once retired. It reserves nothing: a
+  turn inside its body can retire the scope, and the primitives after that turn
+  observe retirement.
+- **MECH-28.** A task that ignores cancellation holds the old lifetime open.
+  Its replacement starts without waiting for it, and when the old work finally
+  completes, the op it calls through its retired controller changes nothing.
+- **MECH-29.** A child's turn requested during a flush waits in the FIFO. If an
+  entry ahead of it retires that child, the write is discarded before its
+  writer body runs and without producing a turn in history; if it reaches its
+  execution point first, it stands. Admission checks the exact scope instance,
+  so a replacement that restores the same domain identity does not admit the
+  earlier child's work.
+- **MECH-30.** A scope body retires its own lifetime while still initializing.
+  Registrations made before it survive as ordinary registrations; every
+  primitive after it is inert, and nothing registered afterward is retained.
+- **MECH-31.** Teardown releases a child's captures, running application code
+  in a deinitializer while a sibling's own cleanup pass has not been reached.
+  That sibling is already inert: it reports not live, registers nothing, and
+  writes nothing.
+
+_One scope per identity in a collection (§6.2)._
+
+- **MECH-32.** I register one collection scope over the open presentation IDs.
+  Pushing an entry opens a child, pushing a second entry for the same resource
+  leaves the first alive and unrestarted, entry-local changes do not restart
+  siblings, reordering alone changes nothing, and removing either entry
+  preserves the other. Repeated push-and-remove cycles add no registrations
+  beyond the one selector and the children current membership justifies, and a
+  reused identity opens a different instance.
+- **MECH-33.** A collection scope is given the same identity twice in one
+  published collection. Cog stops with a clear error naming the scope and the
+  duplicate, in debug builds and release builds. (Proof: exit test.)
+- **MECH-34.** A presentation publishes an intent that a session-lifetime
+  mechanism accepts and owns. Dismissing the presentation ends its feedback and
+  nothing else: the accepted work completes and publishes, and a later
+  presentation reads the result as ordinary shared state.
+
+_Where lifetime identity comes from (§6.2)._
+
+- **MECH-35.** Signing the same account in again mints a new epoch and replaces
+  the session scope; refreshing the token preserves the epoch, so the existing
+  scope keeps its registrations and observes the rotation.
+- **MECH-36.** I call `whenever` on a controller, in any of its three former
+  overloads. The compiler says no: the name was removed outright, with no
+  deprecated alias, forwarding wrapper, or renamed stub. (Proof: compile-fail.)
+- **MECH-37.** A presentation refreshes an async value another mechanism also
+  watches, then retires while the generation is in flight. The refresh handle
+  reports its real outcome, the durable consumer receives the value, and
+  nothing pretends the shared state was released.
 
 ## 9. LIFE — How long state lives
 

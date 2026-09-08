@@ -192,7 +192,7 @@ must not pay an executor hop.
 ## Scopes and tasks
 
 Each mechanism gets one `MechanismScope`. It owns the controller, reaction
-tokens, tasks, and nested `whenever` scopes. A state-gated child exists only
+tokens, tasks, and nested `scope` children. A state-selected child exists only
 while its predicate is true. Scope cancellation stops registrations and
 requests task cancellation before releasing the mechanism value that may own
 their dependencies.
@@ -205,7 +205,7 @@ flowchart TB
   controller[MechanismController]
   token[ReactionToken]
   task[Task]
-  child[whenever child scope]
+  child[scope child]
   cogs --> mechanism
   cogs --> scope
   scope --> controller
@@ -217,6 +217,49 @@ flowchart TB
 Cancellation is about lifetime and resource release. A state write from a
 reaction still enters the turn FIFO; an effect never mutates the graph through
 its reader.
+
+Retirement runs in two passes, and the split is the contract rather than an
+implementation convenience. `revoke()` marks the scope and every descendant
+retired without releasing anything; `cancel()` then performs the teardown. A
+one-pass walk would leave the guarantee resting on traversal order: cancelling a
+child releases its reaction bodies and therefore its captures, and a
+deinitializer running there is application code that can reach a sibling the
+walk has not visited yet. `MechanismController` asks the scope's single
+`isRetired` flag before every primitive, so one marking pass answers for the
+whole subtree.
+
+The controller's registration path checks that flag _before_ it builds a
+registration, while `MechanismScope.add` keeps its own terminal check. The two
+are not redundant. `add` receives a finished token whose initial tracking run
+has already happened, so it can only decline to retain it; the earlier check is
+what keeps a retired scope from executing application code on the way to being
+rejected. `add` still matters for a registration body that retires its own scope
+while it is initializing.
+
+A child selector holds two locals between runs — the open identity and the scope
+object serving it — and the collection form holds those pairs in opening order.
+Reconciliation is membership-only, so a reordered collection performs no work at
+all, and a surviving identity keeps the same `MechanismScope` and the same
+`ReactionToken`s rather than equivalent new ones.
+
+## Deferred turns and lifetime admission
+
+`QueuedCogTurn` carries an optional `CogTurnOwner`, which holds the requesting
+`MechanismScope` weakly. The drain checks it immediately before an entry would
+start, so an entry whose scope an earlier entry retired is skipped without
+starting a turn: no revision, no history entry, no writer body, and no empty
+published turn to explain later.
+
+The check is scope-instance identity rather than the selected domain identity.
+Those differ exactly when a lifetime is reused — `A → B → A` opens a second,
+different `A` child — and value equality would admit the first child's stale
+work into the second child's lifetime. Application turns opened on the runtime
+itself and graph-owned system publication carry no owner, so a child cannot gain
+ownership of an unrelated turn merely by having demanded the state it publishes.
+
+Admission never reorders anything. It is a filter over the existing FIFO, so an
+admitted entry keeps its arrival position and a child write that reaches its
+execution point before its replacement stands.
 
 ## Exports
 

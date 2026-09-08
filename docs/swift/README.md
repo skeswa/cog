@@ -260,7 +260,7 @@ These rules are settled. The linked design files hold the full details.
 
 - A `Mechanism` owns app-wide side effects. Assembly starts mechanisms in
   array order through a limited `MechanismController`.
-- A state-gated `whenever` scope owns shorter work. SwiftUI `.task` and
+- A state-selected `scope` owns shorter work. SwiftUI `.task` and
   `values` own view-lifetime work.
 - Manual state and UI-observed state live for the app by default. Unused
   automatic and async state may expire. The default grace period is 30 seconds.
