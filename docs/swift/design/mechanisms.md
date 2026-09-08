@@ -21,7 +21,7 @@ named mechanisms registered at assembly.
 | Send something outside the graph      | A reaction inside a mechanism                               |
 | Respond to a user action              | Op (§3.2)                                                   |
 | Run for the app lifetime              | A mechanism registered at assembly                          |
-| Run for a shorter domain lifetime     | A `whenever` scope inside a mechanism (§6.2)                |
+| Run for a shorter domain lifetime     | A `scope` inside a mechanism (§6.2)                         |
 | Live only while one screen is visible | SwiftUI `.task` and a `values` stream (§6.5)                |
 | Continue after process death          | Durable state, an engine, and a reconciler (§6.7)           |
 
@@ -102,15 +102,15 @@ keeps names and isolated tests exact.
 `MechanismController` is a final-class lifetime token owned by its scope, not by
 the app runtime. Work that may outlive the scope captures `[weak m]` and stops
 when that value is gone. An external engine must not retain the controller.
-The same rule applies to a `whenever` sub-controller.
+The same rule applies to a `scope` sub-controller.
 
-**Gated scopes.** A lifetime shorter than the app is graph state, not a
-registration ceremony. `whenever` runs a nested scope while a Bool cog is
-true:
+**Scopes.** A lifetime shorter than the app is graph state, not a registration
+ceremony. `scope` runs a nested scope whose lifetime is whatever the state it
+selects says. In its simplest form that state is a Bool:
 
 ```swift
 func operate(_ m: MechanismController) {
-    m.whenever(isLoggedInCog, name: "session") { s in
+    m.scope(isLoggedInCog, name: "session") { s in
         s.watch(pendingUploadsCog, initial: .run) { _, uploads in
             sync.enqueue(uploads)
         }
@@ -127,9 +127,9 @@ func operate(_ m: MechanismController) {
 
 Its rules:
 
-- The gate is the scope's only tracked dependency. When the gate reads true —
-  at registration or after a later turn — the body runs once with a fresh
-  sub-controller and its registrations become live.
+- The selected state is the scope's only tracked dependency. When the gate
+  reads true — at registration or after a later turn — the body runs once with
+  a fresh sub-controller and its registrations become live.
 - When a turn settles the gate to false, everything registered through that
   sub-controller ends: reactions unregister and tasks cancel. The scope's
   teardown replaces a reaction run in the ordinary flush order (§3.2), so
@@ -140,11 +140,232 @@ Its rules:
   own `watch`/`run` registrations use `s.peek` and never re-trigger the
   scope.
 - Scopes nest: a sub-controller offers the full controller surface, including
-  `whenever`, and names continue to compose (`Session.heartbeat` above
+  `scope`, and names continue to compose (`Session.heartbeat` above
   becomes `Weather.session.heartbeat` when nested under `session`).
 
 There is no public effect group or reaction token. Assembly owns app-lifetime
-work. A state gate owns shorter work.
+work. State owns shorter work.
+
+`whenever` was the earlier name for this, and it was removed rather than
+deprecated when identity scopes arrived. A gate is one shape of a lifetime, not
+a family of its own, and two names for one lifecycle would have implied two
+mechanisms. Migration is a rename: `m.whenever(gate) { s in … }` becomes
+`m.scope(gate) { s in … }`, parameters and closure unchanged.
+
+**Scopes owned by an identity.** A Bool says whether work should exist. It
+cannot say _which_ lifetime owns it, and that difference decides whether a
+replacement is expressible at all. Consider a session ending and another
+beginning while onboarding stays active:
+
+```text
+Before: sessionEpoch = A, onboardingActive = true
+After:  sessionEpoch = B, onboardingActive = true
+```
+
+A scope gated on `onboardingActive` stays open, still holding session A's
+credentials and its in-flight work. Forcing a false/true cycle is not a fix: in
+one atomic turn observers only ever see the settled gate, and in separate turns
+the application has invented an inactive state that never happened, purely to
+operate the lifecycle machinery.
+
+Selecting an optional identity says it directly:
+
+```swift
+m.scope(activeOnboardingCog, name: "onboarding") { lifetime, s in
+    let credentials = credentialProvider.bound(to: lifetime.sessionEpoch)
+    s.watch(onboardingStepCog, initial: .run, name: "sync") { _, step in
+        sync.advance(step, using: credentials)
+    }
+}
+```
+
+The body receives the exact nonoptional identity that opened it, so the lifetime
+it belongs to is a value in scope rather than something to re-read later. The
+transitions:
+
+| Observation                         | Result                                               |
+| ----------------------------------- | ---------------------------------------------------- |
+| Initially `nil`                     | Install the selector; open no child                  |
+| Initially `A`                       | Open `A` once, under ordinary registration ordering  |
+| `nil → A`                           | Open a fresh child; run the body once                |
+| `A → A`, including a distinct equal | Keep the same child; no restart                      |
+| `A → B`                             | Retire `A`, then open `B` at the selector's position |
+| `A → nil`                           | Retire `A`; open nothing                             |
+| `A → nil → A` in completed turns    | A second, different `A`; the first stays retired     |
+| One turn staging `A → B → A`        | Nothing: only the settled value is a transition      |
+| Parent or runtime teardown          | Retire this child and every descendant               |
+
+Both families are one implementation. A Bool maps internally to "no identity" or
+one fixed private identity, which is why callers never invent a sentinel
+optional cog for an ordinary condition, and why the Bool body still receives
+only its controller. The identity form requires `Equatable` and not `Hashable`:
+a registration owns one active lifetime, so it needs `==` and nothing more.
+
+Equality is checked at the scope as well as by the graph, so a source
+configured to publish equal values cannot restart an unchanged lifetime. The
+obligation runs both ways: the selected cog must expose lifetime changes
+faithfully, because a custom `==` that calls two genuinely different lifetimes
+equal hides a replacement Cog can never perform.
+
+Identity is minted by the domain operation that creates the lifetime — signing
+in, opening a screen, starting a workflow — and stored in state. Never mint one
+while a selector recomputes: that makes recomputation manufacture a lifetime.
+Signing the same account in again is a new epoch; refreshing a token is not.
+Search text and filters normally select a _request_ inside a presentation
+rather than a new presentation. And a workflow that must end when the session is
+replaced puts the session epoch in its own identity, even if its navigation
+entry survives.
+
+**Scopes over a collection.** One selected identity fits a session, a current
+workflow, or a fixed sheet slot. A navigation stack is a different shape:
+entries arrive and leave in any order, and two entries can address the same
+resource while owning separate work. Registering a selector per entry would open
+and retire children correctly, but nothing would ever remove the selectors
+themselves, so a long session would accumulate one dormant watch per entry ever
+pushed. Rebuilding one whole stack scope on every membership change avoids that
+by restarting every surviving entry, which is worse.
+
+`scope(each:)` is the collection form of the same child lifecycle — one
+selector registration in total, one child per live identity:
+
+```swift
+m.scope(each: openPresentationIDsCog, name: "presentation") { id, s in
+    s.watch(searchQueryCogs[id], initial: .skip, name: "search") { _, query in
+        search.run(query, for: id)
+    }
+}
+```
+
+Reconciliation compares membership, never position. An identity that arrives
+opens a child; one that stays keeps its exact child instance, registrations,
+tasks, and leases; one that leaves retires its child. Reordering alone changes
+nothing. Removing an identity and adding it back in a later turn opens a second,
+different child, while an identity that leaves and returns inside one atomic
+turn never left. Departed children retire first, in opening order, and added
+ones open in collection order. Identities must be distinct: a collection holding
+the same identity twice describes two lifetimes nothing could tell apart, and it
+fails in debug and release builds.
+
+This form takes `Hashable`, unlike the single-identity form. That is an
+independent constraint on an independent operation: membership reconciliation
+and duplicate detection are set operations, which `==` alone cannot perform in
+reasonable time.
+
+**Retirement revokes authority.** Retiring a scope is not only a request that
+its tasks stop. A weak capture is the right ownership convention, but it is not
+the safety mechanism: work can promote the reference and then suspend across an
+`await`, and a retained `status` lens keeps a controller alive by itself. So
+retirement revokes what the controller can do:
+
+| Operation through a retired controller | Behavior                                              |
+| -------------------------------------- | ----------------------------------------------------- |
+| `turn`, and every op built on it       | Inert before the writer body runs or work is enqueued |
+| A turn already waiting in the FIFO     | Rejected at its execution point, publishing nothing   |
+| `run`, `watch`, `status.watch`         | Inert before any baseline read, callback, or lease    |
+| Either `scope` family                  | Inert before the selector is read or a body runs      |
+| `task`                                 | An already-cancelled task; the operation never starts |
+| `peek`, `status.peek`, `refresh`       | Trap, naming the operation and the composed scope     |
+
+Reads trap because the signature cannot honestly manufacture a `Value`, and a
+rejected `refresh` must not answer `.released`: that outcome means the owning
+state left the graph, which is a claim about shared state that one ended
+presentation is in no position to make. A handle obtained while the controller
+was live keeps its real exact-generation outcome; retirement never rewrites it.
+
+Retirement is marked across a whole subtree before any teardown work begins.
+Without that ordering the guarantee would depend on traversal accidents: a
+child's cleanup releases its captures, and a deinitializer running there is
+application code that can reach a sibling the walk has not visited yet.
+
+Two limits are part of the contract. Revocation covers operations routed through
+the controller, not whole methods: a `CogOps` extension is an ordinary Swift
+function, and the statements before it reaches a primitive still run. And a
+synchronous frame that retires its own scope cannot be unwound — later
+primitives in that frame observe retirement, but the frame continues.
+
+**Queued writes are admitted at execution time.** A turn requested during a
+flush waits in the ordinary FIFO (§6.4). Between queuing and draining, an entry
+ahead of it may retire the scope that asked:
+
+```text
+During one reaction flush:
+  an earlier reaction queues the session replacement turn
+  a reaction in the still-live A scope queues an A write
+
+FIFO drain:
+  the replacement turn publishes B and retires A
+  A's queued write now reaches its execution point
+```
+
+That write is discarded, and discarded _before_ its turn starts: no revision, no
+history entry, no writer body, no empty published turn. The check is the exact
+scope instance, not the selected domain identity, because identities are reused
+— an app that returns to session A after B has a second, different A, and the
+first one's work must stay rejected.
+
+Nothing else about ordering changes. Admitted entries keep their arrival order,
+a replacement never overtakes an earlier write, and a child write that reaches
+its execution point before the replacement is valid and is never rolled back.
+Replacement also never waits for cancellation-resistant work to return: the new
+child opens while the old one's request is still in flight, which is the only
+honest behavior when the request has already been sent.
+
+**Late completions publish through receipts, not prechecks.** Because `turn` is
+inert after retirement and its writer body is the guarded place, the ordinary
+completion path needs no liveness check at all:
+
+```swift
+s.task(name: "load") { [weak s] in
+    let page = try await service.load(cursor, using: credentials)
+    await MainActor.run { s?.acceptPage(page, receipt: lifetime) }
+}
+
+extension CogOps {
+    func acceptPage(_ page: Page, receipt: PresentationID) {
+        turn { c in
+            guard c[_currentPresentationCog] == receipt else { return }
+            c[_pagesCogs[receipt]] = page
+        }
+    }
+}
+```
+
+The receipt validation and the acceptance reads are inside the writer body, so a
+retired scope never reaches them, and a live one still has to prove its work is
+current. Domain receipts remain necessary either way: scope retirement is about
+registrations, and acceptance is about results.
+
+When a completion genuinely has to _read_ — to decide whether to retry, or to
+ask for follow-up demand — `ifLive` is the recoverable spelling:
+
+```swift
+guard let s, s.ifLive({ $0.peek(isPresentedCog) }) == true else { return }
+```
+
+It checks once, at entry. It is not a lease on the rest of the closure: a turn
+inside its body can retire that very scope, and the primitives after it are
+authoritative. Re-check after every suspension, because a check made before an
+`await` says nothing about the world after it.
+
+**What replacement does not fix.** A scope keeps every task it started until it
+retires, completed ones included. Replacement clears that ownership along with
+everything else, so a session that is replaced releases its handles — but a
+session that runs for hours and starts a task per keystroke accumulates handles
+the whole time, and identity scopes change nothing about it. Do not read
+`s.task` per keystroke as the recommended search shape; work whose purpose is
+producing graph state belongs in an async cog (§5.1), whose generation rules
+already own exactly one run. If lifetime-local handle accumulation needs fixing,
+it is its own change with its own justification.
+
+**Scope ownership is not state ownership.** Retiring a scope ends its
+registrations and requests cancellation of its tasks. It issues no writes,
+resets no sources, and is not a feature-reset registry. What a departed lifetime
+left in the graph is governed by that state's own declared retention (§5.3), and
+shared resource state stays owned by its other consumers: removing one
+presentation must not destroy state another is using. Releasing a reaction's
+lease can legitimately start ordinary grace, so "no implicit reset" does not
+mean "retirement never affects retention" — it means retirement never decides
+retention.
 
 ### 6.3 Assembly-only registration and lifecycle
 
@@ -243,7 +464,7 @@ buffer may skip intermediate turns for a slow screen, which is right for
 camera state.
 
 If work matters only while one screen is visible, let SwiftUI own it. Put
-app-wide notifications and analytics in a mechanism, with `whenever` when they
+app-wide notifications and analytics in a mechanism, with `scope` when they
 need a shorter state-driven lifetime. One effect should not use both owners.
 
 ### 6.6 Testing mechanisms

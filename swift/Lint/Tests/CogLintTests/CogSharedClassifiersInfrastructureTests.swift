@@ -76,7 +76,7 @@ import Testing
         func operate(_ m: Cog.MechanismController) {
           m.run { c in _ = c[countCog] }
           m.turn { c in c[_countCog] = 0 }
-          m.whenever(enabledCog) { s in
+          m.scope(enabledCog) { s in
             s.run { c in _ = c[countCog] }
           }
         }

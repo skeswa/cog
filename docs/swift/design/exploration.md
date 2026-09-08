@@ -416,7 +416,7 @@ always against settled state. Mechanisms register reactions with `m.run` or
 Outside a flush, the first run finishes before registration returns. During a
 flush, it joins the reaction queue after work already scheduled and before
 queued write-back turns. It never re-enters the registering reaction. A
-reaction ends with its app or `whenever` scope; there is no public handle.
+reaction ends with its app or child `scope`; there is no public handle.
 
 ### 3.4 SwiftUI
 
@@ -803,7 +803,7 @@ correct? Does the app keep one source of truth? Do measurements show less work?
 | Stream end and error | Natural end publishes no turn. A current thrown error publishes failure. Cog-led cancellation is silent. Equal elements are no-ops when equality exists.                                                                                                                                               |
 | Refresh result       | `CogRefresh` reports success, failure, superseded, or released for the exact generation it started.                                                                                                                                                                                                    |
 | Lifetime             | Manual and UI-bound state live for the app by default. Automatic and async state use `whileObserved`. Production grace is 30 seconds.                                                                                                                                                                  |
-| Mechanisms           | Assembly owns app-wide effects. `whenever` owns gated work. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.                                                                                                                                                           |
+| Mechanisms           | Assembly owns app-wide effects. `scope` owns shorter work, selected by a Bool, an optional identity, or a collection of identities. Retirement revokes a controller's graph access and rejects its queued writes. Controllers expose ops but not raw `Cogs`. Reaction writes queue as later turns.     |
 | UI and exports       | Views resolve `\.cogs` themselves. Bindings use a tracked getter and named-op setter. Exports never block a turn.                                                                                                                                                                                      |
 | Runtime creation     | Production calls `assemble(mechanisms:)` once. Tests and previews call `forTesting(seeding:mechanisms:)`. There is no ambient app runtime.                                                                                                                                                             |
 | Tests                | Tests use public APIs, injected clocks, continuations, exact handles, and named diagnostic hooks. A production-install fixture is synchronous and scoped. `CogTesting` ships the async harness: `ControlledWork`, `ControlledStream`, `Cogs.forTestingWithController`, and `TestClock` sleeper counts. |
@@ -866,7 +866,22 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
 25. **SwiftUI runtime access — settled.** Each Cog-using view reads `\.cogs`
     from the environment.
 26. **Mechanisms — settled.** Assembly lists them; controllers register work;
-    state gates own shorter scopes.
+    state owns shorter scopes. `scope` is the sole public name for that
+    lifetime, in three input forms over one lifecycle implementation: a `Bool`
+    condition, an optional `Equatable` identity whose replacement retires the
+    old child and opens a new one with no invented gap, and `scope(each:)` over
+    a collection of `Hashable` identities reconciled by membership. `whenever`
+    was removed outright rather than deprecated, because a gate is one shape of
+    a lifetime and two public names would have implied two mechanisms; the
+    `Hashable` requirement belongs to collection reconciliation alone.
+    Retirement revokes authority rather than only requesting cancellation:
+    turns, registrations, and tasks through a retired controller are inert,
+    value-producing reads trap, and a queued write is rejected at its execution
+    point against the exact scope instance — never against the selected domain
+    identity, which lifetime reuse makes ambiguous. `ifLive` is the
+    recoverable read for a genuine post-suspension check, and it reserves
+    nothing beyond its own call. Scope retirement remains registration
+    ownership only: it issues no writes and decides no retention.
 27. **Lint tooling — settled.** The syntax-only linter, eight rules, plugins,
     docs, and sibling distribution ship together.
 28. **Shape-family spelling — settled.** The automatic shape remains

@@ -43,13 +43,13 @@ public protocol Mechanism {
   ///
   /// Called exactly once, during assembly, in array order. The controller is
   /// the mechanism's entire relationship with the graph: registration, gated
-  /// `whenever` scopes, untracked reads, and the shared ``CogOps`` op
+  /// `scope` children, untracked reads, and the shared ``CogOps`` op
   /// surface. Writes made here run as ordinary named turns and settle
   /// before assembly returns, so a later mechanism observes the result.
   ///
   /// `operate` is registration, not a reaction: reads made directly here
   /// never become dependencies, and the body never reruns. Watch the graph
-  /// through `m.watch`, `m.run`, or `m.whenever` for anything that should
+  /// through `m.watch`, `m.run`, or `m.scope` for anything that should
   /// respond to later turns.
   func operate(_ m: MechanismController)
 }

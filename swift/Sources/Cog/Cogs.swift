@@ -28,7 +28,7 @@ public final class Cogs {
 
   /// Each assembly mechanism's registration scope, parallel to `mechanisms`.
   ///
-  /// A scope owns its mechanism's reactions, tasks, open `whenever` children,
+  /// A scope owns its mechanism's reactions, tasks, open `scope` children,
   /// and controller. Nothing else may register effects: the public `Cogs`
   /// surface deliberately has no reaction, watch, or effect-group API (§6.3).
   private var mechanismScopes: [MechanismScope] = []

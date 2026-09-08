@@ -129,7 +129,7 @@ extension CogOps {
 @Test func `REACT-05 scope teardown does not reorder the surviving reactions`() {
   // A registration made after another's teardown still runs last: slot reuse
   // must not let a newcomer inherit a departed reaction's place in the
-  // registration order. The second reaction lives in a `whenever` scope whose
+  // registration order. The second reaction lives in a gated `scope` whose
   // gate starts true, so its registration slot is real; lowering the gate
   // removes it.
   let secondAlive = Cog<Bool>.Manual { true }
@@ -144,7 +144,7 @@ extension CogOps {
         _ = c[source]
         order.append(1)
       }
-      m.whenever(secondAlive) { s in
+      m.scope(secondAlive) { s in
         s.run { c in
           _ = c[source]
           order.append(2)

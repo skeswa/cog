@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The hike logger, presented as the app's one modal layer.
 ///
-/// A `whenever` scope ticks the elapsed clock only while this sheet is present.
+/// A gated `scope` ticks the elapsed clock only while this sheet is present.
 /// Opening by button, deep link, or restoration starts it; any dismissal stops
 /// it. The note draft stays view-local in `@State` until committed.
 struct HikeLoggerSheet: View {
@@ -27,7 +27,7 @@ struct HikeLoggerSheet: View {
               .contentTransition(.numericText())
           }
         } footer: {
-          Text("A whenever scope gated on this sheet's presence drives the clock.")
+          Text("A scope gated on this sheet's presence drives the clock.")
         }
 
         Section("Note") {

@@ -21,7 +21,7 @@ import Testing
     whileObservedGrace: .seconds(10)
   )
   m.run { c in _ = c[automatic["home"]] }
-  m.whenever(workWatcherAlive) { s in
+  m.scope(workWatcherAlive) { s in
     s.run { c in _ = c[automatic["work"]] }
   }
   #expect(runsByKey == ["home": 1, "work": 1])

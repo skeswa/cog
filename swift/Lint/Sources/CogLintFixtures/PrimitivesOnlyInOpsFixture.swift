@@ -56,7 +56,7 @@ extension CogLintFixtureRegistry {
                 m.turn(_countCog, to: 1)
                 m.refresh(forecastCog)
                 m.run { c in c.refresh(forecastCog) }
-                m.whenever(enabledCog) { child in child.turn(_countCog, to: 2) }
+                m.scope(enabledCog) { child in child.turn(_countCog, to: 2) }
               }
             }
             """
@@ -67,7 +67,7 @@ extension CogLintFixtureRegistry {
           CogLintFixturePosition(line: 5, column: 7),
           CogLintFixturePosition(line: 6, column: 7),
           CogLintFixturePosition(line: 7, column: 20),
-          CogLintFixturePosition(line: 8, column: 45),
+          CogLintFixturePosition(line: 8, column: 42),
         ]
       ),
       CogLintTriggeringExample(

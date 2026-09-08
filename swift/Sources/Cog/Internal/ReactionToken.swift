@@ -1,8 +1,9 @@
 /// The internal lifetime handle for one reaction or watch registration.
 ///
 /// Registration handles are not public API: a registration lives until its
-/// owning ``MechanismScope`` ends, and shorter lifetimes are `whenever` gates
-/// expressed in state (§6.2). The scope keeps the token alive; releasing the
+/// owning ``MechanismScope`` ends, and shorter lifetimes are `scope` children
+/// whose condition or identity lives in state (§6.2). The scope keeps the token
+/// alive; releasing the
 /// last reference cancels the registration, and ``cancel()`` stops it at a
 /// specific point during scope teardown.
 ///

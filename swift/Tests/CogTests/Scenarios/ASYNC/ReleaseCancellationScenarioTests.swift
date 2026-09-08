@@ -46,7 +46,7 @@ private final class Async13ControlledWork {
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let watcherAlive = Cog<Bool>.Manual { true }
   let refresh = cogs.refresh(forecast)
-  m.whenever(watcherAlive) { s in
+  m.scope(watcherAlive) { s in
     s.run { c in _ = c[forecast] }
   }
   var startIterator = work.starts.makeAsyncIterator()
@@ -86,7 +86,7 @@ private final class Async13ControlledWork {
   let work = Async13ControlledWork()
   let forecast = Cog<Int>.Async(default: 0, name: "forecast") { _ in work.makeWork() }
   let firstWatcherAlive = Cog<Bool>.Manual { true }
-  m.whenever(firstWatcherAlive) { s in
+  m.scope(firstWatcherAlive) { s in
     s.run { c in _ = c[forecast] }
   }
   var startIterator = work.starts.makeAsyncIterator()

@@ -15,7 +15,7 @@ import Testing
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
-      m.whenever(scopeOpen, name: "scoped") { s in
+      m.scope(scopeOpen, name: "scoped") { s in
         s.run { c in scopedSeen.append(c[dependency]) }
         s.task(name: "held") {
           taskStartContinuation.yield()

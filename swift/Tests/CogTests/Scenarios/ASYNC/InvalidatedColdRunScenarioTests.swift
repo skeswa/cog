@@ -16,7 +16,7 @@ import Testing
   }
   let initialWatcherAlive = Cog<Bool>.Manual { true }
   let (initialStatuses, initialContinuation) = AsyncStream.makeStream(of: CogStatus<Int>.self)
-  m.whenever(initialWatcherAlive) { s in
+  m.scope(initialWatcherAlive) { s in
     s.run { c in initialContinuation.yield(c.status[forecast]) }
   }
   var initialStatusIterator = initialStatuses.makeAsyncIterator()

@@ -106,9 +106,15 @@ sources. Two kinds of behavior attach to it:
   restoration — with no per-screen tracking calls. Trails demonstrates this
   with the analytics service replaced by a visible journal.
 - **Navigation-gated work.** A derived Bool over navigation state — "is
-  this sheet up?", "is this screen showing?" — gates a `whenever` scope, so
+  this sheet up?", "is this screen showing?" — gates a `scope`, so
   an effect lives exactly while a screen is presented, however it was
   presented ([Side effects](./side-effects.md)).
+- **Per-entry work.** A Bool answers "is anything showing?", which is the
+  wrong question once two entries can show the same thing. Give each entry a
+  minted ID in the stack source and hang `scope(each:)` on the collection of
+  live IDs: each entry gets its own child, pushes and pops open and retire
+  children, and reordering or covering an entry leaves its work running.
+  Visibility is not a lifetime — a covered screen is still open.
 
 ## Restoration is the same code path
 
