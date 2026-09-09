@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useData, withBase } from "vitepress";
+import { withBase } from "vitepress";
 
 /**
  * The landing page.
@@ -59,16 +59,6 @@ const EDGES: Array<[string, string]> = [
   ["headline", "Banner"],
   ["city", "CityTitle"],
 ];
-
-/**
- * The appearance comes from VitePress rather than from a `html.dark`
- * descendant selector. Vue's scoped-style compiler rewrites
- * `:global(html.dark) .cog` down to bare `html.dark`, which sets the tokens on
- * the document element where the component's own `.cog` rule then overrides
- * them — so the dark palette silently never applied. Binding the class here
- * keeps both palettes on the same element at the same specificity.
- */
-const { isDark } = useData();
 
 declare const __COG_SWIFT_RELEASE__: string;
 const swiftRelease = __COG_SWIFT_RELEASE__;
@@ -764,7 +754,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['cog', { dark: isDark }]">
+  <div class="cog">
     <!-- ── Hero ─────────────────────────────────────────────────────── -->
     <header class="hero">
       <p class="eyebrow">State for native mobile UI</p>
@@ -1397,7 +1387,11 @@ onBeforeUnmount(() => {
   font-feature-settings: "kern", "liga";
 }
 
-.cog.dark {
+/* VitePress sets html.dark before first paint. Follow that class directly:
+   binding a second class to isDark leaves the prerendered light palette in
+   place during hydration. Vue scopes the final selector here, so html stays
+   an ancestor and the tokens stay on this component's .cog element. */
+html.dark .cog {
   /* `#1a1aff` is only 2.5:1 on this ground, so the dark palette lifts the
      accent rather than reusing the light one and calling it a theme. */
   --paper: #0b0b10;
@@ -2187,7 +2181,7 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 
-.cog.dark .mechanism-lane.is-active .lane-index {
+html.dark .cog .mechanism-lane.is-active .lane-index {
   color: var(--paper);
 }
 
@@ -2316,8 +2310,8 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.cog.dark .buttons button.btn-run,
-.cog.dark .buttons button.btn-run:hover {
+html.dark .cog .buttons button.btn-run,
+html.dark .cog .buttons button.btn-run:hover {
   color: var(--paper);
 }
 
@@ -2944,7 +2938,7 @@ onBeforeUnmount(() => {
 
 /* On the dark ground `--paper` is the ground, so a toast painted with it has
    nothing but its border to sit on. The panel tone lifts it instead. */
-.cog.dark .toast {
+html.dark .cog .toast {
   background: var(--paper-2);
   box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.8);
 }
