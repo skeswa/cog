@@ -171,6 +171,18 @@ The job uploads the archive, checksum, and record, names the release
 starts `docs.yml` at the tag. This direct start is required because events made
 by the repository token do not usually start another workflow.
 
+Both dispatch jobs gate on `!cancelled() && needs.publish.result == 'success'`.
+The status-check function is required, not decoration. A job whose `if` holds
+none inherits an implicit `success()` that walks the whole upstream graph, and
+`recover-candidate` is skipped on every push-triggered release — which is why
+`publish` already carries `always()`. Without one, both dispatch jobs are
+skipped even when publication succeeds, silently, with no runner and no log:
+that is what happened to 0.7.0 and 0.8.0, whose sibling publications were
+started by hand afterwards. `!cancelled()` rather than `always()` because a run
+cancelled by hand after publication was probably cancelled because something
+looks wrong. `mise run workflows:check` now rejects either dispatch job whose
+gate omits a status-check function.
+
 Nothing waits for Docs to finish. If the
 [published API reference](https://skeswa.github.io/cog/documentation/cog/)
 does not open afterwards, dispatch `docs.yml` at the tag by hand.

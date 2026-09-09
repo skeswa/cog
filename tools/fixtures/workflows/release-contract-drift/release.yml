@@ -40,6 +40,10 @@ jobs:
 
   dispatch-docs:
     needs: publish
+    # Names the right result and even carries a function, yet is still wrong:
+    # `success()` *is* the implicit check, so this gate is skipped by exactly
+    # the ancestor that skipped the unguarded form.
+    if: success() && needs.publish.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
