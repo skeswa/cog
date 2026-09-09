@@ -438,7 +438,19 @@ jobs:
   dispatch-docs:
     name: Dispatch release documentation
     needs: publish
-    if: needs.publish.result == 'success'
+    # The status-check function is load-bearing, not decoration. Without one,
+    # GitHub applies an implicit `success()` that walks the whole upstream
+    # graph, and `recover-candidate` is skipped on every push-triggered
+    # release — so this job was silently skipped for both 0.7.0 and 0.8.0 even
+    # though `publish` itself succeeded. `publish` already carries `always()`
+    # for exactly that reason.
+    #
+    # `!cancelled()` rather than `always()`: a run cancelled by hand after
+    # publication was almost certainly cancelled because something looks wrong,
+    # and that is not the moment to start dispatching follow-on work. The
+    # explicit result comparison keeps the rest of the safety property intact —
+    # a publication that failed or never ran still dispatches nothing.
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -461,7 +473,11 @@ jobs:
   dispatch-plugins:
     name: Dispatch plugin publication
     needs: [publish, dispatch-docs]
-    if: needs.publish.result == 'success'
+    # As above, and doubly so here: `dispatch-docs` is a dependency for
+    # ordering only, so this job must not inherit an implicit `success()` over
+    # it either. A docs dispatch that fails must not withhold the sibling
+    # publication, which is why the gate names `publish` and not `dispatch-docs`.
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

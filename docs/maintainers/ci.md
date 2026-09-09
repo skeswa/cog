@@ -168,6 +168,15 @@ same-repo lane — enforced structurally for any `self-hosted` label, and kept
 on the lane's jobs through the hosted period so the topology snaps back.
 `mise run workflows:check` enforces these rules.
 
+The release contract also checks that a job which is _supposed_ to run can. A
+job whose `if` holds no status-check function inherits an implicit `success()`
+over its whole upstream graph, so one skipped ancestor skips it silently — no
+runner, no log, no failed check. That is not hypothetical: it skipped the Docs
+and `coglint-plugins` dispatches for two releases. Both release dispatch jobs
+must therefore gate on `!cancelled() && needs.publish.result == 'success'`,
+which keeps the safety property while overriding the implicit check. Writing
+`success()` is not a remedy — it is that same check.
+
 ## Branch, tag, and environment rules
 
 - GitHub allows rebase merging only. Merge commits and squash merging are off.

@@ -1264,6 +1264,37 @@ function releaseWorkflowContract(workflow) {
     });
   }
 
+  // A dispatch job that is gated but never runs is worse than no gate at all:
+  // the contract above proves the dispatch *command* is right while the release
+  // silently ships without it. GitHub applies an implicit `success()` to any
+  // job whose `if` contains no status-check function, and that implicit check
+  // walks the whole upstream graph rather than the job's direct `needs`.
+  // `recover-candidate` is skipped on every push-triggered release, which is
+  // why `publish` already carries `always()` — and why both dispatch jobs were
+  // silently skipped for 0.7.0 and 0.8.0 despite `publish` succeeding. Writing
+  // `success()` explicitly is not a remedy; it is the same implicit check. The
+  // fixture pins that case rather than the easier missing-`if` one.
+  for (const id of ["dispatch-docs", "dispatch-plugins"]) {
+    const job = workflow.jobs.find((candidate) => candidate.id === id);
+    if (job === undefined) continue;
+    const condition = job.condition ?? "";
+    const gatesOnPublication = condition.includes("needs.publish.result == 'success'");
+    const overridesImplicitSuccess =
+      /\balways\s*\(\s*\)/.test(condition) || /\bcancelled\s*\(\s*\)/.test(condition);
+    if (!gatesOnPublication || !overridesImplicitSuccess) {
+      diagnostics.push({
+        path: workflow.path,
+        line: job.conditionLine,
+        check: "release-workflow-contract",
+        job: id,
+        message:
+          `release job \`${id}\` must gate on \`needs.publish.result == 'success'\` behind ` +
+          "`!cancelled()` or `always()`, or GitHub's implicit success check skips it whenever an " +
+          "upstream job was skipped — and writing `success()` is that same check",
+      });
+    }
+  }
+
   const plugins = workflow.jobs.find((job) => job.id === "dispatch-plugins");
   const pluginsSource = plugins?.steps.map((step) => step.run ?? "").join("\n") ?? "";
   if (
