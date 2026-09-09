@@ -368,12 +368,12 @@ the turn it observed.
 
 ### Tie work to a fact with a scope
 
-Do not start and cancel work by hand. Hang a scope on the state that decides
-its lifetime. Everything registered through `s` ends when that lifetime ends,
-and the body runs again from scratch for the next one. Prefer derived state, so
-the lifetime follows the fact however it changed.
+Use `.scope(...)` to start and stop work as state changes. Use `.discard(...)`
+to release saved state when the app is finished with it. For example, closing a
+trail screen can stop its timer and release its unfinished note. Ending the
+scope handles the timer; the closing op must also discard the note.
 
-For work that exists while a condition holds, select a Bool:
+Start with a Bool for work that runs while a condition is true:
 
 ```swift
 struct HikeTimerMechanism: Mechanism {
@@ -394,26 +394,36 @@ struct HikeTimerMechanism: Mechanism {
 }
 ```
 
-For work that belongs to a _particular_ session, screen, or workflow, select an
-optional identity. The body receives the exact identity that opened it, so a
-replacement retires the old child and opens a new one in one turn — no invented
-gap, and no chance of a late completion picking up the next lifetime's
-credentials:
+When `isLoggingHikeCog` becomes `true`, the body runs once with controller `s`.
+Register the timer through `s` so it ends with that scope. When the Bool becomes
+`false`, Cog cancels the timer. Opening again runs the body with a new
+controller. The timer resets because the body calls `resetHikeTimer()`;
+scopes do not reset graph state themselves.
+
+Derive the Bool from navigation state so a swipe to dismiss the logger stops
+the timer just as a Close button does.
+
+For work tied to one particular screen, select an optional ID. This sketch
+watches that screen's filter:
 
 ```swift
-m.scope(activeSessionCog, name: "session") { session, s in
-  let credentials = credentials.bound(to: session)
-  s.watch(pendingUploadsCog, initial: .run, name: "sync") { _, uploads in
-    sync.enqueue(uploads, using: credentials)
+// activeTrailScreenCog holds a TrailScreenID? value.
+m.scope(activeTrailScreenCog, name: "trailScreen") { screenID, s in
+  s.watch(trailFilterCogs[screenID], initial: .skip, name: "filter") { _, filter in
+    analytics.record(.filterChanged(filter), screen: screenID)
   }
 }
 ```
 
-An equal identity is the same lifetime and does not restart it. Mint the
-identity in the op that creates the lifetime — signing in, opening a screen —
-never inside a selector, which would make every recomputation a new lifetime.
+`nil` means no screen and no work. Changing A to B stops A's scope and starts
+B's. Keeping A keeps the same work running. A Bool cannot express this
+replacement: `true` stays `true` when the user switches screens.
 
-For a navigation stack, reconcile the whole collection with one registration:
+Create an ID in the op that opens a screen or signs in a session, then keep it
+in state. Never create it inside an automatic selector. Give two openings of
+the same trail different screen IDs so they can own separate work.
+
+For several open screens, use one registration over their ID array:
 
 ```swift
 m.scope(each: openTrailScreensCog, name: "trailScreen") { screenID, s in
@@ -423,14 +433,19 @@ m.scope(each: openTrailScreensCog, name: "trailScreen") { screenID, s in
 }
 ```
 
-Added IDs open children, removed IDs retire them, and unchanged IDs keep their
-exact children — reordering restarts nothing.
+Adding B to `[A]` starts B and keeps A running. Removing A stops only A.
+Reordering the array restarts nothing. IDs must be unique; duplicates cause a
+runtime error. All scope forms use the final value from each turn, so removing
+and restoring an ID within one turn does not restart its scope.
 
-A retired scope is inert, not merely cancelled: `turn` does nothing (including
-a turn already queued), registrations register nothing, `task` returns an
-already-cancelled task, and `peek`, `status.peek`, and `refresh` trap. So a
-completion publishes through a receipt-bearing op and validates inside the
-writer body, rather than checking state before calling it:
+The handbook shows the [scope forms step by step](./handbook/side-effects.md).
+
+Async work may finish after a scope ends. Cog disables that scope's
+controller, which the API calls retirement: `turn` does nothing (including
+a turn already queued), registrations start nothing, and `task` returns an
+already-cancelled task. `peek`, `status.peek`, and `refresh` cause a runtime
+error. Publish results through a named op that checks the requesting screen's
+ID inside the writer body:
 
 ```swift
 extension CogOps {
@@ -447,16 +462,27 @@ When a late completion truly must read, wrap that read in
 `s.ifLive { $0.peek(...) }`, which returns `nil` instead of trapping. It checks
 once, at the call; it reserves nothing, so re-check after every `await`.
 
-Task closures are nonisolated, so graph access inside them is an awaited op
-or `await s.peek(...)`. Inside a `scope` body, read anything other than the
-selected state with `peek`. Inject clocks so tests can drive time.
+Task closures are nonisolated, so await op calls from them. In the scope
+body, use `peek` for one-time reads; those reads do not restart the scope.
+Inject clocks so tests can drive time.
 
-### Release per-lifetime state when its lifetime ends
+### Release a closed screen's state with `discard`
 
-Retiring a scope ends its effects. It does not release the values that lifetime
-kept, and a value a view read stays in the graph for the life of the app —
-Observation gives Cog no way to learn the last reader left. The op that ends the
-lifetime says both halves:
+Ending a scope stops its work but does not clear its values. Cog cannot tell
+when the last SwiftUI view stops reading a value, so values a view has read
+stay in memory until the app releases them.
+
+Declare temporary manual state so it can start over after release:
+
+```swift
+private let _trailFilterCogs = CogBox<String, TrailScreenID>.Manual(
+  { "" },
+  lifetime: .whileObserved(resetToInitial: true)
+)
+let trailFilterCogs = _trailFilterCogs.readOnly
+```
+
+Then remove the screen ID and discard its filter in the closing op:
 
 ```swift
 extension CogOps {
@@ -467,14 +493,26 @@ extension CogOps {
 }
 ```
 
-`discard` releases one exact state, including its UI boundary, and notifies any
-reader first. Only a source declared
-`lifetime: .whileObserved(resetToInitial: true)` is eligible, and a state
-another consumer still watches is left alone. It is not a reset and not a
-feature-wide operation; shared resource data belongs to its own declaration.
+Call this through `cogs` or a controller that outlives the screen. The screen's
+own controller stops accepting `discard` calls once its scope ends.
 
-Effects that matter only while one screen is visible use SwiftUI's own
-`.task`, not a mechanism.
+`discard(_trailFilterCogs[id])` releases only that screen's filter. If it was
+`"easy"`, a later read creates it again as `""`. Other screens' filters stay
+unchanged. Any view still reading the released value is notified after release.
+
+Manual state needs `.whileObserved(resetToInitial: true)`; discarding existing
+`.app` state causes a runtime error. Pass the manual source, not its read-only
+projection. A synchronous automatic cog can also be discarded and recomputes
+on its next read. Async cogs have no `discard` overload.
+
+A watch, exported stream, or another cog can keep a value in use; `discard`
+leaves it alone in that case. Each discard runs as its own turn at the next
+safe graph boundary. Keep it after the turn that ends the screen's watches.
+Leave shared trail data out of this cleanup. For a Clear button on an open
+screen, write an empty string in a normal turn instead.
+
+See [the full closing example](./handbook/writing-state.md#discard-release-state-you-no-longer-need).
+Effects that matter only while one view is visible use SwiftUI's `.task`.
 
 ### Drive navigation from state
 

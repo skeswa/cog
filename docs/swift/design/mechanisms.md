@@ -104,9 +104,12 @@ the app runtime. Work that may outlive the scope captures `[weak m]` and stops
 when that value is gone. An external engine must not retain the controller.
 The same rule applies to a `scope` sub-controller.
 
-**Scopes.** A lifetime shorter than the app is graph state, not a registration
-ceremony. `scope` runs a nested scope whose lifetime is whatever the state it
-selects says. In its simplest form that state is a Bool:
+**Scopes.** Use `.scope(...)` to run work while a selected state says it is
+needed. For example, a Bool can start a timer when a screen opens and stop it
+when the screen closes. An optional ID can choose one screen's work, and an
+array of IDs can keep work running for several screens at once. See the
+[handbook's step-by-step examples](../handbook/side-effects.md#scopes-start-and-stop-work-with-state).
+The simplest form selects a Bool:
 
 ```swift
 func operate(_ m: MechanismController) {
@@ -145,12 +148,6 @@ Its rules:
 
 There is no public effect group or reaction token. Assembly owns app-lifetime
 work. State owns shorter work.
-
-`whenever` was the earlier name for this, and it was removed rather than
-deprecated when identity scopes arrived. A gate is one shape of a lifetime, not
-a family of its own, and two names for one lifecycle would have implied two
-mechanisms. Migration is a rename: `m.whenever(gate) { s in … }` becomes
-`m.scope(gate) { s in … }`, parameters and closure unchanged.
 
 **Scopes owned by an identity.** A Bool says whether work should exist. It
 cannot say _which_ lifetime owns it, and that difference decides whether a

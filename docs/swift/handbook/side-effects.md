@@ -1,5 +1,5 @@
 ---
-description: "Mechanisms, initial state in operate, the persistence pattern, and gated scopes."
+description: "Start and stop work with scope: simple examples for a timer, one screen, and several screens."
 ---
 
 # Side effects
@@ -79,11 +79,28 @@ defaults. This pattern treats storage as a cache of graph state. Work whose
 durable record must survive the process dying has stricter ordering rules;
 see [mechanisms §6.7](../design/mechanisms.md).
 
-## Scopes: lifetime as state
+## Scopes: start and stop work with state
 
-Some work should exist only while some fact is true. Do not register and
-cancel it by hand. Its lifetime _is_ a cog, and `scope` hangs a child
-controller on it. The simplest form reads a Bool:
+A hike timer should tick while the hike logger is open and stop when it closes.
+With `.scope(...)`, you describe that rule once. Cog starts and stops the work
+as the state changes.
+
+Two APIs help when a screen closes:
+
+| API             | What it controls                    | Example                                            |
+| --------------- | ----------------------------------- | -------------------------------------------------- |
+| `.scope(...)`   | How long tasks and watches run      | Stop the hike timer when the logger closes.        |
+| `.discard(...)` | How long a saved value stays in Cog | Release an unfinished note when its screen closes. |
+
+Ending a scope does not clear the values its work used. The operation that
+closes the screen can also call `discard` for values the app no longer needs.
+[Writing state](./writing-state.md#discard-release-state-you-no-longer-need)
+walks through that part.
+
+### Start with a Bool: run a timer while the logger is open
+
+In Trails, `isLoggingHikeCog` is `true` while the hike logger sheet is open.
+Here is the timer's shape:
 
 ```swift
 struct HikeTimerMechanism: Mechanism {
@@ -104,64 +121,78 @@ struct HikeTimerMechanism: Mechanism {
 }
 ```
 
-The gate is the scope's only tracked dependency. When the gate falls,
-everything registered through the sub-controller ends: reactions unregister
-and tasks cancel. The next rise runs the body again from scratch. Nothing
-survives a down-and-up cycle — each presentation of Trails' logger restarts
-its clock from zero. Anything that must survive belongs in graph state, not
-in the scope.
+`m` is the mechanism's controller. `s` is a new controller for this opening of
+its scope. Register work through `s` so Cog knows which work to stop.
+`resetHikeTimer` and `tickHikeTimer` are the app's named operations.
 
-Note that the gate here is derived. `isLoggingHikeCog` is computed from
-navigation state, so the timer's lifetime follows the sheet _however_ it was
-presented or dismissed — button, gesture, deep link, or restoration.
+| Logger state            | What happens                                                    |
+| ----------------------- | --------------------------------------------------------------- |
+| Starts closed (`false`) | No timer starts.                                                |
+| Opens (`true`)          | The scope body runs once: reset the timer, then start ticking.  |
+| Stays open (`true`)     | The same task keeps ticking. The scope body does not run again. |
+| Closes (`false`)        | Cog cancels the ticking task.                                   |
+| Opens again (`true`)    | A new scope runs the body again and starts a new timer.         |
 
-## When the lifetime has a name, select its identity
+If the logger is already open when the scope is registered, the body runs then.
+Closing the scope also removes any watches registered through `s`.
 
-The two sketches below are not from the example apps. Trails' navigation stack
-holds routes rather than per-opening identities, and none of the three examples
-has a session, so these show the shape rather than pointing at code you can
-open.
+The timer returns to zero because the body calls `resetHikeTimer()`. **A scope
+does not reset graph state on its own.** A value that should survive closing
+and reopening can stay in the graph.
 
-A Bool says whether work should exist. It cannot say _which_ lifetime owns it,
-and some work needs to know. A session ends and another begins while onboarding
-stays active; a user signs the same account in twice; a screen is dismissed and
-reopened for the same trail. In each case the gate never falls, so a gated scope
-keeps running against a lifetime that is over.
+Derive `isLoggingHikeCog` from navigation state. That way, a swipe to dismiss
+the sheet stops the timer just as a Close button does.
 
-Select an optional identity instead, and the body receives the exact identity
-that opened it:
+## One screen at a time: select its ID
+
+A Bool works when you only need to know whether something is open. Sometimes
+you also need to know _which_ screen is open.
+
+Suppose a trail screen watches changes to its filter. The user switches from
+screen A to screen B. An `isOpenCog` would stay `true`, so a Bool scope would
+keep A's watch running. Instead, use a cog holding the current screen's ID,
+or `nil` when no screen is open:
 
 ```swift
-m.scope(activeSessionCog, name: "session") { session, s in
-  // Bound once, to this session. A completion cannot pick up the next
-  // session's credentials after a suspension.
-  let credentials = credentials.bound(to: session)
-
-  s.watch(pendingUploadsCog, initial: .run, name: "sync") { _, uploads in
-    sync.enqueue(uploads, using: credentials)
+// activeTrailScreenCog holds a TrailScreenID? value.
+// This sketch extends the Trails idea; it is not code from the example app.
+m.scope(activeTrailScreenCog, name: "trailScreen") { screenID, s in
+  s.watch(trailFilterCogs[screenID], initial: .skip, name: "filter") { _, filter in
+    analytics.record(.filterChanged(filter), screen: screenID)
   }
 }
 ```
 
-`nil` means no lifetime, so no child. A different identity retires the old child
-— unregistering its watches, cancelling its tasks — and opens a new one, in one
-turn, with no invented gap in between. An _equal_ identity is the same lifetime
-and changes nothing, so a source that republishes an equal value never restarts
-the work.
+The body receives the selected ID as `screenID`. It uses that ID to watch
+only this screen's filter. Here, `analytics` is an injected service, and
+`initial: .skip` means it records later changes, not the starting filter.
 
-The rule that makes this work is about where identity comes from: **mint it in
-the op that creates the lifetime.** Signing in mints an epoch; refreshing a
-token does not. Opening a screen mints a presentation ID; typing in its search
-field does not. An identity minted inside a selector would make every
-recomputation a new lifetime, tearing down and rebuilding work on every
-keystroke.
+| Selected ID | What happens                          |
+| ----------- | ------------------------------------- |
+| `nil` → A   | Start A's scope and its filter watch. |
+| A → A       | Keep the same scope and watch.        |
+| A → B       | Stop A's scope, then start B's.       |
+| B → `nil`   | Stop B's scope.                       |
 
-## Many lifetimes at once
+The same rule works for a login session or a checkout. Use an optional ID
+when replacing one with another should replace the work, even if there is no
+closed or signed-out step between them.
 
-A navigation stack has one lifetime per entry, and entries come and go in any
-order. `scope(each:)` reconciles them from a collection of stable IDs:
+**Create the ID in the operation that opens the screen.** Keep it unchanged
+while that screen is open. Do not create a new ID in an automatic cog each
+time it computes, or ordinary state changes could keep restarting the work.
+
+Give each opening its own ID. Two screens can show the same trail but have
+different filters and separate work. A trail's ID identifies the trail; a
+screen's ID identifies one opening of that screen.
+
+## Several screens at once: use `scope(each:)`
+
+For a navigation stack, keep the open screen IDs in an array. Register one
+`scope(each:)` for that array:
 
 ```swift
+// openTrailScreensCog holds [TrailScreenID].
 m.scope(each: openTrailScreensCog, name: "trailScreen") { screenID, s in
   s.watch(trailFilterCogs[screenID], initial: .skip, name: "filter") { _, filter in
     analytics.record(.filterChanged(filter), screen: screenID)
@@ -169,33 +200,41 @@ m.scope(each: openTrailScreensCog, name: "trailScreen") { screenID, s in
 }
 ```
 
-An ID that arrives opens a child. An ID that stays keeps its exact child, its
-registrations, and its running tasks — including when the collection is
-reordered, or when a sibling is added or removed. An ID that leaves retires its
-child. Two entries showing the same trail have different IDs, so they own
-separate work and neither can end the other's.
+Cog gives each ID its own scope and controller:
 
-This is one registration, not one per entry. That matters: registering a
-selector per pushed entry would leave a dormant watch behind for every screen
-the app has ever shown.
+| Open screen IDs     | What happens                                    |
+| ------------------- | ----------------------------------------------- |
+| `[]` → `[A]`        | Start A's scope.                                |
+| `[A]` → `[A, B]`    | Keep A running; start B's scope.                |
+| `[A, B]` → `[B, A]` | Keep both running. Reordering restarts nothing. |
+| `[B, A]` → `[B]`    | Stop A's scope; keep B running.                 |
+| `[B]` → `[]`        | Stop B's scope.                                 |
 
-## Retirement makes a scope inert, not merely cancelled
+Every ID in the array must be unique; duplicates cause a runtime error. If an
+ID is removed and added back in a later turn, it gets a new scope.
 
-Cancellation is a request. An HTTP call already sent will finish anyway, and a
-`[weak s]` capture that was promoted before an `await` is still valid after it.
-So Cog revokes a retired scope's access instead of relying on those:
+A screen covered by another screen is still in the stack, so its work keeps
+running. For work that should last only while a view is visible, use SwiftUI's
+`.task` ([SwiftUI integration](./swiftui.md)).
 
-- `turn` and every op built on it do nothing, including a turn that was already
-  waiting in the queue when the scope was retired.
-- `run`, `watch`, `status.watch`, and `scope` register nothing — not even the
-  initial callback.
-- `task` returns an already-cancelled task whose body never starts.
-- `peek`, `status.peek`, and `refresh` trap. They cannot invent a value, and a
-  refresh that answered "released" would be claiming the shared state left the
-  graph, which one ended screen does not know.
+Use one registration for the collection in `operate`. You do not need to
+register a new `scope` each time the user opens a screen.
 
-The practical consequence is that a completion should **publish through a
-receipt-bearing op** rather than checking anything first:
+All three forms respond to the values at the end of a turn. For example,
+removing A and putting it back in the same turn does not restart A's scope.
+
+## When async work finishes after a scope ends
+
+A network request may finish after its screen closes. Cancelling a task asks
+it to stop; it does not guarantee that the task stops immediately.
+
+Cog also disables the ended scope's controller. The docs call this
+**retirement**. A `turn` called through that controller does nothing, even if
+it was queued before the scope ended. This prevents the old work from writing
+through the old controller.
+
+Publish a result through a named op, using the screen ID captured when the
+work started:
 
 ```swift
 s.task(name: "load") { [weak s] in
@@ -214,34 +253,36 @@ extension CogOps {
 }
 ```
 
-Both checks live inside the writer body. A retired scope never gets there, and a
-live one still has to prove the screen it loaded for is the screen that is open.
+Here, `receipt` is the ID of the screen that requested the load. The guard
+checks that it is still open before saving the result. Keeping that check
+inside `turn` also protects calls through other, still-live controllers.
 
-When a completion really has to read — to decide whether to retry, or to ask for
-more — wrap that read:
+Avoid reading through an ended controller: `peek`, `status.peek`, and
+`refresh` cause a runtime error. If late work needs to read before deciding
+what to do next, use `ifLive`:
 
 ```swift
 guard let s, s.ifLive({ $0.peek(isRefreshableCog) }) == true else { return }
 ```
 
-`ifLive` checks once, when it is called. It is not a reservation: if something
-inside its body retires the scope, the statements after that are running through
-a retired controller like any others. Re-check after every `await`.
+`ifLive` returns `nil` if the scope has ended. It checks only when called;
+check again after each `await`. It does not keep the scope alive, and code
+inside its closure can still end the scope.
 
-Note what retirement does _not_ do. It ends registrations and asks tasks to
-stop. It writes nothing, resets nothing, and reclaims no state. That is a
-deliberate split, not an omission: releasing a departed screen's values is the
-job of the op that closed the screen, through `discard`
-([Writing state](./writing-state.md)). Shared trail data stays owned by whoever
-else is reading it either way.
+Other calls through an ended controller are harmless: `run`, `watch`,
+`status.watch`, and `scope` start nothing. `task` returns an already-cancelled
+task without running its body. `discard` does nothing too, so call the
+screen-closing op through `cogs` or a controller that outlives the screen.
 
-## Task closures are nonisolated
+## Reads inside a scope
 
-A `task` closure is nonisolated, so touching the graph goes through an
-awaited op call — `await s.tickHikeTimer()` above. Inside a `scope` body,
-reads other than its own registrations use `peek` through the controller and
-never re-trigger the scope. The selected state stays the scope's only tracked
-dependency.
+The selected Bool, ID, or ID array decides when a scope starts and stops.
+A `peek` inside the body reads a value once; changes to that value do not
+restart the scope. A `watch` or `run` registered through `s` tracks its own
+reads as usual.
+
+Task closures are nonisolated. To change state from one, await a named op,
+as in `await s.tickHikeTimer()` above. Inject clocks so tests can control time.
 
 ## Where this is specified
 

@@ -261,7 +261,7 @@ type MechanismPhase = "idle" | "state" | "scope" | "watch" | "effect" | "blocked
 type LaneState = "idle" | "active" | "done" | "blocked";
 
 /** The line of the printed source that the current beat is running. */
-type CodeFocus = "none" | "whenever" | "watch" | "send";
+type CodeFocus = "none" | "scope" | "watch" | "send";
 
 type MechanismEventTone = "setup" | "scope" | "effect" | "quiet";
 
@@ -382,7 +382,7 @@ function toggleAlerts() {
       at: 460,
       run: () => {
         mechanismPhase.value = "scope";
-        codeFocus.value = "whenever";
+        codeFocus.value = "scope";
         mechanismReadout.value = next
           ? "The scope reopened and registered a fresh watch."
           : "The scope closed and took its watch with it.";
@@ -518,8 +518,8 @@ const SOURCE_LINES: SourceLine[] = [
     html: '  <span class="k">func</span> operate(<span class="k">_</span> m: <span class="t">MechanismController</span>) {',
   },
   {
-    html: '    m.<span class="v">whenever</span>(<span class="v">alertsEnabledCog</span>) { s <span class="k">in</span>',
-    focus: "whenever",
+    html: '    m.<span class="v">scope</span>(<span class="v">alertsEnabledCog</span>) { s <span class="k">in</span>',
+    focus: "scope",
   },
   {
     html: '      s.<span class="v">watch</span>(<span class="v">messageCountCog</span>, initial: .skip) { <span class="k">_</span>, count <span class="k">in</span>',
@@ -1116,7 +1116,7 @@ onBeforeUnmount(() => {
               <h3>NotificationsMechanism</h3>
               <dl class="lane-values">
                 <div>
-                  <dt>whenever(alertsEnabled)</dt>
+                  <dt>scope(alertsEnabled)</dt>
                   <dd :class="{ live: alertsEnabled }">
                     {{ alertsEnabled ? "scope open" : "scope closed" }}
                   </dd>

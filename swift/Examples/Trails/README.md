@@ -50,7 +50,7 @@ through the same code path.
   sources. The journal mechanism watches it and records every transition —
   tap, gesture, URL, or restoration — with no per-screen tracking code. That
   is the analytics pattern with the service replaced by a visible log.
-- `HikeTimerMechanism` hangs a `whenever` scope on the derived
+- `HikeTimerMechanism` uses `scope` with the derived
   `isLoggingHikeCog`, so the elapsed-time ticker exists exactly while the
   logger sheet is up, however it was presented, and cancels on any dismissal.
 - `NavigationRig+Bindings.swift` and `TrailRig+Bindings.swift` adapt graph

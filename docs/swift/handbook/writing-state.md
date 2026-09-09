@@ -1,5 +1,5 @@
 ---
-description: "Named CogOps operations, one atomic turn per operation, and composing writes across files with nested turns."
+description: "Change state through named operations, combine writes in a turn, and use discard to release a closed screen’s state."
 ---
 
 # Writing state
@@ -102,45 +102,126 @@ the navigation itself.
 Mechanisms can still form a turn → reaction → turn loop. If one spins, a
 debug guard warns after about 64 turns and prints the named cause chain.
 
-## Ending a lifetime releases its state too
+## Discard: release state you no longer need
 
-An op that ends a domain lifetime has two things to say, and they are not the
-same thing. Removing the ID stops the work: the `scope(each:)` child for that
-entry retires, its watches unregister, its tasks cancel
-([Side effects](./side-effects.md)). But the entry's own values are still in the
-graph, and if a view read them they will stay there for the life of the app —
-Observation gives Cog no way to learn the last reader is gone.
+Suppose each trail screen has a filter and an unfinished note. When the user
+closes one screen, the app should stop watching its filter and forget its
+unfinished note.
 
-`discard` says the second half (a sketch — the example apps have no per-opening
-screen state):
+Those are two steps:
+
+1. Remove the screen's ID from the open-screen list. Its
+   [`scope(each:)`](./side-effects.md#several-screens-at-once-use-scope-each)
+   ends, removing its watches and cancelling its tasks.
+2. Call `.discard(...)` for the saved values that belonged to that screen.
+
+**Ending a scope does not clear its state.** Cog also cannot reliably tell
+when the last SwiftUI view stops reading a value. Once a view has read it,
+Cog keeps it for the app's lifetime unless the app explicitly releases it.
+Without cleanup, opening hundreds of screens with different IDs can leave
+hundreds of old filters and notes in memory.
+
+### Declare values that can start over
+
+This small example extends the Trails idea with a separate ID for each
+screen opening. It is a sketch, not code from the example app.
+
+First, give temporary manual state permission to be released:
 
 ```swift
-/// Closes one trail screen and releases what that screen owned.
-func closeTrailScreen(_ id: TrailScreenID) {
-  turn { c in c[_openTrailScreensCog].removeAll { $0 == id } }
-  discard(_trailFilterCogs[id])
-  discard(_trailDraftNoteCogs[id])
+// TrailRig+Cogs.swift
+private let _openTrailScreensCog = Cog<[TrailScreenID]>.Manual { [] }
+let openTrailScreensCog = _openTrailScreensCog.readOnly
+
+private let _trailFilterCogs = CogBox<String, TrailScreenID>.Manual(
+  { "" },
+  lifetime: .whileObserved(resetToInitial: true)
+)
+let trailFilterCogs = _trailFilterCogs.readOnly
+
+private let _trailDraftNoteCogs = CogBox<String, TrailScreenID>.Manual(
+  { "" },
+  lifetime: .whileObserved(resetToInitial: true)
+)
+let trailDraftNoteCogs = _trailDraftNoteCogs.readOnly
+```
+
+`TrailScreenID` is a `Hashable` ID created once for each screen opening.
+Each ID gets its own filter and note. Both start as an empty string.
+
+`resetToInitial: true` means: "It is okay to forget this value. If something
+reads it after release, start again with the initial value." The policy
+allows unused state to expire, but a previous UI read keeps it alive until
+an explicit `discard`.
+
+### Close the screen, then release its values
+
+Put both steps in the screen-closing op, in the same file as the sources:
+
+```swift
+extension CogOps {
+  func closeTrailScreen(_ id: TrailScreenID) {
+    // Updating the list ends this screen's scope.
+    turn { c in c[_openTrailScreensCog].removeAll { $0 == id } }
+
+    // Release this screen's saved values.
+    discard(_trailFilterCogs[id])
+    discard(_trailDraftNoteCogs[id])
+  }
 }
 ```
 
-The rules worth knowing at a call site:
+A view calls `cogs.closeTrailScreen(screenID)`. A mechanism can call the same
+op through a controller that stays live after the screen closes. Avoid
+calling it through the screen's own `s`: ending that scope disables its
+controller, so its later `discard` calls would do nothing.
 
-- **It releases; it does not reset.** Only a source declared
-  `lifetime: .whileObserved(resetToInitial: true)` is eligible, which is the
-  declaration a per-screen value should already have. Discarding an `.app`
-  source fails: a released source has no value to come back as.
-- **It cannot take state from another owner.** A state some other reaction is
-  watching, or some other cog depends on, is left alone and follows its ordinary
-  release path. Closing one screen cannot damage another.
-- **It names one state.** There is no feature-wide reset, and scope retirement
-  never issues discards on your behalf. Say what you are releasing.
-- **A view still reading it is told first.** The state is released and its
-  reader invalidated, so the next render reads a fresh state at its starting
-  value rather than freezing on the old one.
+Imagine A's filter is `"easy"` and B's filter is `"nearby"`. With no other
+watcher or cog holding A's values, closing A has this result:
 
-Shared resource data is not per-screen state and does not belong here. A trail
-that two screens showed is owned by its own declaration, not by whichever screen
-closed last.
+| Value or work                  | After `closeTrailScreen(A)`                   |
+| ------------------------------ | --------------------------------------------- |
+| Open screen IDs                | A is removed; B stays.                        |
+| A's scope                      | Its watches stop and its tasks are cancelled. |
+| A's filter and unfinished note | Released from Cog.                            |
+| B's filter                     | Still `"nearby"`.                             |
+| Shared trail details           | Unchanged. The op did not discard them.       |
+
+If code later reads A's filter, Cog creates it again as `""`. Discarding
+releases the stored value; it does not delete the declaration or prevent
+future reads. A still-reading view is notified after release so it can read
+the fresh value.
+
+### Choose what to discard
+
+Call `discard` on each exact value the app is finished with, such as
+`_trailFilterCogs[id]`. It does not clear a whole box or everything a scope
+read. Shared trail details belong to the trail, so closing one screen is not
+a reason to discard them.
+
+The API follows these rules:
+
+- **Manual state must allow release.** Use
+  `.whileObserved(resetToInitial: true)` as above. Trying to discard existing
+  `.app` state causes a runtime error.
+- **Automatic state can be discarded too.** An ordinary synchronous `Cog`
+  uses `.whileObserved` by default and recomputes on its next read. Pass the
+  automatic reference itself. For manual state, pass the underscored source,
+  as above, rather than its `.readOnly` projection.
+- **Other active users can keep the value.** If a watch, exported stream, or
+  another cog still holds it, `discard` leaves it alone. A UI read is different:
+  the explicit discard can release that value and notify the view.
+- **Async cogs have no `discard` overload.** Their work is managed by their
+  demand and lifetime rules.
+- **A value that was never created needs no cleanup.** The call does nothing.
+
+Each `discard` runs as its own turn when graph work is safe. It runs
+immediately when Cog is idle, or waits until the current turn finishes.
+Keep it after the closing `turn` so the screen's watches can end first.
+
+If the screen stays open and the user just wants to clear its text, write
+`""` in a normal `turn`. Use `discard` when the app is finished with the
+stored value, not as a Clear button.
 
 ## Where this is specified
 

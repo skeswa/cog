@@ -260,16 +260,18 @@ These rules are settled. The linked design files hold the full details.
 
 - A `Mechanism` owns app-wide side effects. Assembly starts mechanisms in
   array order through a limited `MechanismController`.
-- A state-selected `scope` owns shorter work. SwiftUI `.task` and
-  `values` own view-lifetime work.
+- `scope` starts and stops work as a Bool, one optional ID, or an array of
+  IDs changes. Ending a scope stops its watches and tasks; it does not clear
+  saved state. See the [simple examples](./handbook/side-effects.md#scopes-start-and-stop-work-with-state).
+  SwiftUI `.task` and `values` own view-lifetime work.
 - Manual state and UI-observed state live for the app by default. Unused
   automatic and async state may expire. The default grace period is 30 seconds.
 - An ephemeral source must use
   `lifetime: .whileObserved(resetToInitial: true)`.
-- `discard` is the one explicit release. It exists because a UI read pins state
-  permanently, so state keyed by a domain lifetime would otherwise accumulate
-  forever. It releases one exact state and its boundary, notifies any reader
-  first, and refuses state another consumer still owns.
+- `discard` releases a saved value the app no longer needs, such as a closed
+  screen's unfinished note. A UI read keeps state in memory until this explicit
+  release. Other active watches or dependent cogs can still keep the value.
+  See [how to close a screen and release its values](./handbook/writing-state.md#discard-release-state-you-no-longer-need).
 - Tests may seed state before mechanisms start. Seeding creates no turn,
   notice, or reaction.
 
