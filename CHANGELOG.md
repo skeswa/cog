@@ -9,6 +9,14 @@ releases. Pin each dependency with SwiftPM's **Up to Next Minor** rule.
 
 Kotlin releases through Maven coordinates and is not versioned here.
 
+## [0.8.1](https://github.com/skeswa/cog/compare/0.8.0...0.8.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ci:** run release dispatch jobs after skipped dependencies ([d54d7a2](https://github.com/skeswa/cog/commit/d54d7a2a28846100a3589268578ddefb96133d1d))
+* **docs:** apply homepage dark theme on initial load ([7db7315](https://github.com/skeswa/cog/commit/7db7315264ddd7d55d1989198ac011ee4c992d72))
+
 ## [0.8.0](https://github.com/skeswa/cog/compare/0.7.0...0.8.0) (2026-09-09)
 
 
