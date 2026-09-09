@@ -121,10 +121,10 @@ Registration order is effect order within one completed turn. A slow suspending
 effect does not block later registrations; its launch order is still fixed.
 
 **What transfers from Swift's scope retirement, and what does not.** Swift
-replaced its Boolean `whenever` gate with `scope`, which selects a Bool, an
-optional identity, or a collection of identities, and made retirement revoke a
-controller's graph access rather than only cancelling its jobs. Two things in
-that work are runtime invariants rather than Swift spelling, so they apply here:
+uses `scope` to select a Bool, an optional identity, or a collection of
+identities. Retirement revokes a controller's graph access as well as
+cancelling its jobs. Two things in that work are runtime invariants rather
+than Swift spelling, so they apply here:
 
 - **A closed owner cannot publish through its capability.** Kotlin already says
   closing a group "blocks late callbacks from writing through the group", which

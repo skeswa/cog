@@ -412,9 +412,9 @@ Every side effect lives in a named mechanism specified at assembly; a shorter
 lifetime is a `scope` whose condition or identity is expressed in state. (The
 GROUP family — public effect groups and reaction tokens — retired on 2026-08-14
 when mechanisms replaced them; REACT-10 through REACT-13 and REACT-18 retired
-with it. Retired IDs stay retired. `whenever` was renamed to `scope` on
-2026-09-08 and its behavior extended; MECH-07 through MECH-11 keep their IDs,
-because an ID names the behavior rather than its spelling.)
+with it. Retired IDs stay retired. Scope behavior was extended on 2026-09-08;
+MECH-07 through MECH-11 keep their IDs because an ID names the behavior rather
+than its spelling.)
 
 - **MECH-01.** I assemble with a list of mechanisms. Each `operate` runs
   synchronously in list order, and when assembly returns every mechanism is
@@ -569,9 +569,10 @@ _Where lifetime identity comes from (§6.2)._
 - **MECH-35.** Signing the same account in again mints a new epoch and replaces
   the session scope; refreshing the token preserves the epoch, so the existing
   scope keeps its registrations and observes the rotation.
-- **MECH-36.** I call `whenever` on a controller, in any of its three former
-  overloads. The compiler says no: the name was removed outright, with no
-  deprecated alias, forwarding wrapper, or renamed stub. (Proof: compile-fail.)
+- **MECH-36.** I call the removed predecessor of `scope` on a controller, in
+  any of its three former overloads. The compiler rejects it: `scope` is the
+  sole supported name, with no deprecated alias, forwarding wrapper, or renamed
+  stub. (Proof: compile-fail.)
 - **MECH-37.** A presentation refreshes an async value another mechanism also
   watches, then retires while the generation is in flight. The refresh handle
   reports its real outcome, the durable consumer receives the value, and

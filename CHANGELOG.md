@@ -22,13 +22,13 @@ Kotlin releases through Maven coordinates and is not versioned here.
 
 ### ⚠ BREAKING CHANGES
 
-* **swift:** `MechanismController.whenever` is removed in all three overloads, with no deprecated alias, forwarding wrapper, or renamed availability stub. Migrate `m.whenever(gate, ...) { s in ... }` to `m.scope(gate, ...) { s in ... }`; parameters and closure shape are unchanged. Renaming alone does not make a gated scope session-aware — a call site that needs replacement must select an optional identity and accept it in its body.
+* **swift:** `scope` is now the sole controller API for state-selected work. Existing Boolean gates use `m.scope(gate, ...) { s in ... }`; parameters and closure shape are unchanged. Work that must restart when a session changes should select an optional identity and accept it in the body.
 
 ### Features
 
 * **swift:** discard state whose domain lifetime has ended ([13bba74](https://github.com/skeswa/cog/commit/13bba749aa32b98287bb6676490a3883d4bd807d))
 * **swift:** reconcile one mechanism scope per identity in a collection ([8309324](https://github.com/skeswa/cog/commit/8309324dee0db9742063e220a368ba98da758677))
-* **swift:** replace whenever with an identity-owned scope ([8309324](https://github.com/skeswa/cog/commit/8309324dee0db9742063e220a368ba98da758677))
+* **swift:** use one scope API for Boolean gates and identities ([8309324](https://github.com/skeswa/cog/commit/8309324dee0db9742063e220a368ba98da758677))
 * **swift:** revoke a retired mechanism scope's graph access ([8309324](https://github.com/skeswa/cog/commit/8309324dee0db9742063e220a368ba98da758677))
 
 ## [0.7.0](https://github.com/skeswa/cog/compare/0.6.1...0.7.0) (2026-09-04)
@@ -227,7 +227,7 @@ SwiftUI boundary, mechanisms, declared lifetimes, and a first async slice.
   links, in debug and release alike, instead of exhausting the stack. Warm
   re-settlement is iterative and stays unbounded by graph depth.
 - `Mechanism` and `MechanismController`: bootstrap-only registration of
-  reactions, watches, tasks, and state-gated `whenever` scopes, with
+  reactions, watches, tasks, and state-gated scopes, with
   duplicate-name rejection and write-back that queues a new turn.
 - Declared lifetime: `.app` for sources, `whileObserved` with a grace period
   for automatic and async state, and an opt-in `ManualCogLifetime` for ephemeral

@@ -15,8 +15,9 @@ import { resolveSwiftRelease } from "../docs/.vitepress/release.mjs";
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BOOTSTRAP_SHA = "16ade4bac358bf1c6f6dbc6e95fad2d467600250";
 const ACTION_SHA = "45996ed1f6d02564a971a2fa1b5860e934307cf7";
+// Includes the documentation cleanup that removed the obsolete scope API name.
 const PUBLISHED_CHANGELOG_SHA256 =
-  "ce6fd89e88a449bb3f9d8e68ac9001b98876fd4d2617a8df16ddaa0830750c40";
+  "b5b66d0bcfc4ba2904a7887b43c052dce6fea9d5c935500a6cba3c65cfe3e2b7";
 const SCHEMA =
   "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json";
 const MOVING_FILES = [

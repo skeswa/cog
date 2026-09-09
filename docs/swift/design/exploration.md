@@ -699,12 +699,16 @@ State lifetime depends on state kind:
 
 Lifetime follows state kind rather than a declaration convenience flag.
 
-**Explicit release.** UI-pinned keyed growth is not hypothetical: state keyed by
-a domain lifetime — a presentation ID, a workflow ID — leaves a row, a value,
-and a boundary behind for every identity the app has ever shown, and no
-inference the graph can make will ever reclaim them. Every signal Cog has says
-"someone might still be reading", because for the UI half that is the only
-answer Observation can give.
+**Explicit release.** A closed screen can leave its filter and unfinished
+note in memory. Once a SwiftUI view has read those values, Cog cannot reliably
+tell when the last reader leaves. If each opening has a new screen ID, old
+values can keep building up.
+
+Use `.discard(...)` when the app is finished with one of those values. For
+example, the closing op can remove the screen ID, then call
+`discard(_trailDraftNoteCogs[id])`. Ending the screen's scope stops its work;
+discarding releases its saved state. The handbook has a
+[complete closing example](../handbook/writing-state.md#discard-release-state-you-no-longer-need).
 
 `CogOps.discard(_:)` supplies the missing fact: the application declaring one
 keyed lifetime finished. It names one exact state, works only on declarations
@@ -895,10 +899,9 @@ Other docs cite these numbers. Keep an ID even after its question is settled.
     lifetime, in three input forms over one lifecycle implementation: a `Bool`
     condition, an optional `Equatable` identity whose replacement retires the
     old child and opens a new one with no invented gap, and `scope(each:)` over
-    a collection of `Hashable` identities reconciled by membership. `whenever`
-    was removed outright rather than deprecated, because a gate is one shape of
-    a lifetime and two public names would have implied two mechanisms; the
-    `Hashable` requirement belongs to collection reconciliation alone.
+    a collection of `Hashable` identities reconciled by membership. A gate is
+    one shape of a lifetime; the `Hashable` requirement belongs to collection
+    reconciliation alone.
     Retirement revokes authority rather than only requesting cancellation:
     turns, registrations, and tasks through a retired controller are inert,
     value-producing reads trap, and a queued write is rejected at its execution

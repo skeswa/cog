@@ -115,12 +115,21 @@ above.
 
 ## Lifetime
 
-Manual state and UI-observed state live for the whole app by default. Unused
-automatic and async state may expire after a grace period. A source that must
-reset when nothing observes it opts in with
-`lifetime: .whileObserved(resetToInitial: true)`. Reach for that only when
-"nobody is looking" really means "the fact is gone" — a draft, a live
-connection. Otherwise rely on the defaults.
+Manual state lives for the whole app by default. Unused automatic and async
+state may expire after a grace period.
+
+For a temporary manual value, such as a screen's unfinished note, use
+`lifetime: .whileObserved(resetToInitial: true)`. This lets Cog release the
+value when it is unused. A later read starts over at the declared initial value.
+Choose this only when forgetting the old value is okay.
+
+There is one catch: after a SwiftUI view reads a value, Cog cannot tell when
+the last view stops reading it. That value stays in memory even with
+`whileObserved`. When the screen closes and the app no longer needs its
+values, its closing op can call
+[`discard`](./writing-state.md#discard-release-state-you-no-longer-need).
+Ending a [`scope`](./side-effects.md#scopes-start-and-stop-work-with-state)
+stops its work; it does not discard its state.
 
 ## Where declarations live
 
