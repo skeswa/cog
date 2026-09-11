@@ -30,22 +30,30 @@ import Testing
   let uploads = Cog<Int>.Manual { 0 }
   var bodyRuns = 0
   var seen: [Int] = []
-  let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)
-  let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Void.self)
-  let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
+  let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Int.self)
+  let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Int.self)
+  let (heartbeats, heartbeatContinuation) = AsyncStream.makeStream(of: Int.self)
+  var currentHeartbeat: AsyncStream<Void>.Continuation?
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
       m.scope(loggedIn, name: "session") { s in
         bodyRuns += 1
+        let generation = bodyRuns
         s.run { c in seen.append(c[uploads]) }
+        // Cancelling any iterator finishes its entire AsyncStream. Each
+        // task lifetime therefore needs its own stream, even on reopening.
+        let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
+        currentHeartbeat = holdContinuation
         s.task(name: "heartbeat") {
-          // The start event proves the body is running. The held iterator never
-          // yields, so `next()` returns nil only when the task is cancelled.
-          taskStartContinuation.yield()
+          defer { withExtendedLifetime(holdContinuation) {} }
+          taskStartContinuation.yield(generation)
           var iterator = holds.makeAsyncIterator()
-          _ = await iterator.next()
-          cancellationContinuation.yield()
+          while await iterator.next() != nil {
+            heartbeatContinuation.yield(generation)
+          }
+          #expect(Task.isCancelled)
+          cancellationContinuation.yield(generation)
         }
       }
     }
@@ -65,13 +73,13 @@ import Testing
   // The task is running before the fall, so the cancellation it receives is
   // a definite later signal rather than a startup race.
   var startIterator = taskStarts.makeAsyncIterator()
-  _ = await startIterator.next()
+  #expect(await startIterator.next() == 1)
 
   // The fall ends everything the scope registered: the reaction never runs
   // again and the task receives cooperative cancellation.
   cogs.turn(loggedIn, to: false)
   var cancellationIterator = cancellations.makeAsyncIterator()
-  _ = await cancellationIterator.next()
+  #expect(await cancellationIterator.next() == 1)
   cogs.turn { c in c[uploads] = 2 }
   #expect(seen == [0, 1])
 
@@ -79,8 +87,18 @@ import Testing
   // observe current state, with nothing surviving the down-and-up cycle.
   cogs.turn(loggedIn, to: true)
   #expect(bodyRuns == 2)
+  #expect(await startIterator.next() == 2)
+
+  // Reopening must provide live work, not merely rerun the registration body.
+  guard case .enqueued? = currentHeartbeat?.yield() else {
+    Issue.record("The reopened heartbeat stream ended before its scope retired")
+    return
+  }
+  var heartbeatIterator = heartbeats.makeAsyncIterator()
+  #expect(await heartbeatIterator.next() == 2)
   #expect(seen == [0, 1, 2])
   cogs.turn { c in c[uploads] = 3 }
   #expect(seen == [0, 1, 2, 3])
-  _ = holdContinuation
+  cogs.turn(loggedIn, to: false)
+  #expect(await cancellationIterator.next() == 2)
 }

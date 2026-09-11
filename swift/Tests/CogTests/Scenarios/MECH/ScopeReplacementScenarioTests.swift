@@ -24,7 +24,8 @@ private struct Epoch: Equatable {
   var seen: [String] = []
   let (starts, startContinuation) = AsyncStream.makeStream(of: Int.self)
   let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Int.self)
-  let (holds, _holdContinuation) = AsyncStream.makeStream(of: Void.self)
+  let (heartbeats, heartbeatContinuation) = AsyncStream.makeStream(of: Int.self)
+  var currentHeartbeat: AsyncStream<Void>.Continuation?
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
@@ -38,10 +39,18 @@ private struct Epoch: Equatable {
         s.watch(uploads, initial: .skip, name: "sync") { _, count in
           seen.append("sync\(session.value):\(count)")
         }
+        // Cancelling any iterator finishes its entire AsyncStream. Each
+        // task lifetime therefore needs its own stream, even on reopening.
+        let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
+        currentHeartbeat = holdContinuation
         s.task(name: "heartbeat") {
+          defer { withExtendedLifetime(holdContinuation) {} }
           startContinuation.yield(session.value)
           var iterator = holds.makeAsyncIterator()
-          _ = await iterator.next()
+          while await iterator.next() != nil {
+            heartbeatContinuation.yield(session.value)
+          }
+          #expect(Task.isCancelled)
           cancellationContinuation.yield(session.value)
         }
       }
@@ -66,11 +75,21 @@ private struct Epoch: Equatable {
   #expect(await cancellationIterator.next() == 1)
   #expect(await startIterator.next() == 2)
 
+  // Starting is insufficient: a replacement consuming its predecessor's
+  // finished stream also announces a start. Prove it can still receive work.
+  guard case .enqueued? = currentHeartbeat?.yield() else {
+    Issue.record("The replacement heartbeat stream ended before its scope retired")
+    return
+  }
+  var heartbeatIterator = heartbeats.makeAsyncIterator()
+  #expect(await heartbeatIterator.next() == 2)
+
   // The old watch is gone and the new one is installed exactly once: a single
   // entry, not two.
   cogs.turn(uploads, to: 2)
   #expect(seen == ["gate:true", "sync1:1", "sync2:2"])
-  _ = _holdContinuation
+  cogs.turn(epoch, to: nil)
+  #expect(await cancellationIterator.next() == 2)
 }
 
 @MainActor
@@ -83,7 +102,6 @@ private struct Epoch: Equatable {
   var deepSeen: [Int] = []
   let (starts, startContinuation) = AsyncStream.makeStream(of: Void.self)
   let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Void.self)
-  let (holds, _holdContinuation) = AsyncStream.makeStream(of: Void.self)
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
@@ -96,9 +114,13 @@ private struct Epoch: Equatable {
           inner.scope(epoch, name: "generation") { _, deep in
             deep.run { c in deepSeen.append(c[uploads]) }
             deep.task(name: "pump") {
+              // This wait belongs to this task alone, never to a later scope opening.
+              let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
+              defer { withExtendedLifetime(holdContinuation) {} }
               startContinuation.yield()
               var iterator = holds.makeAsyncIterator()
               _ = await iterator.next()
+              #expect(Task.isCancelled)
               cancellationContinuation.yield()
             }
           }
@@ -128,7 +150,6 @@ private struct Epoch: Equatable {
   cogs.turn(syncing, to: false)
   cogs.turn(uploads, to: 2)
   #expect(deepSeen == [0])
-  _ = _holdContinuation
 }
 
 @MainActor
