@@ -11,7 +11,6 @@ import Testing
   var innerSeen: [Int] = []
   let (taskStarts, taskStartContinuation) = AsyncStream.makeStream(of: Void.self)
   let (cancellations, cancellationContinuation) = AsyncStream.makeStream(of: Void.self)
-  let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
 
   let cogs = Cogs.forTesting(mechanisms: [
     MechanismProbe { m in
@@ -20,9 +19,13 @@ import Testing
         s.scope(syncing, name: "sync") { inner in
           inner.run { c in innerSeen.append(c[uploads]) }
           inner.task(name: "pump") {
+            // This wait belongs to this task alone, never to a later scope opening.
+            let (holds, holdContinuation) = AsyncStream.makeStream(of: Void.self)
+            defer { withExtendedLifetime(holdContinuation) {} }
             taskStartContinuation.yield()
             var iterator = holds.makeAsyncIterator()
             _ = await iterator.next()
+            #expect(Task.isCancelled)
             cancellationContinuation.yield()
           }
         }
@@ -48,5 +51,4 @@ import Testing
   cogs.turn { c in c[uploads] = 1 }
   #expect(outerSeen == [0])
   #expect(innerSeen == [0])
-  _ = holdContinuation
 }
